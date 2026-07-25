@@ -1073,4 +1073,3 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
         "device_id": "dev1",
         "error": "ack_timeout must be a number",
     }
-

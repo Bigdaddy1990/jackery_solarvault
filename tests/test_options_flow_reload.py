@@ -16,7 +16,7 @@ These tests pin the migrated behaviour:
 * Re-submitting identical options does not schedule a redundant reload.
 """
 
-from typing import TYPE_CHECKING  # ruff:ignore[unsorted-imports]
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry

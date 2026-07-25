@@ -1,6 +1,6 @@
 """Regression tests for sparse live payload merging outside the ingest gate."""
 
-from typing import Any  # ruff:ignore[unsorted-imports]
+from typing import Any
 
 from custom_components.jackery_solarvault.const import (
     FIELD_DEVICE_SN,

@@ -14,8 +14,6 @@ Covers:
   handling path.
 """
 
-from __future__ import annotations  # ruff: ignore[banned-api]
-
 import logging
 from typing import Any
 

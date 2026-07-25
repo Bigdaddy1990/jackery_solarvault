@@ -11,7 +11,7 @@ Contract under test (owner directive):
 * Loop protection: at most one automatic re-login per 60s per API client.
 """
 
-import asyncio  # ruff:ignore[unsorted-imports]
+import asyncio
 from typing import Any, Self, cast
 from unittest.mock import AsyncMock, patch
 
@@ -159,6 +159,62 @@ async def test_second_401_burst_within_cooldown_does_not_relogin_again(
     assert first == {"ok": True}
     login.assert_awaited_once()
     assert session.request_count == _BURST_TOTAL_REQUESTS
+
+
+@pytest.mark.asyncio()
+async def test_401_relogin_blocked_just_before_cooldown_expires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A rejection one instant before the 60s cooldown elapses stays blocked.
+
+    Pins the exact ``>=`` boundary in ``_auto_relogin_allowed``: only once the
+    cooldown has *fully* elapsed is a new automatic re-login allowed.
+    """
+    clock = _FakeClock()
+    monkeypatch.setattr(api_module, "time", clock)
+    session = _FakeSession([
+        _FakeResponse(401, _UNAUTHORIZED_BODY),
+        _FakeResponse(200, _OK_BODY),
+        _FakeResponse(401, _UNAUTHORIZED_BODY),
+    ])
+    api = _make_api(session)
+    login = _login_mock(api)
+
+    with patch.object(api, "async_login", login):
+        first = await api.async_get_user_info()
+        clock.now += 59.999
+        with pytest.raises(JackeryAuthError):
+            await api.async_get_user_info()
+
+    assert first == {"ok": True}
+    login.assert_awaited_once()
+    assert session.request_count == _BURST_TOTAL_REQUESTS
+
+
+@pytest.mark.asyncio()
+async def test_cancelled_relogin_restores_cooldown_state() -> None:
+    """A cancelled re-login restores the prior cooldown instead of consuming it.
+
+    If ``async_login`` is cancelled mid-flight (e.g. HA shutdown), the retry
+    path must roll back ``_last_auto_relogin_monotonic`` to its previous value
+    before re-raising ``CancelledError`` so a genuinely valid credential is
+    not locked out of a fresh automatic re-login attempt for a full cooldown
+    window just because a cancellation happened to land during the login call.
+    """
+    session = _FakeSession([_FakeResponse(401, _UNAUTHORIZED_BODY)])
+    api = _make_api(session)
+    login = AsyncMock(side_effect=asyncio.CancelledError)
+
+    assert api._last_auto_relogin_monotonic is None
+
+    with (
+        patch.object(api, "async_login", login),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await api.async_get_user_info()
+
+    login.assert_awaited_once()
+    assert api._last_auto_relogin_monotonic is None
 
 
 @pytest.mark.asyncio()

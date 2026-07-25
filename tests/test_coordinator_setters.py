@@ -7,7 +7,7 @@ tests assert the setter's own contract: value coercion and the command it
 requests, plus the resulting local state — not the transport call order.
 """
 
-from typing import Any, cast  # ruff:ignore[unsorted-imports]
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest

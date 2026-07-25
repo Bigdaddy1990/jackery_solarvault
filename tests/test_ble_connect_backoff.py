@@ -13,7 +13,7 @@ without any BLE hardware:
   coordinator cycle may not trigger an immediate second attempt.
 """
 
-import asyncio  # ruff:ignore[unsorted-imports]
+import asyncio
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock
@@ -89,6 +89,30 @@ def test_success_resets_escalation() -> None:
     backoff = BleConnectBackoff()
     backoff.record_failure(_NOW)
     backoff.record_failure(_NOW)
+
+    backoff.record_success()
+
+    assert backoff.seconds_until_allowed(_NOW) == pytest.approx(0.0)
+    assert backoff.record_failure(_NOW) == pytest.approx(
+        BLE_CONNECT_BACKOFF_INITIAL_SEC
+    )
+
+
+def test_success_resets_escalation_from_capped_delay() -> None:
+    """A success after the ladder has hit the cap still fully resets it.
+
+    Regression guard: resetting from a *partially* escalated state (as in
+    ``test_success_resets_escalation``) is not proof that the ladder index
+    itself was cleared rather than merely the currently-open window. Escalate
+    all the way to the cap first, then confirm the very next failure after a
+    reset is back at the initial delay, not one step down from the cap.
+    """
+    backoff = BleConnectBackoff()
+    for _ in range(8):
+        backoff.record_failure(_NOW)
+    assert backoff.seconds_until_allowed(_NOW) == pytest.approx(
+        BLE_CONNECT_BACKOFF_MAX_SEC
+    )
 
     backoff.record_success()
 

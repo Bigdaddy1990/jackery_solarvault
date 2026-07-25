@@ -106,6 +106,94 @@ def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
     assert manifest["iot_class"] == "cloud_polling"
 
 
+def test_manifest_zeroconf_properties_use_lowercase_values() -> None:
+    """Zeroconf discovery property values must be lowercase.
+
+    Home Assistant lowercases discovered zeroconf property values before
+    matching them against the manifest, so an uppercase manifest value such
+    as the old "SolarVault" can never match a real advertisement and would
+    silently break zeroconf discovery. This pins the fix that changed the
+    "device" property to the lowercase "solarvault".
+    """
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    zeroconf_entries = manifest.get("zeroconf", [])
+    assert zeroconf_entries, "manifest.json must declare zeroconf entries"
+
+    for entry in zeroconf_entries:
+        properties = entry.get("properties", {})
+        for key, value in properties.items():
+            assert isinstance(value, str)
+            assert value == value.lower(), (
+                f"zeroconf property {key!r} for type {entry.get("type")!r} "
+                f"must be lowercase, got {value!r}"
+            )
+
+    device_values = {
+        entry["properties"]["device"]
+        for entry in zeroconf_entries
+        if "device" in entry.get("properties", {})
+    }
+    assert device_values == {"solarvault"}
+
+
+def test_manifest_zeroconf_covers_expected_service_types() -> None:
+    """Both the API and HTTP zeroconf service types must be declared."""
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    zeroconf_types = {entry["type"] for entry in manifest.get("zeroconf", [])}
+    assert zeroconf_types == {"_api._tcp.local.", "_http._tcp.local."}
+
+
+def test_manifest_zeroconf_entries_match_expected_structure() -> None:
+    """Pin the full zeroconf entry shape, not just the lowercase-value rule.
+
+    Regression guard for the "SolarVault" -> "solarvault" fix: rather than
+    only checking casing, compare each entry's full ``type``/``properties``
+    mapping against the expected structure so an entry that regresses to the
+    old value (or drops the "device" property entirely) fails loudly.
+    """
+    manifest = json.loads(
+        (CUSTOM_COMPONENT / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    expected = {
+        "_api._tcp.local.": {"device": "solarvault"},
+        "_http._tcp.local.": {"device": "solarvault"},
+    }
+    entries = manifest.get("zeroconf", [])
+    actual = {entry["type"]: entry.get("properties", {}) for entry in entries}
+    assert len(entries) == len(expected)
+    assert actual == expected
+
+
+def test_previously_unsorted_imports_no_longer_carry_stale_ruff_ignore() -> None:
+    """Imports that are actually sorted must not keep a leftover ignore pragma.
+
+    ``import operator`` in ``__init__.py``, ``import logging`` in
+    ``config_flow.py``, the ``dataclass`` import in ``number.py`` and the
+    ``TYPE_CHECKING``-only ``Callable`` import in ``sensor.py`` previously
+    carried a ``# ruff:ignore[unsorted-imports]`` pragma even though they were
+    already correctly ordered relative to their surrounding block. Pin the
+    cleanup so the dead pragma is not silently reintroduced.
+    """
+    checks = {
+        CUSTOM_COMPONENT / "__init__.py": "import operator",
+        CUSTOM_COMPONENT / "config_flow.py": "import logging",
+        CUSTOM_COMPONENT / "number.py": "from dataclasses import dataclass",
+        CUSTOM_COMPONENT / "sensor.py": "from collections.abc import Callable",
+    }
+    for path, plain_import in checks.items():
+        text = path.read_text(encoding="utf-8")
+        assert plain_import in text, f"{path}: expected import {plain_import!r}"
+        stale = f"{plain_import}  # ruff:ignore[unsorted-imports]"
+        assert stale not in text, f"{path}: stale unsorted-imports pragma reappeared"
+
+
 def test_no_duplicate_literal_dict_keys() -> None:
     """Catch accidental duplicate payload keys such as login registerAppId."""
     for path in _python_sources():

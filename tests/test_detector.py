@@ -1,6 +1,6 @@
 """Regression tests for subdevice detection helpers."""
 
-from custom_components.jackery_solarvault.const import (  # ruff:ignore[unsorted-imports]
+from custom_components.jackery_solarvault.const import (
     BATTERY_PACK_HINT_KEYS,
     FIELD_DEVICE_SN,
     FIELD_DEV_TYPE,

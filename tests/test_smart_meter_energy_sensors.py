@@ -7,7 +7,7 @@ non-native meters. Without dedicated energy sensors the smart meter had no kWh
 values at all.
 """
 
-from custom_components.jackery_solarvault.const import (  # ruff:ignore[unsorted-imports]
+from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
 )

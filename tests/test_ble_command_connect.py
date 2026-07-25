@@ -8,7 +8,7 @@ client in the transport's ``_clients`` returned False. The router must ensure a
 connection (bounded wait) before the GATT write.
 """
 
-from typing import Any, cast  # ruff:ignore[unsorted-imports]
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,20 +19,27 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
+from homeassistant.exceptions import HomeAssistantError
 
 _DEVICE_ID = "573702884982521856"
 _ACTION_ID = 3022
 _CMD = 107
 
 
-@pytest.mark.asyncio()
-async def test_ble_first_ensures_connection_before_write() -> None:
-    """The BLE-first router passes a positive connect timeout to the write."""
+def _ble_first_coordinator() -> JackerySolarVaultCoordinator:
+    """Build a coordinator shell wired for ``_async_publish_command_ble_first``."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=_CMD)
     cast("Any", coordinator)._command_body_for_transport = MagicMock(
         return_value=b"body",
     )
+    return coordinator
+
+
+@pytest.mark.asyncio()
+async def test_ble_first_ensures_connection_before_write() -> None:
+    """The BLE-first router passes a positive connect timeout to the write."""
+    coordinator = _ble_first_coordinator()
     send_ble = AsyncMock(return_value=True)
     cast("Any", coordinator).async_send_ble_command = send_ble
 
@@ -50,3 +57,59 @@ async def test_ble_first_ensures_connection_before_write() -> None:
     kwargs = await_args.kwargs
     assert kwargs["connect_timeout_sec"] == BLE_COMMAND_CONNECT_TIMEOUT_SEC
     assert kwargs["connect_timeout_sec"] > 0
+
+
+@pytest.mark.asyncio()
+async def test_ble_write_unavailable_falls_back_to_mqtt() -> None:
+    """A BLE write that reports "not sent" (False) falls back to MQTT.
+
+    ``async_send_ble_command`` returning ``False`` (no live client / write
+    skipped) is not an error — it means BLE just could not deliver the
+    command, so the router must still publish over MQTT instead of silently
+    dropping the command.
+    """
+    coordinator = _ble_first_coordinator()
+    cast("Any", coordinator).async_send_ble_command = AsyncMock(return_value=False)
+    publish_mqtt = AsyncMock()
+    cast("Any", coordinator)._async_publish_command = publish_mqtt
+
+    await coordinator._async_publish_command_ble_first(
+        _DEVICE_ID,
+        message_type="DevicePropertyChange",
+        action_id=_ACTION_ID,
+        cmd=_CMD,
+        body_fields={"foo": "bar"},
+    )
+
+    publish_mqtt.assert_awaited_once_with(
+        _DEVICE_ID,
+        message_type="DevicePropertyChange",
+        action_id=_ACTION_ID,
+        cmd=_CMD,
+        body_fields={"foo": "bar"},
+        ensure_mqtt=True,
+    )
+
+
+@pytest.mark.asyncio()
+async def test_ble_error_and_mqtt_fallback_failure_both_raise() -> None:
+    """When BLE fails and the MQTT fallback also fails, the MQTT error propagates.
+
+    The command must not be silently swallowed when both transports fail;
+    the caller sees the (more actionable) MQTT failure.
+    """
+    coordinator = _ble_first_coordinator()
+    cast("Any", coordinator).async_send_ble_command = AsyncMock(
+        side_effect=RuntimeError("ble write timed out"),
+    )
+    mqtt_error = HomeAssistantError("MQTT client not initialized")
+    cast("Any", coordinator)._async_publish_command = AsyncMock(side_effect=mqtt_error)
+
+    with pytest.raises(HomeAssistantError):
+        await coordinator._async_publish_command_ble_first(
+            _DEVICE_ID,
+            message_type="DevicePropertyChange",
+            action_id=_ACTION_ID,
+            cmd=_CMD,
+            body_fields={},
+        )

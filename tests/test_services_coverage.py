@@ -1,7 +1,5 @@
 """Unit tests for services coverage gaps."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 

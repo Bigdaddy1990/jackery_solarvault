@@ -6,7 +6,7 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-from dataclasses import dataclass  # ruff:ignore[unsorted-imports]
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -343,17 +343,35 @@ async def _set_third_party_mqtt_port(
 # --- Portable / Explorer powerstation number setters ---
 
 
+async def _async_portable_set_number(
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    *,
+    action_id: int,
+    field: str,
+    value: float,
+) -> None:
+    """Push an integer field write to a portable Explorer device."""
+    await coord.async_portable_set_number(
+        dev_id,
+        action_id=action_id,
+        field=field,
+        value=int(value),
+    )
+
+
 async def _set_portable_charge_power(
     coord: JackerySolarVaultCoordinator,
     dev_id: str,
     value: float,
 ) -> None:
     """Set the charge power limit on a portable Explorer device (msgId=38)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_SET_CHARGE_POWER,
         field="csc",
-        value=int(value),
+        value=value,
     )
 
 
@@ -363,11 +381,12 @@ async def _set_portable_energy_storage_charge_limit(
     value: float,
 ) -> None:
     """Set the energy storage charge limit on a portable Explorer device (msgId=31)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
         field="dt",
-        value=int(value),
+        value=value,
     )
 
 
@@ -377,11 +396,12 @@ async def _set_portable_auto_shutdown_time(
     value: float,
 ) -> None:
     """Set the auto-shutdown time on a portable Explorer device (msgId=19)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_AUTO_SHUTDOWN_TIME,
         field="ast",
-        value=int(value),
+        value=value,
     )
 
 
@@ -391,11 +411,12 @@ async def _set_portable_ac_countdown(
     value: float,
 ) -> None:
     """Set the AC output countdown on a portable Explorer device (msgId=34)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_AC_COUNTDOWN,
         field="oact",
-        value=int(value),
+        value=value,
     )
 
 
@@ -409,11 +430,12 @@ async def _set_portable_ac_output_delay(
     App stores ``acdt`` as seconds (HH:MM picker, hour*3600 + minute*60), so the
     value is a whole number of seconds in ``[0, 86340]`` with a 60-second step.
     """
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_AC_OUTPUT_DELAY,
         field="acdt",
-        value=int(value),
+        value=value,
     )
 
 
@@ -453,11 +475,12 @@ async def _set_portable_dc_countdown(
     value: float,
 ) -> None:
     """Set the DC output countdown on a portable Explorer device (msgId=35)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_DC_COUNTDOWN,
         field="odct",
-        value=int(value),
+        value=value,
     )
 
 
@@ -467,11 +490,12 @@ async def _set_portable_dc_usb_countdown(
     value: float,
 ) -> None:
     """Set the DC USB output countdown on a portable Explorer device (msgId=36)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_DC_USB_COUNTDOWN,
         field="odcut",
-        value=int(value),
+        value=value,
     )
 
 
@@ -481,11 +505,12 @@ async def _set_portable_dc_car_countdown(
     value: float,
 ) -> None:
     """Set the DC car output countdown on a portable Explorer device (msgId=37)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_DC_CAR_COUNTDOWN,
         field="odcct",
-        value=int(value),
+        value=value,
     )
 
 
@@ -495,11 +520,12 @@ async def _set_portable_ac1_priority_soc(
     value: float,
 ) -> None:
     """Set the AC1 output-priority SOC threshold on a portable device (msgId=49)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
         field="oac1PrioSoc",
-        value=int(value),
+        value=value,
     )
 
 
@@ -509,11 +535,12 @@ async def _set_portable_ac2_priority_soc(
     value: float,
 ) -> None:
     """Set the AC2 output-priority SOC threshold on a portable device (msgId=49)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
         field="oac2PrioSoc",
-        value=int(value),
+        value=value,
     )
 
 
@@ -523,11 +550,12 @@ async def _set_portable_dc_priority_soc(
     value: float,
 ) -> None:
     """Set the DC output-priority SOC threshold on a portable device (msgId=49)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
         field="odcPrioSoc",
-        value=int(value),
+        value=value,
     )
 
 
@@ -537,11 +565,12 @@ async def _set_portable_bluetooth_sleep(
     value: float,
 ) -> None:
     """Set the Bluetooth module sleep time on a portable Explorer device (msgId=44)."""
-    await coord.async_portable_set_number(
+    await _async_portable_set_number(
+        coord,
         dev_id,
         action_id=ACTION_ID_PORTABLE_BLUETOOTH_SLEEP,
         field="tmt",
-        value=int(value),
+        value=value,
     )
 
 

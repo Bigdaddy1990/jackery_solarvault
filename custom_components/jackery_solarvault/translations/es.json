@@ -262,17 +262,17 @@
       "max_output_power_set": {
         "name": "Potencia m\u00e1xima de salida"
       },
+      "portable_ac1_priority_soc": {
+        "name": "Umbral de SOC de prioridad de salida AC1"
+      },
+      "portable_ac2_priority_soc": {
+        "name": "Umbral de SOC de prioridad de salida AC2"
+      },
       "portable_ac_countdown": {
         "name": "Cuenta atr\u00e1s de salida CA"
       },
       "portable_ac_output_delay": {
         "name": "Tiempo de retardo de apertura de salida CA"
-      },
-      "portable_custom_use_discharge_limit": {
-        "name": "L\u00edmite de descarga personalizado"
-      },
-      "portable_custom_use_charge_limit": {
-        "name": "L\u00edmite de carga personalizado"
       },
       "portable_auto_shutdown_time": {
         "name": "Tiempo de apagado autom\u00e1tico"
@@ -283,11 +283,20 @@
       "portable_charge_power": {
         "name": "L\u00edmite de potencia de carga"
       },
+      "portable_custom_use_charge_limit": {
+        "name": "L\u00edmite de carga personalizado"
+      },
+      "portable_custom_use_discharge_limit": {
+        "name": "L\u00edmite de descarga personalizado"
+      },
       "portable_dc_car_countdown": {
         "name": "Cuenta atr\u00e1s de salida CC para coche"
       },
       "portable_dc_countdown": {
         "name": "Cuenta atr\u00e1s de salida CC"
+      },
+      "portable_dc_priority_soc": {
+        "name": "Umbral de SOC de prioridad de salida DC"
       },
       "portable_dc_usb_countdown": {
         "name": "Cuenta atr\u00e1s de salida USB CC"
@@ -297,15 +306,6 @@
       },
       "portable_output_priority": {
         "name": "Modo de prioridad de salida"
-      },
-      "portable_ac1_priority_soc": {
-        "name": "Umbral de SOC de prioridad de salida AC1"
-      },
-      "portable_ac2_priority_soc": {
-        "name": "Umbral de SOC de prioridad de salida AC2"
-      },
-      "portable_dc_priority_soc": {
-        "name": "Umbral de SOC de prioridad de salida DC"
       },
       "single_tariff_price_set": {
         "name": "Precio de tarifa \u00fanica"
@@ -374,6 +374,22 @@
           "quiet": "Silencioso"
         }
       },
+      "portable_battery_mode": {
+        "name": "Modo de bater\u00eda",
+        "state": {
+          "custom": "Personalizado",
+          "normal": "Normal",
+          "preset": "Predefinido"
+        }
+      },
+      "portable_charge_mode": {
+        "name": "Modo de carga",
+        "state": {
+          "custom": "Personalizado",
+          "fast": "R\u00e1pido",
+          "rush": "Intensivo"
+        }
+      },
       "portable_dc_priority": {
         "name": "Prioridad de salida CC",
         "state": {
@@ -404,22 +420,6 @@
           "2h": "2 horas",
           "2min": "2 minutos",
           "off": "Desactivado"
-        }
-      },
-      "portable_battery_mode": {
-        "name": "Modo de bater\u00eda",
-        "state": {
-          "normal": "Normal",
-          "preset": "Predefinido",
-          "custom": "Personalizado"
-        }
-      },
-      "portable_charge_mode": {
-        "name": "Modo de carga",
-        "state": {
-          "fast": "R\u00e1pido",
-          "rush": "Intensivo",
-          "custom": "Personalizado"
         }
       },
       "portable_ups_model": {
@@ -862,6 +862,24 @@
       "discharge_time": {
         "name": "Tiempo de descarga"
       },
+      "dynamic_price_contract_auth": {
+        "name": "Contrato de precio din\u00e1mico autorizado"
+      },
+      "dynamic_price_nextday_high": {
+        "name": "Precio din\u00e1mico m\u00e1ximo de ma\u00f1ana"
+      },
+      "dynamic_price_nextday_low": {
+        "name": "Precio din\u00e1mico m\u00ednimo de ma\u00f1ana"
+      },
+      "dynamic_price_provider": {
+        "name": "Proveedor de precio din\u00e1mico"
+      },
+      "dynamic_price_today_high": {
+        "name": "Precio din\u00e1mico m\u00e1ximo de hoy"
+      },
+      "dynamic_price_today_low": {
+        "name": "Precio din\u00e1mico m\u00ednimo de hoy"
+      },
       "energy_plan_power": {
         "name": "Potencia del plan de energ\u00eda"
       },
@@ -1078,24 +1096,6 @@
       "power_mode_portable": {
         "name": "Modo de potencia"
       },
-      "dynamic_price_contract_auth": {
-        "name": "Contrato de precio din\u00e1mico autorizado"
-      },
-      "dynamic_price_nextday_high": {
-        "name": "Precio din\u00e1mico m\u00e1ximo de ma\u00f1ana"
-      },
-      "dynamic_price_nextday_low": {
-        "name": "Precio din\u00e1mico m\u00ednimo de ma\u00f1ana"
-      },
-      "dynamic_price_provider": {
-        "name": "Proveedor de precio din\u00e1mico"
-      },
-      "dynamic_price_today_high": {
-        "name": "Precio din\u00e1mico m\u00e1ximo de hoy"
-      },
-      "dynamic_price_today_low": {
-        "name": "Precio din\u00e1mico m\u00ednimo de hoy"
-      },
       "power_price": {
         "name": "Precio de electricidad"
       },
@@ -1186,17 +1186,17 @@
       "smart_meter_export_year_energy": {
         "name": "Exportaci\u00f3n anual a red del Smart Meter"
       },
-      "smart_meter_grid_import_energy": {
-        "name": "Energ\u00eda de importaci\u00f3n de red del Smart Meter"
-      },
-      "smart_meter_grid_export_energy": {
-        "name": "Energ\u00eda de exportaci\u00f3n a red del Smart Meter"
-      },
       "smart_meter_frequency": {
         "name": "Frecuencia del Smart Meter"
       },
       "smart_meter_fun_form": {
         "name": "Forma de funci\u00f3n del Smart Meter"
+      },
+      "smart_meter_grid_export_energy": {
+        "name": "Energ\u00eda de exportaci\u00f3n a red del Smart Meter"
+      },
+      "smart_meter_grid_import_energy": {
+        "name": "Energ\u00eda de importaci\u00f3n de red del Smart Meter"
       },
       "smart_meter_gross_phase_export_power": {
         "name": "Potencia bruta de exportaci\u00f3n por fase del Smart Meter"
@@ -1330,18 +1330,6 @@
       "smart_mode_time_difference": {
         "name": "Diferencia de tiempo del modo inteligente"
       },
-      "smart_schedule_currency": {
-        "name": "Moneda del horario inteligente"
-      },
-      "smart_schedule_days": {
-        "name": "D\u00edas del horario inteligente"
-      },
-      "smart_schedule_points": {
-        "name": "Puntos del horario inteligente"
-      },
-      "smart_schedule_profit": {
-        "name": "Beneficio del horario inteligente"
-      },
       "smart_plug_communication_mode": {
         "name": "Modo de comunicaci\u00f3n del enchufe inteligente"
       },
@@ -1377,6 +1365,18 @@
       },
       "smart_plug_total_energy": {
         "name": "Energia total del enchufe inteligente"
+      },
+      "smart_schedule_currency": {
+        "name": "Moneda del horario inteligente"
+      },
+      "smart_schedule_days": {
+        "name": "D\u00edas del horario inteligente"
+      },
+      "smart_schedule_points": {
+        "name": "Puntos del horario inteligente"
+      },
+      "smart_schedule_profit": {
+        "name": "Beneficio del horario inteligente"
       },
       "soc_charge_limit": {
         "name": "L\u00edmite de carga"
@@ -1601,11 +1601,35 @@
     "accept_shared_device_failed": {
       "message": "No se pudo aceptar el dispositivo compartido para {device_id}: {error}"
     },
+    "agree_privacy_consent_failed": {
+      "message": "No se pudo aceptar el consentimiento de privacidad del dispositivo {device_id}: {error}"
+    },
+    "bind_currency_failed": {
+      "message": "No se pudo vincular la moneda del dispositivo {device_id}: {error}"
+    },
     "bind_device_failed": {
       "message": "No se pudo vincular el dispositivo {device_id}: {error}"
     },
     "bind_smart_part_failed": {
       "message": "No se pudo vincular el accesorio inteligente para el dispositivo {device_id}: {error}"
+    },
+    "cancel_dynamic_price_contract_auth_failed": {
+      "message": "No se pudo cancelar la autorizacion del contrato de precio dinamico del dispositivo {device_id}: {error}"
+    },
+    "check_accessories_exist_failed": {
+      "message": "No se pudo comprobar los accesorios del dispositivo {device_id}: {error}"
+    },
+    "check_app_version_failed": {
+      "message": "No se pudo comprobar la version de la app para el dispositivo {device_id}: {error}"
+    },
+    "check_jackery_accessories_exist_failed": {
+      "message": "No se pudo comprobar los accesorios Jackery del dispositivo {device_id}: {error}"
+    },
+    "check_privacy_update_failed": {
+      "message": "No se pudo comprobar la actualizacion de privacidad del dispositivo {device_id}: {error}"
+    },
+    "check_system_bound_failed": {
+      "message": "No se pudo comprobar la vinculacion del sistema del dispositivo {device_id}: {error}"
     },
     "delete_storm_alert_failed": {
       "message": "No se pudo eliminar la alerta de tormenta {alert_id} para el dispositivo {device_id}: {error}"
@@ -1616,23 +1640,41 @@
     "entity_action_failed": {
       "message": "No se pudo actualizar {entity} para el dispositivo {device_id}: {error}"
     },
+    "get_aiems_energy_prediction_failed": {
+      "message": "No se pudo obtener la predicci\u00f3n energ\u00e9tica AI-EMS del dispositivo {device_id}: {error}"
+    },
+    "get_alarm_detail_failed": {
+      "message": "No se pudo obtener el detalle de alarma del dispositivo {device_id}: {error}"
+    },
+    "get_device_currency_failed": {
+      "message": "No se pudo obtener la moneda del dispositivo {device_id}: {error}"
+    },
+    "get_dynamic_price_login_url_failed": {
+      "message": "No se pudo obtener la URL de inicio de sesion de precio dinamico del dispositivo {device_id}: {error}"
+    },
+    "get_offline_statistics_failed": {
+      "message": "No se pudieron obtener las estadisticas offline del dispositivo {device_id}: {error}"
+    },
+    "get_product_instruction_failed": {
+      "message": "No se pudo obtener la instruccion de producto del dispositivo {device_id}: {error}"
+    },
+    "get_push_config_failed": {
+      "message": "No se pudo obtener la configuracion push del dispositivo {device_id}: {error}"
+    },
     "get_share_qr_code_failed": {
       "message": "No se pudo obtener el c\u00f3digo QR de uso compartido del dispositivo {device_id}: {error}"
+    },
+    "get_shelly_auth_url_failed": {
+      "message": "No se pudo obtener la URL de autorizacion de Shelly para {device_id}: {error}"
     },
     "get_smart_schedule_prediction_failed": {
       "message": "No se pudo obtener la predicci\u00f3n del horario inteligente del dispositivo {device_id}: {error}"
     },
-    "get_aiems_energy_prediction_failed": {
-      "message": "No se pudo obtener la predicci\u00f3n energ\u00e9tica AI-EMS del dispositivo {device_id}: {error}"
+    "get_unread_count_failed": {
+      "message": "No se pudo obtener el contador de no leidos del dispositivo {device_id}: {error}"
     },
-    "unbind_accessories_failed": {
-      "message": "No se pudieron desvincular los accesorios del dispositivo {device_id}: {error}"
-    },
-    "set_ac_nickname_failed": {
-      "message": "No se pudo renombrar el puerto CA del dispositivo {device_id}: {error}"
-    },
-    "report_device_timezone_failed": {
-      "message": "No se pudo informar la zona horaria del dispositivo {device_id}: {error}"
+    "get_user_info_failed": {
+      "message": "No se pudo obtener la informacion de usuario del dispositivo {device_id}: {error}"
     },
     "invalid_number_allowed_values": {
       "message": "{entity} para el dispositivo {device_id} debe ser uno de estos valores: {allowed_values}"
@@ -1646,6 +1688,33 @@
     "invalid_text_value": {
       "message": "{entity} para el dispositivo {device_id} no puede estar vac\u00edo"
     },
+    "list_accessories_failed": {
+      "message": "No se pudieron listar los accesorios del dispositivo {device_id}: {error}"
+    },
+    "list_banners_failed": {
+      "message": "No se pudieron listar los banners del dispositivo {device_id}: {error}"
+    },
+    "list_country_zones_failed": {
+      "message": "No se pudieron listar las zonas de pais del dispositivo {device_id}: {error}"
+    },
+    "list_currencies_failed": {
+      "message": "No se pudieron listar las monedas del dispositivo {device_id}: {error}"
+    },
+    "list_dynamic_price_contracts_failed": {
+      "message": "No se pudieron listar los contratos de precio dinamico del dispositivo {device_id}: {error}"
+    },
+    "list_faq_answers_failed": {
+      "message": "No se pudieron listar las respuestas FAQ del dispositivo {device_id}: {error}"
+    },
+    "list_faqs_failed": {
+      "message": "No se pudieron listar las FAQs del dispositivo {device_id}: {error}"
+    },
+    "list_grid_standards_failed": {
+      "message": "No se pudieron listar los estandares de red del dispositivo {device_id}: {error}"
+    },
+    "list_notifications_failed": {
+      "message": "No se pudieron listar las notificaciones del dispositivo {device_id}: {error}"
+    },
     "list_shared_devices_failed": {
       "message": "No se pudieron listar los dispositivos compartidos del dispositivo {device_id}: {error}"
     },
@@ -1654,9 +1723,6 @@
     },
     "list_shelly_binding_failures_failed": {
       "message": "No se pudieron listar los fallos de vinculacion de Shelly para {device_id}: {error}"
-    },
-    "get_shelly_auth_url_failed": {
-      "message": "No se pudo obtener la URL de autorizacion de Shelly para {device_id}: {error}"
     },
     "list_shelly_devices_failed": {
       "message": "No se pudieron listar los dispositivos Shelly para {device_id}: {error}"
@@ -1673,86 +1739,11 @@
     "mqtt_missing_subdevice_sn": {
       "message": "No se puede enviar el comando MQTT de subdispositivo para {device_id}: falta el deviceSn del subdispositivo"
     },
-    "query_third_party_mqtt_config_failed": {
-      "message": "No se pudo consultar la configuracion MQTT de terceros para el dispositivo {device_id}: {error}"
+    "query_box_stat_failed": {
+      "message": "No se pudieron consultar las estadisticas de box del dispositivo {device_id}: {error}"
     },
-    "query_tou_plan_failed": {
-      "message": "No se pudo consultar el plan TOU del dispositivo {device_id}: {error}"
-    },
-    "save_tou_plan_failed": {
-      "message": "No se pudo guardar el plan TOU del dispositivo {device_id}: {error}"
-    },
-    "list_currencies_failed": {
-      "message": "No se pudieron listar las monedas del dispositivo {device_id}: {error}"
-    },
-    "get_device_currency_failed": {
-      "message": "No se pudo obtener la moneda del dispositivo {device_id}: {error}"
-    },
-    "bind_currency_failed": {
-      "message": "No se pudo vincular la moneda del dispositivo {device_id}: {error}"
-    },
-    "list_accessories_failed": {
-      "message": "No se pudieron listar los accesorios del dispositivo {device_id}: {error}"
-    },
-    "check_accessories_exist_failed": {
-      "message": "No se pudo comprobar los accesorios del dispositivo {device_id}: {error}"
-    },
-    "check_jackery_accessories_exist_failed": {
-      "message": "No se pudo comprobar los accesorios Jackery del dispositivo {device_id}: {error}"
-    },
-    "set_accessory_name_failed": {
-      "message": "No se pudo renombrar el accesorio del dispositivo {device_id}: {error}"
-    },
-    "get_dynamic_price_login_url_failed": {
-      "message": "No se pudo obtener la URL de inicio de sesion de precio dinamico del dispositivo {device_id}: {error}"
-    },
-    "list_dynamic_price_contracts_failed": {
-      "message": "No se pudieron listar los contratos de precio dinamico del dispositivo {device_id}: {error}"
-    },
-    "save_dynamic_price_contract_auth_failed": {
-      "message": "No se pudo guardar la autorizacion del contrato de precio dinamico del dispositivo {device_id}: {error}"
-    },
-    "cancel_dynamic_price_contract_auth_failed": {
-      "message": "No se pudo cancelar la autorizacion del contrato de precio dinamico del dispositivo {device_id}: {error}"
-    },
-    "save_dynamic_price_location_id_failed": {
-      "message": "No se pudo guardar el token de ubicacion de precio dinamico del dispositivo {device_id}: {error}"
-    },
-    "query_socket_stat_failed": {
-      "message": "No se pudieron consultar las estadisticas de enchufe del dispositivo {device_id}: {error}"
-    },
-    "list_country_zones_failed": {
-      "message": "No se pudieron listar las zonas de pais del dispositivo {device_id}: {error}"
-    },
-    "list_grid_standards_failed": {
-      "message": "No se pudieron listar los estandares de red del dispositivo {device_id}: {error}"
-    },
-    "check_system_bound_failed": {
-      "message": "No se pudo comprobar la vinculacion del sistema del dispositivo {device_id}: {error}"
-    },
-    "save_device_max_power_failed": {
-      "message": "No se pudo guardar la potencia maxima del dispositivo {device_id}: {error}"
-    },
-    "get_alarm_detail_failed": {
-      "message": "No se pudo obtener el detalle de alarma del dispositivo {device_id}: {error}"
-    },
-    "list_notifications_failed": {
-      "message": "No se pudieron listar las notificaciones del dispositivo {device_id}: {error}"
-    },
-    "get_unread_count_failed": {
-      "message": "No se pudo obtener el contador de no leidos del dispositivo {device_id}: {error}"
-    },
-    "get_push_config_failed": {
-      "message": "No se pudo obtener la configuracion push del dispositivo {device_id}: {error}"
-    },
-    "set_push_config_failed": {
-      "message": "No se pudo configurar push para el dispositivo {device_id}: {error}"
-    },
-    "sync_alerts_failed": {
-      "message": "No se pudieron sincronizar las alertas del dispositivo {device_id}: {error}"
-    },
-    "get_offline_statistics_failed": {
-      "message": "No se pudieron obtener las estadisticas offline del dispositivo {device_id}: {error}"
+    "query_carbon_stat_failed": {
+      "message": "No se pudieron consultar las estadisticas de carbono del dispositivo {device_id}: {error}"
     },
     "query_charge_report_failed": {
       "message": "No se pudo consultar el informe de carga del dispositivo {device_id}: {error}"
@@ -1760,44 +1751,20 @@
     "query_cutoff_stat_failed": {
       "message": "No se pudieron consultar las estadisticas de corte del dispositivo {device_id}: {error}"
     },
-    "query_soc_stat_failed": {
-      "message": "No se pudieron consultar las estadisticas SOC del dispositivo {device_id}: {error}"
-    },
-    "query_carbon_stat_failed": {
-      "message": "No se pudieron consultar las estadisticas de carbono del dispositivo {device_id}: {error}"
-    },
     "query_profit_stat_failed": {
       "message": "No se pudieron consultar las estadisticas de beneficio del dispositivo {device_id}: {error}"
     },
-    "query_box_stat_failed": {
-      "message": "No se pudieron consultar las estadisticas de box del dispositivo {device_id}: {error}"
+    "query_soc_stat_failed": {
+      "message": "No se pudieron consultar las estadisticas SOC del dispositivo {device_id}: {error}"
     },
-    "check_app_version_failed": {
-      "message": "No se pudo comprobar la version de la app para el dispositivo {device_id}: {error}"
+    "query_socket_stat_failed": {
+      "message": "No se pudieron consultar las estadisticas de enchufe del dispositivo {device_id}: {error}"
     },
-    "list_banners_failed": {
-      "message": "No se pudieron listar los banners del dispositivo {device_id}: {error}"
+    "query_third_party_mqtt_config_failed": {
+      "message": "No se pudo consultar la configuracion MQTT de terceros para el dispositivo {device_id}: {error}"
     },
-    "submit_feedback_failed": {
-      "message": "No se pudo enviar feedback para el dispositivo {device_id}: {error}"
-    },
-    "list_faqs_failed": {
-      "message": "No se pudieron listar las FAQs del dispositivo {device_id}: {error}"
-    },
-    "list_faq_answers_failed": {
-      "message": "No se pudieron listar las respuestas FAQ del dispositivo {device_id}: {error}"
-    },
-    "check_privacy_update_failed": {
-      "message": "No se pudo comprobar la actualizacion de privacidad del dispositivo {device_id}: {error}"
-    },
-    "agree_privacy_consent_failed": {
-      "message": "No se pudo aceptar el consentimiento de privacidad del dispositivo {device_id}: {error}"
-    },
-    "get_product_instruction_failed": {
-      "message": "No se pudo obtener la instruccion de producto del dispositivo {device_id}: {error}"
-    },
-    "get_user_info_failed": {
-      "message": "No se pudo obtener la informacion de usuario del dispositivo {device_id}: {error}"
+    "query_tou_plan_failed": {
+      "message": "No se pudo consultar el plan TOU del dispositivo {device_id}: {error}"
     },
     "refresh_subdevices_failed": {
       "message": "No se pudieron actualizar los subdispositivos del dispositivo {device_id}: {error}"
@@ -1817,8 +1784,29 @@
     "rename_system_failed": {
       "message": "No se pudo cambiar el nombre del sistema Jackery {system_id}: {error}"
     },
+    "report_device_timezone_failed": {
+      "message": "No se pudo informar la zona horaria del dispositivo {device_id}: {error}"
+    },
+    "save_device_max_power_failed": {
+      "message": "No se pudo guardar la potencia maxima del dispositivo {device_id}: {error}"
+    },
+    "save_dynamic_price_contract_auth_failed": {
+      "message": "No se pudo guardar la autorizacion del contrato de precio dinamico del dispositivo {device_id}: {error}"
+    },
+    "save_dynamic_price_location_id_failed": {
+      "message": "No se pudo guardar el token de ubicacion de precio dinamico del dispositivo {device_id}: {error}"
+    },
+    "save_tou_plan_failed": {
+      "message": "No se pudo guardar el plan TOU del dispositivo {device_id}: {error}"
+    },
     "send_ble_command_failed": {
       "message": "No se pudo enviar el comando BLE para el dispositivo {device_id}: {error}"
+    },
+    "set_ac_nickname_failed": {
+      "message": "No se pudo renombrar el puerto CA del dispositivo {device_id}: {error}"
+    },
+    "set_accessory_name_failed": {
+      "message": "No se pudo renombrar el accesorio del dispositivo {device_id}: {error}"
     },
     "set_account_nickname_failed": {
       "message": "Could not set account nickname for device {device_id}: {error}"
@@ -1826,11 +1814,23 @@
     "set_device_nickname_failed": {
       "message": "No se pudo establecer el apodo del dispositivo {device_id}: {error}"
     },
+    "set_push_config_failed": {
+      "message": "No se pudo configurar push para el dispositivo {device_id}: {error}"
+    },
     "set_storm_alert_location_failed": {
       "message": "Could not set storm-alert location for device {device_id}: {error}"
     },
     "set_third_party_mqtt_config_failed": {
       "message": "No se pudo configurar MQTT de terceros para el dispositivo {device_id}: {error}"
+    },
+    "submit_feedback_failed": {
+      "message": "No se pudo enviar feedback para el dispositivo {device_id}: {error}"
+    },
+    "sync_alerts_failed": {
+      "message": "No se pudieron sincronizar las alertas del dispositivo {device_id}: {error}"
+    },
+    "unbind_accessories_failed": {
+      "message": "No se pudieron desvincular los accesorios del dispositivo {device_id}: {error}"
     },
     "unbind_device_failed": {
       "message": "No se pudo desvincular el dispositivo {device_id}: {error}"
@@ -1914,6 +1914,52 @@
     }
   },
   "services": {
+    "accept_shared_device": {
+      "description": "Acepta un dispositivo Jackery compartido en la cuenta propietaria del dispositivo seleccionado y luego actualiza.",
+      "fields": {
+        "device_id": {
+          "description": "Selecciona un dispositivo Jackery de la cuenta que debe aceptar el uso compartido.",
+          "name": "ID de dispositivo"
+        },
+        "qr_code_id": {
+          "description": "ID del codigo QR de la invitacion de uso compartido.",
+          "name": "ID del codigo QR"
+        },
+        "target_dev_id": {
+          "description": "ID de dispositivo Jackery de la invitacion de uso compartido.",
+          "name": "ID del dispositivo destino"
+        }
+      },
+      "name": "Aceptar dispositivo compartido"
+    },
+    "agree_privacy_consent": {
+      "description": "Registra aceptacion de una o varias versiones de privacidad de Jackery.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "pending_agree_version_ids": {
+          "description": "Lista de IDs numericos de version de privacidad enviada como pendingAgreeVersionIds.",
+          "name": "IDs de consentimiento pendientes"
+        }
+      },
+      "name": "Aceptar privacidad"
+    },
+    "bind_currency": {
+      "description": "Vincula una moneda al dispositivo Jackery seleccionado mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "currency": {
+          "description": "Codigo de moneda o identificador aceptado por la API de la app Jackery.",
+          "name": "Moneda"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Vincular moneda"
+    },
     "bind_device": {
       "description": "Vincula un dispositivo Jackery a la misma cuenta que el dispositivo seleccionado mediante la API en la nube de Jackery. El dispositivo de destino ya debe exponer el bindKey, devId y GUID derivados de la app.",
       "fields": {
@@ -1954,6 +2000,98 @@
       },
       "name": "Vincular accesorio inteligente"
     },
+    "cancel_dynamic_price_contract_auth": {
+      "description": "Cancela la autorizacion del contrato de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
+          "name": "ID del dispositivo"
+        },
+        "platform_company_id": {
+          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
+          "name": "ID de empresa de plataforma"
+        }
+      },
+      "name": "Cancelar autorizacion de contrato"
+    },
+    "check_accessories_exist": {
+      "description": "Comprueba si existen accesorios para los IDs de dispositivos Jackery indicados. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "devices": {
+          "description": "IDs de dispositivos Jackery separados por comas para el parametro devices de la API de la app.",
+          "name": "Dispositivos"
+        }
+      },
+      "name": "Comprobar accesorios"
+    },
+    "check_app_version": {
+      "description": "Comprueba metadatos de version de la app Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "type": {
+          "description": "Tipo opcional de plataforma enviado como type.",
+          "name": "Tipo"
+        },
+        "version_name": {
+          "description": "Version opcional de app enviada como versionName.",
+          "name": "Nombre de version"
+        }
+      },
+      "name": "Comprobar version de app"
+    },
+    "check_jackery_accessories_exist": {
+      "description": "Comprueba si existen accesorios Jackery para la informacion de serie indicada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn_infos": {
+          "description": "Informacion de serie aceptada por la API de la app Jackery.",
+          "name": "Informacion de serie"
+        }
+      },
+      "name": "Comprobar accesorios Jackery"
+    },
+    "check_privacy_update": {
+      "description": "Comprueba si la cuenta seleccionada requiere consentimiento de privacidad actualizado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Comprobar privacidad"
+    },
+    "check_system_bound": {
+      "description": "Comprueba si la combinacion de bind key, numero de serie y GUID ya esta vinculada. Solo devuelve la respuesta.",
+      "fields": {
+        "bind_key": {
+          "description": "Bind key aceptada por la API de la app Jackery.",
+          "name": "Bind key"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        },
+        "guid": {
+          "description": "GUID enviado a la API de la app Jackery.",
+          "name": "GUID"
+        }
+      },
+      "name": "Comprobar vinculacion del sistema"
+    },
     "delete_electricity_strategy": {
       "description": "Elimina un plan de estrategia el\u00e9ctrica del dispositivo.",
       "fields": {
@@ -1982,23 +2120,91 @@
       },
       "name": "Eliminar alerta de tormenta"
     },
-    "set_storm_alert_location": {
-      "description": "Update the GPS location used for storm and weather alerts on the selected device via the Jackery cloud API.",
+    "get_aiems_energy_prediction": {
+      "description": "Obtiene el informe de predicci\u00f3n energ\u00e9tica AI-EMS de la API HTTP de Jackery para el dispositivo seleccionado (app 2.4.0). Solo devuelve la respuesta.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        },
-        "latitude": {
-          "description": "Latitude in decimal degrees (-90 to 90).",
-          "name": "Latitude"
-        },
-        "longitude": {
-          "description": "Longitude in decimal degrees (-180 to 180).",
-          "name": "Longitude"
+          "description": "Elige un dispositivo Jackery. El ID del sistema se resuelve desde el payload del coordinador.",
+          "name": "ID del dispositivo"
         }
       },
-      "name": "Set storm alert location"
+      "name": "Obtener predicci\u00f3n energ\u00e9tica AI-EMS"
+    },
+    "get_alarm_detail": {
+      "description": "Obtiene el detalle de alarma por alarm key mediante la API HTTP de Jackery. Solo devuelve la respuesta.",
+      "fields": {
+        "alarm_key": {
+          "description": "Alarm key aceptada por la API de la app Jackery.",
+          "name": "Alarm key"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Obtener detalle de alarma"
+    },
+    "get_device_currency": {
+      "description": "Obtiene la carga de moneda del dispositivo Jackery seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Obtener moneda del dispositivo"
+    },
+    "get_dynamic_price_login_url": {
+      "description": "Obtiene la URL de inicio de sesion del proveedor de precio dinamico para el dispositivo seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
+          "name": "ID del dispositivo"
+        },
+        "platform_company_id": {
+          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
+          "name": "ID de empresa de plataforma"
+        }
+      },
+      "name": "Obtener URL de precio dinamico"
+    },
+    "get_offline_statistics": {
+      "description": "Obtiene estadisticas offline para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Obtener estadisticas offline"
+    },
+    "get_product_instruction": {
+      "description": "Obtiene instrucciones de producto para un numero de serie. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como devSn.",
+          "name": "Numero de serie"
+        },
+        "type": {
+          "description": "Filtro opcional de tipo de instruccion enviado como type.",
+          "name": "Tipo"
+        }
+      },
+      "name": "Obtener instruccion de producto"
+    },
+    "get_push_config": {
+      "description": "Obtiene la configuracion de notificaciones push para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Obtener configuracion push"
     },
     "get_share_qr_code": {
       "description": "Obtiene el c\u00f3digo QR de uso compartido de la cuenta de Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
@@ -2010,6 +2216,16 @@
       },
       "name": "Obtener c\u00f3digo QR de uso compartido"
     },
+    "get_shelly_auth_url": {
+      "description": "Obtiene la autorizacion OAuth de Shelly gestionada por Jackery para la cuenta propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Obtener URL de Shelly"
+    },
     "get_smart_schedule_prediction": {
       "description": "Obtiene la predicci\u00f3n del horario inteligente mediante la API HTTP de Jackery para el dispositivo seleccionado. Solo devuelve la respuesta.",
       "fields": {
@@ -2020,83 +2236,25 @@
       },
       "name": "Obtener predicci\u00f3n del horario inteligente"
     },
-    "get_aiems_energy_prediction": {
-      "description": "Obtiene el informe de predicci\u00f3n energ\u00e9tica AI-EMS de la API HTTP de Jackery para el dispositivo seleccionado (app 2.4.0). Solo devuelve la respuesta.",
+    "get_unread_count": {
+      "description": "Obtiene contadores de notificaciones no leidas para la cuenta seleccionada. Solo devuelve la respuesta.",
       "fields": {
         "device_id": {
-          "description": "Elige un dispositivo Jackery. El ID del sistema se resuelve desde el payload del coordinador.",
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
           "name": "ID del dispositivo"
         }
       },
-      "name": "Obtener predicci\u00f3n energ\u00e9tica AI-EMS"
+      "name": "Obtener contador no leido"
     },
-    "unbind_accessories": {
-      "description": "Desvincula accesorios inteligentes del dispositivo principal por ID de vinculaci\u00f3n y actualiza despu\u00e9s. Devuelve el resultado por elemento.",
+    "get_user_info": {
+      "description": "Obtiene informacion del perfil de usuario autenticado para la cuenta seleccionada. Solo devuelve la respuesta.",
       "fields": {
-        "bind_ids": {
-          "description": "Lista de IDs de vinculaci\u00f3n de accesorios a desvincular.",
-          "name": "IDs de vinculaci\u00f3n"
-        },
         "device_id": {
-          "description": "Elige un dispositivo Jackery de la cuenta propietaria de los accesorios.",
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
           "name": "ID del dispositivo"
         }
       },
-      "name": "Desvincular accesorios"
-    },
-    "set_ac_nickname": {
-      "description": "Renombra una salida CA de un dispositivo port\u00e1til y actualiza despu\u00e9s.",
-      "fields": {
-        "ac_port": {
-          "description": "Salida CA a renombrar (1 o 2).",
-          "name": "Puerto CA"
-        },
-        "device_id": {
-          "description": "Elige el dispositivo port\u00e1til Jackery propietario del puerto CA.",
-          "name": "ID del dispositivo"
-        },
-        "nickname": {
-          "description": "Nuevo nombre visible para la salida CA.",
-          "name": "Nombre"
-        }
-      },
-      "name": "Establecer nombre del puerto CA"
-    },
-    "report_device_timezone": {
-      "description": "Informa la zona horaria del dispositivo a la nube de Jackery, igual que la sincronizaci\u00f3n de la app.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        },
-        "timezone_offset": {
-          "description": "Desfase UTC en minutos (por ejemplo, 120 para CEST).",
-          "name": "Desfase horario"
-        },
-        "zone_id": {
-          "description": "ID de zona IANA, por ejemplo Europe/Berlin.",
-          "name": "ID de zona"
-        }
-      },
-      "name": "Informar zona horaria del dispositivo"
-    },
-    "accept_shared_device": {
-      "description": "Acepta un dispositivo Jackery compartido en la cuenta propietaria del dispositivo seleccionado y luego actualiza.",
-      "fields": {
-        "device_id": {
-          "description": "Selecciona un dispositivo Jackery de la cuenta que debe aceptar el uso compartido.",
-          "name": "ID de dispositivo"
-        },
-        "qr_code_id": {
-          "description": "ID del codigo QR de la invitacion de uso compartido.",
-          "name": "ID del codigo QR"
-        },
-        "target_dev_id": {
-          "description": "ID de dispositivo Jackery de la invitacion de uso compartido.",
-          "name": "ID del dispositivo destino"
-        }
-      },
-      "name": "Aceptar dispositivo compartido"
+      "name": "Obtener informacion de usuario"
     },
     "insert_electricity_strategy": {
       "description": "A\u00f1ade un nuevo plan de estrategia el\u00e9ctrica (carga/descarga) al dispositivo.",
@@ -2111,6 +2269,124 @@
         }
       },
       "name": "A\u00f1adir estrategia el\u00e9ctrica"
+    },
+    "list_accessories": {
+      "description": "Lista accesorios inteligentes para el dispositivo Jackery seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar accesorios"
+    },
+    "list_banners": {
+      "description": "Lista banners de la app Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar banners"
+    },
+    "list_country_zones": {
+      "description": "Lista entradas de pais/zona usadas por la configuracion de dispositivos DIY de Jackery. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar zonas de pais"
+    },
+    "list_currencies": {
+      "description": "Lista las monedas disponibles para la cuenta Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar monedas"
+    },
+    "list_dynamic_price_contracts": {
+      "description": "Lista contratos de precio dinamico para un cliente y proveedor. Solo devuelve la respuesta.",
+      "fields": {
+        "customer_number": {
+          "description": "Numero de cliente aceptado por la API de lista de contratos del proveedor.",
+          "name": "Numero de cliente"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "platform_company_id": {
+          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
+          "name": "ID de empresa de plataforma"
+        }
+      },
+      "name": "Listar contratos de precio dinamico"
+    },
+    "list_faq_answers": {
+      "description": "Lista respuestas FAQ de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar respuestas FAQ"
+    },
+    "list_faqs": {
+      "description": "Lista entradas FAQ de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar FAQs"
+    },
+    "list_grid_standards": {
+      "description": "Lista estandares de conexion a red para un codigo de pais. Solo devuelve la respuesta.",
+      "fields": {
+        "country": {
+          "description": "Codigo de pais aceptado por la API de la app Jackery.",
+          "name": "Pais"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Listar estandares de red"
+    },
+    "list_notifications": {
+      "description": "Lista notificaciones push de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
+      "fields": {
+        "current_time": {
+          "description": "Timestamp currentTime opcional en milisegundos; 0 desactiva el filtro.",
+          "name": "Hora actual"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Filtro opcional de numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        },
+        "page_no": {
+          "description": "Numero de pagina empezando en 1.",
+          "name": "Numero de pagina"
+        },
+        "page_size": {
+          "description": "Numero de notificaciones por pagina.",
+          "name": "Tamano de pagina"
+        }
+      },
+      "name": "Listar notificaciones"
     },
     "list_shared_devices": {
       "description": "Lista los dispositivos compartidos con la cuenta de Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
@@ -2154,16 +2430,6 @@
       },
       "name": "Listar fallos de vinculacion Shelly"
     },
-    "get_shelly_auth_url": {
-      "description": "Obtiene la autorizacion OAuth de Shelly gestionada por Jackery para la cuenta propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener URL de Shelly"
-    },
     "list_shelly_devices": {
       "description": "Lista dispositivos Shelly Cloud vinculados a la cuenta Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
       "fields": {
@@ -2173,6 +2439,90 @@
         }
       },
       "name": "Listar dispositivos Shelly"
+    },
+    "query_box_stat": {
+      "description": "Consulta estadisticas electricas genericas de box para un numero de serie. Solo devuelve la respuesta.",
+      "fields": {
+        "begin_date": {
+          "description": "Fecha inicial enviada como beginDate.",
+          "name": "Fecha inicial"
+        },
+        "date_type": {
+          "description": "Tipo de periodo estadistico de la app.",
+          "name": "Tipo de fecha"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        },
+        "end_date": {
+          "description": "Fecha final enviada como endDate.",
+          "name": "Fecha final"
+        },
+        "key": {
+          "description": "Clave estadistica opcional aceptada por la API de la app Jackery.",
+          "name": "Clave"
+        }
+      },
+      "name": "Consultar estadisticas de box"
+    },
+    "query_carbon_stat": {
+      "description": "Consulta estadisticas de carbono para un numero de serie. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        }
+      },
+      "name": "Consultar estadisticas de carbono"
+    },
+    "query_charge_report": {
+      "description": "Consulta el historial de informe de carga para un numero de serie. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        },
+        "page_index": {
+          "description": "Indice de pagina empezando en uno.",
+          "name": "Indice de pagina"
+        }
+      },
+      "name": "Consultar informe de carga"
+    },
+    "query_cutoff_stat": {
+      "description": "Consulta estadisticas de corte para un numero de serie. Solo devuelve la respuesta.",
+      "fields": {
+        "begin_date": {
+          "description": "Fecha inicial enviada como beginDate.",
+          "name": "Fecha inicial"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie enviado como deviceSn.",
+          "name": "Numero de serie"
+        },
+        "end_date": {
+          "description": "Fecha final enviada como endDate.",
+          "name": "Fecha final"
+        }
+      },
+      "name": "Consultar estadisticas de corte"
     },
     "query_electricity_strategy": {
       "description": "Consulta todos los planes de estrategia el\u00e9ctrica del dispositivo.",
@@ -2184,6 +2534,52 @@
       },
       "name": "Consultar estrategias el\u00e9ctricas"
     },
+    "query_profit_stat": {
+      "description": "Consulta estadisticas de beneficio para el dispositivo seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Consultar estadisticas de beneficio"
+    },
+    "query_soc_stat": {
+      "description": "Consulta estadisticas SOC para el dispositivo seleccionado. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Consultar estadisticas SOC"
+    },
+    "query_socket_stat": {
+      "description": "Consulta estadisticas de grafico de enchufe de la app para un ID de accesorio smart-socket. Solo devuelve la respuesta.",
+      "fields": {
+        "begin_date": {
+          "description": "Fecha inicial del periodo enviada como beginDate, por ejemplo 2026-07-01.",
+          "name": "Fecha inicial"
+        },
+        "date_type": {
+          "description": "Tipo de periodo de estadistica de la app.",
+          "name": "Tipo de fecha"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "end_date": {
+          "description": "Fecha final del periodo enviada como endDate, por ejemplo 2026-07-08.",
+          "name": "Fecha final"
+        },
+        "target_dev_id": {
+          "description": "ID del accesorio smart-socket enviado como deviceId a la API de estadisticas de la app.",
+          "name": "ID del dispositivo destino"
+        }
+      },
+      "name": "Consultar estadisticas de enchufe"
+    },
     "query_third_party_mqtt_config": {
       "description": "Consulta la configuracion experimental del puente MQTT de terceros mediante el canal de comandos MQTT de Jackery existente.",
       "fields": {
@@ -2193,6 +2589,16 @@
         }
       },
       "name": "Consultar configuracion MQTT de terceros"
+    },
+    "query_tou_plan": {
+      "description": "Consulta el plan TOU actual mediante la API HTTP de Jackery. Solo devuelve la respuesta.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Consultar plan TOU"
     },
     "refresh_subdevices": {
       "description": "Fuerza una redetecci\u00f3n de accesorios y subdispositivos desde la nube de Jackery y, a continuaci\u00f3n, actualiza todas las entidades. \u00dasalo despu\u00e9s de a\u00f1adir o quitar f\u00edsicamente un accesorio.",
@@ -2250,34 +2656,6 @@
       },
       "name": "Eliminar acceso compartido"
     },
-    "unbind_shelly_account": {
-      "description": "Desvincula la cuenta Shelly de la cuenta Jackery propietaria del dispositivo seleccionado y luego actualiza.",
-      "fields": {
-        "device_id": {
-          "description": "Selecciona un dispositivo Jackery. La desvinculacion de la cuenta Shelly se realiza en la cuenta propietaria.",
-          "name": "ID de dispositivo"
-        }
-      },
-      "name": "Desvincular cuenta Shelly"
-    },
-    "unbind_shelly_device": {
-      "description": "Desvincula un dispositivo Shelly Cloud mediante la cuenta Jackery propietaria del dispositivo seleccionado y luego actualiza.",
-      "fields": {
-        "binding_id": {
-          "description": "ID de vinculacion Shelly devuelto por la nube Jackery.",
-          "name": "ID de vinculacion"
-        },
-        "device_id": {
-          "description": "Selecciona un dispositivo Jackery. La desvinculacion del dispositivo Shelly se realiza en la cuenta propietaria.",
-          "name": "ID de dispositivo"
-        },
-        "shelly_device_id": {
-          "description": "ID del dispositivo Shelly que se debe desvincular.",
-          "name": "ID de dispositivo Shelly"
-        }
-      },
-      "name": "Desvincular dispositivo Shelly"
-    },
     "rename_system": {
       "description": "Cambia el nombre de un sistema Jackery SolarVault mediante la API de la nube de Jackery. El nombre se muestra en la app de Jackery y en la informaci\u00f3n del dispositivo de Home Assistant.",
       "fields": {
@@ -2291,6 +2669,88 @@
         }
       },
       "name": "Cambiar nombre del sistema SolarVault"
+    },
+    "report_device_timezone": {
+      "description": "Informa la zona horaria del dispositivo a la nube de Jackery, igual que la sincronizaci\u00f3n de la app.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        },
+        "timezone_offset": {
+          "description": "Desfase UTC en minutos (por ejemplo, 120 para CEST).",
+          "name": "Desfase horario"
+        },
+        "zone_id": {
+          "description": "ID de zona IANA, por ejemplo Europe/Berlin.",
+          "name": "ID de zona"
+        }
+      },
+      "name": "Informar zona horaria del dispositivo"
+    },
+    "save_device_max_power": {
+      "description": "Guarda el registro documentado de potencia maxima mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        },
+        "max_power": {
+          "description": "Valor de potencia maxima enviado como maxPower.",
+          "name": "Potencia maxima"
+        }
+      },
+      "name": "Guardar potencia maxima"
+    },
+    "save_dynamic_price_contract_auth": {
+      "description": "Guarda la autorizacion del contrato de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "contract_id": {
+          "description": "ID de contrato aceptado por la API de autorizacion del proveedor.",
+          "name": "ID del contrato"
+        },
+        "custom_id": {
+          "description": "ID de cliente o personalizado aceptado por la API de autorizacion del proveedor.",
+          "name": "ID personalizado"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
+          "name": "ID del dispositivo"
+        },
+        "platform_company_id": {
+          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
+          "name": "ID de empresa de plataforma"
+        }
+      },
+      "name": "Guardar autorizacion de contrato"
+    },
+    "save_dynamic_price_location_id": {
+      "description": "Guarda un token de conexion Flatpeak de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "connect_token": {
+          "description": "Token de conexion Flatpeak aceptado por la API de la app Jackery.",
+          "name": "Token de conexion"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Guardar token de ubicacion"
+    },
+    "save_tou_plan": {
+      "description": "Guarda el plan TOU mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "body": {
+          "description": "Tareas TOU como lista JSON o como objeto que contiene una lista tasks.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Guardar plan TOU"
     },
     "send_ble_command": {
       "description": "Env\u00eda un frame binario BLE experimental al dispositivo seleccionado. Requiere transporte BLE, escrituras BLE y una conexi\u00f3n BLE activa.",
@@ -2340,101 +2800,23 @@
       },
       "name": "Enviar horario del dispositivo"
     },
-    "query_tou_plan": {
-      "description": "Consulta el plan TOU actual mediante la API HTTP de Jackery. Solo devuelve la respuesta.",
+    "set_ac_nickname": {
+      "description": "Renombra una salida CA de un dispositivo port\u00e1til y actualiza despu\u00e9s.",
       "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Consultar plan TOU"
-    },
-    "save_tou_plan": {
-      "description": "Guarda el plan TOU mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "body": {
-          "description": "Tareas TOU como lista JSON o como objeto que contiene una lista tasks.",
-          "name": "Body"
+        "ac_port": {
+          "description": "Salida CA a renombrar (1 o 2).",
+          "name": "Puerto CA"
         },
         "device_id": {
-          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Guardar plan TOU"
-    },
-    "list_currencies": {
-      "description": "Lista las monedas disponibles para la cuenta Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar monedas"
-    },
-    "get_device_currency": {
-      "description": "Obtiene la carga de moneda del dispositivo Jackery seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener moneda del dispositivo"
-    },
-    "bind_currency": {
-      "description": "Vincula una moneda al dispositivo Jackery seleccionado mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "currency": {
-          "description": "Codigo de moneda o identificador aceptado por la API de la app Jackery.",
-          "name": "Moneda"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Vincular moneda"
-    },
-    "list_accessories": {
-      "description": "Lista accesorios inteligentes para el dispositivo Jackery seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar accesorios"
-    },
-    "check_accessories_exist": {
-      "description": "Comprueba si existen accesorios para los IDs de dispositivos Jackery indicados. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "description": "Elige el dispositivo port\u00e1til Jackery propietario del puerto CA.",
           "name": "ID del dispositivo"
         },
-        "devices": {
-          "description": "IDs de dispositivos Jackery separados por comas para el parametro devices de la API de la app.",
-          "name": "Dispositivos"
+        "nickname": {
+          "description": "Nuevo nombre visible para la salida CA.",
+          "name": "Nombre"
         }
       },
-      "name": "Comprobar accesorios"
-    },
-    "check_jackery_accessories_exist": {
-      "description": "Comprueba si existen accesorios Jackery para la informacion de serie indicada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn_infos": {
-          "description": "Informacion de serie aceptada por la API de la app Jackery.",
-          "name": "Informacion de serie"
-        }
-      },
-      "name": "Comprobar accesorios Jackery"
+      "name": "Establecer nombre del puerto CA"
     },
     "set_accessory_name": {
       "description": "Renombra un accesorio inteligente mediante la API HTTP de Jackery y despues actualiza el coordinador.",
@@ -2453,502 +2835,6 @@
         }
       },
       "name": "Renombrar accesorio"
-    },
-    "get_dynamic_price_login_url": {
-      "description": "Obtiene la URL de inicio de sesion del proveedor de precio dinamico para el dispositivo seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
-          "name": "ID del dispositivo"
-        },
-        "platform_company_id": {
-          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
-          "name": "ID de empresa de plataforma"
-        }
-      },
-      "name": "Obtener URL de precio dinamico"
-    },
-    "list_dynamic_price_contracts": {
-      "description": "Lista contratos de precio dinamico para un cliente y proveedor. Solo devuelve la respuesta.",
-      "fields": {
-        "customer_number": {
-          "description": "Numero de cliente aceptado por la API de lista de contratos del proveedor.",
-          "name": "Numero de cliente"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "platform_company_id": {
-          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
-          "name": "ID de empresa de plataforma"
-        }
-      },
-      "name": "Listar contratos de precio dinamico"
-    },
-    "save_dynamic_price_contract_auth": {
-      "description": "Guarda la autorizacion del contrato de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "contract_id": {
-          "description": "ID de contrato aceptado por la API de autorizacion del proveedor.",
-          "name": "ID del contrato"
-        },
-        "custom_id": {
-          "description": "ID de cliente o personalizado aceptado por la API de autorizacion del proveedor.",
-          "name": "ID personalizado"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
-          "name": "ID del dispositivo"
-        },
-        "platform_company_id": {
-          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
-          "name": "ID de empresa de plataforma"
-        }
-      },
-      "name": "Guardar autorizacion de contrato"
-    },
-    "cancel_dynamic_price_contract_auth": {
-      "description": "Cancela la autorizacion del contrato de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta y el sistema.",
-          "name": "ID del dispositivo"
-        },
-        "platform_company_id": {
-          "description": "ID de empresa de plataforma del proveedor de precio dinamico aceptado por la API de la app Jackery.",
-          "name": "ID de empresa de plataforma"
-        }
-      },
-      "name": "Cancelar autorizacion de contrato"
-    },
-    "save_dynamic_price_location_id": {
-      "description": "Guarda un token de conexion Flatpeak de precio dinamico mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "connect_token": {
-          "description": "Token de conexion Flatpeak aceptado por la API de la app Jackery.",
-          "name": "Token de conexion"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Guardar token de ubicacion"
-    },
-    "query_socket_stat": {
-      "description": "Consulta estadisticas de grafico de enchufe de la app para un ID de accesorio smart-socket. Solo devuelve la respuesta.",
-      "fields": {
-        "begin_date": {
-          "description": "Fecha inicial del periodo enviada como beginDate, por ejemplo 2026-07-01.",
-          "name": "Fecha inicial"
-        },
-        "date_type": {
-          "description": "Tipo de periodo de estadistica de la app.",
-          "name": "Tipo de fecha"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "end_date": {
-          "description": "Fecha final del periodo enviada como endDate, por ejemplo 2026-07-08.",
-          "name": "Fecha final"
-        },
-        "target_dev_id": {
-          "description": "ID del accesorio smart-socket enviado como deviceId a la API de estadisticas de la app.",
-          "name": "ID del dispositivo destino"
-        }
-      },
-      "name": "Consultar estadisticas de enchufe"
-    },
-    "list_country_zones": {
-      "description": "Lista entradas de pais/zona usadas por la configuracion de dispositivos DIY de Jackery. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar zonas de pais"
-    },
-    "list_grid_standards": {
-      "description": "Lista estandares de conexion a red para un codigo de pais. Solo devuelve la respuesta.",
-      "fields": {
-        "country": {
-          "description": "Codigo de pais aceptado por la API de la app Jackery.",
-          "name": "Pais"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar estandares de red"
-    },
-    "check_system_bound": {
-      "description": "Comprueba si la combinacion de bind key, numero de serie y GUID ya esta vinculada. Solo devuelve la respuesta.",
-      "fields": {
-        "bind_key": {
-          "description": "Bind key aceptada por la API de la app Jackery.",
-          "name": "Bind key"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        },
-        "guid": {
-          "description": "GUID enviado a la API de la app Jackery.",
-          "name": "GUID"
-        }
-      },
-      "name": "Comprobar vinculacion del sistema"
-    },
-    "save_device_max_power": {
-      "description": "Guarda el registro documentado de potencia maxima mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery. Las automatizaciones tambien pueden pasar directamente el ID numerico del dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        },
-        "max_power": {
-          "description": "Valor de potencia maxima enviado como maxPower.",
-          "name": "Potencia maxima"
-        }
-      },
-      "name": "Guardar potencia maxima"
-    },
-    "get_alarm_detail": {
-      "description": "Obtiene el detalle de alarma por alarm key mediante la API HTTP de Jackery. Solo devuelve la respuesta.",
-      "fields": {
-        "alarm_key": {
-          "description": "Alarm key aceptada por la API de la app Jackery.",
-          "name": "Alarm key"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener detalle de alarma"
-    },
-    "list_notifications": {
-      "description": "Lista notificaciones push de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "current_time": {
-          "description": "Timestamp currentTime opcional en milisegundos; 0 desactiva el filtro.",
-          "name": "Hora actual"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Filtro opcional de numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        },
-        "page_no": {
-          "description": "Numero de pagina empezando en 1.",
-          "name": "Numero de pagina"
-        },
-        "page_size": {
-          "description": "Numero de notificaciones por pagina.",
-          "name": "Tamano de pagina"
-        }
-      },
-      "name": "Listar notificaciones"
-    },
-    "get_unread_count": {
-      "description": "Obtiene contadores de notificaciones no leidas para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener contador no leido"
-    },
-    "get_push_config": {
-      "description": "Obtiene la configuracion de notificaciones push para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener configuracion push"
-    },
-    "set_push_config": {
-      "description": "Configura notificaciones push para la cuenta seleccionada mediante la API HTTP de Jackery.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "set": {
-          "description": "Valor entero de configuracion push aceptado por la API de la app Jackery.",
-          "name": "Set"
-        }
-      },
-      "name": "Configurar push"
-    },
-    "sync_alerts": {
-      "description": "Sincroniza fallos y alertas mediante la API HTTP de Jackery y despues actualiza el coordinador.",
-      "fields": {
-        "content": {
-          "description": "Payload de contenido de alerta aceptado por la API de la app Jackery.",
-          "name": "Contenido"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "id": {
-          "description": "Identificador de dispositivo o sistema enviado como id.",
-          "name": "ID"
-        }
-      },
-      "name": "Sincronizar alertas"
-    },
-    "get_offline_statistics": {
-      "description": "Obtiene estadisticas offline para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener estadisticas offline"
-    },
-    "query_charge_report": {
-      "description": "Consulta el historial de informe de carga para un numero de serie. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        },
-        "page_index": {
-          "description": "Indice de pagina empezando en uno.",
-          "name": "Indice de pagina"
-        }
-      },
-      "name": "Consultar informe de carga"
-    },
-    "query_cutoff_stat": {
-      "description": "Consulta estadisticas de corte para un numero de serie. Solo devuelve la respuesta.",
-      "fields": {
-        "begin_date": {
-          "description": "Fecha inicial enviada como beginDate.",
-          "name": "Fecha inicial"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        },
-        "end_date": {
-          "description": "Fecha final enviada como endDate.",
-          "name": "Fecha final"
-        }
-      },
-      "name": "Consultar estadisticas de corte"
-    },
-    "query_soc_stat": {
-      "description": "Consulta estadisticas SOC para el dispositivo seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Consultar estadisticas SOC"
-    },
-    "query_carbon_stat": {
-      "description": "Consulta estadisticas de carbono para un numero de serie. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        }
-      },
-      "name": "Consultar estadisticas de carbono"
-    },
-    "query_profit_stat": {
-      "description": "Consulta estadisticas de beneficio para el dispositivo seleccionado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Consultar estadisticas de beneficio"
-    },
-    "query_box_stat": {
-      "description": "Consulta estadisticas electricas genericas de box para un numero de serie. Solo devuelve la respuesta.",
-      "fields": {
-        "begin_date": {
-          "description": "Fecha inicial enviada como beginDate.",
-          "name": "Fecha inicial"
-        },
-        "date_type": {
-          "description": "Tipo de periodo estadistico de la app.",
-          "name": "Tipo de fecha"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como deviceSn.",
-          "name": "Numero de serie"
-        },
-        "end_date": {
-          "description": "Fecha final enviada como endDate.",
-          "name": "Fecha final"
-        },
-        "key": {
-          "description": "Clave estadistica opcional aceptada por la API de la app Jackery.",
-          "name": "Clave"
-        }
-      },
-      "name": "Consultar estadisticas de box"
-    },
-    "check_app_version": {
-      "description": "Comprueba metadatos de version de la app Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "type": {
-          "description": "Tipo opcional de plataforma enviado como type.",
-          "name": "Tipo"
-        },
-        "version_name": {
-          "description": "Version opcional de app enviada como versionName.",
-          "name": "Nombre de version"
-        }
-      },
-      "name": "Comprobar version de app"
-    },
-    "list_banners": {
-      "description": "Lista banners de la app Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar banners"
-    },
-    "submit_feedback": {
-      "description": "Envia feedback mediante la API HTTP de Jackery.",
-      "fields": {
-        "contact_info": {
-          "description": "Informacion de contacto enviada como contactInfo.",
-          "name": "Informacion de contacto"
-        },
-        "content": {
-          "description": "Contenido del feedback.",
-          "name": "Contenido"
-        },
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie opcional enviado como deviceSn.",
-          "name": "Numero de serie"
-        }
-      },
-      "name": "Enviar feedback"
-    },
-    "list_faqs": {
-      "description": "Lista entradas FAQ de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar FAQs"
-    },
-    "list_faq_answers": {
-      "description": "Lista respuestas FAQ de Jackery para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Listar respuestas FAQ"
-    },
-    "check_privacy_update": {
-      "description": "Comprueba si la cuenta seleccionada requiere consentimiento de privacidad actualizado. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Comprobar privacidad"
-    },
-    "agree_privacy_consent": {
-      "description": "Registra aceptacion de una o varias versiones de privacidad de Jackery.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "pending_agree_version_ids": {
-          "description": "Lista de IDs numericos de version de privacidad enviada como pendingAgreeVersionIds.",
-          "name": "IDs de consentimiento pendientes"
-        }
-      },
-      "name": "Aceptar privacidad"
-    },
-    "get_product_instruction": {
-      "description": "Obtiene instrucciones de producto para un numero de serie. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        },
-        "device_sn": {
-          "description": "Numero de serie enviado como devSn.",
-          "name": "Numero de serie"
-        },
-        "type": {
-          "description": "Filtro opcional de tipo de instruccion enviado como type.",
-          "name": "Tipo"
-        }
-      },
-      "name": "Obtener instruccion de producto"
-    },
-    "get_user_info": {
-      "description": "Obtiene informacion del perfil de usuario autenticado para la cuenta seleccionada. Solo devuelve la respuesta.",
-      "fields": {
-        "device_id": {
-          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
-          "name": "ID del dispositivo"
-        }
-      },
-      "name": "Obtener informacion de usuario"
     },
     "set_account_nickname": {
       "description": "Set the account display nickname for the Jackery account that owns the selected device. The nickname is shown in the Jackery app profile.",
@@ -2977,6 +2863,38 @@
         }
       },
       "name": "Establecer apodo del dispositivo"
+    },
+    "set_push_config": {
+      "description": "Configura notificaciones push para la cuenta seleccionada mediante la API HTTP de Jackery.",
+      "fields": {
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "set": {
+          "description": "Valor entero de configuracion push aceptado por la API de la app Jackery.",
+          "name": "Set"
+        }
+      },
+      "name": "Configurar push"
+    },
+    "set_storm_alert_location": {
+      "description": "Update the GPS location used for storm and weather alerts on the selected device via the Jackery cloud API.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        },
+        "latitude": {
+          "description": "Latitude in decimal degrees (-90 to 90).",
+          "name": "Latitude"
+        },
+        "longitude": {
+          "description": "Longitude in decimal degrees (-180 to 180).",
+          "name": "Longitude"
+        }
+      },
+      "name": "Set storm alert location"
     },
     "set_third_party_mqtt_config": {
       "description": "Configura el puente MQTT de terceros experimental mediante el canal de comandos MQTT de Jackery existente.",
@@ -3012,6 +2930,60 @@
       },
       "name": "Configurar MQTT de terceros"
     },
+    "submit_feedback": {
+      "description": "Envia feedback mediante la API HTTP de Jackery.",
+      "fields": {
+        "contact_info": {
+          "description": "Informacion de contacto enviada como contactInfo.",
+          "name": "Informacion de contacto"
+        },
+        "content": {
+          "description": "Contenido del feedback.",
+          "name": "Contenido"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "device_sn": {
+          "description": "Numero de serie opcional enviado como deviceSn.",
+          "name": "Numero de serie"
+        }
+      },
+      "name": "Enviar feedback"
+    },
+    "sync_alerts": {
+      "description": "Sincroniza fallos y alertas mediante la API HTTP de Jackery y despues actualiza el coordinador.",
+      "fields": {
+        "content": {
+          "description": "Payload de contenido de alerta aceptado por la API de la app Jackery.",
+          "name": "Contenido"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery para seleccionar la cuenta propietaria.",
+          "name": "ID del dispositivo"
+        },
+        "id": {
+          "description": "Identificador de dispositivo o sistema enviado como id.",
+          "name": "ID"
+        }
+      },
+      "name": "Sincronizar alertas"
+    },
+    "unbind_accessories": {
+      "description": "Desvincula accesorios inteligentes del dispositivo principal por ID de vinculaci\u00f3n y actualiza despu\u00e9s. Devuelve el resultado por elemento.",
+      "fields": {
+        "bind_ids": {
+          "description": "Lista de IDs de vinculaci\u00f3n de accesorios a desvincular.",
+          "name": "IDs de vinculaci\u00f3n"
+        },
+        "device_id": {
+          "description": "Elige un dispositivo Jackery de la cuenta propietaria de los accesorios.",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Desvincular accesorios"
+    },
     "unbind_device": {
       "description": "Desvincula (elimina) un dispositivo de la cuenta de Jackery mediante la API en la nube de Jackery. Es destructivo: el dispositivo y sus entidades se eliminan de Home Assistant tras la siguiente actualizacion.",
       "fields": {
@@ -3021,6 +2993,34 @@
         }
       },
       "name": "Desvincular dispositivo"
+    },
+    "unbind_shelly_account": {
+      "description": "Desvincula la cuenta Shelly de la cuenta Jackery propietaria del dispositivo seleccionado y luego actualiza.",
+      "fields": {
+        "device_id": {
+          "description": "Selecciona un dispositivo Jackery. La desvinculacion de la cuenta Shelly se realiza en la cuenta propietaria.",
+          "name": "ID de dispositivo"
+        }
+      },
+      "name": "Desvincular cuenta Shelly"
+    },
+    "unbind_shelly_device": {
+      "description": "Desvincula un dispositivo Shelly Cloud mediante la cuenta Jackery propietaria del dispositivo seleccionado y luego actualiza.",
+      "fields": {
+        "binding_id": {
+          "description": "ID de vinculacion Shelly devuelto por la nube Jackery.",
+          "name": "ID de vinculacion"
+        },
+        "device_id": {
+          "description": "Selecciona un dispositivo Jackery. La desvinculacion del dispositivo Shelly se realiza en la cuenta propietaria.",
+          "name": "ID de dispositivo"
+        },
+        "shelly_device_id": {
+          "description": "ID del dispositivo Shelly que se debe desvincular.",
+          "name": "ID de dispositivo Shelly"
+        }
+      },
+      "name": "Desvincular dispositivo Shelly"
     },
     "unbind_smart_part": {
       "description": "Desvincula (elimina) un accesorio inteligente del dispositivo seleccionado mediante MQTT.",
