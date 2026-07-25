@@ -4,151 +4,86 @@
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A custom [Home Assistant](https://www.home-assistant.io/) integration for Jackery
-SolarVault / HomePower home-energy systems and Explorer portable power stations.
-It talks to the Jackery cloud over HTTPS as the primary, authoritative data path,
-and layers optional MQTT push and Bluetooth (BLE) transports on top for lower
-latency — without ever letting those supplemental layers block the HTTP path.
+A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your Jackery SolarVault, HomePower, and Explorer power stations directly into your smart home. 
 
-> **Status:** Targets the Home Assistant *Platinum* quality scale. Configuration
-> is UI-only (config entries); there is no YAML configuration.
+Whether you want to monitor your solar input, check your battery level, or automate your home based on your Jackery's energy flow – this integration provides real-time data and full control over your Jackery devices.
 
-## High-level description
+---
 
-The integration signs in to a Jackery cloud account and exposes each bound power
-station as a Home Assistant device with sensors (power, state-of-charge, energy,
-temperatures, grid/PV flows), configuration entities (charge/discharge limits,
-output priorities, working mode, output timers), and actions (services) that
-mirror the Jackery mobile app — including device binding, QR-code sharing,
-time-of-use scheduling, and Shelly cloud-to-cloud linking.
+## 🔋 Supported Devices
 
-Long-run energy statistics are backfilled into Home Assistant's long-term
-statistics from 5-minute samples up through weekly, monthly and yearly period
-totals.
+This integration supports a wide range of Jackery devices, including:
 
-## Supported devices
+- **Home Energy Systems:** Jackery SolarVault and HomePower series.
+- **Portable Power Stations (Explorer Series):** E240, E557, E900, E1000, E1500V2, E1800, E2000, E3000, E7647, E7987.
+- **Accessories:** Battery packs, Smart Meters, Smart Plugs, and linked Shelly cloud sockets.
 
-- **Home energy systems:** Jackery SolarVault / HomePower series (reported by the
-  cloud as `Powerstation` devices, carrying `HomeBody` / `SystemBody` / `BoxBody`
-  telemetry).
-- **Explorer portable power stations:** `E240`, `E557`, `E900`, `E1000`,
-  `E1500V2`, `E1800`, `E2000`, `E3000`, `E7647`, `E7987` (portable `PortableBody`
-  telemetry and controls).
-- **Sub-devices / accessories:** battery packs, CT / smart meters, smart plugs and
-  sockets, meter heads, and Shelly cloud sockets bound to the account.
+---
 
-## Supported functions
+## ✨ Features
 
-Entities are created across these platforms:
+- **Live Monitoring:** Track State of Charge (SOC), PV (Solar) input power, grid import/export, output power, and temperatures.
+- **Full Control:** Toggle AC/DC outputs, change working modes, set charge limits, and prioritize outputs.
+- **Automations:** Seamlessly automate your Jackery power station based on conditions (e.g., turn on a smart plug when the battery reaches 100%).
+- **Energy Dashboard:** Integrates perfectly with the Home Assistant Energy Dashboard using long-term statistics (daily, weekly, monthly, yearly).
+- **Fast & Reliable:** Uses the Jackery Cloud as the primary source of truth, enhanced by local Bluetooth (BLE) and MQTT for instant, low-latency updates.
 
-| Platform | Examples |
-|----------|----------|
-| `sensor` | SOC, input/output/PV power, grid in/out, temperatures, remaining runtime, energy period totals |
-| `binary_sensor` | charging / online / fault flags |
-| `number` | charge power, energy-storage charge limit, per-port output-priority SOC, custom-use battery bounds, output countdowns, AC output delay-open time, Bluetooth sleep time |
-| `select` | working mode, charge mode, battery mode, output priority (master + per AC1/AC2/DC port), UPS model, temperature unit, CT phase, electricity price mode |
-| `switch` | EPS output, AC/DC outputs, output-priority master, discharge memory, energy saving, super charge |
-| `button` | reboot, power-pack blink, plan queries |
-| `text` | Wi-Fi / diagnostic identifiers |
+---
 
-## Installation
+## 🛠️ Installation
 
-### HACS (recommended)
+### Option 1: HACS (Recommended)
+1. Open Home Assistant and go to **HACS**.
+2. Add this repository as a custom repository (Category: *Integration*).
+3. Search for **Jackery SolarVault** and click Download.
+4. Restart Home Assistant.
 
-1. In HACS, add this repository as a custom repository (category: *Integration*).
-2. Install **Jackery SolarVault**.
+### Option 2: Manual
+1. Download the latest release.
+2. Copy the `custom_components/jackery_solarvault` folder into your Home Assistant `config/custom_components/` directory.
 3. Restart Home Assistant.
 
-### Manual
+---
 
-Copy `custom_components/jackery_solarvault` into your Home Assistant
-`config/custom_components/` directory and restart Home Assistant.
+## ⚙️ Configuration
 
-## Configuration
+1. Go to **Settings → Devices & Services**.
+2. Click **Add Integration** and search for **Jackery SolarVault**.
+3. Follow the setup wizard and enter your Jackery Cloud credentials.
 
-Add the integration from **Settings → Devices & Services → Add Integration →
-Jackery SolarVault**, then complete the config flow.
+> [!WARNING]
+> **Important Account Limitation:** Jackery only allows one active session per account. If you log in with your primary app account, you will regularly be logged out on your phone, or the integration will disconnect.  
+> **Solution:** Create a **second, dedicated Jackery account** just for Home Assistant. Share your Jackery devices from your main app account with this new dedicated HA account!
 
-### Configuration parameters
+### Configuration Options
+- **Email & Password:** Your dedicated Jackery Cloud account credentials.
+- **Bluetooth (BLE):** Optional. Allows direct communication when your HA server is in Bluetooth range of the Jackery.
+- **Local MQTT:** Optional. Use this if your device is configured to publish data to a local MQTT broker.
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| Account e-mail | yes | The Jackery cloud account e-mail. Use a **dedicated** account (see limitations). |
-| Password | yes | The Jackery cloud account password. |
-| Enable BLE transport | no | Use Bluetooth as a supplemental low-latency transport when the device is in range. |
-| Local MQTT host / port / username / password | no | Point at a local MQTT broker that the device has been provisioned to publish to. |
-| Third-party MQTT host / port / username / password | no | Credentials for a third-party MQTT relay. |
+---
 
-MQTT and BLE are **supplemental**: the HTTP cloud path always runs and remains the
-source of truth. Missing MQTT/BLE settings simply disable those layers.
+## 💡 Automations & Examples
 
-## Removal
-
-Remove the integration from **Settings → Devices & Services**, open the Jackery
-SolarVault entry's menu and choose **Delete**. All devices, entities and the
-stored account credentials are removed with the config entry. To fully uninstall
-the code, remove it from HACS (or delete `custom_components/jackery_solarvault`)
-and restart Home Assistant.
-
-## Data updates
-
-- **HTTP cloud (primary):** polled on a fixed interval; this is the authoritative
-  data path and the only one that performs authentication.
-- **MQTT push (supplemental, "Layer 5"):** merges live device-property changes
-  into coordinator data between polls. It never gates or delays an HTTP fetch.
-- **BLE (supplemental):** optional local transport for command delivery and live
-  updates when the device is in Bluetooth range.
-
-Energy figures are aggregated into long-term statistics from 5-minute samples up
-to week / month / year period totals.
-
-## Actions (services)
-
-The integration registers 60+ services under the `jackery_solarvault` domain that
-mirror the app. Notable examples:
-
-- **Device & pairing:** `bind_device`, `unbind_device`, `set_device_nickname`,
-  `get_share_qr_code` (QR-code sharing), `accept_shared_device`,
-  `list_shared_devices`, `check_system_bound`.
-- **Cloud-to-cloud (Shelly):** `get_shelly_auth_url`, `list_shelly_devices`,
-  `unbind_shelly_device`, `unbind_shelly_account`.
-- **Accessories / sub-devices:** `list_accessories`, `get_accessories`,
-  `set_accessory_name`, `bind_smart_part`, `unbind_smart_part`,
-  `refresh_subdevices`, `query_socket_stat`.
-- **Energy scheduling & tariffs:** `save_tou_plan`, `query_tou_plan`,
-  `insert_electricity_strategy`, `update_electricity_strategy`,
-  `save_dynamic_price_contract_auth`, `bind_currency`.
-- **Statistics:** `query_charge_report`, `query_soc_stat`, `query_carbon_stat`,
-  `query_profit_stat`, `get_offline_statistics`.
-- **Maintenance:** `rename_system`, `save_device_max_power`, `send_ble_command`,
-  `set_third_party_mqtt_config`, `sync_alerts`.
-
-See `custom_components/jackery_solarvault/services.yaml` for the full list and
-each service's fields.
-
-## Examples
-
-Notify when the battery drops below 20 %:
-
+**Notify when the battery is low:**
 ```yaml
 automation:
-  - alias: "Jackery low battery"
+  - alias: "Jackery Low Battery Warning"
     triggers:
       - trigger: numeric_state
         entity_id: sensor.jackery_solarvault_state_of_charge
         below: 20
     actions:
-      - action: notify.mobile_app
+      - action: notify.notify
         data:
-          message: "Jackery SolarVault battery is below 20%."
+          message: "Your Jackery battery is below 20%!"
 ```
 
-Save a time-of-use schedule via a service call:
-
+**Set a Time-of-Use Schedule:**
+You can use the integration's custom services to change advanced settings like charging schedules:
 ```yaml
 action: jackery_solarvault.save_tou_plan
 data:
-  device_id: "<your device id>"
+  device_id: "<your_device_id>"
   body:
     tasks:
       - start: "04:00"
@@ -158,41 +93,19 @@ data:
         sysSwitch: 1
 ```
 
-## Known limitations
+---
 
-- **One active cloud session per account.** Jackery allows only a single active
-  session per account. Use a **dedicated HA-only account** and share the
-  SolarVault with it. Sharing the same account with the mobile app causes MQTT
-  auth failures from token rotation.
-- **Custom TLS CA.** The MQTT broker (`emqx.jackeryapp.com`) is signed by a custom
-  CA (`jackery_ca.crt`) shipped with the integration; there is no insecure
-  fallback.
-- **Period energy sensors are not cumulative.** Week (Mon–Sun), month and year
-  sensors report period totals, not lifetime values — do not feed them into the
-  Energy Dashboard as lifetime totals.
+## ❓ Troubleshooting
 
-## Troubleshooting
+- **My integration keeps disconnecting or sensors say "unavailable":**
+  This usually happens because you are using the same account in the Jackery App on your phone and in Home Assistant. Please create a dedicated account for Home Assistant and share your devices to it.
+- **I don't see live updates, it takes a few minutes to refresh:**
+  The cloud API is polled every few minutes. For instant live updates, enable the optional Bluetooth (BLE) feature in the configuration, provided your Home Assistant server is close enough to the Jackery device.
+- **Where are the lifetime energy sensors?**
+  The provided week, month, and year sensors are *period totals* and reset automatically. For the Home Assistant Energy Dashboard, please use the cumulative energy sensors provided by the integration.
 
-- **MQTT keeps re-authenticating / drops:** the account is probably shared with
-  the mobile app. Use a dedicated account (see limitations).
-- **No live updates, only polled values:** MQTT/BLE are optional; verify the MQTT
-  settings, or rely on the HTTP polling interval.
-- **Entities show *unavailable* after a restart:** the first cloud poll must
-  succeed; transient auth/timeout failures keep the last known data and retry on
-  the next interval.
-- **Contradictory monthly/yearly figures:** upward "repair" of contradictory
-  period values is intentionally blocked by data-quality guards.
+---
 
-## Use cases
+## 📜 License
 
-- Monitor SOC, PV production, grid import/export and load in real time.
-- Automate output ports, charge/discharge limits and working mode from Home
-  Assistant automations.
-- Drive time-of-use / peak-trough charging schedules and dynamic electricity
-  pricing.
-- Track carbon savings and profit statistics, and integrate Shelly cloud sockets
-  bound to the same account.
-
-## License
-
-See [LICENSE](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
