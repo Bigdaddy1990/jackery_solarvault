@@ -637,14 +637,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="already_in_progress")
         return None
 
-    async def async_step_bluetooth(
+    async def _async_route_discovery_to_user(
         self,
-        discovery_info: BluetoothServiceInfoBleak,
+        discovered_name: str,
     ) -> ConfigFlowResult:
-        """Route Bluetooth discovery to the HTTP-account setup form.
+        """Abort duplicate discovery, otherwise route to the HTTP-account setup form.
 
-        BLE is a supplemental transport and must not start account login/setup
-        from discovery alone.
+        Every discovery transport (Bluetooth, DHCP, MQTT, Zeroconf) is a
+        supplemental signal that must not start account login/setup on its
+        own; it only de-duplicates and pre-fills a display name before
+        handing off to the user step.
 
         Returns:
             ConfigFlowResult: An abort result when the discovery is duplicate,
@@ -652,10 +654,22 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
-        discovered_name = discovery_info.name or discovery_info.address
         self.context["title_placeholders"] = {"name": discovered_name}
         await self._async_handle_discovery_without_unique_id()
         return await self.async_step_user()
+
+    async def async_step_bluetooth(
+        self,
+        discovery_info: BluetoothServiceInfoBleak,
+    ) -> ConfigFlowResult:
+        """Route Bluetooth discovery to the HTTP-account setup form.
+
+        Returns:
+            ConfigFlowResult: An abort result when the discovery is duplicate,
+            otherwise the result from the user step.
+        """
+        discovered_name = discovery_info.name or discovery_info.address
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_dhcp(
         self,
@@ -671,12 +685,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ConfigFlowResult: An abort result when the discovery is duplicate or the
             result of proceeding to the user step.
         """
-        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
-            return abort_result
         discovered_name = discovery_info.hostname or discovery_info.ip
-        self.context["title_placeholders"] = {"name": discovered_name}
-        await self._async_handle_discovery_without_unique_id()
-        return await self.async_step_user()
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_mqtt(
         self,
@@ -684,22 +694,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Route MQTT discovery to the HTTP-account setup form.
 
-        MQTT is a supplemental transport and must not start account login/setup
-        from discovery alone.
-
         Returns:
             ConfigFlowResult: An abort result when the discovery is a duplicate, or the
             result returned by `async_step_user()`.
         """
-        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
-            return abort_result
         topic_suffix = discovery_info.topic.rsplit("/", 1)[-1].strip()
         discovered_name = (
             f"Jackery MQTT ({topic_suffix})" if topic_suffix else "Jackery MQTT"
         )
-        self.context["title_placeholders"] = {"name": discovered_name}
-        await self._async_handle_discovery_without_unique_id()
-        return await self.async_step_user()
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_zeroconf(
         self,
@@ -715,14 +718,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ConfigFlowResult: An abort result when the integration is already
             configured, otherwise the result returned by the user setup step.
         """
-        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
-            return abort_result
         discovered_name = (
             discovery_info.name or discovery_info.hostname or discovery_info.host
         )
-        self.context["title_placeholders"] = {"name": discovered_name}
-        await self._async_handle_discovery_without_unique_id()
-        return await self.async_step_user()
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_user(
         self,

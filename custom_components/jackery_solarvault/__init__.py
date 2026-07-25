@@ -4,6 +4,7 @@ import asyncio  # ruff:ignore[unsorted-imports]
 import contextlib
 from datetime import timedelta
 import logging
+import operator
 import os
 from pathlib import Path
 import re
@@ -70,6 +71,7 @@ from .const import (
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
     ENTRY_BOOTSTRAP_MQTT_SESSION,
+    LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
@@ -949,13 +951,6 @@ def _register_deferred_layer5_start(  # ruff:ignore[non-empty-init-module]
         _schedule_layer5_start_if_ready(hass, entry, coordinator)
 
     entry.async_on_unload(async_at_started(hass, _on_hass_started))
-
-
-import operator
-
-from .const import (
-    LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,
-)
 
 
 def _local_mqtt_client(  # ruff:ignore[non-empty-init-module]
