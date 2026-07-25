@@ -19,7 +19,7 @@ jobs:
           # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
           persist-credentials: true
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
           cache: pip

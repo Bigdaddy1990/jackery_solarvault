@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache-dependency-path: |
@@ -41,12 +41,12 @@ jobs:
             pyproject.toml
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
           #enable-cache: true
           #ignore-nothing-to-cache: true
 
       - uses: astral-sh/ruff-action@v4.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
            python-version: 3.14
       - run: ruff check . --fix
