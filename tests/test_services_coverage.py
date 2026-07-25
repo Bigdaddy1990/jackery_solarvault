@@ -11,7 +11,12 @@ from custom_components.jackery_solarvault.const import DOMAIN, SERVICE_FIELD_DEV
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.exceptions import ServiceValidationError
 
-from .test_services import _Call, _Coordinator, _Device, _Registry
+from .test_services import (  # ruff: ignore[banned-api]
+    _Call,
+    _Coordinator,
+    _Device,
+    _Registry,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -38,8 +43,14 @@ def test_payload_has_home_evidence_with_props() -> None:
 
 def test_service_validation_error_with_extra_placeholders() -> None:
     """Test _service_validation_error with extra placeholders."""
-    err = services._service_validation_error("key", device_id="dev1", error="err1", extra_placeholders={"extra": "val"})
-    assert err.translation_placeholders == {"device_id": "dev1", "error": "err1", "extra": "val"}
+    err = services._service_validation_error(
+        "key", device_id="dev1", error="err1", extra_placeholders={"extra": "val"}
+    )
+    assert err.translation_placeholders == {
+        "device_id": "dev1",
+        "error": "err1",
+        "extra": "val",
+    }
 
 
 def test_rename_name_from_service_rejects_non_string() -> None:
@@ -82,51 +93,94 @@ def test_ble_body_from_service_accepts_valid_string() -> None:
 def test_service_required_text_rejects_invalid() -> None:
     """Test _service_required_text validations."""
     with pytest.raises(ServiceValidationError) as exc:
-        services._service_required_text(123, field_name="f", translation_key="k", device_id="d", max_length=10)
+        services._service_required_text(
+            123, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
     assert "must be text" in exc.value.translation_placeholders["error"]
 
     with pytest.raises(ServiceValidationError) as exc2:
-        services._service_required_text("a" * 11, field_name="f", translation_key="k", device_id="d", max_length=10)
+        services._service_required_text(
+            "a" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
     assert "must be at most 10" in exc2.value.translation_placeholders["error"]
 
 
 def test_service_float_rejects_invalid() -> None:
     """Test _service_float validation limits."""
     with pytest.raises(ServiceValidationError) as exc:
-        services._service_float(float("inf"), field_name="f", translation_key="k", device_id="d", min_value=0, max_value=100)
+        services._service_float(
+            float("inf"),
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            min_value=0,
+            max_value=100,
+        )
     assert "must be a number" in exc.value.translation_placeholders["error"]
 
     with pytest.raises(ServiceValidationError) as exc2:
-        services._service_float(-1.0, field_name="f", translation_key="k", device_id="d", min_value=0, max_value=100)
+        services._service_float(
+            -1.0,
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            min_value=0,
+            max_value=100,
+        )
     assert "must be between 0 and 100" in exc2.value.translation_placeholders["error"]
 
     with pytest.raises(ServiceValidationError) as exc3:
-        services._service_float(101.0, field_name="f", translation_key="k", device_id="d", min_value=0, max_value=100)
+        services._service_float(
+            101.0,
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            min_value=0,
+            max_value=100,
+        )
     assert "must be between 0 and 100" in exc3.value.translation_placeholders["error"]
 
 
-async def test_async_handle_get_share_qr_code_success(hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_async_handle_get_share_qr_code_success(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test successful QR code share retrieval."""
-    mock_call = _Call(data={SERVICE_FIELD_DEVICE_ID: "jackery_dev1", "qr_code_id": "q1", "user_id": "u1"})
+    mock_call = _Call(
+        data={
+            SERVICE_FIELD_DEVICE_ID: "jackery_dev1",
+            "qr_code_id": "q1",
+            "user_id": "u1",
+        }
+    )
 
     registry = _Registry({"jackery_dev1": _Device({(DOMAIN, "d1")})})
-    monkeypatch.setattr("homeassistant.helpers.device_registry.async_get", lambda h: registry)
+    monkeypatch.setattr(
+        "homeassistant.helpers.device_registry.async_get", lambda h: registry
+    )
 
     from unittest.mock import AsyncMock
+
     coordinator = _Coordinator(True)
     coordinator.async_get_share_qr_code = AsyncMock(return_value={})
 
-    def mock_coordinator_for_device(h, d):
+    def mock_coordinator_for_device(h: HomeAssistant, d: str) -> _Coordinator:
         return coordinator
-    monkeypatch.setattr("custom_components.jackery_solarvault.services._coordinator_for_device", mock_coordinator_for_device)
 
-    monkeypatch.setattr("custom_components.jackery_solarvault.services._notify_share_qr_code", Mock())
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.services._coordinator_for_device",
+        mock_coordinator_for_device,
+    )
+
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.services._notify_share_qr_code", Mock()
+    )
 
     res = await services._async_handle_get_share_qr_code(hass, mock_call)
     assert res == {"qr_code_id": None, "user_id": None}
 
 
 def test_service_integer_parser_rejects_bools() -> None:
+    """Test integer parser rejects bools."""
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int(True)
     with pytest.raises(vol.Invalid, match="expected integer"):
@@ -134,16 +188,19 @@ def test_service_integer_parser_rejects_bools() -> None:
 
 
 def test_service_integer_parser_accepts_whole_floats() -> None:
+    """Test integer parser accepts whole floats."""
     assert services._coerce_service_int(42.0) == 42
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int(42.5)
 
 
 def test_service_integer_parser_rejects_empty_string() -> None:
+    """Test integer parser rejects empty strings."""
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int("   ")
 
 
 def test_service_integer_parser_rejects_unrecognized_type() -> None:
+    """Test integer parser rejects unrecognized types."""
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int(object())
