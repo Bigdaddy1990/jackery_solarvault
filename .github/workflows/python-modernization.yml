@@ -94,5 +94,3 @@ jobs:
         run: |
           echo "Modernization checks failed and auto-fix is not allowed for this run."
           exit 0
-       # Commit all changed files back to the repository
-      - uses: stefanzweifel/git-auto-commit-action@v7
