@@ -1,0 +1,230 @@
+"""Characterisation tests for the local midnight daily-energy cache.
+
+These pin the "today's energy" delta backfill that anchors lifetime Wh
+counters at local midnight and derives per-day deltas without the cloud
+day-statistics endpoint, plus the persistence load/save cleaning rules.
+"""
+
+from datetime import date
+from typing import Any
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from homeassistant.core import HomeAssistant
+
+from custom_components.jackery_solarvault.client import local_daily_cache as cache
+
+_TODAY = date(2024, 5, 20)
+_TODAY_ISO = "2024-05-20"
+
+
+# --- daily_delta ---------------------------------------------------------
+
+
+def test_daily_delta_returns_difference_from_anchor() -> None:
+    """A same-day snapshot yields current minus the midnight anchor."""
+    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+
+    assert cache.daily_delta(snap, "pvEgy", 1250, today=_TODAY) == 250
+
+
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        None,
+        "not-a-dict",
+        {"day": "2024-05-19", "values": {"pvEgy": 1000}},  # stale day
+        {"day": _TODAY_ISO, "values": "bad"},  # non-dict values
+        {"day": _TODAY_ISO, "values": {}},  # missing anchor
+        {"day": _TODAY_ISO, "values": {"pvEgy": "x"}},  # non-int anchor
+    ],
+)
+def test_daily_delta_returns_none_for_unusable_snapshot(snapshot: Any) -> None:  # noqa: ANN401
+    """Missing/stale/malformed snapshots disable the delta."""
+    assert cache.daily_delta(snapshot, "pvEgy", 1250, today=_TODAY) is None
+
+
+def test_daily_delta_none_when_current_missing_or_non_numeric() -> None:
+    """A missing or non-numeric current counter disables the delta."""
+    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+
+    assert cache.daily_delta(snap, "pvEgy", None, today=_TODAY) is None
+    assert cache.daily_delta(snap, "pvEgy", "nope", today=_TODAY) is None
+
+
+def test_daily_delta_none_when_counter_below_anchor() -> None:
+    """A counter below the anchor (reset) does not produce a negative delta."""
+    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+
+    assert cache.daily_delta(snap, "pvEgy", 900, today=_TODAY) is None
+
+
+# --- refresh_snapshot ----------------------------------------------------
+
+
+def test_refresh_snapshot_creates_fresh_anchor_on_new_day() -> None:
+    """A missing/stale snapshot re-anchors all numeric current values."""
+    result = cache.refresh_snapshot(
+        None,
+        today=_TODAY,
+        current_values={"pvEgy": 1000, "batChgEgy": None, "bad": "x"},
+    )
+
+    assert result == {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+
+
+def test_refresh_snapshot_preserves_existing_and_adds_missing() -> None:
+    """Same-day refresh keeps existing anchors and only adds new metrics."""
+    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000, "bad": "x"}}
+
+    result = cache.refresh_snapshot(
+        snap,
+        today=_TODAY,
+        current_values={"pvEgy": 9999, "batChgEgy": 50, "skip": None},
+    )
+
+    assert result == {"day": _TODAY_ISO, "values": {"pvEgy": 1000, "batChgEgy": 50}}
+
+
+def test_refresh_snapshot_same_day_with_non_dict_values() -> None:
+    """A same-day snapshot whose values are malformed rebuilds from current."""
+    snap = {"day": _TODAY_ISO, "values": "corrupt"}
+
+    result = cache.refresh_snapshot(
+        snap,
+        today=_TODAY,
+        current_values={"pvEgy": 500, "bad": "x", "none": None},
+    )
+
+    assert result == {"day": _TODAY_ISO, "values": {"pvEgy": 500}}
+
+
+def test_refresh_snapshot_same_day_skips_non_str_and_non_int() -> None:
+    """Non-string existing keys and non-int current values are dropped."""
+    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000, 5: 7}}
+
+    result = cache.refresh_snapshot(
+        snap,
+        today=_TODAY,
+        current_values={"batChgEgy": "x"},
+    )
+
+    assert result == {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+
+
+# --- is_new_day / snapshot_day / signature -------------------------------
+
+
+def test_is_new_day() -> None:
+    """A non-dict or different-day snapshot counts as a new day."""
+    assert cache.is_new_day(None, _TODAY) is True
+    assert cache.is_new_day({"day": "2024-05-19"}, _TODAY) is True
+    assert cache.is_new_day({"day": _TODAY_ISO}, _TODAY) is False
+
+
+def test_snapshot_day() -> None:
+    """The day accessor returns the ISO string only when present and a str."""
+    assert cache.snapshot_day({"day": _TODAY_ISO}) == _TODAY_ISO
+    assert cache.snapshot_day({"day": 20240520}) is None
+    assert cache.snapshot_day(None) is None
+
+
+def test_local_daily_signature_is_stable() -> None:
+    """The signature is order-independent for equal content."""
+    a = cache.local_daily_signature({"d1": {"day": _TODAY_ISO}, "d2": {}})
+    b = cache.local_daily_signature({"d2": {}, "d1": {"day": _TODAY_ISO}})
+
+    assert a == b
+
+
+# --- async load / save ---------------------------------------------------
+
+
+def _fake_store(loaded: Any) -> Any:  # noqa: ANN401
+    store = type("_S", (), {})()
+    store.async_load = AsyncMock(return_value=loaded)
+    store.async_save = AsyncMock()
+    return store
+
+
+@pytest.mark.asyncio()
+async def test_async_load_daily_cache_cleans_and_filters(
+    hass: HomeAssistant,
+) -> None:
+    """Load returns only well-formed snapshots with int-coercible values."""
+    stored = {
+        "entries": {
+            "entry-1": {
+                "dev-a": {"day": _TODAY_ISO, "values": {"pvEgy": "1000", "bad": "x"}},
+                "dev-b": "not-a-dict",
+                "dev-c": {"day": 123, "values": {}},
+            },
+        },
+    }
+    with patch.object(cache, "Store", return_value=_fake_store(stored)):
+        result = await cache.async_load_daily_cache(hass, "entry-1")
+
+    assert result == {"dev-a": {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}}
+
+
+@pytest.mark.parametrize("loaded", [None, {"entries": "bad"}, {"entries": {}}])
+@pytest.mark.asyncio()
+async def test_async_load_daily_cache_empty_for_missing_store(
+    hass: HomeAssistant, loaded: Any
+) -> None:  # noqa: ANN401
+    """A missing or malformed store loads as an empty mapping."""
+    with patch.object(cache, "Store", return_value=_fake_store(loaded)):
+        result = await cache.async_load_daily_cache(hass, "entry-1")
+
+    assert result == {}
+
+
+@pytest.mark.asyncio()
+async def test_async_save_daily_cache_persists_cleaned_snapshots(
+    hass: HomeAssistant,
+) -> None:
+    """Save writes only cleaned snapshots and preserves other entries."""
+    store = _fake_store({"entries": {"other": {"keep": {}}}})
+    snapshots = {
+        "dev-a": {"day": _TODAY_ISO, "values": {"pvEgy": 1000, "bad": "x"}},
+        "dev-b": "not-a-dict",
+    }
+    with patch.object(cache, "Store", return_value=store):
+        await cache.async_save_daily_cache(hass, "entry-1", snapshots=snapshots)
+
+    saved = store.async_save.await_args.args[0]
+    assert saved["entries"]["entry-1"] == {
+        "dev-a": {"day": _TODAY_ISO, "values": {"pvEgy": 1000}},
+    }
+    assert saved["entries"]["other"] == {"keep": {}}
+
+
+@pytest.mark.asyncio()
+async def test_async_save_daily_cache_drops_malformed_fields(
+    hass: HomeAssistant,
+) -> None:
+    """Non-str day, non-dict values and non-str metric keys are all dropped."""
+    store = _fake_store(None)
+    snapshots = {
+        "dev-bad-day": {"day": 20240520, "values": {"pvEgy": 1}},
+        "dev-bad-values": {"day": _TODAY_ISO, "values": "x"},
+        "dev-ok": {"day": _TODAY_ISO, "values": {"pvEgy": 5, 9: 9}},
+    }
+    with patch.object(cache, "Store", return_value=store):
+        await cache.async_save_daily_cache(hass, "e", snapshots=snapshots)
+
+    assert store.async_save.await_args.args[0]["entries"]["e"] == {
+        "dev-ok": {"day": _TODAY_ISO, "values": {"pvEgy": 5}},
+    }
+
+
+@pytest.mark.asyncio()
+async def test_async_load_daily_cache_drops_non_str_metric(
+    hass: HomeAssistant,
+) -> None:
+    """A non-string metric key inside a snapshot's values is skipped on load."""
+    stored = {"entries": {"e": {"dev": {"day": _TODAY_ISO, "values": {"pvEgy": 3, 7: 7}}}}}
+    with patch.object(cache, "Store", return_value=_fake_store(stored)):
+        result = await cache.async_load_daily_cache(hass, "e")
+
+    assert result == {"dev": {"day": _TODAY_ISO, "values": {"pvEgy": 3}}}
