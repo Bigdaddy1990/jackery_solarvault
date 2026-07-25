@@ -86,8 +86,8 @@ Nous exposons également plus de 60 services personnalisés dans Home Assistant,
 3. Suivez l'assistant de configuration et entrez vos identifiants Cloud Jackery.
 
 > [!WARNING]
-> **Limitation Importante du Compte :** Jackery n'autorise qu'une seule session active par compte. Si vous vous connectez avec votre compte principal, vous serez régulièrement déconnecté sur votre téléphone, ou l'intégration se déconnectera.
-> **Solution :** Créez un **deuxième compte Jackery dédié** uniquement pour Home Assistant. Partagez vos appareils Jackery depuis votre compte principal vers ce nouveau compte dédié pour HA !
+> **Limitation Importante du Compte :** Jackery autorise normalement une seule session active par compte. Si vous vous connectez avec un autre appareil (par exemple, votre application principale sur votre téléphone), la connexion MQTT de l'intégration se mettra temporairement en pause et se reconnectera automatiquement peu après.
+> **Solution Recommandée :** Pour une meilleure expérience, créez un **deuxième compte Jackery dédié** uniquement pour Home Assistant. Partagez vos appareils Jackery depuis votre compte principal vers ce nouveau compte dédié pour HA !
 
 ### Options de Configuration
 
