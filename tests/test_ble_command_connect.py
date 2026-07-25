@@ -8,7 +8,7 @@ client in the transport's ``_clients`` returned False. The router must ensure a
 connection (bounded wait) before the GATT write.
 """
 
-from typing import Any, cast  # ruff:ignore[unsorted-imports]
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

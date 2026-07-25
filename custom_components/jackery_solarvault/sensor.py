@@ -501,7 +501,7 @@ from .util import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable  # ruff:ignore[unsorted-imports]
+    from collections.abc import Callable
     from datetime import tzinfo
 
     from homeassistant.core import HomeAssistant

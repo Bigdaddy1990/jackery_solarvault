@@ -1,6 +1,6 @@
 """Config flow for Jackery SolarVault."""
 
-import logging  # ruff:ignore[unsorted-imports]
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
@@ -86,7 +86,7 @@ from .util import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping  # ruff:ignore[unsorted-imports]
+    from collections.abc import Mapping
 
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
     from homeassistant.config_entries import (

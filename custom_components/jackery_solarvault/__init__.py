@@ -951,7 +951,7 @@ def _register_deferred_layer5_start(  # ruff:ignore[non-empty-init-module]
     entry.async_on_unload(async_at_started(hass, _on_hass_started))
 
 
-import operator  # ruff:ignore[unsorted-imports]
+import operator
 
 from .const import (
     LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,

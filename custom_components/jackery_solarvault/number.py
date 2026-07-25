@@ -6,7 +6,7 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-from dataclasses import dataclass  # ruff:ignore[unsorted-imports]
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
 

@@ -13,7 +13,7 @@ without any BLE hardware:
   coordinator cycle may not trigger an immediate second attempt.
 """
 
-import asyncio  # ruff:ignore[unsorted-imports]
+import asyncio
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock

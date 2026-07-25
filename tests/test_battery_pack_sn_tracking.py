@@ -7,7 +7,7 @@ Unknown. The entity now pins its pack's serial on first resolution and matches
 by serial thereafter.
 """
 
-from typing import TYPE_CHECKING, Any, cast  # ruff:ignore[unsorted-imports]
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import PropertyMock, patch
 
 import pytest

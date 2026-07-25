@@ -8,7 +8,7 @@ contract: the right client method with the right arguments, value passthrough,
 and — where the code does it — the refresh / guard / systemId behavior.
 """
 
-import time  # ruff:ignore[unsorted-imports]
+import time
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 

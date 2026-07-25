@@ -11,7 +11,7 @@ Contract under test (owner directive):
 * Loop protection: at most one automatic re-login per 60s per API client.
 """
 
-import asyncio  # ruff:ignore[unsorted-imports]
+import asyncio
 from typing import Any, Self, cast
 from unittest.mock import AsyncMock, patch
 
