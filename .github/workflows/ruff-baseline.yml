@@ -26,10 +26,14 @@ jobs:
       - run: |
           ruff check . --fix || true
           ruff check . --fix --unsafe-fixes --line-length 88 || true
-          ruff check . --add-noqa || true
-          ruff check . --fix --unsafe-fixes --line-length 88 --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
-          ruff check . --output-format=github || true
+          ruff check . --line-length 88 || true
           ruff check . --preview || true
+          ruff check . --add-noqa || true
+          ruff format . | true
+          ruff check . --fix || true
+          ruff check . --fix --unsafe-fixes --line-length 88 || true
+          ruff check . --extend-select "E","F","I","B","UP","TID","A001","ASYNC","D","W","RUF","INP","F541","ANN","Q","SIM","NPY","N","E501" || true
+          ruff check . --output-format=github || true
           ruff format . | true
 
       - name: Commit baseline changes
