@@ -1,0 +1,213 @@
+"""Characterisation tests for the third-party MQTT credential codec."""
+
+import pytest
+
+from custom_components.jackery_solarvault.client import third_party_mqtt_codec as codec
+from custom_components.jackery_solarvault.client.ble import BLE_AES_IV_LEN
+from custom_components.jackery_solarvault.const import (
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_HOST,
+    CONF_LOCAL_MQTT_PASSWORD,
+    CONF_LOCAL_MQTT_PORT,
+    CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_TOKEN,
+    FIELD_THIRD_PARTY_MQTT_ENABLE,
+    FIELD_THIRD_PARTY_MQTT_IP,
+    FIELD_THIRD_PARTY_MQTT_PASSWORD,
+    FIELD_THIRD_PARTY_MQTT_PORT,
+    FIELD_THIRD_PARTY_MQTT_TOKEN,
+    FIELD_THIRD_PARTY_MQTT_USERNAME,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+)
+
+_KEY = b"0123456789abcdef"  # 16 bytes
+_TOKEN_LEN = 9
+_LOCAL_PORT = 1884
+_DEVICE_PORT = 8883
+
+
+# --- field codec ---------------------------------------------------------
+
+
+def test_encode_decode_round_trips() -> None:
+    """A field encoded with the bluetooth key decodes back to the plaintext."""
+    encoded = codec.encode_third_party_mqtt_field("hunter2", _KEY)
+
+    assert encoded != "hunter2"
+    assert codec.decode_third_party_mqtt_field(encoded, _KEY) == "hunter2"
+
+
+def test_encode_rejects_wrong_key_length() -> None:
+    """Encoding requires a 16-byte key."""
+    with pytest.raises(ValueError, match="16-byte"):
+        codec.encode_third_party_mqtt_field("x", b"short")
+
+
+def test_decode_rejects_wrong_key_length() -> None:
+    """Decoding requires a 16-byte key."""
+    with pytest.raises(ValueError, match="16-byte"):
+        codec.decode_third_party_mqtt_field("AAAA", b"short")
+
+
+def test_decode_rejects_garbage_ciphertext() -> None:
+    """Undecodable input raises a codec ValueError."""
+    with pytest.raises(ValueError, match="invalid app-encoded"):
+        codec.decode_third_party_mqtt_field("!!!not-base64!!!", _KEY)
+
+
+def test_key_length_constant_is_16() -> None:
+    """The AES IV length the codec relies on is 16 bytes."""
+    assert len(_KEY) == BLE_AES_IV_LEN
+
+
+# --- token generation / validation ---------------------------------------
+
+
+def test_generate_token_is_nine_digits() -> None:
+    """The fallback token is exactly nine decimal digits."""
+    token = codec.generate_third_party_mqtt_token()
+
+    assert len(token) == _TOKEN_LEN
+    assert token.isdecimal()
+
+
+def test_stable_token_accepts_valid_user_token() -> None:
+    """A valid, non-generated 9-digit token is kept as user-provided."""
+    assert codec.stable_third_party_mqtt_token("123456789", "987654321") == (
+        "123456789",
+        False,
+        None,
+    )
+
+
+def test_stable_token_flags_match_with_generated() -> None:
+    """A token equal to the generated one is treated as generated."""
+    assert codec.stable_third_party_mqtt_token("111111111", "111111111") == (
+        "111111111",
+        True,
+        None,
+    )
+
+
+def test_stable_token_rejects_bad_shape() -> None:
+    """A non-9-digit token is rejected."""
+    with pytest.raises(ValueError, match="9-digit"):
+        codec.stable_third_party_mqtt_token("abc", None)
+
+
+def test_stable_token_generates_when_empty_and_none() -> None:
+    """An empty token with no prior generated token mints a new one."""
+    token, use_generated, new = codec.stable_third_party_mqtt_token("", None)
+
+    assert use_generated is True
+    assert new == token
+    assert len(token) == _TOKEN_LEN
+
+
+def test_stable_token_reuses_existing_generated() -> None:
+    """An empty token reuses the previously generated token."""
+    assert codec.stable_third_party_mqtt_token("  ", "222222222") == (
+        "222222222",
+        True,
+        None,
+    )
+
+
+# --- config from options --------------------------------------------------
+
+
+def test_config_from_options_prefers_local_listener_values() -> None:
+    """Local MQTT options win over the legacy third-party fields."""
+    options = {
+        CONF_LOCAL_MQTT_ENABLE: True,
+        CONF_LOCAL_MQTT_HOST: "10.0.0.5",
+        CONF_LOCAL_MQTT_PORT: _LOCAL_PORT,
+        CONF_LOCAL_MQTT_USERNAME: "user",
+        CONF_LOCAL_MQTT_PASSWORD: "pass",
+        CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
+    }
+
+    result = codec.third_party_mqtt_config_from_options(options, None)
+
+    assert result[FIELD_THIRD_PARTY_MQTT_ENABLE] == 1
+    assert result[FIELD_THIRD_PARTY_MQTT_IP] == "10.0.0.5"
+    assert result[FIELD_THIRD_PARTY_MQTT_PORT] == _LOCAL_PORT
+    assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "user"
+    assert result[FIELD_THIRD_PARTY_MQTT_PASSWORD] == "pass"
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "123456789"
+
+
+def test_config_from_options_uses_generated_token_when_blank() -> None:
+    """A blank configured token falls back to the generated token."""
+    result = codec.third_party_mqtt_config_from_options(
+        {CONF_THIRD_PARTY_MQTT_TOKEN: "   "},
+        "555555555",
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "555555555"
+
+
+# --- decode body ----------------------------------------------------------
+
+
+def test_decode_body_without_key_flags_missing() -> None:
+    """A missing bluetooth key marks the body as non-plaintext."""
+    result = codec.decode_third_party_mqtt_config_body(
+        {FIELD_THIRD_PARTY_MQTT_IP: "x"}, None
+    )
+
+    assert result["_ha_plaintext"] is False
+    assert result["_decode_error"] == "missing_bluetooth_key"
+
+
+def test_decode_body_decodes_present_credentials() -> None:
+    """Encrypted credential fields decode and set the plaintext flag."""
+    body = {
+        FIELD_THIRD_PARTY_MQTT_USERNAME: codec.encode_third_party_mqtt_field("u", _KEY),
+        FIELD_THIRD_PARTY_MQTT_PASSWORD: codec.encode_third_party_mqtt_field("p", _KEY),
+    }
+
+    result = codec.decode_third_party_mqtt_config_body(body, _KEY)
+
+    assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "u"
+    assert result[FIELD_THIRD_PARTY_MQTT_PASSWORD] == "p"
+    assert result["_ha_plaintext"] is True
+    assert result["_decoded_fields"] == sorted([
+        FIELD_THIRD_PARTY_MQTT_USERNAME,
+        FIELD_THIRD_PARTY_MQTT_PASSWORD,
+    ])
+
+
+def test_decode_body_records_failed_fields() -> None:
+    """An undecodable credential is reported and blocks the plaintext flag."""
+    body = {FIELD_THIRD_PARTY_MQTT_TOKEN: "!!!bad!!!"}
+
+    result = codec.decode_third_party_mqtt_config_body(body, _KEY)
+
+    assert result["_ha_plaintext"] is False
+    assert result["_decode_failed_fields"] == [FIELD_THIRD_PARTY_MQTT_TOKEN]
+
+
+# --- plaintext merge ------------------------------------------------------
+
+
+def test_plaintext_merges_device_reported_values() -> None:
+    """Device payload enable/ip/port and plaintext credentials overwrite options."""
+    device = {
+        PAYLOAD_THIRD_PARTY_MQTT_CONFIG: {
+            FIELD_THIRD_PARTY_MQTT_IP: "192.168.1.9",
+            FIELD_THIRD_PARTY_MQTT_PORT: _DEVICE_PORT,
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "dev-user",
+            "_ha_plaintext": True,
+        },
+    }
+
+    result = codec.third_party_mqtt_config_plaintext(
+        {CONF_THIRD_PARTY_MQTT_TOKEN: "123456789"},
+        None,
+        device,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_IP] == "192.168.1.9"
+    assert result[FIELD_THIRD_PARTY_MQTT_PORT] == _DEVICE_PORT
+    assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "dev-user"
