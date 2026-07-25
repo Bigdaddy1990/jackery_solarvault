@@ -83,7 +83,7 @@ Nous exposons également plus de 60 services personnalisés dans Home Assistant,
 3. Suivez l'assistant de configuration et entrez vos identifiants Cloud Jackery.
 
 > [!WARNING]
-> **Limitation Importante du Compte :** Jackery n'autorise qu'une seule session active par compte. Si vous vous connectez avec votre compte principal, vous serez régulièrement déconnecté sur votre téléphone, ou l'intégration se déconnectera.  
+> **Limitation Importante du Compte :** Jackery n'autorise qu'une seule session active par compte. Si vous vous connectez avec votre compte principal, vous serez régulièrement déconnecté sur votre téléphone, ou l'intégration se déconnectera.
 > **Solution :** Créez un **deuxième compte Jackery dédié** uniquement pour Home Assistant. Partagez vos appareils Jackery depuis votre compte principal vers ce nouveau compte dédié pour HA !
 
 ### Options de Configuration

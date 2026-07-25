@@ -8,7 +8,7 @@ Languages:
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your Jackery SolarVault, HomePower, and Explorer power stations directly into your smart home. 
+A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your Jackery SolarVault, HomePower, and Explorer power stations directly into your smart home.
 
 **This is the ultimate (non-plus-ultra) Jackery integration for Home Assistant.** It combines 100% of the official App's functionality (Cloud API) with the speed and reliability of **Local MQTT** and **Bluetooth (BLE)**.
 
@@ -19,7 +19,7 @@ A custom [Home Assistant](https://www.home-assistant.io/) integration that bring
 You might have heard of other manual MQTT workarounds or older integrations. Here is why this integration is the clearly superior choice:
 
 1. **Zero Manual Token Extraction:** We require your Cloud credentials during setup. **Why?** Because the integration automatically discovers all your devices and securely fetches the complex encryption keys and tokens required for local communication. You don't have to intercept network traffic or manually configure JSON payloads.
-2. **True Local Control:** Once the initial cloud handshake is complete, the integration connects directly to your device via **Local MQTT** and **Bluetooth (BLE)** for instant, sub-second updates and local control. 
+2. **True Local Control:** Once the initial cloud handshake is complete, the integration connects directly to your device via **Local MQTT** and **Bluetooth (BLE)** for instant, sub-second updates and local control.
 3. **100% App Functionality:** Unlike basic local-only scripts that only read battery levels, this integration supports *everything* the Jackery App does, including Time-of-Use scheduling, Shelly integration, firmware checks, and advanced charging settings.
 
 ---
@@ -83,7 +83,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 3. Follow the setup wizard and enter your Jackery Cloud credentials.
 
 > [!WARNING]
-> **Important Account Limitation:** Jackery only allows one active session per account. If you log in with your primary app account, you will regularly be logged out on your phone, or the integration will disconnect.  
+> **Important Account Limitation:** Jackery only allows one active session per account. If you log in with your primary app account, you will regularly be logged out on your phone, or the integration will disconnect.
 > **Solution:** Create a **second, dedicated Jackery account** just for Home Assistant. Share your Jackery devices from your main app account with this new dedicated HA account!
 
 ### Configuration Options

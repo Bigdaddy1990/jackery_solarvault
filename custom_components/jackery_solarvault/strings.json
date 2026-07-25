@@ -262,17 +262,17 @@
       "max_output_power_set": {
         "name": "Max output power"
       },
+      "portable_ac1_priority_soc": {
+        "name": "AC1 output priority SOC threshold"
+      },
+      "portable_ac2_priority_soc": {
+        "name": "AC2 output priority SOC threshold"
+      },
       "portable_ac_countdown": {
         "name": "AC output countdown"
       },
       "portable_ac_output_delay": {
         "name": "AC output delay-open time"
-      },
-      "portable_custom_use_discharge_limit": {
-        "name": "Custom use discharge limit"
-      },
-      "portable_custom_use_charge_limit": {
-        "name": "Custom use charge limit"
       },
       "portable_auto_shutdown_time": {
         "name": "Auto shutdown time"
@@ -283,11 +283,20 @@
       "portable_charge_power": {
         "name": "Charge power limit"
       },
+      "portable_custom_use_charge_limit": {
+        "name": "Custom use charge limit"
+      },
+      "portable_custom_use_discharge_limit": {
+        "name": "Custom use discharge limit"
+      },
       "portable_dc_car_countdown": {
         "name": "DC car output countdown"
       },
       "portable_dc_countdown": {
         "name": "DC output countdown"
+      },
+      "portable_dc_priority_soc": {
+        "name": "DC output priority SOC threshold"
       },
       "portable_dc_usb_countdown": {
         "name": "DC USB output countdown"
@@ -297,15 +306,6 @@
       },
       "portable_output_priority": {
         "name": "Output priority mode"
-      },
-      "portable_ac1_priority_soc": {
-        "name": "AC1 output priority SOC threshold"
-      },
-      "portable_ac2_priority_soc": {
-        "name": "AC2 output priority SOC threshold"
-      },
-      "portable_dc_priority_soc": {
-        "name": "DC output priority SOC threshold"
       },
       "single_tariff_price_set": {
         "name": "Single tariff price"
@@ -374,6 +374,22 @@
           "quiet": "Quiet"
         }
       },
+      "portable_battery_mode": {
+        "name": "Battery mode",
+        "state": {
+          "custom": "Custom",
+          "normal": "Normal",
+          "preset": "Preset"
+        }
+      },
+      "portable_charge_mode": {
+        "name": "Charge mode",
+        "state": {
+          "custom": "Custom",
+          "fast": "Fast",
+          "rush": "Rush"
+        }
+      },
       "portable_dc_priority": {
         "name": "DC output priority",
         "state": {
@@ -404,22 +420,6 @@
           "2h": "2 hours",
           "2min": "2 minutes",
           "off": "Off"
-        }
-      },
-      "portable_battery_mode": {
-        "name": "Battery mode",
-        "state": {
-          "normal": "Normal",
-          "preset": "Preset",
-          "custom": "Custom"
-        }
-      },
-      "portable_charge_mode": {
-        "name": "Charge mode",
-        "state": {
-          "fast": "Fast",
-          "rush": "Rush",
-          "custom": "Custom"
         }
       },
       "portable_ups_model": {
@@ -862,6 +862,24 @@
       "discharge_time": {
         "name": "Discharge time"
       },
+      "dynamic_price_contract_auth": {
+        "name": "Dynamic price contract authorized"
+      },
+      "dynamic_price_nextday_high": {
+        "name": "Dynamic price next-day high"
+      },
+      "dynamic_price_nextday_low": {
+        "name": "Dynamic price next-day low"
+      },
+      "dynamic_price_provider": {
+        "name": "Dynamic price provider"
+      },
+      "dynamic_price_today_high": {
+        "name": "Dynamic price today high"
+      },
+      "dynamic_price_today_low": {
+        "name": "Dynamic price today low"
+      },
       "energy_plan_power": {
         "name": "Energy plan power"
       },
@@ -1078,24 +1096,6 @@
       "power_mode_portable": {
         "name": "Power mode"
       },
-      "dynamic_price_contract_auth": {
-        "name": "Dynamic price contract authorized"
-      },
-      "dynamic_price_nextday_high": {
-        "name": "Dynamic price next-day high"
-      },
-      "dynamic_price_nextday_low": {
-        "name": "Dynamic price next-day low"
-      },
-      "dynamic_price_provider": {
-        "name": "Dynamic price provider"
-      },
-      "dynamic_price_today_high": {
-        "name": "Dynamic price today high"
-      },
-      "dynamic_price_today_low": {
-        "name": "Dynamic price today low"
-      },
       "power_price": {
         "name": "Power price"
       },
@@ -1186,17 +1186,17 @@
       "smart_meter_export_year_energy": {
         "name": "Yearly smart-meter grid export"
       },
-      "smart_meter_grid_import_energy": {
-        "name": "Smart-meter grid import energy"
-      },
-      "smart_meter_grid_export_energy": {
-        "name": "Smart-meter grid export energy"
-      },
       "smart_meter_frequency": {
         "name": "Smart meter frequency"
       },
       "smart_meter_fun_form": {
         "name": "Smart meter function form"
+      },
+      "smart_meter_grid_export_energy": {
+        "name": "Smart-meter grid export energy"
+      },
+      "smart_meter_grid_import_energy": {
+        "name": "Smart-meter grid import energy"
       },
       "smart_meter_gross_phase_export_power": {
         "name": "Smart meter gross phase export power"
@@ -1330,18 +1330,6 @@
       "smart_mode_time_difference": {
         "name": "Smart mode time difference"
       },
-      "smart_schedule_currency": {
-        "name": "Smart schedule currency"
-      },
-      "smart_schedule_days": {
-        "name": "Smart schedule days"
-      },
-      "smart_schedule_points": {
-        "name": "Smart schedule points"
-      },
-      "smart_schedule_profit": {
-        "name": "Smart schedule profit"
-      },
       "smart_plug_communication_mode": {
         "name": "Smart plug communication mode"
       },
@@ -1377,6 +1365,18 @@
       },
       "smart_plug_total_energy": {
         "name": "Smart plug total energy"
+      },
+      "smart_schedule_currency": {
+        "name": "Smart schedule currency"
+      },
+      "smart_schedule_days": {
+        "name": "Smart schedule days"
+      },
+      "smart_schedule_points": {
+        "name": "Smart schedule points"
+      },
+      "smart_schedule_profit": {
+        "name": "Smart schedule profit"
       },
       "soc_charge_limit": {
         "name": "Charge limit"
@@ -1601,11 +1601,35 @@
     "accept_shared_device_failed": {
       "message": "Could not accept shared device for device {device_id}: {error}"
     },
+    "agree_privacy_consent_failed": {
+      "message": "Could not agree privacy consent for device {device_id}: {error}"
+    },
+    "bind_currency_failed": {
+      "message": "Could not bind currency for device {device_id}: {error}"
+    },
     "bind_device_failed": {
       "message": "Could not bind device {device_id}: {error}"
     },
     "bind_smart_part_failed": {
       "message": "Could not bind smart part for device {device_id}: {error}"
+    },
+    "cancel_dynamic_price_contract_auth_failed": {
+      "message": "Could not cancel dynamic price contract auth for device {device_id}: {error}"
+    },
+    "check_accessories_exist_failed": {
+      "message": "Could not check accessories for device {device_id}: {error}"
+    },
+    "check_app_version_failed": {
+      "message": "Could not check app version for device {device_id}: {error}"
+    },
+    "check_jackery_accessories_exist_failed": {
+      "message": "Could not check Jackery accessories for device {device_id}: {error}"
+    },
+    "check_privacy_update_failed": {
+      "message": "Could not check privacy update for device {device_id}: {error}"
+    },
+    "check_system_bound_failed": {
+      "message": "Could not check system binding for device {device_id}: {error}"
     },
     "delete_storm_alert_failed": {
       "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
@@ -1616,23 +1640,41 @@
     "entity_action_failed": {
       "message": "Could not update {entity} for device {device_id}: {error}"
     },
+    "get_aiems_energy_prediction_failed": {
+      "message": "Could not fetch the AI-EMS energy prediction for device {device_id}: {error}"
+    },
+    "get_alarm_detail_failed": {
+      "message": "Could not get alarm detail for device {device_id}: {error}"
+    },
+    "get_device_currency_failed": {
+      "message": "Could not get device currency for device {device_id}: {error}"
+    },
+    "get_dynamic_price_login_url_failed": {
+      "message": "Could not get dynamic price login URL for device {device_id}: {error}"
+    },
+    "get_offline_statistics_failed": {
+      "message": "Could not get offline statistics for device {device_id}: {error}"
+    },
+    "get_product_instruction_failed": {
+      "message": "Could not get product instruction for device {device_id}: {error}"
+    },
+    "get_push_config_failed": {
+      "message": "Could not get push config for device {device_id}: {error}"
+    },
     "get_share_qr_code_failed": {
       "message": "Could not fetch the share QR code for device {device_id}: {error}"
+    },
+    "get_shelly_auth_url_failed": {
+      "message": "Could not get Shelly auth URL for device {device_id}: {error}"
     },
     "get_smart_schedule_prediction_failed": {
       "message": "Could not fetch the smart schedule prediction for device {device_id}: {error}"
     },
-    "get_aiems_energy_prediction_failed": {
-      "message": "Could not fetch the AI-EMS energy prediction for device {device_id}: {error}"
+    "get_unread_count_failed": {
+      "message": "Could not get unread count for device {device_id}: {error}"
     },
-    "unbind_accessories_failed": {
-      "message": "Could not unbind the accessories for device {device_id}: {error}"
-    },
-    "set_ac_nickname_failed": {
-      "message": "Could not rename the AC port for device {device_id}: {error}"
-    },
-    "report_device_timezone_failed": {
-      "message": "Could not report the timezone for device {device_id}: {error}"
+    "get_user_info_failed": {
+      "message": "Could not get user info for device {device_id}: {error}"
     },
     "invalid_number_allowed_values": {
       "message": "{entity} for device {device_id} must be one of: {allowed_values}"
@@ -1646,6 +1688,33 @@
     "invalid_text_value": {
       "message": "{entity} for device {device_id} must not be empty"
     },
+    "list_accessories_failed": {
+      "message": "Could not list accessories for device {device_id}: {error}"
+    },
+    "list_banners_failed": {
+      "message": "Could not list banners for device {device_id}: {error}"
+    },
+    "list_country_zones_failed": {
+      "message": "Could not list country zones for device {device_id}: {error}"
+    },
+    "list_currencies_failed": {
+      "message": "Could not list currencies for device {device_id}: {error}"
+    },
+    "list_dynamic_price_contracts_failed": {
+      "message": "Could not list dynamic price contracts for device {device_id}: {error}"
+    },
+    "list_faq_answers_failed": {
+      "message": "Could not list FAQ answers for device {device_id}: {error}"
+    },
+    "list_faqs_failed": {
+      "message": "Could not list FAQs for device {device_id}: {error}"
+    },
+    "list_grid_standards_failed": {
+      "message": "Could not list grid standards for device {device_id}: {error}"
+    },
+    "list_notifications_failed": {
+      "message": "Could not list notifications for device {device_id}: {error}"
+    },
     "list_shared_devices_failed": {
       "message": "Could not list shared devices for device {device_id}: {error}"
     },
@@ -1654,9 +1723,6 @@
     },
     "list_shelly_binding_failures_failed": {
       "message": "Could not list Shelly binding failures for device {device_id}: {error}"
-    },
-    "get_shelly_auth_url_failed": {
-      "message": "Could not get Shelly auth URL for device {device_id}: {error}"
     },
     "list_shelly_devices_failed": {
       "message": "Could not list Shelly devices for device {device_id}: {error}"
@@ -1673,86 +1739,11 @@
     "mqtt_missing_subdevice_sn": {
       "message": "Cannot send Jackery MQTT subdevice command for {device_id}: missing subdevice deviceSn"
     },
-    "query_third_party_mqtt_config_failed": {
-      "message": "Could not query third-party MQTT config for device {device_id}: {error}"
+    "query_box_stat_failed": {
+      "message": "Could not query box statistics for device {device_id}: {error}"
     },
-    "query_tou_plan_failed": {
-      "message": "Could not query TOU plan for device {device_id}: {error}"
-    },
-    "save_tou_plan_failed": {
-      "message": "Could not save TOU plan for device {device_id}: {error}"
-    },
-    "list_currencies_failed": {
-      "message": "Could not list currencies for device {device_id}: {error}"
-    },
-    "get_device_currency_failed": {
-      "message": "Could not get device currency for device {device_id}: {error}"
-    },
-    "bind_currency_failed": {
-      "message": "Could not bind currency for device {device_id}: {error}"
-    },
-    "list_accessories_failed": {
-      "message": "Could not list accessories for device {device_id}: {error}"
-    },
-    "check_accessories_exist_failed": {
-      "message": "Could not check accessories for device {device_id}: {error}"
-    },
-    "check_jackery_accessories_exist_failed": {
-      "message": "Could not check Jackery accessories for device {device_id}: {error}"
-    },
-    "set_accessory_name_failed": {
-      "message": "Could not rename accessory for device {device_id}: {error}"
-    },
-    "get_dynamic_price_login_url_failed": {
-      "message": "Could not get dynamic price login URL for device {device_id}: {error}"
-    },
-    "list_dynamic_price_contracts_failed": {
-      "message": "Could not list dynamic price contracts for device {device_id}: {error}"
-    },
-    "save_dynamic_price_contract_auth_failed": {
-      "message": "Could not save dynamic price contract auth for device {device_id}: {error}"
-    },
-    "cancel_dynamic_price_contract_auth_failed": {
-      "message": "Could not cancel dynamic price contract auth for device {device_id}: {error}"
-    },
-    "save_dynamic_price_location_id_failed": {
-      "message": "Could not save dynamic price location token for device {device_id}: {error}"
-    },
-    "query_socket_stat_failed": {
-      "message": "Could not query socket statistics for device {device_id}: {error}"
-    },
-    "list_country_zones_failed": {
-      "message": "Could not list country zones for device {device_id}: {error}"
-    },
-    "list_grid_standards_failed": {
-      "message": "Could not list grid standards for device {device_id}: {error}"
-    },
-    "check_system_bound_failed": {
-      "message": "Could not check system binding for device {device_id}: {error}"
-    },
-    "save_device_max_power_failed": {
-      "message": "Could not save max power for device {device_id}: {error}"
-    },
-    "get_alarm_detail_failed": {
-      "message": "Could not get alarm detail for device {device_id}: {error}"
-    },
-    "list_notifications_failed": {
-      "message": "Could not list notifications for device {device_id}: {error}"
-    },
-    "get_unread_count_failed": {
-      "message": "Could not get unread count for device {device_id}: {error}"
-    },
-    "get_push_config_failed": {
-      "message": "Could not get push config for device {device_id}: {error}"
-    },
-    "set_push_config_failed": {
-      "message": "Could not set push config for device {device_id}: {error}"
-    },
-    "sync_alerts_failed": {
-      "message": "Could not sync alerts for device {device_id}: {error}"
-    },
-    "get_offline_statistics_failed": {
-      "message": "Could not get offline statistics for device {device_id}: {error}"
+    "query_carbon_stat_failed": {
+      "message": "Could not query carbon statistics for device {device_id}: {error}"
     },
     "query_charge_report_failed": {
       "message": "Could not query charge report for device {device_id}: {error}"
@@ -1760,44 +1751,20 @@
     "query_cutoff_stat_failed": {
       "message": "Could not query cutoff statistics for device {device_id}: {error}"
     },
-    "query_soc_stat_failed": {
-      "message": "Could not query SOC statistics for device {device_id}: {error}"
-    },
-    "query_carbon_stat_failed": {
-      "message": "Could not query carbon statistics for device {device_id}: {error}"
-    },
     "query_profit_stat_failed": {
       "message": "Could not query profit statistics for device {device_id}: {error}"
     },
-    "query_box_stat_failed": {
-      "message": "Could not query box statistics for device {device_id}: {error}"
+    "query_soc_stat_failed": {
+      "message": "Could not query SOC statistics for device {device_id}: {error}"
     },
-    "check_app_version_failed": {
-      "message": "Could not check app version for device {device_id}: {error}"
+    "query_socket_stat_failed": {
+      "message": "Could not query socket statistics for device {device_id}: {error}"
     },
-    "list_banners_failed": {
-      "message": "Could not list banners for device {device_id}: {error}"
+    "query_third_party_mqtt_config_failed": {
+      "message": "Could not query third-party MQTT config for device {device_id}: {error}"
     },
-    "submit_feedback_failed": {
-      "message": "Could not submit feedback for device {device_id}: {error}"
-    },
-    "list_faqs_failed": {
-      "message": "Could not list FAQs for device {device_id}: {error}"
-    },
-    "list_faq_answers_failed": {
-      "message": "Could not list FAQ answers for device {device_id}: {error}"
-    },
-    "check_privacy_update_failed": {
-      "message": "Could not check privacy update for device {device_id}: {error}"
-    },
-    "agree_privacy_consent_failed": {
-      "message": "Could not agree privacy consent for device {device_id}: {error}"
-    },
-    "get_product_instruction_failed": {
-      "message": "Could not get product instruction for device {device_id}: {error}"
-    },
-    "get_user_info_failed": {
-      "message": "Could not get user info for device {device_id}: {error}"
+    "query_tou_plan_failed": {
+      "message": "Could not query TOU plan for device {device_id}: {error}"
     },
     "refresh_subdevices_failed": {
       "message": "Could not refresh sub-devices for device {device_id}: {error}"
@@ -1817,8 +1784,29 @@
     "rename_system_failed": {
       "message": "Could not rename Jackery system {system_id}: {error}"
     },
+    "report_device_timezone_failed": {
+      "message": "Could not report the timezone for device {device_id}: {error}"
+    },
+    "save_device_max_power_failed": {
+      "message": "Could not save max power for device {device_id}: {error}"
+    },
+    "save_dynamic_price_contract_auth_failed": {
+      "message": "Could not save dynamic price contract auth for device {device_id}: {error}"
+    },
+    "save_dynamic_price_location_id_failed": {
+      "message": "Could not save dynamic price location token for device {device_id}: {error}"
+    },
+    "save_tou_plan_failed": {
+      "message": "Could not save TOU plan for device {device_id}: {error}"
+    },
     "send_ble_command_failed": {
       "message": "Could not send BLE command for device {device_id}: {error}"
+    },
+    "set_ac_nickname_failed": {
+      "message": "Could not rename the AC port for device {device_id}: {error}"
+    },
+    "set_accessory_name_failed": {
+      "message": "Could not rename accessory for device {device_id}: {error}"
     },
     "set_account_nickname_failed": {
       "message": "Could not set account nickname for device {device_id}: {error}"
@@ -1826,11 +1814,23 @@
     "set_device_nickname_failed": {
       "message": "Could not set nickname for device {device_id}: {error}"
     },
+    "set_push_config_failed": {
+      "message": "Could not set push config for device {device_id}: {error}"
+    },
     "set_storm_alert_location_failed": {
       "message": "Could not set storm-alert location for device {device_id}: {error}"
     },
     "set_third_party_mqtt_config_failed": {
       "message": "Could not set third-party MQTT config for device {device_id}: {error}"
+    },
+    "submit_feedback_failed": {
+      "message": "Could not submit feedback for device {device_id}: {error}"
+    },
+    "sync_alerts_failed": {
+      "message": "Could not sync alerts for device {device_id}: {error}"
+    },
+    "unbind_accessories_failed": {
+      "message": "Could not unbind the accessories for device {device_id}: {error}"
     },
     "unbind_device_failed": {
       "message": "Could not unbind device {device_id}: {error}"
@@ -1914,6 +1914,52 @@
     }
   },
   "services": {
+    "accept_shared_device": {
+      "description": "Accept a shared Jackery device on the account that owns the selected device, then refresh.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device from the account that should accept the share.",
+          "name": "Device ID"
+        },
+        "qr_code_id": {
+          "description": "QR code ID from the sharing invitation.",
+          "name": "QR code ID"
+        },
+        "target_dev_id": {
+          "description": "Jackery device ID from the sharing invitation.",
+          "name": "Target device ID"
+        }
+      },
+      "name": "Accept shared device"
+    },
+    "agree_privacy_consent": {
+      "description": "Record agreement to one or more Jackery privacy-consent versions.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "pending_agree_version_ids": {
+          "description": "List of numeric privacy version IDs sent as pendingAgreeVersionIds.",
+          "name": "Pending agreement version IDs"
+        }
+      },
+      "name": "Agree privacy consent"
+    },
+    "bind_currency": {
+      "description": "Bind a currency to the selected Jackery device through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "currency": {
+          "description": "Currency code or identifier accepted by the Jackery app API.",
+          "name": "Currency"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Bind currency"
+    },
     "bind_device": {
       "description": "Bind a Jackery device to the same account as the selected device through the Jackery cloud API. The target device must already expose the app-derived bind key, devId, and GUID.",
       "fields": {
@@ -1954,6 +2000,98 @@
       },
       "name": "Bind smart part"
     },
+    "cancel_dynamic_price_contract_auth": {
+      "description": "Cancel dynamic-price contract authorization through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account and system.",
+          "name": "Device ID"
+        },
+        "platform_company_id": {
+          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
+          "name": "Platform company ID"
+        }
+      },
+      "name": "Cancel dynamic price contract auth"
+    },
+    "check_accessories_exist": {
+      "description": "Check whether accessories exist for the supplied Jackery device ids. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "devices": {
+          "description": "Comma-separated Jackery device ids sent as the app API devices parameter.",
+          "name": "Devices"
+        }
+      },
+      "name": "Check accessories exist"
+    },
+    "check_app_version": {
+      "description": "Check Jackery app-version metadata for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "type": {
+          "description": "Optional app platform type sent as type.",
+          "name": "Type"
+        },
+        "version_name": {
+          "description": "Optional app version sent as versionName.",
+          "name": "Version name"
+        }
+      },
+      "name": "Check app version"
+    },
+    "check_jackery_accessories_exist": {
+      "description": "Check whether Jackery accessories exist for the supplied device serial info. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn_infos": {
+          "description": "Device serial info string accepted by the Jackery app API.",
+          "name": "Device serial info"
+        }
+      },
+      "name": "Check Jackery accessories exist"
+    },
+    "check_privacy_update": {
+      "description": "Check whether the selected account requires updated privacy consent. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Check privacy update"
+    },
+    "check_system_bound": {
+      "description": "Check whether a bind-key, device serial number, and GUID tuple is already bound. Returns the response only.",
+      "fields": {
+        "bind_key": {
+          "description": "Bind key accepted by the Jackery app API.",
+          "name": "Bind key"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        },
+        "guid": {
+          "description": "GUID sent to the Jackery app API.",
+          "name": "GUID"
+        }
+      },
+      "name": "Check system binding"
+    },
     "delete_electricity_strategy": {
       "description": "Delete an electricity strategy plan from the device.",
       "fields": {
@@ -1982,23 +2120,91 @@
       },
       "name": "Delete storm alert"
     },
-    "set_storm_alert_location": {
-      "description": "Update the GPS location used for storm and weather alerts on the selected device via the Jackery cloud API.",
+    "get_aiems_energy_prediction": {
+      "description": "Fetch the AI-EMS energy prediction report from the Jackery HTTP API for the selected device (app 2.4.0). Returns the response only.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "description": "Pick a Jackery device. The system ID is resolved from the owning coordinator payload.",
           "name": "Device ID"
-        },
-        "latitude": {
-          "description": "Latitude in decimal degrees (-90 to 90).",
-          "name": "Latitude"
-        },
-        "longitude": {
-          "description": "Longitude in decimal degrees (-180 to 180).",
-          "name": "Longitude"
         }
       },
-      "name": "Set storm alert location"
+      "name": "Get AI-EMS energy prediction"
+    },
+    "get_alarm_detail": {
+      "description": "Get alarm detail by alarm key through the Jackery HTTP API. Returns the response only.",
+      "fields": {
+        "alarm_key": {
+          "description": "Alarm key accepted by the Jackery app API.",
+          "name": "Alarm key"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get alarm detail"
+    },
+    "get_device_currency": {
+      "description": "Get the currency payload for the selected Jackery device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get device currency"
+    },
+    "get_dynamic_price_login_url": {
+      "description": "Get the dynamic-price provider login URL for the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account and system.",
+          "name": "Device ID"
+        },
+        "platform_company_id": {
+          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
+          "name": "Platform company ID"
+        }
+      },
+      "name": "Get dynamic price login URL"
+    },
+    "get_offline_statistics": {
+      "description": "Get offline statistics for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get offline statistics"
+    },
+    "get_product_instruction": {
+      "description": "Get product instructions for a device serial number. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as devSn.",
+          "name": "Device serial number"
+        },
+        "type": {
+          "description": "Optional instruction type filter sent as type.",
+          "name": "Type"
+        }
+      },
+      "name": "Get product instruction"
+    },
+    "get_push_config": {
+      "description": "Get push-notification configuration for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get push config"
     },
     "get_share_qr_code": {
       "description": "Fetch the share QR code for the Jackery account that owns the selected device. Returns the response only.",
@@ -2010,6 +2216,16 @@
       },
       "name": "Get share QR code"
     },
+    "get_shelly_auth_url": {
+      "description": "Get the Jackery-owned Shelly OAuth authorization payload for the account that owns the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Get Shelly auth URL"
+    },
     "get_smart_schedule_prediction": {
       "description": "Fetch the AI smart schedule prediction from the Jackery HTTP API for the selected device. Returns the response only.",
       "fields": {
@@ -2020,83 +2236,25 @@
       },
       "name": "Get smart schedule prediction"
     },
-    "get_aiems_energy_prediction": {
-      "description": "Fetch the AI-EMS energy prediction report from the Jackery HTTP API for the selected device (app 2.4.0). Returns the response only.",
+    "get_unread_count": {
+      "description": "Get unread notification counts for the selected account. Returns the response only.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device. The system ID is resolved from the owning coordinator payload.",
+          "description": "Pick a Jackery device to select the owning account.",
           "name": "Device ID"
         }
       },
-      "name": "Get AI-EMS energy prediction"
+      "name": "Get unread count"
     },
-    "unbind_accessories": {
-      "description": "Unbind smart accessories from their parent device by bind ID, then refresh. Returns the per-item result.",
+    "get_user_info": {
+      "description": "Get authenticated-user profile information for the selected account. Returns the response only.",
       "fields": {
-        "bind_ids": {
-          "description": "List of accessory bind IDs to unbind.",
-          "name": "Bind IDs"
-        },
         "device_id": {
-          "description": "Pick a Jackery device from the account that owns the accessories.",
+          "description": "Pick a Jackery device to select the owning account.",
           "name": "Device ID"
         }
       },
-      "name": "Unbind accessories"
-    },
-    "set_ac_nickname": {
-      "description": "Rename one AC output port of a portable device, then refresh.",
-      "fields": {
-        "ac_port": {
-          "description": "AC output port to rename (1 or 2).",
-          "name": "AC port"
-        },
-        "device_id": {
-          "description": "Pick the portable Jackery device that owns the AC port.",
-          "name": "Device ID"
-        },
-        "nickname": {
-          "description": "New display name for the AC port.",
-          "name": "Nickname"
-        }
-      },
-      "name": "Set AC port nickname"
-    },
-    "report_device_timezone": {
-      "description": "Report the device's timezone to the Jackery cloud, matching the app's timezone sync.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        },
-        "timezone_offset": {
-          "description": "UTC offset in minutes (for example 120 for CEST).",
-          "name": "Timezone offset"
-        },
-        "zone_id": {
-          "description": "IANA zone ID, for example Europe/Berlin.",
-          "name": "Zone ID"
-        }
-      },
-      "name": "Report device timezone"
-    },
-    "accept_shared_device": {
-      "description": "Accept a shared Jackery device on the account that owns the selected device, then refresh.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device from the account that should accept the share.",
-          "name": "Device ID"
-        },
-        "qr_code_id": {
-          "description": "QR code ID from the sharing invitation.",
-          "name": "QR code ID"
-        },
-        "target_dev_id": {
-          "description": "Jackery device ID from the sharing invitation.",
-          "name": "Target device ID"
-        }
-      },
-      "name": "Accept shared device"
+      "name": "Get user info"
     },
     "insert_electricity_strategy": {
       "description": "Add a new electricity strategy plan (charge/discharge) to the device.",
@@ -2111,6 +2269,124 @@
         }
       },
       "name": "Add electricity strategy"
+    },
+    "list_accessories": {
+      "description": "List smart accessories for the selected Jackery device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List accessories"
+    },
+    "list_banners": {
+      "description": "List Jackery app banners for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List banners"
+    },
+    "list_country_zones": {
+      "description": "List country/zone entries used by Jackery DIY device setup. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List country zones"
+    },
+    "list_currencies": {
+      "description": "List currencies available to the Jackery account that owns the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List currencies"
+    },
+    "list_dynamic_price_contracts": {
+      "description": "List dynamic-price contracts for a customer and provider. Returns the response only.",
+      "fields": {
+        "customer_number": {
+          "description": "Customer number accepted by the provider contract-list API.",
+          "name": "Customer number"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "platform_company_id": {
+          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
+          "name": "Platform company ID"
+        }
+      },
+      "name": "List dynamic price contracts"
+    },
+    "list_faq_answers": {
+      "description": "List Jackery FAQ answer entries for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List FAQ answers"
+    },
+    "list_faqs": {
+      "description": "List Jackery FAQ entries for the selected account. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List FAQs"
+    },
+    "list_grid_standards": {
+      "description": "List grid-connection standards for a country code. Returns the response only.",
+      "fields": {
+        "country": {
+          "description": "Country code accepted by the Jackery app API.",
+          "name": "Country"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "List grid standards"
+    },
+    "list_notifications": {
+      "description": "List Jackery push notifications for the selected account. Returns the response only.",
+      "fields": {
+        "current_time": {
+          "description": "Optional currentTime timestamp in milliseconds; 0 disables the filter.",
+          "name": "Current time"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Optional device serial number filter sent as deviceSn.",
+          "name": "Device serial number"
+        },
+        "page_no": {
+          "description": "One-based page number.",
+          "name": "Page number"
+        },
+        "page_size": {
+          "description": "Number of notifications per page.",
+          "name": "Page size"
+        }
+      },
+      "name": "List notifications"
     },
     "list_shared_devices": {
       "description": "List the devices shared with the Jackery account that owns the selected device. Returns the response only.",
@@ -2154,16 +2430,6 @@
       },
       "name": "List Shelly binding failures"
     },
-    "get_shelly_auth_url": {
-      "description": "Get the Jackery-owned Shelly OAuth authorization payload for the account that owns the selected device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get Shelly auth URL"
-    },
     "list_shelly_devices": {
       "description": "List Shelly Cloud devices linked to the Jackery account that owns the selected device. Returns the response only.",
       "fields": {
@@ -2173,6 +2439,90 @@
         }
       },
       "name": "List Shelly devices"
+    },
+    "query_box_stat": {
+      "description": "Query generic box electricity statistics for a device serial number. Returns the response only.",
+      "fields": {
+        "begin_date": {
+          "description": "Period begin date sent as beginDate.",
+          "name": "Begin date"
+        },
+        "date_type": {
+          "description": "App statistic period type.",
+          "name": "Date type"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        },
+        "end_date": {
+          "description": "Period end date sent as endDate.",
+          "name": "End date"
+        },
+        "key": {
+          "description": "Optional statistic key accepted by the Jackery app API.",
+          "name": "Key"
+        }
+      },
+      "name": "Query box statistics"
+    },
+    "query_carbon_stat": {
+      "description": "Query carbon-offset statistics for a device serial number. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        }
+      },
+      "name": "Query carbon statistics"
+    },
+    "query_charge_report": {
+      "description": "Query charge-report history for a device serial number. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        },
+        "page_index": {
+          "description": "One-based page index.",
+          "name": "Page index"
+        }
+      },
+      "name": "Query charge report"
+    },
+    "query_cutoff_stat": {
+      "description": "Query cutoff/power-outage statistics for a device serial number. Returns the response only.",
+      "fields": {
+        "begin_date": {
+          "description": "Period begin date sent as beginDate.",
+          "name": "Begin date"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        },
+        "end_date": {
+          "description": "Period end date sent as endDate.",
+          "name": "End date"
+        }
+      },
+      "name": "Query cutoff statistics"
     },
     "query_electricity_strategy": {
       "description": "Query all electricity strategy plans from the device.",
@@ -2184,6 +2534,52 @@
       },
       "name": "Query electricity strategy"
     },
+    "query_profit_stat": {
+      "description": "Query profit/revenue statistics for the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Query profit statistics"
+    },
+    "query_soc_stat": {
+      "description": "Query SOC statistics for the selected device. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Query SOC statistics"
+    },
+    "query_socket_stat": {
+      "description": "Query app socket chart statistics for a smart-socket accessory device id. Returns the response only.",
+      "fields": {
+        "begin_date": {
+          "description": "Period begin date sent as beginDate, for example 2026-07-01.",
+          "name": "Begin date"
+        },
+        "date_type": {
+          "description": "App statistic period type.",
+          "name": "Date type"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "end_date": {
+          "description": "Period end date sent as endDate, for example 2026-07-08.",
+          "name": "End date"
+        },
+        "target_dev_id": {
+          "description": "Smart-socket accessory device id sent as deviceId to the app statistic API.",
+          "name": "Target device ID"
+        }
+      },
+      "name": "Query socket statistics"
+    },
     "query_third_party_mqtt_config": {
       "description": "Query the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
       "fields": {
@@ -2193,6 +2589,16 @@
         }
       },
       "name": "Query third-party MQTT config"
+    },
+    "query_tou_plan": {
+      "description": "Query the current TOU schedule plan through the Jackery HTTP API. Returns the response only.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Query TOU plan"
     },
     "refresh_subdevices": {
       "description": "Force a rediscovery of accessories and sub-devices from the Jackery cloud, then refresh all entities. Use this after physically adding or removing an accessory.",
@@ -2250,34 +2656,6 @@
       },
       "name": "Remove shared access"
     },
-    "unbind_shelly_account": {
-      "description": "Unbind the Shelly account from the Jackery account that owns the selected device, then refresh.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. The Shelly account unlink is performed on the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Unbind Shelly account"
-    },
-    "unbind_shelly_device": {
-      "description": "Unbind one Shelly Cloud device through the Jackery account that owns the selected device, then refresh.",
-      "fields": {
-        "binding_id": {
-          "description": "Shelly binding ID returned by the Jackery cloud.",
-          "name": "Binding ID"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device. The Shelly device unlink is performed on the owning account.",
-          "name": "Device ID"
-        },
-        "shelly_device_id": {
-          "description": "Shelly device ID to unbind.",
-          "name": "Shelly device ID"
-        }
-      },
-      "name": "Unbind Shelly device"
-    },
     "rename_system": {
       "description": "Rename a Jackery SolarVault system through the Jackery cloud API. The name is shown in the Jackery app and Home Assistant device info.",
       "fields": {
@@ -2291,6 +2669,88 @@
         }
       },
       "name": "Rename SolarVault system"
+    },
+    "report_device_timezone": {
+      "description": "Report the device's timezone to the Jackery cloud, matching the app's timezone sync.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device.",
+          "name": "Device ID"
+        },
+        "timezone_offset": {
+          "description": "UTC offset in minutes (for example 120 for CEST).",
+          "name": "Timezone offset"
+        },
+        "zone_id": {
+          "description": "IANA zone ID, for example Europe/Berlin.",
+          "name": "Zone ID"
+        }
+      },
+      "name": "Report device timezone"
+    },
+    "save_device_max_power": {
+      "description": "Save the documented device max-power record through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        },
+        "max_power": {
+          "description": "Maximum power value sent as maxPower.",
+          "name": "Max power"
+        }
+      },
+      "name": "Save device max power"
+    },
+    "save_dynamic_price_contract_auth": {
+      "description": "Save dynamic-price contract authorization through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "contract_id": {
+          "description": "Contract id accepted by the provider authorization API.",
+          "name": "Contract ID"
+        },
+        "custom_id": {
+          "description": "Customer or custom id accepted by the provider authorization API.",
+          "name": "Custom ID"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account and system.",
+          "name": "Device ID"
+        },
+        "platform_company_id": {
+          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
+          "name": "Platform company ID"
+        }
+      },
+      "name": "Save dynamic price contract auth"
+    },
+    "save_dynamic_price_location_id": {
+      "description": "Save a Flatpeak dynamic-price connect token through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "connect_token": {
+          "description": "Flatpeak connect token accepted by the Jackery app API.",
+          "name": "Connect token"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Save dynamic price location token"
+    },
+    "save_tou_plan": {
+      "description": "Save the TOU schedule plan through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "body": {
+          "description": "TOU tasks as a JSON list, or an object containing a tasks list.",
+          "name": "Body"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Save TOU plan"
     },
     "send_ble_command": {
       "description": "Send one experimental binary BLE command frame to the selected device. Requires BLE transport, BLE writes and an active BLE connection.",
@@ -2340,101 +2800,23 @@
       },
       "name": "Send device schedule"
     },
-    "query_tou_plan": {
-      "description": "Query the current TOU schedule plan through the Jackery HTTP API. Returns the response only.",
+    "set_ac_nickname": {
+      "description": "Rename one AC output port of a portable device, then refresh.",
       "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query TOU plan"
-    },
-    "save_tou_plan": {
-      "description": "Save the TOU schedule plan through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "body": {
-          "description": "TOU tasks as a JSON list, or an object containing a tasks list.",
-          "name": "Body"
+        "ac_port": {
+          "description": "AC output port to rename (1 or 2).",
+          "name": "AC port"
         },
         "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Save TOU plan"
-    },
-    "list_currencies": {
-      "description": "List currencies available to the Jackery account that owns the selected device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List currencies"
-    },
-    "get_device_currency": {
-      "description": "Get the currency payload for the selected Jackery device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get device currency"
-    },
-    "bind_currency": {
-      "description": "Bind a currency to the selected Jackery device through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "currency": {
-          "description": "Currency code or identifier accepted by the Jackery app API.",
-          "name": "Currency"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Bind currency"
-    },
-    "list_accessories": {
-      "description": "List smart accessories for the selected Jackery device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List accessories"
-    },
-    "check_accessories_exist": {
-      "description": "Check whether accessories exist for the supplied Jackery device ids. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
+          "description": "Pick the portable Jackery device that owns the AC port.",
           "name": "Device ID"
         },
-        "devices": {
-          "description": "Comma-separated Jackery device ids sent as the app API devices parameter.",
-          "name": "Devices"
+        "nickname": {
+          "description": "New display name for the AC port.",
+          "name": "Nickname"
         }
       },
-      "name": "Check accessories exist"
-    },
-    "check_jackery_accessories_exist": {
-      "description": "Check whether Jackery accessories exist for the supplied device serial info. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn_infos": {
-          "description": "Device serial info string accepted by the Jackery app API.",
-          "name": "Device serial info"
-        }
-      },
-      "name": "Check Jackery accessories exist"
+      "name": "Set AC port nickname"
     },
     "set_accessory_name": {
       "description": "Rename a smart accessory through the Jackery HTTP API, then refresh the coordinator.",
@@ -2453,502 +2835,6 @@
         }
       },
       "name": "Set accessory name"
-    },
-    "get_dynamic_price_login_url": {
-      "description": "Get the dynamic-price provider login URL for the selected device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account and system.",
-          "name": "Device ID"
-        },
-        "platform_company_id": {
-          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
-          "name": "Platform company ID"
-        }
-      },
-      "name": "Get dynamic price login URL"
-    },
-    "list_dynamic_price_contracts": {
-      "description": "List dynamic-price contracts for a customer and provider. Returns the response only.",
-      "fields": {
-        "customer_number": {
-          "description": "Customer number accepted by the provider contract-list API.",
-          "name": "Customer number"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "platform_company_id": {
-          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
-          "name": "Platform company ID"
-        }
-      },
-      "name": "List dynamic price contracts"
-    },
-    "save_dynamic_price_contract_auth": {
-      "description": "Save dynamic-price contract authorization through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "contract_id": {
-          "description": "Contract id accepted by the provider authorization API.",
-          "name": "Contract ID"
-        },
-        "custom_id": {
-          "description": "Customer or custom id accepted by the provider authorization API.",
-          "name": "Custom ID"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account and system.",
-          "name": "Device ID"
-        },
-        "platform_company_id": {
-          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
-          "name": "Platform company ID"
-        }
-      },
-      "name": "Save dynamic price contract auth"
-    },
-    "cancel_dynamic_price_contract_auth": {
-      "description": "Cancel dynamic-price contract authorization through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account and system.",
-          "name": "Device ID"
-        },
-        "platform_company_id": {
-          "description": "Dynamic-price provider platform company id accepted by the Jackery app API.",
-          "name": "Platform company ID"
-        }
-      },
-      "name": "Cancel dynamic price contract auth"
-    },
-    "save_dynamic_price_location_id": {
-      "description": "Save a Flatpeak dynamic-price connect token through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "connect_token": {
-          "description": "Flatpeak connect token accepted by the Jackery app API.",
-          "name": "Connect token"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Save dynamic price location token"
-    },
-    "query_socket_stat": {
-      "description": "Query app socket chart statistics for a smart-socket accessory device id. Returns the response only.",
-      "fields": {
-        "begin_date": {
-          "description": "Period begin date sent as beginDate, for example 2026-07-01.",
-          "name": "Begin date"
-        },
-        "date_type": {
-          "description": "App statistic period type.",
-          "name": "Date type"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "end_date": {
-          "description": "Period end date sent as endDate, for example 2026-07-08.",
-          "name": "End date"
-        },
-        "target_dev_id": {
-          "description": "Smart-socket accessory device id sent as deviceId to the app statistic API.",
-          "name": "Target device ID"
-        }
-      },
-      "name": "Query socket statistics"
-    },
-    "list_country_zones": {
-      "description": "List country/zone entries used by Jackery DIY device setup. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List country zones"
-    },
-    "list_grid_standards": {
-      "description": "List grid-connection standards for a country code. Returns the response only.",
-      "fields": {
-        "country": {
-          "description": "Country code accepted by the Jackery app API.",
-          "name": "Country"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List grid standards"
-    },
-    "check_system_bound": {
-      "description": "Check whether a bind-key, device serial number, and GUID tuple is already bound. Returns the response only.",
-      "fields": {
-        "bind_key": {
-          "description": "Bind key accepted by the Jackery app API.",
-          "name": "Bind key"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        },
-        "guid": {
-          "description": "GUID sent to the Jackery app API.",
-          "name": "GUID"
-        }
-      },
-      "name": "Check system binding"
-    },
-    "save_device_max_power": {
-      "description": "Save the documented device max-power record through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        },
-        "max_power": {
-          "description": "Maximum power value sent as maxPower.",
-          "name": "Max power"
-        }
-      },
-      "name": "Save device max power"
-    },
-    "get_alarm_detail": {
-      "description": "Get alarm detail by alarm key through the Jackery HTTP API. Returns the response only.",
-      "fields": {
-        "alarm_key": {
-          "description": "Alarm key accepted by the Jackery app API.",
-          "name": "Alarm key"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get alarm detail"
-    },
-    "list_notifications": {
-      "description": "List Jackery push notifications for the selected account. Returns the response only.",
-      "fields": {
-        "current_time": {
-          "description": "Optional currentTime timestamp in milliseconds; 0 disables the filter.",
-          "name": "Current time"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Optional device serial number filter sent as deviceSn.",
-          "name": "Device serial number"
-        },
-        "page_no": {
-          "description": "One-based page number.",
-          "name": "Page number"
-        },
-        "page_size": {
-          "description": "Number of notifications per page.",
-          "name": "Page size"
-        }
-      },
-      "name": "List notifications"
-    },
-    "get_unread_count": {
-      "description": "Get unread notification counts for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get unread count"
-    },
-    "get_push_config": {
-      "description": "Get push-notification configuration for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get push config"
-    },
-    "set_push_config": {
-      "description": "Set push-notification configuration for the selected account through the Jackery HTTP API.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "set": {
-          "description": "Integer push configuration value accepted by the Jackery app API.",
-          "name": "Set"
-        }
-      },
-      "name": "Set push config"
-    },
-    "sync_alerts": {
-      "description": "Sync faults and alarms through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "content": {
-          "description": "Alert content payload string accepted by the Jackery app API.",
-          "name": "Content"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "id": {
-          "description": "Device or system identifier sent as id.",
-          "name": "ID"
-        }
-      },
-      "name": "Sync alerts"
-    },
-    "get_offline_statistics": {
-      "description": "Get offline statistics for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get offline statistics"
-    },
-    "query_charge_report": {
-      "description": "Query charge-report history for a device serial number. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        },
-        "page_index": {
-          "description": "One-based page index.",
-          "name": "Page index"
-        }
-      },
-      "name": "Query charge report"
-    },
-    "query_cutoff_stat": {
-      "description": "Query cutoff/power-outage statistics for a device serial number. Returns the response only.",
-      "fields": {
-        "begin_date": {
-          "description": "Period begin date sent as beginDate.",
-          "name": "Begin date"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        },
-        "end_date": {
-          "description": "Period end date sent as endDate.",
-          "name": "End date"
-        }
-      },
-      "name": "Query cutoff statistics"
-    },
-    "query_soc_stat": {
-      "description": "Query SOC statistics for the selected device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query SOC statistics"
-    },
-    "query_carbon_stat": {
-      "description": "Query carbon-offset statistics for a device serial number. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        }
-      },
-      "name": "Query carbon statistics"
-    },
-    "query_profit_stat": {
-      "description": "Query profit/revenue statistics for the selected device. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Query profit statistics"
-    },
-    "query_box_stat": {
-      "description": "Query generic box electricity statistics for a device serial number. Returns the response only.",
-      "fields": {
-        "begin_date": {
-          "description": "Period begin date sent as beginDate.",
-          "name": "Begin date"
-        },
-        "date_type": {
-          "description": "App statistic period type.",
-          "name": "Date type"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        },
-        "end_date": {
-          "description": "Period end date sent as endDate.",
-          "name": "End date"
-        },
-        "key": {
-          "description": "Optional statistic key accepted by the Jackery app API.",
-          "name": "Key"
-        }
-      },
-      "name": "Query box statistics"
-    },
-    "check_app_version": {
-      "description": "Check Jackery app-version metadata for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "type": {
-          "description": "Optional app platform type sent as type.",
-          "name": "Type"
-        },
-        "version_name": {
-          "description": "Optional app version sent as versionName.",
-          "name": "Version name"
-        }
-      },
-      "name": "Check app version"
-    },
-    "list_banners": {
-      "description": "List Jackery app banners for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List banners"
-    },
-    "submit_feedback": {
-      "description": "Submit feedback through the Jackery HTTP API.",
-      "fields": {
-        "contact_info": {
-          "description": "Contact information sent as contactInfo.",
-          "name": "Contact info"
-        },
-        "content": {
-          "description": "Feedback content.",
-          "name": "Content"
-        },
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Optional device serial number sent as deviceSn.",
-          "name": "Device serial number"
-        }
-      },
-      "name": "Submit feedback"
-    },
-    "list_faqs": {
-      "description": "List Jackery FAQ entries for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List FAQs"
-    },
-    "list_faq_answers": {
-      "description": "List Jackery FAQ answer entries for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "List FAQ answers"
-    },
-    "check_privacy_update": {
-      "description": "Check whether the selected account requires updated privacy consent. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Check privacy update"
-    },
-    "agree_privacy_consent": {
-      "description": "Record agreement to one or more Jackery privacy-consent versions.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "pending_agree_version_ids": {
-          "description": "List of numeric privacy version IDs sent as pendingAgreeVersionIds.",
-          "name": "Pending agreement version IDs"
-        }
-      },
-      "name": "Agree privacy consent"
-    },
-    "get_product_instruction": {
-      "description": "Get product instructions for a device serial number. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        },
-        "device_sn": {
-          "description": "Device serial number sent as devSn.",
-          "name": "Device serial number"
-        },
-        "type": {
-          "description": "Optional instruction type filter sent as type.",
-          "name": "Type"
-        }
-      },
-      "name": "Get product instruction"
-    },
-    "get_user_info": {
-      "description": "Get authenticated-user profile information for the selected account. Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get user info"
     },
     "set_account_nickname": {
       "description": "Set the account display nickname for the Jackery account that owns the selected device. The nickname is shown in the Jackery app profile.",
@@ -2977,6 +2863,38 @@
         }
       },
       "name": "Set device nickname"
+    },
+    "set_push_config": {
+      "description": "Set push-notification configuration for the selected account through the Jackery HTTP API.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "set": {
+          "description": "Integer push configuration value accepted by the Jackery app API.",
+          "name": "Set"
+        }
+      },
+      "name": "Set push config"
+    },
+    "set_storm_alert_location": {
+      "description": "Update the GPS location used for storm and weather alerts on the selected device via the Jackery cloud API.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
+          "name": "Device ID"
+        },
+        "latitude": {
+          "description": "Latitude in decimal degrees (-90 to 90).",
+          "name": "Latitude"
+        },
+        "longitude": {
+          "description": "Longitude in decimal degrees (-180 to 180).",
+          "name": "Longitude"
+        }
+      },
+      "name": "Set storm alert location"
     },
     "set_third_party_mqtt_config": {
       "description": "Set the experimental third-party MQTT bridge config over the existing Jackery MQTT command channel.",
@@ -3012,6 +2930,60 @@
       },
       "name": "Set third-party MQTT config"
     },
+    "submit_feedback": {
+      "description": "Submit feedback through the Jackery HTTP API.",
+      "fields": {
+        "contact_info": {
+          "description": "Contact information sent as contactInfo.",
+          "name": "Contact info"
+        },
+        "content": {
+          "description": "Feedback content.",
+          "name": "Content"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "device_sn": {
+          "description": "Optional device serial number sent as deviceSn.",
+          "name": "Device serial number"
+        }
+      },
+      "name": "Submit feedback"
+    },
+    "sync_alerts": {
+      "description": "Sync faults and alarms through the Jackery HTTP API, then refresh the coordinator.",
+      "fields": {
+        "content": {
+          "description": "Alert content payload string accepted by the Jackery app API.",
+          "name": "Content"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device to select the owning account.",
+          "name": "Device ID"
+        },
+        "id": {
+          "description": "Device or system identifier sent as id.",
+          "name": "ID"
+        }
+      },
+      "name": "Sync alerts"
+    },
+    "unbind_accessories": {
+      "description": "Unbind smart accessories from their parent device by bind ID, then refresh. Returns the per-item result.",
+      "fields": {
+        "bind_ids": {
+          "description": "List of accessory bind IDs to unbind.",
+          "name": "Bind IDs"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device from the account that owns the accessories.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Unbind accessories"
+    },
     "unbind_device": {
       "description": "Unbind (remove) a device from the Jackery account through the Jackery cloud API. This is destructive: the device and its entities are removed from Home Assistant after the next refresh.",
       "fields": {
@@ -3021,6 +2993,34 @@
         }
       },
       "name": "Unbind device"
+    },
+    "unbind_shelly_account": {
+      "description": "Unbind the Shelly account from the Jackery account that owns the selected device, then refresh.",
+      "fields": {
+        "device_id": {
+          "description": "Pick a Jackery device. The Shelly account unlink is performed on the owning account.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Unbind Shelly account"
+    },
+    "unbind_shelly_device": {
+      "description": "Unbind one Shelly Cloud device through the Jackery account that owns the selected device, then refresh.",
+      "fields": {
+        "binding_id": {
+          "description": "Shelly binding ID returned by the Jackery cloud.",
+          "name": "Binding ID"
+        },
+        "device_id": {
+          "description": "Pick a Jackery device. The Shelly device unlink is performed on the owning account.",
+          "name": "Device ID"
+        },
+        "shelly_device_id": {
+          "description": "Shelly device ID to unbind.",
+          "name": "Shelly device ID"
+        }
+      },
+      "name": "Unbind Shelly device"
     },
     "unbind_smart_part": {
       "description": "Unbind (remove) a smart accessory from the selected device over MQTT.",

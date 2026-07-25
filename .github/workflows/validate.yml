@@ -86,4 +86,3 @@ jobs:
       - name: Run HA fixture tests
         if: steps.fixtures.outputs.exists == 'true'
         run: pytest -q -p no:cacheprovider
-

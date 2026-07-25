@@ -83,7 +83,7 @@ Wir stellen außerdem über 60 benutzerdefinierte Services in Home Assistant zur
 3. Folge dem Einrichtungsassistenten und gib deine Jackery-Cloud-Zugangsdaten ein.
 
 > [!WARNING]
-> **Wichtige Account-Einschränkung:** Jackery erlaubt nur eine aktive Sitzung pro Account. Wenn du dich mit dem Hauptaccount deiner App anmeldest, wirst du auf dem Handy regelmäßig abgemeldet, oder die Integration verliert die Verbindung.  
+> **Wichtige Account-Einschränkung:** Jackery erlaubt nur eine aktive Sitzung pro Account. Wenn du dich mit dem Hauptaccount deiner App anmeldest, wirst du auf dem Handy regelmäßig abgemeldet, oder die Integration verliert die Verbindung.
 > **Lösung:** Erstelle einen **zweiten, dedizierten Jackery-Account** nur für Home Assistant. Teile deine Jackery-Geräte aus deinem Haupt-App-Account mit diesem neuen, dedizierten HA-Account!
 
 ### Konfigurationsoptionen
