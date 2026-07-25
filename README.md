@@ -1,12 +1,26 @@
-# Jackery SolarVault — Home Assistant Integration
+# Jackery SolarVault for Home Assistant
+
+Languages:
+[English](./README.md) · [Deutsch](./docs/README.de.md) · [Français](./docs/README.fr.md) · [Español](./docs/README.es.md)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your Jackery SolarVault, HomePower, and Explorer power stations directly into your smart home. 
 
-Whether you want to monitor your solar input, check your battery level, or automate your home based on your Jackery's energy flow – this integration provides real-time data and full control over your Jackery devices.
+**This is the ultimate (non-plus-ultra) Jackery integration for Home Assistant.** It combines 100% of the official App's functionality (Cloud API) with the speed and reliability of **Local MQTT** and **Bluetooth (BLE)**.
+
+---
+
+## 🏆 Why this integration is the best choice
+
+You might have heard of other manual MQTT workarounds or older integrations. Here is why this integration is the clearly superior choice:
+
+1. **Zero Manual Token Extraction:** We require your Cloud credentials during setup. **Why?** Because the integration automatically discovers all your devices and securely fetches the complex encryption keys and tokens required for local communication. You don't have to intercept network traffic or manually configure JSON payloads.
+2. **True Local Control:** Once the initial cloud handshake is complete, the integration connects directly to your device via **Local MQTT** and **Bluetooth (BLE)** for instant, sub-second updates and local control. 
+3. **100% App Functionality:** Unlike basic local-only scripts that only read battery levels, this integration supports *everything* the Jackery App does, including Time-of-Use scheduling, Shelly integration, firmware checks, and advanced charging settings.
 
 ---
 
@@ -20,23 +34,40 @@ This integration supports a wide range of Jackery devices, including:
 
 ---
 
-## ✨ Features
+## ✨ Features & Entities
 
-- **Live Monitoring:** Track State of Charge (SOC), PV (Solar) input power, grid import/export, output power, and temperatures.
-- **Full Control:** Toggle AC/DC outputs, change working modes, set charge limits, and prioritize outputs.
-- **Automations:** Seamlessly automate your Jackery power station based on conditions (e.g., turn on a smart plug when the battery reaches 100%).
-- **Energy Dashboard:** Integrates perfectly with the Home Assistant Energy Dashboard using long-term statistics (daily, weekly, monthly, yearly).
-- **Fast & Reliable:** Uses the Jackery Cloud as the primary source of truth, enhanced by local Bluetooth (BLE) and MQTT for instant, low-latency updates.
+The integration creates dozens of entities per device to give you full visibility and control:
+
+| Platform | Examples |
+|----------|----------|
+| `sensor` | SOC, input/output/PV power, grid in/out, temperatures, remaining runtime, cumulative energy statistics |
+| `binary_sensor` | charging, online, and fault status |
+| `number` | charge power limit, energy-storage limits, custom battery bounds, AC output delay-open time |
+| `select` | working mode, charge mode, battery mode, output priority, UPS model, electricity price mode |
+| `switch` | EPS output, AC/DC outputs, energy saving, super charge |
+| `button` | reboot, power-pack blink |
+| `text` | Wi-Fi and diagnostic identifiers |
+
+### 🛠️ Advanced Services
+We also expose 60+ custom services in Home Assistant, giving you the power of the Jackery App in your automations:
+- **Device Management:** `bind_device`, `unbind_device`, `get_share_qr_code`
+- **Cloud-to-Cloud:** `get_shelly_auth_url`, `list_shelly_devices`
+- **Energy Scheduling:** `save_tou_plan`, `insert_electricity_strategy`, `bind_currency`
+- **Statistics:** `query_charge_report`, `query_soc_stat`, `query_profit_stat`
 
 ---
 
 ## 🛠️ Installation
 
-### Option 1: HACS (Recommended)
-1. Open Home Assistant and go to **HACS**.
-2. Add this repository as a custom repository (Category: *Integration*).
-3. Search for **Jackery SolarVault** and click Download.
-4. Restart Home Assistant.
+### HACS (Recommended)
+1. Open HACS.
+2. Open the three-dot menu.
+3. Select `Custom repositories`.
+4. Add `https://github.com/Bigdaddy1990/jackery_solarvault` as an `Integration`.
+5. Search for `Jackery SolarVault` and install it.
+6. Restart Home Assistant.
+7. Go to `Settings > Devices & services > Add integration`.
+8. Select `Jackery SolarVault`.
 
 ### Option 2: Manual
 1. Download the latest release.
@@ -79,7 +110,6 @@ automation:
 ```
 
 **Set a Time-of-Use Schedule:**
-You can use the integration's custom services to change advanced settings like charging schedules:
 ```yaml
 action: jackery_solarvault.save_tou_plan
 data:
@@ -99,8 +129,6 @@ data:
 
 - **My integration keeps disconnecting or sensors say "unavailable":**
   This usually happens because you are using the same account in the Jackery App on your phone and in Home Assistant. Please create a dedicated account for Home Assistant and share your devices to it.
-- **I don't see live updates, it takes a few minutes to refresh:**
-  The cloud API is polled every few minutes. For instant live updates, enable the optional Bluetooth (BLE) feature in the configuration, provided your Home Assistant server is close enough to the Jackery device.
 - **Where are the lifetime energy sensors?**
   The provided week, month, and year sensors are *period totals* and reset automatically. For the Home Assistant Energy Dashboard, please use the cumulative energy sensors provided by the integration.
 
