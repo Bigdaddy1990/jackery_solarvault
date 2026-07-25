@@ -87,8 +87,8 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 3. Follow the setup wizard and enter your Jackery Cloud credentials.
 
 > [!WARNING]
-> **Important Account Limitation:** Jackery only allows one active session per account. If you log in with your primary app account, you will regularly be logged out on your phone, or the integration will disconnect.
-> **Solution:** Create a **second, dedicated Jackery account** just for Home Assistant. Share your Jackery devices from your main app account with this new dedicated HA account!
+> **Important Account Limitation:** Jackery normally permits one active session per account. If you log in with another device (e.g., your primary app on your phone), the integration's MQTT connection will temporarily pause and automatically reconnect shortly after.
+> **Recommended Solution:** For the best experience, create a **second, dedicated Jackery account** just for Home Assistant. Share your Jackery devices from your main app account with this new dedicated HA account!
 
 ### Configuration Options
 
