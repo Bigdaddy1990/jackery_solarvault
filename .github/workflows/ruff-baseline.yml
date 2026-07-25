@@ -3,7 +3,7 @@ name: Ruff baseline (web only)
 on: { workflow_dispatch: {} }
 permissions:
   id-token: write # for Trusted Publishing + attest-action
-  contents: read # for actions/checkout, if you're in a private repo
+  contents: write # for actions/checkout, if you're in a private repo
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
 jobs:
@@ -35,7 +35,7 @@ jobs:
           ruff format .
           
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+          pre-commit run --hook-stage manual --check --py314-plus --ruff || true
           
       - uses: peter-evans/create-pull-request@v8
         with:
