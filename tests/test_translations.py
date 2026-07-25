@@ -15,11 +15,13 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # ruff: ignore[any-t
     """Return the set of dotted "leaf" key paths from a nested dictionary structure.
 
     Parameters:
-        value (Any): The value to inspect; if it is a dict, its nested keys are traversed, otherwise treated as a leaf.
+        value (Any): The value to inspect; if it is a dict, its nested keys are traversed, 
+        otherwise treated as a leaf.
         prefix (str): Optional starting prefix for paths; when provided, child keys are joined using '.'.
 
     Returns:
-        set[str]: A set of dotted key paths representing all leaf nodes found (the prefix itself is a leaf when `value` is not a dict).
+        set[str]: A set of dotted key paths representing all leaf nodes found 
+        (the prefix itself is a leaf when `value` is not a dict).
     """
     if not isinstance(value, dict):
         return {prefix}
@@ -34,7 +36,9 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # ruff: ignore[any-t
 def test_language_files_cover_all_string_keys() -> None:
     """Ensure each per-language translation file contains exactly the same set of leaf string keys as strings.json.
 
-    Loads the base key set from `strings.json` and asserts, for every language in LANGUAGES, that `translations/{lang}.json` has an identical set of leaf key paths. The assertion includes the language code on failure for diagnostic context.
+    Loads the base key set from `strings.json` and asserts, for every language in LANGUAGES, 
+    that `translations/{lang}.json` has an identical set of leaf key paths. The assertion includes the language 
+    code on failure for diagnostic context.
     """
     base = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
     base_paths = _leaf_paths(base)
@@ -51,7 +55,8 @@ def test_language_files_cover_all_string_keys() -> None:
 def test_service_actions_use_translation_files() -> None:
     """Verify that service names and descriptions are provided via translation files rather than hardcoded in services.yaml.
 
-    Asserts that services.yaml does not contain the literals "  name:" or "  description:", that the expected service IDs are present in both strings.json and icons.json, and that each listed service in icons.json contains a "service" key.
+    Asserts that services.yaml does not contain the literals "  name:" or "  description:", that the expected service IDs are 
+    present in both strings.json and icons.json, and that each listed service in icons.json contains a "service" key.
     """
     services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
     strings = json.loads(
