@@ -1,0 +1,1205 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "smart_plug_switch_state": {
+        "default": "mdi:power-socket-de"
+      }
+    },
+    "button": {
+      "delete_storm_alert": {
+        "default": "mdi:weather-lightning-rainy"
+      },
+      "portable_current_charge_plan": {
+        "default": "mdi:clock-outline"
+      },
+      "portable_get_charge_plan": {
+        "default": "mdi:battery-clock"
+      },
+      "portable_get_electricity_data_count": {
+        "default": "mdi:counter"
+      },
+      "portable_get_peaks_troughs": {
+        "default": "mdi:chart-line"
+      },
+      "portable_get_power_pack_list": {
+        "default": "mdi:battery"
+      },
+      "portable_get_wifi_config": {
+        "default": "mdi:wifi-cog"
+      },
+      "portable_power_off": {
+        "default": "mdi:power"
+      },
+      "portable_power_pack_blink": {
+        "default": "mdi:led-outline"
+      },
+      "portable_read_device_info": {
+        "default": "mdi:information-outline"
+      },
+      "portable_read_sub_ct": {
+        "default": "mdi:transmission-tower"
+      },
+      "portable_read_wifi_list": {
+        "default": "mdi:wifi"
+      },
+      "portable_refresh_battery_packs": {
+        "default": "mdi:battery-sync"
+      },
+      "portable_refresh_device_info": {
+        "default": "mdi:database-refresh"
+      },
+      "portable_refresh_electricity_count": {
+        "default": "mdi:counter"
+      },
+      "portable_refresh_sub_ct": {
+        "default": "mdi:meter-electric"
+      },
+      "portable_refresh_wifi_config": {
+        "default": "mdi:wifi-cog"
+      },
+      "portable_refresh_wifi_list": {
+        "default": "mdi:wifi-refresh"
+      },
+      "portable_restart": {
+        "default": "mdi:restart"
+      },
+      "portable_send_time_zone": {
+        "default": "mdi:clock-outline"
+      },
+      "portable_sync_mqtt_info": {
+        "default": "mdi:cloud-sync"
+      },
+      "portable_sync_time_zone": {
+        "default": "mdi:clock-check"
+      },
+      "read_custom_mode_schedule": {
+        "default": "mdi:calendar-clock"
+      },
+      "read_smart_plug_schedule": {
+        "default": "mdi:calendar-clock"
+      },
+      "read_time_electricity_schedule": {
+        "default": "mdi:calendar-sync"
+      },
+      "reboot_device": {
+        "default": "mdi:restart"
+      },
+      "refresh_battery_packs": {
+        "default": "mdi:battery-sync"
+      },
+      "refresh_device_info": {
+        "default": "mdi:database-refresh"
+      },
+      "refresh_device_ota_version": {
+        "default": "mdi:update"
+      },
+      "refresh_meter_heads": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "refresh_smart_meter": {
+        "default": "mdi:meter-electric"
+      },
+      "refresh_smart_plugs": {
+        "default": "mdi:power-plug-battery"
+      },
+      "refresh_subdevice_combo": {
+        "default": "mdi:devices"
+      },
+      "refresh_system_info": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "refresh_third_party_mqtt_config": {
+        "default": "mdi:mqtt"
+      },
+      "refresh_time_zone": {
+        "default": "mdi:map-clock"
+      },
+      "refresh_weather_plan": {
+        "default": "mdi:weather-cloudy-clock"
+      },
+      "refresh_wifi_config": {
+        "default": "mdi:wifi-cog"
+      },
+      "refresh_wifi_list": {
+        "default": "mdi:wifi-refresh"
+      },
+      "sync_cloud_mqtt_info": {
+        "default": "mdi:cloud-sync"
+      },
+      "sync_time_zone": {
+        "default": "mdi:clock-check"
+      }
+    },
+    "number": {
+      "default_power_set": {
+        "default": "mdi:flash-outline"
+      },
+      "max_feed_grid": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "max_output_power_set": {
+        "default": "mdi:flash"
+      },
+      "portable_ac1_priority_soc": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_ac2_priority_soc": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_ac_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_ac_output_delay": {
+        "default": "mdi:timer-play"
+      },
+      "portable_auto_shutdown_time": {
+        "default": "mdi:timer-cog"
+      },
+      "portable_bluetooth_sleep": {
+        "default": "mdi:bluetooth"
+      },
+      "portable_charge_power": {
+        "default": "mdi:battery-charging-wireless"
+      },
+      "portable_custom_use_charge_limit": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "portable_custom_use_discharge_limit": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_dc_car_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_dc_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_dc_priority_soc": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_dc_usb_countdown": {
+        "default": "mdi:timer"
+      },
+      "portable_energy_storage_charge_limit": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "portable_output_priority": {
+        "default": "mdi:sort-bool-descending"
+      },
+      "single_tariff_price_set": {
+        "default": "mdi:currency-eur"
+      },
+      "soc_charge_limit_set": {
+        "default": "mdi:battery-charging-high"
+      },
+      "soc_discharge_limit_set": {
+        "default": "mdi:battery-low"
+      },
+      "third_party_mqtt_port": {
+        "default": "mdi:numeric"
+      }
+    },
+    "select": {
+      "auto_off_island_mode": {
+        "default": "mdi:timer-cog-outline"
+      },
+      "ct_phase_select": {
+        "default": "mdi:transmission-tower"
+      },
+      "electricity_price_mode": {
+        "default": "mdi:cash-multiple"
+      },
+      "electricity_price_provider": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "portable_ac1_priority": {
+        "default": "mdi:current-ac"
+      },
+      "portable_ac2_priority": {
+        "default": "mdi:current-ac"
+      },
+      "portable_ac_output_mode": {
+        "default": "mdi:current-ac"
+      },
+      "portable_battery_mode": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "portable_charge_mode": {
+        "default": "mdi:battery-charging-high"
+      },
+      "portable_dc_priority": {
+        "default": "mdi:current-dc"
+      },
+      "portable_output_priority": {
+        "default": "mdi:sort-bool-descending"
+      },
+      "portable_power_mode": {
+        "default": "mdi:flash"
+      },
+      "portable_screen": {
+        "default": "mdi:monitor"
+      },
+      "portable_ups_model": {
+        "default": "mdi:battery-charging-outline"
+      },
+      "storm_warning_minutes_select": {
+        "default": "mdi:weather-lightning-rainy"
+      },
+      "temp_unit_select": {
+        "default": "mdi:thermometer"
+      },
+      "work_mode_select": {
+        "default": "mdi:tune-variant"
+      }
+    },
+    "sensor": {
+      "ability_bits": {
+        "default": "mdi:chip"
+      },
+      "alarm_count": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "auto_standby": {
+        "default": "mdi:power-sleep"
+      },
+      "battery_charge_month_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_charge_power": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_charge_week_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_charge_year_energy": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_count": {
+        "default": "mdi:battery-multiple"
+      },
+      "battery_discharge_month_energy": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_discharge_power": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_discharge_week_energy": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_discharge_year_energy": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_net_power": {
+        "default": "mdi:battery-sync"
+      },
+      "battery_pack_cell_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "battery_pack_charge_power": {
+        "default": "mdi:battery-arrow-up"
+      },
+      "battery_pack_communication_state": {
+        "default": "mdi:access-point-network"
+      },
+      "battery_pack_discharge_power": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "battery_pack_firmware_version": {
+        "default": "mdi:chip"
+      },
+      "battery_pack_lifetime_charge_energy": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "battery_pack_lifetime_discharge_energy": {
+        "default": "mdi:battery-arrow-down-outline"
+      },
+      "battery_pack_serial_number": {
+        "default": "mdi:barcode"
+      },
+      "battery_pack_soc": {
+        "default": "mdi:battery"
+      },
+      "battery_pack_update_status": {
+        "default": "mdi:update"
+      },
+      "battery_stack_net_power": {
+        "default": "mdi:battery-sync"
+      },
+      "battery_state": {
+        "default": "mdi:battery-sync"
+      },
+      "ble_transport": {
+        "default": "mdi:bluetooth"
+      },
+      "charging_input_power": {
+        "default": "mdi:car-battery"
+      },
+      "cloud_mqtt": {
+        "default": "mdi:cloud-sync"
+      },
+      "conversion_loss_power": {
+        "default": "mdi:transmission-tower-off"
+      },
+      "ct_input_day_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "ct_input_month_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "ct_input_week_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "ct_input_year_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "ct_output_day_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "ct_output_month_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "ct_output_week_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "ct_output_year_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "ct_state": {
+        "default": "mdi:counter"
+      },
+      "device_activation": {
+        "default": "mdi:key-variant"
+      },
+      "device_ongrid_input_month_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "device_ongrid_input_week_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "device_ongrid_input_year_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "device_ongrid_output_month_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "device_ongrid_output_week_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "device_ongrid_output_year_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "device_pv1_day_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv1_month_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv1_week_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv1_year_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv2_day_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv2_month_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv2_week_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv2_year_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv3_day_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv3_month_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv3_week_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv3_year_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv4_day_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv4_month_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv4_week_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "device_pv4_year_energy": {
+        "default": "mdi:solar-panel"
+      },
+      "dynamic_price_contract_auth": {
+        "default": "mdi:file-certificate"
+      },
+      "dynamic_price_nextday_high": {
+        "default": "mdi:cash-plus"
+      },
+      "dynamic_price_nextday_low": {
+        "default": "mdi:cash-minus"
+      },
+      "dynamic_price_provider": {
+        "default": "mdi:office-building-cog"
+      },
+      "dynamic_price_today_high": {
+        "default": "mdi:cash-plus"
+      },
+      "dynamic_price_today_low": {
+        "default": "mdi:cash-minus"
+      },
+      "eps_input_day_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "eps_input_month_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "eps_input_week_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "eps_input_year_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "eps_output_day_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "eps_output_month_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "eps_output_week_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "eps_output_year_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "eps_switch_state": {
+        "default": "mdi:power-plug-outline"
+      },
+      "eth_port": {
+        "default": "mdi:ethernet"
+      },
+      "ethernet_ip": {
+        "default": "mdi:ethernet"
+      },
+      "ethernet_mac": {
+        "default": "mdi:ethernet"
+      },
+      "ethernet_port": {
+        "default": "mdi:ethernet"
+      },
+      "firmware_version": {
+        "default": "mdi:chip"
+      },
+      "follow_meter_state": {
+        "default": "mdi:gauge"
+      },
+      "function_enable_flags": {
+        "default": "mdi:chip"
+      },
+      "grid_in_power": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "grid_net_power": {
+        "default": "mdi:transmission-tower"
+      },
+      "grid_out_power": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "grid_state": {
+        "default": "mdi:transmission-tower-off"
+      },
+      "home_consumption_power": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_day_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_month_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_week_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "home_year_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "http_api": {
+        "default": "mdi:cloud"
+      },
+      "inverter_ac_input_power": {
+        "default": "mdi:sine-wave"
+      },
+      "inverter_ac_output_power": {
+        "default": "mdi:sine-wave"
+      },
+      "latitude": {
+        "default": "mdi:latitude"
+      },
+      "local_mqtt": {
+        "default": "mdi:lan"
+      },
+      "longitude": {
+        "default": "mdi:longitude"
+      },
+      "mac_address": {
+        "default": "mdi:lan"
+      },
+      "max_iot_num": {
+        "default": "mdi:devices"
+      },
+      "meter_head_charging_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "meter_head_communication_mode": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "meter_head_communication_state": {
+        "default": "mdi:access-point-network"
+      },
+      "meter_head_discharging_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "meter_head_input_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "meter_head_ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "meter_head_mac_address": {
+        "default": "mdi:lan"
+      },
+      "meter_head_output_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "off_grid_shutdown_state": {
+        "default": "mdi:power-off"
+      },
+      "off_grid_time": {
+        "default": "mdi:timer-outline"
+      },
+      "ongrid_state": {
+        "default": "mdi:transmission-tower"
+      },
+      "power_price": {
+        "default": "mdi:currency-eur"
+      },
+      "pv1_power": {
+        "default": "mdi:solar-panel"
+      },
+      "pv2_power": {
+        "default": "mdi:solar-panel"
+      },
+      "pv3_power": {
+        "default": "mdi:solar-panel"
+      },
+      "pv4_power": {
+        "default": "mdi:solar-panel"
+      },
+      "pv_month_energy": {
+        "default": "mdi:solar-power-variant"
+      },
+      "pv_power_total": {
+        "default": "mdi:solar-power"
+      },
+      "pv_revenue_day": {
+        "default": "mdi:cash"
+      },
+      "pv_revenue_month": {
+        "default": "mdi:cash"
+      },
+      "pv_revenue_week": {
+        "default": "mdi:cash"
+      },
+      "pv_revenue_year": {
+        "default": "mdi:cash"
+      },
+      "pv_week_energy": {
+        "default": "mdi:solar-power-variant"
+      },
+      "pv_year_energy": {
+        "default": "mdi:solar-power-variant"
+      },
+      "raw_properties": {
+        "default": "mdi:code-json"
+      },
+      "reboot_flag": {
+        "default": "mdi:restart"
+      },
+      "savings_battery_loss_year_energy": {
+        "default": "mdi:battery-alert-variant-outline"
+      },
+      "savings_calculated_total": {
+        "default": "mdi:cash-check"
+      },
+      "savings_conversion_loss_year_energy": {
+        "default": "mdi:transmission-tower-off"
+      },
+      "savings_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "savings_price": {
+        "default": "mdi:currency-eur"
+      },
+      "savings_pv_residual_year_energy": {
+        "default": "mdi:solar-power-variant-outline"
+      },
+      "smart_meter_apparent_power": {
+        "default": "mdi:flash-outline"
+      },
+      "smart_meter_communication_mode": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "smart_meter_frequency": {
+        "default": "mdi:sine-wave"
+      },
+      "smart_meter_fun_form": {
+        "default": "mdi:transit-connection-horizontal"
+      },
+      "smart_meter_grid_export_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_grid_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_gross_phase_export_power": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_gross_phase_flow_power": {
+        "default": "mdi:current-ac"
+      },
+      "smart_meter_gross_phase_import_power": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "smart_meter_lifetime_export_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_lifetime_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_mac_address": {
+        "default": "mdi:lan"
+      },
+      "smart_meter_net_export_power": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_net_import_power": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_phase_1_apparent_power": {
+        "default": "mdi:flash-outline"
+      },
+      "smart_meter_phase_1_current": {
+        "default": "mdi:current-ac"
+      },
+      "smart_meter_phase_1_lifetime_export_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_phase_1_lifetime_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_phase_1_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "smart_meter_phase_1_power_factor": {
+        "default": "mdi:angle-acute"
+      },
+      "smart_meter_phase_1_reactive_power": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "smart_meter_phase_1_voltage": {
+        "default": "mdi:sine-wave"
+      },
+      "smart_meter_phase_2_apparent_power": {
+        "default": "mdi:flash-outline"
+      },
+      "smart_meter_phase_2_current": {
+        "default": "mdi:current-ac"
+      },
+      "smart_meter_phase_2_lifetime_export_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_phase_2_lifetime_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_phase_2_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "smart_meter_phase_2_power_factor": {
+        "default": "mdi:angle-acute"
+      },
+      "smart_meter_phase_2_reactive_power": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "smart_meter_phase_2_voltage": {
+        "default": "mdi:sine-wave"
+      },
+      "smart_meter_phase_3_apparent_power": {
+        "default": "mdi:flash-outline"
+      },
+      "smart_meter_phase_3_current": {
+        "default": "mdi:current-ac"
+      },
+      "smart_meter_phase_3_lifetime_export_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "smart_meter_phase_3_lifetime_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "smart_meter_phase_3_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "smart_meter_phase_3_power_factor": {
+        "default": "mdi:angle-acute"
+      },
+      "smart_meter_phase_3_reactive_power": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "smart_meter_phase_3_voltage": {
+        "default": "mdi:sine-wave"
+      },
+      "smart_meter_power": {
+        "default": "mdi:meter-electric-outline"
+      },
+      "smart_meter_power_factor": {
+        "default": "mdi:angle-acute"
+      },
+      "smart_meter_reactive_power": {
+        "default": "mdi:flash-triangle-outline"
+      },
+      "smart_meter_voltage": {
+        "default": "mdi:sine-wave"
+      },
+      "smart_plug_communication_mode": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "smart_plug_communication_state": {
+        "default": "mdi:access-point-network"
+      },
+      "smart_plug_firmware_version": {
+        "default": "mdi:chip"
+      },
+      "smart_plug_input_power": {
+        "default": "mdi:power-plug-outline"
+      },
+      "smart_plug_ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "smart_plug_last_update_ts": {
+        "default": "mdi:clock-outline"
+      },
+      "smart_plug_mac_address": {
+        "default": "mdi:lan"
+      },
+      "smart_plug_output_power": {
+        "default": "mdi:power-socket-de"
+      },
+      "smart_plug_priority": {
+        "default": "mdi:priority-high"
+      },
+      "smart_plug_switch_cycle": {
+        "default": "mdi:counter"
+      },
+      "smart_plug_today_energy": {
+        "default": "mdi:power-plug-battery"
+      },
+      "smart_plug_total_energy": {
+        "default": "mdi:power-plug-battery"
+      },
+      "smart_schedule_currency": {
+        "default": "mdi:currency-usd"
+      },
+      "smart_schedule_days": {
+        "default": "mdi:calendar-range"
+      },
+      "smart_schedule_points": {
+        "default": "mdi:chart-timeline-variant"
+      },
+      "smart_schedule_profit": {
+        "default": "mdi:cash-multiple"
+      },
+      "soc_charge_limit": {
+        "default": "mdi:battery-charging-high"
+      },
+      "soc_discharge_limit": {
+        "default": "mdi:battery-low"
+      },
+      "storm_warning_enabled": {
+        "default": "mdi:weather-lightning-rainy"
+      },
+      "storm_warning_minutes": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "subdevice_alert_count": {
+        "default": "mdi:alert-outline"
+      },
+      "symmetry_total_negative": {
+        "default": "mdi:swap-horizontal"
+      },
+      "symmetry_total_positive": {
+        "default": "mdi:swap-horizontal"
+      },
+      "system_state": {
+        "default": "mdi:state-machine"
+      },
+      "task_plan": {
+        "default": "mdi:calendar-clock"
+      },
+      "temp_unit": {
+        "default": "mdi:thermometer"
+      },
+      "today_battery_energy": {
+        "default": "mdi:battery-charging"
+      },
+      "today_feed_in_energy": {
+        "default": "mdi:transmission-tower-export"
+      },
+      "today_grid_import_energy": {
+        "default": "mdi:transmission-tower-import"
+      },
+      "today_home_load_energy": {
+        "default": "mdi:home-lightning-bolt"
+      },
+      "total_carbon_saved": {
+        "default": "mdi:molecule-co2"
+      },
+      "total_revenue": {
+        "default": "mdi:currency-eur"
+      },
+      "weather_plan": {
+        "default": "mdi:weather-lightning-rainy"
+      },
+      "wifi_ip": {
+        "default": "mdi:ip-network"
+      },
+      "wifi_name": {
+        "default": "mdi:wifi"
+      },
+      "work_mode": {
+        "default": "mdi:tune-variant"
+      }
+    },
+    "switch": {
+      "auto_standby_set": {
+        "default": "mdi:power-sleep"
+      },
+      "breaker_switch": {
+        "default": "mdi:circuit-breaker"
+      },
+      "eps_output": {
+        "default": "mdi:power-plug"
+      },
+      "follow_meter": {
+        "default": "mdi:gauge"
+      },
+      "off_grid_shutdown": {
+        "default": "mdi:power-off"
+      },
+      "portable_ac240_output": {
+        "default": "mdi:power-plug-battery"
+      },
+      "portable_ac_output": {
+        "default": "mdi:power-plug-battery"
+      },
+      "portable_car_output": {
+        "default": "mdi:car"
+      },
+      "portable_dc_car_output": {
+        "default": "mdi:car-electric"
+      },
+      "portable_dc_output": {
+        "default": "mdi:power-plug"
+      },
+      "portable_dc_usb_output": {
+        "default": "mdi:usb-port"
+      },
+      "portable_discharge_memory": {
+        "default": "mdi:battery-arrow-down"
+      },
+      "portable_light": {
+        "default": "mdi:lightbulb"
+      },
+      "portable_output_priority_switch": {
+        "default": "mdi:sort-bool-descending"
+      },
+      "portable_super_charge": {
+        "default": "mdi:flash"
+      },
+      "portable_usb_output": {
+        "default": "mdi:usb"
+      },
+      "smart_plug_priority_enabled": {
+        "default": "mdi:priority-high"
+      },
+      "smart_plug_switch": {
+        "default": "mdi:power-socket-de"
+      },
+      "standby": {
+        "default": "mdi:power-sleep"
+      },
+      "storm_warning": {
+        "default": "mdi:weather-lightning-rainy"
+      },
+      "third_party_mqtt_enable": {
+        "default": "mdi:mqtt"
+      }
+    },
+    "text": {
+      "grid_standard": {
+        "default": "mdi:transmission-tower"
+      },
+      "pv1_name": {
+        "default": "mdi:solar-panel"
+      },
+      "pv2_name": {
+        "default": "mdi:solar-panel"
+      },
+      "pv3_name": {
+        "default": "mdi:solar-panel"
+      },
+      "pv4_name": {
+        "default": "mdi:solar-panel"
+      },
+      "system_name": {
+        "default": "mdi:rename-box"
+      }
+    }
+  },
+  "services": {
+    "accept_shared_device": {
+      "service": "mdi:account-check"
+    },
+    "agree_privacy_consent": {
+      "service": "mdi:file-sign"
+    },
+    "bind_currency": {
+      "service": "mdi:currency-eur"
+    },
+    "bind_device": {
+      "service": "mdi:link-variant"
+    },
+    "bind_smart_part": {
+      "service": "mdi:puzzle-plus"
+    },
+    "cancel_dynamic_price_contract_auth": {
+      "service": "mdi:file-cancel"
+    },
+    "check_accessories_exist": {
+      "service": "mdi:magnify"
+    },
+    "check_app_version": {
+      "service": "mdi:cellphone-arrow-down"
+    },
+    "check_jackery_accessories_exist": {
+      "service": "mdi:magnify"
+    },
+    "check_privacy_update": {
+      "service": "mdi:shield-refresh"
+    },
+    "check_system_bound": {
+      "service": "mdi:link-lock"
+    },
+    "delete_electricity_strategy": {
+      "service": "mdi:playlist-remove"
+    },
+    "delete_storm_alert": {
+      "service": "mdi:weather-lightning-rainy"
+    },
+    "get_aiems_energy_prediction": {
+      "service": "mdi:chart-timeline-variant-shimmer"
+    },
+    "get_alarm_detail": {
+      "service": "mdi:alert-circle-outline"
+    },
+    "get_device_currency": {
+      "service": "mdi:currency-sign"
+    },
+    "get_dynamic_price_login_url": {
+      "service": "mdi:login-variant"
+    },
+    "get_offline_statistics": {
+      "service": "mdi:chart-box-outline"
+    },
+    "get_product_instruction": {
+      "service": "mdi:book-open-variant"
+    },
+    "get_push_config": {
+      "service": "mdi:bell-cog"
+    },
+    "get_share_qr_code": {
+      "service": "mdi:qrcode"
+    },
+    "get_shelly_auth_url": {
+      "service": "mdi:login-variant"
+    },
+    "get_smart_schedule_prediction": {
+      "service": "mdi:calendar-clock"
+    },
+    "get_unread_count": {
+      "service": "mdi:email-alert"
+    },
+    "get_user_info": {
+      "service": "mdi:account"
+    },
+    "insert_electricity_strategy": {
+      "service": "mdi:playlist-plus"
+    },
+    "list_accessories": {
+      "service": "mdi:format-list-bulleted"
+    },
+    "list_banners": {
+      "service": "mdi:image-multiple"
+    },
+    "list_country_zones": {
+      "service": "mdi:earth"
+    },
+    "list_currencies": {
+      "service": "mdi:currency-sign"
+    },
+    "list_dynamic_price_contracts": {
+      "service": "mdi:file-document-multiple"
+    },
+    "list_faq_answers": {
+      "service": "mdi:frequently-asked-questions"
+    },
+    "list_faqs": {
+      "service": "mdi:frequently-asked-questions"
+    },
+    "list_grid_standards": {
+      "service": "mdi:transmission-tower"
+    },
+    "list_notifications": {
+      "service": "mdi:bell-outline"
+    },
+    "list_shared_devices": {
+      "service": "mdi:account-multiple"
+    },
+    "list_shared_managers": {
+      "service": "mdi:account-supervisor"
+    },
+    "list_shelly_binding_failures": {
+      "service": "mdi:alert-octagon-outline"
+    },
+    "list_shelly_devices": {
+      "service": "mdi:power-socket-eu"
+    },
+    "query_box_stat": {
+      "service": "mdi:battery-charging"
+    },
+    "query_carbon_stat": {
+      "service": "mdi:leaf"
+    },
+    "query_charge_report": {
+      "service": "mdi:file-chart"
+    },
+    "query_cutoff_stat": {
+      "service": "mdi:power-plug-off"
+    },
+    "query_electricity_strategy": {
+      "service": "mdi:playlist-check"
+    },
+    "query_profit_stat": {
+      "service": "mdi:cash-plus"
+    },
+    "query_soc_stat": {
+      "service": "mdi:battery-50"
+    },
+    "query_socket_stat": {
+      "service": "mdi:power-socket"
+    },
+    "query_third_party_mqtt_config": {
+      "service": "mdi:message-text-clock"
+    },
+    "query_tou_plan": {
+      "service": "mdi:clock-time-four-outline"
+    },
+    "refresh_subdevices": {
+      "service": "mdi:refresh"
+    },
+    "refresh_weather_plan": {
+      "service": "mdi:cloud-refresh"
+    },
+    "remove_all_shared_access": {
+      "service": "mdi:account-multiple-remove"
+    },
+    "remove_shared_access": {
+      "service": "mdi:account-remove"
+    },
+    "rename_system": {
+      "service": "mdi:rename"
+    },
+    "report_device_timezone": {
+      "service": "mdi:map-clock"
+    },
+    "save_device_max_power": {
+      "service": "mdi:flash"
+    },
+    "save_dynamic_price_contract_auth": {
+      "service": "mdi:file-check"
+    },
+    "save_dynamic_price_location_id": {
+      "service": "mdi:map-marker"
+    },
+    "save_tou_plan": {
+      "service": "mdi:content-save-cog"
+    },
+    "send_ble_command": {
+      "service": "mdi:bluetooth-transfer"
+    },
+    "send_device_schedule": {
+      "service": "mdi:calendar-export"
+    },
+    "set_ac_nickname": {
+      "service": "mdi:rename-box"
+    },
+    "set_accessory_name": {
+      "service": "mdi:rename-box"
+    },
+    "set_account_nickname": {
+      "service": "mdi:account-edit"
+    },
+    "set_device_nickname": {
+      "service": "mdi:rename-box"
+    },
+    "set_push_config": {
+      "service": "mdi:bell-cog"
+    },
+    "set_storm_alert_location": {
+      "service": "mdi:map-marker-radius"
+    },
+    "set_third_party_mqtt_config": {
+      "service": "mdi:message-cog"
+    },
+    "submit_feedback": {
+      "service": "mdi:message-text"
+    },
+    "sync_alerts": {
+      "service": "mdi:sync-alert"
+    },
+    "unbind_accessories": {
+      "service": "mdi:link-variant-off"
+    },
+    "unbind_device": {
+      "service": "mdi:link-variant-off"
+    },
+    "unbind_shelly_account": {
+      "service": "mdi:account-off"
+    },
+    "unbind_shelly_device": {
+      "service": "mdi:link-variant-off"
+    },
+    "unbind_smart_part": {
+      "service": "mdi:puzzle-remove"
+    },
+    "update_electricity_strategy": {
+      "service": "mdi:playlist-edit"
+    }
+  }
+}
