@@ -12,6 +12,7 @@ autotyping>=24.9.0
 certifi
 coverage>=7.14.1
 coverage[toml]>=7.14.1
+homeassistant>=2026.7.4
 homeassistant-stubs>=2026.7.4
 hypothesis>=6.155.2
 ifaddr>=0.2.0
@@ -58,6 +59,6 @@ types-requests>=2.33.0.20260518
 types-xmltodict>=1.0.1.20260518
 typing-extensions>=4.15.0,<5.0
 typing-inspection>=0.4.2
-voluptuous>=0.16.0
+voluptuous>=0.15.2
 voluptuous-serialize>=2.7.0
 zeroconf
