@@ -106,6 +106,151 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
         assert result == user_result
 
 
+@pytest.mark.asyncio()
+async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
+    """The shared router pre-fills the display name and hands off to the user step.
+
+    ``_async_route_discovery_to_user`` backs every discovery transport
+    (Bluetooth/DHCP/MQTT/Zeroconf); this pins its own contract directly so a
+    regression here is caught even if a transport's fallback-name test still
+    mocks the router itself away.
+    """
+    flow = _flow()
+    user_result = {"type": FlowResultType.FORM, "step_id": FLOW_STEP_USER}
+
+    with (
+        patch.object(
+            flow,
+            "_async_abort_duplicate_discovery",
+            return_value=None,
+        ) as abort_guard,
+        patch.object(
+            flow,
+            "_async_handle_discovery_without_unique_id",
+            AsyncMock(return_value=None),
+        ) as handle_discovery,
+        patch.object(
+            flow,
+            "async_step_user",
+            AsyncMock(return_value=user_result),
+        ) as user_step,
+    ):
+        result = await flow._async_route_discovery_to_user("Jackery Device")
+
+    assert result == user_result
+    abort_guard.assert_called_once_with()
+    assert flow.context["title_placeholders"] == {"name": "Jackery Device"}
+    handle_discovery.assert_awaited_once_with()
+    user_step.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio()
+async def test_route_discovery_to_user_short_circuits_on_duplicate() -> None:
+    """A duplicate discovery aborts before pre-filling the name or handling it."""
+    flow = _flow()
+    abort_result = {"type": FlowResultType.ABORT, "reason": "already_configured"}
+
+    with (
+        patch.object(
+            flow,
+            "_async_abort_duplicate_discovery",
+            return_value=abort_result,
+        ),
+        patch.object(
+            flow,
+            "_async_handle_discovery_without_unique_id",
+            AsyncMock(return_value=None),
+        ) as handle_discovery,
+        patch.object(
+            flow,
+            "async_step_user",
+            AsyncMock(return_value={"type": FlowResultType.FORM}),
+        ) as user_step,
+    ):
+        result = await flow._async_route_discovery_to_user("Jackery Device")
+
+    assert result == abort_result
+    assert "title_placeholders" not in flow.context
+    handle_discovery.assert_not_awaited()
+    user_step.assert_not_awaited()
+
+
+async def _discovered_name(method_name: str, discovery_info: SimpleNamespace) -> str:
+    """Drive one discovery step and capture the name it hands to the router."""
+    flow = _flow()
+    with patch.object(
+        flow,
+        "_async_route_discovery_to_user",
+        AsyncMock(return_value={"type": FlowResultType.FORM}),
+    ) as router:
+        await getattr(flow, method_name)(discovery_info)
+
+    return cast("str", router.await_args.args[0])
+
+
+@pytest.mark.asyncio()
+async def test_bluetooth_discovery_falls_back_to_address_without_name() -> None:
+    """Bluetooth discovery prefers the advertised name, else the MAC address."""
+    named = SimpleNamespace(name="Jackery BLE", address="AA:BB:CC:DD:EE:FF")
+    assert await _discovered_name("async_step_bluetooth", named) == "Jackery BLE"
+
+    unnamed = SimpleNamespace(name="", address="AA:BB:CC:DD:EE:FF")
+    assert (
+        await _discovered_name("async_step_bluetooth", unnamed) == "AA:BB:CC:DD:EE:FF"
+    )
+
+
+@pytest.mark.asyncio()
+async def test_dhcp_discovery_falls_back_to_ip_without_hostname() -> None:
+    """DHCP discovery prefers the hostname, else the IP address."""
+    named = SimpleNamespace(hostname="jackery.local", ip="192.0.2.10")
+    assert await _discovered_name("async_step_dhcp", named) == "jackery.local"
+
+    unnamed = SimpleNamespace(hostname="", ip="192.0.2.10")
+    assert await _discovered_name("async_step_dhcp", unnamed) == "192.0.2.10"
+
+
+@pytest.mark.parametrize(
+    ["topic", "expected_name"],
+    [
+        ["jackery/discovery/device-1", "Jackery MQTT (device-1)"],
+        ["device-1", "Jackery MQTT (device-1)"],
+        ["jackery/discovery/", "Jackery MQTT"],
+        ["jackery/discovery/  ", "Jackery MQTT"],
+    ],
+)
+@pytest.mark.asyncio()
+async def test_mqtt_discovery_formats_or_falls_back_from_topic_suffix(
+    topic: str,
+    expected_name: str,
+) -> None:
+    """MQTT discovery names itself after the topic suffix, or a bare fallback.
+
+    A topic ending in a separator (or whitespace-only suffix) yields an empty
+    suffix after ``strip()``, which must fall back to the bare ``"Jackery
+    MQTT"`` label rather than the malformed ``"Jackery MQTT ()"``.
+    """
+    discovery_info = SimpleNamespace(topic=topic)
+    assert await _discovered_name("async_step_mqtt", discovery_info) == expected_name
+
+
+@pytest.mark.asyncio()
+async def test_zeroconf_discovery_prefers_name_then_hostname_then_host() -> None:
+    """Zeroconf discovery falls back through name -> hostname -> host in order."""
+    full = SimpleNamespace(
+        name="Jackery SolarVault",
+        hostname="jackery.local",
+        host="192.0.2.10",
+    )
+    assert await _discovered_name("async_step_zeroconf", full) == "Jackery SolarVault"
+
+    no_name = SimpleNamespace(name="", hostname="jackery.local", host="192.0.2.10")
+    assert await _discovered_name("async_step_zeroconf", no_name) == "jackery.local"
+
+    host_only = SimpleNamespace(name="", hostname="", host="192.0.2.10")
+    assert await _discovered_name("async_step_zeroconf", host_only) == "192.0.2.10"
+
+
 def test_duplicate_discovery_guard_reports_current_entries() -> None:
     """The discovery guard aborts configured and in-progress duplicates."""
     flow = _flow()
