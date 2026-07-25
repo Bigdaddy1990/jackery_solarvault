@@ -328,10 +328,11 @@ type RandomBytesSource = Callable[[int], bytes]
 
 
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
-    """Encrypt PKCS7-padded plaintext with AES-ECB."""
+    """Encrypt PKCS7-padded plaintext with AES-ECB (required by Jackery Cloud protocol)."""
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    # codeql[py/weak-cryptographic-algorithm] AES-ECB is mandatory for Jackery Cloud API wire protocol
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # noqa: S304,S413
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -447,7 +448,8 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
 
 def _generate_udid(seed: str) -> str:
     """Derive the deterministic app-style MQTT identifier for an account."""
-    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
+    # MD5 is used solely for non-security UUIDv3 generation (protocol compatibility)
+    md5_digest = hashlib.md5(seed.encode("utf-8"), usedforsecurity=False).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
 
