@@ -18,14 +18,14 @@ jobs:
     name: Home Assistant hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
     name: HACS validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hacs/action@main
         with:
           category: integration
@@ -34,8 +34,8 @@ jobs:
     name: Ruff lint + format check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Install ruff
@@ -49,8 +49,8 @@ jobs:
     name: Unit / source-only tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Install unit-test deps
@@ -66,7 +66,7 @@ jobs:
     name: HA fixture tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check for HA tests
         id: fixtures
         run: |
@@ -76,7 +76,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "No tests found; skipping HA fixture test job."
           fi
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: steps.fixtures.outputs.exists == 'true'
         with:
           python-version: "3.14"

@@ -27,7 +27,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -46,9 +46,6 @@ jobs:
           #ignore-nothing-to-cache: true
 
       - uses: astral-sh/ruff-action@v4.0.0
-      - uses: actions/setup-python@v7
-        with:
-           python-version: 3.14
       - run: ruff check . --fix
       - run: ruff format .
       - run: ruff check . --fix --preview --target-version py314 || true
