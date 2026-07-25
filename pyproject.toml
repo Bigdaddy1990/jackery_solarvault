@@ -80,7 +80,7 @@ requires-python = "==3.14.6"
 dependencies = [
     "pip>=26.1.2",
     "pre-commit>=4.6.0",
-    "ruff>=0.16.0",
+    "ruff>=0.15.21",
     "ty>=0.0.58",
 ]
 
@@ -288,11 +288,13 @@ filterwarnings = [
   "ignore:.*invalid escape sequence:SyntaxWarning:.*pydub.utils",
   # https://pypi.org/project/PyPasser/ - v0.0.5 - 2021-10-21
   "ignore:.*invalid escape sequence:SyntaxWarning:.*pypasser.utils",
+  # https://pypi.org/project/rxv/ - v0.7.0 - 2021-10-10
+  "ignore:defusedxml.cElementTree is deprecated, import from defusedxml.ElementTree instead:DeprecationWarning:rxv.ssdp",
 ]
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.21"
+required-version = ">=0.15.20"
 line-length = 88
 src = ["custom_components/jackery_solarvault"]
 indent-width = 4
@@ -438,15 +440,7 @@ select = [
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "line-too-long", "unused-import"]
-ignore = [
-  "undocumented-param",
-  "relative-imports",
-  # D205: the restored upstream docstrings use multi-line summaries that cannot
-  # fit Home Assistant's 88-character line limit on a single line. Keeping the
-  # 88-char limit (HA convention) and requiring a one-line summary is mutually
-  # exclusive for those, so the summary rule is relaxed instead.
-  "missing-blank-line-after-summary",
-]
+ignore = ["undocumented-param", "relative-imports"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
@@ -469,15 +463,19 @@ dev = [
     "astroid>=4.1.2",
     "attrs",
     "autotyping",
-    "bleak-retry-connector>=4.6.3",
+    "bleak-retry-connector>=3.5.0",
     "codecov",
     "coverage[toml]>=7.5.4",
+    "defusedxml",
+    "fastmcp",
     "homeassistant>=2026.7.2",
     "homeassistant-stubs>=2026.7.2",
     "hypothesis",
     "ifaddr",
     "iniconfig",
     "jinja2",
+    "mcp",
+    "mgrep",
     "multidict",
     "mypy",
     "numpy",
@@ -495,7 +493,7 @@ dev = [
     "pytest-homeassistant-custom-component",
     "pyupgrade",
     "pyyaml",
-    "ruff>=0.16.0",
+    "ruff>=0.15.21",
     "segno>=1.6.0",
     "semgrep",
     "smellcheck",
@@ -528,23 +526,6 @@ max-complexity = 25
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["module-import-not-at-top-of-file", "undefined-local-with-import-star"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-# The restored module docstring carries the field-to-source reference tables
-# (sensor key / HTTP endpoint / MQTT message). Their columns are up to 127
-# characters wide and cannot be wrapped without destroying the table, and a
-# `noqa` cannot be placed inside a string literal. Trade-off: `line-too-long`
-# is no longer enforced for comments and strings in this one file; `ruff
-# format` still holds all *code* lines in it to the 88-character limit.
-"**/sensor.py" = ["line-too-long"]
-"custom_components/jackery_solarvault/const.py" = ["hardcoded-password-string"]
-"tests/*" = [
-    "import-outside-top-level",
-    "private-member-access",
-    "float-equality-comparison",
-    "magic-value-comparison",
-    "line-too-long",
-    "import-private-name",
-    "unused-async",
-]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -560,7 +541,7 @@ property-decorators = ["propcache.api.cached_property"]
 force-sort-within-sections = true
 known-first-party = ["homeassistant", "custom_components", "pytest_"]
 combine-as-imports = true
-split-on-trailing-comma = false
+split-on-trailing-comma = true
 case-sensitive = true
 order-by-type = true
 single-line-exclusions = ["os", "json"]
@@ -640,7 +621,7 @@ omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 65
+fail_under = 85
 skip_covered = true
 precision = 2
 ignore_errors = false
