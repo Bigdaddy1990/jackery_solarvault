@@ -50,3 +50,6 @@ jobs:
           git add -A
           git commit -m "chore: ruff baseline (format+fix)"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+          
+      # Commit all changed files back to the repository
+      - uses: stefanzweifel/git-auto-commit-action@v7
