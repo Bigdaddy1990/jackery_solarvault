@@ -12,53 +12,8 @@ include = ["custom_components*"]
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements*.txt"] }
 
-[tool.setuptools.dynamic.optional-dependencies]
-tests = { file = ["requirements-test.txt", "requirements-dev.txt"] }
-pytest = { file = ["requirements-dev.txt"] }
-hassfest = { file = ["requirements-dev.txt"] }
-hacs-action = { file = ["requirements-dev.txt"] }
-codecov = { file = ["requirements-dev.txt"] }
-codefactor = { file = ["requirements-dev.txt"] }
-
 [tool.setuptools]
 include-package-data = true
-
-[tool.uv]
-# Ensure that the setuptools v80.0.0 is used whenever a package has a build dependency
-# on setuptools.
-build-constraint-dependencies = ["setuptools<=80.0.0","wheel"]
-no-cache = true
-link-mode = "hardlink"
-index-strategy = "unsafe-best-match"
-fork-strategy = "requires-python"
-cache-dir = "./.uv_cache"
-python-downloads = "automatic"
-python-preference = "system"
-package = true
-managed = true
-#upgrade-package = ["hassfest"]
-# Require that the package is available on the following platforms:
-required-environments = [
-    # Linux on x86_64 (Intel/AMD)
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
-    # Windows on x86_64 (Intel/AMD)
-    "sys_platform == 'win32' and platform_machine == 'AMD64'",
-]
-
-[tool.uv.sources]
-jackery-solarvault = { workspace = true }
-
-[tool.uv.pip]
-all-extras = true
-allow-empty-requirements = true
-compile-bytecode = true
-config-settings = { editable_mode = "compat" }
-extra-build-dependencies = { pytest = ["setuptools"] }
-prerelease = "if-necessary-or-explicit"
-python = "3.14"
-python-version = "3.13"
-strict = true
-universal = true
 
 [project]
 name = "jackery_solarvault"
@@ -76,12 +31,11 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = "==3.14.6"
+requires-python = ">=3.14.6"
 dependencies = [
     "pip>=26.1.2",
     "pre-commit>=4.6.0",
-    "ruff>=0.15.21",
-    "ty>=0.0.58",
+    "ruff>=0.16.0"
 ]
 
 [project.urls]
@@ -294,7 +248,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.15.21"
+required-version = ">=0.16.0"
 line-length = 88
 src = ["custom_components/jackery_solarvault"]
 indent-width = 4
@@ -457,9 +411,6 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
 task-tags = ["TODO", "FIX", "BUG"]
 
-[project.scripts]
-hass = "homeassistant.__main__:main"
-
 [dependency-groups]
 dev = [
     "aiohttp>=3.14.1",
@@ -474,16 +425,12 @@ dev = [
     "bleak-retry-connector>=3.5.0",
     "codecov",
     "coverage[toml]>=7.15.2",
-    "defusedxml",
-    "fastmcp",
     "homeassistant>=2026.7.4",
-    "homeassistant-stubs>=2026.7.2",
+    "homeassistant-stubs>=2026.7.4",
     "hypothesis",
     "ifaddr",
     "iniconfig",
     "jinja2",
-    "mcp",
-    "mgrep",
     "multidict",
     "mypy",
     "numpy",
@@ -501,7 +448,7 @@ dev = [
     "pytest-homeassistant-custom-component",
     "pyupgrade",
     "pyyaml",
-    "ruff>=0.15.21",
+    "ruff>=0.16.0",
     "segno>=1.6.0",
     "semgrep",
     "smellcheck",
@@ -526,7 +473,6 @@ dev = [
     "uv",
     "voluptuous>=0.15.2",
 ]
-
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
@@ -594,7 +540,7 @@ quote-annotations = true
 strict = true
 
 [tool.ruff.lint.flake8-bandit]
-check-typed-exception = false
+check-typed-exception = true
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
@@ -645,7 +591,7 @@ omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 65
+fail_under = 80
 skip_covered = true
 precision = 2
 ignore_errors = false
@@ -704,7 +650,6 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 
 # per-path overrides
 [tool.smellcheck.per-file-ignores]
-"scripts/**" = []
 "docs/**" = []
 # Untracked scratch parsers (gitignored); suppress every rule (smellcheck
 # resolves only exact rule IDs, no family prefixes or wildcards).
@@ -986,7 +931,7 @@ disable = [
   "wrong-exception-operation",
 ]
 enable = [
-  #"useless-suppression",  # temporarily every now and then to clean them up
+  "useless-suppression",
   "use-symbolic-message-instead",
 ]
 per-file-ignores = [
