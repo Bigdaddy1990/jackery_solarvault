@@ -49,6 +49,7 @@ The integration creates dozens of entities per device to give you full visibilit
 | `text` | Wi-Fi and diagnostic identifiers |
 
 ### 🛠️ Advanced Services
+
 We also expose 60+ custom services in Home Assistant, giving you the power of the Jackery App in your automations:
 - **Device Management:** `bind_device`, `unbind_device`, `get_share_qr_code`
 - **Cloud-to-Cloud:** `get_shelly_auth_url`, `list_shelly_devices`
@@ -60,6 +61,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 ## 🛠️ Installation
 
 ### HACS (Recommended)
+
 1. Open HACS.
 2. Open the three-dot menu.
 3. Select `Custom repositories`.
@@ -70,6 +72,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 8. Select `Jackery SolarVault`.
 
 ### Option 2: Manual
+
 1. Download the latest release.
 2. Copy the `custom_components/jackery_solarvault` folder into your Home Assistant `config/custom_components/` directory.
 3. Restart Home Assistant.
@@ -87,6 +90,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 > **Solution:** Create a **second, dedicated Jackery account** just for Home Assistant. Share your Jackery devices from your main app account with this new dedicated HA account!
 
 ### Configuration Options
+
 - **Email & Password:** Your dedicated Jackery Cloud account credentials.
 - **Bluetooth (BLE):** Optional. Allows direct communication when your HA server is in Bluetooth range of the Jackery.
 - **Local MQTT:** Optional. Use this if your device is configured to publish data to a local MQTT broker.
@@ -96,6 +100,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 ## 💡 Automations & Examples
 
 **Notify when the battery is low:**
+
 ```yaml
 automation:
   - alias: "Jackery Low Battery Warning"
@@ -110,6 +115,7 @@ automation:
 ```
 
 **Set a Time-of-Use Schedule:**
+
 ```yaml
 action: jackery_solarvault.save_tou_plan
 data:
