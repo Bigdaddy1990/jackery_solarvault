@@ -386,7 +386,7 @@ select = [
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "line-too-long", "unused-import"]
-ignore = ["undocumented-param", "relative-imports"] 
+ignore = ["undocumented-param", "relative-imports"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
