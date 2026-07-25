@@ -127,7 +127,7 @@ def test_manifest_zeroconf_properties_use_lowercase_values() -> None:
         for key, value in properties.items():
             assert isinstance(value, str)
             assert value == value.lower(), (
-                f"zeroconf property {key!r} for type {entry.get('type')!r} "
+                f"zeroconf property {key!r} for type {entry.get("type")!r} "
                 f"must be lowercase, got {value!r}"
             )
 

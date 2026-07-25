@@ -121,7 +121,7 @@ def _assert_keys_sorted(value: Any, path: str = "") -> None:
     """
     if isinstance(value, dict):
         keys = list(value.keys())
-        assert keys == sorted(keys), f"keys not sorted at {path or '<root>'}: {keys}"
+        assert keys == sorted(keys), f"keys not sorted at {path or "<root>"}: {keys}"
         for key, child in value.items():
             _assert_keys_sorted(child, f"{path}.{key}" if path else key)
     elif isinstance(value, list):
