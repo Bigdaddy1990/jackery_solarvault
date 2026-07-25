@@ -24,7 +24,6 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Framework :: AsyncIO",
   "Programming Language :: Python :: 3.14",
-  "Programming Language :: Python :: 3.15",
   "Topic :: Home Automation",
   "Typing :: Typed",
 ]
@@ -318,28 +317,28 @@ select = [
   "B",      # flake8-bugbear
   "BLE",
   "C",      # complexity
-  "trailing-comma-on-bare-tuple", # Trailing comma on bare tuple prohibited
+  "COM818", # Trailing comma on bare tuple prohibited
   "D",      # docstrings
-  "call-datetime-utcnow", # Use datetime.now(tz=) instead of datetime.utcnow()
-  "call-datetime-utcfromtimestamp", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
-  "call-date-today", # Use datetime.now(tz=).date() instead of date.today()
+  "DTZ003", # Use datetime.now(tz=) instead of datetime.utcnow()
+  "DTZ004", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
+  "DTZ011", # Use datetime.now(tz=).date() instead of date.today()
   "E",      # pycodestyle
-  "line-too-long",
+  "E501",
   "F",      # pyflakes/autoflake
-  "f-string-missing-placeholders",   # f-string without any placeholders
+  "F541",   # f-string without any placeholders
   "FLY",    # flynt
   "FURB",   # refurb
   "G",      # flake8-logging-format
   "I",      # isort
   "INP",    # flake8-no-pep420
   "ISC",    # flake8-implicit-str-concat
-  "unconventional-import-alias", # import concentions; {name} should be imported as {asname}
+  "ICN001", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
   "N",
-  "invalid-first-argument-name-for-class-method",   # First argument of a class method should be named cls
-  "invalid-first-argument-name-for-method",   # First argument of a method should be named self
-  "non-lowercase-variable-in-function",   # Variable {name} in function should be snake_case
-  "mixed-case-variable-in-class-scope",   # Variable {name} in class scope should not be mixedCase
+  "N804",   # First argument of a class method should be named cls
+  "N805",   # First argument of a method should be named self
+  "N806",   # Variable {name} in function should be snake_case
+  "N815",   # Variable {name} in class scope should not be mixedCase
   "NPY",
   "PERF",   # Perflint
   "PGH",    # pygrep-hooks
@@ -351,43 +350,43 @@ select = [
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules (see `ignore` for exclusions)
-  "unused-noqa",
-  "hardcoded-password-default",   # Possible hardcoded password assigned to function default
-  "exec-builtin",   # Use of exec detected
-  "bad-file-permissions",   # bad-file-permissions
-  "hardcoded-temp-file",   # hardcoded-temp-file
-  "suspicious-pickle-usage",   # suspicious-pickle-usage
-  "suspicious-mktemp-usage",   # suspicious-mktemp-usage
-  "suspicious-eval-usage",   # suspicious-eval-usage
-  "suspicious-xmlc-element-tree-usage",   # suspicious-xmlc-element-tree-usage
-  "suspicious-xml-element-tree-usage",   # suspicious-xml-element-tree-usage
-  "suspicious-xml-expat-reader-usage",   # suspicious-xml-expat-reader-usage
-  "suspicious-xml-expat-builder-usage",   # suspicious-xml-expat-builder-usage
-  "suspicious-xml-sax-usage",   # suspicious-xml-sax-usage
-  "suspicious-xml-mini-dom-usage",   # suspicious-xml-mini-dom-usage
-  "suspicious-xml-pull-dom-usage",   # suspicious-xml-pull-dom-usage
-  "paramiko-call",   # paramiko-call
-  "subprocess-popen-with-shell-equals-true",   # subprocess-popen-with-shell-equals-true
-  "call-with-shell-equals-true",   # call-with-shell-equals-true
-  "hardcoded-sql-expression",   # hardcoded-sql-expression
-  "unix-command-wildcard-injection",   # unix-command-wildcard-injection
+  "RUF100",
+  "S107",   # Possible hardcoded password assigned to function default
+  "S102",   # Use of exec detected
+  "S103",   # bad-file-permissions
+  "S108",   # hardcoded-temp-file
+  "S301",   # suspicious-pickle-usage
+  "S306",   # suspicious-mktemp-usage
+  "S307",   # suspicious-eval-usage
+  "S313",   # suspicious-xmlc-element-tree-usage
+  "S314",   # suspicious-xml-element-tree-usage
+  "S315",   # suspicious-xml-expat-reader-usage
+  "S316",   # suspicious-xml-expat-builder-usage
+  "S317",   # suspicious-xml-sax-usage
+  "S318",   # suspicious-xml-mini-dom-usage
+  "S319",   # suspicious-xml-pull-dom-usage
+  "S601",   # paramiko-call
+  "S602",   # subprocess-popen-with-shell-equals-true
+  "S604",   # call-with-shell-equals-true
+  "S608",   # hardcoded-sql-expression
+  "S609",   # unix-command-wildcard-injection
   "SIM",    # flake8-simplify
   "SLF",    # flake8-self
   "SLOT",   # flake8-slots
-  "debugger",   # Trace found: {name} used
+  "T100",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
   "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
-  "printf-string-formatting",  # Use format specifiers instead of percent format
-  "f-string",  # Use f-string instead of `format` call
+  "UP031",  # Use format specifiers instead of percent format
+  "UP032",  # Use f-string instead of `format` call
   "W",      # pycodestyle
   "Q"
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
-extend-unsafe-fixes = ["E", "line-too-long", "unused-import"]
-ignore = ["undocumented-param", "relative-imports"] 
+extend-unsafe-fixes = ["E", "E501", "F401"]
+ignore = ["D417", "TID252"] 
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
@@ -400,7 +399,7 @@ task-tags = ["TODO", "FIX", "BUG"]
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["module-import-not-at-top-of-file", "undefined-local-with-import-star"]
+"**/__init__.py" = ["E402", "F403"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 
 [tool.ruff.lint.pydocstyle]
