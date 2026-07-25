@@ -21,6 +21,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          ref: ${{ github.head_ref }}
+          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+          persist-credentials: true
 
       - run: python -m pip install --upgrade pip ruff
       - run: |
