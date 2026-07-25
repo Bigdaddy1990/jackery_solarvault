@@ -1,12 +1,26 @@
-# Jackery SolarVault — Intégration Home Assistant
+# Jackery SolarVault for Home Assistant
+
+Languages:
+[English](../README.md) · [Deutsch](./README.de.md) · [Français](./README.fr.md) · [Español](./README.es.md)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Bigdaddy1990&repository=jackery_solarvault&category=integration)
 [![Release](https://img.shields.io/github/v/release/Bigdaddy1990/jackery_solarvault)](https://github.com/Bigdaddy1990/jackery_solarvault/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Une intégration personnalisée pour [Home Assistant](https://www.home-assistant.io/) qui intègre vos stations d'énergie Jackery SolarVault, HomePower et Explorer directement dans votre maison intelligente.
 
-Que vous souhaitiez surveiller votre apport solaire, vérifier le niveau de votre batterie ou automatiser votre maison en fonction du flux d'énergie de votre Jackery – cette intégration vous offre des données en temps réel et un contrôle total sur vos appareils Jackery.
+**Ceci est l'intégration Jackery ultime (non-plus-ultra) pour Home Assistant.** Elle combine 100 % des fonctionnalités de l'application officielle (Cloud API) avec la vitesse et la fiabilité du **MQTT local** et du **Bluetooth (BLE)**.
+
+---
+
+## 🏆 Pourquoi cette intégration est le meilleur choix
+
+Vous avez peut-être entendu parler d'autres solutions MQTT manuelles ou d'intégrations plus anciennes. Voici pourquoi cette intégration est clairement supérieure :
+
+1. **Aucune Extraction Manuelle de Tokens :** Nous nécessitons vos identifiants Cloud lors de l'installation. **Pourquoi ?** Parce que l'intégration découvre automatiquement tous vos appareils et récupère en toute sécurité les clés de cryptage et les tokens complexes requis pour la communication locale. Vous n'avez pas à intercepter le trafic réseau ni à configurer manuellement des charges utiles JSON.
+2. **Vrai Contrôle Local :** Une fois la liaison cloud initiale terminée, l'intégration se connecte directement à votre appareil via **MQTT Local** et **Bluetooth (BLE)** pour des mises à jour instantanées de l'ordre de la milliseconde et un contrôle local.
+3. **100 % des Fonctionnalités de l'App :** Contrairement aux scripts locaux basiques qui ne lisent que les niveaux de batterie, cette intégration prend en charge *tout* ce que fait l'application Jackery, y compris la planification de l'Heure d'Utilisation, l'intégration Shelly, les vérifications de firmware et les paramètres de charge avancés.
 
 ---
 
@@ -20,23 +34,40 @@ Cette intégration prend en charge une large gamme d'appareils Jackery, notammen
 
 ---
 
-## ✨ Fonctionnalités
+## ✨ Fonctionnalités & Entités
 
-- **Surveillance en Direct :** Suivez l'état de charge (SOC), la puissance d'entrée PV (Solaire), l'import/export du réseau, la puissance de sortie et les températures.
-- **Contrôle Total :** Basculez les sorties AC/DC, changez les modes de fonctionnement, définissez les limites de charge et priorisez les sorties.
-- **Automatisations :** Automatisez facilement votre station d'énergie Jackery selon des conditions (ex. : allumer une prise intelligente lorsque la batterie atteint 100 %).
-- **Tableau de Bord Énergie :** S'intègre parfaitement au tableau de bord Énergie de Home Assistant grâce aux statistiques à long terme (journalières, hebdomadaires, mensuelles, annuelles).
-- **Rapide & Fiable :** Utilise le Cloud Jackery comme source de vérité principale, complétée par le Bluetooth local (BLE) et MQTT pour des mises à jour instantanées avec une faible latence.
+L'intégration crée des dizaines d'entités par appareil pour vous donner une visibilité et un contrôle complets :
+
+| Plateforme | Exemples |
+|------------|----------|
+| `sensor` | SOC, puissance d'entrée/sortie/PV, réseau, températures, autonomie restante, statistiques d'énergie |
+| `binary_sensor` | état de charge, en ligne et défauts |
+| `number` | limite de puissance de charge, limites de batterie personnalisées, délai de sortie AC |
+| `select` | mode de fonctionnement, mode de charge, priorité de sortie, modèle onduleur, mode de prix de l'électricité |
+| `switch` | sortie EPS, sorties AC/DC, économie d'énergie, charge super rapide |
+| `button` | redémarrer, clignotement de la batterie |
+| `text` | identifiants Wi-Fi et diagnostics |
+
+### 🛠️ Services Avancés
+Nous exposons également plus de 60 services personnalisés dans Home Assistant, vous donnant la puissance de l'application Jackery dans vos automatisations :
+- **Gestion des Appareils :** `bind_device`, `unbind_device`, `get_share_qr_code`
+- **Cloud-to-Cloud :** `get_shelly_auth_url`, `list_shelly_devices`
+- **Planification de l'Énergie :** `save_tou_plan`, `insert_electricity_strategy`, `bind_currency`
+- **Statistiques :** `query_charge_report`, `query_soc_stat`, `query_profit_stat`
 
 ---
 
 ## 🛠️ Installation
 
-### Option 1 : HACS (Recommandé)
-1. Ouvrez Home Assistant et allez dans **HACS**.
-2. Ajoutez ce dépôt comme dépôt personnalisé (Catégorie : *Integration*).
-3. Recherchez **Jackery SolarVault** et cliquez sur Télécharger.
-4. Redémarrez Home Assistant.
+### HACS (Recommandé)
+1. Ouvrez HACS.
+2. Ouvrez le menu à trois points.
+3. Sélectionnez `Dépôts personnalisés`.
+4. Ajoutez `https://github.com/Bigdaddy1990/jackery_solarvault` comme `Intégration`.
+5. Recherchez `Jackery SolarVault` et installez-le.
+6. Redémarrez Home Assistant.
+7. Allez dans `Paramètres > Appareils et services > Ajouter une intégration`.
+8. Sélectionnez `Jackery SolarVault`.
 
 ### Option 2 : Manuel
 1. Téléchargez la dernière version (release).
@@ -79,7 +110,6 @@ automation:
 ```
 
 **Définir un calendrier d'Heure d'Utilisation (Time-of-Use) :**
-Vous pouvez utiliser les services personnalisés de l'intégration pour modifier des paramètres avancés comme les plannings de charge :
 ```yaml
 action: jackery_solarvault.save_tou_plan
 data:
@@ -99,10 +129,8 @@ data:
 
 - **Mon intégration se déconnecte sans cesse ou les capteurs affichent "indisponible" :**
   Cela se produit généralement parce que vous utilisez le même compte dans l'application Jackery sur votre téléphone et dans Home Assistant. Veuillez créer un compte dédié pour Home Assistant et lui partager vos appareils.
-- **Je ne vois pas les mises à jour en direct, cela prend quelques minutes :**
-  L'API cloud est interrogée toutes les quelques minutes. Pour des mises à jour en direct instantanées, activez la fonction optionnelle Bluetooth (BLE) dans la configuration, à condition que votre serveur Home Assistant soit suffisamment proche de l'appareil Jackery.
 - **Où sont les capteurs d'énergie à vie ?**
-  Les capteurs de semaine, mois et année fournis sont des *totaux de période* et se réinitialisent automatiquement. Pour le tableau de bord Énergie de Home Assistant, veuillez utiliser les capteurs d'énergie cumulée fournis par l'intégration.
+  Les capteurs de semaine, mois et année fournis sont des *totales de période* et se réinitialisent automatiquement. Pour le tableau de bord Énergie de Home Assistant, veuillez utiliser les capteurs d'énergie cumulée fournis par l'intégration.
 
 ---
 
