@@ -122,7 +122,7 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
 
 
 def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
-    """deviceSn wins over devSn/sn, and a blank/whitespace-only value is None.
+    """DeviceSn wins over devSn/sn, and a blank/whitespace-only value is None.
 
     A field that goes empty (e.g. ``""`` or all-whitespace) must not resolve
     to a falsy-but-truthy pack identity that would still pass an
