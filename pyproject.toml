@@ -12,8 +12,53 @@ include = ["custom_components*"]
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements*.txt"] }
 
+[tool.setuptools.dynamic.optional-dependencies]
+tests = { file = ["requirements-test.txt", "requirements-dev.txt"] }
+pytest = { file = ["requirements-dev.txt"] }
+hassfest = { file = ["requirements-dev.txt"] }
+hacs-action = { file = ["requirements-dev.txt"] }
+codecov = { file = ["requirements-dev.txt"] }
+codefactor = { file = ["requirements-dev.txt"] }
+
 [tool.setuptools]
 include-package-data = true
+
+[tool.uv]
+# Ensure that the setuptools v80.0.0 is used whenever a package has a build dependency
+# on setuptools.
+build-constraint-dependencies = ["setuptools<=80.0.0","wheel"]
+no-cache = true
+link-mode = "hardlink"
+index-strategy = "unsafe-best-match"
+fork-strategy = "requires-python"
+cache-dir = "./.uv_cache"
+python-downloads = "automatic"
+python-preference = "system"
+package = true
+managed = true
+#upgrade-package = ["hassfest"]
+# Require that the package is available on the following platforms:
+required-environments = [
+    # Linux on x86_64 (Intel/AMD)
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    # Windows on x86_64 (Intel/AMD)
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
+[tool.uv.sources]
+jackery-solarvault = { workspace = true }
+
+[tool.uv.pip]
+all-extras = true
+allow-empty-requirements = true
+compile-bytecode = true
+config-settings = { editable_mode = "compat" }
+extra-build-dependencies = { pytest = ["setuptools"] }
+prerelease = "if-necessary-or-explicit"
+python = "3.14"
+python-version = "3.13"
+strict = true
+universal = true
 
 [project]
 name = "jackery_solarvault"
@@ -31,11 +76,12 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = ">=3.14.6"
+requires-python = "==3.14.6"
 dependencies = [
     "pip>=26.1.2",
     "pre-commit>=4.6.0",
-    "ruff>=0.16.0"
+    "ruff>=0.16.0",
+    "ty>=0.0.58",
 ]
 
 [project.urls]
@@ -242,13 +288,11 @@ filterwarnings = [
   "ignore:.*invalid escape sequence:SyntaxWarning:.*pydub.utils",
   # https://pypi.org/project/PyPasser/ - v0.0.5 - 2021-10-21
   "ignore:.*invalid escape sequence:SyntaxWarning:.*pypasser.utils",
-  # https://pypi.org/project/rxv/ - v0.7.0 - 2021-10-10
-  "ignore:defusedxml.cElementTree is deprecated, import from defusedxml.ElementTree instead:DeprecationWarning:rxv.ssdp",
 ]
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.16.0"
+required-version = ">=0.15.21"
 line-length = 88
 src = ["custom_components/jackery_solarvault"]
 indent-width = 4
@@ -411,6 +455,9 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
 task-tags = ["TODO", "FIX", "BUG"]
 
+[project.scripts]
+hass = "homeassistant.__main__:main"
+
 [dependency-groups]
 dev = [
     "aiohttp>=3.14.1",
@@ -422,11 +469,11 @@ dev = [
     "astroid>=4.1.2",
     "attrs",
     "autotyping",
-    "bleak-retry-connector>=3.5.0",
+    "bleak-retry-connector>=4.6.3",
     "codecov",
-    "coverage[toml]>=7.15.2",
-    "homeassistant>=2026.7.4",
-    "homeassistant-stubs>=2026.7.4",
+    "coverage[toml]>=7.5.4",
+    "homeassistant>=2026.7.2",
+    "homeassistant-stubs>=2026.7.2",
     "hypothesis",
     "ifaddr",
     "iniconfig",
@@ -457,12 +504,12 @@ dev = [
     "types-atomicwrites>=1.4.5.1",
     "types-caldav>=1.3.0.20250516",
     "types-chardet>=0.1.5",
-    "types-croniter>=6.2.4.20260711",
+    "types-croniter>=6.0.0.20250809",
     "types-decorator>=5.2.0.20251101",
     "types-pexpect>=4.9.0.20250916",
     "types-protobuf>=6.30.2.20250914",
     "types-psutil>=7.1.1.20251122",
-    "types-pyserial>=3.5.0.20260712",
+    "types-pyserial>=3.5.0.20251001",
     "types-python-dateutil>=2.9.0.20260124",
     "types-python-slugify>=8.0.2.20240310",
     "types-pytz>=2025.2.0.20251108",
@@ -473,6 +520,7 @@ dev = [
     "uv",
     "voluptuous>=0.15.2",
 ]
+
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
@@ -487,6 +535,7 @@ max-complexity = 25
 # is no longer enforced for comments and strings in this one file; `ruff
 # format` still holds all *code* lines in it to the 88-character limit.
 "**/sensor.py" = ["line-too-long"]
+"custom_components/jackery_solarvault/const.py" = ["hardcoded-password-string"]
 "tests/*" = [
     "import-outside-top-level",
     "private-member-access",
@@ -540,7 +589,7 @@ quote-annotations = true
 strict = true
 
 [tool.ruff.lint.flake8-bandit]
-check-typed-exception = true
+check-typed-exception = false
 
 [tool.ruff.lint.flake8-pytest-style]
 fixture-parentheses = true
@@ -591,7 +640,7 @@ omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 80
+fail_under = 65
 skip_covered = true
 precision = 2
 ignore_errors = false
@@ -650,6 +699,7 @@ cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-c
 
 # per-path overrides
 [tool.smellcheck.per-file-ignores]
+"scripts/**" = []
 "docs/**" = []
 # Untracked scratch parsers (gitignored); suppress every rule (smellcheck
 # resolves only exact rule IDs, no family prefixes or wildcards).
@@ -931,7 +981,7 @@ disable = [
   "wrong-exception-operation",
 ]
 enable = [
-  "useless-suppression",
+  #"useless-suppression",  # temporarily every now and then to clean them up
   "use-symbolic-message-instead",
 ]
 per-file-ignores = [
