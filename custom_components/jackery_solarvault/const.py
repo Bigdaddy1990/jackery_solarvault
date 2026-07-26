@@ -1902,6 +1902,15 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_SMART_MODE,
     PAYLOAD_SMART_SCHEDULE,
     PAYLOAD_TOU_SCHEDULE,
+    "local_daily_energy",
+    "device_symmetry_stat_day",
+    "device_home_stat_day",
+    "device_symmetry_stat_week",
+    "device_home_stat_week",
+    "device_symmetry_stat_month",
+    "device_home_stat_month",
+    "device_symmetry_stat_year",
+    "device_home_stat_year",
 )
 
 # Service names and payload fields from services.yaml.

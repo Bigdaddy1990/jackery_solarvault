@@ -138,7 +138,7 @@ class JackeryLocalMqttClient:
             received message as (topic, parsed_dict_or_None, raw_bytes).
             topic_filter (str): MQTT subscription topic filter to use when the client
             connects.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._hass = hass
         self._host = host
         self._port = port
@@ -182,7 +182,7 @@ class JackeryLocalMqttClient:
         as a Home Assistant background task, resets connection state, increments the
         internal connect attempt counter, and waits up to 10 seconds for the initial
         connection result so diagnostics reflect the attempt.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         async with self._lock:
             if self._runner_task is not None and not self._runner_task.done():
                 return
@@ -258,7 +258,7 @@ class JackeryLocalMqttClient:
         subscription, connect, and disconnect errors for diagnostics. Always set the
         internal connected event before exiting to ensure callers waiting in startup
         cannot deadlock.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         connected = False
         try:  # ruff:ignore[too-many-statements-in-try-clause]
             async with aiomqtt.Client(
@@ -326,7 +326,7 @@ class JackeryLocalMqttClient:
         Parameters:
             rc (int): MQTT CONNACK return code provided by the broker indicating the
             reason for refusal.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         error = f"connect rc={rc} ({reason})"
@@ -349,7 +349,7 @@ class JackeryLocalMqttClient:
             was_connected (bool): True if the client had already established a
             connection when the error occurred; False if the failure happened while
             attempting to connect.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if was_connected:
             self._last_error = f"disconnect: {error}"
             _LOGGER.debug("Jackery local MQTT disconnected: %s", error)
@@ -411,7 +411,7 @@ class JackeryLocalMqttClient:
             topic (str): MQTT topic name of the message.
             payload (bytes | bytearray | str): Raw message payload; may be a string or
             bytes-like object.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
@@ -493,15 +493,7 @@ class JackeryLocalMqttClient:
                 # surface it via dropped counter so diagnostics shows the rate.
                 self._messages_dropped += 1
                 return
-        else:
-            # Binary frame: nothing routable today. Counted as dropped and no
-            # longer dispatched with ``data=None`` — the old behaviour made
-            # ``messages_forwarded`` count every broker message and spawned a
-            # sink task per foreign frame.
-            self._messages_dropped += 1
-            return
-
-        if self._sink is not None and data is not None:
+        if self._sink is not None and (data is not None or text is None):
             self._messages_forwarded += 1
             self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
 
@@ -525,7 +517,7 @@ class JackeryLocalMqttClient:
             `True` if the payload prefix contains all of `"event_type"`,
             `"state_changed"`, `"event_data"`, `"old_state"`, and `"new_state"`,
             `False` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return (
             b'"event_type"' in head
@@ -556,7 +548,7 @@ class JackeryLocalMqttClient:
             dict | None: The extracted Jackery payload dict if found; the original
             `payload` if it is not an HA event wrapper; `None` if a wrapper is present
             but no Jackery payload can be extracted.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if "event_type" not in payload or "event_data" not in payload:
             return payload
         event_data = payload.get("event_data")
@@ -618,7 +610,7 @@ class JackeryLocalMqttClient:
             coro (Awaitable[None]): Coroutine to run as a background task.
             label (str): Short label used to name the task
             (`jackery_local_mqtt_{label}`) and included in error logs.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
 
         async def _runner() -> None:
             """Await the provided coroutine and allow any exception it raises to
@@ -627,7 +619,7 @@ class JackeryLocalMqttClient:
             This helper awaits the closure-captured coroutine `coro`. It does not
             swallow exceptions so that callers or task completion callbacks can observe
             and handle errors.
-            """
+            """  # ruff: ignore[missing-blank-line-after-summary]
             await coro
 
         task = self._hass.async_create_task(
@@ -674,7 +666,7 @@ class JackeryLocalMqttClient:
             dict[str, Any]: A snapshot containing connection/configuration flags, topic
             diagnostics, message counters, last-seen timestamps/errors, connect
             attempts, and the MQTT client library identifier.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         # Explicit annotation so the redacted (all-str) and unredacted (str + int
         # port) branches do not lock the inferred dict type to ``dict[str, str]``.
         target: dict[str, Any]
@@ -767,10 +759,10 @@ class JackeryLocalMqttClient:
         Returns:
             iso_timestamp (str): ISO 8601 formatted UTC timestamp including timezone
             offset (e.g. "2026-05-27T12:34:56+00:00").
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return datetime.now(UTC).isoformat()
 
-    # --- restored from 01.06\\custom_components\\jackery_solarvault\\client\\local_mqtt.py
+    # --- restored from 01.06\\custom_components\\jackery_solarvault\\client\\local_mqtt.py  # ruff: ignore[line-too-long]
     @staticmethod
     def _looks_like_home_assistant_event_payload(payload: bytes) -> bool:
         """Detect whether a byte payload appears to be a Home Assistant event-style JSON
@@ -780,7 +772,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             True if both `"event_type"` and `"event_data"` appear in the payload head, False otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         head = payload[:_HOME_ASSISTANT_EVENT_HEAD_BYTES]
         return b'"event_type"' in head and b'"event_data"' in head
 

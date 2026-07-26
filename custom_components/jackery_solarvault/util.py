@@ -184,7 +184,7 @@ def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
     Returns:
         bool: The resolved boolean value (`true` or `false`), or `default` if the value
         is missing or not parseable.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -210,7 +210,7 @@ def config_entry_str_option(entry: object, key: str, default: str) -> str:
 
     Returns:
         str: The resolved option value coerced to `str`, or `default` when unset.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -234,7 +234,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
 
     Returns:
         int: The resolved integer option or `default` if not present or not convertible.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -290,7 +290,7 @@ def parse_utc_datetime(  # ruff:ignore[too-many-branches]
     Raises:
         ValueError: If the input is an empty string, an unsupported type, or an invalid
         timestamp/ISO string.
-    """
+    """  # ruff: ignore[line-too-long]
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -400,7 +400,7 @@ def coordinator_entity_signature(  # ruff:ignore[too-many-locals]
         alarm payload, a boolean indicating presence of an OTA current version, a
         boolean indicating presence of a CT meter, and the per-section stat-series
         usability summary so late-arriving stat curves re-trigger dynamic setup.
-    """
+    """  # ruff: ignore[line-too-long]
     if not coordinator_data:
         return ()
 
@@ -552,7 +552,7 @@ def append_unique_entity[EntityT](
     Returns:
         `True` if the entity was appended, `False` if it was skipped due to a duplicate
         `unique_id`.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         return False
@@ -582,7 +582,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
 
     Returns:
         tuple[date, date]: (begin_date, end_date) for the requested period, inclusive.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     date_type = validate_app_period_date_type(date_type)
     if today is None:
         today = datetime.now(UTC).astimezone().date()
@@ -644,7 +644,7 @@ def app_period_date_bounds(
     Raises:
         ValueError: If inputs are invalid for a date bound or if the resolved begin date
         is after the resolved end date.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -928,7 +928,7 @@ def safe_float(
     Returns:
         float_value (float | None): The parsed float on success, or `None` if `value` is
         `None` or cannot be converted.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if value is None:
         return None
     if isinstance(value, bool):
@@ -997,7 +997,7 @@ def dev_mode_redactions_disabled() -> bool:
 
     Returns:
         `True` if `JACKERY_DEV_MODE` is set to one of "1", "true", "yes", or "on" (case-insensitive), `False` otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     global _DEV_MODE_CACHED  # ruff:ignore[global-statement]  # module-level memoization cache for a one-time env lookup
     if _DEV_MODE_CACHED is None:
         raw = os.environ.get(_DEV_MODE_ENV, "")
@@ -1207,7 +1207,7 @@ def append_payload_debug_line(
         redactions_disabled (bool | None): When `True`, write the event without
         redaction; when `False`, enforce redaction; when `None`, use the module's
         default redaction behavior.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
@@ -1478,7 +1478,7 @@ class AppDataQualityWarning(NamedTuple):
         Returns:
             dict[str, object]: Diagnostic dictionary containing required fields and any
             available optional fields.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         payload: dict[str, object] = {
             DATA_QUALITY_KEY_LEVEL: self.level,
             DATA_QUALITY_KEY_REASON: self.reason,
@@ -1592,14 +1592,14 @@ def format_data_quality_warning(warning: dict[str, Any]) -> str:
     source_text = "unknown" if source_value is None else str(source_value)
     reference_text = "unknown" if reference_value is None else str(reference_value)
 
-    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"
+    text = f"{metric}: {source_section}={source_text} < {reference_section}={reference_text}"  # ruff: ignore[line-too-long]
     source_request = _format_request_range(warning.get(DATA_QUALITY_KEY_SOURCE_REQUEST))
     reference_request = _format_request_range(
         warning.get(DATA_QUALITY_KEY_REFERENCE_REQUEST)
     )
 
     if source_request or reference_request:
-        text += f" [{source_section}: {source_request or "unknown"}; {reference_section}: {reference_request or "unknown"}]"
+        text += f" [{source_section}: {source_request or "unknown"}; {reference_section}: {reference_request or "unknown"}]"  # ruff: ignore[line-too-long]
     return text
 
 
@@ -1697,7 +1697,7 @@ def app_data_quality_warnings(
         Each warning includes rounded
         source/reference values (5 decimal places) and optional request and chart-series
         metadata for diagnostics.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     if today is None:
         today = datetime.now(UTC).astimezone().date()
     week_begin, week_end = app_period_range(DATE_TYPE_WEEK, today=today)
@@ -1744,7 +1744,7 @@ def app_data_quality_warnings(
         Returns:
             str | None: The chart-series key for the given section and statistic when
             the section exists and contains a mapping; `None` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         source = payload.get(section)
         return trend_series_key(section, stat_key) if isinstance(source, dict) else None
 
@@ -1781,7 +1781,7 @@ def app_data_quality_warnings(
 
         Side effects:
                 Appends a populated AppDataQualityWarning to the module-level `warnings` list. The warning includes chart-series key hints (derived from `stat_key`) and, when the source is not the overall statistic section, marks the total method as `"chart_series_sum"`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         warnings.append(
             AppDataQualityWarning(
                 level=DATA_QUALITY_LEVEL_WARNING,
@@ -1933,7 +1933,7 @@ def external_trend_statistic_id(
 
     Returns:
         str: A statistic id string in the form "<domain>:<device>_<metric>_<bucket>" where each part is normalized by `statistic_id_part`.
-    """
+    """  # ruff: ignore[line-too-long]
     return (
         f"{domain}:"
         f"{statistic_id_part(device_id)}_"
@@ -1965,7 +1965,7 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     Returns:
         str | None: One of the `DATE_TYPE_*` suffix values when found, `None` if no date
         type can be determined.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
         date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
@@ -2095,7 +2095,7 @@ def expanded_year_series_values(
               the documented total within a small tolerance; otherwise returns the raw
               series values.
             - If the series key is missing or the series is not a list, returns `None`.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -2196,7 +2196,7 @@ def effective_trend_series_values(
     Returns:
         list[float] | None: Normalized list of floats rounded to 5 decimals, or `None`
         if the chart series key is not applicable or the series value is not a list.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     # dateType=day arrays are W power curves (served through
     # day_power_series_key), never energy chart buckets — their energy
     # totals live in the scalar fields.
@@ -2231,7 +2231,7 @@ def effective_period_total_value(
     Returns:
         float: The period total rounded to 2 decimals when available, `None` if no value
         can be determined.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
@@ -2281,7 +2281,7 @@ def year_payload_appears_current_month_only(
     Returns:
         bool: `True` if any inspected series has non-zero values only for
         `current_month`, `False` otherwise.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -2427,7 +2427,7 @@ def _calculated_savings_from_year(  # ruff:ignore[too-many-locals]  # cohesive s
             - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
         None: If required inputs are missing (no usable device/home/CT totals or no
         configured/derivable price).
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -2611,7 +2611,7 @@ def _backfill_pv_revenue(
     Side effects:
         - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -2674,7 +2674,7 @@ def backfill_year_payload_from_months(  # ruff:ignore[too-many-branches]  # per-
         A dictionary payload: either the unchanged `year_source` or a modified copy with
         corrected series/stat fields and `APP_YEAR_BACKFILL_META` when corrections were
         applied.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -2764,7 +2764,7 @@ def apply_year_month_backfill(
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section
         prefix to a mapping of 1-based month index -> month payload dict used to
         reconstruct year-series values.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             APP_SECTION_PV_STAT,
@@ -2824,7 +2824,7 @@ def guard_statistic_totals_from_year(  # ruff:ignore[too-many-locals]  # data-qu
         previous_statistic (dict[str, Any] | None): Optional prior statistic mapping
         whose `APP_STAT_TOTAL_GENERATION` may be used as a lower bound when the PV year
         section is absent.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     statistic = payload.get(PAYLOAD_STATISTIC)
     if not isinstance(statistic, dict):
         return
@@ -3082,7 +3082,7 @@ def _day_power_sample_minute(
         minute_of_day (int | None): Minutes after local midnight (0–1439) for the
         sample, or `None` if the computed minute is outside the day range or no valid
         label/index mapping exists.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
         if minute is not None:
@@ -3233,7 +3233,7 @@ def day_power_energy_points(  # ruff:ignore[too-many-return-statements, too-many
         (rounded to 5 decimal places). Returns an empty list for invalid inputs,
         unsupported units, out-of-range request dates, or when scaling rules prevent
         producing buckets.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]
     if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
         return []
     series_key = day_power_series_key(source, section, stat_key)
@@ -3335,7 +3335,7 @@ def directional_power_value(
     Returns:
         float | None: The net power (sum of positive keys minus sum of negative keys) if
         at least one numeric value is present, `None` otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     positive = 0.0
     negative = 0.0
     found = False
@@ -3369,7 +3369,7 @@ def signed_phase_power_values(ct: dict[str, Any]) -> list[float] | None:
         list[float] | None: A list of signed per-phase power values in the same order as
         CT_PHASE_POWER_PAIRS, or `None` if any phase value is missing or cannot be
         computed.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     values: list[float] = []
     for pos_key, neg_key in CT_PHASE_POWER_PAIRS:
         value = directional_power_value(ct, (pos_key,), (neg_key,))
@@ -3415,7 +3415,7 @@ def calculated_smart_meter_power(  # ruff:ignore[too-many-return-statements]  # 
     Returns:
         float | None: Calculated power in the same units as the input values, or `None`
         when required inputs are missing or the calculation mode is unrecognized.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -3457,7 +3457,7 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
     Returns:
         float | None: The first value successfully coerced to a number, or `None` if no
         numeric value is found.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     for key in keys:
         if key in source and source.get(key) is not None:
             value = safe_float(source.get(key))
@@ -3614,7 +3614,7 @@ def jackery_corrected_home_consumption_power(
             - `source`: string indicating which data was used (`FIELD_OTHER_LOAD_PW` when reported, otherwise `"smart_meter_net_minus_input_plus_output"`).
         Returns `None` when insufficient inputs are available to compute a corrected
         consumption.
-    """
+    """  # ruff: ignore[line-too-long]
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -3726,7 +3726,7 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a period payload or no mapping exists.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     if not section.endswith((
         f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
@@ -3748,7 +3748,7 @@ def day_power_series_key(
     Returns:
         The chart-series key string for the given `section`/`stat_key` when `source` is
         a day-period payload, `None` otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if not is_day_period_payload(source, section):
         return None
     if (
@@ -3782,7 +3782,7 @@ def trend_series_total(  # ruff:ignore[too-many-return-statements]  # flat guard
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total
         cannot be determined.
-    """
+    """  # ruff: ignore[line-too-long]
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -3841,7 +3841,7 @@ def trend_series_has_value(  # ruff:ignore[too-many-return-statements]  # flat g
     Returns:
         `true` if a numeric value can be derived from the payload for the section and
         stat_key, `false` otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
@@ -3894,7 +3894,7 @@ def task_plan_value(
     Returns:
         Any: The first non-`None` value found for the provided keys, or `None` if none
         are present.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:
             return task_plan.get(key)
@@ -3928,7 +3928,7 @@ def trend_payload_has_value(
 
     Returns:
         True if a usable period value exists, False otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None

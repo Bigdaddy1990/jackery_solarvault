@@ -328,10 +328,10 @@ type RandomBytesSource = Callable[[int], bytes]
 
 
 def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
-    """Encrypt PKCS7-padded plaintext with AES-ECB (required by Jackery Cloud protocol)."""
+    """Encrypt PKCS7-padded plaintext with AES-ECB (required by Jackery Cloud protocol)."""  # ruff: ignore[line-too-long]
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
-    # codeql[py/weak-cryptographic-algorithm] AES-ECB is mandatory for Jackery Cloud API wire protocol
+    # codeql[py/weak-cryptographic-algorithm] AES-ECB is mandatory for Jackery Cloud API wire protocol  # ruff: ignore[line-too-long]
     cipher = Cipher(algorithms.AES(key), modes.ECB())
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
@@ -684,7 +684,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
         Returns:
             str: The resolved MAC ID string.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -890,7 +890,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
     async def async_get_mqtt_credentials(self) -> dict[str, str] | None:
         """Return MQTT credentials for the active REST login session
         (compatibility alias).
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return self._derive_mqtt_credentials()
 
     async def async_get_generated_jwt(self) -> dict[str, Any]:
@@ -968,7 +968,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
         Returns:
             True if the response indicates token expiration, False otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if not isinstance(data, dict):
             return False
         code = self._extract_code(data)
@@ -1761,7 +1761,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             payload (dict): Normalized response payload containing chart/statistics
             data. When available, includes `APP_REQUEST_META` with request metadata
             (excluding `deviceId`).
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return await self._async_get_device_period_stat(
             DEVICE_HOME_STAT_PATH,
             device_id=device_id,
@@ -1846,7 +1846,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         Returns:
             list[dict]: Battery pack dictionaries extracted from the response; empty
             list if no packs are found or the response shape is unrecognized.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         params = {FIELD_DEVICE_SN: str(device_sn)}
         data = await self._get_json(BATTERY_PACK_PATH, params=params)
         if isinstance(data, dict):
@@ -2414,7 +2414,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             dict: Payload containing aggregated totals (e.g., `totalInEpsEnergy`,
             `totalOutEpsEnergy`), chart series arrays (`x`, `y`, `y1`, `y2`), and, when
             present, an `APP_REQUEST_META` dict with the request parameters used.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
             device_id=device_id,
@@ -4048,7 +4048,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             authentication failure.
             JackeryApiError: On network/request failures, non-200 HTTP status, or
             backend `code` that is neither `CODE_OK` nor `None`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         token_used = await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -4224,7 +4224,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             the response `code` indicates an error.
             JackeryAuthError: When the response indicates an authentication or
             authorization failure.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         token_used = await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -4369,7 +4369,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if not isinstance(max_power, int) or max_power < 0:
             msg = "max_power must be a non-negative integer"
             raise JackeryApiError(msg)

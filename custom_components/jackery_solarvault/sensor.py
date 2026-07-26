@@ -68,7 +68,7 @@ Unique IDs follow ``PROTOCOL.md §11`` strictly:
 The ``key`` attribute of each ``JackerySensorDescription`` is the
 ``<stable_key_suffix>``; translation keys, names and any localized text
 must never affect ``unique_id``.
-"""
+"""  # ruff: ignore[line-too-long]
 
 import asyncio
 from copy import deepcopy
@@ -632,7 +632,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
         Callable[[Any], float | None]: A function that accepts any value, returns the
         quotient rounded to 2 decimals when the value can be converted to float, or
         `None` when conversion fails.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
 
     def _f(value: Any) -> float | None:  # ruff:ignore[any-type]  # arbitrary payload value, coerced via float() at runtime
         try:
@@ -2129,7 +2129,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -2141,7 +2141,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="home_month_energy",
         translation_key="home_month_energy",
@@ -2153,7 +2153,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="home_year_energy",
         translation_key="home_year_energy",
@@ -2168,7 +2168,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- PROTOCOL.md §2: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -2180,7 +2180,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="device_ongrid_input_month_energy",
         translation_key="device_ongrid_input_month_energy",
@@ -2192,7 +2192,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="device_ongrid_input_year_energy",
         translation_key="device_ongrid_input_year_energy",
@@ -2204,7 +2204,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_YEAR,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="device_ongrid_output_week_energy",
         translation_key="device_ongrid_output_week_energy",
@@ -2216,7 +2216,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="device_ongrid_output_month_energy",
         translation_key="device_ongrid_output_month_energy",
@@ -2228,7 +2228,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
     # APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_year_energy",
@@ -2382,7 +2382,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE  # ruff: ignore[line-too-long]
     JackeryStatSensorDescription(
         key="battery_discharge_month_energy",
         translation_key="battery_discharge_month_energy",
@@ -4555,7 +4555,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async, complex-structure, too
         Returns:
             list[SensorEntity]: A list of instantiated sensor entities ready for
             registration.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         (
             create_smart_meter_derived,
             create_calculated_power,
@@ -4918,7 +4918,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async, complex-structure, too
         Compares the current coordinator entity signature with the previously stored
         signature; when different, updates the stored signature, collects entities to
         create, and calls the platform's entity adder for any discovered entities.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         nonlocal last_option_signature, last_signature
         sig = coordinator_entity_signature(coordinator.data)
         option_signature = _entity_option_signature()
@@ -5098,7 +5098,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             and device registry linkage.
             description (JackeryStatSensorDescription): Sensor description that
             supplies stat key, source section, transforms, and optional reset_period.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
         self._attr_entity_registry_enabled_default = (
@@ -5146,7 +5146,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         Returns:
             datetime | None: Timezone-aware local midnight for the period start, or
             `None` when no reset period is configured.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # ruff:ignore[property-docstring-starts-with-verb]  # ruff: ignore[missing-blank-line-after-summary]
         # last_reset is only valid on a TOTAL sensor. Non-period sensors (no
         # reset period) and the week/month/year totals (state_class=None, since
         # the external ``jackery_solarvault:`` statistics own their long-term
@@ -5199,7 +5199,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
 
         Returns:
             date: Local date in the configured Home Assistant timezone.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return dt_util.now(self._local_timezone()).date()
 
     def _period_begin_from_meta(
@@ -5243,7 +5243,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         Returns:
             `true` if the source period begin date is before the current local period
             start date, `false` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self._reset_period is None:
             return False
         wall_clock_start = _period_start(
@@ -5271,7 +5271,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         Returns:
             True if the source period begin date is after the local period start for the
             sensor's reset period, False otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self._reset_period is None:
             return False
         wall_clock_start = _period_start(
@@ -5302,7 +5302,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         Returns:
                 dict[str, Any]: The dict storing data for the requested section, or an
                 empty dict if no usable source is available.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if payload is not None:
             source = payload.get(section) or {}
             return source if isinstance(source, dict) else {}
@@ -5340,7 +5340,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             corresponding source payload dictionary; `None` when the function is not
             applicable or no
             suitable week/month bucket contains today's value.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self._reset_period != DATE_TYPE_DAY:
             return None
         prefix = _day_section_prefix(section)
@@ -6233,7 +6233,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
             pack field to expose and how to transform it.
             enabled_default (bool): Whether the entity should be enabled by default in
             the entity registry.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         super().__init__(
             coordinator,
             device_id,
@@ -6325,7 +6325,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         Returns:
             The transformed field value when present, `None` if the field (and any
             fallbacks) are absent.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         field = self.entity_description.field
         raw = pack.get(field)
         if raw is None:
@@ -6415,7 +6415,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
         This updates self._cached_native_value and self._cached_attrs using the current
         pack snapshot; intended to be run once per coordinator update.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         pack = self._pack
         self._cached_native_value = _guard_total_increasing_jitter(
             self._cached_native_value,
@@ -6533,7 +6533,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         Notes:
             Builds and caches the per-plug `device_info` at construction time from the
             current plug payload.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         super().__init__(
             coordinator,
             device_id,
@@ -6570,7 +6570,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         Returns:
             dict: The matching plug payload dictionary, or an empty dict if no match is
             found.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -7065,7 +7065,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         Returns:
             dict[str, Any]: Mapping of diagnostic attribute names to their values (may
             be empty if no diagnostics are available).
-        """  # ruff:ignore[ambiguous-unicode-character-docstring]
+        """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]
         if self.entity_description.calculation:
             return {
                 "calculation": self.entity_description.calculation,
@@ -7776,7 +7776,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 "max(smart_meter_net_power - jackery_grid_side_input_power "
                 "+ jackery_grid_side_output_power, 0)"
             ),
-            "source": "http_primary_otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",
+            "source": "http_primary_otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",  # ruff: ignore[line-too-long]
             "scope": (
                 "Jackery-corrected home load; external non-Jackery generation"
                 " must be measured separately"
@@ -7916,7 +7916,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
         Returns:
             datetime: Timezone-aware UTC datetime parsed from the milliseconds value, or
             `None` if the value is missing or cannot be parsed.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         ts_ms = self._device_meta.get(self._source_key)
         if not ts_ms:
             return None

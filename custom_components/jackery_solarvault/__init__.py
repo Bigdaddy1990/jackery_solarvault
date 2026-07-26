@@ -963,7 +963,7 @@ def _local_mqtt_client(  # ruff:ignore[non-empty-init-module]
     Returns:
         JackeryLocalMqttClient instance for the entry, or None if no client is stored or
         the stored value is not a JackeryLocalMqttClient.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None
@@ -1355,7 +1355,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
     Returns:
         True if setup completed successfully.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if not await _async_release_fenced_coordinator(hass, entry):
         msg = (
             "A previous Jackery coordinator is still stopping; "
@@ -1454,7 +1454,7 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # ruff:ign
     current state has no `unit_of_measurement` (missing or empty) and its entity_id
     contains any token from STALE_HELPER_VENDOR_TOKENS, the entity is removed from
     the registry and an informational log entry is emitted.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
@@ -1503,7 +1503,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # ruff:ignore[no
     Returns:
         `True` if `uid` is a legacy head concatenated with `key_suffix`, `False`
         otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     if not key_suffix:
         return _LEGACY_UID_HEAD_RE.fullmatch(uid) is not None
     if not uid.endswith(key_suffix):
@@ -1964,7 +1964,7 @@ def _async_remove_entities_with_suffixes(  # ruff:ignore[non-empty-init-module]
         suffixes (Iterable[str]): Iterable of legacy unique-id suffix strings; an entity
         is removed if its unique ID matches any suffix.
         log_label (str): Human-readable label included in removal log messages.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     suffix_tuple = tuple(suffixes)
     if not suffix_tuple:
         return

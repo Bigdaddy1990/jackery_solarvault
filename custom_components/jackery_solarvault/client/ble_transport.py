@@ -260,7 +260,7 @@ class JackeryBleListener:
             serial_resolver (Callable[[str], str | None] | None): Maps a BLE-broadcast
             serial string to a Jackery device_id; when omitted incoming advertisements
             with unmapped serials are logged but not associated.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._hass = hass
         self._sink = sink
         self._key_resolver = key_resolver
@@ -716,7 +716,7 @@ class JackeryBleListener:
             RuntimeError: When the payload cannot be chunked for the selected MTU, on
             GATT-layer failures (including write timeouts), or when an ACK wait times
             out.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if (
             isinstance(msg_id, bool)
             or not isinstance(msg_id, int)
@@ -1009,7 +1009,7 @@ class JackeryBleListener:
             device_ids (list[str]): Device IDs to monitor; a background connection task
             will be created lazily for a device the first time an advertisement matching
             the listener's BLE matcher is seen.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._stop_event.clear()
 
         bluetooth_module: Any = sys.modules.get(
@@ -1203,7 +1203,7 @@ class JackeryBleListener:
 
         Returns:
             `device_id` if the advertisement maps to a known device, `None` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         address = service_info.address
         # Step 1: address cache hit.
         for cached_id, cached_mac in self._device_addresses.items():
@@ -1247,7 +1247,7 @@ class JackeryBleListener:
 
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         stats = self.stats_for(device_id)
         runner_task = asyncio.current_task()
         try:  # ruff:ignore[too-many-statements-in-try-clause]
@@ -1681,7 +1681,7 @@ class JackeryBleListener:
         frame is parsed successfully this method resolves matching pending ACK futures
         and increments decode-related counters; when parsing fails it increments the
         decode-failure counter.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if session is not None and not self._session_is_current(device_id, session):
             return
         stats = self.stats_for(device_id)

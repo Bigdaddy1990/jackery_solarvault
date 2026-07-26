@@ -283,7 +283,7 @@ def _storm_minutes_fallback(
     Returns:
         int | None: `DEFAULT_STORM_WARNING_MINUTES` when a fallback is appropriate,
         `None` otherwise.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     raw = properties.get(FIELD_WPS)
     if raw is None:
         raw = weather_plan.get(FIELD_WPS)
@@ -1122,7 +1122,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         coordinator and device payloads.
         async_add_entities (AddEntitiesCallback): Callback used to register new
         SelectEntity instances with Home Assistant.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -1152,7 +1152,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Returns:
             bool: `True` if the select entity for `key` is supported for this device,
             `False` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         props = payload_properties_for_sources(payload)
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":
@@ -1197,7 +1197,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
 
         Returns:
             list[SelectEntity]: Created JackerySelect instances for eligible devices.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)
@@ -1229,7 +1229,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         signature, collect eligible entities and pass them to the platform's
         async_add_entities callback, then update the cached signature; if the signature
         is unchanged, take no action.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

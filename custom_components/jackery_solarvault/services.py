@@ -1058,7 +1058,7 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g.,
         "12345"), otherwise the original input.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
@@ -1074,7 +1074,7 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
     Returns:
         parent_id (str): The parent Jackery numeric device id with any documented
         subdevice suffix removed.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
     if device is not None:
@@ -1228,7 +1228,7 @@ def _service_validation_error(
         ServiceValidationError: Error with `translation_domain` set to DOMAIN,
         `translation_key` set to `translation_key`, and `translation_placeholders`
         containing `device_id` and `error`.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     placeholders = {
         "device_id": device_id,
         "error": str(error),
@@ -1410,7 +1410,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
     Raises:
         ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object
         string, or if JSON parsing fails.
-    """
+    """  # ruff: ignore[line-too-long]
     if isinstance(raw_body, dict):
         return _json_native_body(raw_body, device_id)
     if isinstance(raw_body, str):
@@ -1879,7 +1879,7 @@ async def _async_handle_set_third_party_mqtt_config(
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or
         if applying the configuration fails. The error includes translation placeholders
         `device_id` and `error`.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2058,7 +2058,7 @@ async def _async_handle_send_ble_command(
 
     Raises:
         ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
-    """
+    """  # ruff: ignore[line-too-long]
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -3687,7 +3687,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     storm alert, set/query third-party MQTT config, send BLE command, and send device
     schedule. Each service is registered with this module's corresponding voluptuous
     schema and forwards validated ServiceCall objects to the integration handlers.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
 
     def _make_handler(
         handler: _ServiceHandler,
@@ -3728,7 +3728,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
         `body` is invalid, or if sending the schedule fails.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

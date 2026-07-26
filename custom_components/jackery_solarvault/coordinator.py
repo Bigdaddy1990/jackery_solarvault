@@ -61,7 +61,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter
 
-from .client import JackeryApiError, JackeryAuthError, JackeryError
+from .client import JackeryApiError, JackeryAuthError, JackeryError, ble
 from .client.api import encrypt_mqtt_body
 from .client.discovery_cache import (
     async_load_discovery_cache,
@@ -15383,7 +15383,25 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         await self.async_start_local_mqtt_listener()
 
-    async def async_start_local_mqtt_listener(self) -> None:  # ruff:ignore[too-many-statements]  # option resolution + queue closure incl. the foreign-traffic gate belong together
+    def _decrypt_binary_local_mqtt_payload(
+        self, raw_payload: bytes | bytearray
+    ) -> dict[str, Any] | None:
+        """Attempt binary AES-CBC decryption for ESP / firmware frames."""
+        for dev_id in list(self._device_index.keys()):
+            key = self.device_bluetooth_key(dev_id)
+            if not key:
+                continue
+            try:
+                parsed_binary = ble.decrypt_binary_notify(bytes(raw_payload), key)
+                if parsed_binary and parsed_binary.body:
+                    payload = json.loads(parsed_binary.body.decode("utf-8"))
+                    if isinstance(payload, dict):
+                        return payload
+            except Exception:  # ruff:ignore[blind-except]
+                continue
+        return None
+
+    async def async_start_local_mqtt_listener(self) -> None:  # ruff:ignore[too-many-statements]
         """Subscribe to the user's HA MQTT broker for local bridge payloads."""
         if self._shutdown_started:
             return
@@ -15411,9 +15429,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if self._shutdown_started:
                 return
             raw_payload = message.payload
-            if isinstance(raw_payload, bytes):
-                raw_payload = raw_payload.decode()
-            if isinstance(raw_payload, str):
+            payload: Any = None
+            if isinstance(raw_payload, (bytes, bytearray)):
+                try:
+                    payload = json.loads(raw_payload.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    payload = self._decrypt_binary_local_mqtt_payload(raw_payload)
+            elif isinstance(raw_payload, str):
                 try:
                     payload = json.loads(raw_payload)
                 except PAYLOAD_PARSE_ERRORS as err:

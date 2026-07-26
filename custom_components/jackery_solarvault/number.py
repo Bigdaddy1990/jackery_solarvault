@@ -954,7 +954,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             The unit of measurement string, or None if no unit is configured.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -1007,7 +1007,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when
             `raise_on_setter_error` is True and the setter fails.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         parsed_value = safe_float(value)
         if parsed_value is None:
             self._raise_action_error(
@@ -1160,7 +1160,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home
             Assistant.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)

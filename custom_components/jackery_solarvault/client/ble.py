@@ -167,7 +167,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     return data.hex().upper()
 
 

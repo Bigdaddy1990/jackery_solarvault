@@ -148,7 +148,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     coordinator data, de-duplicates entities across rebuilds, and calls the provided
     `async_add_entities` callback to register newly discovered entities when the
     coordinator's entity signature changes.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -164,7 +164,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             unique ID is new.
             entity (BinarySensorEntity): Binary sensor entity whose unique ID will be
             checked and recorded.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -260,7 +260,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Compute the coordinator entity signature and, if it differs from the previously
         recorded signature, collect entities and register them via `async_add_entities`;
         update the stored signature. No action is taken when the signature is unchanged.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -360,7 +360,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: The matching smart-plug dictionary from the current payload,
             or an empty dict if no match is found.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         payload = self._payload
         if payload:
             for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
@@ -393,7 +393,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains
             `plug_index`.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # ruff:ignore[property-docstring-starts-with-verb]  # ruff: ignore[missing-blank-line-after-summary]
         plug = self._plug
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (

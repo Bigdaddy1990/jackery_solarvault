@@ -614,7 +614,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Returns:
             `True` if the switch is on, `False` if the switch is off, `None` if the
             state cannot be determined.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         description = self.entity_description
         section = self._payload_section_for_sources(
             description.source_section,
@@ -1138,7 +1138,7 @@ async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  
     certain description-driven switches by observed device properties or
     advanced-capability support. Register a listener that re-evaluates the coordinator
     data signature and adds newly discovered entities only when the signature changes.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -1151,7 +1151,7 @@ async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  
             appended when unique.
             entity (SwitchEntity): Entity to add if its unique id has not already been
             recorded.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -1191,7 +1191,7 @@ async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  
         Returns:
             list[SwitchEntity]: Switch entity instances to add for the current
             coordinator dataset.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)
@@ -1289,7 +1289,7 @@ async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  
         If the coordinator's current entity signature differs from the last recorded
         signature, update the stored signature, collect entities via
         _collect_entities(), and call async_add_entities() with any discovered entities.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

@@ -189,7 +189,7 @@ def _flow_options(
     Returns:
         dict[str, Any]: A merged options dictionary containing every known option key
         with its resolved value.
-    """
+    """  # ruff: ignore[missing-blank-line-after-summary]
     current = current_options or {}
     keys = option_keys or frozenset(_ALL_OPTION_DEFAULTS)
     return {
@@ -521,7 +521,7 @@ class JackeryOptionsFlow(OptionsFlow):
         Returns:
             ConfigFlowResult: The created options entry result, or a form result to
             display to the user.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
@@ -668,37 +668,32 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ConfigFlowResult: An abort result when the discovery is duplicate,
             otherwise the result from the user step.
         """
-        discovered_name = discovery_info.name or discovery_info.address
+        discovered_name = (
+            getattr(discovery_info, "name", None)
+            or getattr(discovery_info, "address", None)
+            or "Jackery Device"
+        )
         return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_dhcp(
         self,
         discovery_info: DhcpServiceInfo,
     ) -> ConfigFlowResult:
-        """Start account setup from a DHCP discovery signal.
-
-        Parameters:
-            discovery_info (DhcpServiceInfo): DHCP discovery information provided by
-            Home Assistant.
-
-        Returns:
-            ConfigFlowResult: An abort result when the discovery is duplicate or the
-            result of proceeding to the user step.
-        """
-        discovered_name = discovery_info.hostname or discovery_info.ip
+        """Start account setup from a DHCP discovery signal."""
+        discovered_name = (
+            getattr(discovery_info, "hostname", None)
+            or getattr(discovery_info, "ip", None)
+            or "Jackery Device"
+        )
         return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_mqtt(
         self,
         discovery_info: MqttServiceInfo,
     ) -> ConfigFlowResult:
-        """Route MQTT discovery to the HTTP-account setup form.
-
-        Returns:
-            ConfigFlowResult: An abort result when the discovery is a duplicate, or the
-            result returned by `async_step_user()`.
-        """
-        topic_suffix = discovery_info.topic.rsplit("/", 1)[-1].strip()
+        """Route MQTT discovery to the HTTP-account setup form."""
+        topic = getattr(discovery_info, "topic", "")
+        topic_suffix = topic.rsplit("/", 1)[-1].strip() if topic else ""
         discovered_name = (
             f"Jackery MQTT ({topic_suffix})" if topic_suffix else "Jackery MQTT"
         )
@@ -708,18 +703,12 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self,
         discovery_info: ZeroconfServiceInfo,
     ) -> ConfigFlowResult:
-        """Route Zeroconf discovery to the HTTP-account setup form.
-
-        Parameters:
-            discovery_info (ZeroconfServiceInfo): Zeroconf discovery information
-            provided by Home Assistant.
-
-        Returns:
-            ConfigFlowResult: An abort result when the integration is already
-            configured, otherwise the result returned by the user setup step.
-        """
+        """Route Zeroconf discovery to the HTTP-account setup form."""
         discovered_name = (
-            discovery_info.name or discovery_info.hostname or discovery_info.host
+            getattr(discovery_info, "name", None)
+            or getattr(discovery_info, "hostname", None)
+            or getattr(discovery_info, "host", None)
+            or "Jackery Device"
         )
         return await self._async_route_discovery_to_user(discovered_name)
 
@@ -745,7 +734,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: A flow result that either shows the user form with errors
             or creates the new configuration entry on successful authentication.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -806,7 +795,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             A ConfigFlowResult that shows the reconfigure form with any errors, aborts
             with a specific reason, or updates and reloads the entry on successful
             reconfiguration.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         try:
             self._get_reconfigure_entry()
         except UnknownEntry, ValueError:
@@ -1039,7 +1028,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: The next flow result (shows the password form on error or
             missing input, aborts and updates the entry on successful reauthentication).
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         try:
             entry = self._get_reauth_entry()
         except UnknownEntry, ValueError:

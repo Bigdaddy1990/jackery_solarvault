@@ -941,7 +941,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             is unique.
             entity (ButtonEntity): Button entity to append if its unique identifier has
             not been seen.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -1045,7 +1045,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
 
         If the coordinator-derived signature differs from the last cached signature,
         update the cache, collect new entities, and add them via `async_add_entities`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         nonlocal last_signature
         storm_signature = tuple(
             (

@@ -174,7 +174,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             entities (list[TextEntity]): Target list to which the entity will be
             appended if allowed.
             entity (TextEntity): Candidate text entity to append.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -306,7 +306,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
             is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is
             empty, or the remote API reports a failure.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:

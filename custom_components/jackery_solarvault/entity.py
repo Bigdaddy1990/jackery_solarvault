@@ -218,7 +218,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
-        """
+        """  # ruff: ignore[line-too-long]
         name = first_nonblank_text(
             self._system.get(FIELD_DEVICE_NAME),
             self._discovery.get(FIELD_DEVICE_NAME),
@@ -265,7 +265,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             DeviceInfo: Device registry metadata for the smart-plug including
             identifiers, manufacturer, name, model, serial_number, sw_version, and
             via_device.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         base_name = first_nonblank_text(
             self._system.get(FIELD_DEVICE_NAME),
             self._discovery.get(FIELD_DEVICE_NAME),

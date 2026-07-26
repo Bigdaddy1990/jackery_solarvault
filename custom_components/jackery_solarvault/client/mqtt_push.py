@@ -134,7 +134,7 @@ class JackeryMqttPushClient:
             disconnect_callback (Callable[[], Awaitable[None]] | None): Optional async
             callback invoked after a prior successful connection when the client
             disconnects.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._hass = hass
         self._message_callback = message_callback
         self._connect_callback = connect_callback
@@ -354,7 +354,7 @@ class JackeryMqttPushClient:
         Raises:
             RuntimeError: If the MQTT client runner is not started, or if the client
             fails to connect within `timeout_sec`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if not self.is_started:
             msg = "MQTT client is not running"
             raise RuntimeError(msg)
@@ -373,7 +373,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -495,7 +495,7 @@ class JackeryMqttPushClient:
         connected and schedules the disconnect callback when a previously established
         session ends. On errors, updates internal error state and sets or clears the
         connected event to reflect whether the termination was a connect failure.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         runner_task = asyncio.current_task()
         broker_connected = False
         subscription_error: str | None = None
@@ -519,7 +519,7 @@ class JackeryMqttPushClient:
                 self._last_connect_failure_signature = None
                 self._consecutive_auth_failures = 0
                 _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
+                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # ruff: ignore[line-too-long]
                     len(topics),
                     self._tls_certificate_source,
                 )
@@ -620,7 +620,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         message = f"connect rc={rc} ({reason})"
@@ -667,7 +667,7 @@ class JackeryMqttPushClient:
                 error (str): The error message to record.
                 was_connected (bool): If True, record the error as a disconnect; if
                 False, record it as a connect failure.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self._is_connect_failure_error(self._last_error):
             return
         if was_connected:
@@ -707,7 +707,7 @@ class JackeryMqttPushClient:
         Returns:
             True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes),
             False otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         return rc in MQTT_AUTH_FAILURE_RCS
 
     @staticmethod
@@ -720,7 +720,7 @@ class JackeryMqttPushClient:
 
         Returns:
             bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """
+        """  # ruff: ignore[line-too-long]
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
@@ -738,7 +738,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and
             `verify_mode = ssl.CERT_REQUIRED`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -806,7 +806,7 @@ class JackeryMqttPushClient:
                 `_messages_seen`, records `_last_message_at` (UTC ISO), clears
                 `_last_message_error`, and schedules the configured message callback
                 with `(topic, data)`.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if generation is not None and not self._session_is_current(
             generation, runner_task
         ):
@@ -1019,7 +1019,7 @@ class JackeryMqttPushClient:
 
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if topic is None:
             return None
         parts = topic.split("/")
@@ -1055,7 +1055,7 @@ class JackeryMqttPushClient:
               - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
                 "tls_certificate_source": TLS and certificate source flags
               - "library": identifier of the MQTT client library
-        """
+        """  # ruff: ignore[line-too-long]
 
         def topic_value(topic: str | None) -> str | None:
             """Produce the topic with the user-specific segment redacted when redaction
@@ -1067,7 +1067,7 @@ class JackeryMqttPushClient:
             Returns:
                 str | None: The redacted topic when redaction is enabled, the original
                 topic when redaction is disabled, or `None` if `topic` is `None`.
-            """
+            """  # ruff: ignore[missing-blank-line-after-summary]
             return self._redact_topic(topic) if redact_topics else topic
 
         requested_topics = [topic_value(topic) for topic in self._topics]
@@ -1136,7 +1136,7 @@ class JackeryMqttPushClient:
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if
             unavailable or invalid.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if self._last_message_at is None:
             return None
         try:
@@ -1177,7 +1177,7 @@ class JackeryMqttPushClient:
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds
             MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
-        """
+        """  # ruff: ignore[missing-blank-line-after-summary]
         if not self._connected:
             return False
         elapsed = self._seconds_since_last_message()
