@@ -4,9 +4,7 @@ on: { workflow_dispatch: {} }
 permissions:
   id-token: write # for Trusted Publishing + attest-action
   contents: write # for actions/checkout, if you're in a private repo
-  actions: write
-  pull-requests: write
-  checks: write
+  actions: write 
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
 jobs:
@@ -20,10 +18,11 @@ jobs:
       }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          ref: ${{ github.head_ref }}
 
       - run: python -m pip install --upgrade pip ruff pre-commit
       - run: |
