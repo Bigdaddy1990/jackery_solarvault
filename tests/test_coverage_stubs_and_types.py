@@ -1,6 +1,6 @@
 """Test imports of client cache modules and DTO types."""
 
-import custom_components.jackery_solarvault.api as root_api
+import custom_components.jackery_solarvault.client.api as root_api
 import custom_components.jackery_solarvault.client.discovery_cache as client_dc
 import custom_components.jackery_solarvault.client.local_daily_cache as client_ldc
 import custom_components.jackery_solarvault.client.mqtt_session_cache as client_msc
