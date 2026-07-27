@@ -4,7 +4,7 @@ on: { workflow_dispatch: {} }
 permissions:
   id-token: write # for Trusted Publishing + attest-action
   contents: write # for actions/checkout, if you're in a private repo
-  actions: write 
+  actions: write
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
 jobs:
@@ -34,17 +34,17 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format .
-          
+
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual --check --py314-plus --ruff || true
-          
+
       - uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/ruff-baseline
           title: "chore: ruff baseline (format+fix)"
           commit-message: "chore: ruff baseline (format+fix)"
           body: "Automated ruff baseline via GitHub Actions."
-          
+
   #    - name: Commit baseline changes
   #      run: |
   #        if [ -z "$(git status --porcelain)" ]; then
@@ -56,4 +56,4 @@ jobs:
  #         git add -A
  #         git commit -m "chore: ruff baseline (format+fix)"
  ##         git push origin "HEAD:${GITHUB_REF_NAME}"
-          
+
