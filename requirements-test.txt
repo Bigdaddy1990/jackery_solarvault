@@ -10,15 +10,15 @@ astral>=2.2
 attrs>=17.3.0
 autotyping>=24.9.0
 certifi
-coverage[toml]>=7.14.1
+coverage[toml]>=7.15.2
 homeassistant>=2026.7.4
 homeassistant-stubs>=2026.7.4
-hypothesis>=6.155.2
+hypothesis>=6.161.7
 ifaddr>=0.2.0
 iniconfig>=1.0.1
 jinja2>=3.1.6
 multidict<7.0,>=4.5
-mypy>=2.1.0
+mypy>=2.3.0
 numpy>=2.3.2
 packaging>=23.1
 paho-mqtt<=3.0.0
@@ -27,13 +27,13 @@ pip>=24.2
 pydantic
 pyjwt>=2.10.1
 pylint>=4.0.5
-pytest>=9.0.3
-pytest-asyncio>=1.3.0
+pytest>=9.1.1
+pytest-asyncio>=1.4.0
 pytest-cov>=7.1.0
-pytest-github-actions-annotate-failures>=0.4.0
+pytest-github-actions-annotate-failures>=0.4.2
 pytest-homeassistant-custom-component  # follows daily HA Version
 pytest_aiohttp
-pytest_socket>=0.7.0
+pytest_socket>=0.8.0
 python-dateutil>=2.7
 python_discovery>=1.4.0
 pyupgrade>=3.21.2
