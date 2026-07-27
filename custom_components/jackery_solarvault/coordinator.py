@@ -15433,7 +15433,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if isinstance(raw_payload, (bytes, bytearray)):
                 try:
                     payload = json.loads(raw_payload.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError):
+                except UnicodeDecodeError, json.JSONDecodeError:
                     payload = self._decrypt_binary_local_mqtt_payload(raw_payload)
             elif isinstance(raw_payload, str):
                 try:
