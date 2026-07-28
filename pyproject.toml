@@ -12,6 +12,9 @@ include = ["custom_components*"]
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements*.txt"] }
 
+[tool.setuptools]
+include-package-data = true
+
 [project]
 name = "jackery_solarvault"
 description = "Solarvault integration for Home Assistant"
@@ -28,7 +31,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = "==3.14.6"
+requires-python = ">=3.14.6"
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
@@ -240,7 +243,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.16.0"
+required-version = ">=0.15.18"
 line-length = 88
 src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
@@ -317,28 +320,28 @@ select = [
   "B",      # flake8-bugbear
   "BLE",
   "C",      # complexity
-  "trailing-comma-on-bare-tuple", # Trailing comma on bare tuple prohibited
+  "COM818", # Trailing comma on bare tuple prohibited
   "D",      # docstrings
-  "call-datetime-utcnow", # Use datetime.now(tz=) instead of datetime.utcnow()
-  "call-datetime-utcfromtimestamp", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
-  "call-date-today", # Use datetime.now(tz=).date() instead of date.today()
+  "DTZ003", # Use datetime.now(tz=) instead of datetime.utcnow()
+  "DTZ004", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
+  "DTZ011", # Use datetime.now(tz=).date() instead of date.today()
   "E",      # pycodestyle
-  "line-too-long",
+  "E501",
   "F",      # pyflakes/autoflake
-  "f-string-missing-placeholders",   # f-string without any placeholders
+  "F541",   # f-string without any placeholders
   "FLY",    # flynt
   "FURB",   # refurb
   "G",      # flake8-logging-format
   "I",      # isort
   "INP",    # flake8-no-pep420
   "ISC",    # flake8-implicit-str-concat
-  "unconventional-import-alias", # import concentions; {name} should be imported as {asname}
+  "ICN001", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
   "N",
-  "invalid-first-argument-name-for-class-method",   # First argument of a class method should be named cls
-  "invalid-first-argument-name-for-method",   # First argument of a method should be named self
-  "non-lowercase-variable-in-function",   # Variable {name} in function should be snake_case
-  "mixed-case-variable-in-class-scope",   # Variable {name} in class scope should not be mixedCase
+  "N804",   # First argument of a class method should be named cls
+  "N805",   # First argument of a method should be named self
+  "N806",   # Variable {name} in function should be snake_case
+  "N815",   # Variable {name} in class scope should not be mixedCase
   "NPY",
   "PERF",   # Perflint
   "PGH",    # pygrep-hooks
@@ -350,58 +353,133 @@ select = [
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules (see `ignore` for exclusions)
-  "unused-noqa",
-  "hardcoded-password-default",   # Possible hardcoded password assigned to function default
-  "exec-builtin",   # Use of exec detected
-  "bad-file-permissions",   # bad-file-permissions
-  "hardcoded-temp-file",   # hardcoded-temp-file
-  "suspicious-pickle-usage",   # suspicious-pickle-usage
-  "suspicious-mktemp-usage",   # suspicious-mktemp-usage
-  "suspicious-eval-usage",   # suspicious-eval-usage
-  "suspicious-xmlc-element-tree-usage",   # suspicious-xmlc-element-tree-usage
-  "suspicious-xml-element-tree-usage",   # suspicious-xml-element-tree-usage
-  "suspicious-xml-expat-reader-usage",   # suspicious-xml-expat-reader-usage
-  "suspicious-xml-expat-builder-usage",   # suspicious-xml-expat-builder-usage
-  "suspicious-xml-sax-usage",   # suspicious-xml-sax-usage
-  "suspicious-xml-mini-dom-usage",   # suspicious-xml-mini-dom-usage
-  "suspicious-xml-pull-dom-usage",   # suspicious-xml-pull-dom-usage
-  "paramiko-call",   # paramiko-call
-  "subprocess-popen-with-shell-equals-true",   # subprocess-popen-with-shell-equals-true
-  "call-with-shell-equals-true",   # call-with-shell-equals-true
-  "hardcoded-sql-expression",   # hardcoded-sql-expression
-  "unix-command-wildcard-injection",   # unix-command-wildcard-injection
+  "RUF100",
+  "S107",   # Possible hardcoded password assigned to function default
+  "S102",   # Use of exec detected
+  "S103",   # bad-file-permissions
+  "S108",   # hardcoded-temp-file
+  "S301",   # suspicious-pickle-usage
+  "S306",   # suspicious-mktemp-usage
+  "S307",   # suspicious-eval-usage
+  "S313",   # suspicious-xmlc-element-tree-usage
+  "S314",   # suspicious-xml-element-tree-usage
+  "S315",   # suspicious-xml-expat-reader-usage
+  "S316",   # suspicious-xml-expat-builder-usage
+  "S317",   # suspicious-xml-sax-usage
+  "S318",   # suspicious-xml-mini-dom-usage
+  "S319",   # suspicious-xml-pull-dom-usage
+  "S601",   # paramiko-call
+  "S602",   # subprocess-popen-with-shell-equals-true
+  "S604",   # call-with-shell-equals-true
+  "S608",   # hardcoded-sql-expression
+  "S609",   # unix-command-wildcard-injection
   "SIM",    # flake8-simplify
   "SLF",    # flake8-self
   "SLOT",   # flake8-slots
-  "debugger",   # Trace found: {name} used
+  "T100",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
   "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
-  "printf-string-formatting",  # Use format specifiers instead of percent format
-  "f-string",  # Use f-string instead of `format` call
+  "UP031",  # Use format specifiers instead of percent format
+  "UP032",  # Use f-string instead of `format` call
   "W",      # pycodestyle
   "Q"
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "E501", "F401"]
-ignore = ["D417", "TID252"]
+ignore = ["D417", "TID252"] 
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 unfixable = []
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
-task-tags = ["TODO", "FIX", "BUG"]
+task-tags = ["TODO", "FIX"]
+
+[project.scripts]
+hass = "homeassistant.__main__:main"
+
+[dependency-groups]
+dev = [
+    "aiohttp>=3.13.3",
+    "aiomqtt>=2.5.1",
+    "annotated-doc",
+    "annotated-types",
+    "annotatedyaml>=1.0.2",
+    "ast-grep",
+    "astral",
+    "astroid>=4.1.2",
+    "attrs",
+    "autotyping",
+    "codecov",
+    "coverage[toml]>=7.5.4",
+    "defusedxml",
+    "distutils",
+    "fastmcp",
+    "hacs-action",
+    "hassfest",
+    "homeassistant>=2026.6.1",
+    "homeassistant-stubs",
+    "hypothesis",
+    "ifaddr",
+    "iniconfig",
+    "jinja2>=3.1.6",
+    "mcp",
+    "mcporter",
+    "mgrep",
+    "multidict",
+    "mypy>=1.19.1",
+    "numpy",
+    "packaging>=26.0",
+    "pip>=26.0",
+    "pre-commit",
+    "prek",
+    "pydantic",
+    "pylint",
+    "pysemgrep",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-github-actions-annotate-failures>=0.3.0",
+    "pytest-homeassistant",
+    "pytest-homeassistant-custom-component>=0.13.340",
+    "python>=3.11",
+    "pyupgrade",
+    "pyyaml",
+    "ruff>=0.15.18",
+    "semgrep",
+    "smellcheck",
+    "ty",
+    "types-aiofiles>=25.1.0.20251011",
+    "types-atomicwrites>=1.4.5.1",
+    "types-caldav>=1.3.0.20250516",
+    "types-chardet>=0.1.5",
+    "types-croniter>=6.0.0.20250809",
+    "types-decorator>=5.2.0.20251101",
+    "types-pexpect>=4.9.0.20250916",
+    "types-protobuf>=6.30.2.20250914",
+    "types-psutil>=7.1.1.20251122",
+    "types-pyserial>=3.5.0.20251001",
+    "types-python-dateutil>=2.9.0.20260124",
+    "types-python-slugify>=8.0.2.20240310",
+    "types-pytz>=2025.2.0.20251108",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
+    "types-xmltodict>=1.0.1.20260113",
+    "typing",
+    "typing-extensions>=4.15.0,<5.0",
+    "uv",
+    "voluptuous>=0.15.2",
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["module-import-not-at-top-of-file", "undefined-local-with-import-star"]
+"**/__init__.py" = ["E402", "F403"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-"tests/*" = ["redefined-loop-name", "private-member-access"]  # SLF001 is private-member-access
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -497,7 +575,7 @@ omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 85
+fail_under = 100
 skip_covered = true
 precision = 2
 ignore_errors = false
@@ -537,7 +615,7 @@ overgeneral-exceptions = [
 runtime-typing = false
 
 [tool.pylint.CODE_STYLE]
-max-line-length-suggestions = 88
+max-line-length-suggestions = 72
 
 [tool.pylint.TYPECHECK]
 ignored-classes = [
@@ -856,6 +934,6 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 
 [tool.cfduplication]
 # Minimum duplicated line threshold
-MinLineCount= 15
+MinLineCount= 50
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**", "tests/**", "scripts/**"]
