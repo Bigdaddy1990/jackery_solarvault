@@ -2,5 +2,5 @@
 
 aiomqtt>=2.5.0
 bleak-retry-connector>=3.5.0
-cryptography>=41.0.0
+cryptography>=49.0.0
 segno>=1.6.0
