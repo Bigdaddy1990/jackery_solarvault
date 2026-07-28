@@ -26,7 +26,7 @@ pillow>=11.1.0
 pip>=24.2
 pydantic
 pyjwt>=2.10.1
-pylint>=4.0.5
+pylint>=4.0.6
 pytest>=9.1.1
 pytest-asyncio>=1.4.0
 pytest-cov>=7.1.0
