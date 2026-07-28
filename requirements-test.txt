@@ -1,6 +1,6 @@
 # Test-time dependencies for the jackery_solarvault integration.
 
-aiohttp<4.0.0,>=3.3.0
+aiohttp>=3.14.3,<4.0.0
 aiomqtt>=2.5.1,<2.6.0
 aiousbwatcher>=1.1.2
 annotated-doc>=0.0.4
