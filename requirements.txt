@@ -1,6 +1,4 @@
-# Runtime dependencies for jackery_solarvault Home Assistant custom integration.
-
-aiomqtt>=2.5.0
+aiomqtt==2.5.1
 bleak-retry-connector>=3.5.0
-cryptography>=49.0.0
+cryptography
 segno>=1.6.0
