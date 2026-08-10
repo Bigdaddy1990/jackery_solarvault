@@ -8,7 +8,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DEFAULT_DEVICE_MODEL_FALLBACK,
-    DEFAULT_LIVE_SOURCES,
     DOMAIN,
     FIELD_CURRENT_VERSION,
     FIELD_DEVICE_NAME,
@@ -54,31 +53,71 @@ from .util import (
 
 _LOGGER = logging.getLogger(__name__)
 
+HTTP_DATA_SOURCES = ("http",)
+LAYER5_DATA_SOURCES = ("cloud_mqtt", "local_mqtt", "ble")
+ALL_LIVE_DATA_SOURCES = (*HTTP_DATA_SOURCES, *LAYER5_DATA_SOURCES)
+# The App has no Local-MQTT command publisher. Direct device commands are
+# BLE-first with cloud MQTT fallback; explicit REST setters declare HTTP
+# separately.
+LAYER5_COMMAND_SOURCES = ("ble", "cloud_mqtt")
+HTTP_COMMAND_SOURCES = ("http",)
+HTTP_AND_LAYER5_COMMAND_SOURCES = (*HTTP_COMMAND_SOURCES, *LAYER5_COMMAND_SOURCES)
+_SOURCE_FIELD_SEQUENCE_ATTRIBUTES = (
+    "app_fields",
+    "source_keys",
+    "required_property_keys",
+    "aliases",
+    "negative_aliases",
+    "sum_fields",
+    "negative_sum_fields",
+    "fallback_fields",
+)
+_SOURCE_FIELD_SCALAR_ATTRIBUTES = ("field", "smali_field", "stat_key")
+_FALLBACK_SOURCE_FIELD_INDEX = 1
+
+
+def property_data_sources(
+    *fields: str,
+    layer5_proven: bool = False,
+) -> tuple[str, ...]:
+    """Return the App-proven source family for property-model fields.
+
+    HomeBody, SystemBody, PortableBody and decoded subdevice property models
+    are available through the documented HTTP property/shadow reads and the
+    decoded Layer-5 observation pipeline. A description with no property field
+    stays HTTP-only; this is the safe default for statistics, plans, price,
+    discovery and other REST-owned sections.
+    """
+    return ALL_LIVE_DATA_SOURCES if layer5_proven and any(fields) else HTTP_DATA_SOURCES
+
 
 def payload_properties_for_sources(
     payload: dict[str, Any],
-    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES,
+    data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES,
 ) -> dict[str, Any]:
-    """Return raw HTTP-only or coordinator-resolved live properties by source set."""
+    """Return the transport-neutral coordinator-resolved live properties.
+
+    ``data_sources`` remains part of the entity-description interface, but it
+    must never filter already-decoded live values. HTTP, cloud MQTT, local MQTT
+    and BLE all contribute to the same non-blank property snapshot.
+    """
+    del data_sources
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     merged_props = props if isinstance(props, dict) else {}
-    if "http" not in data_sources:
+    if merged_props:
         return merged_props
     http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
-    http_props = http_props if isinstance(http_props, dict) else {}
-    supplemental_sources = {"cloud_mqtt", "local_mqtt", "ble"}
-    if not supplemental_sources.intersection(data_sources):
-        return http_props
-    # PAYLOAD_PROPERTIES already starts from every current HTTP field and applies
-    # only fresh, approved local live overrides. Re-overlaying HTTP here would
-    # silently undo those live values at the entity boundary.
-    return merged_props or http_props
+    return http_props if isinstance(http_props, dict) else {}
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     """Jackery entity."""
 
     _attr_has_entity_name = True
+    data_sources: tuple[str, ...] = HTTP_DATA_SOURCES
+    command_sources: tuple[str, ...] = ()
+    app_fields: tuple[str, ...] = ()
+    availability_uses_supervisor = False
 
     def __init__(
         self,
@@ -97,7 +136,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _properties(self) -> dict[str, Any]:
-        return self._source_properties(DEFAULT_LIVE_SOURCES)
+        return self._source_properties(ALL_LIVE_DATA_SOURCES)
 
     @property
     def _merged_properties(self) -> dict[str, Any]:
@@ -113,13 +152,13 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         self,
         data_sources: tuple[str, ...],
     ) -> dict[str, Any]:
-        """Return live properties with HTTP values taking precedence when allowed."""
+        """Return live properties without reapplying transport priority."""
         return payload_properties_for_sources(self._payload, data_sources)
 
     def _payload_section_for_sources(
         self,
         section: str,
-        data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES,
+        data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES,
     ) -> dict[str, Any]:
         if section == PAYLOAD_PROPERTIES:
             return self._source_properties(data_sources)
@@ -128,7 +167,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     def _payload_for_sources(
         self,
-        data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES,
+        data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES,
     ) -> dict[str, Any]:
         payload = dict(self._payload)
         payload[PAYLOAD_PROPERTIES] = self._source_properties(data_sources)
@@ -161,7 +200,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         Returns:
             dict[str, Any]: PV trends data from the device payload, or an empty dict if
             not present.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # noqa: D421, RUF105
         return self._payload.get(PAYLOAD_PV_TRENDS) or {}
 
     @property
@@ -171,7 +210,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         Returns:
             The alarm payload object from the device payload, or None if no alarm data
             is present.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # noqa: D421, RUF105
         return self._payload.get(PAYLOAD_ALARM)
 
     @property
@@ -214,11 +253,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     def device_info(self) -> DeviceInfo:
         """Constructs the DeviceInfo for the parent SolarVault device.
 
-        The returned DeviceInfo includes identifiers {(DOMAIN, device_id)}, manufacturer, name, model, and optional serial_number and sw_version. The display name is chosen from system.device_name, discovery.device_name, properties.wname, then falls back to "Jackery {device_id}". The model is chosen from discovery.dev_model, device_meta.model_name, then falls back to "SolarVault". Serial number and software version are included when present in device metadata/discovery and OTA data, respectively.
+        The result includes the parent identifier, manufacturer, display name,
+        model, and optional serial and software versions. Names and models use
+        deterministic payload fallbacks so temporary source loss cannot change
+        registry identity.
 
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
-        """  # ruff: ignore[line-too-long]
+        """
         name = first_nonblank_text(
             self._system.get(FIELD_DEVICE_NAME),
             self._discovery.get(FIELD_DEVICE_NAME),
@@ -252,8 +294,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         plug: dict[str, Any],
         plug_key: str | None = None,
     ) -> DeviceInfo:
-        """Construct DeviceInfo for a smart-plug subdevice attached to the parent
-        SolarVault.
+        """Construct DeviceInfo for a smart-plug subdevice.
+
+        The subdevice remains attached to the parent SolarVault.
 
         Parameters:
             plug_index (int): 1-based index used to form the subdevice identifier and
@@ -265,7 +308,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             DeviceInfo: Device registry metadata for the smart-plug including
             identifiers, manufacturer, name, model, serial_number, sw_version, and
             via_device.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """
         base_name = first_nonblank_text(
             self._system.get(FIELD_DEVICE_NAME),
             self._discovery.get(FIELD_DEVICE_NAME),
@@ -305,33 +348,121 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             via_device=(DOMAIN, self._device_id),
         )
 
-    @property
-    def available(self) -> bool:
-        """Determine whether the entity is available.
-
-        First verifies the parent coordinator's availability. If present, uses the
-        device metadata `online_status` or the system `online_state` (parsed with
-        `jackery_online_state`) to determine availability; if no explicit state is
-        available, falls back to whether the device ID exists in the coordinator data.
-
-        Returns:
-            True if the entity is available, False otherwise.
-        """
-        transport_reachable = self.coordinator.is_device_reachable(
-            self._device_id,
+    def _source_capability_contract(
+        self,
+    ) -> tuple[
+        bool,
+        tuple[str, ...],
+        tuple[str, ...],
+        tuple[str, ...],
+        bool,
+    ]:
+        """Return product support, source declarations and referenced App fields."""
+        description = getattr(self, "entity_description", None)
+        if description is None:
+            description = getattr(self, "_query_description", None)
+        product_support = getattr(description, "product_support", None)
+        if product_support is None:
+            product_support = getattr(self, "product_support", None)
+        supported = not callable(product_support) or bool(
+            product_support(self._payload),
         )
-        if not super().available and not transport_reachable:
-            return False
+        data_sources = tuple(
+            getattr(description, "data_sources", self.data_sources)
+            or HTTP_DATA_SOURCES,
+        )
+        command_sources = tuple(
+            getattr(description, "command_sources", self.command_sources) or (),
+        )
+        field_candidates: list[str] = []
+        for owner in (description, self):
+            if owner is None:
+                continue
+            for attribute in _SOURCE_FIELD_SEQUENCE_ATTRIBUTES:
+                values = getattr(owner, attribute, ())
+                if isinstance(values, str):
+                    field_candidates.append(values)
+                elif isinstance(values, tuple):
+                    field_candidates.extend(str(value) for value in values if value)
+            for attribute in _SOURCE_FIELD_SCALAR_ATTRIBUTES:
+                value = getattr(owner, attribute, None)
+                if value:
+                    field_candidates.append(str(value))
+            fallback_sources = getattr(owner, "fallback_sources", ())
+            if isinstance(fallback_sources, tuple):
+                field_candidates.extend(
+                    str(fallback[1])
+                    for fallback in fallback_sources
+                    if (
+                        isinstance(fallback, tuple)
+                        and len(fallback) > _FALLBACK_SOURCE_FIELD_INDEX
+                        and fallback[_FALLBACK_SOURCE_FIELD_INDEX]
+                    )
+                )
+        return (
+            supported,
+            data_sources,
+            command_sources,
+            tuple(dict.fromkeys(field_candidates)),
+            bool(
+                getattr(
+                    description,
+                    "availability_uses_supervisor",
+                    self.availability_uses_supervisor,
+                )
+            ),
+        )
+
+    def _online_marker_available(self, transport_reachable: bool) -> bool:
+        """Return availability after applying the optional cloud online marker."""
         online = self._device_meta.get(FIELD_ONLINE_STATUS)
         if online is None:
             online = self._system.get(FIELD_ONLINE_STATE)
-        if online is not None:
-            parsed_online = jackery_online_state(online)
-            if parsed_online is not None:
-                if not parsed_online and transport_reachable:
-                    return True
-                return parsed_online
+        parsed_online = jackery_online_state(online) if online is not None else None
+        if parsed_online is not None:
+            return parsed_online or transport_reachable
         return transport_reachable or self._device_id in (self.coordinator.data or {})
+
+    @property
+    def available(self) -> bool:
+        """Availability for the entity's product, fields and transports.
+
+        Explicit product support and source-specific freshness are checked before
+        the parent device's online marker. A fresh independent transport remains
+        authoritative when a stale cloud marker incorrectly reports the device
+        offline.
+        """
+        if self._device_id not in (self.coordinator.data or {}):
+            return False
+        supported, data_sources, command_sources, fields, supervisor_only = (
+            self._source_capability_contract()
+        )
+        if not supported:
+            return False
+        source_checker = getattr(
+            self.coordinator,
+            "is_entity_source_available",
+            None,
+        )
+        if callable(source_checker) and (command_sources or supervisor_only):
+            transport_reachable = bool(
+                source_checker(
+                    self._device_id,
+                    data_sources=data_sources,
+                    command_sources=command_sources,
+                    fields=fields,
+                    supervisor_only=supervisor_only,
+                )
+            )
+            if not transport_reachable:
+                return False
+        else:
+            transport_reachable = self.coordinator.is_device_reachable(
+                self._device_id,
+            )
+        if not super().available and not transport_reachable:
+            return False
+        return self._online_marker_available(transport_reachable)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity is added to Home Assistant."""

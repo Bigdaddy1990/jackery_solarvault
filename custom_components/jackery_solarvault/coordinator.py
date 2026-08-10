@@ -5,7 +5,7 @@ Transport Layer Architecture (MANDATORY):
   Layer 5 = MQTT/BLE/local MQTT -> local live data + command transports
 
 Button command flow:
-  _async_publish_command_ble_first() -> BLE first, then MQTT fallback
+  _async_publish_command_ble_first() -> independent concurrent BLE/MQTT writes
   HTTP-backed setters stay on self.api.async_*(); app transport commands stay
   coordinator-owned and never gate the HTTP polling path.
 """
@@ -19,8 +19,8 @@ import contextlib
 import copy
 from dataclasses import dataclass, field as dataclass_field
 from datetime import UTC, date, datetime, timedelta
-from functools import wraps
-import hashlib
+from enum import StrEnum
+from functools import partial, wraps
 import importlib
 import json
 from json import JSONDecodeError
@@ -31,7 +31,6 @@ import sys
 import time
 from typing import TYPE_CHECKING, Any, ClassVar, Final, NoReturn, cast
 
-from homeassistant.components import mqtt
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.db_schema import (
     Statistics,
@@ -40,7 +39,6 @@ from homeassistant.components.recorder.db_schema import (
 from homeassistant.components.recorder.models import (
     StatisticData,
     StatisticMeanType,
-    StatisticMetaData,
 )
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
@@ -61,8 +59,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter
 
-from .client import JackeryApiError, JackeryAuthError, JackeryError, ble
-from .client.api import encrypt_mqtt_body
+from .client import JackeryApiError, JackeryAuthError, JackeryError
+from .client.ble import decrypt_binary_notify
 from .client.discovery_cache import (
     async_load_discovery_cache,
     async_save_discovery_cache,
@@ -74,15 +72,14 @@ from .client.local_daily_cache import (
     local_daily_signature,
     refresh_snapshot,
 )
-from .client.local_mqtt import JackeryLocalMqttClient, payload_has_jackery_marker
+from .client.local_mqtt import JackeryLocalMqttClient
 from .client.mqtt_session_cache import (
-    async_clear_mqtt_session,
     async_save_mqtt_session,
 )
 from .client.third_party_mqtt_codec import (
     decode_third_party_mqtt_config_body,
     encode_third_party_mqtt_field,
-    stable_third_party_mqtt_token,
+    resolve_third_party_mqtt_token,
     third_party_mqtt_config_plaintext,
 )
 from .const import (
@@ -155,6 +152,7 @@ from .const import (
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_DEVICE_STAT_PV_ENERGY,
     APP_DEVICE_STAT_PV_TO_BATTERY,
+    APP_DEVICE_STAT_PV_TO_ONGRID,
     APP_PERIOD_DATE_TYPES,
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_BATTERY_TRENDS,
@@ -171,10 +169,6 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
-    APP_STAT_TODAY_BATTERY_ENERGY,
-    APP_STAT_TODAY_FEED_IN_ENERGY,
-    APP_STAT_TODAY_GRID_IMPORT_ENERGY,
-    APP_STAT_TODAY_HOME_LOAD_ENERGY,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
@@ -185,10 +179,7 @@ from .const import (
     APP_STAT_TOTAL_OUT_EPS_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_SOLAR_ENERGY,
-    APP_STAT_UNIT,
-    BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC,
     BATTERY_PACK_HINT_KEYS,
-    BATTERY_PACK_STALE_THRESHOLD_SEC,
     BLE_AES_KEY_LENGTHS,
     BLE_COMMAND_CONNECT_TIMEOUT_SEC,
     BLE_CONNECT_BACKOFF_INITIAL_SEC,
@@ -196,6 +187,7 @@ from .const import (
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     CONF_ENABLE_MONTH_STATISTICS,
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
     CONF_LOCAL_MQTT_ENABLE,
@@ -203,7 +195,6 @@ from .const import (
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
     CONF_LOCAL_MQTT_USERNAME,
-    CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -212,12 +203,6 @@ from .const import (
     COORDINATOR_UPDATE_TIMEOUT_SEC,
     CT_METER_KEYS,
     CUSTOM_USE_BATTERY_BC_OFFSET,
-    DATA_QUALITY_KEY_LABEL,
-    DATA_QUALITY_KEY_METRIC_KEY,
-    DATA_QUALITY_KEY_REASON,
-    DATA_QUALITY_KEY_REFERENCE_SECTION,
-    DATA_QUALITY_KEY_SOURCE_SECTION,
-    DATA_QUALITY_REPAIR_EXAMPLE_LIMIT,
     DATE_TYPE_DAY,
     DATE_TYPE_HOUR,
     DATE_TYPE_MONTH,
@@ -231,7 +216,6 @@ from .const import (
     DEFAULT_ENABLE_YEAR_STATISTICS,
     DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DIAGNOSTICS_SCHEMA_VERSION,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
@@ -287,6 +271,8 @@ from .const import (
     FIELD_DISCHARGING_ENERGY,
     FIELD_DYNAMIC_OR_SINGLE,
     FIELD_ENERGY_PLAN_PW,
+    FIELD_IN_EGY,
+    FIELD_OUT_EGY,
     FIELD_GRID_IN_PW,
     FIELD_GRID_OUT_PW,
     FIELD_GRID_STANDARD,
@@ -296,7 +282,6 @@ from .const import (
     FIELD_ID,
     FIELD_IDX,
     FIELD_INTEGRATOR_ENABLED,
-    FIELD_IN_EGY,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
     FIELD_IN_PW,
@@ -321,10 +306,10 @@ from .const import (
     FIELD_ONLINE_STATUS,
     FIELD_OP,
     FIELD_OTHER_LOAD_PW,
-    FIELD_OUT_EGY,
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
     FIELD_OUT_PW,
+    SOLAR_VAULT_HEAD_UNIT_MODEL_CODE,
     FIELD_PACK_LIST,
     FIELD_PLATFORM_COMPANY_ID,
     FIELD_PLUGS,
@@ -337,7 +322,6 @@ from .const import (
     FIELD_PV4,
     FIELD_PV_NAME,
     FIELD_PV_PW,
-    FIELD_RB,
     FIELD_REBOOT,
     FIELD_SAFETY,
     FIELD_SCAN_NAME,
@@ -396,6 +380,7 @@ from .const import (
     FIELD_WPC,
     FIELD_WPS,
     LOCAL_DAILY_LIFETIME_METRICS,
+    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_RUNTIME_KEY,
     MAIN_PROPERTY_ALIAS_PAIRS,
     MQTT_ACTION_IDS_ALARM,
@@ -405,7 +390,6 @@ from .const import (
     MQTT_ACTION_IDS_SUBDEVICE,
     MQTT_APP_CONFLICT_PAUSE_SEC,
     MQTT_AUTH_FAILURE_RCS,
-    MQTT_AUTH_FAILURE_TOLERANCE,
     MQTT_CMD_BIND_SMART_PART,
     MQTT_CMD_CONTROL_COMBINE,
     MQTT_CMD_CONTROL_SUB_DEVICE,
@@ -464,13 +448,13 @@ from .const import (
     MQTT_MESSAGE_UPLOAD_COMBINE_DATA,
     MQTT_MESSAGE_UPLOAD_DEVICE_ALERT,
     MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA,
+    MQTT_MESSAGE_UPLOAD_SUBDEVICE_INCREMENTAL_PROPERTY,
     MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
     MQTT_PORT,
     MQTT_RECONNECT_THROTTLE_SEC,
     MQTT_SESSION_MAC_ID,
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
-    MQTT_TOPIC_SUFFIXES,
     MQTT_TRANSIENT_BACKOFF_STEPS_SEC,
     NON_BATTERY_SUBDEVICE_TYPES,
     PACK_FIELD_LAST_SEEN_AT,
@@ -480,10 +464,8 @@ from .const import (
     PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_CIRCUIT_PROPERTY,
     PAYLOAD_CT_METER,
-    PAYLOAD_DATA_QUALITY,
     PAYLOAD_DEBUG_LOG_FILENAME,
     PAYLOAD_DEBUG_LOGGER_NAME,
-    PAYLOAD_DEBUG_THROTTLE_SEC,
     PAYLOAD_DEVICE,
     PAYLOAD_DEVICE_META,
     PAYLOAD_DEVICE_STATISTIC,
@@ -525,9 +507,8 @@ from .const import (
     PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID,
     PRESERVED_FAST_PAYLOAD_KEYS,
     PRICE_CONFIG_INTERVAL_SEC,
-    REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
+    REQUEST_TIMEOUT_SEC,
     REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
-    REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY,
     REPAIR_TRANSLATION_DEVICE_NOT_ACTIVATED,
     SHELLY_CONTROL_ACTION_OFF,
     SHELLY_CONTROL_ACTION_ON,
@@ -572,27 +553,27 @@ if TYPE_CHECKING:
     from .client.api import JackeryApi, MqttSessionSnapshot
     from .client.ble_transport import BleFrameObservation
     from .client.mqtt_push import JackeryMqttPushClient
+    from .types import FieldProvenance
 
 from itertools import starmap
 import operator
 
 from .ingest import (
     TransportSource,
-    gate_payload_section,
-    gate_period_hierarchy_for_recorder,
+    ingest_observation,
     is_periodic_section,
 )
+from .types import Observation
 from .util import (
     WHOLE_INT_TEXT_RE,
     app_chart_name_prefix,
     app_chart_period_meta,
-    app_data_quality_warnings,
     app_month_request_kwargs,
-    app_period_range,
     app_period_request_kwargs,
     app_year_request_kwargs,
     append_payload_debug_line,
     apply_year_month_backfill,
+    attach_calculated_savings_metadata,
     chart_series_debug,
     circuit_id,
     config_entry_bool_option,
@@ -600,19 +581,13 @@ from .util import (
     config_entry_str_option,
     day_power_energy_points,
     day_power_series_key,
-    dev_mode_redactions_disabled,
-    diagnostic_redactions_disabled,
     effective_period_total_value,
     external_trend_statistic_id,
     first_nonblank_int,
-    format_data_quality_warning,
-    guard_statistic_totals_from_year,
     historical_day_payload_from_sources,
     iter_calendar_months,
     iter_calendar_weeks,
     iter_calendar_years,
-    normalized_data_quality_warnings,
-    parse_statistics_backfill_date,
     safe_bool,
     safe_float,
     safe_int,
@@ -622,39 +597,40 @@ from .util import (
     sub_device_serial,
     trend_series_points,
     utc_now,
-    verify_and_backfill,
     year_payload_appears_current_month_only,
 )
 
 _LOGGER = logging.getLogger(__name__)
-#: Dedicated payload-debug channel. Restored from the 0.1.0 baseline: gating the
-#: payload records on this logger's own level is what lets the maintainer switch
-#: raw payload capture on through HA's normal logging controls and get ONLY the
-#: payloads — no integration-wide DEBUG flood. The name constant survived in
-#: const.py after the logger itself was dropped, leaving it unreferenced.
+#: Dedicated payload-debug channel. Capture is an explicit entry option or follows
+#: the logger's effective DEBUG level, including an inherited parent level. The
+#: emitted JSONL remains bounded and mandatorily redacted.
 _PAYLOAD_DEBUG_LOGGER = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
 _BACKGROUND_TASK_STOP_TIMEOUT_SEC = 2.0
 
 
-def _payload_debug_capture_enabled() -> bool:
-    """Return whether raw-payload JSONL capture is currently active.
-
-    Capture is controlled exclusively through Home Assistant's logging
-    system (deep review 2026-07-25, HA logging best practices): the user
-    raises the dedicated ``payload_debug`` logger to DEBUG via the
-    ``logger:`` configuration. ``JACKERY_DEV_MODE`` no longer force-enables
-    capture — coupling it to the env flag made the JSONL trace grow
-    unbounded on every dev-mode install. Do NOT use ``isEnabledFor(DEBUG)``
-    for the logger check: this child logger inherits DEBUG from the parent
-    integration logger and would then write JSONL whenever ordinary HA
-    debug logging is on. Requiring a concrete DEBUG level on this exact
-    logger keeps the trace an explicit opt-in.
-    """
-    return _PAYLOAD_DEBUG_LOGGER.level == logging.DEBUG
+def _payload_debug_capture_enabled(entry: object | None = None) -> bool:
+    """Return whether redacted payload JSONL capture is explicitly active."""
+    return _PAYLOAD_DEBUG_LOGGER.isEnabledFor(logging.DEBUG) or (
+        entry is not None
+        and config_entry_bool_option(
+            entry,
+            CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+            False,
+        )
+    )
 
 
 #: PV channel property blocks addressed by 0-based index for per-input renames.
 _PV_CHANNEL_FIELDS: tuple[str, ...] = (FIELD_PV1, FIELD_PV2, FIELD_PV3, FIELD_PV4)
+
+# Home Assistant schedules DataUpdateCoordinator intervals after a refresh
+# returns and adds up to roughly half a second of stagger. Reserve 1.5 seconds
+# from the configured 15-second start-to-start budget: 0.5 s for HA's stagger
+# plus 1 s for cancellation and ordinary event-loop scheduling latency. Spend
+# only the remaining time in the follow-up timer. A strictly positive minimum
+# is required because DataUpdateCoordinator treats timedelta(0) as "disabled".
+_POLL_CADENCE_SCHEDULER_MARGIN_SEC: Final = 1.5
+_POLL_CADENCE_MIN_DELAY_SEC: Final = 0.05
 
 # HomeCmdAction msgId/bleMsgType pairs from
 # docs/source-of-truth/jackery_command_catalog_v2.csv. Portable commands use a
@@ -709,40 +685,12 @@ _HOME_BLE_COMMAND_PAIRS: Final[frozenset[tuple[int, int]]] = frozenset({
     (3047, 114),
 })
 
-# Home Assistant schedules DataUpdateCoordinator intervals after a refresh
-# returns and adds up to roughly half a second of stagger. Reserve 1.5 seconds
-# from the configured 15-second start-to-start budget: 0.5 s for HA's stagger
-# plus 1 s for cancellation and ordinary event-loop scheduling latency. Spend
-# only the remaining time in the follow-up timer. A strictly positive minimum
-# is required because DataUpdateCoordinator treats timedelta(0) as "disabled".
-_POLL_CADENCE_SCHEDULER_MARGIN_SEC: Final = 1.5
-_POLL_CADENCE_MIN_DELAY_SEC: Final = 0.05
-
-# bleMsgType=0 marks Home actions without a BLE command type. The QUERY (read)
-# commands are refresh polls that fire every coordinator cycle, and live
-# evidence shows the device firmware never returns a command ACK for them over
-# BLE (confirmed for 110 in the baseline; the same holds for the other reads).
-# Routing them BLE-first with wait_for_ack burns a full ack timeout PER CYCLE
-# before falling back to MQTT — which stalls the slow-metric refresh that feeds
-# PV / sub-device sensors and violates the invariant that the poll path is
-# never gated by BLE/MQTT. Send every query straight to MQTT instead; the end
-# result is identical (they fell back to MQTT anyway) minus the per-cycle block.
-#
-# SET_THIRD_PARTY_MQTT_CONFIG (cmd 113) is excluded for a different reason: the
-# third-party MQTT bridge config is an MQTT-layer command (mqtt_message_type
-# "ThirdPartMQTTConfig" per docs/hbxn_commands.csv). BLE and MQTT are independent
-# layers with their own per-layer commands, so this config must publish
-# pure-MQTT and never reuse cmd 113 as a BLE bleMsgType. Its read-back twin
-# (QUERY cmd 114) is already excluded below.
-_BLE_FIRST_UNSUPPORTED_MSG_TYPES: Final[frozenset[int]] = frozenset({
-    0,
-    MQTT_CMD_QUERY_DEVICE_PROPERTY,
-    MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
-    MQTT_CMD_QUERY_COMBINE_DATA,
-    MQTT_CMD_QUERY_WEATHER_PLAN,
-    MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
-    MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
-})
+# ``bleMsgType=0`` marks the three HomeCmdAction entries for which App 2.4.0
+# exposes no BLE command. Every non-zero pair in ``_HOME_BLE_COMMAND_PAIRS`` is
+# a documented BLE path, including the query commands and Third-Party MQTT
+# config 3046/113 + 3047/114. Do not suppress those paths merely because Cloud
+# MQTT can carry the same logical command.
+_BLE_UNSUPPORTED_MSG_TYPES: Final[frozenset[int]] = frozenset({0})
 
 
 #: Section prefixes whose chart ``y``/``y1``..``y6`` series are PV *generation*
@@ -764,20 +712,36 @@ _DAY_TREND_SOURCE_BY_METRIC_KEY: Final[dict[str, tuple[str, str]]] = {
 }
 
 
-def stable_payload_debug_signature(event: dict[str, Any]) -> str:
-    """Return a content-only signature for payload-debug dedup."""
+def exception_debug_message(err: BaseException) -> str:
+    """Return a useful debug message for exceptions with empty ``str(err)``."""
+    return f"{type(err).__name__}: {err or "(no message)"}"
+
+
+def _stable_payload_debug_signature(event: dict[str, Any]) -> str:
+    """Return a content-only signature for payload-debug dedup.
+
+    Per-message identifiers (``id``, ``timestamp``, ``messageId``) and
+    the optional ``entry_id`` annotation change for every record but
+    do not represent new information about the device. They are
+    excluded from the signature so a stream of identical telemetry
+    payloads collapses into one log line per actually-changed value.
+    """
     payload = event.get("payload") or {}
     body = payload.get("body") if isinstance(payload, dict) else None
     if isinstance(body, dict):
-        body_sig: Any = {
-            key: value for key, value in body.items() if key != "messageId"
-        }
+        body_sig: Any = {k: v for k, v in body.items() if k != "messageId"}
     else:
         body_sig = body
     response = (
         event.get("response") if isinstance(event.get("response"), dict) else None
     )
-    response_data = response.get("data") if response is not None else None
+    response_data = (
+        response.get("data")
+        if response is not None and isinstance(response.get("data"), dict)
+        else response.get("data")
+        if response is not None
+        else None
+    )
     return json.dumps(
         [
             event.get("kind"),
@@ -795,11 +759,6 @@ def stable_payload_debug_signature(event: dict[str, Any]) -> str:
     )
 
 
-def exception_debug_message(err: BaseException) -> str:
-    """Return a useful debug message for exceptions with empty ``str(err)``."""
-    return f"{type(err).__name__}: {err or "(no message)"}"
-
-
 def _slow_fetch_failure_log_level(
     err: JackeryError,
     *,
@@ -811,7 +770,7 @@ def _slow_fetch_failure_log_level(
     return logging.WARNING
 
 
-def control_int(value: Any, field_name: str) -> int:  # ruff:ignore[any-type]
+def control_int(value: Any, field_name: str) -> int:  # noqa: ANN401, RUF105
     """Return a finite integer control value or raise a coordinator error."""
     parsed = None if isinstance(value, bool) else safe_int(value)
     if parsed is None:
@@ -820,7 +779,7 @@ def control_int(value: Any, field_name: str) -> int:  # ruff:ignore[any-type]
     return parsed
 
 
-def transport_cmd(value: Any) -> int:  # ruff:ignore[any-type]
+def transport_cmd(value: Any) -> int:  # noqa: ANN401, RUF105
     """Return a command integer for MQTT/BLE transport routing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
@@ -836,17 +795,72 @@ def _load_mqtt_push_client() -> type[Any]:
 
 
 _STATISTICS_BACKFILL_STORE_DEVICES = "devices"
-_STATISTICS_BACKFILL_LAST_SUCCESS = "last_successful_import_date"
-_STATISTICS_BACKFILL_LAST_REPAIR = "last_repair_date"
-_STATISTICS_BACKFILL_LAST_REPAIRED_BUCKETS = "last_repaired_bucket_count"
-_STATISTICS_BACKFILL_LAST_FAILED_BUCKETS = "last_failed_bucket_count"
-_STATISTICS_BACKFILL_LAST_ERROR = "last_error"
-_STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION = "external_statistics_repair_version"
-_EXTERNAL_STATISTICS_REPAIR_VERSION = 1
-_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION = "entity_statistics_repair_version"
-_ENTITY_STATISTICS_REPAIR_VERSION = 3
 _BLE_PARTIAL_UPDATE_COALESCE_SEC = 0.25
-_LOCAL_MQTT_MAX_PENDING_MESSAGE_TASKS = 32
+_MONTHS_PER_YEAR = 12
+
+
+class BackfillStatus(StrEnum):
+    """Serializable lifecycle states for one statistics backfill bucket."""
+
+    PENDING = "pending"
+    RETRYABLE = "retryable"
+    IMPORTED = "imported"
+
+
+def _backfill_period_is_closed(
+    date_type: str,
+    period_start: date,
+    *,
+    today: date,
+) -> bool:
+    """Return whether a calendar bucket can no longer receive new source data."""
+    if date_type == DATE_TYPE_DAY:
+        period_end = period_start
+    elif date_type == DATE_TYPE_WEEK:
+        period_end = period_start + timedelta(days=6)
+    elif date_type == DATE_TYPE_MONTH:
+        if period_start.month == _MONTHS_PER_YEAR:
+            next_period = period_start.replace(
+                year=period_start.year + 1,
+                month=1,
+                day=1,
+            )
+        else:
+            next_period = period_start.replace(month=period_start.month + 1, day=1)
+        period_end = next_period - timedelta(days=1)
+    elif date_type == DATE_TYPE_YEAR:
+        period_end = date(period_start.year, 12, 31)
+    else:
+        return False
+    return period_end < today
+
+
+def _normalize_backfill_status(
+    value: object,
+    *,
+    closed: bool,
+) -> BackfillStatus:
+    """Map legacy/transient cache values onto the durable state contract."""
+    try:
+        status = BackfillStatus(str(value))
+    except TypeError, ValueError:
+        if value in {
+            "auth_error",
+            "deferred",
+            "empty_ambiguous",
+            "fetched",
+            "recorder_error",
+            "transport_error",
+            "unavailable",
+        }:
+            status = BackfillStatus.RETRYABLE
+        else:
+            status = BackfillStatus.PENDING
+    if not closed and status is BackfillStatus.IMPORTED:
+        return BackfillStatus.RETRYABLE
+    return status
+
+
 # 10422/10432: persistent parameter/bind failures. 10600: endpoint/feature not
 # supported or not configured for this device (e.g. device/stat/symmetry and
 # device/dynamic/v2/dynamicPrice for units without ATS / dynamic-price
@@ -856,10 +870,17 @@ _LOCAL_MQTT_MAX_PENDING_MESSAGE_TASKS = 32
 # only spams the debug log with identical failures. Back them off on the long
 # diagnostic ladder. Do not back off transient timeouts or generic "no data"
 # responses: HTTP/API is the primary path and must retry on its normal cadence
-# rather than being throttled by auxiliary endpoint noise. Energy/stat keys are
-# still exempt from suppression via ``_endpoint_backoff_is_energy_key`` below.
+# rather than being throttled by auxiliary endpoint noise.
+_SYSTEM_BUSY_API_CODE = 10426
 _ENDPOINT_BACKOFF_CODES = frozenset({10422, 10432, 10600})
 _ENDPOINT_BACKOFF_DELAYS_SEC: tuple[int, ...] = (300, 900, 3600, 21600)
+
+
+def _is_system_busy_error(err: BaseException) -> bool:
+    """Return whether Jackery rejected a request with its transient busy code."""
+    return f"code={_SYSTEM_BUSY_API_CODE}" in str(err)
+
+
 # Timeouts carry no cloud error ``code=`` token, so the code-based backoff above
 # never records them. A supplementary (Layer-5) endpoint that repeatedly TIMES
 # OUT — e.g. Shelly Cloud realtime power for an unreachable device — would
@@ -875,13 +896,14 @@ _ENDPOINT_BACKOFF_TIMEOUT_DELAYS_SEC: tuple[int, ...] = (60, 300, 900, 3600)
 _SHELLY_REALTIME_BACKOFF_PREFIX = "shelly_realtime:"
 # kWh/period endpoints feed the recorder and must keep flowing. Their backoff
 # ladder is capped at two minutes so a transient cloud failure never escalates
-# to the multi-hour window used for static diagnostics. The recorded window is
-# tracking-only: ``_endpoint_backoff_active`` returns ``False`` for energy keys,
-# so the next scheduled HTTP attempt is never actually suppressed.
+# to the multi-hour window used for static diagnostics. The short window is
+# enforced per endpoint: it prevents a failed stat request from immediately
+# re-entering Jackery's rate-limit window while unrelated HTTP/live transports
+# continue independently.
 _ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC: tuple[int, ...] = (30, 60, 120)
 # kWh/period endpoints feed the recorder and must keep flowing. They may return
-# cache/default data after a failed request, but they must not be entered into an
-# endpoint-backoff window that suppresses the next scheduled HTTP attempt.
+# cache/default data during their bounded retry window; a successful fetch
+# clears that window immediately.
 # NOTE: ``symmetry_stat`` is intentionally NOT listed here. The ATS/symmetry
 # endpoint does not feed a kWh recorder sensor for the shipped hardware and
 # returns code=10600 (unsupported) every cycle, so it must be eligible for
@@ -1045,8 +1067,6 @@ class MqttConnectionManager:
             been logged.
             last_connect_attempt (float): Monotonic timestamp of the last connect
             attempt.
-            auth_failure_message (str | None): Legacy diagnostic slot. MQTT does not
-            own reauthentication; HTTP/API remains the only auth authority.
             paused_until_monotonic (float): Monotonic timestamp until which reconnects
             are paused due to auth/app-conflict.
             app_conflict_pause_cycles (int): Number of auth-triggered pause cycles
@@ -1061,7 +1081,6 @@ class MqttConnectionManager:
         self.fingerprint: tuple[str | None, str | None, str | None] | None = None
         self.generated_mac_warning_logged = False
         self.last_connect_attempt: float = 0.0
-        self.auth_failure_message: str | None = None
         self.paused_until_monotonic: float = 0.0
         self.app_conflict_pause_cycles: int = 0
         self.backoff_until_monotonic: float = 0.0
@@ -1081,6 +1100,16 @@ class MqttConnectionManager:
             int: Seconds remaining until backoff expires, or 0 if no backoff is active.
         """
         return max(0, int(self.backoff_until_monotonic - time.monotonic()))
+
+    def retry_delay(self) -> float:
+        """Return the exact delay before this Cloud-MQTT client may retry."""
+        now = time.monotonic()
+        return max(
+            0.0,
+            self.paused_until_monotonic - now,
+            self.backoff_until_monotonic - now,
+            self.last_connect_attempt + MQTT_RECONNECT_THROTTLE_SEC - now,
+        )
 
     def note_connect_failure(self, message: object) -> None:
         """Enter or extend Cloud-MQTT reconnect backoff after a setup or.
@@ -1284,6 +1313,8 @@ class MqttConnectionManager:
         if mqtt is not None:
             self.fingerprint = current_fingerprint
             self.clear_connect_backoff()
+            self.paused_until_monotonic = 0.0
+            self.app_conflict_pause_cycles = 0
 
     def handle_connect_error(
         self,
@@ -1339,7 +1370,6 @@ class MqttConnectionManager:
             streak = mqtt.consecutive_auth_failures if mqtt else None
             self.pause_after_auth_failure(message, streak=streak)
             return
-        self.auth_failure_message = None
         _LOGGER.debug(
             "Jackery MQTT background auth notice ignored for reauth; "
             "HTTP/API polling remains the auth authority: %s",
@@ -1895,7 +1925,6 @@ def normalize_battery_pack_payload(item: object) -> dict[str, Any]:
         if isinstance(nested, dict):
             normalized = merge_dict_values(normalized, nested)
     aliases = {
-        FIELD_RB: FIELD_BAT_SOC,
         FIELD_IP: FIELD_IN_PW,
         FIELD_OP: FIELD_OUT_PW,
     }
@@ -1913,8 +1942,16 @@ def looks_like_battery_pack(  # ruff:ignore[too-many-return-statements]
     ct_meter_keys: frozenset[str],
     battery_pack_hint_keys: frozenset[str],
 ) -> bool:
-    """Return True for add-on battery pack dicts, not CT/smart meters."""
+    """Return True for add-on battery pack dicts, not CT/smart meters or head unit."""
     if not isinstance(item, dict):
+        return False
+    # Exclude the SolarVault head unit (modelCode=3002, devModel starts with "HTH")
+    # which incorrectly reports devType=1 (battery pack) but is the main storage unit.
+    model_code = item.get(FIELD_MODEL_CODE)
+    dev_model = item.get(FIELD_DEV_MODEL)
+    if model_code == SOLAR_VAULT_HEAD_UNIT_MODEL_CODE or (
+        isinstance(dev_model, str) and dev_model.startswith("HTH")
+    ):
         return False
     if any(key in item for key in ct_meter_keys):
         return False
@@ -2130,18 +2167,33 @@ def subdevice_dev_type(
     rejection_callback: Callable[[str], None] | None = None,
 ) -> int | None:
     """Return the documented subdevice devType, including Shelly scan names."""
-    raw_type = item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE)
-    if raw_type is not None and raw_type != "":  # ruff:ignore[compare-to-empty-string]
+    rejection_reason: str | None = None
+    raw_dev_type = item.get(FIELD_DEV_TYPE)
+    if raw_dev_type is not None and raw_dev_type != "":  # ruff:ignore[compare-to-empty-string]
         try:
-            return int(str(raw_type))
+            return int(str(raw_dev_type))
         except TypeError:
-            if rejection_callback is not None:
-                rejection_callback("subdevice_dev_type_type_error")
+            rejection_reason = "subdevice_dev_type_type_error"
         except ValueError:
-            if rejection_callback is not None:
-                rejection_callback("subdevice_dev_type_value_error")
+            rejection_reason = "subdevice_dev_type_value_error"
+
+    # Shelly Cloud uses ``deviceType`` for a textual product category such as
+    # ``"relay"``.  Some Jackery payload variants also use that key for a
+    # numeric devType, so accept numeric values without treating documented
+    # textual categories as malformed numeric schema data.
+    raw_device_type = item.get(FIELD_DEVICE_TYPE)
+    if raw_device_type is not None and raw_device_type != "":  # ruff:ignore[compare-to-empty-string]
+        try:
+            return int(str(raw_device_type))
+        except TypeError, ValueError:
+            pass
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
-    return SUBDEVICE_SCAN_NAME_DEV_TYPES.get(scan_name)
+    resolved_type = SUBDEVICE_SCAN_NAME_DEV_TYPES.get(scan_name)
+    if resolved_type is not None:
+        return resolved_type
+    if rejection_reason is not None and rejection_callback is not None:
+        rejection_callback(rejection_reason)
+    return None
 
 
 def is_smart_meter_accessory(item: dict[str, Any]) -> bool:
@@ -2521,10 +2573,8 @@ def sanitize_main_properties(props: dict[str, Any]) -> dict[str, Any]:
 
 
 def merge_battery_pack_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
-    *,
-    refresh_last_seen: bool = True,
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while.
 
@@ -2534,8 +2584,8 @@ def merge_battery_pack_lists(
     (FIELD_DEVICE_SN / FIELD_DEV_SN / FIELD_SN). Position is used only when an update
     has no serial identity; an unknown serial is appended instead of overwriting a
     different identified pack. Non-dict and None entries from the prior list are
-    ignored. The function updates touched packs' PACK_FIELD_LAST_SEEN_AT timestamp
-    when the caller confirms a fresh transport response.
+    ignored. Values already learned from any transport remain available when a
+    later partial frame omits them.
 
     Returns:
         Merged list of battery pack dictionaries.
@@ -2548,7 +2598,6 @@ def merge_battery_pack_lists(
         if (sn := battery_pack_serial(item)) is not None:
             index_by_sn[sn] = idx
 
-    touched_indices: set[int] = set()
     for update_idx, raw_update in enumerate(updates):
         update = {key: value for key, value in raw_update.items() if value is not None}
         for identity_key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN):
@@ -2569,15 +2618,6 @@ def merge_battery_pack_lists(
             merged[target_idx] = merge_dict_values(merged[target_idx], update)
             if sn is not None:
                 index_by_sn[sn] = target_idx
-        touched_indices.add(target_idx)
-
-    if refresh_last_seen:
-        # Only an actual transport response is proof-of-life. Callers replaying
-        # a TTL cache explicitly disable this stamp.
-        now_iso = datetime.now(UTC).isoformat()
-        for index in touched_indices:
-            merged[index][PACK_FIELD_LAST_SEEN_AT] = now_iso
-
     return merged
 
 
@@ -2587,7 +2627,7 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
@@ -2641,7 +2681,7 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Merge Shelly Cloud accessory data by stable identity values and return an.
@@ -2681,7 +2721,7 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental smart-plug telemetry entries using device serial numbers to.
@@ -2703,7 +2743,7 @@ def merge_smart_plug_lists(
 
 
 def merge_circuits(
-    current: Any,  # ruff:ignore[any-type]
+    current: Any,  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental circuit breaker telemetry using idx to align updates."""
@@ -2711,7 +2751,7 @@ def merge_circuits(
 
 
 def merge_sub_devices(
-    current: Any,  # ruff:ignore[any-type]
+    current: Any,  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge generic sub-device telemetry using serial numbers to align updates."""
@@ -2719,9 +2759,9 @@ def merge_sub_devices(
 
 
 def _merge_subdevice_lists_by_fn(
-    current: Any,  # ruff:ignore[any-type]
+    current: Any,  # noqa: ANN401, RUF105
     updates: list[dict[str, Any]],
-    serial_fn: Any,  # ruff:ignore[any-type]
+    serial_fn: Any,  # noqa: ANN401, RUF105
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
 
@@ -2752,148 +2792,6 @@ def _merge_subdevice_lists_by_fn(
             if sn:
                 index_by_sn[str(sn)] = target_idx
     return merged
-
-
-# ---------------------------------------------------------------------------
-# Stale battery-pack cleanup
-# ---------------------------------------------------------------------------
-
-
-def drop_stale_battery_packs(
-    packs: list[dict[str, Any]],
-    *,
-    threshold_seconds: int = BATTERY_PACK_STALE_THRESHOLD_SEC,
-) -> tuple[list[dict[str, Any]], int, list[int]]:
-    """Remove packs that have been silent past the stale threshold.
-
-    Returns a tuple of ``(kept_packs, stale_count, dropped_indices)``
-    where ``dropped_indices`` is the list of original positions of
-    the dropped packs (used by the coordinator to build the matching
-    ``device_registry`` identifiers and call ``async_remove_device``).
-
-    Cleanup is deliberately conservative: a pack must have been
-    silent for the full threshold (default 30 days) before it is
-    dropped, so daily WiFi blips or manual reboots do not trigger
-    spurious removal.
-    """
-    if not packs:
-        return packs, 0, []
-    now = datetime.now(UTC)
-    kept: list[dict[str, Any]] = []
-    stale = 0
-    dropped_indices: list[int] = []
-    for index, pack in enumerate(packs):
-        last_seen = pack.get(PACK_FIELD_LAST_SEEN_AT)
-        if not isinstance(last_seen, str):
-            # Establish a baseline even if no further packet ever arrives.
-            stamped = dict(pack)
-            stamped[PACK_FIELD_LAST_SEEN_AT] = now.isoformat()
-            kept.append(stamped)
-            continue
-        try:
-            seen_at = datetime.fromisoformat(last_seen)
-            if seen_at.tzinfo is None:
-                seen_at = seen_at.replace(tzinfo=UTC)
-        except ValueError as err:
-            # Corrupt timestamp; keep but rewrite so future passes
-            # have a clean baseline.
-            _LOGGER.debug(
-                "Battery pack %s has unparseable last-seen timestamp %r, "
-                "resetting baseline: %s",
-                index,
-                last_seen,
-                err,
-            )
-            fixed = dict(pack)
-            fixed[PACK_FIELD_LAST_SEEN_AT] = now.isoformat()
-            kept.append(fixed)
-            continue
-        elapsed = (now - seen_at).total_seconds()
-        if elapsed > threshold_seconds:
-            stale += 1
-            dropped_indices.append(index)
-            continue
-        kept.append(pack)
-    return kept, stale, dropped_indices
-
-
-# ---------------------------------------------------------------------------
-# Stale non-battery subdevice cleanup (F-SW3-A2)
-# ---------------------------------------------------------------------------
-
-
-def stamp_subdevice_last_seen(
-    merged: list[dict[str, Any]],
-    touched_serials: set[str],
-    serial_fn: Callable[[dict[str, Any]], str | None],
-) -> list[dict[str, Any]]:
-    """Refresh the last-seen timestamp for entries mentioned in this update.
-
-    A partial MQTT/BLE/shadow update proves presence only for identities it
-    contains. Absence from that partial update is not evidence of unbinding.
-    """
-    if not touched_serials:
-        return merged
-    now_iso = datetime.now(UTC).isoformat()
-    for item in merged:
-        sn = serial_fn(item)
-        if sn and sn in touched_serials:
-            item[SUBDEVICE_FIELD_LAST_SEEN_AT] = now_iso
-    return merged
-
-
-def drop_stale_subdevices(
-    items: list[dict[str, Any]],
-    *,
-    confirmed_absent: Callable[[dict[str, Any]], bool],
-    threshold_seconds: int = BATTERY_PACK_STALE_THRESHOLD_SEC,
-) -> tuple[list[dict[str, Any]], int, list[int]]:
-    """Remove accessories both stale and absent from authoritative discovery.
-
-    Silence alone is insufficient because transport updates are partial.
-    ``confirmed_absent`` must be based on a complete HTTP discovery result.
-    Missing or invalid timestamps establish a clean baseline instead of
-    authorizing removal.
-    """
-    if not items:
-        return items, 0, []
-    now = datetime.now(UTC)
-    kept: list[dict[str, Any]] = []
-    stale = 0
-    dropped_indices: list[int] = []
-    for index, item in enumerate(items):
-        last_seen = item.get(SUBDEVICE_FIELD_LAST_SEEN_AT)
-        if not isinstance(last_seen, str):
-            # Establish a baseline even if an unbound accessory never emits again.
-            stamped = dict(item)
-            stamped[SUBDEVICE_FIELD_LAST_SEEN_AT] = now.isoformat()
-            kept.append(stamped)
-            continue
-        try:
-            seen_at = datetime.fromisoformat(last_seen)
-            if seen_at.tzinfo is None:
-                seen_at = seen_at.replace(tzinfo=UTC)
-        except ValueError as err:
-            # Corrupt timestamp; keep but rewrite so future passes
-            # have a clean baseline.
-            _LOGGER.debug(
-                "Subdevice entry %s has unparseable last-seen timestamp %r, "
-                "resetting baseline: %s",
-                index,
-                last_seen,
-                err,
-            )
-            fixed = dict(item)
-            fixed[SUBDEVICE_FIELD_LAST_SEEN_AT] = now.isoformat()
-            kept.append(fixed)
-            continue
-        elapsed = (now - seen_at).total_seconds()
-        if elapsed > threshold_seconds and confirmed_absent(item):
-            stale += 1
-            dropped_indices.append(index)
-            continue
-        kept.append(item)
-    return kept, stale, dropped_indices
 
 
 def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
@@ -2927,95 +2825,6 @@ def resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
             ):
                 return str(value).strip()
     return None
-
-
-# ---------------------------------------------------------------------------
-# BLE lifetime counter merging
-# ---------------------------------------------------------------------------
-
-
-def merge_battery_pack_lifetime_from_ble(  # ruff:ignore[too-many-return-statements, too-many-branches]
-    updated: dict[str, Any],
-    body: dict[str, Any],
-) -> bool:
-    """Merge BLE lifetime counters into the matching battery-pack.
-
-    entry.
-
-    Updates the `updated["batteryPacks"]` list when a pack with a matching serial
-    number (from the payload) has its `inEgy` or `outEgy` changed, or when no matching
-    pack exists (a minimal pack is appended containing the counters and identifying
-    fields). Does nothing and returns `False` if the payload lacks a device serial,
-    `batteryPacks` is not a list, or neither `inEgy` nor `outEgy` are present.
-
-    Returns:
-        `True` if `updated["batteryPacks"]` was modified (existing pack fields changed
-        or a new minimal pack appended), `False` otherwise.
-    """
-    sn = body.get(FIELD_DEVICE_SN)
-    if not sn:
-        return False
-    sn_str = str(sn).strip()
-    if not sn_str:
-        return False
-    packs_key = FIELD_BATTERY_PACKS
-    packs = updated.get(packs_key)
-    if not isinstance(packs, list):
-        packs_key = PAYLOAD_BATTERY_PACKS
-        packs = updated.get(packs_key)
-    if not isinstance(packs, list):
-        return False
-    in_egy = body.get(FIELD_IN_EGY)
-    out_egy = body.get(FIELD_OUT_EGY)
-    if in_egy is None and out_egy is None:
-        return False
-    # Match by deviceSn. Pack lists are short (<=5 packs) so a
-    # linear scan is fine.
-    touched = False
-    matched = False
-    merged_packs: list[Any] = []
-    for pack in packs:
-        if not isinstance(pack, dict):
-            merged_packs.append(pack)
-            continue
-        pack_sn_raw = (
-            pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
-        )
-        pack_sn = str(pack_sn_raw).strip() if pack_sn_raw is not None else None
-        if pack_sn != sn_str:
-            merged_packs.append(pack)
-            continue
-        matched = True
-        new_pack = dict(pack)
-        if in_egy is not None and new_pack.get(FIELD_IN_EGY) != in_egy:
-            new_pack[FIELD_IN_EGY] = in_egy
-            touched = True
-        if out_egy is not None and new_pack.get(FIELD_OUT_EGY) != out_egy:
-            new_pack[FIELD_OUT_EGY] = out_egy
-            touched = True
-        merged_packs.append(new_pack)
-    if touched:
-        updated[packs_key] = merged_packs
-        return True
-    if matched:
-        return False
-
-    # BLE can report lifetime counters for packs that are not yet
-    # present in the MQTT/HTTP pack list. Create a minimal pack so
-    # lifetime entities do not stay unrouted forever.
-    minimal_pack: dict[str, Any] = {
-        FIELD_DEVICE_SN: sn_str,
-        FIELD_DEV_TYPE: body.get(FIELD_DEV_TYPE),
-        FIELD_SUB_TYPE: body.get(FIELD_SUB_TYPE),
-        PACK_FIELD_LAST_SEEN_AT: datetime.now(UTC).isoformat(),
-    }
-    if in_egy is not None:
-        minimal_pack[FIELD_IN_EGY] = in_egy
-    if out_egy is not None:
-        minimal_pack[FIELD_OUT_EGY] = out_egy
-    merged_packs.append(minimal_pack)
-    updated[packs_key] = merged_packs
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -3053,7 +2862,7 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge OTA metadata into a battery-pack list by matching serial numbers.
@@ -3106,6 +2915,94 @@ def merge_battery_pack_ota_lists(
             if key in raw_update and raw_update.get(key) is not None:
                 merged[target_idx][key] = raw_update.get(key)
     return merged[:5]
+
+
+# ---------------------------------------------------------------------------
+# BLE lifetime merging
+# ---------------------------------------------------------------------------
+
+
+def merge_battery_pack_lifetime_from_ble(  # ruff:ignore[too-many-branches]  # noqa: PLR0915, RUF105
+    updated: dict[str, Any],
+    body: dict[str, Any],
+) -> bool:
+    """Merge BLE lifetime counters into the matching battery-pack entry.
+
+    Updates the `updated["batteryPacks"]` list when a pack with a matching serial
+    number (from the payload) has its `inEgy` or `outEgy` changed, or when no matching
+    pack exists (a minimal pack is appended containing the counters and identifying
+    fields). Does nothing and returns `False` if the payload lacks a device serial,
+    `batteryPacks` is not a list, or neither `inEgy` nor `outEgy` are present.
+
+    Returns:
+        `True` if `updated["batteryPacks"]` was modified (existing pack fields changed
+        or a new minimal pack appended), `False` otherwise.
+    """
+    sn = body.get(FIELD_DEVICE_SN)
+    if not sn:
+        return False
+    sn_str = str(sn).strip()
+    if not sn_str:
+        return False
+    packs_key = FIELD_BATTERY_PACKS
+    packs = updated.get(packs_key)
+    if not isinstance(packs, list):
+        packs_key = PAYLOAD_BATTERY_PACKS
+        packs = updated.get(packs_key)
+    if not isinstance(packs, list):
+        return False
+    in_egy = body.get(FIELD_IN_EGY)
+    out_egy = body.get(FIELD_OUT_EGY)
+    if in_egy is None and out_egy is None:
+        return False
+    # Match by deviceSn. Pack lists are short (<=5 packs) so a
+    # linear scan is fine.
+    touched = False
+    matched = False
+    merged_packs: list[Any] = []
+    for pack in packs:
+        if not isinstance(pack, dict):
+            merged_packs.append(pack)
+            continue
+        pack_sn_raw = (
+            pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_DEV_SN) or pack.get(FIELD_SN)
+        )
+        pack_sn = str(pack_sn_raw).strip() if pack_sn_raw is not None else None
+        if pack_sn != sn_str:
+            merged_packs.append(pack)
+            continue
+        matched = True
+        changed = False
+        if in_egy is not None and pack.get(FIELD_IN_EGY) != in_egy:
+            pack[FIELD_IN_EGY] = in_egy
+            changed = True
+        if out_egy is not None and pack.get(FIELD_OUT_EGY) != out_egy:
+            pack[FIELD_OUT_EGY] = out_egy
+            changed = True
+        if changed:
+            touched = True
+        merged_packs.append(pack)
+    if not matched:
+        # Create a minimal pack entry with the lifetime counters.
+        new_pack: dict[str, Any] = {FIELD_DEVICE_SN: sn_str}
+        if in_egy is not None:
+            new_pack[FIELD_IN_EGY] = in_egy
+        if out_egy is not None:
+            new_pack[FIELD_OUT_EGY] = out_egy
+        # Preserve devType and subType if present in payload (helps
+        # downstream filtering).
+        dev_type = body.get(FIELD_DEV_TYPE)
+        if dev_type is not None:
+            new_pack[FIELD_DEV_TYPE] = dev_type
+        sub_type = body.get(FIELD_SUB_TYPE)
+        if sub_type is not None:
+            new_pack[FIELD_SUB_TYPE] = sub_type
+        # Stamp the pack as seen now so it survives the stale cleanup baseline.
+        new_pack[PACK_FIELD_LAST_SEEN_AT] = datetime.now(UTC).isoformat()
+        merged_packs.append(new_pack)
+        touched = True
+    updated[packs_key] = merged_packs[:5]
+    return touched
 
 
 # ---------------------------------------------------------------------------
@@ -3357,9 +3254,8 @@ def shelly_cloud_device_ids(entry: dict[str, Any]) -> list[str]:
 
 
 _app_period_section_fn = app_period_section
-_drop_stale_battery_packs_fn = drop_stale_battery_packs
-_merge_battery_pack_lifetime_from_ble_fn = merge_battery_pack_lifetime_from_ble
 _merge_battery_pack_lists_fn = merge_battery_pack_lists
+_merge_battery_pack_lifetime_from_ble_fn = merge_battery_pack_lifetime_from_ble
 _merge_battery_pack_ota_lists_fn = merge_battery_pack_ota_lists
 _merge_circuits_fn = merge_circuits
 _merge_pack_ota_fn = merge_pack_ota
@@ -3384,23 +3280,22 @@ _METRIC_SOURCE_FALLBACKS: dict[str, tuple[tuple[str, str], ...]] = {
 }
 _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 120
 _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS = 120
-_STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET = 4
-_STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET = 3
+_STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET = 50
+_STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET = 20
 _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_BACKFILL_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS = 2
 _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS = 3
 _STATISTICS_HTTP_TRANSIENT_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
+# A genuinely empty historical response is not permanent: the app/cloud can
+# publish older buckets later. Reuse the longest existing HTTP endpoint backoff
+# so empty high-priority periods cannot starve independent year/week/day queues.
+_STATISTICS_HTTP_EMPTY_RETRY_SEC = _ENDPOINT_BACKOFF_DELAYS_SEC[-1]
 _STATISTICS_HTTP_RETRY_AFTER_EPOCH = "retry_after_epoch"
 _STATISTICS_IMPORT_THROTTLE_SEC = 300
 _STATISTICS_IMPORT_STATE_TOLERANCE = 1e-4
 _LOCAL_MQTT_CONFIG_RETRY_DELAYS_SEC = (15.0, 60.0)
-_TRANSPORT_SOURCE_PRIORITY: Final[dict[TransportSource, int]] = {
-    TransportSource.HTTP: 0,
-    TransportSource.CLOUD_MQTT: 1,
-    TransportSource.BLE: 2,
-    TransportSource.LOCAL_MQTT: 3,
-}
+_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC = 15.0
 _ACCESSORY_IDENTITY_FIELDS: Final[frozenset[str]] = frozenset({
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,
@@ -3466,9 +3361,9 @@ def _serialize_mqtt_messages_by_device(
         self: JackerySolarVaultCoordinator,
         topic: str,
         payload: dict[str, Any],
-        **kwargs: Any,  # ruff:ignore[any-type]
+        **kwargs: Any,  # noqa: ANN401, RUF105
     ) -> str | None:
-        device_id = self._resolve_device_id_from_mqtt(payload) if self.data else None
+        device_id = self._resolve_device_id_from_mqtt(payload)
         lock_key = device_id or "__unresolved__"
         locks = getattr(self, "_mqtt_message_locks", None)
         if locks is None:
@@ -3478,6 +3373,36 @@ def _serialize_mqtt_messages_by_device(
             return await handler(self, topic, payload, **kwargs)
 
     return _wrapped
+
+
+def _is_smart_meter_accessory(item: dict[str, Any]) -> bool:
+    """Return True for the CT/Smart-Meter accessory entry used by the app."""
+    if (
+        str(item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "")
+        == SUBDEVICE_TYPE_SMART_METER
+    ):
+        return True
+    text = " ".join(
+        str(item.get(key) or "")
+        for key in (
+            FIELD_SCAN_NAME,
+            FIELD_TYPE_NAME,
+            FIELD_DEVICE_NAME,
+            FIELD_PRODUCT_MODEL,
+        )
+    ).lower()
+    if "shelly" in text or "3em" in text or "meter" in text or "ct" in text:
+        return True
+    return str(item.get(FIELD_SUB_TYPE) or "") == SMART_METER_SUBTYPE
+
+
+@dataclass(slots=True)
+class _CloudCommandAttempt:
+    """Bind one Cloud command result to its actual MQTT session and attempt."""
+
+    command_key: tuple[str, int, int]
+    attempt_id: int
+    session_generation: int
 
 
 class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # ruff:ignore[too-many-public-methods]
@@ -3499,22 +3424,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             else:
                 merged[key] = value
         return merged
-
-    def _merge_lifetime_counter_data(
-        self,
-        updated: dict[str, Any],
-        source: object,
-    ) -> bool:
-        """Merge transport lifetime energy counters into their own bucket."""
-        if not isinstance(source, dict):
-            return False
-        current = updated.get("lifetime_counters")
-        current_dict = current if isinstance(current, dict) else {}
-        merged = self._merge_dict_values(current_dict, source)
-        if merged == current_dict:
-            return False
-        updated["lifetime_counters"] = merged
-        return True
 
     _PRICE_OVERRIDE_TTL_SEC = 600
     _PROPERTY_OVERRIDE_TTL_SEC = 120
@@ -3547,6 +3456,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         APP_DEVICE_STAT_ONGRID_OUTPUT,
         APP_DEVICE_STAT_BATTERY_TO_GRID,
         APP_DEVICE_STAT_PV_TO_BATTERY,
+        APP_DEVICE_STAT_PV_TO_ONGRID,
         APP_DEVICE_STAT_ONGRID_TO_BATTERY,
         APP_DEVICE_STAT_EPS_INPUT,
         APP_DEVICE_STAT_EPS_OUTPUT,
@@ -3661,15 +3571,23 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Cloud MQTT connection state: backoff, pause, auth, fingerprint.
         # Owned here so supplemental transport failures cannot pause HTTP.
         self._mqtt_mgr: MqttConnectionManager = MqttConnectionManager()
+        self._mqtt_session_generation = 0
+        self._mqtt_session_actions_seen: set[tuple[str, int]] = set()
+        self._mqtt_birth_snapshot_pending = False
+        self._cloud_mqtt_command_failures: dict[tuple[str, int, int], str] = {}
+        self._cloud_mqtt_command_attempts: dict[tuple[str, int, int], int] = {}
+        self._cloud_mqtt_command_attempt_sequence = 0
         self._last_weather_plan_query: dict[str, float] = {}
         self._weather_plan_query_interval_sec = 180
         self._last_system_info_query: dict[str, float] = {}
         self._system_info_query_interval_sec = 180
         self._last_subdevice_query: dict[str, float] = {}
-        # HTTP property-shadow fallback (Layer 3) reuses the subdevice cadence:
-        # it only fills accessory live buckets when MQTT (Layer 5) is absent or
-        # stale, so it must not run more often than the user's polling interval.
+        # HTTP property-shadow fallback (Layer 3) is independent from MQTT but
+        # consists of supplementary system/subdevice/config endpoints. Keep it
+        # on the slow HTTP cadence so the 15-second authoritative property poll
+        # cannot trigger a multi-request shadow burst every cycle.
         self._last_shadow_query: dict[str, float] = {}
+        self._shadow_query_interval_sec = self._slow_metrics_interval_sec
         self._battery_pack_http_cache_seen: dict[str, float] = {}
         self._shelly_realtime_cache_seen: dict[tuple[str, str], float] = {}
         self._shelly_device_cache_seen = float("-inf")
@@ -3679,12 +3597,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._price_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._property_overrides: dict[str, tuple[float, dict[str, Any]]] = {}
         self._statistics_import_task: asyncio.Task[None] | None = None
+        self._statistics_backfill_task: asyncio.Task[None] | None = None
+        # Current app buckets and historical backfill run independently. Only
+        # the short Recorder read/upsert section is serialized so a long HTTP
+        # backfill can never fence the current day import.
+        self._statistics_recorder_lock = asyncio.Lock()
         self._statistics_import_ready = False
         self._battery_pack_ota_tasks: dict[str, asyncio.Task[None]] = {}
         # Experimental BLE transport (Phase 3a — gated by
         # CONF_ENABLE_BLE_TRANSPORT). Typed as ``Any`` so the coordinator
         # module imports cleanly on hosts without BlueZ / bleak.
         self._ble_listener: Any = None
+        self._ble_start_lock = asyncio.Lock()
         # Coalesce rapid BLE bursts into one coordinator update per device.
         self._ble_pending_updates: dict[str, dict[str, Any]] = {}
         self._ble_coalesce_tasks: dict[str, asyncio.Task[None]] = {}
@@ -3703,55 +3627,32 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # reversing a newer MQTT/BLE value while also letting genuinely stale
         # push data expire.  Message locks preserve callback arrival order per
         # device without serializing unrelated devices or dropping frames.
-        self._live_property_received_monotonic: dict[str, dict[str, float]] = {}
         self._live_ct_received_monotonic: dict[str, float] = {}
         # Per-field provenance prevents a later lower-priority snapshot from
         # reversing fresh local data. State stays internal: payloads remain the
         # protocol's complete dictionaries, with no HA bookkeeping injected.
         self._property_source_state: dict[
             str,
-            dict[str, tuple[TransportSource, float]],
+            dict[str, FieldProvenance],
         ] = {}
         self._accessory_source_state: dict[
             tuple[str, str, str],
-            dict[str, tuple[TransportSource, float]],
+            dict[str, FieldProvenance],
         ] = {}
         self._mqtt_message_locks: dict[str, asyncio.Lock] = {}
-        # MqttMsgActivity generates a 9-digit fallback token once for the
-        # form. Keep the integration-generated equivalent stable for this
-        # config-entry session instead of rotating it on every write.
-        self._generated_third_party_mqtt_token: str | None = None
-        # Dedup cache for payload-debug records:
-        # (kind, channel, message_type) -> (last_signature, last_emit_monotonic).
-        # Bounded by the number of distinct topics the device publishes
-        # (typically <10), so memory stays trivial.
-        self._payload_debug_last_sig: dict[tuple[str, str, str], str] = {}
-        self._payload_debug_last_emit_ts: dict[tuple[str, str, str], float] = {}
         # Queue (not a single slot) so a burst of HTTP payload-debug events is
         # never lost to overwrite before the background drain runs.
         self._payload_debug_pending_events: deque[
             dict[str, Any] | Callable[[], dict[str, Any]]
         ] = deque()
-        # Counter for diagnostics: how many battery packs the cleanup has
-        # removed for being silent past BATTERY_PACK_STALE_THRESHOLD_SEC.
-        # Resets on integration reload.
-        self._stale_battery_packs_dropped = 0
-        # Identifiers for devices to remove from HA's device_registry on
-        # the next async cleanup hook. Populated synchronously by
-        # _merge_subdevice_data, drained asynchronously by
-        # _async_cleanup_pending_device_removals.
-        self._pending_device_removals: list[tuple[str, str]] = []
-        self._pending_battery_pack_removal_serials: dict[tuple[str, str], str] = {}
         # Setup-local registry migration can freeze an index to either a trusted
         # serial or an explicit index fallback for this coordinator session.
         self._battery_pack_identity_overrides: dict[tuple[str, int], str | None] = {}
-        self._battery_pack_topology_reload_required = False
         # Statistic-import cache: avoid re-publishing identical chart buckets
         # to HA recorder when the cloud snapshot did not change. Keyed by
         # statistic_id, value is the JSON signature of the last published
         # (starts, states) tuple.
         self._stat_import_last_sig: dict[str, str] = {}
-        self._data_quality_issue_signature: str | None = None
         self._activation_issue_active: set[str] = set()
         # Throttle recorder-statistics import separately from HTTP polling so
         # the recorder is not invoked on every fast Layer 3 refresh. The first
@@ -3787,20 +3688,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._local_daily_cache_loaded = False
         self._mqtt_poll_task: asyncio.Task[None] | None = None
         self._shadow_fallback_task: asyncio.Task[None] | None = None
-        self._local_mqtt_unsubs: list[Callable[[], None]] = []
-        self._local_mqtt_message_tasks: set[asyncio.Task[None]] = set()
         self._background_tasks: dict[str, asyncio.Task[Any]] = {}
         self._active_http_update_tasks: set[asyncio.Task[Any]] = set()
-        self._topology_reload_task: asyncio.Task[None] | None = None
         self._shutdown_started: bool = False
         self._base_shutdown_task: asyncio.Task[None] | None = None
         self._ble_connect_backoff: dict[str, BleConnectBackoff] = {}
-        self._local_mqtt_backlog_dropped = 0
-        self._local_mqtt_listener_messages_received: int = 0
-        self._local_mqtt_listener_foreign_ignored: int = 0
+        self._local_mqtt_device_traffic_observed = False
         self._local_mqtt_last_message_monotonic: float = float("-inf")
         self._local_mqtt_last_device_message_monotonic: dict[str, float] = {}
         self._local_mqtt_config_retry_pending = False
+        self._local_mqtt_config_applied_signature: (
+            tuple[str, int, str, str, str, tuple[str, ...]] | None
+        ) = None
+        self._third_party_mqtt_config_waiters: dict[
+            str,
+            list[asyncio.Future[dict[str, Any]]],
+        ] = {}
+        self._local_mqtt_config_diagnostics: dict[str, Any] = {
+            "scheduled": 0,
+            "attempts": 0,
+            "target_count": 0,
+            "last_status": "not_started",
+            "last_attempt_at": None,
+            "last_success_at": None,
+            "last_errors": {},
+        }
         self._statistics_startup_sync_pending = True
         self._polling_diagnostics: dict[str, Any] = {
             "cache_hits": 0,
@@ -3848,6 +3760,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # home_trends, battery_trends, statistic, price, alarm etc.)
         # without blocking the main coordinator update cycle.
         self._slow_metrics_bg_task: asyncio.Task[None] | None = None
+        self._slow_http_request_semaphore = asyncio.Semaphore(2)
         self._system_info_cache_monotonic: dict[str, float] = {}
         # Poll-cadence watchdog (P6): the scheduled interval tick and the
         # background-refresh chain both proved losable during a BLE
@@ -3903,7 +3816,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Coalesce payload-file writes outside the primary HTTP request path."""
         if self._shutdown_started:
             return
-        if not _payload_debug_capture_enabled():
+        if not _payload_debug_capture_enabled(getattr(self, "entry", None)):
             return
         self._payload_debug_pending_events.append(event_or_factory)
         self._schedule_background_once(
@@ -3924,33 +3837,24 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Append one redacted raw/parsed HTTP/MQTT diagnostic event when enabled.
 
-        Raw payload diagnostics are deliberately gated behind a dedicated DEBUG
-        logger. They are useful for parser/source bugs, but writing every
-        HTTP/MQTT payload on normal installations is unnecessary disk churn.
+        Payload diagnostics are gated behind an explicit option or the effective
+        DEBUG level of the dedicated logger. They are useful for parser/source
+        bugs, but writing every HTTP/MQTT payload on normal installations is
+        unnecessary disk churn.
 
-        Two safety nets prevent log spam even when DEBUG is enabled:
-
-        1. **Dedup**: a tiny per-coordinator signature cache. If the redacted
-           event payload is identical to the most recent record for the same
-           ``(kind, topic-or-path)`` channel, the line is dropped. Real
-           Jackery devices repeat the same MQTT bodies for ~80% of polls
-           (verified against captured ``payload_debug.jsonl`` traces).
-        2. **Empty-chart-series suppression**: ``chart_series_debug`` returns
-           an empty dict for non-trend payloads (smart-meter telemetry,
-           CT phase frames, OTA/control etc). Empty debug fields are
-           dropped rather than written as ``"body_chart_series_debug": {}``.
+        Every enabled HTTP/MQTT/BLE event is retained. The writer redacts
+        secrets and rotates the bounded JSONL file; no transport record is
+        deduplicated or throttled in the integration.
 
         ``event_or_factory`` may be either a pre-built event dict or a
         zero-arg callable that returns one. The callable form lets call
         sites avoid building the event when DEBUG is disabled -- the most
         important hot-path optimization on the per-MQTT-message path.
         """
-        # Gate the JSONL file on the dedicated payload-debug DEBUG logger only
-        # (see _payload_debug_capture_enabled). MQTT/BLE call this writer
-        # directly (bypassing _schedule_payload_debug_event), so the gate must
-        # live here too. Redaction of the written line is a separate concern
-        # (diagnostic_redactions_disabled below).
-        if not _payload_debug_capture_enabled():
+        # MQTT/BLE call this writer directly (bypassing the scheduler), so the
+        # option/effective-logger guard must live here too. The final writer
+        # boundary always redacts the event.
+        if not _payload_debug_capture_enabled(getattr(self, "entry", None)):
             return
         if isinstance(event_or_factory, dict):
             event = dict(event_or_factory)
@@ -3965,42 +3869,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             if empty_key in event and not event[empty_key]:
                 event.pop(empty_key)
-        # Two-stage filter on the same logical channel:
-        # 1. Dedup: drop records whose redacted body matches the previous
-        #    record from the same (kind, channel, messageType). Drops ~93%
-        #    of HTTP responses against real devices.
-        # 2. Throttle: when the body keeps changing slowly (e.g. CT phase
-        #    power flickering by 1 W every second), still emit at most one
-        #    record per ``PAYLOAD_DEBUG_THROTTLE_SEC`` per channel. This
-        #    keeps the file useful for debugging without filling the disk
-        #    when a user forgot to switch the dedicated DEBUG logger off.
-        signature = stable_payload_debug_signature(event)
-        kind = str(event.get("kind") or "?")
-        channel = str(event.get("topic") or event.get("path") or "")
-        message_type = ""
-        payload_obj = event.get("payload")
-        if isinstance(payload_obj, dict):
-            message_type = str(payload_obj.get("messageType") or "")
-        cache_key = (kind, channel, message_type)
-        last_sig = self._payload_debug_last_sig.get(cache_key)
-        last_ts = self._payload_debug_last_emit_ts.get(cache_key, 0.0)
-        now_mono = time.monotonic()
-        if last_sig == signature:
-            return
-        if last_sig is not None and (now_mono - last_ts) < PAYLOAD_DEBUG_THROTTLE_SEC:
-            # Body changed but a record from this channel was emitted very
-            # recently. Skip this one; the next genuinely-new record after
-            # the throttle window will carry the difference.
-            return
-        # Bound the dedup cache to prevent unbounded memory growth. With
-        # ~10 topics per device the cap is never hit in normal operation;
-        # it only guards against pathological churn.
-        if len(self._payload_debug_last_sig) >= 256:  # ruff:ignore[magic-value-comparison]
-            oldest = next(iter(self._payload_debug_last_sig))
-            self._payload_debug_last_sig.pop(oldest, None)
-            self._payload_debug_last_emit_ts.pop(oldest, None)
-        self._payload_debug_last_sig[cache_key] = signature
-        self._payload_debug_last_emit_ts[cache_key] = now_mono
         event.setdefault("timestamp", dt_util.now().isoformat())
         event.setdefault("entry_id", self.entry.entry_id)
         path = self.hass.config.path(PAYLOAD_DEBUG_LOG_FILENAME)
@@ -4008,7 +3876,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             append_payload_debug_line,
             path,
             event,
-            diagnostic_redactions_disabled(self.entry),
         )
 
     def _reset_discovery_removal_confirmations(
@@ -4074,7 +3941,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._pending_discovery_parent_removals = next_confirmations
         return reconciled, first_omissions, confirmed_removals
 
-    async def async_discover(self) -> bool:  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+    async def async_discover(self) -> bool:  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
         """Populate _device_index from config or /v1/device/system/list."""
         new_index: dict[str, dict[str, Any]] = {}
         discovered_at = datetime.now(UTC).isoformat()
@@ -4093,6 +3960,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             ) from err
         except JackeryError as err:
             self._reset_discovery_removal_confirmations()
+            if self._device_index:
+                _LOGGER.debug(
+                    "Jackery system/list is temporarily unavailable; preserving "
+                    "the validated discovery index for this HTTP refresh: %s",
+                    err,
+                )
+                return True
             msg = f"system/list failed: {err}"
             raise UpdateFailed(msg) from err
         system_response = self.api.last_system_list_response
@@ -4373,7 +4247,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return
 
         next_index = dict(self._device_index)
-        changed = False
+        topology_updates: dict[str, dict[str, Any]] = {}
+        index_changed = False
         for device_id, before_record in before.items():
             refreshed_record = refreshed.get(device_id)
             current_record = self._device_index.get(device_id)
@@ -4397,13 +4272,39 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             next_record = dict(current_record)
             next_record[PAYLOAD_SYSTEM_META] = current_system
             next_index[device_id] = next_record
-            changed = True
+            index_changed = True
+            if self._accessory_topology(refreshed_accessories) != (
+                self._accessory_topology(before_accessories)
+            ):
+                topology_updates[device_id] = {
+                    PAYLOAD_SYSTEM: {
+                        FIELD_ACCESSORIES: copy.deepcopy(refreshed_accessories),
+                    },
+                }
 
-        if not changed:
+        if not index_changed:
             return
         self._device_index = next_index
         await self._async_save_discovery_cache()
+        if topology_updates and self.data:
+            self._push_partial_update(topology_updates)
         _LOGGER.debug("Jackery: refreshed HTTP accessory discovery in background")
+
+    @staticmethod
+    def _accessory_topology(accessories: object) -> object:
+        """Return accessory content without observation-only timestamps."""
+        if not isinstance(accessories, list):
+            return accessories
+        return [
+            {
+                key: value
+                for key, value in item.items()
+                if key != SUBDEVICE_FIELD_LAST_SEEN_AT
+            }
+            if isinstance(item, dict)
+            else item
+            for item in accessories
+        ]
 
     @staticmethod
     def _overlay_http_accessories(
@@ -4504,8 +4405,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 len(new_device_ids),
                 ", ".join(sorted(new_device_ids)),
             )
-            if self._mqtt is not None and self._mqtt.is_connected:
-                self.async_schedule_local_mqtt_device_config()
+            # The shared command router starts BLE and Cloud MQTT independently.
+            # Do not gate a newly discovered device's Local-MQTT configuration
+            # on either supplemental connection state.
+            self.async_schedule_local_mqtt_device_config()
 
     def _unlink_removed_parent_devices(self, device_ids: set[str]) -> int:
         """Unlink removed parents and their descendants from this config entry."""
@@ -4608,12 +4511,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Pause MQTT after a broker auth rejection while HTTP keeps polling."""
         self.rejection_metrics.increment("mqtt_broker_rejections", str(message))
+        self.api.invalidate_mqtt_session_for_http_refresh()
+        self._mqtt_mgr.fingerprint = None
         self._mqtt_mgr.pause_after_auth_failure(message, streak=streak)
 
     def record_http_auth_rejection(self, status: int, data: object) -> None:
         """Record HTTP/API authentication rejection metrics."""
         reason = f"http_{status}"
-        if self.api._is_token_expired_response(status, data):  # ruff:ignore[private-member-access]
+        if self.api._is_token_expired_response(status, data):  # noqa: RUF105, SLF001
             self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
             return
         self.rejection_metrics.increment("http_auth_rejections", reason)
@@ -4739,27 +4644,57 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Request a full app-style MQTT snapshot after every broker connect."""
         if self._shutdown_started:
             return
+        session_generation = self._synchronize_mqtt_session_generation()
+        self._mqtt_birth_snapshot_pending = True
         self._mqtt_mgr.record_connect_success(self._mqtt, self.api.mqtt_fingerprint)
-        # cmd=113 is a cloud-MQTT-only command. Schedule its idempotent bridge
-        # configuration immediately after every broker connect so a failed
-        # startup attempt is retried on reconnect and never waits for the
-        # independent local-MQTT/BLE startup tasks to finish.
+        # Re-run the App-proven 3046/BLE-113 bridge configuration after each
+        # Cloud-MQTT reconnect. The direct Local-MQTT lifecycle also schedules
+        # this independently, so BLE-only operation does not depend on Cloud MQTT.
         self.async_schedule_local_mqtt_device_config()
+        snapshot = dict(self.data or {})
+        if not snapshot:
+            _LOGGER.debug(
+                "Jackery Cloud MQTT birth snapshot deferred until HTTP discovery "
+                "provides the device inventory"
+            )
+            return
         try:
             await self._async_query_system_info_for_missing(
                 force=True,
                 ensure_mqtt=False,
+                snapshot=snapshot,
             )
             await self._async_query_weather_plan_for_missing(
                 force=True,
                 ensure_mqtt=False,
+                snapshot=snapshot,
             )
             await self._async_query_subdevices_for_missing(
                 force=True,
                 ensure_mqtt=False,
+                snapshot=snapshot,
             )
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
+        else:
+            if session_generation == self._mqtt_session_generation:
+                self._mqtt_birth_snapshot_pending = False
+
+    def _synchronize_mqtt_session_generation(self) -> int:
+        """Synchronize session state with the MQTT client's ownership counter."""
+        generation = (
+            self._mqtt.session_generation
+            if self._mqtt is not None
+            else self._mqtt_session_generation
+        )
+        if generation == self._mqtt_session_generation:
+            return generation
+        self._mqtt_session_generation = generation
+        self._mqtt_session_actions_seen.clear()
+        self._mqtt_birth_snapshot_pending = True
+        self._cloud_mqtt_command_failures.clear()
+        self._cloud_mqtt_command_attempts.clear()
+        return generation
 
     async def _async_handle_mqtt_disconnect(self) -> None:
         """Recover from a server-side MQTT drop without flooding the log.
@@ -4786,26 +4721,49 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self.hass.state in stopping_states:
             return
 
+        mqtt = self._mqtt
+
         async def _reconnect_background() -> None:
-            try:
-                # Do NOT reset _last_mqtt_connect_attempt here — the throttle
-                # prevents reconnect storms that crash ESP32 proxies.
-                # Do NOT use wait_connected=True — the coordinator update
-                # cycle already handles the normal MQTT health check.
-                await self._async_ensure_mqtt(force=False, wait_connected=False)
-            except ConfigEntryAuthFailed as err:
-                self._defer_background_auth_failure(err)
-            except JackeryAuthError as err:
-                _LOGGER.debug(
-                    "Jackery MQTT auto-reconnect hit a transport auth error; "
-                    "HTTP polling remains authoritative: %s",
-                    err,
-                )
-            except BACKGROUND_TASK_ERRORS as err:
-                _LOGGER.debug(
-                    "Jackery MQTT auto-reconnect after disconnect failed: %s",
-                    err,
-                )
+            """Retry this Cloud-MQTT client until it connects or is stopped."""
+            while (
+                not self._shutdown_started
+                and self._mqtt is mqtt
+                and not mqtt.is_connected
+            ):
+                retry_delay = self._mqtt_mgr.retry_delay()
+                if retry_delay > 0:
+                    await asyncio.sleep(retry_delay)
+                if self._shutdown_started or self._mqtt is not mqtt:
+                    return
+                try:
+                    # This is the dedicated recovery loop: after the manager's
+                    # bounded delay has elapsed it must start a fresh session and
+                    # observe the CONNACK/subscription result before deciding
+                    # whether another retry is needed.  Fire-and-forget startup
+                    # left a disconnected client parked until an unrelated call.
+                    await self._async_ensure_mqtt(force=True, wait_connected=True)
+                except ConfigEntryAuthFailed as err:
+                    self._defer_background_auth_failure(err)
+                except JackeryAuthError as err:
+                    if self._mqtt_mgr.retry_delay() <= 0:
+                        self._mqtt_mgr.handle_connect_error(mqtt, err)
+                    _LOGGER.debug(
+                        "Jackery MQTT auto-reconnect hit a transport auth error; "
+                        "HTTP polling remains authoritative: %s",
+                        err,
+                    )
+                except BACKGROUND_TASK_ERRORS as err:
+                    if self._mqtt_mgr.retry_delay() <= 0:
+                        self._mqtt_mgr.handle_connect_error(mqtt, err)
+                    _LOGGER.debug(
+                        "Jackery MQTT auto-reconnect after disconnect failed: %s",
+                        err,
+                    )
+                if self._mqtt_mgr.retry_delay() <= 0:
+                    self._mqtt_mgr.note_connect_failure(
+                        mqtt.diagnostics.get("last_error")
+                        or "MQTT session did not connect",
+                    )
 
         self._schedule_background_once(
             "mqtt_reconnect",
@@ -4815,7 +4773,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's coordinator polling interval."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the integration's coordinator polling interval."""  # noqa: D421, RUF105
         return self._configured_update_interval
 
     def _poll_cycle_timeout_seconds(self) -> float:
@@ -4825,12 +4783,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # Initial login/discovery has no previous state to preserve and may
             # legitimately need more than one regular poll interval.
             return hard_timeout
-        cadence_timeout = max(
-            _POLL_CADENCE_MIN_DELAY_SEC,
-            self._configured_update_interval.total_seconds()
-            - _POLL_CADENCE_SCHEDULER_MARGIN_SEC,
-        )
-        return min(hard_timeout, cadence_timeout)
+        # The HTTP request timeout is REQUEST_TIMEOUT_SEC (30s). The cycle
+        # ceiling must be at least that long so one HTTP request can complete.
+        # Add a small per-device margin for multiple devices.
+        per_request_budget = REQUEST_TIMEOUT_SEC
+        device_count = max(1, len(self._device_index))
+        per_device_margin = 1.0
+        http_budget = per_request_budget + (device_count * per_device_margin)
+        # The cadence-based ceiling (interval - scheduler_margin) is for the
+        # *next* cycle's scheduling, not for capping the current cycle's
+        # execution. Capping at interval - 1.5s (13.5s at 15s cadence) is
+        # shorter than the HTTP timeout and causes every cycle to timeout.
+        # Use the HTTP budget as the primary ceiling, bounded by the hard timeout.
+        return min(hard_timeout, http_budget)
 
     def _set_next_poll_delay(self, started: float, completed: float) -> None:
         """Use only the unused portion of the start-to-start polling budget."""
@@ -4878,7 +4843,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return
             except ConfigEntryAuthFailed as err:
                 self._defer_background_auth_failure(err)
-            except Exception as err:  # ruff:ignore[blind-except]  # background boundary
+            except Exception as err:  # background boundary  # noqa: BLE001, RUF105
                 _LOGGER.debug("Jackery background task %s failed: %s", key, err)
 
         task.add_done_callback(_task_done)
@@ -4890,11 +4855,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         key = "local_mqtt_device_config"
         if self._shutdown_started:
             return None
+        self._local_mqtt_config_diagnostics["scheduled"] = (
+            safe_int(self._local_mqtt_config_diagnostics.get("scheduled")) or 0
+        ) + 1
         current = self._background_tasks.get(key)
         if current is not None and not current.done():
-            # A new broker session supersedes the one the in-flight command
-            # started on. Remember it and replay once after the current
-            # idempotent push completes; never overlap cmd=113 writers.
+            # A transport state change arrived while the idempotent App command
+            # was in flight. Replay once after it completes; never overlap
+            # 3046/BLE-113 writers.
             self._local_mqtt_config_retry_pending = True
             return current
 
@@ -4923,74 +4891,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     async def _async_local_mqtt_config_retry_sleep(delay: float) -> None:
-        """Sleep before a bounded cmd=113 retry without blocking HA."""
+        """Sleep before a bounded 3046/BLE-113 retry without blocking HA."""
         await asyncio.sleep(delay)
 
     def _note_property_equivalent_push(
         self,
-        device_id: str,
+        _device_id: str,
         body: Mapping[str, Any],
     ) -> None:
-        """Remember per-field live-property arrival times and diagnostics."""
+        """Remember the latest property-equivalent push for diagnostics."""
         now = time.monotonic()
         if any(key in body for key in self._MAIN_LIVE_PROPERTY_KEYS):
             self._last_property_push_monotonic = now
-        received = getattr(self, "_live_property_received_monotonic", None)
-        if received is None:
-            received = self._live_property_received_monotonic = {}
-        timestamps = received.setdefault(device_id, {})
-        for key in self._MQTT_LIVE_MAIN_PROPERTY_KEYS:
-            if key in body and body.get(key) is not None:
-                timestamps[key] = now
-
-    def _schedule_topology_reload(self) -> None:
-        """Reload once after a rare dynamic topology reindex completes."""
-        if self._shutdown_started:
-            return
-        current = self._topology_reload_task
-        if current is not None and not current.done():
-            return
-
-        async def _reload() -> None:
-            await asyncio.sleep(1)
-            if not await self.hass.config_entries.async_reload(self.entry.entry_id):
-                msg = "Home Assistant rejected the Jackery topology reload"
-                raise RuntimeError(msg)
-            self._battery_pack_topology_reload_required = False
-            replacement = self.entry.runtime_data
-            if isinstance(replacement, type(self)) and replacement is not self:
-                for identifier in self._pending_device_removals:
-                    if identifier not in replacement._pending_device_removals:  # ruff:ignore[private-member-access]
-                        replacement._pending_device_removals.append(identifier)  # ruff:ignore[private-member-access]
-                replacement._pending_battery_pack_removal_serials.update(  # ruff:ignore[private-member-access]
-                    self._pending_battery_pack_removal_serials
-                )
-                self._pending_device_removals.clear()
-                self._pending_battery_pack_removal_serials.clear()
-                self._battery_pack_identity_overrides.clear()
-
-        task = self.hass.async_create_background_task(
-            _reload(),
-            name=f"{DOMAIN}_topology_reload",
-            eager_start=False,
-        )
-        self._topology_reload_task = task
-
-        def _reload_done(done: asyncio.Task[None]) -> None:
-            if self._topology_reload_task is done:
-                self._topology_reload_task = None
-            try:
-                done.result()
-            except asyncio.CancelledError:
-                return
-            except Exception as err:  # ruff:ignore[blind-except]
-                _LOGGER.warning("Jackery topology reload failed: %s", err)
-
-        task.add_done_callback(_reload_done)
 
     @property
     def has_pending_supplemental_transport_cleanup(self) -> bool:
-        """Return whether a Layer-5 transport still needs independent cleanup."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return whether a Layer-5 transport still needs independent cleanup."""  # noqa: D421, RUF105
         return (
             self._mqtt is not None
             or self._ble_listener is not None
@@ -5003,12 +4919,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             task
             for task in (
                 self._statistics_import_task,
+                self._statistics_backfill_task,
                 self._slow_metrics_bg_task,
                 self._mqtt_poll_task,
                 self._shadow_fallback_task,
                 *self._battery_pack_ota_tasks.values(),
                 *self._ble_coalesce_tasks.values(),
-                *self._local_mqtt_message_tasks,
                 *self._background_tasks.values(),
             )
             if task is not None
@@ -5021,6 +4937,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Drop completed supplemental task references and retain retryable work."""
         if self._statistics_import_task not in pending_tasks:
             self._statistics_import_task = None
+        if self._statistics_backfill_task not in pending_tasks:
+            self._statistics_backfill_task = None
         if self._slow_metrics_bg_task not in pending_tasks:
             self._slow_metrics_bg_task = None
         if self._mqtt_poll_task not in pending_tasks:
@@ -5037,7 +4955,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             for key, task in self._ble_coalesce_tasks.items()
             if task in pending_tasks
         }
-        self._local_mqtt_message_tasks.intersection_update(pending_tasks)
         self._background_tasks = {
             key: task
             for key, task in self._background_tasks.items()
@@ -5109,7 +5026,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if stop_errors:
             raise RuntimeError("; ".join(stop_errors))
 
-    async def async_shutdown(self) -> None:  # ruff:ignore[too-many-branches]
+    async def async_shutdown(self) -> None:
         """Stop MQTT + BLE clients on integration unload."""
         self._shutdown_started = True
         if self._base_shutdown_task is None:
@@ -5121,11 +5038,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._poll_watchdog_unsub is not None:
             self._poll_watchdog_unsub()
             self._poll_watchdog_unsub = None
-        for unsubscribe in self._local_mqtt_unsubs:
-            with contextlib.suppress(Exception):
-                unsubscribe()
-        self._local_mqtt_unsubs.clear()
-
         supplemental_tasks = self._supplemental_transport_tasks()
         current_shutdown_task = asyncio.current_task()
         if current_shutdown_task is not None:
@@ -5138,11 +5050,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         })
 
         tracked_tasks = set(self._active_http_update_tasks)
-        if (
-            self._topology_reload_task is not None
-            and self._topology_reload_task is not current_shutdown_task
-        ):
-            tracked_tasks.add(self._topology_reload_task)
         for task in tracked_tasks:
             if not task.done():
                 task.cancel()
@@ -5163,11 +5070,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
 
         self._active_http_update_tasks.intersection_update(pending_tasks)
-        if (
-            self._topology_reload_task is not current_shutdown_task
-            and self._topology_reload_task not in pending_tasks
-        ):
-            self._topology_reload_task = None
         if shutdown_errors:
             raise RuntimeError("; ".join(shutdown_errors))
 
@@ -5210,53 +5112,79 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         verbatim. Returns ``True`` if the GATT write completed (and, when
         ``wait_for_ack`` is set, the device echoed a decoded notify frame
         in time). Returns ``False`` only when the BLE listener is not
-        connected to the device — callers fall back to MQTT in that case.
+        connected to the device. The shared command router starts the
+        Cloud-MQTT attempt independently, so either transport can complete
+        the command.
 
         Raises ``RuntimeError`` on ACK timeout when ``wait_for_ack`` is
-        enabled; the BLE-first setter router catches that and falls back
-        to MQTT. For SolarVault setters the duplicated write is
+        enabled. The shared command router isolates that BLE failure from
+        the concurrent Cloud-MQTT write. SolarVault setter writes are
         idempotent.
 
         The trailer is currently sent as four NUL bytes — the firmware
         may or may not validate it; see :class:`.client.ble.BleBinaryFrame`.
         """
+        portable_ble_type = PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID.get(flags)
         if (
             isinstance(flags, bool)
             or isinstance(cmd, bool)
-            or (flags, cmd) not in _HOME_BLE_COMMAND_PAIRS
-            or cmd in _BLE_FIRST_UNSUPPORTED_MSG_TYPES
+            or (
+                (flags, cmd) not in _HOME_BLE_COMMAND_PAIRS and portable_ble_type != cmd
+            )
+            or cmd in _BLE_UNSUPPORTED_MSG_TYPES
         ):
             return False
         if not self._ble_writes_enabled() or self._ble_listener is None:
             return False
+
+        # FIX: Body-Validierung hinzufügen
+        # Type signature ensures body is dict | bytes,
+        # but validate dict is JSON-serializable
         if isinstance(body, dict):
-            transport_body = self._command_body_for_transport(body, cmd=cmd)
-            payload = json.dumps(
-                transport_body,
-                separators=(",", ":"),
-                ensure_ascii=False,
-            )
-            body_bytes = payload.encode("utf-8")
-        else:
-            body_bytes = bytes(body)
-        if (
-            connect_timeout_sec > 0
-            and not await self._ble_listener.async_ensure_connected(
+            # JSON-Validierung
+            try:
+                json.dumps(body)
+            except TypeError, ValueError:
+                _LOGGER.exception(
+                    "Invalid JSON in BLE command body for device %s", device_id
+                )
+                raise
+
+        # Device-Lock für Race-Condition-Schutz hinzufügen
+        if not hasattr(self, "_device_locks"):
+            self._device_locks: dict[str, asyncio.Lock] = {}
+
+        lock = self._device_locks.setdefault(device_id, asyncio.Lock())
+
+        async with lock:
+            if isinstance(body, dict):
+                transport_body = self._command_body_for_transport(body, cmd=cmd)
+                payload = json.dumps(
+                    transport_body,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                )
+                body_bytes = payload.encode("utf-8")
+            else:
+                body_bytes = bytes(body)
+            if (
+                connect_timeout_sec > 0
+                and not await self._ble_listener.async_ensure_connected(
+                    device_id,
+                    timeout_sec=connect_timeout_sec,
+                )
+            ):
+                return False
+            sent = await self._ble_listener.async_send_command(
                 device_id,
-                timeout_sec=connect_timeout_sec,
+                msg_id=flags,
+                ble_msg_type=cmd,
+                body=body_bytes,
+                wait_for_ack=wait_for_ack,
+                ack_timeout_sec=ack_timeout_sec,
+                mtu_override=mtu_override,
             )
-        ):
-            return False
-        sent = await self._ble_listener.async_send_command(
-            device_id,
-            msg_id=flags,
-            ble_msg_type=cmd,
-            body=body_bytes,
-            wait_for_ack=wait_for_ack,
-            ack_timeout_sec=ack_timeout_sec,
-            mtu_override=mtu_override,
-        )
-        return bool(sent)
+            return bool(sent)
 
     def ble_observations(self) -> dict[str, Any]:
         """Return a JSON-friendly snapshot of the BLE listener stats.
@@ -5427,41 +5355,35 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         }
 
     def local_mqtt_observations(self) -> dict[str, Any]:
-        """Return a JSON-friendly snapshot of the Local MQTT bridge.
-
-        Used by the Local MQTT diagnostic sensor. Reports both receive
-        paths: the direct :class:`JackeryLocalMqttClient` (Path A) and the
-        HA-integration broker listener (Path B). ``messages_received`` sums
-        both counters and ``enabled`` reflects either path, so the RX total
-        stays visible even when only the listener is active and no direct
-        client is registered.
-        """
+        """Return a JSON-friendly snapshot of the direct Local MQTT bridge."""
         bucket = self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id)
         client = (
             bucket.get(LOCAL_MQTT_RUNTIME_KEY) if isinstance(bucket, dict) else None
         )
         snap = (
-            client.diagnostics_snapshot(redact=False)
+            client.diagnostics_snapshot()
             if isinstance(client, JackeryLocalMqttClient)
             else {}
         )
-        listener_active = bool(self._local_mqtt_unsubs)
         return {
-            "enabled": bool(snap.get("enabled", False)) or listener_active,
+            "enabled": bool(snap.get("enabled", False)),
             "connected": snap.get("connected", False),
-            "messages_received": (
-                snap.get("messages_received", 0)
-                + self._local_mqtt_listener_messages_received
-            ),
+            "broker_connected": snap.get("broker_connected", False),
+            "subscribed": snap.get("subscribed", False),
+            "started": snap.get("started", False),
+            "subscription_filter_count": snap.get("subscription_filter_count", 0),
+            "topics_seen_count": snap.get("topics_seen_count", 0),
+            "topics_seen_truncated": snap.get("topics_seen_truncated", False),
+            "device_traffic_observed": bool(snap.get("device_traffic_observed", False))
+            or bool(getattr(self, "_local_mqtt_device_traffic_observed", False)),
+            "messages_received": snap.get("messages_received", 0),
             "messages_dropped": snap.get("messages_dropped", 0),
             "messages_forwarded": snap.get("messages_forwarded", 0),
-            "messages_ignored_foreign": (
-                snap.get("messages_ignored_foreign", 0)
-                + self._local_mqtt_listener_foreign_ignored
+            "messages_rejected_by_sink": snap.get(
+                "messages_rejected_by_sink",
+                0,
             ),
-            "pending_sink_tasks": snap.get("pending_sink_tasks", 0),
-            "max_pending_sink_tasks": snap.get("max_pending_sink_tasks", 0),
-            "sink_backlog_dropped": snap.get("sink_backlog_dropped", 0),
+            "messages_ignored_foreign": snap.get("messages_ignored_foreign", 0),
             "last_connect_at": snap.get("last_connect_at"),
             "last_disconnect_at": snap.get("last_disconnect_at"),
             "last_message_at": snap.get("last_message_at"),
@@ -5470,9 +5392,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "blocked_by_filter_count": snap.get("blocked_by_filter_count", 0),
             "payload_too_large_count": snap.get("payload_too_large_count", 0),
             "home_assistant_event_count": snap.get("home_assistant_event_count", 0),
-            "pending_ha_local_mqtt_tasks": len(self._local_mqtt_message_tasks),
-            "max_pending_ha_local_mqtt_tasks": _LOCAL_MQTT_MAX_PENDING_MESSAGE_TASKS,
-            "backlog_dropped": self._local_mqtt_backlog_dropped,
             "routing_warning": snap.get("routing_warning"),
             "local_mqtt_active": self._local_mqtt_is_active(),
             "library": snap.get("library"),
@@ -5524,238 +5443,320 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Clear BLE connect backoff after a successful device session."""
         self._ble_backoff_for_device(device_id).record_success()
 
-    async def async_start_ble_transport(self) -> None:  # ruff:ignore[too-many-statements]
+    async def _async_ingest_ble_observation(  # ruff:ignore[too-many-branches, too-many-locals, too-many-return-statements, too-many-statements]  # One guarded decoder keeps App frame validation and routing atomic.  # noqa: C901, RUF105
+        self,
+        device_id: str,
+        observation: BleFrameObservation,
+    ) -> bool:
+        """Decode and merge one requested or unsolicited BLE frame."""
+        parsed = observation.parsed
+        if parsed is None or not parsed.body:
+            return False
+        try:
+            decoded = json.loads(parsed.body.decode("utf-8"))
+        except PAYLOAD_PARSE_ERRORS as err:
+            _LOGGER.debug(
+                "Jackery BLE %s: body is not JSON (cmd=%d, %d bytes): %s",
+                device_id,
+                parsed.cmd,
+                len(parsed.body),
+                err,
+            )
+            return False
+        if not isinstance(decoded, dict):
+            _LOGGER.debug(
+                "Jackery BLE %s: body decoded to %s, expected dict",
+                device_id,
+                type(decoded).__name__,
+            )
+            return False
+
+        cmd = parsed.cmd
+        action_id = parsed.flags
+        classification_body = {**decoded, FIELD_CMD: cmd}
+        payload = {key: value for key, value in decoded.items() if key != FIELD_CMD}
+        if not payload:
+            return False
+        raw_message_type = decoded.get(FIELD_MESSAGE_TYPE)
+        message_type = (
+            str(raw_message_type)
+            if isinstance(raw_message_type, str) and raw_message_type
+            else None
+        )
+
+        await self._async_payload_debug_event(
+            lambda: {
+                "kind": TransportSource.BLE.value,
+                "topic": f"ble://{device_id}/cmd{cmd}",
+                "device_id": device_id,
+                "cmd": cmd,
+                "body_size": len(parsed.body),
+                "payload": payload,
+                "payload_chart_series_debug": chart_series_debug(payload),
+            },
+        )
+
+        current_device = self._ble_partial_update_base(device_id)
+        if not isinstance(current_device, dict):
+            # The GATT session is already bound to a cached identity. A frame
+            # for an identity absent from both cache and committed state is
+            # rejected rather than attributed to another device.
+            return False
+        updated = dict(current_device)
+        touched = False
+
+        is_third_party_config = is_third_party_mqtt_config_message(
+            message_type,
+            action_id,
+            classification_body,
+        )
+        is_wifi_config = is_wifi_config_message(
+            message_type,
+            action_id,
+            classification_body,
+        )
+        is_wifi_list = is_wifi_list_message(action_id, classification_body)
+        is_time_zone_config = is_time_zone_config_message(
+            action_id,
+            classification_body,
+        )
+        is_grid_standard_sync = is_grid_standard_sync_message(
+            action_id,
+            classification_body,
+        )
+        is_mqtt_connect_info = is_mqtt_connect_info_message(
+            action_id,
+            classification_body,
+        )
+        is_device_ota_version = is_device_ota_version_message(
+            action_id,
+            classification_body,
+        )
+        is_weather_plan = (
+            message_type
+            in {
+                MQTT_MESSAGE_UPLOAD_WEATHER_PLAN,
+                MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+                MQTT_MESSAGE_SEND_WEATHER_ALERT,
+                MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
+            }
+            or cmd == MQTT_CMD_QUERY_WEATHER_PLAN
+        )
+        is_schedule = (
+            message_type == MQTT_MESSAGE_DOWNLOAD_DEVICE_SCHEDULE
+            or cmd == MQTT_CMD_DOWNLOAD_DEVICE_SCHEDULE
+        )
+        is_electricity_strategy = message_type in {
+            MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
+            MQTT_MESSAGE_INSERT_ELECTRICITY_STRATEGY,
+            MQTT_MESSAGE_UPDATE_ELECTRICITY_STRATEGY,
+            MQTT_MESSAGE_DELETE_ELECTRICITY_STRATEGY,
+            MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
+        }
+        is_tou_schedule = message_type in {
+            MQTT_MESSAGE_TOU_SCHEDULE,
+            MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
+        }
+        is_battery_boundary = message_type == MQTT_MESSAGE_SET_BATTERY_BOUNDARY
+        ble_envelope: dict[str, Any] = {FIELD_ACTION_ID: action_id}
+        if message_type is not None:
+            ble_envelope[FIELD_MESSAGE_TYPE] = message_type
+        is_direct_subdevice = self._is_subdevice_payload(
+            ble_envelope,
+            classification_body,
+        )
+
+        if is_alarm_message(message_type, action_id, classification_body):
+            updated[PAYLOAD_ALARM] = payload
+            touched = True
+        elif is_third_party_config:
+            updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = (
+                self._store_third_party_mqtt_config_body(
+                    device_id,
+                    payload,
+                    action_id,
+                )
+            )
+            touched = True
+        elif is_wifi_config:
+            updated[PAYLOAD_WIFI_CONFIG] = payload
+            touched = True
+        elif is_wifi_list:
+            updated[PAYLOAD_WIFI_LIST] = payload
+            touched = True
+        elif is_time_zone_config:
+            updated[PAYLOAD_TIMEZONE_CONFIG] = payload
+            if payload.get(FIELD_TIMEZONE) is not None:
+                system = dict(current_device.get(PAYLOAD_SYSTEM) or {})
+                system[FIELD_TIMEZONE] = payload.get(FIELD_TIMEZONE)
+                updated[PAYLOAD_SYSTEM] = system
+                self._patch_device_index_system_meta(
+                    device_id,
+                    {FIELD_TIMEZONE: payload.get(FIELD_TIMEZONE)},
+                )
+            touched = True
+        elif is_grid_standard_sync:
+            value = payload.get(FIELD_GRID_STANDARD)
+            if value is None:
+                value = payload.get(FIELD_SAFETY)
+            if value is not None:
+                system = dict(current_device.get(PAYLOAD_SYSTEM) or {})
+                system[FIELD_GRID_STANDARD] = str(value)
+                updated[PAYLOAD_SYSTEM] = system
+                self._patch_device_index_system_meta(
+                    device_id,
+                    {FIELD_GRID_STANDARD: str(value)},
+                )
+            touched = True
+        elif is_mqtt_connect_info:
+            updated[PAYLOAD_MQTT_CONNECT_INFO] = payload
+            touched = True
+        elif is_device_ota_version:
+            ota = dict(current_device.get(PAYLOAD_OTA) or {})
+            ota.update(payload)
+            updated[PAYLOAD_OTA] = ota
+            touched = True
+        elif is_weather_plan:
+            updated[PAYLOAD_WEATHER_PLAN] = payload
+            touched = True
+        elif is_schedule:
+            updated[PAYLOAD_TASK_PLAN] = payload
+            touched = True
+        elif is_electricity_strategy:
+            updated[PAYLOAD_ELECTRICITY_STRATEGY] = payload
+            touched = True
+        elif is_tou_schedule:
+            updated[PAYLOAD_TOU_SCHEDULE] = payload
+            touched = True
+        elif is_battery_boundary:
+            updated[PAYLOAD_BATTERY_BOUNDARY] = payload
+            touched = True
+        elif (
+            is_direct_subdevice
+            or cmd == MQTT_CMD_CONTROL_SUB_DEVICE
+            or (
+                cmd == MQTT_CMD_QUERY_COMBINE_DATA
+                and self._is_subdevice_payload(payload, classification_body)
+            )
+        ):
+            touched = self._merge_subdevice_data(
+                updated,
+                payload,
+                device_id=device_id,
+                source_transport=TransportSource.BLE,
+            )
+        else:
+            property_payload = self._normalize_live_property_payload(payload)
+            props = self._merge_main_properties_for_device(
+                device_id,
+                current_device.get(PAYLOAD_PROPERTIES) or {},
+                property_payload,
+                source=TransportSource.BLE,
+            )
+            updated[PAYLOAD_PROPERTIES] = props
+            touched = bool(property_payload)
+
+        if not touched or updated == current_device:
+            if not touched and self._ble_listener is not None:
+                stats = self._ble_listener.stats_for(device_id)
+                stats.unrouted_frames_by_cmd[cmd] = (
+                    stats.unrouted_frames_by_cmd.get(cmd, 0) + 1
+                )
+            return False
+
+        self._schedule_ble_partial_update(device_id, updated)
+        return True
+
+    async def async_start_ble_transport(self) -> None:
         """Start the optional BLE listener if the config-entry option is set.
 
         Safe to call repeatedly; only the first call attaches a listener.
         Failures are logged at WARNING and don't propagate — BLE is an
         opt-in diagnostic channel and must not break cloud setup.
         """
-        if self._ble_listener is not None:
-            return
-        if not config_entry_bool_option(
-            self.entry,
-            CONF_ENABLE_BLE_TRANSPORT,
-            DEFAULT_ENABLE_BLE_TRANSPORT,
-        ):
-            return
+        async with self._ble_start_lock:
+            if self._ble_listener is not None or self._shutdown_started:
+                return
+            if not config_entry_bool_option(
+                self.entry,
+                CONF_ENABLE_BLE_TRANSPORT,
+                DEFAULT_ENABLE_BLE_TRANSPORT,
+            ):
+                return
 
-        async def _sink(device_id: str, observation: BleFrameObservation) -> bool:  # ruff:ignore[too-many-return-statements, too-many-branches]
-            """Merge BLE-delivered JSON bodies into ``coordinator.data``.
+            async def _sink(
+                device_id: str,
+                observation: BleFrameObservation,
+            ) -> bool:
+                """Route every requested or unsolicited frame through shared ingest."""
+                return await self._async_ingest_ble_observation(device_id, observation)
 
-            Mirrors the cmd-routing of ``_async_handle_mqtt_message`` so
-            BLE-decoded telemetry uses the **same** merge helpers as MQTT
-            payloads. Without this contract the live values stop updating
-            whenever MQTT goes quiet: a 2-arg
-            ``_merge_main_properties_for_device(device_id, payload)``
-            call (the previous shape) raises ``TypeError`` in the sink's
-            ``try/except`` and silently drops every decoded frame
-            (observed 2026-05-16 17:41–17:44 production log).
-
-            Routing per ``cmd`` (from :data:`.const.MQTT_CMD_*`):
-
-            * ``107`` / ``121`` (DevicePropertyChange / CombineData):
-              main-properties merge via
-              :meth:`_merge_main_properties_for_device` (3 args:
-              ``device_id, base, updates``).
-            * ``111`` (UploadSubDeviceIncrementalProperty): subdevice
-              merge via :meth:`_merge_subdevice_data`.
-            * Other cmds (e.g. ``120`` lifetime stat snapshots) are
-              logged but not merged — they need their own contract that
-              is out of scope here.
-
-            After a successful merge the updated bundle is published via
-            :meth:`_push_partial_update` so the existing entity listeners
-            pick it up.
-            """  # ruff:ignore[ambiguous-unicode-character-docstring]
-            if observation.parsed is None:
-                return False
-            body = observation.parsed.body
-            if not body:
-                return False
             try:
-                payload = json.loads(body.decode("utf-8"))
-            except PAYLOAD_PARSE_ERRORS as err:
-                _LOGGER.debug(
-                    "Jackery BLE %s: body is not JSON (cmd=%d, %d bytes): %s",
-                    device_id,
-                    observation.parsed.cmd,
-                    len(body),
+                ble_transport_module = await self.hass.async_add_executor_job(
+                    importlib.import_module,
+                    f"{__package__}.client.ble_transport",
+                )
+                listener_class = cast("Any", ble_transport_module).JackeryBleListener
+            except (AttributeError, ImportError) as err:
+                _LOGGER.warning(
+                    "Jackery BLE transport is unavailable; retrying independently: %s",
                     err,
                 )
-                return False
-            if not isinstance(payload, dict):
-                _LOGGER.debug(
-                    "Jackery BLE %s: body decoded to %s, expected dict",
-                    device_id,
-                    type(payload).__name__,
-                )
-                return False
-            # Strip the BLE-only framing key — ``cmd`` duplicates
-            # ``observation.parsed.cmd`` and never appears in cloud HTTP
-            # payloads. ``deviceSn`` and ``devType`` stay (subdevice
-            # merge needs them).
-            payload = {k: v for k, v in payload.items() if k != FIELD_CMD}
-            if not payload:
-                return False
+                self._schedule_ble_start_retry()
+                return
 
-            cmd = observation.parsed.cmd
-            # Mirror the MQTT debug-emit pattern (see ``_async_handle_mqtt_message``)
-            # so payload-debug consumers can see BLE traffic too. The lazy
-            # factory keeps the ``chart_series_debug`` walk off the hot path
-            # when the dedicated payload_debug logger is below DEBUG. The
-            # ``topic`` field is synthesised as ``ble://<device>/cmd<n>`` so
-            # the per-channel dedup throttle in
-            # ``_async_payload_debug_event`` distinguishes each device/cmd
-            # pair (otherwise every BLE frame would share one cache slot).
-            await self._async_payload_debug_event(
-                lambda: {
-                    "kind": "ble",
-                    "topic": f"ble://{device_id}/cmd{cmd}",
-                    "device_id": device_id,
-                    "cmd": cmd,
-                    "body_size": len(body),
-                    "payload": payload,
-                    "payload_chart_series_debug": chart_series_debug(payload),
-                },
+            listener = listener_class(
+                self.hass,
+                _sink,
+                key_resolver=self.device_bluetooth_key,
+                ble_address_resolver=self._ble_address_for_device,
+                connect_backoff_remaining=self._ble_connect_backoff_remaining,
+                connect_backoff_note_failure=self._ble_note_connect_failure,
+                connect_backoff_note_success=self._ble_note_connect_success,
+                keep_alive_msg_id=ACTION_ID_QUERY_DEVICE_PROPERTY,
+                keep_alive_ble_msg_type=MQTT_CMD_QUERY_DEVICE_PROPERTY,
+                serial_resolver=self.device_id_for_ble_serial,
             )
-            current_device = self._ble_partial_update_base(device_id)
-            if not isinstance(current_device, dict):
-                # Coordinator hasn't populated this device yet (first
-                # cloud refresh still pending). Drop the frame quietly;
-                # the next BLE notify after discovery will land.
-                return False
-            updated = dict(current_device)
-            touched = False
-
-            if cmd in {MQTT_CMD_DEVICE_PROPERTY_CHANGE, MQTT_CMD_CONTROL_COMBINE}:
-                property_payload = self._normalize_live_property_payload(payload)
-                props = self._merge_main_properties_for_device(
-                    device_id,
-                    current_device.get(PAYLOAD_PROPERTIES) or {},
-                    property_payload,
-                    source=TransportSource.BLE,
-                )
-                updated[PAYLOAD_PROPERTIES] = props
-                touched = bool(property_payload) or touched
-            elif cmd == MQTT_CMD_CONTROL_SUB_DEVICE:
-                touched = self._merge_subdevice_data(
-                    updated,
-                    payload,
-                    device_id=device_id,
-                    source_transport=TransportSource.BLE,
-                )
-            elif cmd == MQTT_CMD_QUERY_COMBINE_DATA:
-                if self._is_subdevice_payload(payload, payload):
-                    touched = (
-                        self._merge_subdevice_data(
-                            updated,
-                            payload,
-                            device_id=device_id,
-                            source_transport=TransportSource.BLE,
-                        )
-                        or touched
-                    )
-                    if str(payload.get(FIELD_DEV_TYPE)) == str(
-                        SUBDEVICE_DEV_TYPE_BATTERY_PACK,
-                    ) and payload.get(FIELD_DEVICE_SN):
-                        touched = (
-                            self._merge_battery_pack_lifetime_from_ble(
-                                updated,
-                                payload,
-                            )
-                            or touched
-                        )
-                else:
-                    property_payload = self._normalize_live_property_payload(payload)
-                    props = self._merge_main_properties_for_device(
-                        device_id,
-                        current_device.get(PAYLOAD_PROPERTIES) or {},
-                        property_payload,
-                        source=TransportSource.BLE,
-                    )
-                    updated[PAYLOAD_PROPERTIES] = props
-                    touched = bool(property_payload) or touched
-            # Track unrouted frames in the listener stats so they
-            # show up in diagnostics without spamming DEBUG once per
-            # frame (cmd=120 system/per-device/CT variants arrive
-            # multiple times per minute over BLE).
-            elif self._ble_listener is not None:
-                stats = self._ble_listener.stats_for(device_id)
-                stats.unrouted_frames_by_cmd[cmd] = (
-                    stats.unrouted_frames_by_cmd.get(cmd, 0) + 1
-                )
-
-            if not touched:
-                return False
-            if updated == current_device:
-                return False
-
-            self._schedule_ble_partial_update(device_id, updated)
-            return True
-
-        try:
-            ble_transport_module = await self.hass.async_add_executor_job(
-                importlib.import_module,
-                f"{__package__}.client.ble_transport",
-            )
-            listener_class = cast("Any", ble_transport_module).JackeryBleListener
-        except (AttributeError, ImportError) as err:
-            _LOGGER.warning(
-                "Jackery BLE transport is unavailable; HTTP remains active: %s",
-                err,
-            )
-            return
-
-        listener = listener_class(
-            self.hass,
-            _sink,
-            key_resolver=self.device_bluetooth_key,
-            ble_address_resolver=self._ble_address_for_device,
-            connect_backoff_remaining=self._ble_connect_backoff_remaining,
-            connect_backoff_note_failure=self._ble_note_connect_failure,
-            connect_backoff_note_success=self._ble_note_connect_success,
-            keep_alive_msg_id=ACTION_ID_QUERY_DEVICE_PROPERTY,
-            keep_alive_ble_msg_type=MQTT_CMD_QUERY_DEVICE_PROPERTY,
-            serial_resolver=self.device_id_for_ble_serial,
-        )
-        try:
-            await listener.async_start(list(self._device_index.keys()))
-        except BACKGROUND_TASK_ERRORS as err:
-            _LOGGER.warning("Jackery BLE listener failed to start: %s", err)
-            return
-        self._ble_listener = listener
-        _LOGGER.info(
-            "Jackery BLE listener attached for %d device(s)",
-            len(self._device_index),
-        )
-        # Dev-mode convenience: when the developer env-var toggle is on,
-        # log the per-device bluetoothKey so it can be reused to decrypt
-        # sniffed BLE frames outside the integration. JACKERY_DEV_MODE=1
-        # *also* disables redaction in the JSONL log and diagnostics
-        # export; both surfaces are off by default.
-
-        if dev_mode_redactions_disabled():
-            for device_id in self._device_index:
-                key = self.device_bluetooth_key(device_id)
-                if key is None:
-                    _LOGGER.warning(
-                        "Jackery DEV_MODE: device %s has no bluetoothKey captured yet",
-                        device_id,
-                    )
-                    continue
-                # Never write raw key material into the HA log, even in
-                # DEV_MODE — HA logs get shared for support. The full key
-                # remains available (DEV_MODE only) in the payload-debug
-                # JSONL and the diagnostics export.
+            try:
+                await listener.async_start(list(self._device_index.keys()))
+            except BACKGROUND_TASK_ERRORS as err:
+                with contextlib.suppress(Exception):
+                    await listener.async_stop()
                 _LOGGER.warning(
-                    "Jackery DEV_MODE: device %s bluetoothKey captured "
-                    "(sha256=%s, %d bytes); full key is in the payload-debug "
-                    "JSONL / diagnostics export",
-                    device_id,
-                    hashlib.sha256(key).hexdigest()[:16],
-                    len(key),
+                    "Jackery BLE listener failed to start; retrying independently: %s",
+                    err,
                 )
+                self._schedule_ble_start_retry()
+                return
+            self._ble_listener = listener
+            _LOGGER.info(
+                "Jackery BLE listener attached for %d device(s)",
+                len(self._device_index),
+            )
+
+    def _schedule_ble_start_retry(self) -> asyncio.Task[Any] | None:
+        """Keep retrying BLE listener startup without involving other transports."""
+
+        async def _retry() -> None:
+            delay = BLE_CONNECT_BACKOFF_INITIAL_SEC
+            while (
+                not self._shutdown_started
+                and self._ble_listener is None
+                and config_entry_bool_option(
+                    self.entry,
+                    CONF_ENABLE_BLE_TRANSPORT,
+                    DEFAULT_ENABLE_BLE_TRANSPORT,
+                )
+            ):
+                await asyncio.sleep(delay)
+                await self.async_start_ble_transport()
+                delay = min(delay * 2, BLE_CONNECT_BACKOFF_MAX_SEC)
+
+        return self._schedule_background_once(
+            "ble_start_retry",
+            _retry,
+            name=f"{DOMAIN}_ble_start_retry",
+        )
 
     async def async_reconcile_ble_transport(self) -> None:
         """Restart only BLE after its option changes, leaving HTTP untouched."""
@@ -5773,7 +5774,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     _BACKGROUND_TASK_STOP_TIMEOUT_SEC,
                 )
                 return
-            except Exception as err:  # ruff:ignore[blind-except]
+            except Exception as err:  # noqa: BLE001, RUF105
                 _LOGGER.warning(
                     "Jackery BLE option reconfiguration failed; HTTP remains "
                     "active: %s",
@@ -5813,6 +5814,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not ble_serial:
             return None
         target = ble_serial.strip().upper()
+        matches: list[str] = []
         for device_id, idx in self._device_index.items():
             device_meta = idx.get(PAYLOAD_DEVICE_META) or {}
             http_sn = (
@@ -5827,7 +5829,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if not http_sn:
                 continue
             if http_sn == target or http_sn.endswith(target):
-                return device_id
+                matches.append(device_id)
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            _LOGGER.warning(
+                "Jackery BLE advertisement matched multiple cached devices; "
+                "rejecting the ambiguous identity",
+            )
         return None
 
     def async_start_statistics_imports(self) -> None:
@@ -5927,7 +5936,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._mqtt_mgr.record_connect_success(mqtt, fingerprint)
 
     @_serialize_mqtt_messages_by_device
-    async def _async_handle_mqtt_message(  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+    async def _async_handle_mqtt_message(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
         self,
         topic: str,
         payload: dict[str, Any],
@@ -5949,16 +5958,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "data_chart_series_debug": chart_series_debug(payload.get(FIELD_DATA)),
             },
         )
-        if not self.data:
-            return None
-
         device_id = self._resolve_device_id_from_mqtt(payload)
         if not device_id:
             return None
-        if device_id not in self.data:
+        current = self._transport_partial_update_base(device_id)
+        if current is None:
             return None
 
-        current = self.data[device_id]
         updated = dict(current)
         touched = False
         body = payload.get(FIELD_BODY)
@@ -5967,6 +5973,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body = alt_body if isinstance(alt_body, dict) else {}
         msg_type = payload.get(FIELD_MESSAGE_TYPE)
         action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))
+        if source is TransportSource.CLOUD_MQTT and action_id is not None:
+            self._synchronize_mqtt_session_generation()
+            self._mqtt_session_actions_seen.add((device_id, action_id))
         cmd = first_nonblank_int(body.get(FIELD_CMD))
         classification_body = body
         if cmd is not None:
@@ -6045,20 +6054,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     touched = True
                 elif is_third_party_mqtt_config:
                     updated[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = (
-                        self._decode_third_party_mqtt_config_body(device_id, body)
+                        self._store_third_party_mqtt_config_body(
+                            device_id,
+                            body,
+                            action_id,
+                        )
                     )
                     touched = True
-                elif is_subdevice:
-                    touched = (
-                        self._merge_subdevice_data(
-                            updated,
-                            body,
-                            device_id=device_id,
-                            source_transport=source,
-                        )
-                        or touched
-                    )
-                elif not is_alarm:
+                elif not is_alarm and not is_subdevice:
                     property_body = self._normalize_live_property_payload(body)
                     props = self._merge_main_properties_for_device(
                         device_id,
@@ -6259,10 +6262,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             touched = bool(property_body) or touched
 
         # Sub-device status: battery packs and CT/smart meter values are
-        # transported as QuerySubDeviceGroupProperty responses.
+        # transported as QuerySubDeviceGroupProperty responses, and live
+        # incremental updates arrive via UploadSubDeviceIncrementalProperty.
         if (
-            is_subdevice
-            or msg_type == MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY
+            msg_type
+            in {
+                MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+                MQTT_MESSAGE_UPLOAD_SUBDEVICE_INCREMENTAL_PROPERTY,
+            }
+            or is_subdevice
             or action_id in MQTT_ACTION_IDS_SUBDEVICE
         ):
             subdevice_source = body or payload
@@ -6290,7 +6298,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "source": source.value,
         }
 
-        new_data = dict(self.data)
+        new_data = dict(self.data or {})
         new_data[device_id] = updated
         self._push_partial_update(new_data)
         if updated.get(PAYLOAD_BATTERY_PACKS):
@@ -6312,6 +6320,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         device_sn = payload.get(FIELD_DEVICE_SN) or body.get(FIELD_DEVICE_SN)
         if device_sn:
+            matching_device_ids: list[str] = []
             for dev_id, idx in self._device_index.items():
                 candidates = [
                     (idx.get(PAYLOAD_DEVICE_META) or {}).get(FIELD_DEVICE_SN),
@@ -6323,8 +6332,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         (self.data or {}).get(dev_id, {}).get(PAYLOAD_DISCOVERY) or {}
                     ).get(FIELD_DEVICE_SN),
                 ]
-                if device_sn in candidates:
-                    return dev_id
+                if any(
+                    candidate is not None and str(candidate) == str(device_sn)
+                    for candidate in candidates
+                ):
+                    matching_device_ids.append(dev_id)
+            if len(matching_device_ids) == 1:
+                return matching_device_ids[0]
+            # Never assign an explicit unknown/ambiguous serial to an unrelated
+            # sole cached device.
+            return None
 
         if len(self._device_index) == 1:
             return next(iter(self._device_index))
@@ -6333,25 +6350,59 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     async def async_handle_local_mqtt_message(
         self,
         topic: str,
-        payload: dict[str, Any],
-    ) -> None:
+        payload: dict[str, Any] | None = None,
+        raw_bytes: bytes | None = None,
+    ) -> bool:
         """Route local third-party MQTT JSON through the shared MQTT parser.
 
         The device-side third-party bridge can publish body-only JSON on the
         local broker instead of the cloud envelope. Wrap that body so the
         existing MQTT/BLE routing logic sees the same normalized shape.
+
+        Returns:
+            True only when shared ingest accepted the frame for one known device.
         """
+        if raw_bytes is not None and len(raw_bytes) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
+            return False
+        if not payload and raw_bytes:
+            decode_error: Exception | None = None
+            for dev_id in self._device_index:
+                key = self.device_bluetooth_key(dev_id)
+                if not key:
+                    continue
+                try:  # ruff:ignore[too-many-statements-in-try-clause]
+                    frame = decrypt_binary_notify(raw_bytes, key)
+                    if frame.body:
+                        decoded = json.loads(frame.body)
+                        if isinstance(decoded, dict):
+                            payload = decoded
+                            break
+                except PAYLOAD_PARSE_ERRORS as err:
+                    decode_error = err
+            if not payload and decode_error is not None:
+                _LOGGER.debug(
+                    "Jackery local MQTT binary payload could not be decoded "
+                    "with any configured device key: %s",
+                    decode_error,
+                )
+
+        if not payload:
+            return False
+
         accepted_device_id = await self._async_handle_mqtt_message(
             topic,
             self._normalize_local_mqtt_payload(payload),
             source=TransportSource.LOCAL_MQTT,
         )
-        # Freshness is diagnostic state only; Local MQTT never controls the
-        # lifecycle or scheduling of HTTP, Cloud MQTT, or BLE.
+        if not accepted_device_id:
+            return False
+        # Freshness is diagnostic state only; Local MQTT never controls the lifecycle
+        # or scheduling of HTTP, Cloud MQTT, or BLE.
         now = time.monotonic()
         self._local_mqtt_last_message_monotonic = now
-        if accepted_device_id:
-            self._local_mqtt_last_device_message_monotonic[accepted_device_id] = now
+        self._local_mqtt_last_device_message_monotonic[accepted_device_id] = now
+        self._local_mqtt_device_traffic_observed = True
+        return True
 
     @classmethod
     def _normalize_local_mqtt_payload(
@@ -6530,95 +6581,94 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return dict(updates)
 
     def _transport_source_freshness_window(self) -> float:
-        """Return how long a higher-priority transport owns one field."""
+        """Return the observation age used by entity health reporting."""
         interval = getattr(self, "_configured_update_interval", timedelta(seconds=15))
         return max(60.0, interval.total_seconds() * 2)
-
-    def _source_field_update_allowed(
-        self,
-        state: dict[str, tuple[TransportSource, float]],
-        field: str,
-        source: TransportSource,
-        *,
-        now: float,
-    ) -> bool:
-        """Return whether ``source`` may replace the current value of ``field``."""
-        previous = state.get(field)
-        if previous is None:
-            return True
-        previous_source, received_at = previous
-        if source == previous_source:
-            return True
-        if (
-            _TRANSPORT_SOURCE_PRIORITY[source]
-            >= _TRANSPORT_SOURCE_PRIORITY[previous_source]
-        ):
-            return True
-        return now - received_at > self._transport_source_freshness_window()
 
     def _property_updates_for_source(
         self,
         device_id: str,
         updates: dict[str, Any],
         source: TransportSource,
+        *,
+        base: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Filter and stamp main-property updates by transport precedence."""
-        clean = self._sanitize_main_properties(updates)
+        """Prepare one transport's live properties and retain provenance."""
+        clean = {
+            field: value
+            for field, value in self._sanitize_main_properties(updates).items()
+            if self._property_value_present(value)
+        }
         source_state = getattr(self, "_property_source_state", None)
         if source_state is None:
             source_state = self._property_source_state = {}
         device_state = source_state.setdefault(device_id, {})
         now = time.monotonic()
-        accepted: dict[str, Any] = {}
-        for field, value in clean.items():
-            if not self._property_value_present(value):
-                continue
-            if not self._source_field_update_allowed(
-                device_state,
-                field,
-                source,
-                now=now,
-            ):
-                continue
-            accepted[field] = value
-            device_state[field] = (source, now)
-        return accepted
+        current_values: dict[str, Any] = dict(base) if isinstance(base, Mapping) else {}
+        result = ingest_observation(
+            Observation(
+                source=source,
+                device_id=device_id,
+                section=PAYLOAD_PROPERTIES,
+                payload=clean,
+                received_at_monotonic=now,
+            ),
+            current=current_values,
+            provenance=device_state,
+            received_at_monotonic=now,
+            freshness_window_seconds=self._transport_source_freshness_window(),
+        )
+        source_state[device_id] = result.provenance
+        return result.payload
 
-    def _accessory_updates_for_source(
+    def _accessory_updates_for_source(  # noqa: PLR0913, RUF105
         self,
         device_id: str | None,
         bucket: str,
         identity: str,
         updates: dict[str, Any],
         source: TransportSource,
+        *,
+        current: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Filter and stamp one accessory's fields by transport precedence."""
+        """Prepare one transport's accessory fields and retain provenance."""
         if device_id is None:
             return dict(updates)
         source_state = getattr(self, "_accessory_source_state", None)
         if source_state is None:
             source_state = self._accessory_source_state = {}
-        item_state = source_state.setdefault((device_id, bucket, identity), {})
+        state_key = (device_id, bucket, identity)
+        item_state = source_state.setdefault(state_key, {})
         now = time.monotonic()
-        accepted: dict[str, Any] = {}
+        always_accepted: dict[str, Any] = {}
+        guarded: dict[str, Any] = {}
         for field, value in updates.items():
             if field == SUBDEVICE_FIELD_LAST_SEEN_AT or field in (
                 _ACCESSORY_IDENTITY_FIELDS
             ):
-                accepted[field] = value
+                always_accepted[field] = value
                 continue
             if not self._property_value_present(value):
                 continue
-            if not self._source_field_update_allowed(
-                item_state,
-                field,
-                source,
-                now=now,
-            ):
-                continue
-            accepted[field] = value
-            item_state[field] = (source, now)
-        return accepted
+            guarded[field] = value
+        current_values: dict[str, Any] = (
+            dict(current) if isinstance(current, Mapping) else {}
+        )
+        result = ingest_observation(
+            Observation(
+                source=source,
+                device_id=device_id,
+                section=bucket,
+                payload=guarded,
+                received_at_monotonic=now,
+            ),
+            current=current_values,
+            provenance=item_state,
+            received_at_monotonic=now,
+            freshness_window_seconds=self._transport_source_freshness_window(),
+        )
+        source_state[state_key] = result.provenance
+        return {**result.payload, **always_accepted}
 
     def _merge_main_properties_for_device(
         self,
@@ -6628,8 +6678,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         *,
         source: TransportSource = TransportSource.CLOUD_MQTT,
     ) -> dict[str, Any]:
-        """Merge main properties with source priority and setter protection."""
-        accepted = self._property_updates_for_source(device_id, updates, source)
+        """Merge main properties with provenance and setter protection."""
+        accepted = self._property_updates_for_source(
+            device_id,
+            updates,
+            source,
+            base=base,
+        )
         if source is not TransportSource.HTTP:
             self._note_property_equivalent_push(device_id, accepted)
         merged = self._merge_main_properties(base, accepted)
@@ -6674,88 +6729,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> dict[str, Any] | None:
         """Find the first nested dict containing any of the requested keys."""
         return find_dict_with_any_key(obj, keys)
-
-    def _reconcile_today_energy(self, entry: dict[str, Any]) -> None:
-        """Cross-check today_energy against day-period stats (AGENTS.md §2.3).
-
-        The compact ``/v1/device/stat/today`` endpoint returns ``de/dg/dh/ds``
-        as daily KPIs.  At boundary times the cloud may return 0 for these
-        while the dated ``dateType=day`` endpoints still carry real values.
-        When that happens, use the dated endpoint value via
-        :func:`verify_and_backfill` so the Energy Dashboard does not show
-        misleading 0 values.
-
-        Field mapping (today_energy → day-period stat):
-        * ``de`` (feed-in) → ``APP_STAT_TOTAL_OUT_GRID_ENERGY`` from home_stat_day
-        * ``dg`` (grid import) → ``APP_STAT_TOTAL_IN_GRID_ENERGY`` from home_stat_day
-        * ``dh`` (home load) → ``APP_STAT_TOTAL_HOME_ENERGY`` from home_stat_day
-        * ``ds`` (battery energy) → ``APP_STAT_TOTAL_CHARGE`` from battery_stat_day
-        """
-        today_energy = entry.get(APP_SECTION_TODAY_ENERGY)
-        if not isinstance(today_energy, dict) or not today_energy:
-            return
-
-        home_stat_day = entry.get(
-            self._app_period_section(APP_SECTION_HOME_STAT, DATE_TYPE_DAY),
-        )
-        battery_stat_day = entry.get(
-            self._app_period_section(APP_SECTION_BATTERY_STAT, DATE_TYPE_DAY),
-        )
-
-        def _reconcile_field(
-            field: str,
-            alt_section: dict[str, Any] | None,
-            alt_key: str,
-        ) -> None:
-            cloud_val = safe_float(today_energy.get(field))
-            # ``None`` means the cloud omitted the field; a measured ``0.0`` is a
-            # real reading and has to survive. Merging the two into one
-            # "missing_or_zero" predicate dropped legitimate zeros (grid import
-            # on a pure feed-in day), which surfaced the sensor as
-            # ``unavailable`` instead of ``0``. A negative daily energy is never
-            # plausible and counts as absent.
-            if cloud_val is None or cloud_val < 0:
-                today_energy.pop(field, None)
-                return
-            if not isinstance(alt_section, dict):
-                return
-            local_val = safe_float(alt_section.get(alt_key))
-            if local_val is None or local_val < 0 or math.isclose(local_val, 0.0):
-                # No usable comparison value, so there is nothing to backfill
-                # from. Keep the cloud reading as it stands — including a
-                # confirmed ``0.0``.
-                return
-            reconciled = verify_and_backfill(
-                cloud_val,
-                local_val,
-                label=f"today_energy.{field}",
-            )
-            if reconciled is None:
-                today_energy.pop(field, None)
-                return
-            if reconciled != cloud_val:
-                today_energy[field] = reconciled
-
-        _reconcile_field(
-            APP_STAT_TODAY_FEED_IN_ENERGY,
-            home_stat_day,
-            APP_STAT_TOTAL_OUT_GRID_ENERGY,
-        )
-        _reconcile_field(
-            APP_STAT_TODAY_GRID_IMPORT_ENERGY,
-            home_stat_day,
-            APP_STAT_TOTAL_IN_GRID_ENERGY,
-        )
-        _reconcile_field(
-            APP_STAT_TODAY_HOME_LOAD_ENERGY,
-            home_stat_day,
-            APP_STAT_TOTAL_HOME_ENERGY,
-        )
-        _reconcile_field(
-            APP_STAT_TODAY_BATTERY_ENERGY,
-            battery_stat_day,
-            APP_STAT_TOTAL_CHARGE,
-        )
 
     def _has_activation_contradicting_payload(self, entry: dict[str, Any]) -> bool:
         """Return true when populated data contradicts cloud activated=0."""
@@ -6835,7 +6808,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             rejection_callback=self.record_schema_rejection,
         )
 
-    def _merge_subdevice_data(  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+    def _merge_subdevice_data(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
         self,
         updated: dict[str, Any],
         source: dict[str, Any],
@@ -6852,14 +6825,23 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             serial_fn: Callable[[dict[str, Any]], str | None],
         ) -> list[dict[str, Any]]:
             filtered: list[dict[str, Any]] = []
+            current_bucket = updated.get(bucket, [])
+            current_by_identity: dict[str, dict[str, Any]] = {}
+            if isinstance(current_bucket, list):
+                for idx, existing_item in enumerate(current_bucket):
+                    if isinstance(existing_item, dict):
+                        existing_identity = serial_fn(existing_item) or f"index_{idx}"
+                        current_by_identity[existing_identity] = existing_item
             for index, item in enumerate(items, start=1):
                 identity = serial_fn(item) or f"index_{index}"
+                current_item = current_by_identity.get(identity)
                 accepted = self._accessory_updates_for_source(
                     device_id,
                     bucket,
                     identity,
                     item,
                     source_transport,
+                    current=current_item or {},
                 )
                 if accepted:
                     filtered.append(accepted)
@@ -6878,15 +6860,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 updated.get(PAYLOAD_BATTERY_PACKS),
                 packs,
             )
-            removal_device_id = device_id or self._resolve_device_id_from_payload(
-                updated
-            )
             if device_id is None:
-                device_id = removal_device_id
-            self._prune_stale_battery_pack_bucket(
-                updated,
-                device_id=removal_device_id,
-            )
+                device_id = self._resolve_device_id_from_payload(updated)
             touched = True
 
         packs = self._battery_packs_from_source(source)
@@ -6913,6 +6888,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "ct",
                 ct,
                 source_transport,
+                current=updated.get(PAYLOAD_CT_METER),
             )
             current_ct = updated.get(PAYLOAD_CT_METER)
             if isinstance(current_ct, dict):
@@ -6939,14 +6915,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 subdevice_serial,
             )
             if plug_dicts:
-                self._merge_and_prune_subdevice_bucket(
+                self._merge_subdevice_bucket(
                     updated,
                     PAYLOAD_SMART_PLUGS,
                     plug_dicts,
                     self._merge_smart_plug_lists,
-                    subdevice_serial,
-                    device_id=device_id,
-                    key_prefix="smart_plug",
                 )
                 touched = True
 
@@ -6959,14 +6932,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 subdevice_serial,
             )
             if collector_dicts:
-                self._merge_and_prune_subdevice_bucket(
+                self._merge_subdevice_bucket(
                     updated,
                     PAYLOAD_METER_HEADS,
                     collector_dicts,
                     self._merge_subdevice_lists_by_sn,
-                    subdevice_serial,
-                    device_id=device_id,
-                    key_prefix="meter_head",
                 )
                 touched = True
 
@@ -6979,14 +6949,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 circuit_id,
             )
             if circuit_dicts:
-                self._merge_and_prune_subdevice_bucket(
+                self._merge_subdevice_bucket(
                     updated,
                     PAYLOAD_CIRCUIT_PROPERTY,
                     circuit_dicts,
                     _merge_circuits_fn,
-                    circuit_id,
-                    device_id=device_id,
-                    key_prefix="breaker",
                 )
                 touched = True
 
@@ -7011,14 +6978,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         sub_device_serial,
                     )
                 if regular_sub_device_dicts:
-                    self._merge_and_prune_subdevice_bucket(
+                    self._merge_subdevice_bucket(
                         updated,
                         PAYLOAD_SUBDEVICES,
                         regular_sub_device_dicts,
                         _merge_sub_devices_fn,
-                        sub_device_serial,
-                        device_id=device_id,
-                        key_prefix="sub_device",
                     )
                     touched = True
 
@@ -7045,239 +7009,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         return touched
 
-    def _merge_and_prune_subdevice_bucket(  # ruff:ignore[too-many-arguments]
-        self,
+    @staticmethod
+    def _merge_subdevice_bucket(
         updated: dict[str, Any],
         bucket: str,
         update_dicts: list[dict[str, Any]],
         merge_fn: Callable[[Any, list[dict[str, Any]]], list[dict[str, Any]]],
-        serial_fn: Callable[[dict[str, Any]], str | None],
-        *,
-        device_id: str | None,
-        key_prefix: str,
     ) -> None:
-        """Merge one accessory bucket and remove confirmed stale ghosts.
-
-        Transport updates are partial. They refresh only mentioned identities;
-        destructive cleanup additionally requires absence from the complete
-        HTTP system-list discovery stored on ``updated``.
-        """
-        merged = merge_fn(updated.get(bucket), update_dicts)
-        touched_serials = {
-            sn for item in update_dicts if (sn := serial_fn(item)) is not None
-        }
-        merged = stamp_subdevice_last_seen(merged, touched_serials, serial_fn)
-        now_iso = datetime.now(UTC).isoformat()
-        for index, update in enumerate(update_dicts):
-            if serial_fn(update) is None and index < len(merged):
-                merged[index][SUBDEVICE_FIELD_LAST_SEEN_AT] = now_iso
-        updated[bucket] = merged
-        self._prune_stale_subdevice_bucket(
-            updated,
-            bucket,
-            serial_fn,
-            device_id=device_id,
-            key_prefix=key_prefix,
-        )
-
-    @staticmethod
-    def _discovery_confirms_accessory_absent(
-        entry: dict[str, Any],
-        item: dict[str, Any],
-    ) -> bool:
-        """Confirm an accessory is absent from an explicit system-list result."""
-        system = entry.get(PAYLOAD_SYSTEM) or entry.get(PAYLOAD_SYSTEM_META)
-        if not isinstance(system, dict):
-            return False
-        accessories = system.get(FIELD_ACCESSORIES)
-        if not isinstance(accessories, list):
-            return False
-        item_ids = subdevice_identity_values(item)
-        if not item_ids:
-            return False
-        return not any(
-            isinstance(accessory, dict)
-            and bool(item_ids & subdevice_identity_values(accessory))
-            for accessory in accessories
-        )
-
-    def _prune_stale_subdevice_bucket(
-        self,
-        updated: dict[str, Any],
-        bucket: str,
-        serial_fn: Callable[[dict[str, Any]], str | None],
-        *,
-        device_id: str | None,
-        key_prefix: str,
-    ) -> int:
-        """Remove confirmed stale accessories and queue registry cleanup."""
-        current = updated.get(bucket)
-        if not isinstance(current, list):
-            return 0
-        merged = [item for item in current if isinstance(item, dict)]
-        kept, stale_count, dropped_indices = drop_stale_subdevices(
-            merged,
-            confirmed_absent=lambda item: self._discovery_confirms_accessory_absent(
-                updated,
-                item,
-            ),
-        )
-        if kept != current:
-            updated[bucket] = kept
-        if stale_count:
-            parent_device_id = device_id or self._resolve_device_id_from_payload(
-                updated
-            )
-            if parent_device_id is not None:
-                for dropped_index in dropped_indices:
-                    dropped = merged[dropped_index]
-                    stable_key = stable_subdevice_key(
-                        key_prefix,
-                        serial_fn(dropped),
-                        dropped_index + 1,
-                    )
-                    identifier = (DOMAIN, f"{parent_device_id}_{stable_key}")
-                    if identifier not in self._pending_device_removals:
-                        self._pending_device_removals.append(identifier)
-            _LOGGER.info(
-                "Jackery: dropped %d stale %s entrie(s) silent for >%d days",
-                stale_count,
-                bucket,
-                BATTERY_PACK_STALE_THRESHOLD_SEC // 86400,
-            )
-        return stale_count
-
-    def _prune_stale_battery_pack_bucket(
-        self,
-        updated: dict[str, Any],
-        *,
-        device_id: str | None,
-    ) -> int:
-        """Age out one pack bucket and queue the matching registry device."""
-        current = updated.get(PAYLOAD_BATTERY_PACKS)
-        if not isinstance(current, list):
-            return 0
-        ordered = sorted_battery_pack_payloads(current)
-        kept, stale_count, dropped_indices = self._drop_stale_battery_packs(ordered)
-        if kept != current:
-            updated[PAYLOAD_BATTERY_PACKS] = kept
-        if not stale_count:
-            return 0
-        self._stale_battery_packs_dropped += stale_count
-        parent_device_id = device_id or self._resolve_device_id_from_payload(updated)
-        if parent_device_id is not None:
-
-            def _queue_pack(pack: dict[str, Any], pack_index: int) -> None:
-                pack_number = pack_index + 1
-                serial = self._battery_pack_identity_overrides.get(
-                    (parent_device_id, pack_number),
-                    battery_pack_serial(pack),
-                )
-                stable_key = stable_subdevice_key(
-                    "battery_pack",
-                    serial,
-                    pack_number,
-                )
-                identifier = (
-                    DOMAIN,
-                    f"{parent_device_id}_{stable_key}",
-                )
-                if identifier not in self._pending_device_removals:
-                    self._pending_device_removals.append(identifier)
-                if serial is not None:
-                    self._pending_battery_pack_removal_serials[identifier] = serial
-
-            dropped_index_set = set(dropped_indices)
-            for dropped_index in dropped_indices:
-                _queue_pack(ordered[dropped_index], dropped_index)
-
-            # Serial-identified survivors stay stable when an earlier pack
-            # disappears. Session-frozen index identities remain positional,
-            # so unlink only those shifted fallback devices.
-            first_affected_index = min(dropped_indices)
-            for affected_index in range(first_affected_index, len(ordered)):
-                if affected_index in dropped_index_set:
-                    continue
-                affected_pack = ordered[affected_index]
-                identity_serial = self._battery_pack_identity_overrides.get(
-                    (parent_device_id, affected_index + 1),
-                    battery_pack_serial(affected_pack),
-                )
-                if identity_serial is not None:
-                    continue
-                _queue_pack(affected_pack, affected_index)
-            self._battery_pack_topology_reload_required = True
-        _LOGGER.info(
-            "Jackery: dropped %d stale battery pack(s) silent for >%d days",
-            stale_count,
-            BATTERY_PACK_STALE_THRESHOLD_SEC // 86400,
-        )
-        return stale_count
-
-    def _prune_stale_battery_packs(
-        self,
-        data: dict[str, Any],
-    ) -> None:
-        """Run battery-pack cleanup every completed HTTP cycle."""
-        for parent_device_id, entry in data.items():
-            if isinstance(entry, dict):
-                self._prune_stale_battery_pack_bucket(
-                    entry,
-                    device_id=parent_device_id,
-                )
-
-    def _prune_stale_subdevices(
-        self,
-        data: dict[str, Any],
-    ) -> None:
-        """Run stale accessory cleanup every HTTP cycle, even without new pushes."""
-        bucket_specs = (
-            (PAYLOAD_SMART_PLUGS, subdevice_serial, "smart_plug"),
-            (PAYLOAD_METER_HEADS, subdevice_serial, "meter_head"),
-            (PAYLOAD_CIRCUIT_PROPERTY, circuit_id, "breaker"),
-            (PAYLOAD_SUBDEVICES, sub_device_serial, "sub_device"),
-        )
-        for parent_device_id, entry in data.items():
-            if not isinstance(entry, dict):
-                continue
-            for bucket, serial_fn, key_prefix in bucket_specs:
-                self._prune_stale_subdevice_bucket(
-                    entry,
-                    bucket,
-                    serial_fn,
-                    device_id=parent_device_id,
-                    key_prefix=key_prefix,
-                )
-            ct_meter = entry.get(PAYLOAD_CT_METER)
-            if not isinstance(ct_meter, dict):
-                continue
-
-            def _confirmed_absent(
-                item: dict[str, Any],
-                parent_entry: dict[str, Any] = entry,
-            ) -> bool:
-                """Return whether authoritative discovery omits this accessory."""
-                return self._discovery_confirms_accessory_absent(
-                    parent_entry,
-                    item,
-                )
-
-            kept_ct, stale_count, _dropped = drop_stale_subdevices(
-                [ct_meter],
-                confirmed_absent=_confirmed_absent,
-            )
-            if kept_ct:
-                entry[PAYLOAD_CT_METER] = kept_ct[0]
-                continue
-            if stale_count:
-                entry.pop(PAYLOAD_CT_METER, None)
-                identifier = (DOMAIN, f"{parent_device_id}_smart_meter")
-                if identifier not in self._pending_device_removals:
-                    self._pending_device_removals.append(identifier)
-                _LOGGER.info(
-                    "Jackery: dropped stale smart-meter data silent for >%d days",
-                    BATTERY_PACK_STALE_THRESHOLD_SEC // 86400,
-                )
+        """Merge partial accessory telemetry without deleting other sources."""
+        updated[bucket] = merge_fn(updated.get(bucket), update_dicts)
 
     def _normalize_live_property_payload(  # ruff:ignore[no-self-use]
         self, source: dict[str, Any]
@@ -7288,10 +7028,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
         updates: list[dict[str, Any]],
-        *,
-        refresh_last_seen: bool = True,
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields.
 
@@ -7301,16 +7039,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         fields and overlay the latest non-null telemetry by SN, falling back
         to list position.
         """
-        return _merge_battery_pack_lists_fn(
-            current,
-            updates,
-            refresh_last_seen=refresh_last_seen,
-        )
+        return _merge_battery_pack_lists_fn(current, updates)
 
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -7319,7 +7053,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``.
@@ -7335,40 +7069,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return _merge_smart_plug_lists_fn(current, updates)
 
     @classmethod
-    def _drop_stale_battery_packs(
+    def _merge_battery_pack_lifetime_from_ble(
         cls,
-        packs: list[dict[str, Any]],
-        *,
-        threshold_seconds: int = BATTERY_PACK_STALE_THRESHOLD_SEC,
-    ) -> tuple[list[dict[str, Any]], int, list[int]]:
-        """Remove packs that have been silent past the stale threshold.
-
-        Returns a tuple of ``(kept_packs, stale_count, dropped_indices)``
-        where ``dropped_indices`` is the list of original positions of
-        the dropped packs (used by the coordinator to build the matching
-        ``device_registry`` identifiers and call ``async_remove_device``).
-
-        Cleanup is deliberately conservative: a pack must have been
-        silent for the full threshold (default 7 days) before it is
-        dropped, so daily WiFi blips or manual reboots do not trigger
-        spurious removal.
-
-        See ``BATTERY_PACK_STALE_THRESHOLD_SEC`` in const.py for the
-        rationale and ``docs/PROTOCOL.md`` §1 for the rule that we never
-        invent device state, only document silence.
-        """
-        return _drop_stale_battery_packs_fn(packs, threshold_seconds=threshold_seconds)
+        updated: dict[str, Any],
+        body: dict[str, Any],
+    ) -> bool:
+        """Merge BLE lifetime counters into the matching battery-pack entry."""
+        return _merge_battery_pack_lifetime_from_ble_fn(updated, body)
 
     @staticmethod
     def _resolve_device_id_from_payload(payload: dict[str, Any]) -> str | None:
-        """Pick the parent device id from a coordinator payload slice.
-
-        Used by the stale-pack cleanup to construct the ``device_registry``
-        identifier. The coordinator data is keyed by ``device_id`` at the
-        top level, but nested payload slices passed into the merge step
-        do not carry that key. Best-effort fallback: read ``deviceId``,
-        ``device_id`` or ``id`` from the merged props.
-        """
+        """Pick the parent device id from a coordinator payload slice."""
         return _resolve_device_id_from_payload_fn(payload)
 
     @callback
@@ -7432,95 +7143,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return battery_pack_serial(ordered[pack_index - 1])
         except IndexError:
             return None
-
-    async def async_cleanup_pending_device_removals(self) -> int:
-        """Remove queued battery-pack devices from HA's device registry.
-
-        Called once per coordinator update from ``_async_update_data``
-        after the merge has settled. Drains
-        ``_pending_device_removals`` and asks HA to remove each
-        device. Returns the number of devices actually removed.
-
-        Implements the Gold-tier ``dynamic-devices`` rule: when a pack
-        is permanently unplugged, both the integration's payload and
-        HA's device registry must end up consistent without manual
-        user intervention.
-        """
-        if not self._pending_device_removals:
-            return 0
-        # Local import keeps the registry stub-free for unit tests that
-        # exercise the coordinator without HA helpers loaded.
-
-        registry = dr.async_get(self.hass)
-        removed = 0
-        # Snapshot the queue and clear it before iterating so a concurrent
-        # merge cannot lose new entries appended during the await.
-        pending = list(self._pending_device_removals)
-        self._pending_device_removals.clear()
-        deferred: list[tuple[str, str]] = []
-        for identifier in pending:
-            expected_serial = self._pending_battery_pack_removal_serials.pop(
-                identifier,
-                None,
-            )
-            try:  # ruff:ignore[too-many-statements-in-try-clause]
-                device = None
-                if expected_serial is not None:
-                    _domain, unique_id = identifier
-                    parent_device_id = unique_id.rsplit("_battery_pack_", 1)[0]
-                    parent = registry.async_get_device(
-                        identifiers={(DOMAIN, parent_device_id)}
-                    )
-                    if parent is not None:
-                        device = next(
-                            (
-                                candidate
-                                for candidate in registry.devices.values()
-                                if candidate.via_device_id == parent.id
-                                and candidate.serial_number == expected_serial
-                                and self.entry.entry_id in candidate.config_entries
-                            ),
-                            None,
-                        )
-                else:
-                    device = registry.async_get_device(identifiers={identifier})
-                if device is not None:
-                    self._remove_registry_entities_for_devices({device.id})
-                    registry.async_update_device(
-                        device_id=device.id,
-                        remove_config_entry_id=self.entry.entry_id,
-                    )
-                    removed += 1
-            except Exception as err:  # ruff:ignore[blind-except]  # isolate registry failures
-                if expected_serial is not None:
-                    self._pending_battery_pack_removal_serials[identifier] = (
-                        expected_serial
-                    )
-                deferred.append(identifier)
-                _LOGGER.debug(
-                    "Jackery: registry cleanup for %s deferred independently: %s",
-                    identifier[1],
-                    err,
-                )
-                continue
-            # Commit cache cleanup per successful identifier so a later failure
-            # cannot discard work from the processed prefix.
-            _domain, unique_id = identifier
-            if "_battery_pack_" in unique_id:
-                dev_id = unique_id.rsplit("_battery_pack_", 1)[0]
-                self._slow_cache.pop(f"dev:{dev_id}", None)
-                self._last_system_info_query.pop(dev_id, None)
-                self._last_weather_plan_query.pop(dev_id, None)
-                self._last_subdevice_query.pop(dev_id, None)
-        for identifier in deferred:
-            if identifier not in self._pending_device_removals:
-                self._pending_device_removals.append(identifier)
-        if removed:
-            _LOGGER.info(
-                "Jackery: unlinked %d stale accessory device(s) from this config entry",
-                removed,
-            )
-        return removed
 
     async def _async_enrich_battery_pack_ota(
         self,
@@ -7703,43 +7325,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._battery_pack_ota_tasks.pop(device_id, None)
 
     @staticmethod
-    def _merge_battery_pack_lifetime_from_ble(
-        updated: dict[str, Any],
-        body: dict[str, Any],
-    ) -> bool:
-        """Merge BLE-sourced lifetime ``inEgy``/``outEgy`` into a battery pack.
-
-        BLE ``cmd=120`` for ``devType=1`` carries lifetime cumulative
-        energy counters per pack:
-
-            {"cmd": 120, "deviceSn": "HQ2C01400955HP3",
-             "devType": 1, "subType": 0,
-             "outEgy": 5095, "inEgy": 5648}
-
-        Values are in Wh-int (BLE wire format). HTTP
-        ``/v1/device/battery/pack/list`` returns ``data: null`` for
-        SolarVault, so BLE is the only source for these per-pack
-        lifetime counters. We merge them into the existing pack entry
-        identified by ``deviceSn``. Returns ``True`` when a matching
-        pack was found and updated, ``False`` otherwise.
-
-        We deliberately do NOT create a new pack entry from BLE alone:
-        the pack list authority remains the MQTT
-        ``UploadSubDeviceGroupProperty`` actionId=3014 stream, which
-        also delivers live ``inPw``/``outPw``/``batSoc``. BLE merely
-        enriches an already-known pack with otherwise-unreachable
-        lifetime values.
-        """
-        return _merge_battery_pack_lifetime_from_ble_fn(updated, body)
-
-    @staticmethod
     def _merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
         """Merge OTA metadata fields into a battery pack dict in-place."""
         _merge_pack_ota_fn(pack, ota)
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff:ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: ANN401, RUF105
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -8050,13 +7642,37 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             eager_start=False,
         )
 
+    def _transport_partial_update_base(
+        self,
+        device_id: str,
+    ) -> dict[str, Any] | None:
+        """Return a committed or cache-derived base for any Layer-5 ingest."""
+        current = (self.data or {}).get(device_id)
+        if isinstance(current, dict):
+            return current
+        cached = self._device_index.get(device_id)
+        if not isinstance(cached, dict):
+            return None
+        device_meta = cached.get(PAYLOAD_DEVICE_META)
+        system_meta = cached.get(PAYLOAD_SYSTEM_META)
+        return {
+            PAYLOAD_DEVICE: {},
+            PAYLOAD_PROPERTIES: {},
+            PAYLOAD_HTTP_PROPERTIES: {},
+            PAYLOAD_SYSTEM: (
+                copy.deepcopy(system_meta) if isinstance(system_meta, dict) else {}
+            ),
+            PAYLOAD_DISCOVERY: (
+                copy.deepcopy(device_meta) if isinstance(device_meta, dict) else {}
+            ),
+        }
+
     def _ble_partial_update_base(self, device_id: str) -> dict[str, Any] | None:
-        """Return the pending BLE snapshot before falling back to committed data."""
+        """Return a BLE base from pending, committed, or cached discovery state."""
         pending = self._ble_pending_updates.get(device_id)
         if isinstance(pending, dict):
             return pending
-        current = (self.data or {}).get(device_id)
-        return current if isinstance(current, dict) else None
+        return self._transport_partial_update_base(device_id)
 
     async def _async_flush_ble_partial_update(self, device_id: str) -> None:
         """Flush the latest pending BLE payload for one device."""
@@ -8066,9 +7682,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if not isinstance(pending, dict):
                 return
             current = (self.data or {}).get(device_id)
-            if not isinstance(current, dict):
-                return
-            if current == pending:
+            if isinstance(current, dict) and current == pending:
                 return
             new_data = dict(self.data or {})
             new_data[device_id] = pending
@@ -8080,8 +7694,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _endpoint_backoff_active(self, key: str, now_monotonic: float) -> bool:
         """Return True when the endpoint key is currently in backoff."""
-        if self._endpoint_backoff_is_energy_key(key):
-            return False
         state = self._endpoint_backoff.get(key)
         if not isinstance(state, dict):
             return False
@@ -8092,9 +7704,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return the number of slow HTTP endpoint keys currently in backoff."""
         now = time.monotonic() if now_monotonic is None else now_monotonic
         active_count = 0
-        for key, state in self._endpoint_backoff.items():
-            if self._endpoint_backoff_is_energy_key(key):
-                continue
+        for state in self._endpoint_backoff.values():
             until = safe_float(state.get("until")) or 0.0
             if until > now:
                 active_count += 1
@@ -8229,8 +7839,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         now_monotonic = time.monotonic()
         active: dict[str, dict[str, int]] = {}
         for key, state in self._endpoint_backoff.items():
-            if self._endpoint_backoff_is_energy_key(key):
-                continue
             until = safe_float(state.get("until")) or 0.0
             remaining_raw = until - now_monotonic
             if remaining_raw <= 0:
@@ -8394,8 +8002,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         for device_id, payload in data.items():
             props = payload.get(PAYLOAD_PROPERTIES) or {}
             has_all = all(props.get(key) is not None for key in self._SYSTEM_INFO_KEYS)
-            should_query_combine = force or not has_all
-            should_query_device_info = force or not props
+            should_query_combine = (
+                force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_QUERY_COMBINE_DATA,
+                )
+                or not has_all
+            )
+            should_query_device_info = (
+                force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_QUERY_DEVICE_PROPERTY,
+                )
+                or not props
+            )
             if not should_query_combine and not should_query_device_info:
                 continue
             last_query = self._last_system_info_query.get(device_id, 0.0)
@@ -8439,7 +8061,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         snapshot: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Query weather/storm plan when lead-time fields are missing."""
-        if self._mqtt is None or not self._mqtt.is_connected:
+        mqtt_ready = self._mqtt is not None and self._mqtt.is_connected
+        if self._ble_listener is None and not mqtt_ready:
             return
         data = snapshot if snapshot is not None else (self.data or {})
         if not data:
@@ -8455,7 +8078,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 or weather.get(FIELD_WPC) is not None
                 or weather.get(FIELD_MINS_INTERVAL) is not None
             )
-            if has_minutes and not force:
+            if (
+                has_minutes
+                and not force
+                and not self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_QUERY_WEATHER_PLAN,
+                )
+            ):
                 continue
             last_query = self._last_weather_plan_query.get(device_id, 0.0)
             if not force and (now - last_query) < self._weather_plan_query_interval_sec:
@@ -8473,7 +8103,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
 
     @staticmethod
-    def _coerce_transport_cmd(cmd: Any) -> int:  # ruff:ignore[any-type]
+    def _coerce_transport_cmd(cmd: Any) -> int:  # noqa: ANN401, RUF105
         """Coerce transport cmd input to an integer.
 
         Accepts plain ints plus integral numeric strings (e.g. ``"107"``,
@@ -8530,7 +8160,160 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body[FIELD_CMD] = cmd_value
         return body
 
-    async def _async_publish_command_ble_first(  # ruff:ignore[too-many-arguments]
+    def _record_independent_cloud_mqtt_result(
+        self,
+        cloud_attempt: _CloudCommandAttempt,
+        succeeded: list[str],
+        failures: list[str],
+    ) -> None:
+        """Log a changed Cloud MQTT failure when another transport succeeded."""
+        if (
+            cloud_attempt.session_generation
+            != self._synchronize_mqtt_session_generation()
+            or self._cloud_mqtt_command_attempts.get(cloud_attempt.command_key)
+            != cloud_attempt.attempt_id
+        ):
+            return
+        command_key = cloud_attempt.command_key
+        if "Cloud MQTT" in succeeded:
+            self._cloud_mqtt_command_failures.pop(command_key, None)
+            return
+        cloud_failure = next(
+            (
+                failure
+                for failure in failures
+                if failure.startswith("Cloud MQTT=")
+            ),
+            None,
+        )
+        if cloud_failure is None:
+            return
+        previous_failure = self._cloud_mqtt_command_failures.get(command_key)
+        self._cloud_mqtt_command_failures[command_key] = cloud_failure
+        if not succeeded:
+            # The all-transports-failed branch logs the command error below.
+            # Retain this Cloud-specific failure so its own retry decision does
+            # not depend on BLE availability or success.
+            return
+        log = (
+            _LOGGER.warning if previous_failure != cloud_failure else _LOGGER.debug
+        )
+        device_id, action_id, cmd = command_key
+        log(
+            "Jackery Cloud MQTT command failed independently for %s "
+            "actionId=%s cmd=%s: %s; successful transports remain active",
+            device_id,
+            action_id,
+            cmd,
+            cloud_failure,
+        )
+
+    def _bind_cloud_command_attempt(
+        self,
+        cloud_attempt: _CloudCommandAttempt,
+    ) -> None:
+        """Bind an attempt immediately before use of the current MQTT session."""
+        cloud_attempt.session_generation = self._synchronize_mqtt_session_generation()
+        previous_attempt = self._cloud_mqtt_command_attempts.get(
+            cloud_attempt.command_key,
+            0,
+        )
+        if cloud_attempt.attempt_id >= previous_attempt:
+            self._cloud_mqtt_command_attempts[cloud_attempt.command_key] = (
+                cloud_attempt.attempt_id
+            )
+
+    def _cloud_mqtt_action_needs_retry(
+        self,
+        device_id: str,
+        action_id: int,
+        *,
+        require_response: bool = True,
+    ) -> bool:
+        """Return whether this Cloud action still needs an independent retry."""
+        if self._mqtt is None or not self._mqtt.is_connected:
+            return False
+        publish_failed = any(
+            failed_device_id == device_id and failed_action_id == action_id
+            for failed_device_id, failed_action_id, _cmd in (
+                self._cloud_mqtt_command_failures
+            )
+        )
+        return publish_failed or (
+            require_response
+            and (device_id, action_id) not in self._mqtt_session_actions_seen
+        )
+
+    @staticmethod
+    def _collect_command_transport_results(
+        operations: list[tuple[str, asyncio.Task[bool]]],
+        results: list[Any],
+        succeeded: list[str],
+        failures: list[str],
+    ) -> Exception | None:
+        """Collect independent command results without masking cancellation."""
+        first_error: Exception | None = None
+        for (label, _task), result in zip(operations, results, strict=True):
+            if result is True:
+                succeeded.append(label)
+                continue
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, Exception):
+                first_error = first_error or result
+                failures.append(f"{label}={type(result).__name__}: {result}")
+                continue
+            failures.append(f"{label}=unavailable")
+        return first_error
+
+    def _record_successful_command_transports(
+        self,
+        cloud_attempt: _CloudCommandAttempt,
+        succeeded: list[str],
+        failures: list[str],
+    ) -> None:
+        """Record and log a command that succeeded on at least one transport."""
+        self._record_independent_cloud_mqtt_result(
+            cloud_attempt,
+            succeeded,
+            failures,
+        )
+        command_key = cloud_attempt.command_key
+        device_id, action_id, cmd_value = command_key
+        _LOGGER.debug(
+            "Jackery command succeeded for %s actionId=%s cmd=%s via %s%s",
+            device_id,
+            action_id,
+            cmd_value,
+            ", ".join(succeeded),
+            f"; independent failures: {', '.join(failures)}" if failures else "",
+        )
+
+    async def _async_finish_independent_command_transports(
+        self,
+        cloud_attempt: _CloudCommandAttempt,
+        operations: list[tuple[str, asyncio.Task[bool]]],
+        succeeded: list[str],
+        failures: list[str],
+    ) -> None:
+        """Observe transports that continue after another one succeeded."""
+        results = await asyncio.gather(
+            *(task for _label, task in operations),
+            return_exceptions=True,
+        )
+        self._collect_command_transport_results(
+            operations,
+            results,
+            succeeded,
+            failures,
+        )
+        self._record_successful_command_transports(
+            cloud_attempt,
+            succeeded,
+            failures,
+        )
+
+    async def _async_publish_command_ble_first(  # ruff:ignore[too-many-arguments, too-many-statements]
         self,
         device_id: str,
         *,
@@ -8541,34 +8324,42 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ble_extra_body_fields: dict[str, Any] | None = None,
         ensure_mqtt: bool = True,
     ) -> None:
-        """Try the BLE write path before falling back to MQTT.
+        """Write independently through every supported app command transport.
 
-        BLE writes are issued with ``wait_for_ack=True`` so a silent
-        firmware drop (e.g. unknown cmd, missing CRC trailer) raises a
-        ``RuntimeError`` after a short window and the caller cleanly
-        falls back to the cloud-MQTT pipeline. Setters in this router
-        are idempotent, so the worst case of a duplicated write is
-        another state-toggle write — preferable to silently swallowing
-        the command.
+        BLE and Cloud MQTT are started concurrently. A failure or unavailable
+        state on one transport never prevents the other transport from sending;
+        the command succeeds when at least one supported transport succeeds.
+        The historical method name is retained for call-site compatibility.
         """
         cmd_value = self._coerce_transport_cmd(cmd)
-        ble_error: Exception | None = None
+        self._cloud_mqtt_command_attempt_sequence += 1
+        cloud_attempt = _CloudCommandAttempt(
+            command_key=(device_id, action_id, cmd_value),
+            attempt_id=self._cloud_mqtt_command_attempt_sequence,
+            session_generation=self._mqtt_session_generation,
+        )
+        # Bind once for failures that occur before a socket publish (for
+        # example missing cached credentials). The publish loop rebinds this
+        # same attempt immediately before each actual MQTT session is used.
+        self._bind_cloud_command_attempt(cloud_attempt)
 
-        portable_ble_type = PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID.get(action_id)
         ble_supported = (
             not isinstance(action_id, bool)
             and (
                 (action_id, cmd_value) in _HOME_BLE_COMMAND_PAIRS
-                or portable_ble_type == cmd_value
+                or PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID.get(action_id) == cmd_value
             )
-            and cmd_value not in _BLE_FIRST_UNSUPPORTED_MSG_TYPES
+            and cmd_value not in _BLE_UNSUPPORTED_MSG_TYPES
         )
+
+        operations: list[tuple[str, Any]] = []
         if ble_supported:
-            try:
-                ble_body_fields = body_fields
-                if ble_extra_body_fields is not None:
-                    ble_body_fields = {**body_fields, **ble_extra_body_fields}
-                sent = await self.async_send_ble_command(
+            ble_body_fields = body_fields
+            if ble_extra_body_fields is not None:
+                ble_body_fields = {**body_fields, **ble_extra_body_fields}
+            operations.append((
+                "BLE",
+                self.async_send_ble_command(
                     device_id,
                     cmd=cmd_value,
                     flags=action_id,
@@ -8578,158 +8369,207 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     ),
                     wait_for_ack=True,
                     connect_timeout_sec=BLE_COMMAND_CONNECT_TIMEOUT_SEC,
-                )
-            except ACTION_WRITE_ERRORS as err:
-                ble_error = err
-                _LOGGER.debug(
-                    "Jackery BLE command failed for %s actionId=%s cmd=%s: %s",
+                ),
+            ))
+
+        async def _async_send_cloud_mqtt() -> bool:
+            """Send the command over Cloud MQTT and normalize success."""
+            try:
+                await self._async_publish_command(
                     device_id,
-                    action_id,
-                    cmd_value,
-                    err,
+                    message_type=message_type,
+                    action_id=action_id,
+                    cmd=cmd_value,
+                    body_fields=body_fields,
+                    ensure_mqtt=ensure_mqtt,
+                    cloud_attempt=cloud_attempt,
                 )
-            else:
-                if sent:
-                    return
-                _LOGGER.debug(
-                    "Jackery BLE command unavailable for %s actionId=%s cmd=%s",
-                    device_id,
-                    action_id,
-                    cmd_value,
-                )
-        try:
-            await self._async_publish_command(
-                device_id,
-                message_type=message_type,
-                action_id=action_id,
-                cmd=cmd_value,
-                body_fields=body_fields,
-                ensure_mqtt=ensure_mqtt,
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A connect can allocate a new client generation and fail
+                # before reaching ``async_publish_json``. Attribute that
+                # pre-publish failure to the generation that actually failed.
+                self._bind_cloud_command_attempt(cloud_attempt)
+                raise
+            return True
+
+        operations.append(("Cloud MQTT", _async_send_cloud_mqtt()))
+        task_operations: list[tuple[str, asyncio.Task[bool]]] = [
+            (
+                label,
+                self.entry.async_create_background_task(
+                    self.hass,
+                    operation,
+                    name=(
+                        f"{DOMAIN}_command_{action_id}_{cmd_value}_"
+                        f"{label.lower().replace(' ', '_')}"
+                    ),
+                    eager_start=False,
+                ),
             )
-        except BACKGROUND_TASK_ERRORS as mqtt_err:
-            if ble_error is not None:
-                _LOGGER.warning(
-                    "Jackery MQTT fallback also failed for %s actionId=%s cmd=%s: "
-                    "BLE=%s MQTT=%s",
-                    device_id,
-                    action_id,
-                    cmd_value,
-                    ble_error,
-                    mqtt_err,
+            for label, operation in operations
+        ]
+        pending = {task for _label, task in task_operations}
+        succeeded: list[str] = []
+        failures: list[str] = []
+        first_error: Exception | None = None
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
+                completed_operations = [
+                    (label, task)
+                    for label, task in task_operations
+                    if task in done
+                ]
+                results = await asyncio.gather(
+                    *(task for _label, task in completed_operations),
+                    return_exceptions=True,
+                )
+                first_error = first_error or self._collect_command_transport_results(
+                    completed_operations,
+                    results,
+                    succeeded,
+                    failures,
+                )
+                if not succeeded:
+                    continue
+                if pending:
+                    pending_operations = [
+                        (label, task)
+                        for label, task in task_operations
+                        if task in pending
+                    ]
+                    self.entry.async_create_background_task(
+                        self.hass,
+                        self._async_finish_independent_command_transports(
+                            cloud_attempt,
+                            pending_operations,
+                            list(succeeded),
+                            list(failures),
+                        ),
+                        name=f"{DOMAIN}_command_remainder_{action_id}_{cmd_value}",
+                        eager_start=False,
+                    )
+                else:
+                    self._record_successful_command_transports(
+                        cloud_attempt,
+                        succeeded,
+                        failures,
+                    )
+                return
+        except asyncio.CancelledError:
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
             raise
 
-    async def _async_publish_command(  # ruff:ignore[too-many-branches, too-many-arguments, too-many-statements]
+        self._record_independent_cloud_mqtt_result(
+            cloud_attempt,
+            succeeded,
+            failures,
+        )
+
+        _LOGGER.error(
+            "Jackery command failed on every supported app transport for %s "
+            "actionId=%s cmd=%s: %s",
+            device_id,
+            action_id,
+            cmd_value,
+            "; ".join(failures) or "no transport available",
+        )
+        if first_error is not None:
+            raise first_error
+        msg = "No supported Jackery app command transport is available"
+        raise HomeAssistantError(msg)
+
+    async def _async_get_mqtt_credentials(
         self,
-        device_id: str,
-        *,
-        message_type: str,
-        action_id: int,
-        cmd: int,
-        body_fields: dict[str, Any],
-        ensure_mqtt: bool = True,
-    ) -> None:
-        """Publish an MQTT command through the coordinator-owned command path."""
-        if self._mqtt is None and ensure_mqtt:
+        ensure_mqtt: bool,
+    ) -> dict[str, str]:
+        """Return cached MQTT credentials or raise a clear HomeAssistantError.
+
+        Credentials are checked before starting the MQTT client so a missing
+        cached login session fails fast instead of leaving a half-initialized
+        client behind (``_async_ensure_mqtt`` returns early from connect when
+        no cached session exists).
+        """
+        creds = self.api.get_cached_mqtt_credentials()
+        if creds is not None:
+            return creds
+        del ensure_mqtt
+        msg = (
+            "Jackery MQTT credentials are not available yet; the HTTP login "
+            "session has not been cached"
+        )
+        raise HomeAssistantError(msg)
+
+    async def _async_ensure_mqtt_connected(self, ensure_mqtt: bool) -> None:
+        """Ensure a connected MQTT client exists before publishing.
+
+        Layered after the credential check so the "client not initialized"
+        path can only be reached with real credentials in hand. The client
+        must be *connected*, not merely instantiated.
+        """
+        if ensure_mqtt and self._mqtt is None:
             # A foreground entity command may run before the deferred Layer-5
             # startup completed (or after supplemental transport cleanup).
             # Build the cloud client on demand; _async_ensure_mqtt cannot do so
             # itself because it deliberately owns connection state only.
             await self.async_start_mqtt()
-        if self._mqtt is None:
-            msg = "MQTT client not initialized"
+        if ensure_mqtt and self._mqtt is not None and not self._mqtt.is_connected:
+            # A server-side reset leaves the runtime allocated but disconnected.
+            # Foreground commands must be able to restart that same independent
+            # Cloud-MQTT layer instead of failing before the publish retry path.
+            await self._async_ensure_mqtt(force=True, wait_connected=True)
+        if self._mqtt is None or not self._mqtt.is_connected:
+            msg = "MQTT client is not connected"
             raise HomeAssistantError(msg)
 
-        device_sn = self._resolve_device_sn(device_id)
-        if not device_sn:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="mqtt_missing_device_sn",
-                translation_placeholders={"device_id": str(device_id)},
-            )
-
-        async def _ensure() -> None:
-            if not ensure_mqtt:
-                return
-            await self._async_ensure_mqtt(
-                force=not (self._mqtt is not None and self._mqtt.is_connected),
-                wait_connected=True,
-            )
-
-        async def _stop_mqtt() -> None:
-            if self._mqtt is not None:
-                await self._mqtt.async_stop()
-
-        # No auth handling here: the MQTT command path is transport-only and
-        # never triggers login/reauth (owner invariant 2026-07-05). A missing
-        # cached session surfaces as a plain HomeAssistantError from
-        # this method; the HTTP/API login path owns credentials.
-        await _ensure()
-        creds = self.api.get_cached_mqtt_credentials()
-        if creds is None:
-            msg = (
-                "Jackery MQTT credentials are not available yet; the HTTP login "
-                "session has not been cached"
-            )
-            raise HomeAssistantError(msg)
-
-        user_id = creds[MQTT_CREDENTIAL_USER_ID]
-        topic = f"{MQTT_TOPIC_PREFIX}/{user_id}/{MQTT_TOPIC_COMMAND}"
-        timestamp_ms = int(time.time() * 1000)
-        body = self._command_body_for_transport(body_fields, cmd=cmd)
-        bt_key = self.device_bluetooth_key(device_id)
-
-        payload_body: str
-        if bt_key is not None and len(bt_key) == 16:  # ruff:ignore[magic-value-comparison]
-            try:
-                payload_body = encrypt_mqtt_body(body, bt_key)
-            except (ValueError, TypeError) as err:
-                _LOGGER.warning(
-                    "Jackery MQTT Layer C encrypt failed for %s, sending plaintext: %s",
-                    device_id,
-                    err,
-                )
-                payload_body = json.dumps(
-                    body,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
-                )
-        else:
-            payload_body = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
-
-        payload = {
-            FIELD_DEVICE_SN: device_sn,
-            "id": timestamp_ms,
-            FIELD_VERSION: 0,
-            FIELD_MESSAGE_TYPE: message_type,
-            FIELD_ACTION_ID: action_id,
-            FIELD_TIMESTAMP: timestamp_ms,
-            FIELD_BODY: payload_body,
-        }
-
+    async def _async_publish_with_retry(
+        self,
+        device_id: str,
+        topic: str,
+        payload: dict[str, Any],
+        *,
+        command_cmd: int,
+        cloud_attempt: _CloudCommandAttempt | None = None,
+    ) -> None:
+        """Publish an MQTT JSON command with a single stop-and-retry cycle."""
+        message_type = str(payload.get(FIELD_MESSAGE_TYPE) or "")
+        action_id = safe_int(payload.get(FIELD_ACTION_ID))
         last_err: Exception | None = None
         for attempt in range(2):
             try:  # ruff:ignore[too-many-statements-in-try-clause]
                 mqtt = self._mqtt
                 if mqtt is not None and not mqtt.is_connected:
-                    await _ensure()
+                    await self._async_ensure_mqtt(
+                        force=not (self._mqtt is not None and self._mqtt.is_connected),
+                        wait_connected=True,
+                    )
                     mqtt = self._mqtt
                 if mqtt is None or not mqtt.is_connected:
                     msg = "MQTT client is not connected"
                     raise RuntimeError(msg)  # ruff:ignore[raise-within-try]
+                if cloud_attempt is not None:
+                    self._bind_cloud_command_attempt(cloud_attempt)
                 await mqtt.async_publish_json(topic, payload, qos=0, retain=False)
                 _LOGGER.debug(
                     "Jackery MQTT TX %s: messageType=%s actionId=%s cmd=%s",
                     device_id,
                     message_type,
                     action_id,
-                    cmd,
+                    command_cmd,
                 )
                 break
             except RuntimeError as err:
                 last_err = err
                 if attempt == 0:
-                    await _stop_mqtt()
+                    if self._mqtt is not None:
+                        await self._mqtt.async_stop()
                     continue
         else:
             mqtt = self._mqtt
@@ -8753,12 +8593,61 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "kind": "mqtt_tx",
                 "device_id": device_id,
                 "payload": {
-                    FIELD_DEVICE_SN: device_sn,
+                    FIELD_DEVICE_SN: str(payload.get(FIELD_DEVICE_SN)),
                     "messageType": message_type,
                     "actionId": action_id,
-                    "cmd": cmd,
+                    "cmd": command_cmd,
                 },
             },
+        )
+
+    async def _async_publish_command(  # ruff:ignore[too-many-arguments]
+        self,
+        device_id: str,
+        *,
+        message_type: str,
+        action_id: int,
+        cmd: int,
+        body_fields: dict[str, Any],
+        ensure_mqtt: bool = True,
+        cloud_attempt: _CloudCommandAttempt | None = None,
+    ) -> None:
+        """Publish an app-compatible command through the Cloud-MQTT path."""
+        creds = await self._async_get_mqtt_credentials(ensure_mqtt)
+        device_sn = self._resolve_device_sn(device_id)
+        if not device_sn:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="mqtt_missing_device_sn",
+                translation_placeholders={"device_id": str(device_id)},
+            )
+
+        await self._async_ensure_mqtt_connected(ensure_mqtt)
+
+        user_id = creds[MQTT_CREDENTIAL_USER_ID]
+        topic = f"{MQTT_TOPIC_PREFIX}/{user_id}/{MQTT_TOPIC_COMMAND}"
+        timestamp_ms = int(time.time() * 1000)
+        body = self._command_body_for_transport(body_fields, cmd=cmd)
+
+        payload = {
+            FIELD_DEVICE_SN: device_sn,
+            "id": timestamp_ms,
+            FIELD_VERSION: 0,
+            FIELD_MESSAGE_TYPE: message_type,
+            FIELD_ACTION_ID: action_id,
+            FIELD_TIMESTAMP: timestamp_ms,
+            # App 2.4.0 HomeControlFormat.h() serializes the body map and its
+            # MQTT branch j() inserts that JSON directly into the envelope.
+            # The bb/c Layer-C crypto call exists only in BLE branch f().
+            FIELD_BODY: body,
+        }
+
+        await self._async_publish_with_retry(
+            device_id,
+            topic,
+            payload,
+            command_cmd=cmd,
+            cloud_attempt=cloud_attempt,
         )
 
     async def async_bind_smart_part(self, device_id: str, accessory_sn: str) -> None:
@@ -8860,6 +8749,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._apply_local_device_name_patch(device_id, nickname)
         await self.async_request_refresh()
         self._apply_local_device_name_patch(device_id, nickname)
+
+    async def async_set_device_name(
+        self,
+        device_id: str,
+        device_name: str,
+    ) -> None:
+        """Rename one D-I-Y system device through the explicit App REST endpoint."""
+        await self.api.async_modify_device_name(
+            device_name=device_name,
+            id=device_id,
+        )
+        self._apply_local_device_name_patch(device_id, device_name)
+        await self.async_request_refresh()
+        self._apply_local_device_name_patch(device_id, device_name)
 
     async def async_unbind_device(self, device_id: str) -> None:
         """Unbind a Jackery device through the primary HTTP API and refresh."""
@@ -9754,7 +9657,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             recognized = isinstance(sub_devices, list) and bool(sub_devices)
         return recognized
 
-    async def async_refresh_documented_http_read(  # ruff:ignore[complex-structure,too-many-branches,too-many-locals,too-many-statements]
+    async def async_refresh_documented_http_read(  # ruff:ignore[too-many-branches,too-many-statements]  # noqa: C901, RUF105
         self,
         device_id: str,
         *,
@@ -9879,16 +9782,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 response_succeeded = True
                 if isinstance(raw_props, dict):
                     working[PAYLOAD_HTTP_PROPERTIES] = http_props
-                    guarded = self._http_properties_with_live_overrides(
-                        working,
-                        http_props,
-                        device_id=device_id,
-                    )
                     working[PAYLOAD_PROPERTIES] = (
                         self._merge_main_properties_for_device(
                             device_id,
                             working.get(PAYLOAD_PROPERTIES) or {},
-                            guarded,
+                            http_props,
                             source=TransportSource.HTTP,
                         )
                     )
@@ -10246,24 +10144,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # publishing. For SolarVault home devices the concrete codec is AES/CBC
     # with the decoded bluetoothKey as key+IV and Base64 ciphertext output.
 
-    def _stable_third_party_mqtt_token(self, token: str) -> tuple[str, bool]:
-        """Return a valid app-style token and whether HA generated it."""
-        result_token, use_generated, new_generated = stable_third_party_mqtt_token(
-            token,
-            self._generated_third_party_mqtt_token,
-        )
-        if new_generated is not None:
-            self._generated_third_party_mqtt_token = new_generated
-            options = dict(self.entry.options)
-            if not str(options.get(CONF_THIRD_PARTY_MQTT_TOKEN) or "").strip():
-                options[CONF_THIRD_PARTY_MQTT_TOKEN] = new_generated
-                self.hass.config_entries.async_update_entry(
-                    self.entry,
-                    options=options,
-                )
-            _LOGGER.debug("Jackery: generated stable 9-digit third-party MQTT token")
-        return result_token, use_generated
-
     def _decode_third_party_mqtt_config_body(
         self,
         device_id: str,
@@ -10279,6 +10159,33 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             body,
             bluetooth_key,
         )
+
+    def _store_third_party_mqtt_config_body(
+        self,
+        device_id: str,
+        body: dict[str, Any],
+        action_id: int | None,
+    ) -> dict[str, Any]:
+        """Decode a device-reported 3047 config and wake readback waiters."""
+        decoded = self._decode_third_party_mqtt_config_body(device_id, body)
+        config_keys = (
+            FIELD_THIRD_PARTY_MQTT_ENABLE,
+            FIELD_THIRD_PARTY_MQTT_IP,
+            FIELD_THIRD_PARTY_MQTT_PORT,
+            *_THIRD_PARTY_MQTT_CONFIG_KEYS,
+        )
+        config: dict[str, Any] = {
+            key: decoded[key] for key in config_keys if key in decoded
+        }
+        for meta_key in ("_ha_plaintext", "_decoded_fields"):
+            if meta_key in decoded:
+                config[meta_key] = decoded[meta_key]
+        if action_id == ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG:
+            waiters = self._third_party_mqtt_config_waiters.get(device_id, [])
+            for waiter in tuple(waiters):
+                if not waiter.done():
+                    waiter.set_result(dict(config))
+        return config
 
     @staticmethod
     def _has_encoded_third_party_mqtt_field(body: dict[str, Any]) -> bool:
@@ -10297,28 +10204,80 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def third_party_mqtt_config_plaintext(self, device_id: str) -> dict[str, Any]:
         """Return plaintext third-party MQTT config for HA entities."""
+        device_data = (self.data or {}).get(device_id)
+        current = (
+            device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
+            if isinstance(device_data, dict)
+            else None
+        )
+        prior_generated = (
+            current.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+            if isinstance(current, dict)
+            else None
+        )
         return third_party_mqtt_config_plaintext(
             dict(self.entry.options),
-            self._generated_third_party_mqtt_token,
-            ((self.data or {}).get(device_id, {}) or {}),
+            prior_generated,
+            device_data,
         )
 
-    def _apply_local_third_party_mqtt_config_patch(
+    @staticmethod
+    def _third_party_mqtt_config_mismatches(
+        observed: dict[str, Any],
+        expected: dict[str, Any],
+    ) -> tuple[str, ...]:
+        """Return app config field names whose 3047 readback differs."""
+        mismatches: list[str] = []
+        for key in (
+            FIELD_THIRD_PARTY_MQTT_ENABLE,
+            FIELD_THIRD_PARTY_MQTT_IP,
+            FIELD_THIRD_PARTY_MQTT_PORT,
+            FIELD_THIRD_PARTY_MQTT_USERNAME,
+            FIELD_THIRD_PARTY_MQTT_PASSWORD,
+            FIELD_THIRD_PARTY_MQTT_TOKEN,
+        ):
+            if key not in observed:
+                mismatches.append(key)
+                continue
+            if key == FIELD_THIRD_PARTY_MQTT_ENABLE:
+                observed_bool = safe_bool(observed.get(key))
+                expected_bool = safe_bool(expected.get(key))
+                if observed_bool is not expected_bool:
+                    mismatches.append(key)
+                continue
+            if key == FIELD_THIRD_PARTY_MQTT_PORT:
+                if safe_int(observed.get(key)) != safe_int(expected.get(key)):
+                    mismatches.append(key)
+                continue
+            if str(observed.get(key) or "").strip() != str(
+                expected.get(key) or "",
+            ).strip():
+                mismatches.append(key)
+        return tuple(mismatches)
+
+    async def _async_query_third_party_mqtt_config_readback(
         self,
         device_id: str,
-        config: dict[str, Any],
-    ) -> None:
-        """Mirror plaintext third-party MQTT settings into coordinator data."""
-        if not self.data or device_id not in self.data:
-            return
-        payload = dict(self.data[device_id])
-        payload[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = {
-            **config,
-            "_ha_plaintext": True,
-        }
-        new_data = dict(self.data)
-        new_data[device_id] = payload
-        self._push_partial_update(new_data)
+    ) -> dict[str, Any] | None:
+        """Publish 3047 and wait briefly for the device-reported config."""
+        future = asyncio.get_running_loop().create_future()
+        waiters = self._third_party_mqtt_config_waiters.setdefault(device_id, [])
+        waiters.append(future)
+        try:
+            await self.async_query_third_party_mqtt_config(device_id)
+            return await asyncio.wait_for(
+                future,
+                timeout=_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            return None
+        finally:
+            current_waiters = self._third_party_mqtt_config_waiters.get(device_id)
+            if current_waiters is not None:
+                with contextlib.suppress(ValueError):
+                    current_waiters.remove(future)
+                if not current_waiters:
+                    self._third_party_mqtt_config_waiters.pop(device_id, None)
 
     async def async_update_third_party_mqtt_config(
         self,
@@ -10358,12 +10317,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Configure the device's third-party MQTT bridge (experimental).
 
-        Publishes ``SET_THIRD_PARTY_MQTT_CONFIG`` (actionId 3046, cmd 113)
-        with a plaintext body. See PROTOCOL.md §15 for the open questions.
+        Publishes ``SET_THIRD_PARTY_MQTT_CONFIG`` (actionId 3046, cmd 113).
+        ``userName``, ``password`` and ``token`` use the App's AES/Base64
+        codec; ``enable``, ``ip`` and ``port`` remain plain body fields.
         """
-        normalized_token, use_generated_token = self._stable_third_party_mqtt_token(
-            token,
-        )
+        normalized_token = str(token)
         bluetooth_key = self.device_bluetooth_key(device_id)
         if bluetooth_key is None:
             msg = "Cannot set third-party MQTT config without device bluetoothKey"
@@ -10398,12 +10356,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         }
         _LOGGER.info(
             "Jackery: publishing SET_THIRD_PARTY_MQTT_CONFIG (3046) to %s "
-            "enable=%s target_configured=%s username_set=%s token_generated=%s",
+            "enable=%s target_configured=%s username_set=%s token_set=%s",
             device_id,
             enable,
             bool(ip) and int(port) > 0,
             bool(username),
-            use_generated_token,
+            bool(normalized_token),
         )
         await self._async_publish_command_ble_first(
             device_id,
@@ -10412,16 +10370,35 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cmd=MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
             body_fields=body,
         )
-        self._apply_local_third_party_mqtt_config_patch(
+        expected_plaintext = {
+            FIELD_THIRD_PARTY_MQTT_ENABLE: 1 if enable else 0,
+            FIELD_THIRD_PARTY_MQTT_IP: str(ip),
+            FIELD_THIRD_PARTY_MQTT_PORT: int(port),
+            FIELD_THIRD_PARTY_MQTT_USERNAME: str(username),
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: str(password),
+            FIELD_THIRD_PARTY_MQTT_TOKEN: normalized_token,
+        }
+        readback = await self._async_query_third_party_mqtt_config_readback(device_id)
+        if readback is None:
+            msg = (
+                "Third-party MQTT config write was not confirmed by "
+                f"3047 readback within {_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC:.0f}s"
+            )
+            raise HomeAssistantError(msg)
+        mismatches = self._third_party_mqtt_config_mismatches(
+            readback,
+            expected_plaintext,
+        )
+        if mismatches:
+            msg = (
+                "Third-party MQTT config readback did not match written fields: "
+                f"{', '.join(mismatches)}"
+            )
+            raise HomeAssistantError(msg)
+        _LOGGER.info(
+            "Jackery: confirmed SET_THIRD_PARTY_MQTT_CONFIG (3046) for %s "
+            "via 3047 readback",
             device_id,
-            {
-                FIELD_THIRD_PARTY_MQTT_ENABLE: 1 if enable else 0,
-                FIELD_THIRD_PARTY_MQTT_IP: str(ip),
-                FIELD_THIRD_PARTY_MQTT_PORT: int(port),
-                FIELD_THIRD_PARTY_MQTT_USERNAME: str(username),
-                FIELD_THIRD_PARTY_MQTT_PASSWORD: str(password),
-                FIELD_THIRD_PARTY_MQTT_TOKEN: normalized_token,
-            },
         )
 
     async def async_query_third_party_mqtt_config(self, device_id: str) -> None:
@@ -10926,13 +10903,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         body_fields: dict[str, Any],
         message_type: str = MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
     ) -> None:
-        """Send an arbitrary portable command (msg_id 1-53) via BLE-first then MQTT.
-
-        Portable commands use ``action_id=<msgId>`` and ``cmd=<bleMsgType>``
-        from ``cmd.portable.b``.  Most portable commands transport as
-        ``DevicePropertyChange`` (the ``message_type`` parameter allows overriding
-        for strategy/plan commands).
-        """
+        """Send an arbitrary portable command via its direct App wire identifiers."""
         await self._async_publish_command_ble_first(
             device_id,
             message_type=message_type,
@@ -11085,14 +11056,48 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         for device_id, payload in data.items():
             should_query_meter = (
                 force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_SUBDEVICE_3031,
+                    require_response=False,
+                )
                 or self._has_smart_meter_accessory(payload)
                 or isinstance(payload.get(PAYLOAD_CT_METER), dict)
             )
-            should_query_packs = self._battery_packs_need_query(payload)
-            should_query_meter_heads = force or self._has_meter_head_accessory(payload)
-            should_query_plugs = force or self._has_smart_plug_accessory(payload)
+            should_query_packs = (
+                force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_SUBDEVICE_3014,
+                    require_response=False,
+                )
+                or self._battery_packs_need_query(payload)
+            )
+            should_query_meter_heads = (
+                force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_SUBDEVICE_3033,
+                    require_response=False,
+                )
+                or self._has_meter_head_accessory(payload)
+            )
+            should_query_plugs = (
+                force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_SUBDEVICE_3032,
+                    require_response=False,
+                )
+                or self._has_smart_plug_accessory(payload)
+            )
             should_query_combo = (
                 force
+                or self._cloud_mqtt_action_needs_retry(
+                    device_id,
+                    ACTION_ID_SUBDEVICE_3037,
+                    require_response=False,
+                )
                 or has_breaker_accessory(payload)
                 or has_sub_device_accessory(payload)
             )
@@ -11196,7 +11201,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return
         now_monotonic = time.monotonic()
         import_throttle_sec = (
-            max(15.0, self._configured_update_interval.total_seconds())
+            self._slow_metrics_interval_sec
             if self._statistics_startup_sync_pending
             else _STATISTICS_IMPORT_THROTTLE_SEC
         )
@@ -11214,6 +11219,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 in {
                     PAYLOAD_DEVICE,
                     PAYLOAD_DISCOVERY,
+                    PAYLOAD_LOCAL_DAILY_ENERGY,
                     PAYLOAD_SYSTEM,
                     PAYLOAD_SYSTEM_META,
                 }
@@ -11232,7 +11238,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self,
         snapshot: dict[str, dict[str, Any]],
     ) -> None:
-        """Run recorder statistic import/backfill in the background."""
+        """Import current Recorder buckets without waiting for history backfill."""
         try:
             await self._async_import_and_repair_app_chart_statistics(snapshot)
         except asyncio.CancelledError:
@@ -11245,9 +11251,84 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # never escape this background task and surface as an unhandled-task
             # crash (which reads as a hung setup to the user).
             _LOGGER.exception("Jackery recorder-statistics import failed")
+        else:
+            self._schedule_statistics_backfill(snapshot)
         finally:
             if asyncio.current_task() is self._statistics_import_task:
                 self._statistics_import_task = None
+
+    @callback
+    def _schedule_statistics_backfill(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Run bounded historical HTTP queues independently from current imports."""
+        if self._shutdown_started:
+            return
+        if (
+            self._statistics_backfill_task is not None
+            and not self._statistics_backfill_task.done()
+        ):
+            return
+        self._statistics_backfill_task = self.hass.async_create_background_task(
+            self._async_statistics_backfill_job(snapshot),
+            name=f"{DOMAIN}_statistics_backfill",
+            eager_start=False,
+        )
+
+    async def _async_statistics_backfill_job(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Advance historical queues while the current import remains schedulable."""
+        try:
+            await self._async_advance_statistics_backfill(snapshot)
+        except asyncio.CancelledError:
+            raise
+        except ConfigEntryAuthFailed as err:
+            self._defer_background_auth_failure(err)
+        except RECORDER_BACKGROUND_TASK_ERRORS:
+            _LOGGER.exception("Jackery historical statistics backfill failed")
+        finally:
+            if asyncio.current_task() is self._statistics_backfill_task:
+                self._statistics_backfill_task = None
+
+    async def _async_advance_statistics_backfill(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Advance the bounded historical HTTP queues outside current imports."""
+        if not snapshot:
+            return
+
+        startup_sync = self._statistics_startup_sync_pending
+        backfill_result = await self._async_http_backfill_recent_day_statistics(
+            snapshot,
+            force=startup_sync,
+            window_days=(
+                _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
+                if startup_sync
+                else _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS
+            ),
+            include_current_year=startup_sync,
+            request_budget=_STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET,
+        )
+        day_pending = backfill_result.get("pending_sources", 0)
+        if backfill_result.get("rate_limited") is True:
+            self._statistics_import_diagnostics[
+                "last_period_backfill_skipped_reason"
+            ] = "day_backfill_rate_limited"
+            return
+        self._statistics_import_diagnostics.pop(
+            "last_period_backfill_skipped_reason",
+            None,
+        )
+        period_backfill_result = await self._async_http_backfill_period_statistics(
+            snapshot,
+        )
+        period_pending = period_backfill_result.get("pending_sources", 0)
+        if startup_sync and period_pending == 0 and day_pending == 0:
+            self._statistics_startup_sync_pending = False
 
     # ------------------------------------------------------------------
     # Statistics import & data-quality reporting
@@ -11335,92 +11416,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             return 0.0
 
-    async def _async_update_data_quality_issue(
-        self,
-        snapshot: dict[str, dict[str, Any]],
-    ) -> None:
-        """Surface contradictory app statistics as a HA repair issue.
-
-        The integration must not silently repair period or lifetime totals with
-        other periods. Instead it keeps every entity on its documented source
-        and creates a repair issue when the app/cloud data contradicts itself.
-        """
-        warnings: list[dict[str, Any]] = []
-        for dev_id in sorted(snapshot):
-            source = snapshot[dev_id].get(PAYLOAD_DATA_QUALITY)
-            if isinstance(source, list):
-                warnings.extend(item for item in source if isinstance(item, dict))
-        warnings = normalized_data_quality_warnings(warnings)
-
-        issue_suffix = f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"
-        issue_id = f"{self.entry.entry_id}{issue_suffix}"
-        registry = ir.async_get(self.hass)
-        for domain, existing_issue_id in tuple(registry.issues):
-            if (
-                domain == DOMAIN
-                and existing_issue_id.endswith(issue_suffix)
-                and existing_issue_id != issue_id
-            ):
-                ir.async_delete_issue(self.hass, DOMAIN, existing_issue_id)
-        if not warnings:
-            self._data_quality_issue_signature = None
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
-            return
-
-        first = warnings[0]
-        examples = "; ".join(
-            format_data_quality_warning(warning)
-            for warning in warnings[:DATA_QUALITY_REPAIR_EXAMPLE_LIMIT]
-        )
-        # Dedup on the contradiction's identity (which periods disagree), NOT
-        # the live kWh values. The warning dicts carry rounded source/reference
-        # values that drift every poll as the device produces energy; keying on
-        # the full payload made every drift look like a new contradiction and
-        # re-raised the repair issue every cycle. Keying on
-        # reason+metric+sections fires the issue once and lets it rest.
-        signature = json.dumps(
-            sorted(
-                [
-                    str(warning.get(DATA_QUALITY_KEY_REASON, "")),
-                    str(warning.get(DATA_QUALITY_KEY_METRIC_KEY, "")),
-                    str(warning.get(DATA_QUALITY_KEY_SOURCE_SECTION, "")),
-                    str(warning.get(DATA_QUALITY_KEY_REFERENCE_SECTION, "")),
-                ]
-                for warning in warnings
-            ),
-        )
-        if self._data_quality_issue_signature == signature:
-            return
-        ir.async_create_issue(
-            self.hass,
-            DOMAIN,
-            issue_id,
-            is_fixable=True,
-            is_persistent=False,
-            severity=ir.IssueSeverity.WARNING,
-            translation_key=REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY,
-            translation_placeholders={
-                "count": str(len(warnings)),
-                "metric": str(
-                    first.get(DATA_QUALITY_KEY_LABEL)
-                    or first.get(DATA_QUALITY_KEY_METRIC_KEY)
-                    or "unknown",
-                ),
-                "examples": examples or "unknown",
-            },
-            data={
-                "entry_id": self.entry.entry_id,
-                "count": str(len(warnings)),
-                "metric": str(
-                    first.get(DATA_QUALITY_KEY_LABEL)
-                    or first.get(DATA_QUALITY_KEY_METRIC_KEY)
-                    or "unknown",
-                ),
-                "examples": examples or "unknown",
-            },
-        )
-        self._data_quality_issue_signature = signature
-
     async def async_load_statistics_backfill_state(self) -> None:
         """Load persistent recorder-statistics repair state."""
         if self._statistics_backfill_state_loaded:
@@ -11447,7 +11442,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def statistics_backfill_diagnostics(self) -> dict[str, Any]:
-        """Return redaction-safe statistics repair diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return redaction-safe statistics repair diagnostics."""  # noqa: D421, RUF105
         devices = self._statistics_backfill_state.get(
             _STATISTICS_BACKFILL_STORE_DEVICES,
         )
@@ -11484,97 +11479,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             state = {}
             devices[str(device_id)] = state
         return state
-
-    @staticmethod
-    def _parse_statistics_backfill_date(value: object) -> date | None:
-        """Parse a persisted ISO date for statistics repair decisions."""
-        return parse_statistics_backfill_date(value)
-
-    @staticmethod
-    def _statistics_current_year_recovery_needed(
-        *,
-        last_success: date,
-        last_repair: date | None,
-        failed_bucket_count: int,
-        today: date,
-    ) -> bool:
-        """Return True when an old success marker may have skipped history.
-
-        Older builds could persist ``last_successful_import_date`` from the
-        current snapshot while the historical month/year repair never ran
-        because a live MQTT window returned early. In that state the normal
-        month-boundary branch would never revisit elapsed months of the same
-        calendar year. Use ``last_repair_date`` as the recovery marker: once
-        a repair has run in the same month as ``last_success``, the one-time
-        current-year recovery is complete.
-        """
-        if today.month == 1:
-            return False
-        if last_success.year != today.year:
-            return False
-        if failed_bucket_count > 0:
-            return last_repair is None or last_repair < today
-        if last_repair is None:
-            return True
-        last_success_month = last_success.replace(day=1)
-        return last_repair < last_success_month
-
-    def _statistics_repair_from_date(  # ruff:ignore[too-many-return-statements]
-        self,
-        device_id: str,
-        today: date,
-    ) -> date | None:
-        """Return the recovery start date for one device, if needed.
-
-        On first run (``last_success`` not persisted yet) the method seeds
-        the historical statistics from January 1 of the current calendar
-        year. This matches the year-month backfill scope documented in
-        ``docs/PROTOCOL.md §8`` and ensures HA Energy Dashboard /
-        Recorder get past month/day buckets when the integration is added
-        mid-year. In January the seed is skipped because there is no prior
-        month inside the current calendar year, and the current snapshot
-        already supplies the running January chart. If an older build already
-        persisted a current-year success marker without a matching repair
-        marker, the same January seed is used once to recover elapsed months.
-        """
-        state = self._statistics_backfill_device_state(device_id)
-        last_success = self._parse_statistics_backfill_date(
-            state.get(_STATISTICS_BACKFILL_LAST_SUCCESS)
-        )
-        if last_success is None:
-            if today.month == 1:
-                return None
-            return today.replace(month=1, day=1)
-        last_repair = self._parse_statistics_backfill_date(
-            state.get(_STATISTICS_BACKFILL_LAST_REPAIR)
-        )
-        failed_bucket_count = int(
-            safe_float(state.get(_STATISTICS_BACKFILL_LAST_FAILED_BUCKETS)) or 0
-        )
-        if (
-            today.month != 1
-            and state.get(_STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION)
-            != _EXTERNAL_STATISTICS_REPAIR_VERSION
-        ):
-            return today.replace(month=1, day=1)
-        if (
-            today.month != 1
-            and state.get(_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION)
-            != _ENTITY_STATISTICS_REPAIR_VERSION
-        ):
-            return today.replace(month=1, day=1)
-        if self._statistics_current_year_recovery_needed(
-            last_success=last_success,
-            last_repair=last_repair,
-            failed_bucket_count=failed_bucket_count,
-            today=today,
-        ):
-            return today.replace(month=1, day=1)
-        if last_success >= today:
-            return None
-        if (last_success.year, last_success.month) == (today.year, today.month):
-            return None
-        return last_success
 
     @staticmethod
     def _iter_calendar_months(start_date: date, end_date: date) -> list[date]:
@@ -11664,13 +11568,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             source = payload.get(section)
             if not isinstance(source, dict):
                 continue
-            source = gate_payload_section(
-                TransportSource.HTTP,
-                section,
-                source,
-            )
-            if not source:
-                continue
             points = day_power_energy_points(
                 source,
                 section,
@@ -11683,7 +11580,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return points
         return []
 
-    async def _async_add_app_chart_statistics(  # ruff:ignore[too-many-branches, too-many-arguments, too-many-locals, too-many-statements]
+    async def _async_add_app_chart_statistics(  # ruff:ignore[too-many-arguments]
+        self,
+        *,
+        device_id: str,
+        name_prefix: str,
+        metric_key: str,
+        label: str,
+        bucket: str,
+        bucket_label: str,
+        points: list[Any],
+    ) -> tuple[bool, int]:
+        """Serialize only one external-statistics Recorder read/upsert."""
+        async with self._statistics_recorder_lock:
+            return await self._async_add_app_chart_statistics_locked(
+                device_id=device_id,
+                name_prefix=name_prefix,
+                metric_key=metric_key,
+                label=label,
+                bucket=bucket,
+                bucket_label=bucket_label,
+                points=points,
+            )
+
+    async def _async_add_app_chart_statistics_locked(  # ruff:ignore[too-many-branches, too-many-arguments, too-many-locals, too-many-return-statements, too-many-statements]  # noqa: RUF105
         self,
         *,
         device_id: str,
@@ -11703,31 +11623,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if not points:
             return True, 0
         samples: list[tuple[datetime, float]] = []
-        negatives_skipped = 0
         for point in points:
             state = safe_float(point.value)
             if state is None:
-                continue
-            if state < 0:
-                # §2.2 rule-1: PV / generation / grid / battery energy buckets
-                # are always >= 0, so a negative value is anomalous (corrupt
-                # payload or upstream API fault). Reject + skip as before, but
-                # count it so the rejection is no longer silent.
-                negatives_skipped += 1
                 continue
             samples.append((
                 self._local_statistic_start(point.start_date),
                 round(state, 5),
             ))
-        if negatives_skipped:
-            # Aggregate to one line per (metric, bucket) call — never per bucket.
-            _LOGGER.warning(
-                "Rejected %d negative value(s) for metric '%s' bucket '%s' "
-                "(§2.2: energy buckets must be >= 0); skipped from import",
-                negatives_skipped,
-                metric_key,
-                bucket,
-            )
         if not samples:
             return True, 0
         starts = [start for start, _state in samples]
@@ -11762,19 +11665,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if self._stat_import_last_sig.get(statistic_id) == series_signature:
             return True, 0
         # ``async_add_external_statistics`` UPSERTs per (metadata_id, start_ts)
-        # in this HA version (recorder/statistics.py: ``_statistics_exists`` ->
-        # ``_update_statistics`` writes both state and sum, else
-        # ``_insert_statistics``; the session is wrapped in
-        # ``filter_unique_constraint_integrity_error``). Re-submitting an
-        # existing start therefore UPDATEs it rather than raising
-        # ``IntegrityError``. We read both the existing ``state`` and ``sum`` so
-        # we can find the first bucket that diverges from the recorder.
-        existing_states: dict[float, float] = {}
+        # in this HA version. For an energy series with ``has_sum=True``, Home
+        # Assistant's own external-statistics example supplies only the running
+        # ``sum``. The App chart value is an interval increment, not a sensor
+        # state, so storing it as ``state`` creates a second incompatible value
+        # channel. Compare and publish only the cumulative sum.
         existing_sums: dict[float, float] = {}
+        earliest = dt_util.as_utc(min(starts))
+        latest = dt_util.as_utc(max(starts))
         try:  # ruff:ignore[too-many-statements-in-try-clause]
             recorder = get_instance(self.hass)
-            earliest = dt_util.as_utc(min(starts))
-            latest = dt_util.as_utc(max(starts))
             existing = await recorder.async_add_executor_job(
                 statistics_during_period,
                 self.hass,
@@ -11783,15 +11683,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 {statistic_id},
                 "hour",
                 None,
-                {"start", "state", "sum"},
+                {"start", "sum"},
             )
             for row in existing.get(statistic_id, []):
                 row_start = self._stat_row_start(row)
                 if row_start is None:
                     continue
-                row_state = safe_float(row.get("state"))
-                if row_state is not None:
-                    existing_states[row_start] = row_state
                 row_sum = safe_float(row.get("sum"))
                 if row_sum is not None:
                     existing_sums[row_start] = row_sum
@@ -11799,56 +11696,64 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER.debug("Jackery recorder existing-statistics lookup failed: %s", err)
 
         # Walk buckets front-to-back accumulating the running sum. Skip the
-        # leading contiguous prefix whose stored state *and* sum already match
-        # the recorder, then re-emit every bucket from the first divergence
-        # onward - a new start, a changed state, or a stale sum. Re-emitting the
-        # whole tail keeps the submitted sum sequence monotonic so HA never sees
-        # a spurious counter reset, and applies Jackery's historical corrections
-        # instead of silently dropping them.
+        # leading contiguous prefix whose stored sum already matches the recorder,
+        # then re-emit every bucket from the first divergence onward. Any changed
+        # interval necessarily changes the running sum at that bucket, including
+        # legitimate signed corrections, so no synthetic ``state`` is needed.
         statistics: list[StatisticData] = []
+        expected_import_sums: dict[float, float] = {}
         cumulative = offset
         imported_any = False
         diverged = False
         for start, state in zip(starts, states, strict=False):
             cumulative = round(cumulative + state, 5)
+            start_ts = self._stat_row_start({"start": start})
+            if start_ts is None:
+                return False, 0
             if not diverged:
-                start_ts = self._stat_row_start({"start": start})
-                prior_state = (
-                    existing_states.get(start_ts) if start_ts is not None else None
-                )
-                prior_sum = (
-                    existing_sums.get(start_ts) if start_ts is not None else None
-                )
-                state_matches = (
-                    prior_state is not None
-                    and abs(prior_state - state) < _STATISTICS_IMPORT_STATE_TOLERANCE
-                )
+                prior_sum = existing_sums.get(start_ts)
                 sum_matches = (
                     prior_sum is not None
                     and abs(prior_sum - cumulative) < _STATISTICS_IMPORT_STATE_TOLERANCE
                 )
-                if state_matches and sum_matches:
+                if sum_matches:
                     continue
                 diverged = True
-            statistics.append(StatisticData(start=start, state=state, sum=cumulative))
+            statistics.append(StatisticData(start=start, sum=cumulative))
+            expected_import_sums[start_ts] = cumulative
             imported_any = True
         if not imported_any:
             self._stat_import_last_sig[statistic_id] = series_signature
             return True, 0
-        metadata = StatisticMetaData(
-            mean_type=StatisticMeanType.NONE,
-            has_sum=True,
-            name=f"{name_prefix} {label} ({bucket_label})",
-            source=DOMAIN,
-            statistic_id=statistic_id,
-            unit_class=EnergyConverter.UNIT_CLASS,
-            unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        )
+        metadata_dict: dict[str, Any] = {
+            "mean_type": StatisticMeanType.NONE,
+            "has_sum": True,
+            "name": f"{name_prefix} {label} ({bucket_label})",
+            "source": DOMAIN,
+            "statistic_id": statistic_id,
+            "unit_class": EnergyConverter.UNIT_CLASS,
+            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        }
         try:
+            recorder = get_instance(self.hass)
             async_add_external_statistics(
                 self.hass,
-                metadata,
+                metadata_dict,  # type: ignore[arg-type]
                 statistics,
+            )
+            # Home Assistant queues an ImportStatisticsTask here.  Wait for its
+            # SynchronizeTask commit barrier while the single-writer lock is
+            # held, then verify exact persisted sums before deduplicating.
+            await recorder.async_block_till_done()
+            verified = await recorder.async_add_executor_job(
+                statistics_during_period,
+                self.hass,
+                earliest,
+                latest + timedelta(seconds=1),
+                {statistic_id},
+                "hour",
+                None,
+                {"start", "sum"},
             )
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.warning(
@@ -11856,6 +11761,24 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 len(statistics),
                 statistic_id,
                 exception_debug_message(err),
+            )
+            return False, 0
+        verified_sums: dict[float, float] = {}
+        for row in verified.get(statistic_id, []):
+            row_start = self._stat_row_start(row)
+            row_sum = safe_float(row.get("sum"))
+            if row_start is not None and row_sum is not None:
+                verified_sums[row_start] = row_sum
+        if any(
+            (actual := verified_sums.get(start_ts)) is None
+            or abs(actual - expected_sum) >= _STATISTICS_IMPORT_STATE_TOLERANCE
+            for start_ts, expected_sum in expected_import_sums.items()
+        ):
+            _LOGGER.warning(
+                "Home Assistant recorder did not verify %d queued app chart "
+                "bucket(s) for %s; leaving the import retryable",
+                len(expected_import_sums),
+                statistic_id,
             )
             return False, 0
         self._stat_import_last_sig[statistic_id] = series_signature
@@ -11929,13 +11852,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     source = payload.get(section)
                     if not isinstance(source, dict):
                         continue
-                    source = gate_payload_section(
-                        TransportSource.HTTP,
-                        section,
-                        source,
-                    )
-                    if not source:
-                        continue
                     points = trend_series_points(
                         source,
                         section,
@@ -11957,7 +11873,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         successful_devices.add(device_id)
         return successful_devices
 
-    async def _async_fetch_historical_app_chart_source(  # ruff:ignore[too-many-return-statements, too-many-arguments]
+    async def _async_fetch_historical_app_chart_source(  # ruff:ignore[too-many-arguments]  # noqa: PLR0912, RUF105
         self,
         *,
         device_id: str,
@@ -11977,309 +11893,74 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         else:
             return {}
 
+        semaphore = getattr(self, "_slow_http_request_semaphore", None)
+
+        request_factory: Callable[[], Awaitable[dict[str, Any]]]
         if section_prefix == APP_SECTION_PV_STAT:
             if not system_id:
                 return {}
-            return await self.api.async_get_device_pv_stat(
+            request_factory = partial(
+                self.api.async_get_device_pv_stat,
                 device_id,
                 system_id,
                 **kwargs,
             )
-        if section_prefix == APP_SECTION_BATTERY_STAT:
-            return await self.api.async_get_device_battery_stat(
+        elif section_prefix == APP_SECTION_BATTERY_STAT:
+            request_factory = partial(
+                self.api.async_get_device_battery_stat,
                 device_id,
                 **kwargs,
             )
-        if section_prefix == APP_SECTION_HOME_STAT:
-            return await self.api.async_get_device_home_stat(
+        elif section_prefix == APP_SECTION_HOME_STAT:
+            request_factory = partial(
+                self.api.async_get_device_home_stat,
                 device_id,
                 **kwargs,
             )
-        if section_prefix == APP_SECTION_HOME_TRENDS:
+        elif section_prefix == APP_SECTION_HOME_TRENDS:
             if not system_id:
                 return {}
-            return await self.api.async_get_home_trends(
+            request_factory = partial(
+                self.api.async_get_home_trends,
                 system_id,
                 **kwargs,
             )
-        if section_prefix == APP_SECTION_CT_STAT:
-            return await self.api.async_get_device_ct_stat(
+        elif section_prefix == APP_SECTION_CT_STAT:
+            request_factory = partial(
+                self.api.async_get_device_ct_stat,
                 ct_device_id or device_id,
                 **kwargs,
             )
-        if section_prefix == APP_SECTION_EPS_STAT:
-            return await self.api.async_get_device_eps_stat(
+        elif section_prefix == APP_SECTION_EPS_STAT:
+            request_factory = partial(
+                self.api.async_get_device_eps_stat,
                 device_id,
                 **kwargs,
             )
-        return {}
+        else:
+            return {}
 
-    async def _collect_repair_buckets(
-        self,
-        *,
-        device_id: str,
-        system_id: str | None,
-        ct_device_id: str | None,
-        prefixes: tuple[str, ...],
-        period_plan: tuple[tuple[str, list[date]], ...],
-    ) -> tuple[
-        dict[tuple[str, str, date], dict[str, Any]],
-        dict[str, tuple[str, str]],
-        int,
-    ]:
-        """Fetch and first-gate every historical repair bucket (collect pass).
+        if semaphore is not None:
+            async with semaphore:
+                return await request_factory()
+        return await request_factory()
 
-        Each surviving bucket is keyed by ``(prefix, date_type, period_start)``
-        so the containment check can pair a shorter period with the exact
-        longer-period container that contains it, rather than only the single
-        period of one outer iteration. The transport-neutral first gate
-        (:func:`gate_payload_section`) is applied unchanged before a bucket is
-        retained.
-
-        Args:
-            device_id: The Jackery device being repaired.
-            system_id: The device's system id, if known.
-            ct_device_id: The smart-meter accessory device id, if any.
-            prefixes: The distinct section prefixes to fetch per period.
-            period_plan: The ``(date_type, period_starts)`` backfill plan.
-
-        Returns:
-            A ``(collected, period_meta_by_type, fetch_failed_count)`` triple.
-            ``collected`` maps ``(prefix, date_type, period_start)`` to the
-            first-gated source; ``period_meta_by_type`` maps each date type to
-            its ``(bucket, bucket_label)``; ``fetch_failed_count`` counts the
-            per-section fetch failures.
-        """
-        collected: dict[tuple[str, str, date], dict[str, Any]] = {}
-        period_meta_by_type: dict[str, tuple[str, str]] = {}
-        fetch_failed_count = 0
-
-        for date_type, period_starts in period_plan:
-            period_meta = self._app_chart_period_meta(date_type)
-            if period_meta is None:
-                continue
-            bucket, bucket_label = period_meta
-            for period_start in period_starts:
-                for section_prefix in prefixes:
-                    try:
-                        fetched_source = (
-                            await self._async_fetch_historical_app_chart_source(
-                                device_id=device_id,
-                                system_id=system_id,
-                                ct_device_id=ct_device_id,
-                                section_prefix=section_prefix,
-                                date_type=date_type,
-                                period_start=period_start,
-                            )
-                        )
-                    except JackeryAuthError as err:
-                        fetch_failed_count += 1
-                        _LOGGER.debug(
-                            "Jackery statistics backfill auth-rejected for "
-                            "%s %s %s; skipping this bucket while live HTTP "
-                            "polling remains authoritative: %s",
-                            device_id,
-                            section_prefix,
-                            period_start.isoformat(),
-                            exception_debug_message(err),
-                        )
-                        continue
-                    except JackeryError as err:
-                        fetch_failed_count += 1
-                        _LOGGER.debug(
-                            "Jackery statistics backfill fetch failed for %s %s %s: %s",
-                            device_id,
-                            section_prefix,
-                            period_start.isoformat(),
-                            err,
-                        )
-                        continue
-                    if fetched_source:
-                        section = f"{section_prefix}_{date_type}"
-                        gated_source = gate_payload_section(
-                            TransportSource.HTTP,
-                            section,
-                            fetched_source,
-                        )
-                        if gated_source:
-                            collected[section_prefix, date_type, period_start] = (
-                                gated_source
-                            )
-                            period_meta_by_type[date_type] = (bucket, bucket_label)
-
-                await asyncio.sleep(0)
-
-        return collected, period_meta_by_type, fetch_failed_count
-
-    @staticmethod
-    def _repair_containment_violations(
-        *,
-        collected: dict[tuple[str, str, date], dict[str, Any]],
-        payload: dict[str, Any],
-        to_date: date,
-    ) -> set[tuple[str, str, date]]:
-        """Return collected buckets that break the §2.2 period hierarchy.
-
-        Mirrors :meth:`_gate_snapshot_period_hierarchy` for the backfill path,
-        but validates every shorter-period bucket against the longer-period
-        container that *actually contains it*, identified from the bucket's own
-        ``period_start`` (never ``to_date`` or the current snapshot). This is
-        what makes historical and multi-year backfill correct: a 2024 month is
-        compared to the 2024 year, not the 2026 snapshot.
-
-        For each shorter period a minimal flat unit is assembled holding only
-        that bucket and its containing longer-period bucket(s), and the
-        detector is run with ``today`` anchored *inside* the shorter period so
-        its ``week_inside_current_*`` guards resolve true for the bucket under
-        test. A month-straddling week skips the month check (mirroring the
-        detector's ``week_inside_current_month`` guard).
-
-        Containers are resolved against ``collected`` first. When a container
-        was not fetched, the current snapshot's same-period section is used as
-        a fallback ceiling *only* when that container period is the current
-        calendar period (matched via :func:`app_period_range` against
-        ``to_date``); this restores the current-snapshot coverage of the live
-        gate without ever comparing a historical bucket to a different
-        (current) snapshot period. When the year container is still absent, the
-        PV lifetime ``PAYLOAD_STATISTIC`` total is used as the year-level
-        ceiling; for non-PV prefixes there is no authoritative ceiling, so the
-        bucket is imported without a cross-period withhold rather than
-        over-blocked. The exceeding shorter period is named by
-        ``warning.reference_section`` and is withheld; the lifetime
-        ``PAYLOAD_STATISTIC`` source itself is never withheld.
-
-        Args:
-            collected: Fetched, first-gated buckets keyed by
-                ``(prefix, date_type, period_start)``.
-            payload: The device snapshot, consulted for its current-period
-                container sections and its lifetime ``PAYLOAD_STATISTIC`` total
-                as a PV year-level ceiling.
-            to_date: The repair window's end date, used to identify which
-                container period is the current calendar period.
-
-        Returns:
-            The set of ``(prefix, date_type, period_start)`` keys to withhold.
-        """
-        statistic = payload.get(PAYLOAD_STATISTIC)
-        withheld: set[tuple[str, str, date]] = set()
-
-        def _container_keys(
-            prefix: str,
-            date_type: str,
-            period_start: date,
-        ) -> list[tuple[str, str, date]]:
-            if date_type == DATE_TYPE_WEEK:
-                week_begin, week_end = app_period_range(
-                    DATE_TYPE_WEEK, today=period_start
-                )
-                keys: list[tuple[str, str, date]] = []
-                straddles_month = (
-                    week_begin.month != week_end.month
-                    or week_begin.year != week_end.year
-                )
-                if not straddles_month:
-                    keys.append((
-                        prefix,
-                        DATE_TYPE_MONTH,
-                        date(week_begin.year, week_begin.month, 1),
-                    ))
-                if week_begin.year == week_end.year:
-                    keys.append((prefix, DATE_TYPE_YEAR, date(week_begin.year, 1, 1)))
-                return keys
-            if date_type == DATE_TYPE_MONTH:
-                return [(prefix, DATE_TYPE_YEAR, date(period_start.year, 1, 1))]
-            return []
-
-        def _container_source(
-            container_key: tuple[str, str, date],
-        ) -> dict[str, Any] | None:
-            fetched = collected.get(container_key)
-            if fetched is not None:
-                return fetched
-            container_prefix, container_type, container_start = container_key
-            is_current_period = app_period_range(
-                container_type, today=container_start
-            ) == app_period_range(container_type, today=to_date)
-            if not is_current_period:
-                return None
-            snapshot_source = payload.get(f"{container_prefix}_{container_type}")
-            return snapshot_source if isinstance(snapshot_source, dict) else None
-
-        for (prefix, date_type, period_start), source in collected.items():
-            if date_type not in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
-                continue
-            unit: dict[str, Any] = {f"{prefix}_{date_type}": source}
-            year_key = (prefix, DATE_TYPE_YEAR, date(period_start.year, 1, 1))
-            year_present = False
-            for container_key in _container_keys(prefix, date_type, period_start):
-                container_source = _container_source(container_key)
-                if container_source is None:
-                    continue
-                _container_prefix, container_type, _container_start = container_key
-                unit[f"{prefix}_{container_type}"] = container_source
-                if container_key == year_key:
-                    year_present = True
-            if (
-                not year_present
-                and prefix == APP_SECTION_PV_STAT
-                and isinstance(statistic, dict)
-            ):
-                unit[PAYLOAD_STATISTIC] = statistic
-
-            warnings = app_data_quality_warnings(unit, today=period_start)
-            for warning in warnings:
-                reference_section = warning.reference_section
-                if reference_section == PAYLOAD_STATISTIC:
-                    continue
-                violating_prefix, violating_type = reference_section.rsplit("_", 1)
-                if (violating_prefix, violating_type) == (prefix, date_type):
-                    # The detector knows both sides of the comparison; the
-                    # caller's summary warning names only the dropped section.
-                    # Without the two values a drop cannot be attributed from
-                    # the log: a bucket exceeding a *correct* container is bad
-                    # data, while the same bucket exceeding a container the
-                    # cloud reports as 0 is a cloud self-contradiction — and
-                    # the two demand opposite remedies.
-                    _LOGGER.warning(
-                        "Jackery containment violation %s on %s (%s): "
-                        "container %s=%r vs bucket %s=%r [metric=%s, unit=%s]",
-                        warning.reason,
-                        reference_section,
-                        period_start.isoformat(),
-                        warning.source_section,
-                        warning.source_value,
-                        warning.reference_section,
-                        warning.reference_value,
-                        warning.metric_key,
-                        source.get(APP_STAT_UNIT),
-                    )
-                    withheld.add((prefix, date_type, period_start))
-
-        return withheld
-
-    async def _import_collected_repair_buckets(  # ruff:ignore[too-many-arguments]
+    async def _import_collected_repair_buckets(
         self,
         *,
         device_id: str,
         name_prefix: str,
         collected: dict[tuple[str, str, date], dict[str, Any]],
         period_meta_by_type: dict[str, tuple[str, str]],
-        withheld: set[tuple[str, str, date]],
         to_date: date,
     ) -> tuple[int, int]:
-        """Import surviving collected buckets as external + entity statistics.
-
-        Buckets in ``withheld`` are intentionally dropped: they are neither
-        repaired nor failed. Entity batches emit one tuple per
-        ``(date_type, period_start)`` group so distinct period starts of the
-        same date type are not collapsed into a single overwriting dict.
+        """Import collected buckets as external statistics.
 
         Args:
             device_id: The Jackery device being repaired.
             name_prefix: The user-readable statistic name prefix.
             collected: All fetched, first-gated buckets.
             period_meta_by_type: Each date type's ``(bucket, bucket_label)``.
-            withheld: Buckets to drop for §2.2 containment violations.
             to_date: The repair window's end date (the local "today").
 
         Returns:
@@ -12287,9 +11968,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """
         repaired_buckets = 0
         failed_buckets = 0
-        survivors = {
-            key: source for key, source in collected.items() if key not in withheld
-        }
 
         for (
             section_prefix,
@@ -12297,7 +11975,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             metric_key,
             label,
         ) in APP_CHART_STAT_METRICS:
-            for (prefix, date_type, _period_start), source in survivors.items():
+            for (prefix, date_type, _period_start), source in collected.items():
                 if prefix != section_prefix:
                     continue
                 meta = period_meta_by_type.get(date_type)
@@ -12341,257 +12019,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # Dashboard consumes those.
         return repaired_buckets, failed_buckets
 
-    async def _async_repair_missing_app_chart_statistics(  # ruff:ignore[too-many-locals]
-        self,
-        device_id: str,
-        payload: dict[str, Any],
-        from_date: date,
-        to_date: date,
-    ) -> tuple[int, int]:
-        """Backfill historical app chart statistic buckets after an outage.
-
-        The normal coordinator snapshot only contains the app's current
-        week/month/year periods. If HA or the Jackery cloud was unavailable
-        over a calendar boundary, previous week/month/year buckets must be fetched
-        explicitly before importing the current snapshot so cumulative sums stay
-        monotonic and the long-term statistic graph has no avoidable gaps.
-        """
-        name_prefix = self._app_chart_name_prefix(device_id, payload)
-        index = self._device_index.get(device_id) or {}
-        system_id = (
-            str(index.get(FIELD_SYSTEM_ID)) if index.get(FIELD_SYSTEM_ID) else None
-        )
-        ct_device_id = self._smart_meter_accessory_device_id(
-            payload,
-        ) or self._smart_meter_accessory_device_id(index)
-        prefixes = tuple(dict.fromkeys(metric[0] for metric in APP_CHART_STAT_METRICS))
-
-        enabled_date_types = self._enabled_app_chart_date_types()
-        period_plan_candidates: tuple[tuple[str, list[date]], ...] = (
-            (DATE_TYPE_MONTH, self._iter_calendar_months(from_date, to_date)),
-            (
-                DATE_TYPE_YEAR,
-                [
-                    date(year, 1, 1)
-                    for year in self._iter_calendar_years(from_date, to_date)
-                ],
-            ),
-            (DATE_TYPE_WEEK, self._iter_calendar_weeks(from_date, to_date)),
-        )
-        period_plan = tuple(
-            entry for entry in period_plan_candidates if entry[0] in enabled_date_types
-        )
-        # Month charts contain the per-day buckets needed by the Energy
-        # Dashboard. Fetch and import month+year first, before the much larger
-        # historical week plan. This makes useful history durable even if a
-        # reload or transient outage interrupts the later phase.
-        fast_plan = tuple(
-            item for item in period_plan if item[0] in {DATE_TYPE_MONTH, DATE_TYPE_YEAR}
-        )
-        week_plan = tuple(item for item in period_plan if item[0] == DATE_TYPE_WEEK)
-        phase_plans = tuple(plan for plan in (fast_plan, week_plan) if plan)
-
-        all_collected: dict[tuple[str, str, date], dict[str, Any]] = {}
-        all_period_meta: dict[str, tuple[str, str]] = {}
-        all_withheld: set[tuple[str, str, date]] = set()
-        repaired_buckets = 0
-        failed_buckets = 0
-
-        for phase_plan in phase_plans:
-            (
-                phase_collected,
-                phase_period_meta,
-                phase_fetch_failed,
-            ) = await self._collect_repair_buckets(
-                device_id=device_id,
-                system_id=system_id,
-                ct_device_id=ct_device_id,
-                prefixes=prefixes,
-                period_plan=phase_plan,
-            )
-            failed_buckets += phase_fetch_failed
-            all_collected.update(phase_collected)
-            all_period_meta.update(phase_period_meta)
-            phase_withheld = self._repair_containment_violations(
-                collected=all_collected,
-                payload=payload,
-                to_date=to_date,
-            )
-            all_withheld.update(phase_withheld)
-            (
-                phase_repaired,
-                phase_import_failed,
-            ) = await self._import_collected_repair_buckets(
-                device_id=device_id,
-                name_prefix=name_prefix,
-                collected=phase_collected,
-                period_meta_by_type=all_period_meta,
-                withheld=phase_withheld,
-                to_date=to_date,
-            )
-            repaired_buckets += phase_repaired
-            failed_buckets += phase_import_failed
-
-        if all_withheld:
-            withheld_names = sorted(
-                f"{prefix}_{date_type} ({period_start.isoformat()})"
-                for prefix, date_type, period_start in all_withheld
-            )
-            _LOGGER.warning(
-                "Withholding repaired app chart section(s) %s for %s from "
-                "recorder: violates the AGENTS.md §2.2 period hierarchy "
-                "(shorter period exceeds its longer-period container)",
-                ", ".join(withheld_names),
-                device_id,
-            )
-
-        return repaired_buckets, failed_buckets
-
-    @staticmethod
-    def _gate_snapshot_period_hierarchy(
-        snapshot: dict[str, dict[str, Any]],
-        *,
-        today: date,
-    ) -> dict[str, dict[str, Any]]:
-        """Withhold hierarchy-violating period sections before recorder import.
-
-        AGENTS.md §2.2 requires every period total to stay within its
-        longer-period container (``daily <= weekly <= monthly <= yearly <=
-        lifetime``). Contradictions are detected by
-        :func:`app_data_quality_warnings`; the exceeding (shorter) period is
-        named as the warning ``reference_section``. Drop exactly those sections
-        per device via the transport-neutral ingest gate so only validated
-        period data reaches the HA Recorder. The lifetime statistic total is
-        already bounded by ``guard_statistic_totals_from_year`` upstream, so its
-        ``PAYLOAD_STATISTIC`` source is never withheld here.
-        """
-        gated: dict[str, dict[str, Any]] = {}
-        for device_id, payload in snapshot.items():
-            gated[device_id] = (
-                JackerySolarVaultCoordinator._gate_period_hierarchy_from_warnings(
-                    payload,
-                    app_data_quality_warnings(payload, today=today),
-                )
-            )
-        return gated
-
-    @staticmethod
-    def _gate_period_hierarchy_from_warnings(
-        entry: dict[str, Any],
-        warnings: Sequence[object],
-    ) -> dict[str, Any]:
-        """Withhold only contradictory period sections from a live entry.
-
-        The gate receives already-computed data-quality warnings and removes
-        exactly the named period sections. Property, accessory, MQTT, BLE and
-        other live payloads are copied through unchanged; Recorder validation
-        must never throttle or discard live telemetry.
-        """
-        violating = frozenset(
-            str(reference)
-            for warning in warnings
-            if (
-                (reference := getattr(warning, "reference_section", None)) is not None
-                and reference != PAYLOAD_STATISTIC
-            )
-        )
-        return gate_period_hierarchy_for_recorder(entry, violating)
-
     async def _async_import_and_repair_app_chart_statistics(
         self,
         snapshot: dict[str, dict[str, Any]],
     ) -> None:
-        """Import current app chart buckets, then repair missed history.
+        """Import the current app-chart buckets into Recorder.
 
-        Restored per deep review 2026-07-25 (HA Recorder & long-term
-        statistics guidelines): without the per-device repair loop a cloud
-        or HA outage across a calendar boundary left permanent gaps in the
-        Recorder / Energy Dashboard. The current-bucket import stays the
-        single bounded job; the repair loop re-fetches missed periods via
-        the app's beginDate/endDate stat endpoints and re-imports them as
-        external statistics. Entity (``sensor.``) statistics stay removed —
-        the external ``jackery_solarvault:`` ids are authoritative.
+        The entry point is retained for task/diagnostic compatibility. Historical
+        day and week/month/year queues run independently so their bounded HTTP
+        requests cannot delay current curve imports or authoritative polling.
         """
-        if not snapshot:
-            return
-        await self._async_ensure_statistics_backfill_state_loaded()
-        today = self._local_today()
-        repair_ok: dict[str, bool] = {}
-        repair_counts: dict[str, tuple[int, int]] = {}
-
-        successful_devices = await self._async_import_current_app_chart_statistics_job(
-            snapshot,
-        )
-
-        for device_id, payload in snapshot.items():
-            from_date = self._statistics_repair_from_date(device_id, today)
-            if from_date is None:
-                repair_ok[device_id] = True
-                continue
-            try:
-                (
-                    repaired,
-                    failed,
-                ) = await self._async_repair_missing_app_chart_statistics(
-                    device_id,
-                    payload,
-                    from_date,
-                    today,
-                )
-            except JackeryAuthError as err:
-                _raise_config_entry_auth_failed(
-                    "Jackery credentials were rejected during statistics backfill",
-                    err,
-                )
-            repair_counts[device_id] = (repaired, failed)
-            repair_ok[device_id] = failed == 0
-            state = self._statistics_backfill_device_state(device_id)
-            state[_STATISTICS_BACKFILL_LAST_REPAIR] = today.isoformat()
-            state[_STATISTICS_BACKFILL_LAST_REPAIRED_BUCKETS] = repaired
-            state[_STATISTICS_BACKFILL_LAST_FAILED_BUCKETS] = failed
-            if failed == 0:
-                state[_STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION] = (
-                    _EXTERNAL_STATISTICS_REPAIR_VERSION
-                )
-                state[_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION] = (
-                    _ENTITY_STATISTICS_REPAIR_VERSION
-                )
-            if failed:
-                state[_STATISTICS_BACKFILL_LAST_ERROR] = (
-                    f"{failed} app chart backfill fetch/import step(s) failed"
-                )
-                _LOGGER.debug(
-                    "Jackery statistics backfill for %s repaired %d bucket(s), "
-                    "%d step(s) failed",
-                    device_id,
-                    repaired,
-                    failed,
-                )
-            elif repaired:
-                state.pop(_STATISTICS_BACKFILL_LAST_ERROR, None)
-                _LOGGER.debug(
-                    "Jackery statistics backfill for %s repaired %d bucket(s)",
-                    device_id,
-                    repaired,
-                )
-
-        if any(repaired for repaired, _failed in repair_counts.values()):
-            successful_devices.update(
-                await self._async_import_app_chart_statistics(snapshot),
-            )
-        changed = bool(repair_counts)
-        for device_id in successful_devices:
-            state = self._statistics_backfill_device_state(device_id)
-            if not repair_ok.get(device_id, True):
-                changed = True
-                continue
-            state[_STATISTICS_BACKFILL_LAST_SUCCESS] = today.isoformat()
-            state[_STATISTICS_BACKFILL_LAST_FAILED_BUCKETS] = 0
-            state.pop(_STATISTICS_BACKFILL_LAST_ERROR, None)
-            changed = True
-
-        if changed:
-            await self._async_save_statistics_backfill_state()
+        await self._async_import_current_app_chart_statistics_job(snapshot)
 
     # ------------------------------------------------------------------
     # Coordinator update cycle (merge of HTTP + MQTT + caches)
@@ -12636,7 +12074,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Poll with a hard timeout while preserving last-known live data."""
         cycle_started = time.monotonic()
         timeout_sec = self._poll_cycle_timeout_seconds()
-        cycle_baseline = copy.deepcopy(self.data or {})
+        # Coordinator updates replace device dictionaries instead of mutating
+        # them in place. A shallow outer snapshot is therefore sufficient to
+        # detect pushes received while HTTP awaits I/O and avoids a potentially
+        # multi-second deepcopy on Home Assistant's event loop.
+        cycle_baseline = dict(self.data or {})
         try:
             async with asyncio.timeout(timeout_sec):
                 result = await self._async_update_data_guarded()
@@ -12666,31 +12108,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 result,
             )
 
-    async def _async_update_data_guarded(  # ruff:ignore[complex-structure, too-many-branches, too-many-locals, too-many-statements]
+    async def _async_update_data_guarded(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
         self,
         _retry_discovery_once: bool = True,
     ) -> dict[str, dict[str, Any]]:
         """Run one HTTP-primary update and reconcile supplementary snapshots."""
-        # A background transport/task may have recorded an auth failure. Do NOT
-        # re-raise it as ConfigEntryAuthFailed here: that opens reauth, and HA
-        # then STOPS this coordinator until the user re-authenticates — so a
-        # background MQTT/BLE rejection (or a transient single-session 401 the
-        # HTTP client already auto-relogins around) would pause HTTP polling
-        # indefinitely. The owner forbids exactly this: "HTTP polling must never
-        # stop; MQTT/BLE must never trigger reauth" (2026-07-05). Genuine auth
-        # is owned solely by the authoritative HTTP property fetch below — if
-        # the credentials are truly invalid, that request raises
-        # ConfigEntryAuthFailed on its own. So clear the deferred notice and
-        # keep polling.
-        if self._mqtt_mgr.auth_failure_message is not None:
-            message = self._mqtt_mgr.auth_failure_message
-            self._mqtt_mgr.auth_failure_message = None
-            _LOGGER.debug(
-                "Jackery: cleared a deferred background auth notice without "
-                "pausing HTTP polling (the HTTP fetch owns reauth): %s",
-                message,
-            )
-
         # The passive reconnect path (``_async_ensure_mqtt`` without
         # ``wait_connected=True``) does not observe the CONNACK outcome
         # directly. If the MQTT client recorded broker auth rejections, treat
@@ -12700,17 +12122,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if streak > 0 and not self._mqtt.is_connected:
                 last_error = self._mqtt.diagnostics.get("last_error") or "unknown"
                 self._pause_mqtt_after_auth_failure(last_error, streak=streak)
-                if (
-                    streak >= MQTT_AUTH_FAILURE_TOLERANCE
-                    and self._persisted_mqtt_session is not None
-                ):
-                    self._schedule_background_once(
-                        "mqtt_session_cache_invalidate",
-                        lambda: self._async_invalidate_mqtt_session_cache(
-                            f"broker rejected cached session after {streak} attempts",
-                        ),
-                        name=f"{DOMAIN}_mqtt_session_cache_invalidate",
-                    )
         # Local-first SystemBody fill (F6): workModel/maxSysOutPw/... have
         # no HTTP source; the throttled BLE-first query keeps them alive
         # without a healthy cloud-MQTT session. Never awaited in the poll.
@@ -12869,11 +12280,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
+            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401, RUF105
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401, RUF105
             """Generic TTL cache helper operating on any dict."""
             now = time.monotonic()
             entry = cache.get(cache_key)
@@ -12896,8 +12307,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 seeded_default = copy.deepcopy(default)
                 cache[cache_key] = (0.0, seeded_default)
                 return seeded_default
+
+            async def _fetch_uncached() -> Any:  # noqa: ANN401, RUF105
+                """Run one cache miss under the shared slow-HTTP limit."""
+                semaphore = getattr(self, "_slow_http_request_semaphore", None)
+                if not stale_ok and semaphore is not None:
+                    async with semaphore:
+                        return await fetcher()
+                return await fetcher()
+
             try:
-                value = await fetcher()
+                # Every non-stale slow HTTP request shares one bound. Applying
+                # it here covers device statistics and historical backfills as
+                # well as system statistics; wrapping only the outer device
+                # coroutine allowed all of its endpoint calls to burst at once
+                # and provoked Jackery code=10426 responses.
+                value = await _fetch_uncached()
             except JackeryAuthError as err:
                 if backoff_key:
                     self._endpoint_backoff_note_failure(backoff_key, err)
@@ -12956,11 +12381,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
+            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: ANN401, RUF105
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff:ignore[any-type]
+        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: ANN401, RUF105
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -13177,7 +12602,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     self._price_config_interval_sec,
                     self.api.async_get_dynamic_price,
                     {},
-                    backoff_key=f"dynamic_price:{sys_id}",
                     stale_ok=stale_ok,
                 ),
                 _get_with_ttl(
@@ -13324,13 +12748,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         cache_key: str,
                         request_kwargs: dict[str, str],
                     ) -> Callable[[], Awaitable[Any]]:
-                        async def _refresh() -> Any:  # ruff:ignore[any-type]
-                            return await _get_with_ttl(
-                                sys_id,
+                        async def _refresh() -> Any:  # noqa: ANN401, RUF105
+                            # Use the non-semaphore primitive here. The
+                            # background pass already bounds every device
+                            # refresher with the shared slow-HTTP semaphore in
+                            # ``_refresh_device``; calling ``_get_with_ttl``
+                            # (which re-acquires that same semaphore) would
+                            # deadlock the gather once the externally-held
+                            # slots exhaust the pool.
+                            per_system = self._slow_cache.setdefault(sys_id, {})
+                            return await _get_with_ttl_for(
+                                per_system,
                                 cache_key,
                                 self._price_config_interval_sec,
-                                lambda sid: self.api.async_get_home_trends(
-                                    sid,
+                                lambda: self.api.async_get_home_trends(
+                                    sys_id,
                                     **request_kwargs,
                                 ),
                                 {},
@@ -13342,7 +12774,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:  # forwards arbitrary cached payload  # ruff:ignore[any-type]
+                    ) -> Any:  # forwards arbitrary cached payload  # noqa: ANN401, RUF105
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         cache_key = (
                             f"{section_prefix}_{DATE_TYPE_MONTH}_"
@@ -13487,8 +12919,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             stale_ok=stale_ok,
                         ),
                     )
-                task_names.append(battery_key)  # ruff:ignore[repeated-append]
-                tasks.append(  # ruff:ignore[repeated-append]
+                task_names.append(battery_key)  # noqa: FURB113, RUF105
+                tasks.append(  # noqa: FURB113, RUF105
                     _get_with_ttl_for(
                         per_dev,
                         battery_key,
@@ -13609,8 +13041,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # REST pack/list is slow and often returns null for SolarVault.
                 # Live pack values are refreshed via MQTT subdevice queries.
                 pack_interval_sec = self._slow_metrics_interval_sec
-                task_names.append(PAYLOAD_OTA)  # ruff:ignore[repeated-append]
-                tasks.append(  # ruff:ignore[repeated-append]
+                task_names.append(PAYLOAD_OTA)  # noqa: FURB113, RUF105
+                tasks.append(  # noqa: FURB113, RUF105
                     _get_with_ttl_for(
                         per_dev,
                         PAYLOAD_OTA,
@@ -14222,15 +13654,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if not isinstance(raw_http_props, dict):
                 raw_http_props = {}
             http_props = self._sanitize_main_properties(raw_http_props)
-            live_guarded_props = self._http_properties_with_live_overrides(
-                old_entry,
-                http_props,
-                device_id=dev_id,
-            )
             merged_props = self._merge_main_properties_for_device(
                 dev_id,
                 old_entry.get(PAYLOAD_PROPERTIES) or {},
-                live_guarded_props,
+                http_props,
                 source=TransportSource.HTTP,
             )
             local_daily_properties = self._local_daily_counter_properties(
@@ -14250,7 +13677,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 battery_packs = self._merge_battery_pack_lists(
                     old_packs,
                     extra_packs,
-                    refresh_last_seen=pack_response_is_new,
                 )
             elif isinstance(old_packs, list):
                 battery_packs = old_packs
@@ -14268,11 +13694,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._schedule_battery_pack_ota_enrichment(dev_id)
 
             period_payloads = {
-                # Live entity state shows the cloud's answer as-is, including
-                # genuine zeros. Live values NEVER pass through ingest (owner
-                # directive 2026-07-25): the gate — zero-drop, negative-series
-                # scrub, hierarchy withholding — is exclusively a Recorder/
-                # statistics-import safeguard applied on that path.
+                # Preserve every cloud answer, including genuine zeros. Source
+                # fusion and Recorder import must not discard transport data.
                 section: dict(extras.get(section) or {})
                 for prefix in (
                     APP_SECTION_PV_STAT,
@@ -14291,19 +13714,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 PAYLOAD_HTTP_PROPERTIES: http_props,
                 PAYLOAD_SYSTEM: idx.get(PAYLOAD_SYSTEM_META) or {},
                 PAYLOAD_DISCOVERY: idx.get(PAYLOAD_DEVICE_META) or {},
-                PAYLOAD_DEVICE_STATISTIC: gate_payload_section(
-                    TransportSource.HTTP,
-                    PAYLOAD_DEVICE_STATISTIC,
-                    extras.get(PAYLOAD_DEVICE_STATISTIC) or {},
-                    # systemStatistic today counters from the same cycle
-                    # cross-confirm real day-zeros (AGENTS.md §2.2 rule 7).
-                    confirmation_source=extras.get(PAYLOAD_STATISTIC) or {},
+                PAYLOAD_DEVICE_STATISTIC: dict(
+                    extras.get(PAYLOAD_DEVICE_STATISTIC) or {}
                 ),
                 **period_payloads,
-                # ``device/stat/today`` must be reconciled against dated day
-                # stats before zero-only values are withheld; otherwise the
-                # generic ingest gate can erase the cloud body before
-                # ``_reconcile_today_energy`` has a chance to backfill it.
+                # Preserve ``device/stat/today`` so reconciliation can compare
+                # it with the dated day-stat response without losing either.
                 APP_SECTION_TODAY_ENERGY: dict(
                     extras.get(APP_SECTION_TODAY_ENERGY) or {}
                 ),
@@ -14325,7 +13741,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 dev_id,
                 entry.get(PAYLOAD_PROPERTIES) or {},
             )
-            self._reconcile_today_energy(entry)
             for accessory in self._entry_subdevice_candidates(entry):
                 self._merge_shelly_cloud_item(entry, accessory)
             for shelly_device in shelly_cloud_devices:
@@ -14493,20 +13908,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         and main_props.get(prop_field) is not None
                     ):
                         pack[pack_field] = main_props[prop_field]
-            previous_statistic = old_entry.get(PAYLOAD_STATISTIC)
-            guard_statistic_totals_from_year(
-                entry,
-                previous_statistic=previous_statistic
-                if isinstance(previous_statistic, dict)
-                else None,
-            )
-            quality_warnings = app_data_quality_warnings(entry, today=today)
-            if quality_warnings:
-                for warning in quality_warnings:
-                    self.record_schema_rejection(warning.reason)
-                entry[PAYLOAD_DATA_QUALITY] = [
-                    warning.as_dict() for warning in quality_warnings
-                ]
+            # Keep every cloud KPI on its own documented source. Separate
+            # calculated-savings sensors receive metadata but never overwrite
+            # totalGeneration/totalRevenue/totalCarbon or compact daily KPIs.
+            attach_calculated_savings_metadata(entry)
             # Create or dismiss a repair issue based on the cloud-reported
             # activation flag. Treat activated=0 as a cloud data-quality signal,
             # not proof of local pairing state.
@@ -14584,7 +13989,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._async_ensure_mqtt,
                 name=f"{DOMAIN}_mqtt_ensure",
             )
-        await self._async_update_data_quality_issue(result)
         # Recorder statistic imports only run at the slow-metric cadence
         # (server-side chart updates also operate at ~5 min granularity)
         # so the recorder is not woken up on every fast HTTP refresh.
@@ -14594,21 +13998,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # buckets when MQTT is absent/stale. Background-only — never awaited in
         # this hot update path. Runs regardless of MQTT connection state.
         self._schedule_shadow_fallback(result)
-        # Drain queued device-registry removals from the stale-pack
-        # cleanup. Fire-and-forget on the same task so a registry
-        # hiccup does not break the data refresh.
-        self._prune_stale_battery_packs(result)
-        self._prune_stale_subdevices(result)
-        if self._pending_device_removals:
-            try:
-                await self.async_cleanup_pending_device_removals()
-            except BACKGROUND_TASK_ERRORS as err:
-                _LOGGER.debug("Jackery: device-registry cleanup deferred: %s", err)
-        if self._battery_pack_topology_reload_required and not any(
-            "_battery_pack_" in unique_id
-            for _domain, unique_id in self._pending_device_removals
-        ):
-            self._schedule_topology_reload()
         # Launch a non-blocking background refresh for systems whose
         # slow-metric caches were stale this cycle.  This avoids blocking
         # the main coordinator update with 17+ parallel HTTP requests
@@ -14627,7 +14016,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             def _make_device_refresher(
                 descriptor: tuple[str, str | None, str | None, str | None],
             ) -> Callable[[], Awaitable[Any]]:
-                async def _refresh() -> Any:  # forwards device extras  # ruff:ignore[any-type]
+                async def _refresh() -> Any:  # forwards device extras  # noqa: ANN401, RUF105
                     return await _fetch_device_extras(
                         descriptor[0],
                         descriptor[1],
@@ -14647,7 +14036,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # buckets back into ``self.data`` and push a partial update.
                 # Auth / transient failures stay isolated so they never flip
                 # ``last_update_success``.
-                async def _refresh() -> Any:  # ruff:ignore[any-type]
+                async def _refresh() -> Any:  # noqa: ANN401, RUF105
                     if not self.data or enrich_dev_id not in self.data:
                         return None
                     enrich_entry = dict(self.data[enrich_dev_id])
@@ -14698,7 +14087,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             device_refreshers.extend(historical_month_refreshers)
             if shelly_cache_stale:
 
-                async def _refresh_shelly() -> Any:  # ruff:ignore[any-type]
+                async def _refresh_shelly() -> Any:  # noqa: ANN401, RUF105
                     return await _fetch_shelly_cloud_devices(stale_ok=False)
 
                 device_refreshers.append(_refresh_shelly)
@@ -14818,8 +14207,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         on 17+ parallel cloud HTTP requests (pv_trends, home_trends, etc.)
         that may each take up to 15 s.  When the TTL has expired, this
         method launches a non-blocking background task that fetches fresh
-        data and triggers a coordinator re-update so entities reflect the
-        latest values without delaying the fast property poll.
+        data into the shared caches. The next regular coordinator poll consumes
+        those caches, preserving the configured HTTP cadence.
 
         ``device_refreshers`` carries one zero-arg coroutine factory per
         device whose per-device slow cache (deviceStatistic, period stats,
@@ -14851,13 +14240,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             started_monotonic = time.monotonic()
 
-            device_refresh_semaphore = asyncio.Semaphore(2)
-
             async def _refresh_device(
                 refresh_device: Callable[[], Awaitable[Any]],
-            ) -> Any:  # ruff:ignore[any-type]
-                async with device_refresh_semaphore:
-                    return await refresh_device()
+            ) -> Any:  # noqa: ANN401, RUF105
+                return await refresh_device()
 
             async def _refresh_devices() -> None:
                 results = await asyncio.gather(
@@ -14868,243 +14254,251 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if isinstance(result, BaseException):
                         raise result
 
-            try:  # ruff:ignore[too-many-statements-in-try-clause]
-                async with asyncio.timeout(BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC):
-                    device_task = (
-                        asyncio.create_task(_refresh_devices())
-                        if dev_refreshers
-                        else None
-                    )
-                    try:
-                        for sid in sys_ids:
-                            await asyncio.gather(
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_STATISTIC,
-                                    self._slow_metrics_interval_sec,
-                                    self.api.async_get_system_statistic,
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_ALARM,
-                                    self._slow_metrics_interval_sec,
-                                    self.api.async_get_alarm,
-                                    None,
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_PV_TRENDS,
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_pv_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_DAY),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_PV_TRENDS,
-                                        DATE_TYPE_WEEK,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_pv_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_WEEK),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_PV_TRENDS,
-                                        DATE_TYPE_MONTH,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_pv_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_MONTH),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_PV_TRENDS,
-                                        DATE_TYPE_YEAR,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_pv_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_YEAR),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_HOME_TRENDS,
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_home_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_DAY),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_HOME_TRENDS,
-                                        DATE_TYPE_WEEK,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_home_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_WEEK),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_HOME_TRENDS,
-                                        DATE_TYPE_MONTH,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_home_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_MONTH),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_HOME_TRENDS,
-                                        DATE_TYPE_YEAR,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_home_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_YEAR),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_BATTERY_TRENDS,
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_battery_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_DAY),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_BATTERY_TRENDS,
-                                        DATE_TYPE_WEEK,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_battery_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_WEEK),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_BATTERY_TRENDS,
-                                        DATE_TYPE_MONTH,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_battery_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_MONTH),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    self._app_period_section(
-                                        APP_SECTION_BATTERY_TRENDS,
-                                        DATE_TYPE_YEAR,
-                                    ),
-                                    self._slow_metrics_interval_sec,
-                                    lambda s: self.api.async_get_battery_trends(
-                                        s,
-                                        **self._trend_query_kwargs(DATE_TYPE_YEAR),
-                                    ),
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_DYNAMIC_PRICE,
-                                    self._price_config_interval_sec,
-                                    self.api.async_get_dynamic_price,
-                                    {},
-                                    backoff_key=f"dynamic_price:{sid}",
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_PRICE,
-                                    self._price_config_interval_sec,
-                                    self.api.async_get_power_price,
-                                    {},
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_PRICE_SOURCES,
-                                    self._price_config_interval_sec,
-                                    self.api.async_get_price_sources,
-                                    [],
-                                ),
-                                get_with_ttl(
-                                    sid,
-                                    PAYLOAD_PRICE_HISTORY_CONFIG,
-                                    self._price_config_interval_sec,
-                                    self.api.async_get_price_history_config,
-                                    {},
-                                ),
-                                return_exceptions=True,
-                            )
-                        if device_task is not None:
-                            await device_task
-                    finally:
-                        if device_task is not None:
-                            if not device_task.done():
-                                device_task.cancel()
-                            await asyncio.gather(device_task, return_exceptions=True)
-            except TimeoutError:
-                _LOGGER.warning(
-                    "Jackery: background slow-metric refresh timed out after %.0fs; "
-                    "aborting cycle (will retry next tick)",
-                    BACKGROUND_SLOW_REFRESH_TIMEOUT_SEC,
+            async def _fetch_system_refresh(sid: str) -> None:
+                """Fetch all slow metrics for a single system under the
+                semaphore.
+                """  # noqa: D205, RUF105
+                # Run all system-level slow metric fetches concurrently,
+                # bounded by the shared semaphore.
+                await asyncio.gather(
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_STATISTIC,
+                        self._slow_metrics_interval_sec,
+                        self.api.async_get_system_statistic,
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_ALARM,
+                        self._slow_metrics_interval_sec,
+                        self.api.async_get_alarm,
+                        None,
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_PV_TRENDS,
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_pv_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_DAY),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_PV_TRENDS,
+                            DATE_TYPE_WEEK,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_pv_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_PV_TRENDS,
+                            DATE_TYPE_MONTH,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_pv_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_PV_TRENDS,
+                            DATE_TYPE_YEAR,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_pv_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_HOME_TRENDS,
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_home_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_DAY),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_HOME_TRENDS,
+                            DATE_TYPE_WEEK,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_home_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_HOME_TRENDS,
+                            DATE_TYPE_MONTH,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_home_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_HOME_TRENDS,
+                            DATE_TYPE_YEAR,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_home_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_BATTERY_TRENDS,
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_battery_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_DAY),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_BATTERY_TRENDS,
+                            DATE_TYPE_WEEK,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_battery_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_WEEK),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_BATTERY_TRENDS,
+                            DATE_TYPE_MONTH,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_battery_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_MONTH),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        self._app_period_section(
+                            APP_SECTION_BATTERY_TRENDS,
+                            DATE_TYPE_YEAR,
+                        ),
+                        self._slow_metrics_interval_sec,
+                        lambda s: self.api.async_get_battery_trends(
+                            s,
+                            **self._trend_query_kwargs(DATE_TYPE_YEAR),
+                        ),
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_DYNAMIC_PRICE,
+                        self._price_config_interval_sec,
+                        self.api.async_get_dynamic_price,
+                        {},
+                        backoff_key=f"dynamic_price:{sid}",
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_PRICE,
+                        self._price_config_interval_sec,
+                        self.api.async_get_power_price,
+                        {},
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_PRICE_SOURCES,
+                        self._price_config_interval_sec,
+                        self.api.async_get_price_sources,
+                        [],
+                    ),
+                    get_with_ttl(
+                        sid,
+                        PAYLOAD_PRICE_HISTORY_CONFIG,
+                        self._price_config_interval_sec,
+                        self.api.async_get_price_history_config,
+                        {},
+                    ),
+                    return_exceptions=True,
                 )
+
+            try:  # ruff:ignore[too-many-statements-in-try-clause]
+                # Each HTTP request already has its own bounded client timeout.
+                # A second timeout around the complete queue aborted valid
+                # period/backfill work solely because many independent bounded
+                # requests collectively exceeded one wall-clock deadline.
+                device_task = (
+                    asyncio.create_task(_refresh_devices()) if dev_refreshers else None
+                )
+                try:
+                    for sid in sys_ids:
+                        await _fetch_system_refresh(sid)
+                    if device_task is not None:
+                        await device_task
+                finally:
+                    if device_task is not None:
+                        if not device_task.done():
+                            device_task.cancel()
+                        await asyncio.gather(device_task, return_exceptions=True)
             except asyncio.CancelledError:
-                # Re-raise so the cancel-on-restack guard (above) actually stops
-                # the prior in-flight task; a swallowed CancelledError would let
-                # it keep running and stack. async_shutdown awaits this task under
-                # suppress(CancelledError), so the re-raise is absorbed there.
+                # Shutdown awaits this task under suppress(CancelledError);
+                # re-raise so cancellation cannot leave its HTTP work running.
                 _LOGGER.debug("Jackery: background slow-metric refresh cancelled")
                 raise
             except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug("Jackery: background slow-metric refresh failed: %s", err)
             else:
-                # Notify HA that fresh data is available so entity states
-                # are updated immediately rather than waiting for the next
-                # scheduled coordinator tick. The duration log is the P6
-                # stall instrumentation: it makes the end of every bg run
-                # visible so a lost request_refresh is diagnosable.
+                # Consume the newly populated caches immediately. The follow-up
+                # coordinator cycle only performs the fast property request;
+                # every slow slot just filled above is still inside its TTL.
+                periodic_cache_advanced = any(
+                    is_periodic_section(cache_key)
+                    and (safe_float(cache_entry[0]) or 0.0) >= started_monotonic
+                    for cache in self._slow_cache.values()
+                    for cache_key, cache_entry in cache.items()
+                )
+                if periodic_cache_advanced:
+                    self._last_stat_import_monotonic = float("-inf")
+                # Do NOT request a refresh here - the scheduled HTTP poll timer
+                # must remain the sole driver of the regular cadence.
                 _LOGGER.debug(
                     "Jackery: background slow-metric refresh completed in "
-                    "%.1fs; requesting coordinator refresh",
+                    "%.1fs; periodic cache advanced=%s",
                     time.monotonic() - started_monotonic,
+                    periodic_cache_advanced,
                 )
-                if not self._shutdown_started:
-                    await self.async_request_refresh()
 
         self._slow_metrics_bg_task = self.hass.async_create_background_task(
             _background_refresh(),
@@ -15119,22 +14513,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:
-        """Return the MQTT client diagnostics block for the diagnostics export."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the MQTT client diagnostics block for the diagnostics export."""  # noqa: D421, RUF105
         return self.mqtt_diagnostics_snapshot()
 
-    def mqtt_diagnostics_snapshot(
-        self,
-        *,
-        redact_topics: bool = True,
-    ) -> dict[str, Any]:
+    def mqtt_diagnostics_snapshot(self) -> dict[str, Any]:
         """Return the MQTT client diagnostics block for the diagnostics export."""
         if self._mqtt is None:
             return {"enabled": False}
-        diag = dict(self._mqtt.diagnostics_snapshot(redact_topics=redact_topics))
+        diag = dict(self._mqtt.diagnostics_snapshot())
         diag["enabled"] = True
         diag["credential_mac_id_source"] = self.api.mqtt_mac_id_source
-        # Key comes from ``MQTT_SESSION_MAC_ID`` so the diagnostics export
-        # redacts it via ``REDACT_KEYS``; JACKERY_DEV_MODE=1 shows it verbatim.
+        # Key comes from ``MQTT_SESSION_MAC_ID`` so the mandatory diagnostics
+        # boundary redacts it via ``REDACT_KEYS``.
         diag[MQTT_SESSION_MAC_ID] = self.api.mqtt_mac_id
         diag["slow_metrics_interval_seconds"] = self._slow_metrics_interval_sec
         diag["price_interval_seconds"] = self._price_config_interval_sec
@@ -15144,7 +14534,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         diag["tls_certificate_verification"] = "enabled"
         diag["tls_insecure_warning"] = None
-        diag["stale_battery_packs_dropped"] = self._stale_battery_packs_dropped
         diag["app_conflict_pause_cycles"] = self._mqtt_mgr.app_conflict_pause_cycles
         now_mono = time.monotonic()
         push_ts = self._last_property_push_monotonic
@@ -15164,15 +14553,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         diag["property_push_live_threshold_seconds"] = MQTT_LIVE_THRESHOLD_SEC
         active_endpoint_backoff_count = self._endpoint_backoff_active_count(now_mono)
         diag["active_endpoint_backoff_count"] = active_endpoint_backoff_count
-        diag["third_party_mqtt_generated_token_active"] = (
-            self._generated_third_party_mqtt_token is not None
-        )
         pause_remaining = safe_int(self._mqtt_mgr.paused_until_monotonic - now_mono)
         diag["app_conflict_pause_remaining_seconds"] = max(0, pause_remaining or 0)
         diag["connect_backoff_remaining_seconds"] = (
             self._mqtt_connect_backoff_remaining()
         )
         diag["connect_backoff_signature"] = self._mqtt_mgr.backoff_signature
+        diag["birth_snapshot_pending"] = self._mqtt_birth_snapshot_pending
+        diag["session_action_ids_seen"] = sorted({
+            action_id
+            for _device_id, action_id in self._mqtt_session_actions_seen
+        })
+        diag["session_action_device_pairs_seen"] = len(
+            self._mqtt_session_actions_seen,
+        )
+        diag["independent_publish_failures"] = [
+            {"action_id": action_id, "cmd": cmd, "error": error}
+            for (_device_id, action_id, cmd), error in sorted(
+                self._cloud_mqtt_command_failures.items(),
+            )
+        ]
         return diag
 
     def app_chart_import_diagnostics(self) -> dict[str, Any]:  # ruff:ignore[too-many-locals]
@@ -15272,30 +14672,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "devices": devices,
         }
 
-    # --- restored from 24.05 lineage (offline/local/cmd=113 features) ---
-    _MQTT_LIVE_MAIN_PROPERTY_KEYS = frozenset({
-        FIELD_BAT_IN_PW,
-        FIELD_BAT_OUT_PW,
-        FIELD_BAT_SOC,
-        FIELD_CHARGE_PLAN_PW,
-        FIELD_ENERGY_PLAN_PW,
-        FIELD_GRID_IN_PW,
-        FIELD_GRID_OUT_PW,
-        FIELD_IN_GRID_SIDE_PW,
-        FIELD_IN_ONGRID_PW,
-        FIELD_OTHER_LOAD_PW,
-        FIELD_OUT_GRID_SIDE_PW,
-        FIELD_OUT_ONGRID_PW,
-        FIELD_PV_PW,
-        FIELD_SOC,
-        FIELD_STACK_IN_PW,
-        FIELD_STACK_OUT_PW,
-        FIELD_SW_EPS,
-        FIELD_SW_EPS_IN_PW,
-        FIELD_SW_EPS_OUT_PW,
-        FIELD_SW_EPS_STATE,
-    })
-
     @staticmethod
     def _with_discovery_source_marker(
         record: Mapping[str, Any],
@@ -15333,9 +14709,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return False
         self._discovery_source = "cache"
         self._last_discovery_refresh_monotonic = time.monotonic()
-        _LOGGER.warning(
-            "Jackery cloud discovery unavailable (%s); using cached discovery "
-            "for local BLE startup while HTTP login/cache remains the primary path",
+        log = _LOGGER.debug if reason == "startup cache bootstrap" else _LOGGER.warning
+        log(
+            "Jackery cached discovery loaded (%s) for local BLE startup; "
+            "HTTP login/cache remains the primary path",
             reason,
         )
         return True
@@ -15350,167 +14727,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery discovery cache save failed: %s", err)
-
-    async def async_reconcile_local_mqtt_listener(self) -> None:
-        """Restart only the HA-MQTT listener after local options change."""
-        if self._shutdown_started:
-            return
-        for unsubscribe in self._local_mqtt_unsubs:
-            with contextlib.suppress(Exception):
-                unsubscribe()
-        self._local_mqtt_unsubs.clear()
-
-        message_tasks = set(self._local_mqtt_message_tasks)
-        current_task = asyncio.current_task()
-        if current_task is not None:
-            message_tasks.discard(current_task)
-        for task in message_tasks:
-            if not task.done():
-                task.cancel()
-        pending_tasks: set[asyncio.Task[None]] = set()
-        if message_tasks:
-            _done_tasks, pending_tasks = await asyncio.wait(
-                message_tasks,
-                timeout=_BACKGROUND_TASK_STOP_TIMEOUT_SEC,
-            )
-        self._local_mqtt_message_tasks.intersection_update(pending_tasks)
-        if pending_tasks:
-            _LOGGER.warning(
-                "%d Jackery HA-MQTT message task(s) did not stop within %.1fs; "
-                "HTTP remains active",
-                len(pending_tasks),
-                _BACKGROUND_TASK_STOP_TIMEOUT_SEC,
-            )
-        await self.async_start_local_mqtt_listener()
-
-    def _decrypt_binary_local_mqtt_payload(
-        self, raw_payload: bytes | bytearray
-    ) -> dict[str, Any] | None:
-        """Attempt binary AES-CBC decryption for ESP / firmware frames."""
-        for dev_id in list(self._device_index.keys()):
-            key = self.device_bluetooth_key(dev_id)
-            if not key:
-                continue
-            try:
-                parsed_binary = ble.decrypt_binary_notify(bytes(raw_payload), key)
-                if parsed_binary and parsed_binary.body:
-                    payload = json.loads(parsed_binary.body.decode("utf-8"))
-                    if isinstance(payload, dict):
-                        return payload
-            except Exception:  # ruff:ignore[blind-except]
-                continue
-        return None
-
-    async def async_start_local_mqtt_listener(self) -> None:  # ruff:ignore[too-many-statements]
-        """Subscribe to the user's HA MQTT broker for local bridge payloads."""
-        if self._shutdown_started:
-            return
-        options = getattr(self.entry, "options", {}) or {}
-        data = getattr(self.entry, "data", {}) or {}
-        if CONF_LOCAL_MQTT_ENABLE in options or CONF_LOCAL_MQTT_ENABLE in data:
-            enabled = config_entry_bool_option(
-                self.entry,
-                CONF_LOCAL_MQTT_ENABLE,
-                DEFAULT_LOCAL_MQTT_ENABLE,
-            )
-        else:
-            enabled = config_entry_bool_option(
-                self.entry,
-                CONF_THIRD_PARTY_MQTT_ENABLE,
-                DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-            )
-        if not enabled:
-            return
-        if self._local_mqtt_unsubs:
-            return
-        topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
-
-        async def _handle_local_mqtt_message(message: Any) -> None:  # ruff:ignore[any-type]
-            if self._shutdown_started:
-                return
-            raw_payload = message.payload
-            payload: Any = None
-            if isinstance(raw_payload, (bytes, bytearray)):
-                try:
-                    payload = json.loads(raw_payload.decode("utf-8"))
-                except UnicodeDecodeError, json.JSONDecodeError:
-                    payload = self._decrypt_binary_local_mqtt_payload(raw_payload)
-            elif isinstance(raw_payload, str):
-                try:
-                    payload = json.loads(raw_payload)
-                except PAYLOAD_PARSE_ERRORS as err:
-                    _LOGGER.debug(
-                        "Jackery local MQTT payload on %s is not JSON: %s",
-                        message.topic,
-                        err,
-                    )
-                    return
-            else:
-                payload = raw_payload
-            if not isinstance(payload, dict):
-                _LOGGER.debug(
-                    "Jackery local MQTT payload on %s is %s, expected object",
-                    message.topic,
-                    type(payload).__name__,
-                )
-                return
-            await self.async_handle_local_mqtt_message(
-                str(message.topic),
-                payload,
-            )
-
-        def _queue_local_mqtt_message(message: Any) -> None:  # ruff:ignore[any-type]
-            if self._shutdown_started:
-                return
-            if not payload_has_jackery_marker(message.payload):
-                # Foreign broker traffic on a shared topic — no task, no JSON
-                # parse (layer independence: never load the polling loop).
-                self._local_mqtt_listener_foreign_ignored += 1
-                return
-            self._local_mqtt_listener_messages_received += 1
-            task = self.hass.async_create_background_task(
-                _handle_local_mqtt_message(message),
-                name=f"{DOMAIN}_local_mqtt_message",
-                eager_start=False,
-            )
-            self._local_mqtt_message_tasks.add(task)
-
-            def _drop_local_mqtt_task(done: asyncio.Task[None]) -> None:
-                self._local_mqtt_message_tasks.discard(done)
-                try:
-                    done.result()
-                except asyncio.CancelledError:
-                    return
-                except Exception as err:  # ruff:ignore[blind-except]  # message-task boundary
-                    _LOGGER.debug("Jackery HA-MQTT message task failed: %s", err)
-
-            task.add_done_callback(_drop_local_mqtt_task)
-
-        try:
-            for topic in topics:
-                unsubscribe = await mqtt.async_subscribe(
-                    self.hass,
-                    topic,
-                    _queue_local_mqtt_message,
-                    qos=0,
-                    encoding="utf-8",
-                )
-                self._local_mqtt_unsubs.append(unsubscribe)
-        except (HomeAssistantError, RuntimeError) as err:
-            for unsubscribe in self._local_mqtt_unsubs:
-                with contextlib.suppress(Exception):
-                    unsubscribe()
-            self._local_mqtt_unsubs.clear()
-            _LOGGER.warning(
-                "Jackery local MQTT listener could not subscribe; "
-                "BLE/cloud MQTT/HTTP remain active: %s",
-                err,
-            )
-            return
-        _LOGGER.info(
-            "Jackery local MQTT listener subscribed to %d topic(s)",
-            len(self._local_mqtt_unsubs),
-        )
 
     def is_device_locally_reachable(self, device_id: str) -> bool:
         """Return whether an already-loaded local transport sees the device.
@@ -15552,28 +14768,113 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             async_address_present(self.hass, address, connectable=True),
         )
 
-    def is_device_reachable(self, device_id: str) -> bool:
-        """Return whether any independent transport recently reached the device."""
-        if self.is_device_locally_reachable(device_id):
-            return True
-        now = time.monotonic()
-        freshness_window = max(
-            60.0,
-            self._configured_update_interval.total_seconds() * 2,
-        )
-        last_http = getattr(
-            self,
-            "_last_http_device_refresh_monotonic",
-            {},
-        ).get(device_id)
-        if last_http is not None and now - last_http <= freshness_window:
-            return True
-        entry = (self.data or {}).get(device_id) or {}
-        marker = entry.get(PAYLOAD_MQTT_LAST)
-        if not isinstance(marker, dict):
+    def _command_source_available(self, device_id: str, source: str) -> bool:
+        """Return whether one configured supervisor can execute a command."""
+        if self._shutdown_started:
             return False
-        received_at = safe_float(marker.get("received_at_monotonic"))
-        return received_at is not None and now - received_at <= freshness_window
+        if source == "http":
+            return self.api is not None
+        if source == "cloud_mqtt":
+            if self._mqtt is not None and self._mqtt.is_connected:
+                return True
+            cached_credentials = getattr(
+                self.api,
+                "get_cached_mqtt_credentials",
+                None,
+            )
+            return callable(cached_credentials) and cached_credentials() is not None
+        if source == "ble":
+            return (
+                self._ble_listener is not None
+                and self._ble_writes_enabled()
+                and bool(
+                    self.device_bluetooth_key(device_id)
+                    or self._ble_address_for_device(device_id)
+                )
+            )
+        # App 2.4.0 contains no Local-MQTT command publisher.
+        return False
+
+    def _data_source_supervisor_available(  # ruff:ignore[too-many-return-statements]  # Explicit transport exits keep diagnostic visibility rules auditable.
+        self,
+        source: str,
+    ) -> bool:
+        """Return whether a read transport is configured for diagnostics.
+
+        Transport-health entities must remain visible while a configured client is
+        disconnected or has not received its first frame; otherwise the diagnostic
+        needed to explain that failure disappears with the failed transport.
+        """
+        if self._shutdown_started:
+            return False
+        if source == "http":
+            return self.api is not None
+        if source == "cloud_mqtt":
+            if self._mqtt is not None:
+                return True
+            cached_credentials = getattr(
+                self.api,
+                "get_cached_mqtt_credentials",
+                None,
+            )
+            return callable(cached_credentials) and cached_credentials() is not None
+        if source == "ble":
+            return config_entry_bool_option(
+                self.entry,
+                CONF_ENABLE_BLE_TRANSPORT,
+                DEFAULT_ENABLE_BLE_TRANSPORT,
+            )
+        if source != "local_mqtt":
+            return False
+        return config_entry_bool_option(
+            self.entry,
+            CONF_LOCAL_MQTT_ENABLE,
+            DEFAULT_LOCAL_MQTT_ENABLE,
+        )
+
+    def is_entity_source_available(
+        self,
+        device_id: str,
+        *,
+        data_sources: tuple[str, ...],
+        command_sources: tuple[str, ...] = (),
+        fields: tuple[str, ...] = (),
+        supervisor_only: bool = False,
+    ) -> bool:
+        """Return source-specific availability for one entity.
+
+        Writable entities follow executable supervisor state. Read-only entities
+        use aggregate device reachability so one independent transport cannot
+        make data from another transport unavailable.
+        """
+        del fields
+        if command_sources:
+            return any(
+                self._command_source_available(device_id, source)
+                for source in command_sources
+            )
+        if supervisor_only:
+            return any(
+                self._data_source_supervisor_available(source)
+                for source in data_sources
+            )
+
+        return bool(data_sources) and self.is_device_reachable(device_id)
+
+    def is_device_reachable(self, device_id: str) -> bool:
+        """Keep a known device available while its last snapshot is usable.
+
+        One failed or delayed connection must not invalidate values already
+        supplied by HTTP, cloud MQTT, local MQTT, or BLE. Entity values become
+        unavailable only when the device is absent from coordinator data or the
+        coordinator is shutting down; transport health remains visible through
+        its dedicated diagnostic entities.
+        """
+        if self._shutdown_started:
+            return False
+        if device_id in (self.data or {}):
+            return True
+        return bool(self.is_device_locally_reachable(device_id))
 
     def mark_mqtt_session_cache_loaded(
         self,
@@ -15603,7 +14904,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return True
 
     async def _async_persist_mqtt_session_if_changed(self) -> None:
-        """Store the current MQTT session so cloud outages cannot block reconnects."""
+        """Persist and hand off a newly rotated HTTP MQTT session.
+
+        ``mqttPassWord`` is returned by the authoritative HTTP login and can
+        change on any later re-login.  Persisting that new seed is not enough
+        for an already running Cloud-MQTT client: it must be restarted with the
+        freshly derived credentials or its reconnect loop keeps presenting the
+        obsolete password.  The handoff stays inside this background
+        persistence path so HTTP polling never waits for broker connectivity.
+        """
         if (
             not self._mqtt_session_cache_loaded
             or self._shutdown_started
@@ -15619,39 +14928,45 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             _LOGGER.debug("Jackery MQTT session cache save failed: %s", err)
             return
         self._persisted_mqtt_session = snapshot
-
-    async def _async_invalidate_mqtt_session_cache(self, reason: str) -> None:
-        """Drop the cached MQTT session after a confirmed broker rejection."""
+        mqtt = self._mqtt
+        if mqtt is None or not mqtt.is_started:
+            return
         try:
-            await async_clear_mqtt_session(self.hass, self.entry.entry_id)
-        except BACKGROUND_TASK_ERRORS as err:
+            await self._async_ensure_mqtt(force=True, wait_connected=False)
+        except asyncio.CancelledError:
+            raise
+        except RuntimeError as err:
             _LOGGER.debug(
-                "Jackery MQTT session cache clear failed (%s): %s",
-                reason,
+                "Jackery MQTT credential handoff did not complete; the "
+                "independent MQTT lifecycle will retry: %s",
                 err,
             )
-            return
-        self._persisted_mqtt_session = None
-        _LOGGER.info("Jackery MQTT session cache cleared: %s", reason)
 
-    async def async_load_local_daily_snapshots(self) -> None:
+    async def async_persist_http_mqtt_session(self) -> None:
+        """Persist credentials produced by the authoritative HTTP login."""
+        await self._async_persist_mqtt_session_if_changed()
+
+    async def async_load_local_daily_snapshots(self) -> bool:
         """Restore midnight-anchor snapshots for the daily-energy deltas.
 
-        Scheduled after the mandatory first HTTP refresh. Persistence remains
-        disabled until this read succeeds so a cold-start refresh cannot erase
-        the stored same-day anchors.
+        Loaded before the first HTTP refresh. Persistence remains disabled until
+        this read succeeds so a cold-start refresh cannot erase the stored
+        same-day anchors.
+
+        Returns:
+            True after a valid storage read was reconciled, otherwise False.
         """
         starting_signature = self._local_daily_signature(self._local_daily_snapshots)
         try:
             cached = await async_load_daily_cache(self.hass, self.entry.entry_id)
         except STORAGE_ERRORS as err:
             _LOGGER.debug("Jackery local daily cache load failed: %s", err)
-            return
+            return False
         if (
             self._shutdown_started
             or getattr(self.entry, "runtime_data", None) is not self
         ):
-            return
+            return False
         cached_snapshots = {
             str(device_id): dict(snapshot)
             for device_id, snapshot in cached.items()
@@ -15699,6 +15014,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             self._async_persist_local_daily_snapshots_if_changed,
             name=f"{DOMAIN}_daily_persist",
         )
+        return True
 
     @staticmethod
     def _local_daily_signature(
@@ -15752,14 +15068,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             isinstance(previous_snapshot, dict)
             and previous_snapshot.get("day") == today.isoformat()
         )
-        if not previous_same_day and not allow_new_anchor_delta:
-            return {}
         snapshot = refresh_snapshot(
             previous_snapshot,
             today=today,
             current_values=current_values,
         )
         self._local_daily_snapshots[device_id] = snapshot
+        if not previous_same_day and not allow_new_anchor_delta:
+            # A cold start cannot reconstruct energy consumed before this first
+            # observation, so expose no artificial 0 kWh value yet. The current
+            # lifetime counters still have to become the same-day anchor;
+            # otherwise every later poll also looks like a cold start and the
+            # Store remains empty forever.
+            return {}
         delta_snapshot = previous_snapshot if previous_same_day else snapshot
         deltas: dict[str, int] = {}
         for metric in LOCAL_DAILY_LIFETIME_METRICS:
@@ -15836,21 +15157,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return
         self._persisted_local_daily_signature = signature
 
-    def _mqtt_live_properties_are_fresh(self, entry: dict[str, Any]) -> bool:
-        """Return True when MQTT has live property data newer than HTTP cache."""
-        marker = entry.get(PAYLOAD_MQTT_LAST)
-        if not isinstance(marker, dict):
-            return False
-        received_at = safe_float(marker.get("received_at_monotonic"))
-        if received_at is not None:
-            freshness_window = max(
-                60.0,
-                self._configured_update_interval.total_seconds() * 2,
-            )
-            if time.monotonic() - received_at <= freshness_window:
-                return True
-        return False
-
     def _live_ct_is_fresh(self, device_id: str) -> bool:
         """Return whether a push transport recently updated this device's CT data."""
         received_times: dict[str, float] = getattr(
@@ -15867,60 +15173,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         return time.monotonic() - received_at <= freshness_window
 
-    def _http_properties_with_live_overrides(
+    async def async_apply_local_mqtt_config_to_devices(  # ruff:ignore[too-many-branches,too-many-locals,too-many-statements]
         self,
-        entry: dict[str, Any],
-        http_props: dict[str, Any],
-        *,
-        device_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Keep fresh MQTT/BLE live telemetry from being overwritten by stale HTTP.
-
-        HTTP/API remains the unconditional primary fetch and its pristine
-        response stays in ``PAYLOAD_HTTP_PROPERTIES``. When a live (MQTT/BLE)
-        frame is fresh, the approved live keys override HTTP; keys HTTP omits
-        (combine/CT fields) are left untouched (AGENTS.md §1.2: local is
-        preferred for live values).
-        """
-        fallback_fresh = self._mqtt_live_properties_are_fresh(entry)
-        per_key = (
-            getattr(self, "_live_property_received_monotonic", {}).get(device_id, {})
-            if device_id is not None
-            else {}
-        )
-        if not fallback_fresh and not per_key:
-            return http_props
-        live_props = entry.get(PAYLOAD_PROPERTIES) or {}
-        if not isinstance(live_props, dict):
-            return http_props
-        guarded = dict(http_props)
-        freshness_window = max(
-            60.0,
-            self._configured_update_interval.total_seconds() * 2,
-        )
-        now = time.monotonic()
-        for key in self._MQTT_LIVE_MAIN_PROPERTY_KEYS:
-            received_at = per_key.get(key)
-            key_is_fresh = (
-                received_at is not None and now - received_at <= freshness_window
-            )
-            if (
-                key in guarded
-                and live_props.get(key) is not None
-                and (key_is_fresh or (not per_key and fallback_fresh))
-            ):
-                guarded[key] = live_props[key]
-        return guarded
-
-    async def async_apply_local_mqtt_config_to_devices(self) -> bool:
+    ) -> bool:
         """Push the user's local-MQTT bridge config to every known device.
 
         Reads the config-entry options (``CONF_LOCAL_MQTT_ENABLE``, host, port,
         credentials) and, when enabled, sends ``SET_THIRD_PARTY_MQTT_CONFIG``
-        (cmd=113) to each device in ``_device_index`` through Jackery Cloud
-        MQTT. Idempotent: a device already pointing at the configured broker
-        just re-receives the same body. The cloud-connect callback schedules
-        this method after every reconnect, independently from local MQTT/BLE.
+        (actionId 3046 / BLE message type 113) to each device in
+        ``_device_index`` through the independent concurrent BLE and Cloud-MQTT
+        command paths. Idempotent: a device already pointing at the configured
+        broker just re-receives the same body. Both the direct Local-MQTT
+        lifecycle and Cloud-MQTT reconnect callback schedule this method.
 
         If the option is disabled or the host is empty, the method is a no-op —
         existing device-side bridge config is left untouched so users do not
@@ -15932,26 +15196,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # fallback, a host stored under ``third_party_mqtt_ip`` reads back
         # empty here even though the bridge is enabled, so the push is wrongly
         # skipped ("enabled but no host configured"). Keep both in sync.
-        # The user's explicit local-bridge toggle is authoritative. Only fall
-        # back to the legacy app-synced ``third_party_mqtt_enable`` flag when
-        # ``local_mqtt_enable`` was never set — otherwise a stale legacy ``True``
-        # OR-overrides an explicit disable, so the bridge "cannot be turned off"
-        # and keeps pushing (and warning) against the user's choice.
-        options = getattr(self.entry, "options", {}) or {}
-        data = getattr(self.entry, "data", {}) or {}
-        if CONF_LOCAL_MQTT_ENABLE in options or CONF_LOCAL_MQTT_ENABLE in data:
-            enabled = config_entry_bool_option(
-                self.entry,
-                CONF_LOCAL_MQTT_ENABLE,
-                DEFAULT_LOCAL_MQTT_ENABLE,
-            )
-        else:
-            enabled = config_entry_bool_option(
-                self.entry,
-                CONF_THIRD_PARTY_MQTT_ENABLE,
-                False,
-            )
+        # Only the explicit Home Assistant local-MQTT option authorizes a
+        # device-side config push. The app-synchronised legacy enable field is
+        # device state, not permission to mutate the device during HA startup.
+        enabled = config_entry_bool_option(
+            self.entry,
+            CONF_LOCAL_MQTT_ENABLE,
+            DEFAULT_LOCAL_MQTT_ENABLE,
+        )
         if not enabled:
+            self._local_mqtt_config_applied_signature = None
+            self._local_mqtt_config_diagnostics["last_status"] = "disabled"
             return True
         host = (
             config_entry_str_option(self.entry, CONF_LOCAL_MQTT_HOST, "").strip()
@@ -15968,8 +15223,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     "integration options.",
                 )
                 self._local_mqtt_no_host_warned = True
+            self._local_mqtt_config_applied_signature = None
+            self._local_mqtt_config_diagnostics["last_status"] = "missing_host"
             return True
         self._local_mqtt_no_host_warned = False
+        diagnostics = self._local_mqtt_config_diagnostics
+        diagnostics["attempts"] = (safe_int(diagnostics.get("attempts")) or 0) + 1
+        diagnostics["target_count"] = len(self._device_index)
+        diagnostics["last_attempt_at"] = datetime.now(UTC).isoformat()
+        if not self._device_index:
+            diagnostics["last_status"] = "waiting_for_http_discovery"
+            diagnostics["last_errors"] = {
+                "discovery": "HTTP discovery has not populated a device yet",
+            }
+            return False
         port = config_entry_int_option(
             self.entry,
             CONF_LOCAL_MQTT_PORT,
@@ -15989,12 +15256,44 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             CONF_LOCAL_MQTT_PASSWORD,
             "",
         ) or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
+        # Resolve the third-party MQTT token, generating a new one if needed.
+        # The prior_generated token comes from the device data stored in coordinator
+        # data so it persists across reloads.
+        prior_generated = None
+        if self.data:
+            for device_data in self.data.values():
+                current = device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
+                if isinstance(current, dict):
+                    prior_generated = current.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+                    if prior_generated:
+                        break
+        token, newly_generated = resolve_third_party_mqtt_token(
+            dict(self.entry.options), prior_generated
+        )
+        # If a new token was generated, persist it to the config entry options
+        # so it survives reloads and is reused on subsequent pushes.
+        if newly_generated:
+            new_options = dict(self.entry.options)
+            new_options[CONF_THIRD_PARTY_MQTT_TOKEN] = token
+            self.hass.config_entries.async_update_entry(self.entry, options=new_options)
+            _LOGGER.info(
+                "Jackery: generated and persisted new third-party MQTT token "
+                "for local MQTT bridge"
+            )
+        signature = (
+            host,
+            port,
+            username,
+            password,
+            token,
+            tuple(sorted(self._device_index)),
+        )
+        if self._local_mqtt_config_applied_signature == signature:
+            diagnostics["last_status"] = "unchanged"
+            return True
         success = True
-        config_errors = getattr(self, "_local_mqtt_config_last_errors", {})
-        if not isinstance(config_errors, dict):
-            config_errors = {}
-        self._local_mqtt_config_last_errors = config_errors
-        for device_id in list(self._device_index):
+        config_errors: dict[str, str] = {}
+        for device_id in tuple(self._device_index):
             try:
                 await self.async_set_third_party_mqtt_config(
                     device_id,
@@ -16003,6 +15302,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     port=port,
                     username=username,
                     password=password,
+                    token=token,
                 )
                 config_errors.pop(str(device_id), None)
             except BACKGROUND_TASK_ERRORS as err:
@@ -16020,11 +15320,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     device_id,
                     error,
                 )
+        diagnostics["last_errors"] = dict(config_errors)
+        diagnostics["last_status"] = "success" if success else "transport_failed"
+        if success:
+            self._local_mqtt_config_applied_signature = signature
+            diagnostics["last_success_at"] = datetime.now(UTC).isoformat()
         return success
 
     def _schedule_mqtt_poll_queries(self, snapshot: dict[str, dict[str, Any]]) -> None:
-        """Queue MQTT query commands without blocking the HTTP poll result."""
-        if self._shutdown_started or self._mqtt is None or not self._mqtt.is_connected:
+        """Queue independent Layer-5 getters without blocking the HTTP result."""
+        if self._shutdown_started:
+            return
+        cloud_mqtt_connected = self._mqtt is not None and self._mqtt.is_connected
+        if not cloud_mqtt_connected and not self._ble_writes_enabled():
             return
         if self._mqtt_poll_task is not None and not self._mqtt_poll_task.done():
             return
@@ -16038,11 +15346,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self,
         snapshot: dict[str, dict[str, Any]],
     ) -> None:
-        """Refresh app-side MQTT-only data after the HTTP poll has completed."""
+        """Refresh App Layer-5 data over every already-available transport."""
+        session_generation = self._mqtt_session_generation
+        force_birth_snapshot = (
+            self._mqtt_birth_snapshot_pending
+            and self._mqtt is not None
+            and self._mqtt.is_connected
+        )
         try:
-            await self._async_query_subdevices_for_missing(snapshot=snapshot)
-            await self._async_query_system_info_for_missing(snapshot=snapshot)
-            await self._async_query_weather_plan_for_missing(snapshot=snapshot)
+            await self._async_query_subdevices_for_missing(
+                force=force_birth_snapshot,
+                snapshot=snapshot,
+                ensure_mqtt=False,
+            )
+            await self._async_query_system_info_for_missing(
+                force=force_birth_snapshot,
+                snapshot=snapshot,
+                ensure_mqtt=False,
+            )
+            await self._async_query_weather_plan_for_missing(
+                force=force_birth_snapshot,
+                snapshot=snapshot,
+                ensure_mqtt=False,
+            )
         except ConfigEntryAuthFailed as err:
             self._defer_background_auth_failure(err)
         except BACKGROUND_TASK_ERRORS as err:
@@ -16050,6 +15376,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "Jackery MQTT polling query failed: %s",
                 exception_debug_message(err),
             )
+        else:
+            if (
+                force_birth_snapshot
+                and session_generation == self._mqtt_session_generation
+            ):
+                self._mqtt_birth_snapshot_pending = False
 
     def _schedule_shadow_fallback(
         self,
@@ -16198,7 +15530,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # comm/funForm, SystemBody config) as soon as MQTT was live.
             # The per-device cadence is the only remaining limiter.
             last_query = self._last_shadow_query.get(device_id, 0.0)
-            if (now - last_query) < self._subdevice_query_interval_sec:
+            if (now - last_query) < self._shadow_query_interval_sec:
                 continue
             parent_sn = self._shadow_parent_device_sn(entry)
             if not parent_sn:
@@ -16482,6 +15814,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 device_sn=parent_sn,
                 sub_device_sn=sub_device_sn,
             )
+        except JackeryAuthError:
+            raise
         except (TimeoutError, HomeAssistantError, JackeryError) as err:
             _LOGGER.debug(
                 "Jackery sub-shadow query failed for %s/%s: %s",
@@ -16513,6 +15847,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 device_sn=parent_sn,
                 diy_sn=system_id,
             )
+        except JackeryAuthError:
+            raise
         except (TimeoutError, HomeAssistantError, JackeryError) as err:
             _LOGGER.debug(
                 "Jackery system-shadow query failed for %s: %s",
@@ -16578,7 +15914,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             prefixes.extend((APP_SECTION_PV_STAT, APP_SECTION_HOME_TRENDS))
         return tuple(prefixes)
 
-    async def _async_fetch_historical_day_chart_source(
+    async def _async_fetch_historical_day_chart_source(  # noqa: PLR0912, RUF105
         self,
         *,
         device_id: str,
@@ -16595,34 +15931,43 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             payload,
         ) or self._smart_meter_accessory_device_id(index)
 
+        semaphore = getattr(self, "_slow_http_request_semaphore", None)
+
+        request_factory: Callable[[], Awaitable[dict[str, Any]]]
         if section_prefix == APP_SECTION_BATTERY_STAT:
-            request = self.api.async_get_device_battery_stat(
+            request_factory = partial(
+                self.api.async_get_device_battery_stat,
                 device_id,
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_HOME_STAT:
-            request = self.api.async_get_device_home_stat(
+            request_factory = partial(
+                self.api.async_get_device_home_stat,
                 device_id,
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_CT_STAT:
-            request = self.api.async_get_device_ct_stat(
+            request_factory = partial(
+                self.api.async_get_device_ct_stat,
                 ct_device_id or device_id,
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_EPS_STAT:
-            request = self.api.async_get_device_eps_stat(
+            request_factory = partial(
+                self.api.async_get_device_eps_stat,
                 device_id,
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_PV_STAT and system_id is not None:
-            request = self.api.async_get_device_pv_stat(
+            request_factory = partial(
+                self.api.async_get_device_pv_stat,
                 device_id,
                 system_id,
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_HOME_TRENDS and system_id is not None:
-            request = self.api.async_get_home_trends(
+            request_factory = partial(
+                self.api.async_get_home_trends,
                 system_id,
                 **request_kwargs,
             )
@@ -16632,7 +15977,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         error_status: str | None = None
         result: object = {}
         try:
-            result = await request
+            if semaphore is not None:
+                async with semaphore:
+                    result = await request_factory()
+            else:
+                result = await request_factory()
         except JackeryAuthError as err:
             # Supplementary historical requests are not the authentication
             # authority. The primary property poll owns reauthentication.
@@ -16653,8 +16002,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 target_day.isoformat(),
                 exception_debug_message(err),
             )
-            error_status = "transport_error"
-        except Exception as err:  # ruff:ignore[blind-except]
+            error_status = (
+                "rate_limited" if _is_system_busy_error(err) else "transport_error"
+            )
+        except Exception as err:  # noqa: BLE001, RUF105
             _LOGGER.debug(
                 "Jackery historical %s fetch for %s on %s failed: %s",
                 section_prefix,
@@ -16664,19 +16015,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             error_status = "transport_error"
 
-        section = (
-            PAYLOAD_HOME_TRENDS
-            if section_prefix == APP_SECTION_HOME_TRENDS
-            else f"{section_prefix}_{DATE_TYPE_DAY}"
-        )
         if error_status is None and isinstance(result, dict) and result:
-            gated_result = gate_payload_section(
-                TransportSource.HTTP,
-                section,
-                result,
-            )
-            if gated_result:
-                return "fetched", gated_result
+            return "fetched", dict(result)
 
         return error_status or "empty_ambiguous", {}
 
@@ -16790,6 +16130,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         successful_devices: set[str] = set()
         terminal_transitions = 0
         requests = 0
+        rate_limited = False
+        pending_sources_total = 0
         state_changed = False
         candidates: list[
             tuple[
@@ -16839,14 +16181,25 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if not isinstance(day_state, dict):
                         day_state = {}
                         days_state[target_key] = day_state
-                    state_status = day_state.get("status")
-                    if state_status in {"imported", "unavailable"}:
+                    raw_status = day_state.get("status")
+                    state_status = _normalize_backfill_status(
+                        raw_status,
+                        closed=True,
+                    )
+                    if raw_status != state_status:
+                        day_state["status"] = state_status.value
+                        if state_status is not BackfillStatus.IMPORTED:
+                            day_state["attempts"] = 0
+                            day_state.pop("completed_at", None)
+                        state_changed = True
+                    if state_status is BackfillStatus.IMPORTED:
                         continue
+                    pending_sources_total += 1
                     retry_after = safe_float(
                         day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH),
                     )
                     if (
-                        state_status == "deferred"
+                        state_status == BackfillStatus.RETRYABLE
                         and retry_after is not None
                         and retry_after > now_epoch
                     ):
@@ -16866,7 +16219,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         day_state,
                     ))
 
-        candidates.sort(key=operator.itemgetter(slice(6)))
+        # Prioritise the newest missing days. A bounded queue that starts with
+        # the oldest date leaves yesterday's Energy-Dashboard curve pending for
+        # many runs while it walks months of history first. Previously-attempted
+        # rows still retain fair ordering by their oldest attempt timestamp.
+        candidates.sort(
+            key=lambda candidate: (
+                candidate[0],
+                candidate[1],
+                -candidate[2].toordinal(),
+                candidate[3],
+                candidate[4],
+                candidate[5],
+            ),
+        )
         for (
             _attempted,
             _last_attempt,
@@ -16889,19 +16255,27 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 attempts + 1 if isinstance(attempts, int) and attempts >= 0 else 1
             )
             day_state["last_attempt_at"] = utc_now().isoformat()
-            day_state["status"] = status
+            day_state["status"] = BackfillStatus.RETRYABLE.value
             day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
             state_changed = True
 
             if status != "fetched":
                 attempts_now = day_state["attempts"]
+                if status == "rate_limited":
+                    rate_limited = True
+                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                        time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+                    )
+                    break
                 if (
                     status == "empty_ambiguous"
                     and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
                 ):
-                    day_state["status"] = "unavailable"
-                    day_state["completed_at"] = utc_now().isoformat()
-                    terminal_transitions += 1
+                    day_state["status"] = BackfillStatus.RETRYABLE.value
+                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
+                    )
+                    day_state.pop("completed_at", None)
                 elif (
                     status in {"auth_error", "transport_error"}
                     and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
@@ -16910,11 +16284,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     # rapid bootstrap pass without becoming permanent data
                     # loss. The normal five-minute statistics scheduler will
                     # retry this exact source/day after the cooldown.
-                    day_state["status"] = "deferred"
+                    day_state["status"] = BackfillStatus.RETRYABLE.value
                     day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
                         time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
                     )
-                    terminal_transitions += 1
                 await asyncio.sleep(0)
                 continue
 
@@ -16929,30 +16302,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             external_rows += imported
             if ok:
-                day_state["status"] = "imported"
+                day_state["status"] = BackfillStatus.IMPORTED.value
                 day_state["imported_rows"] = imported
                 day_state["completed_at"] = utc_now().isoformat()
                 successful_devices.add(device_id)
                 terminal_transitions += 1
+                pending_sources_total -= 1
             else:
                 # A non-empty HTTP envelope can still contain no usable series
-                # for this metric/day. That is missing source data, not a
-                # Recorder write failure. Mark it terminal for this source/day
-                # so it cannot starve independent periods in an endless loop.
-                day_state["status"] = "unavailable"
-                day_state["completed_at"] = utc_now().isoformat()
+                # for this metric/day. Keep it retryable after a long cooldown;
+                # an empty app bucket must never become permanent data loss.
+                if day_state["attempts"] >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS:
+                    day_state["status"] = BackfillStatus.RETRYABLE.value
+                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
+                    )
+                    day_state.pop("completed_at", None)
+                else:
+                    day_state["status"] = BackfillStatus.RETRYABLE.value
                 day_state.pop("imported_rows", None)
-                terminal_transitions += 1
             # Entity-backed (``sensor.xxx``) day import remains removed: it
             # collides with HA's recorder on the same statistic_id.
             await asyncio.sleep(0)
 
-        pending_sources = sum(
-            1
-            for candidate in candidates
-            if candidate[-1].get("status")
-            not in {"deferred", "imported", "unavailable"}
-        )
+        pending_sources = pending_sources_total
 
         if state_changed:
             await self._async_save_statistics_backfill_state()
@@ -16975,6 +16348,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "requests": requests,
             "terminal_transitions": terminal_transitions,
             "pending_sources": pending_sources,
+            "rate_limited": rate_limited,
         }
         diag.update({
             "last_http_backfill_checked_at": utc_now().isoformat(),
@@ -17001,11 +16375,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "last_http_backfill_requests": requests,
             "last_http_backfill_terminal_transitions": terminal_transitions,
             "last_http_backfill_pending_sources": pending_sources,
+            "last_http_backfill_rate_limited": rate_limited,
             "next_http_backfill_allowed_in_seconds": retry_after_sec,
         })
         return result
 
-    async def _async_http_backfill_period_statistics(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]
+    async def _async_http_backfill_period_statistics(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
         self,
         snapshot: dict[str, dict[str, Any]],
         *,
@@ -17013,10 +16388,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> dict[str, int]:
         """Advance persistent week/month/year HTTP history independently.
 
-        Each source/period bucket has its own terminal state. Month and year
-        lead the queue so an empty weekly endpoint can never prevent the Energy
-        Dashboard's daily/monthly history from becoming durable.
+        Each closed source/period bucket has its own terminal state. Open
+        week/month/year buckets are already fetched by the normal HTTP cycle
+        and imported from its snapshot; fetching them here as well duplicates
+        cloud requests without adding data. Month and year lead the historical
+        queue so an empty weekly endpoint cannot block other closed buckets.
         """
+        _LOGGER.debug(
+            "Period backfill START: snapshot_keys=%s budget=%d",
+            list(snapshot.keys()),
+            request_budget,
+        )
         await self._async_ensure_statistics_backfill_state_loaded()
         today = self._local_today()
         now_epoch = time.time()
@@ -17062,6 +16444,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 dict[str, Any],
             ]
         ] = []
+        state_changed = False
+        open_sources = 0
+        pending_sources_total = 0
 
         for device_id in sorted(snapshot, key=str):
             payload = snapshot[device_id]
@@ -17091,16 +16476,52 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         if not isinstance(bucket_state, dict):
                             bucket_state = {}
                             type_state[period_key] = bucket_state
-                        if bucket_state.get("status") in {
-                            "imported",
-                            "unavailable",
-                        }:
+                        closed = _backfill_period_is_closed(
+                            date_type,
+                            period_start,
+                            today=today,
+                        )
+                        was_open = bucket_state.get("period_open")
+                        raw_status = bucket_state.get("status")
+                        state_status = _normalize_backfill_status(
+                            raw_status,
+                            closed=closed,
+                        )
+                        if was_open is True and closed:
+                            # The previous successful read was only a partial,
+                            # active-period snapshot. Re-open the bucket once so
+                            # the first closed-period read can finalize it.
+                            state_status = BackfillStatus.PENDING
+                            bucket_state["attempts"] = 0
+                            bucket_state.pop("completed_at", None)
+                            bucket_state.pop("imported_rows", None)
+                            bucket_state.pop(
+                                _STATISTICS_HTTP_RETRY_AFTER_EPOCH,
+                                None,
+                            )
+                        elif (
+                            raw_status != state_status
+                            and state_status is not BackfillStatus.IMPORTED
+                        ):
+                            # Any obsolete/transient status is reopened. Only a
+                            # successful Recorder import is terminal.
+                            bucket_state["attempts"] = 0
+                            bucket_state.pop("completed_at", None)
+                        if raw_status != state_status or was_open is not (not closed):
+                            bucket_state["status"] = state_status.value
+                            bucket_state["period_open"] = not closed
+                            state_changed = True
+                        if not closed:
+                            open_sources += 1
                             continue
+                        if state_status is BackfillStatus.IMPORTED:
+                            continue
+                        pending_sources_total += 1
                         retry_after = safe_float(
                             bucket_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH),
                         )
                         if (
-                            bucket_state.get("status") == "deferred"
+                            state_status == BackfillStatus.RETRYABLE
                             and retry_after is not None
                             and retry_after > now_epoch
                         ):
@@ -17118,11 +16539,44 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             bucket_state,
                         ))
 
-        candidates.sort(key=operator.itemgetter(slice(7)))
+        # Within each documented period type, make the newest missing closed
+        # bucket visible first. With several source prefixes and a bounded
+        # request budget, oldest-first ordering can otherwise leave the most
+        # recent Energy-Dashboard history pending for many scheduler cycles.
+        # Previously attempted rows still sort by their oldest attempt time.
+        candidates.sort(
+            key=lambda candidate: (
+                candidate[0],
+                candidate[1],
+                candidate[2],
+                -candidate[3].toordinal(),
+                candidate[4],
+                candidate[5],
+                candidate[6],
+            ),
+        )
+        _LOGGER.debug(
+            "Period backfill candidates before budget slice: %d total, budget=%d",
+            len(candidates),
+            request_budget,
+        )
+        if candidates:
+            _LOGGER.debug(
+                "First closed-period candidate: priority=%s device=%s prefix=%s "
+                "date_type=%s period=%s status=%s",
+                candidates[0][0],
+                candidates[0][4],
+                candidates[0][5],
+                candidates[0][6],
+                candidates[0][3].isoformat(),
+                candidates[0][8].get("status"),
+            )
+        else:
+            _LOGGER.debug("Period backfill: no closed-period candidates")
         requests = 0
         imported_sources = 0
         terminal_transitions = 0
-        state_changed = False
+        rate_limited = False
 
         for (
             _priority,
@@ -17135,10 +16589,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             payload,
             bucket_state,
         ) in candidates[: max(0, request_budget)]:
-            requests += 1
+            _LOGGER.debug(
+                "Period backfill processing: device=%s prefix=%s "
+                "date_type=%s period=%s status=%s",
+                device_id,
+                section_prefix,
+                date_type,
+                period_start.isoformat(),
+                bucket_state.get("status"),
+            )
             status = "empty_ambiguous"
             fetched_source: dict[str, Any] = {}
             try:
+                requests += 1
                 fetched = await self._async_fetch_historical_app_chart_source(
                     device_id=device_id,
                     system_id=self._system_id_from_payload(device_id, payload),
@@ -17162,7 +16625,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     exception_debug_message(err),
                 )
             except (TimeoutError, HomeAssistantError, JackeryError) as err:
-                status = "transport_error"
+                status = (
+                    "rate_limited"
+                    if _is_system_busy_error(err)
+                    else "transport_error"
+                )
                 _LOGGER.debug(
                     "Jackery period backfill failed for %s %s %s: %s",
                     device_id,
@@ -17170,7 +16637,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     period_start.isoformat(),
                     exception_debug_message(err),
                 )
-            except Exception as err:  # ruff:ignore[blind-except]
+            except Exception as err:  # noqa: BLE001, RUF105
                 status = "transport_error"
                 _LOGGER.debug(
                     "Jackery period backfill failed for %s %s %s: %s",
@@ -17181,13 +16648,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
             else:
                 if isinstance(fetched, dict) and fetched:
-                    section = f"{section_prefix}_{date_type}"
-                    fetched_source = gate_payload_section(
-                        TransportSource.HTTP,
-                        section,
-                        fetched,
-                    )
-                    status = "fetched" if fetched_source else "empty_ambiguous"
+                    fetched_source = dict(fetched)
+                    status = "fetched"
 
             attempts = bucket_state.get("attempts", 0)
             attempts_now = (
@@ -17196,7 +16658,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             bucket_state.update({
                 "attempts": attempts_now,
                 "last_attempt_at": utc_now().isoformat(),
-                "status": status,
+                "status": BackfillStatus.RETRYABLE.value,
+                "period_open": False,
             })
             bucket_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
             state_changed = True
@@ -17205,11 +16668,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 collected = {
                     (section_prefix, date_type, period_start): fetched_source,
                 }
-                withheld = self._repair_containment_violations(
-                    collected=collected,
-                    payload=payload,
-                    to_date=today,
-                )
                 period_meta = self._app_chart_period_meta(date_type)
                 repaired, failed = await self._import_collected_repair_buckets(
                     device_id=device_id,
@@ -17218,51 +16676,56 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     period_meta_by_type=(
                         {date_type: period_meta} if period_meta is not None else {}
                     ),
-                    withheld=withheld,
                     to_date=today,
                 )
                 if repaired > 0 and failed == 0:
+                    bucket_state["imported_rows"] = repaired
+                    imported_sources += 1
                     bucket_state.update({
-                        "status": "imported",
-                        "imported_rows": repaired,
+                        "status": BackfillStatus.IMPORTED.value,
                         "completed_at": utc_now().isoformat(),
                     })
-                    imported_sources += 1
                     terminal_transitions += 1
+                    pending_sources_total -= 1
                 elif failed:
-                    bucket_state["status"] = "recorder_error"
+                    status = "recorder_error"
                 else:
-                    bucket_state["status"] = "empty_ambiguous"
+                    status = "empty_ambiguous"
 
-            current_status = bucket_state.get("status")
-            if (
-                current_status == "empty_ambiguous"
-                and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
-            ):
+            if status == "rate_limited":
+                rate_limited = True
                 bucket_state.update({
-                    "status": "unavailable",
-                    "completed_at": utc_now().isoformat(),
-                })
-                terminal_transitions += 1
-            elif (
-                current_status in {"auth_error", "transport_error", "recorder_error"}
-                and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
-            ):
-                bucket_state.update({
-                    "status": "deferred",
+                    "status": BackfillStatus.RETRYABLE.value,
                     _STATISTICS_HTTP_RETRY_AFTER_EPOCH: (
                         time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
                     ),
                 })
-                terminal_transitions += 1
+                await asyncio.sleep(0)
+                break
+            if (
+                status == "empty_ambiguous"
+                and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
+            ):
+                bucket_state.update({
+                    "status": BackfillStatus.RETRYABLE.value,
+                    _STATISTICS_HTTP_RETRY_AFTER_EPOCH: (
+                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
+                    ),
+                })
+                bucket_state.pop("completed_at", None)
+            elif (
+                status in {"auth_error", "transport_error", "recorder_error"}
+                and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
+            ):
+                bucket_state.update({
+                    "status": BackfillStatus.RETRYABLE.value,
+                    _STATISTICS_HTTP_RETRY_AFTER_EPOCH: (
+                        time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+                    ),
+                })
             await asyncio.sleep(0)
 
-        pending_sources = sum(
-            1
-            for candidate in candidates
-            if candidate[-1].get("status")
-            not in {"deferred", "imported", "unavailable"}
-        )
+        pending_sources = pending_sources_total
         if state_changed:
             await self._async_save_statistics_backfill_state()
         self._statistics_import_diagnostics.update({
@@ -17270,22 +16733,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "last_period_backfill_imported_sources": imported_sources,
             "last_period_backfill_terminal_transitions": terminal_transitions,
             "last_period_backfill_pending_sources": pending_sources,
+            "last_period_backfill_open_sources": open_sources,
+            "last_period_backfill_rate_limited": rate_limited,
         })
         return {
             "requests": requests,
             "imported_sources": imported_sources,
             "terminal_transitions": terminal_transitions,
             "pending_sources": pending_sources,
+            "open_sources": open_sources,
+            "rate_limited": rate_limited,
         }
 
     @property
+    def local_mqtt_config_diagnostics(self) -> dict[str, Any]:
+        """Device-side 3046/BLE-113 configuration lifecycle."""
+        return copy.deepcopy(self._local_mqtt_config_diagnostics)
+
+    @property
     def polling_diagnostics(self) -> dict[str, Any]:
-        """Return the latest HTTP polling/cache diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the latest HTTP polling/cache diagnostics."""  # noqa: D421, RUF105
         return dict(self._polling_diagnostics)
 
     @property
     def statistics_import_diagnostics(self) -> dict[str, Any]:
-        """Return the latest Recorder import diagnostics."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the latest Recorder import diagnostics."""  # noqa: D421, RUF105
         return dict(self._statistics_import_diagnostics)
 
     def _metric_source_candidates(
@@ -17347,51 +16819,149 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
         )
 
-    async def _async_import_current_app_chart_statistics_job(
+    async def _async_import_local_daily_lifetime_statistics(
         self,
         snapshot: dict[str, dict[str, Any]],
     ) -> set[str]:
-        """Advance independent period/day history, then import current buckets.
+        """Import local daily energy deltas as lifetime TOTAL_INCREASING statistics.
 
-        Returns:
-            Device ids whose external statistics imported successfully, so
-            the repair wrapper can maintain the per-device backfill state.
+        The coordinator computes local daily energy deltas (Wh) from midnight
+        lifetime counter snapshots and stores them in PAYLOAD_LOCAL_DAILY_ENERGY.
+        These deltas need to be aggregated into lifetime TOTAL_INCREASING
+        external statistics for the Energy Dashboard.
+
+        For each device and each LOCAL_DAILY_LIFETIME_METRIC, we import the
+        accumulated lifetime sum as a TOTAL_INCREASING statistic.
         """
         if not snapshot:
             return set()
 
-        snapshot = self._gate_snapshot_period_hierarchy(
-            snapshot,
-            today=self._local_today(),
-        )
+        successful_devices: set[str] = set()
+        today = self._local_today()
+
+        for device_id, payload in snapshot.items():
+            local_daily = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
+            if not isinstance(local_daily, dict):
+                continue
+
+            name_prefix = self._app_chart_name_prefix(device_id, payload)
+            for metric_key in LOCAL_DAILY_LIFETIME_METRICS:
+                daily_wh = safe_float(local_daily.get(metric_key))
+                if daily_wh is None:
+                    continue
+
+                daily_kwh = round(daily_wh / 1000.0, 5)
+
+                # Map metric_key to a stable statistic label
+                label = self._local_daily_metric_to_label(metric_key)
+                if not label:
+                    continue
+
+                statistic_id = external_trend_statistic_id(
+                    DOMAIN,
+                    device_id,
+                    f"{metric_key}_lifetime",
+                    EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+                )
+
+                # Import one cumulative sum point at local midnight. External
+                # energy statistics use ``has_sum=True``; fold the daily
+                # increment into the previous sum instead of exposing a
+                # non-monotonic daily value as the statistic state.
+                start_dt = datetime.combine(
+                    today, datetime.min.time(), tzinfo=self._local_timezone()
+                )
+
+                async with self._statistics_recorder_lock:
+                    # Get existing offset to maintain monotonic sum. Keep the
+                    # read, queued import, and recorder commit together so a
+                    # concurrent chart/backfill import cannot compute from an
+                    # older sum and then mark a stale write as complete.
+                    offset = await self._async_statistic_sum_offset(
+                        statistic_id,
+                        [start_dt],
+                        [daily_kwh],
+                    )
+                    cumulative = round(offset + daily_kwh, 5)
+
+                    metadata_dict: dict[str, Any] = {
+                        "mean_type": StatisticMeanType.NONE,
+                        "has_sum": True,
+                        "name": f"{name_prefix} {label} (lifetime)",
+                        "source": DOMAIN,
+                        "statistic_id": statistic_id,
+                        "unit_class": EnergyConverter.UNIT_CLASS,
+                        "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+                    }
+
+                    statistics = [StatisticData(start=start_dt, sum=cumulative)]
+
+                    try:
+                        async_add_external_statistics(
+                            self.hass,
+                            metadata_dict,  # type: ignore[arg-type]
+                            statistics,
+                        )
+                        await get_instance(self.hass).async_block_till_done()
+                        successful_devices.add(device_id)
+                    except BACKGROUND_TASK_ERRORS as err:
+                        _LOGGER.debug(
+                            "Could not import local daily lifetime statistic for "
+                            "%s (%s): %s",
+                            device_id,
+                            metric_key,
+                            exception_debug_message(err),
+                        )
+
+        return successful_devices
+
+    def _local_daily_metric_to_label(self, metric_key: str) -> str | None:  # noqa: PLR6301, RUF105
+        """Map LOCAL_DAILY_LIFETIME_METRIC to a human-readable label."""
+        mapping = {
+            APP_DEVICE_STAT_PV_ENERGY: "PV energy",
+            APP_STAT_PV1_ENERGY: "PV1 energy",
+            APP_STAT_PV2_ENERGY: "PV2 energy",
+            APP_STAT_PV3_ENERGY: "PV3 energy",
+            APP_STAT_PV4_ENERGY: "PV4 energy",
+            APP_DEVICE_STAT_BATTERY_CHARGE: "Battery charge",
+            APP_DEVICE_STAT_BATTERY_DISCHARGE: "Battery discharge",
+            APP_DEVICE_STAT_ONGRID_INPUT: "On-grid input",
+            APP_DEVICE_STAT_ONGRID_OUTPUT: "On-grid output",
+            APP_DEVICE_STAT_BATTERY_TO_GRID: "Battery to grid",
+            APP_DEVICE_STAT_PV_TO_BATTERY: "PV to battery",
+            APP_DEVICE_STAT_PV_TO_ONGRID: "PV to on-grid",
+            APP_DEVICE_STAT_ONGRID_TO_BATTERY: "On-grid to battery",
+            APP_DEVICE_STAT_EPS_INPUT: "EPS input",
+            APP_DEVICE_STAT_EPS_OUTPUT: "EPS output",
+            FIELD_CT_TOTAL_PHASE_ENERGY: "CT total phase energy",
+            FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: "CT negative phase energy",
+        }
+        return mapping.get(metric_key)
+
+    async def _async_import_current_app_chart_statistics_job(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> set[str]:
+        """Import current app-chart and local-delta buckets without HTTP waits.
+
+        Returns:
+            Device ids whose external statistics imported successfully, so
+            diagnostics can report the current Recorder import result.
+        """
+        if not snapshot:
+            return set()
+
         startup_sync = self._statistics_startup_sync_pending
-        period_backfill_result = await self._async_http_backfill_period_statistics(
-            snapshot,
-        )
-        period_pending = period_backfill_result.get("pending_sources", 0)
-        backfill_result = await self._async_http_backfill_recent_day_statistics(
-            snapshot,
-            force=startup_sync,
-            window_days=(
-                _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
-                if startup_sync
-                else _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS
-            ),
-            include_current_year=startup_sync,
-            request_budget=(
-                1
-                if startup_sync and period_pending > 0
-                else _STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET
-            ),
-        )
-        day_pending = backfill_result.get("pending_sources", 0)
-        if startup_sync and period_pending == 0 and day_pending == 0:
-            self._statistics_startup_sync_pending = False
         successful_devices = await self._async_import_day_chart_statistics(snapshot)
         period_successful_devices = await self._async_import_app_chart_statistics(
             snapshot,
         )
         successful_devices.update(period_successful_devices)
+        # Import local daily energy deltas as lifetime TOTAL_INCREASING statistics
+        local_import_result = await self._async_import_local_daily_lifetime_statistics(
+            snapshot
+        )
+        successful_devices.update(local_import_result)
         # Entity-backed (``sensor.xxx``) statistics import removed here too: it
         # collided with HA's own sensor recorder on the same statistic_id. The
         # external ``jackery_solarvault:`` statistics above are authoritative;
@@ -17452,27 +17022,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             msg = f"missing systemId for {device_id}"
             raise LookupError(msg)
         return await self.api.async_get_smart_schedule_prediction(
-            system_id=system_id,
-        )
-
-    async def async_get_aiems_energy_prediction(
-        self,
-        device_id: str,
-    ) -> dict[str, Any]:
-        """Get the AI-EMS energy prediction for a configured device.
-
-        Calls ``/v1/api/aiems/report/energy/prediction`` (GET, app 2.4.0)
-        using the systemId resolved from the coordinator payload.
-        """
-        payload = (self.data or {}).get(device_id) or {}
-        if not self._shadow_has_home_config_context(payload):
-            msg = f"AI-EMS prediction is not a Home/System feature for {device_id}"
-            raise LookupError(msg)
-        system_id = self._shadow_system_id(payload)
-        if system_id is None:
-            msg = f"missing systemId for {device_id}"
-            raise LookupError(msg)
-        return await self.api.async_get_aiems_energy_prediction(
             system_id=system_id,
         )
 
@@ -17942,4 +17491,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         await self.api.async_update_user_info(nick_name=nick_name)
 
 
-__all__ = ["JackerySolarVaultCoordinator", "RejectionMetrics"]
+__all__ = [
+    "JackerySolarVaultCoordinator",
+    "RejectionMetrics",
+    "stable_payload_debug_signature",
+]
+
+stable_payload_debug_signature = _stable_payload_debug_signature

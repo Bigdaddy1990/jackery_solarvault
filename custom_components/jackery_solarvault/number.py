@@ -37,7 +37,6 @@ from .const import (
     ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
     ACTION_ID_PORTABLE_SET_CHARGE_POWER,
-    DEFAULT_LIVE_SOURCES,
     DEFAULT_NULL_SEMANTICS,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DOMAIN,
@@ -67,7 +66,15 @@ from .const import (
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
 from .coordinator import ACTION_WRITE_ERRORS
-from .entity import JackeryEntity, payload_properties_for_sources
+from .entity import (
+    HTTP_COMMAND_SOURCES,
+    HTTP_DATA_SOURCES,
+    LAYER5_COMMAND_SOURCES,
+    LAYER5_DATA_SOURCES,
+    JackeryEntity,
+    payload_properties_for_sources,
+    property_data_sources,
+)
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -158,7 +165,7 @@ def _is_portable_payload(
 # ---------------------------------------------------------------------------
 
 
-def _rounded_int(value: Any) -> int:  # ruff:ignore[any-type]
+def _rounded_int(value: Any) -> int:  # noqa: ANN401, RUF105
     """Round a value accepted by Home Assistant as a number to the nearest integer.
 
     Parameters:
@@ -205,10 +212,32 @@ class JackeryNumberDescription(NumberEntityDescription):
     integer_value: bool = False
     display_precision: int | None = None
     smali_field: str | None = None
-    data_sources: tuple[str, ...] = DEFAULT_LIVE_SOURCES
+    app_fields: tuple[str, ...] = ()
+    data_sources: tuple[str, ...] = ()
+    command_sources: tuple[str, ...] = ()
     null_semantics: str = DEFAULT_NULL_SEMANTICS
     recorder_allowed: bool = True
     ha_derived: bool = False
+
+    def __post_init__(self) -> None:
+        """Resolve field, read-source and command-source capabilities."""
+        app_fields = self.app_fields or self.source_keys
+        if not app_fields and self.smali_field:
+            app_fields = (self.smali_field,)
+        object.__setattr__(self, "app_fields", app_fields)
+        if not self.data_sources:
+            if self.source_section == PAYLOAD_PROPERTIES:
+                sources = property_data_sources(
+                    *app_fields,
+                    layer5_proven=self.setter is not None,
+                )
+            elif self.source_section == PAYLOAD_THIRD_PARTY_MQTT_CONFIG:
+                sources = LAYER5_DATA_SOURCES
+            else:
+                sources = HTTP_DATA_SOURCES
+            object.__setattr__(self, "data_sources", sources)
+        if not self.command_sources and self.setter is not None:
+            object.__setattr__(self, "command_sources", LAYER5_COMMAND_SOURCES)
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +245,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 # ---------------------------------------------------------------------------
 
 
-def _wire_int(value: Any) -> int:  # ruff:ignore[any-type]
+def _wire_int(value: Any) -> int:  # noqa: ANN401, RUF105
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
@@ -237,7 +266,7 @@ def _wire_int(value: Any) -> int:  # ruff:ignore[any-type]
     return parsed
 
 
-def _wire_float(value: Any) -> float:  # ruff:ignore[any-type]
+def _wire_float(value: Any) -> float:  # noqa: ANN401, RUF105
     """Parse an arbitrary input into a float suitable for coordinator setter calls.
 
     Parameters:
@@ -695,6 +724,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_keys=(FIELD_SINGLE_PRICE,),
         source_section=PAYLOAD_PRICE,
         setter=_set_single_price,
+        command_sources=HTTP_COMMAND_SOURCES,
         dynamic_unit=_single_tariff_dynamic_unit,
         value_transform=_wire_float,
     ),
@@ -925,7 +955,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity's current value."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the entity's current value."""  # noqa: D421, RUF105
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -938,7 +968,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
-        """Return the highest value the user can write."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the highest value the user can write."""  # noqa: D421, RUF105
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -954,7 +984,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             The unit of measurement string, or None if no unit is configured.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -963,7 +993,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def suggested_display_precision(self) -> int | None:
-        """Return the suggested number of decimal places for display."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the suggested number of decimal places for display."""  # noqa: D421, RUF105
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
@@ -1007,7 +1037,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when
             `raise_on_setter_error` is True and the setter fails.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         parsed_value = safe_float(value)
         if parsed_value is None:
             self._raise_action_error(
@@ -1160,7 +1190,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home
             Assistant.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)

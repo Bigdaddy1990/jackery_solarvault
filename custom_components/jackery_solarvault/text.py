@@ -33,7 +33,14 @@ from .const import (
     PAYLOAD_SYSTEM,
 )
 from .coordinator import ACTION_WRITE_ERRORS
-from .entity import JackeryEntity
+from .entity import (
+    ALL_LIVE_DATA_SOURCES,
+    HTTP_COMMAND_SOURCES,
+    HTTP_DATA_SOURCES,
+    LAYER5_COMMAND_SOURCES,
+    LAYER5_DATA_SOURCES,
+    JackeryEntity,
+)
 from .util import append_unique_entity, coordinator_entity_signature
 
 if TYPE_CHECKING:
@@ -164,8 +171,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """Append a TextEntity to the provided list if its unique identifier has not
-        been registered.
+        """Append a TextEntity when its identifier is new.
 
         Modifies the `entities` list by appending `entity` when its unique id is new,
         and records that id to prevent duplicate entities from being added.
@@ -174,7 +180,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             entities (list[TextEntity]): Target list to which the entity will be
             appended if allowed.
             entity (TextEntity): Candidate text entity to append.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -195,6 +201,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
             is_portable = _is_portable_payload(payload)
+            _append_unique(entities, JackeryDeviceNameText(coordinator, dev_id))
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
                 _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
@@ -258,6 +265,79 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
 
 
+class JackeryDeviceNameText(JackeryEntity, TextEntity):
+    """Rename a device through one of the App's explicit HTTP rename endpoints."""
+
+    _attr_translation_key = "device_name"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_native_min = 1
+    _attr_native_max = 64
+    _attr_pattern = r"^.{1,64}$"
+    data_sources = HTTP_DATA_SOURCES
+    command_sources = HTTP_COMMAND_SOURCES
+    app_fields = (FIELD_DEVICE_NAME,)
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+    ) -> None:
+        """Initialise the HTTP-backed device-name entity."""
+        super().__init__(coordinator, device_id, "device_name")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the device name exposed by the HTTP property/discovery payload."""  # noqa: D421, RUF105
+        for section in (self._device_meta, self._discovery, self._system):
+            value = section.get(FIELD_DEVICE_NAME)
+            if isinstance(value, str) and value:
+                return value
+        return None
+
+    async def async_set_value(self, value: str) -> None:
+        """Rename a Home D-I-Y or legacy portable device over HTTP."""
+        new_name = (value or "").strip()
+        if not new_name:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_text_value",
+                translation_placeholders={
+                    "entity": "device_name",
+                    "device_id": self._device_id,
+                },
+            )
+
+        try:
+            if _is_portable_payload(self._payload):
+                await self.coordinator.async_set_device_nickname(
+                    self._device_id,
+                    new_name,
+                )
+            else:
+                await self.coordinator.async_set_device_name(
+                    self._device_id,
+                    new_name,
+                )
+        except JackeryAuthError as err:
+            msg = (
+                "Jackery credentials were rejected while renaming a device. "
+                "Re-authentication is required."
+            )
+            raise ConfigEntryAuthFailed(msg) from err
+        except JackeryError as err:
+            _LOGGER.debug("Failed to rename device %s: %s", self._device_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="set_device_nickname_failed",
+                translation_placeholders={
+                    "device_id": self._device_id,
+                    "error": str(err),
+                },
+            ) from err
+
+        self.async_write_ha_state()
+
+
 class JackerySystemNameText(JackeryEntity, TextEntity):
     """Rename the SolarVault system using SYSTEM_NAME_PATH from const.py."""
 
@@ -266,6 +346,9 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
     _attr_native_min = 1
     _attr_native_max = 64
     _attr_pattern = r"^.{1,64}$"
+    data_sources = HTTP_DATA_SOURCES
+    command_sources = HTTP_COMMAND_SOURCES
+    app_fields = (FIELD_SYSTEM_NAME, FIELD_DEVICE_NAME)
 
     def __init__(
         self,
@@ -284,14 +367,13 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # noqa: D421, RUF105
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
 
     async def async_set_value(self, value: str) -> None:
-        """Rename the remote system and update local state so the change appears in the
-        UI.
+        """Rename the remote system and update local state.
 
         Trims leading and trailing whitespace from `value`, sends the rename request to
         the Jackery API, applies an optimistic local update on success, and requests a
@@ -306,7 +388,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
             is required.
             HomeAssistantError: If the system identifier is missing, the trimmed name is
             empty, or the remote API reports a failure.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
         if not system_id:
@@ -360,6 +442,9 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
     _attr_native_min = 1
     _attr_native_max = 8
     _attr_pattern = r"^\d{1,8}$"
+    data_sources = ALL_LIVE_DATA_SOURCES
+    command_sources = LAYER5_COMMAND_SOURCES
+    app_fields = (FIELD_GRID_STANDARD,)
 
     def __init__(
         self,
@@ -432,6 +517,9 @@ class JackeryPvNameText(JackeryEntity, TextEntity):
     _attr_native_min = 1
     _attr_native_max = 64
     _attr_pattern = r"^.{1,64}$"
+    data_sources = HTTP_DATA_SOURCES
+    command_sources = HTTP_COMMAND_SOURCES
+    app_fields = (FIELD_PV_NAME,)
 
     def __init__(
         self,
@@ -525,6 +613,8 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min = 0
     _attr_native_max = 128
+    data_sources = LAYER5_DATA_SOURCES
+    command_sources = LAYER5_COMMAND_SOURCES
 
     def __init__(  # ruff:ignore[too-many-arguments]
         self,
@@ -540,6 +630,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         """Initialise the Third-Party MQTT text field."""
         super().__init__(coordinator, device_id, key_suffix)
         self._field = field
+        self.app_fields = (field,)
         self._attr_translation_key = translation_key
         self._attr_mode = mode
         if pattern is not None:
@@ -547,7 +638,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current plaintext value used for writes."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return the current plaintext value used for writes."""  # noqa: D421, RUF105
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
             self._field,
         )

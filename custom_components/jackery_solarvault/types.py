@@ -8,7 +8,72 @@ All types are runtime-resolvable — no ``from __future__ import annotations``
 (ruff TID251).
 """
 
-from typing import Any, NotRequired, TypedDict
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from datetime import datetime
+
+
+# =============================================================================
+# Shared transport ingest
+# =============================================================================
+
+
+class DataSource(StrEnum):
+    """Transport that produced a decoded Jackery observation."""
+
+    HTTP = "http"
+    CLOUD_MQTT = "cloud_mqtt"
+    LOCAL_MQTT = "local_mqtt"
+    BLE = "ble"
+
+
+@dataclass(frozen=True, slots=True)
+class Observation:
+    """One decoded transport payload before it reaches coordinator state."""
+
+    source: DataSource
+    device_id: str
+    section: str
+    payload: Mapping[str, Any]
+    observed_at: datetime | None = None
+    request_id: str | None = None
+    received_at_monotonic: float | None = None
+
+    def __post_init__(self) -> None:
+        """Reject ambiguous wall-clock timestamps at the ingest boundary."""
+        if self.observed_at is not None and self.observed_at.utcoffset() is None:
+            msg = "observed_at must be timezone-aware"
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True, slots=True)
+class FieldProvenance:
+    """Source metadata retained outside entity-visible payload dictionaries."""
+
+    source: DataSource
+    section: str
+    observed_at: datetime | None
+    received_at_monotonic: float
+    request_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IngestResult:
+    """Result of applying one observation to a single payload section."""
+
+    payload: dict[str, Any]
+    provenance: dict[str, FieldProvenance]
+    accepted_fields: frozenset[str]
+
+    @property
+    def accepted(self) -> bool:
+        """Whether at least one field passed the ingest contract."""
+        return bool(self.accepted_fields)
+
 
 # =============================================================================
 # Generic Wrapper

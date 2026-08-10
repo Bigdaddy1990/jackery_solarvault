@@ -1,7 +1,7 @@
 """Config flow for Jackery SolarVault."""
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import voluptuous as vol
 
@@ -22,7 +22,7 @@ from .const import (
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     CONF_ENABLE_MONTH_STATISTICS,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
     CONF_LOCAL_MQTT_ENABLE,
@@ -46,6 +46,7 @@ from .const import (
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
+    DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
     DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
@@ -75,6 +76,7 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_RECONFIGURE_CREDENTIALS,
     FLOW_STEP_USER,
+    REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
 )
@@ -105,6 +107,7 @@ _LOGGER = logging.getLogger(__name__)
 _BOOL_OPTION_DEFAULTS: dict[str, bool] = {
     **_OPTION_DEFAULTS,
     CONF_THIRD_PARTY_MQTT_ENABLE: DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG: DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
 }
 
 _STR_OPTION_DEFAULTS: dict[str, str] = {
@@ -189,7 +192,7 @@ def _flow_options(
     Returns:
         dict[str, Any]: A merged options dictionary containing every known option key
         with its resolved value.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     current = current_options or {}
     keys = option_keys or frozenset(_ALL_OPTION_DEFAULTS)
     return {
@@ -291,13 +294,13 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     options: Mapping[str, Any] = entry.options
     data: Mapping[str, Any] = entry.data
 
-    def _entry_value(key: str, default: Any = None) -> Any:  # ruff:ignore[any-type]
+    def _entry_value(key: str, default: Any = None) -> Any:  # noqa: ANN401, RUF105
         value = options.get(key)
         if value is None:
             value = data.get(key, default)
         return value
 
-    def _first_entry_value(*keys: str, default: Any = "") -> Any:  # ruff:ignore[any-type]
+    def _first_entry_value(*keys: str, default: Any = "") -> Any:  # noqa: ANN401, RUF105
         for key in keys:
             value = _entry_value(key)
             if value not in {None, ""}:
@@ -364,9 +367,9 @@ def _merge_local_mqtt_options(
 
     For each expected local-MQTT field, the value from `user_input` is used when
     present; otherwise the value from `current` is used. Returned values are coerced:
-    enable is converted to `bool`; host, username, password, and topic filter are
-    converted to `str` (host and topic are trimmed and empty defaults are `""`); port
-    is converted to `int`.
+    enable is converted to `bool`; host, username, password, topic filter are converted
+    to `str` (host and topic are trimmed and empty defaults are `""`);
+    port is converted to `int`.
 
     Parameters:
         user_input (dict[str, Any]): Partial form input containing any local-MQTT
@@ -466,6 +469,9 @@ def _reconfigure_options(
     """
     current_local_mqtt = _current_local_mqtt_options(entry)
     merged = dict(entry.options)
+    merged.pop("enable_unredacted_diagnostics", None)
+    for key in REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS:
+        merged.pop(key, None)
     current_options = _current_option_values(entry)
     merged.update(
         _flow_options(
@@ -521,7 +527,7 @@ class JackeryOptionsFlow(OptionsFlow):
         Returns:
             ConfigFlowResult: The created options entry result, or a form result to
             display to the user.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
@@ -545,8 +551,8 @@ class JackeryOptionsFlow(OptionsFlow):
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
-        current_enable_unredacted_diagnostics = current_options[
-            CONF_ENABLE_UNREDACTED_DIAGNOSTICS
+        current_enable_payload_debug_log = current_options[
+            CONF_ENABLE_PAYLOAD_DEBUG_LOG
         ]
         schema = vol.Schema({
             vol.Optional(
@@ -582,8 +588,8 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_enable_derived_home_fallback,
             ): bool,
             vol.Optional(
-                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
-                default=current_enable_unredacted_diagnostics,
+                CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+                default=current_enable_payload_debug_log,
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -605,16 +611,15 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
             ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOKEN,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
-            ): str,
             # Single bridge mask (owner rule 2026-07-05): the third-party
             # fields above ARE the one mask. The local listener derives its
             # ``local_mqtt_*`` values from them via
             # ``_merge_local_mqtt_options`` below, so no duplicate
             # ``local_mqtt_*`` field block is exposed here. Only the shared
             # topic filter is surfaced.
+            # CONF_THIRD_PARTY_MQTT_TOKEN is intentionally omitted from the form
+            # per const.py: "the integration must fill it and must never
+            # surface it to the user". _flow_options preserves it from current_options.
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
@@ -627,6 +632,16 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the Jackery SolarVault config flow."""
 
     VERSION = 1
+
+    @override
+    def is_matching(self, other_flow: Self) -> bool:
+        """Match discovery flows for the single account-backed Jackery hub."""
+        # Bluetooth/DHCP/Zeroconf cannot reveal the Jackery cloud account that
+        # owns a device.  The integration intentionally creates one account
+        # hub entry, so concurrent signals from any of its discovery sources
+        # represent the same pending setup.  Home Assistant requires this
+        # matcher when discovery has no stable unique id.
+        return True
 
     @callback
     def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
@@ -668,32 +683,37 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ConfigFlowResult: An abort result when the discovery is duplicate,
             otherwise the result from the user step.
         """
-        discovered_name = (
-            getattr(discovery_info, "name", None)
-            or getattr(discovery_info, "address", None)
-            or "Jackery Device"
-        )
+        discovered_name = discovery_info.name or discovery_info.address
         return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_dhcp(
         self,
         discovery_info: DhcpServiceInfo,
     ) -> ConfigFlowResult:
-        """Start account setup from a DHCP discovery signal."""
-        discovered_name = (
-            getattr(discovery_info, "hostname", None)
-            or getattr(discovery_info, "ip", None)
-            or "Jackery Device"
-        )
+        """Start account setup from a DHCP discovery signal.
+
+        Parameters:
+            discovery_info (DhcpServiceInfo): DHCP discovery information provided by
+            Home Assistant.
+
+        Returns:
+            ConfigFlowResult: An abort result when the discovery is duplicate or the
+            result of proceeding to the user step.
+        """
+        discovered_name = discovery_info.hostname or discovery_info.ip
         return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_mqtt(
         self,
         discovery_info: MqttServiceInfo,
     ) -> ConfigFlowResult:
-        """Route MQTT discovery to the HTTP-account setup form."""
-        topic = getattr(discovery_info, "topic", "")
-        topic_suffix = topic.rsplit("/", 1)[-1].strip() if topic else ""
+        """Route MQTT discovery to the HTTP-account setup form.
+
+        Returns:
+            ConfigFlowResult: An abort result when the discovery is a duplicate, or the
+            result returned by `async_step_user()`.
+        """
+        topic_suffix = discovery_info.topic.rsplit("/", 1)[-1].strip()
         discovered_name = (
             f"Jackery MQTT ({topic_suffix})" if topic_suffix else "Jackery MQTT"
         )
@@ -703,12 +723,18 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self,
         discovery_info: ZeroconfServiceInfo,
     ) -> ConfigFlowResult:
-        """Route Zeroconf discovery to the HTTP-account setup form."""
+        """Route Zeroconf discovery to the HTTP-account setup form.
+
+        Parameters:
+            discovery_info (ZeroconfServiceInfo): Zeroconf discovery information
+            provided by Home Assistant.
+
+        Returns:
+            ConfigFlowResult: An abort result when the integration is already
+            configured, otherwise the result returned by the user setup step.
+        """
         discovered_name = (
-            getattr(discovery_info, "name", None)
-            or getattr(discovery_info, "hostname", None)
-            or getattr(discovery_info, "host", None)
-            or "Jackery Device"
+            discovery_info.name or discovery_info.hostname or discovery_info.host
         )
         return await self._async_route_discovery_to_user(discovered_name)
 
@@ -734,7 +760,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: A flow result that either shows the user form with errors
             or creates the new configuration entry on successful authentication.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -795,7 +821,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             A ConfigFlowResult that shows the reconfigure form with any errors, aborts
             with a specific reason, or updates and reloads the entry on successful
             reconfiguration.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         try:
             self._get_reconfigure_entry()
         except UnknownEntry, ValueError:
@@ -899,8 +925,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 default=current_options[CONF_ENABLE_BLE_TRANSPORT],
             ): bool,
             vol.Optional(
-                CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
-                default=current_options[CONF_ENABLE_UNREDACTED_DIAGNOSTICS],
+                CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+                default=current_options[CONF_ENABLE_PAYLOAD_DEBUG_LOG],
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -926,10 +952,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
             ): str,
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_TOKEN,
-                default=current_options[CONF_THIRD_PARTY_MQTT_TOKEN],
-            ): str,
+            # The reconfigure-credentials form exposes the local-MQTT fields under the
+            # legacy ``third_party_mqtt_*`` input keys (see _merge_local_mqtt_options),
+            # which the flow maps onto the stored ``local_mqtt_*`` option keys.
+            # CONF_THIRD_PARTY_MQTT_TOKEN is intentionally omitted from the form
+            # per const.py: "the integration must fill it and must never
+            # surface it to the user". _reconfigure_options preserves it from
+            # current_options.
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
@@ -1028,7 +1057,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: The next flow result (shows the password form on error or
             missing input, aborts and updates the entry on successful reauthentication).
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         try:
             entry = self._get_reauth_entry()
         except UnknownEntry, ValueError:

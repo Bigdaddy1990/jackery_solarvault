@@ -126,7 +126,6 @@ from .const import (
     SERVICE_FIELD_VERSION_NAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
     SERVICE_FIELD_ZONE_ID,
-    SERVICE_GET_AIEMS_ENERGY_PREDICTION,
     SERVICE_GET_ALARM_DETAIL,
     SERVICE_GET_DEVICE_CURRENCY,
     SERVICE_GET_DYNAMIC_PRICE_LOGIN_URL,
@@ -205,7 +204,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _coerce_service_int(raw: Any) -> int:  # ruff:ignore[any-type]
+def _coerce_service_int(raw: Any) -> int:  # noqa: ANN401, RUF105
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
         msg = "expected integer"
@@ -234,7 +233,7 @@ def _coerce_service_int(raw: Any) -> int:  # ruff:ignore[any-type]
     raise vol.Invalid(msg)
 
 
-def _coerce_service_float(raw: Any) -> float:  # ruff:ignore[any-type]
+def _coerce_service_float(raw: Any) -> float:  # noqa: ANN401, RUF105
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
         msg = "expected finite number"
@@ -868,12 +867,6 @@ GET_SMART_SCHEDULE_PREDICTION_SCHEMA = vol.Schema({
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
 })
-GET_AIEMS_ENERGY_PREDICTION_SCHEMA = vol.Schema({
-    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string,
-        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
-    ),
-})
 UNBIND_ACCESSORIES_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
         cv.string,
@@ -1058,7 +1051,7 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g.,
         "12345"), otherwise the original input.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
@@ -1074,7 +1067,7 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
     Returns:
         parent_id (str): The parent Jackery numeric device id with any documented
         subdevice suffix removed.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
     if device is not None:
@@ -1228,7 +1221,7 @@ def _service_validation_error(
         ServiceValidationError: Error with `translation_domain` set to DOMAIN,
         `translation_key` set to `translation_key`, and `translation_placeholders`
         containing `device_id` and `error`.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     placeholders = {
         "device_id": device_id,
         "error": str(error),
@@ -1244,7 +1237,7 @@ def _service_validation_error(
 
 def _device_id_from_service(
     hass: HomeAssistant,
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     translation_key: str,
     extra_placeholders: dict[str, str] | None = None,
@@ -1266,7 +1259,7 @@ def _device_id_from_service(
     )
 
 
-def _rename_system_id_from_service(raw: Any) -> str:  # ruff:ignore[any-type]
+def _rename_system_id_from_service(raw: Any) -> str:  # noqa: ANN401, RUF105
     """Return a validated system id from a direct rename service call."""
     system_id = ""
     if isinstance(raw, str):
@@ -1289,7 +1282,7 @@ def _rename_system_id_from_service(raw: Any) -> str:  # ruff:ignore[any-type]
     )
 
 
-def _rename_name_from_service(raw: Any, system_id: str) -> str:  # ruff:ignore[any-type]
+def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: ANN401, RUF105
     """Return a validated system name from a direct rename service call."""
     if not isinstance(raw, str):
         raise ServiceValidationError(
@@ -1322,7 +1315,7 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:  # ruff:ignore[a
     return parsed
 
 
-def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # ruff:ignore[any-type]
+def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # noqa: ANN401, RUF105
     """Return a validated storm-alert id from a direct service call."""
     alert_id = ""
     if isinstance(raw, str):
@@ -1349,7 +1342,7 @@ def _reject_json_constant(constant: str) -> object:
     raise ValueError(msg)
 
 
-def _json_native_value(value: Any) -> Any:  # ruff:ignore[any-type]
+def _json_native_value(value: Any) -> Any:  # noqa: ANN401, RUF105
     """Return a JSON-native value or raise ValueError."""
     if value is None or isinstance(value, str | bool | int):
         return value
@@ -1393,7 +1386,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     return normalized
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # ruff:ignore[any-type]
+def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # noqa: ANN401, RUF105
     """Parse a BLE command `body` value from a service call into a dict.
 
     Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.
@@ -1442,7 +1435,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
     )
 
 
-def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:  # ruff:ignore[any-type]
+def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:  # noqa: ANN401, RUF105
     """Return a TOU tasks list from a service object or JSON string."""
     parsed: Any = raw_body
     if isinstance(raw_body, str):
@@ -1481,7 +1474,7 @@ def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any
 
 
 def _service_bool(
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     field_name: str,
     translation_key: str,
@@ -1499,7 +1492,7 @@ def _service_bool(
 
 
 def _service_required_text(
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     field_name: str,
     translation_key: str,
@@ -1530,7 +1523,7 @@ def _service_required_text(
 
 
 def _service_optional_text(
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     field_name: str,
     translation_key: str,
@@ -1557,7 +1550,7 @@ def _service_optional_text(
 
 
 def _service_int(  # ruff:ignore[too-many-arguments]
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     field_name: str,
     translation_key: str,
@@ -1584,7 +1577,7 @@ def _service_int(  # ruff:ignore[too-many-arguments]
 
 
 def _service_float(  # ruff:ignore[too-many-arguments]
-    raw: Any,  # ruff:ignore[any-type]
+    raw: Any,  # noqa: ANN401, RUF105
     *,
     field_name: str,
     translation_key: str,
@@ -1879,7 +1872,7 @@ async def _async_handle_set_third_party_mqtt_config(
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or
         if applying the configuration fails. The error includes translation placeholders
         `device_id` and `error`.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2572,48 +2565,6 @@ async def _async_handle_get_smart_schedule_prediction(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "get_smart_schedule_prediction_failed"
-        raise _service_validation_error(
-            msg,
-            device_id=device_id,
-            error=err,
-        ) from err
-    return {"prediction": cast("JsonValueType", prediction)}
-
-
-async def _async_handle_get_aiems_energy_prediction(
-    hass: HomeAssistant,
-    call: ServiceCall,
-) -> ServiceResponse:
-    """Return the AI-EMS energy prediction for the selected device."""
-    device_id = _device_id_from_service(
-        hass,
-        call.data[SERVICE_FIELD_DEVICE_ID],
-        translation_key="get_aiems_energy_prediction_failed",
-    )
-    coordinator = _coordinator_for_device(hass, device_id)
-    if coordinator is None:
-        msg = "get_aiems_energy_prediction_failed"
-        raise _service_validation_error(
-            msg,
-            device_id=device_id,
-            error="no Jackery entry owns this device id",
-        )
-    _raise_if_portable_home_service(
-        coordinator,
-        device_id,
-        translation_key="get_aiems_energy_prediction_failed",
-        service_name=SERVICE_GET_AIEMS_ENERGY_PREDICTION,
-    )
-    try:
-        prediction = await coordinator.async_get_aiems_energy_prediction(device_id)
-    except JackeryAuthError as err:
-        msg = (
-            "Jackery credentials were rejected while fetching the AI-EMS "
-            "energy prediction. Re-authentication is required."
-        )
-        raise ConfigEntryAuthFailed(msg) from err
-    except (JackeryError, LookupError) as err:
-        msg = "get_aiems_energy_prediction_failed"
         raise _service_validation_error(
             msg,
             device_id=device_id,
@@ -3620,12 +3571,6 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
             SupportsResponse.ONLY,
         ),
         _ServiceRegistration(
-            SERVICE_GET_AIEMS_ENERGY_PREDICTION,
-            _async_handle_get_aiems_energy_prediction,
-            GET_AIEMS_ENERGY_PREDICTION_SCHEMA,
-            SupportsResponse.ONLY,
-        ),
-        _ServiceRegistration(
             SERVICE_UNBIND_ACCESSORIES,
             _async_handle_unbind_accessories,
             UNBIND_ACCESSORIES_SCHEMA,
@@ -3687,7 +3632,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     storm alert, set/query third-party MQTT config, send BLE command, and send device
     schedule. Each service is registered with this module's corresponding voluptuous
     schema and forwards validated ServiceCall objects to the integration handlers.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
 
     def _make_handler(
         handler: _ServiceHandler,
@@ -3728,7 +3673,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
         `body` is invalid, or if sending the schedule fails.
-    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
+    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

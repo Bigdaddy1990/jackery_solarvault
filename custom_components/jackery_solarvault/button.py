@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
-from . import JackeryAuthError
+from .client import JackeryAuthError
 from .const import (
     ACTION_ID_GET_DEVICE_OTA_VERSION,
     ACTION_ID_GET_TIME_ZONE,
@@ -97,7 +97,14 @@ from .coordinator import (
     JackerySolarVaultCoordinator,
     subdevice_accessories,
 )
-from .entity import JackeryEntity, payload_properties_for_sources
+from .entity import (
+    ALL_LIVE_DATA_SOURCES,
+    HTTP_DATA_SOURCES,
+    LAYER5_COMMAND_SOURCES,
+    LAYER5_DATA_SOURCES,
+    JackeryEntity,
+    payload_properties_for_sources,
+)
 from .util import append_unique_entity, coordinator_entity_signature, sorted_smart_plugs
 
 if TYPE_CHECKING:
@@ -133,6 +140,28 @@ class JackeryQueryButtonDescription:
     http_system_shadow: bool = False
     http_battery_packs: bool = False
     http_subdevice_dev_type: int | None = None
+    data_sources: tuple[str, ...] = ()
+    command_sources: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Resolve direct read and command transports for this App command."""
+        realtime_sources = LAYER5_COMMAND_SOURCES
+        if not self.data_sources:
+            object.__setattr__(
+                self,
+                "data_sources",
+                (ALL_LIVE_DATA_SOURCES if self.has_http_read else realtime_sources),
+            )
+        if not self.command_sources:
+            object.__setattr__(
+                self,
+                "command_sources",
+                (
+                    (HTTP_DATA_SOURCES[0], *realtime_sources)
+                    if self.has_http_read
+                    else realtime_sources
+                ),
+            )
 
     @property
     def has_http_read(self) -> bool:
@@ -933,15 +962,14 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
-        """Append a ButtonEntity to the list if its unique identifier has not been
-        recorded, and record it to prevent duplicate button entities.
+        """Append a ButtonEntity when its unique identifier is new.
 
         Parameters:
             entities (list[ButtonEntity]): Target list to append the entity to when it
             is unique.
             entity (ButtonEntity): Button entity to append if its unique identifier has
             not been seen.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -1040,12 +1068,11 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
 
     @callback
     def _add_new_entities() -> None:
-        """Register newly discovered reboot button entities when the coordinator's
-        device signature changes.
+        """Register newly discovered buttons after the device signature changes.
 
         If the coordinator-derived signature differs from the last cached signature,
         update the cache, collect new entities, and add them via `async_add_entities`.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """
         nonlocal last_signature
         storm_signature = tuple(
             (
@@ -1194,6 +1221,9 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 
     _attr_translation_key = "reboot_device"
     _attr_entity_category = EntityCategory.CONFIG
+    data_sources = LAYER5_DATA_SOURCES
+    command_sources = LAYER5_COMMAND_SOURCES
+    app_fields = (FIELD_REBOOT,)
 
     def __init__(
         self,
@@ -1255,6 +1285,8 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
 
     _attr_translation_key = "refresh_weather_plan"
     _attr_entity_category = EntityCategory.CONFIG
+    data_sources = LAYER5_DATA_SOURCES
+    command_sources = LAYER5_COMMAND_SOURCES
 
     def __init__(
         self,
@@ -1323,6 +1355,8 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
     """Read one app schedule bucket via ``DownloadDeviceSchedule``."""
 
     _attr_entity_category = EntityCategory.CONFIG
+    data_sources = LAYER5_DATA_SOURCES
+    command_sources = LAYER5_COMMAND_SOURCES
 
     def __init__(  # ruff:ignore[too-many-arguments]
         self,
@@ -1422,6 +1456,9 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
 
     _attr_translation_key = "delete_storm_alert"
     _attr_entity_category = EntityCategory.CONFIG
+    data_sources = ("cloud_mqtt",)
+    command_sources = ("cloud_mqtt",)
+    app_fields = (FIELD_ALERT_ID,)
 
     def __init__(
         self,

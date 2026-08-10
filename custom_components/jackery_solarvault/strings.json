@@ -48,7 +48,7 @@
           "enable_ble_transport": "Enable BLE transport",
           "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
           "enable_month_statistics": "Import month statistics",
-          "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
+          "enable_payload_debug_log": "Enable redacted payload debug log",
           "enable_week_statistics": "Import week statistics",
           "enable_year_statistics": "Import year statistics",
           "local_mqtt_enable": "Enable local MQTT listener",
@@ -70,7 +70,7 @@
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
+          "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "local_mqtt_enable": "Subscribes to the SolarVault's local MQTT broker for LAN telemetry. Cloud MQTT pauses while the local connection is active; the cloud HTTP API keeps polling.",
@@ -568,6 +568,9 @@
       "auto_standby_timer": {
         "name": "Auto standby timer"
       },
+      "battery_charge_energy": {
+        "name": "Battery lifetime charge energy"
+      },
       "battery_charge_month_energy": {
         "name": "Monthly battery charge"
       },
@@ -582,6 +585,9 @@
       },
       "battery_count": {
         "name": "Battery count"
+      },
+      "battery_discharge_energy": {
+        "name": "Battery lifetime discharge energy"
       },
       "battery_discharge_month_energy": {
         "name": "Battery discharge monthly energy"
@@ -943,8 +949,14 @@
       "function_enable_flags": {
         "name": "Function enable flags"
       },
+      "grid_export_energy": {
+        "name": "Lifetime grid export energy"
+      },
       "grid_in_power": {
         "name": "Grid import"
+      },
+      "grid_import_energy": {
+        "name": "Lifetime grid import energy"
       },
       "grid_net_power": {
         "name": "Grid-side net power"
@@ -1018,8 +1030,17 @@
       "mac_address": {
         "name": "MAC address"
       },
+      "main_battery_charge_energy": {
+        "name": "Main battery lifetime charge energy"
+      },
+      "main_battery_discharge_energy": {
+        "name": "Main battery lifetime discharge energy"
+      },
       "max_feed_grid_read": {
         "name": "Max feed-in power (runtime)"
+      },
+      "max_grid_standard_power": {
+        "name": "Maximum grid standard power"
       },
       "max_inverter_power": {
         "name": "Max inverter power"
@@ -1176,6 +1197,9 @@
       },
       "smart_meter_communication_mode": {
         "name": "Smart meter communication mode"
+      },
+      "smart_meter_current": {
+        "name": "Smart meter current"
       },
       "smart_meter_export_month_energy": {
         "name": "Monthly smart-meter grid export"
@@ -1384,6 +1408,9 @@
       "soc_discharge_limit": {
         "name": "Discharge limit"
       },
+      "solar_production_energy": {
+        "name": "Lifetime solar production energy"
+      },
       "stack_in_power": {
         "name": "Battery system charge power"
       },
@@ -1426,8 +1453,8 @@
       "today_battery_energy": {
         "name": "Today battery energy"
       },
-      "today_feed_in_energy": {
-        "name": "Today feed-in energy"
+      "today_solar_energy": {
+        "name": "Today solar energy"
       },
       "today_grid_import_energy": {
         "name": "Today grid import energy"
@@ -1565,6 +1592,9 @@
       }
     },
     "text": {
+      "device_name": {
+        "name": "Device name"
+      },
       "grid_standard": {
         "name": "Grid standard code"
       },
@@ -1639,9 +1669,6 @@
     },
     "entity_action_failed": {
       "message": "Could not update {entity} for device {device_id}: {error}"
-    },
-    "get_aiems_energy_prediction_failed": {
-      "message": "Could not fetch the AI-EMS energy prediction for device {device_id}: {error}"
     },
     "get_alarm_detail_failed": {
       "message": "Could not get alarm detail for device {device_id}: {error}"
@@ -1846,17 +1873,6 @@
     }
   },
   "issues": {
-    "app_data_inconsistency": {
-      "fix_flow": {
-        "step": {
-          "confirm": {
-            "description": "Jackery returned contradictory app/cloud statistics. {count} warning(s) were detected. First affected metric: {metric}. Examples: {examples}. Entity states are not silently repaired; enable logger custom_components.jackery_solarvault.payload_debug=debug, then use payload debug log jackery_solarvault_payload_debug.jsonl and diagnostics to compare raw payload values, parsed chart series and documented source sections in docs/PROTOCOL.md (\u00a72 HTTP endpoints, \u00a78 data-source priority).\n\nConfirm to force a refresh from Jackery's cloud. Transient inconsistencies clear once a fresh consistent payload arrives. If the warning returns, file an issue at the integration tracker with the diagnostic dump.",
-            "title": "Force a Jackery cloud refresh"
-          }
-        }
-      },
-      "title": "Jackery app statistics are inconsistent"
-    },
     "device_not_activated": {
       "fix_flow": {
         "step": {
@@ -1879,7 +1895,7 @@
           "enable_ble_transport": "Enable BLE transport",
           "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
           "enable_month_statistics": "Import month statistics",
-          "enable_unredacted_diagnostics": "Enable unredacted developer diagnostics",
+          "enable_payload_debug_log": "Enable redacted payload debug log",
           "enable_week_statistics": "Import week statistics",
           "enable_year_statistics": "Import year statistics",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
@@ -1897,7 +1913,7 @@
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_unredacted_diagnostics": "Disables redaction in the diagnostics export and payload debug JSONL for local troubleshooting. It exposes credentials, serial numbers, device IDs, MQTT topics and bluetoothKey values. Turn it off before sharing files.",
+          "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
@@ -2119,16 +2135,6 @@
         }
       },
       "name": "Delete storm alert"
-    },
-    "get_aiems_energy_prediction": {
-      "description": "Fetch the AI-EMS energy prediction report from the Jackery HTTP API for the selected device (app 2.4.0). Returns the response only.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. The system ID is resolved from the owning coordinator payload.",
-          "name": "Device ID"
-        }
-      },
-      "name": "Get AI-EMS energy prediction"
     },
     "get_alarm_detail": {
       "description": "Get alarm detail by alarm key through the Jackery HTTP API. Returns the response only.",

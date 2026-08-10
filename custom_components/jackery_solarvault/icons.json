@@ -1012,9 +1012,6 @@
     "delete_storm_alert": {
       "service": "mdi:weather-lightning-rainy"
     },
-    "get_aiems_energy_prediction": {
-      "service": "mdi:chart-timeline-variant-shimmer"
-    },
     "get_alarm_detail": {
       "service": "mdi:alert-circle-outline"
     },

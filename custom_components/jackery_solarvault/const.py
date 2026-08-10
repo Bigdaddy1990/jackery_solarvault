@@ -47,32 +47,11 @@ LOGIN_AES_KEY_LEN: Final = 24
 MQTT_HOST: Final = "emqx.jackeryapp.com"
 MQTT_PORT: Final = 8883
 MQTT_KEEPALIVE_SEC: Final = 60
-# Strict by default: no implicit wildcard subscription.
-LOCAL_MQTT_DEFAULT_TOPIC: str = ""
 # Track topic names with a sensible upper bound so a misconfigured broker
 # (foreign neighbours publishing on the same LAN) cannot explode memory.
 LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
 # Guardrail for unexpectedly large broker payloads.
 LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
-_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
-_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
-    "actionId",
-    "batSoc",
-    "body",
-    "cmd",
-    "data",
-    "devId",
-    "devSn",
-    "deviceId",
-    "deviceSn",
-    "gridInPw",
-    "gridOutPw",
-    "messageType",
-    "payload",
-    "pvPw",
-    "sn",
-    "soc",
-}
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
@@ -382,8 +361,8 @@ DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
 ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
 SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
-PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/statics"
-PV_TRENDS_LEGACY_PATH: Final = "/v1/device/stat/sys/pv/trends"
+PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"
+PV_TRENDS_LEGACY_PATH: Final = "/v1/device/stat/sys/pv/statics"
 # ?systemId=<id>&beginDate&endDate&dateType
 POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
 PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
@@ -493,7 +472,7 @@ CANCEL_CONTRACT_PATH: Final = "/v1/device/dynamic/cancelContractAuth"
 # App 2.4.0 moved this endpoint to v2 (ElePriceDynamicApi.smali:
 # "device/dynamic/v2/dynamicPrice"); request (systemId) and response bean
 # are unchanged from 2.1.1, only the path gained the v2 segment.
-DYNAMIC_PRICE_PATH: Final = "/v1/device/dynamic/v2/dynamicPrice"
+DYNAMIC_PRICE_PATH: Final = "/v1/device/dynamic/dynamicPrice"
 SAVE_LOCATION_ID_PATH: Final = "/v1/device/dynamic/saveLocationId"
 SAVE_TOU_PLAN_PATH: Final = "/v1/device/tou/saveTouPlan"
 QUERY_TOU_PLAN_PATH: Final = "/v1/device/tou/queryTouPlan"
@@ -519,7 +498,6 @@ SMART_MODE_START_PATH: Final = "/v1/device/smartMode/startSmartMode"
 SMART_SCHEDULE_PATH: Final = "/v1/device/stat/getSmartSchedulePrediction"
 # 2.4.0 AiEmsEnergyPredictionApi ("api/aiems/report/energy/prediction"):
 # request systemId only; distinct from getSmartSchedulePrediction above.
-AIEMS_ENERGY_PREDICTION_PATH: Final = "/v1/api/aiems/report/energy/prediction"
 
 # --- Miscellaneous endpoints -------------------------------------------------
 APP_VERSION_PATH: Final = "/v1/app/version/getNewVersion"
@@ -540,9 +518,7 @@ POWER3_PATH: Final = "/v1/device/property/power3"
 # Crypto material extracted from the Jackery app (iOS+Android both use these).
 # Layer A login follows source-of-truth/jackery_auth.py: generate 16 random
 # bytes, Base64-encode them, then AES-ECB the LoginBean with those 24 ASCII
-# bytes and RSA-wrap the same bytes. ``AES_KEY`` is compatibility-only; the
-# app does not require b"1234567890123456" for runtime login.
-AES_KEY: Final = b"1234567890123456"
+# bytes and RSA-wrap the same bytes.
 RSA_PUBLIC_KEY_B64: Final = (
     "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCVmzgJy/4XolxPnkfu32YtJqYG"
     "FLYqf9/rnVgURJED+8J9J3Pccd6+9L97/+7COZE5OkejsgOkqeLNC9C3r5mhpE4zk"
@@ -633,6 +609,10 @@ SLOW_METRICS_INTERVAL_SEC: Final = 120  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 REQUEST_TIMEOUT_SEC: Final = 30
+# DNS resolution and connection setup must finish inside the normal 15-second
+# coordinator cadence even though a completed response may use the larger total
+# request budget below.
+HTTP_CONNECT_TIMEOUT_SEC: Final[float] = 10.0
 # Slow endpoints (pv_trends, home_trends, battery_trends) need more time
 SLOW_ENDPOINT_TIMEOUT_SEC: Final = 60
 # Shelly Cloud realtime is supplementary and must stay below the fast poll budget.
@@ -711,7 +691,6 @@ PAYLOAD_CIRCUIT_PROPERTY: Final = "circuit_property"
 PAYLOAD_SUBDEVICES: Final = "sub_devices"
 PAYLOAD_BATTERY_BOUNDARY: Final = "battery_boundary"
 PAYLOAD_MQTT_LAST: Final = "mqtt_last"
-PAYLOAD_DATA_QUALITY: Final = "data_quality"
 
 # Internal normalized payload/cache keys. These are not Jackery wire keys, but
 # integration-owned keys used to keep coordinator payloads and diagnostics stable.
@@ -786,6 +765,9 @@ FIELD_WIP: Final = "wip"
 FIELD_EIP: Final = "eip"
 FIELD_EMAC: Final = "emac"
 FIELD_CURRENT_VERSION: Final = "currentVersion"
+FIELD_FIRMWARE_VERSION: Final = "firmwareVersion"
+FIELD_HARDWARE_VERSION: Final = "hardwareVersion"
+SOLAR_VAULT_HEAD_UNIT_MODEL_CODE: Final = "3002"
 FIELD_TARGET_VERSION: Final = "targetVersion"
 FIELD_TARGET_FIRMWARE_IDS: Final = "targetFirmwareIds"
 FIELD_TARGET_VERSION_ID: Final = "targetVersionId"
@@ -1371,6 +1353,8 @@ SYSTEM_INFO_KEYS: Final = frozenset({
     FIELD_TEMP_UNIT,
     FIELD_DEFAULT_PW,
     FIELD_IS_FOLLOW_METER_PW,
+    FIELD_BAT_STATE,
+    FIELD_SOC,
 })
 BATTERY_PACK_HINT_KEYS: Final = frozenset({
     FIELD_BAT_SOC,
@@ -1469,33 +1453,6 @@ APP_CHART_STAT_PERIODS: Final = tuple(
     for date_type in APP_CHART_DATE_TYPES
 )
 
-# Repair/data-quality diagnostics. These do not change entity values; they only
-# surface contradictions between documented app sources. Keep the dict keys
-# centralized because coordinator, diagnostics and tests read the same payload.
-DATA_QUALITY_LEVEL_WARNING: Final = "warning"
-DATA_QUALITY_KEY_LEVEL: Final = "level"
-DATA_QUALITY_KEY_REASON: Final = "reason"
-DATA_QUALITY_KEY_METRIC_KEY: Final = "metric_key"
-DATA_QUALITY_KEY_LABEL: Final = "label"
-DATA_QUALITY_KEY_SOURCE_SECTION: Final = "source_section"
-DATA_QUALITY_KEY_SOURCE_VALUE: Final = "source_value"
-DATA_QUALITY_KEY_REFERENCE_SECTION: Final = "reference_section"
-DATA_QUALITY_KEY_REFERENCE_VALUE: Final = "reference_value"
-DATA_QUALITY_KEY_SOURCE_REQUEST: Final = "source_request"
-DATA_QUALITY_KEY_REFERENCE_REQUEST: Final = "reference_request"
-DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY: Final = "source_chart_series_key"
-DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY: Final = "reference_chart_series_key"
-DATA_QUALITY_KEY_TOTAL_METHOD: Final = "total_method"
-DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH: Final = "year_less_than_month"
-DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK: Final = "year_less_than_week"
-DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK: Final = "month_less_than_week"
-DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR: Final = "lifetime_less_than_year"
-DATA_QUALITY_REASON_WEEK_LESS_THAN_DAY: Final = "week_less_than_day"
-DATA_QUALITY_REASON_ZERO_UNCONFIRMED: Final = "zero_unconfirmed"
-# day value is 0 but not confirmed by another source
-DATA_QUALITY_REPAIR_EXAMPLE_LIMIT: Final = 3
-REPAIR_ISSUE_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
-REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
 REPAIR_ISSUE_DEVICE_NOT_ACTIVATED: Final = "device_not_activated"
 REPAIR_TRANSLATION_DEVICE_NOT_ACTIVATED: Final = "device_not_activated"
 
@@ -1534,14 +1491,14 @@ APP_STAT_TOTAL_CT_OUTPUT_ENERGY: Final = "totalOutCtEnergy"
 # off-grid in/out totals for a single dateType payload.
 APP_STAT_TOTAL_IN_EPS_ENERGY: Final = "totalInEpsEnergy"
 APP_STAT_TOTAL_OUT_EPS_ENERGY: Final = "totalOutEpsEnergy"
-# TodayEnergyApi$Bean per PROTOCOL.md §2.4 — flat today KPI bean:
-# ``de`` = feed-in (Einspeisung), ``dg`` = grid import (Bezug),
-# ``dh`` = home load (Hausverbrauch), ``ds`` = battery energy
-# (Batterie-Energie). All four are doubles in kWh.
-APP_STAT_TODAY_FEED_IN_ENERGY: Final = "de"
+# TodayEnergyApi$Bean per App 2.4.x UI wiring — flat today KPI bean:
+# ``de`` = battery, ``dg`` = grid, ``dh`` = home, ``ds`` = solar.
+# BoxPanelActivity routes getters g/h/i/j to the corresponding
+# tv_{battery,power,family,solar}_statistics_day binding fields.
+APP_STAT_TODAY_BATTERY_ENERGY: Final = "de"
 APP_STAT_TODAY_GRID_IMPORT_ENERGY: Final = "dg"
 APP_STAT_TODAY_HOME_LOAD_ENERGY: Final = "dh"
-APP_STAT_TODAY_BATTERY_ENERGY: Final = "ds"
+APP_STAT_TODAY_SOLAR_ENERGY: Final = "ds"
 APP_STAT_TOTAL_TREND_CHARGE_ENERGY: Final = "totalChgEgy"
 APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: Final = "totalDisChgEgy"
 APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
@@ -1712,7 +1669,7 @@ PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 # Per-device BLE AES key from ``/v1/device/system/list``; used by BLE/MQTT
 # Layer-C payload encryption and always redacted from diagnostics.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
-REDACT_KEYS: Final = {
+REDACT_KEYS: Final = frozenset({
     "p",
     "s",
     FIELD_PASSWORD,
@@ -1738,6 +1695,7 @@ REDACT_KEYS: Final = {
     FIELD_DEV_SN,
     FIELD_SN,
     FIELD_SYSTEM_SN,
+    "ACCOUNTID",
     FIELD_WNAME,
     FIELD_MAC,
     FIELD_WIP,
@@ -1796,7 +1754,7 @@ REDACT_KEYS: Final = {
     "local_mqtt_host",
     "local_mqtt_username",
     "local_mqtt_password",
-}
+})
 
 # MQTT client metadata and topic layout
 MQTT_CLIENT_LIBRARY: Final = "aiomqtt"
@@ -1817,12 +1775,6 @@ MQTT_TOPIC_SUFFIXES: Final = (
     MQTT_TOPIC_CONFIG,
     MQTT_TOPIC_NOTICE,
 )
-# Scoped default subscription for the direct local-MQTT client when the user
-# leaves the topic filter empty. The device mirrors its cloud topics onto the
-# local broker under the Jackery prefix ``hb/app/<userId>/...``, so subscribing
-# to ``hb/app/#`` catches all of them while staying off the broker-wide ``#``
-# that BLOCKED_LOCAL_MQTT_TOPIC_FILTERS rejects for CPU safety.
-LOCAL_MQTT_DEFAULT_TOPIC_FILTER: Final = f"{MQTT_TOPIC_PREFIX}/#"
 MQTT_CONNACK_REASONS: Final = {
     0: "Connection accepted",
     1: "unacceptable protocol version",
@@ -1902,15 +1854,6 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_SMART_MODE,
     PAYLOAD_SMART_SCHEDULE,
     PAYLOAD_TOU_SCHEDULE,
-    "local_daily_energy",
-    "device_symmetry_stat_day",
-    "device_home_stat_day",
-    "device_symmetry_stat_week",
-    "device_home_stat_week",
-    "device_symmetry_stat_month",
-    "device_home_stat_month",
-    "device_symmetry_stat_year",
-    "device_home_stat_year",
 )
 
 # Service names and payload fields from services.yaml.
@@ -1963,7 +1906,6 @@ SERVICE_UNBIND_SMART_PART: Final = "unbind_smart_part"
 SERVICE_UNBIND_ACCESSORIES: Final = "unbind_accessories"
 SERVICE_SET_AC_NICKNAME: Final = "set_ac_nickname"
 SERVICE_REPORT_DEVICE_TIMEZONE: Final = "report_device_timezone"
-SERVICE_GET_AIEMS_ENERGY_PREDICTION: Final = "get_aiems_energy_prediction"
 # Account-level sharing services. They resolve the coordinator through a
 # required device_id (device selector) so multi-account setups dispatch to the
 # correct account even though the cloud call itself is account-scoped.
@@ -2206,6 +2148,9 @@ MQTT_MESSAGE_QUERY_COMBINE_DATA: Final = "QueryCombineData"
 MQTT_MESSAGE_QUERY_DEVICE_PROPERTY: Final = "QueryDeviceProperty"
 MQTT_MESSAGE_UPLOAD_COMBINE_DATA: Final = "UploadCombineData"
 MQTT_MESSAGE_UPLOAD_INCREMENTAL_COMBINE_DATA: Final = "UploadIncrementalCombineData"
+MQTT_MESSAGE_UPLOAD_SUBDEVICE_INCREMENTAL_PROPERTY: Final = (
+    "UploadSubDeviceIncrementalProperty"
+)
 MQTT_MESSAGE_UPLOAD_WEATHER_PLAN: Final = "UploadWeatherPlan"
 MQTT_MESSAGE_BIND_SMART_ACCESSORY: Final = "BindSmartAccessory"
 MQTT_MESSAGE_REMOVE_SMART_ACCESSORY: Final = "RemoveSmartAccessory"
@@ -2710,6 +2655,16 @@ CONF_LOCAL_MQTT_PORT: Final = "local_mqtt_port"
 CONF_LOCAL_MQTT_USERNAME: Final = "local_mqtt_username"
 CONF_LOCAL_MQTT_PASSWORD: Final = "local_mqtt_password"
 CONF_LOCAL_MQTT_TOPIC: Final = "local_mqtt_topic"
+# Removed listener-only TLS fields from an earlier refactor. App command 3046
+# configures a plain LAN MQTT target and exposes no TLS inputs; keep this list
+# solely so existing config entries can be migrated without retaining dead UI
+# state or passing it back through reconfigure.
+REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS: Final[frozenset[str]] = frozenset({
+    "local_mqtt_tls_ca_cert",
+    "local_mqtt_tls_client_cert",
+    "local_mqtt_tls_client_key",
+    "local_mqtt_tls_insecure",
+})
 DEFAULT_LOCAL_MQTT_ENABLE: Final = False
 DEFAULT_LOCAL_MQTT_PORT: Final = 1883
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
@@ -2738,7 +2693,6 @@ LOCAL_DAILY_LIFETIME_METRICS: Final[tuple[str, ...]] = (
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
 )
 PAYLOAD_LOCAL_DAILY_ENERGY: Final = "local_daily_energy"
-PAYLOAD_LIFETIME_COUNTERS: Final = "lifetime_counters"
 
 # Recorder exclusion: diagnostic sensors that dump full payloads into
 # extra_state_attributes.  The frozensets list every attribute key so the
@@ -2777,9 +2731,17 @@ UNRECORDED_ATTRS_CLOUD_MQTT: Final = frozenset({
 })
 UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "connected",
+    "broker_connected",
+    "subscribed",
+    "started",
+    "subscription_filter_count",
+    "topics_seen_count",
+    "topics_seen_truncated",
+    "device_traffic_observed",
     "messages_received",
     "messages_dropped",
     "messages_forwarded",
+    "messages_rejected_by_sink",
     "messages_ignored_foreign",
     "last_connect_at",
     "last_disconnect_at",
@@ -2790,13 +2752,13 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "payload_too_large_count",
     "home_assistant_event_count",
     "routing_warning",
+    "local_mqtt_active",
     "library",
 })
 
 # Cumulative lifetime energy counter keys carried by live property payloads.
-# They bypass ingest like other live values; the coordinator's HTTP-first merge
-# guard prevents supplemental MQTT/BLE/local-MQTT frames from overwriting
-# present HTTP values.
+# They follow the same transport-neutral, arrival-order ingest path as every
+# other live value; HTTP, cloud MQTT, BLE and local MQTT may all refresh them.
 DEVICE_LIFETIME_COUNTER_KEYS: Final = frozenset({
     APP_DEVICE_STAT_PV_ENERGY,
     APP_STAT_PV1_ENERGY,
@@ -2818,6 +2780,39 @@ DEVICE_LIFETIME_COUNTER_KEYS: Final = frozenset({
     APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
     APP_DEVICE_STAT_PV_TO_AC,
     APP_DEVICE_STAT_PV_TO_ONGRID,
+})
+
+# HTTP-only field keys: identity/config/setup fields that come exclusively from
+# the HTTP API and must never be overwritten by supplemental MQTT/BLE/local-MQTT
+# live property frames. These are used by the HTTP-first merge guard.
+HTTP_ONLY_FIELDS: Final = frozenset({
+    FIELD_ACTION_ID,
+    FIELD_ALERT_ID,
+    FIELD_BIND_ID,
+    FIELD_DEVICE_CODE,
+    FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
+    FIELD_DEV_MODEL,
+    FIELD_HOST,
+    FIELD_ICON,
+    FIELD_ICON_PATH,
+    FIELD_INTEGRATOR_ENABLED,
+    FIELD_MANUFACTURER_CODE,
+    FIELD_MODEL_CODE,
+    FIELD_MODEL_ID,
+    FIELD_MODEL_NAME,
+    FIELD_OWNER_ID,
+    FIELD_REMARK,
+    FIELD_SYSTEM_SN,
+    FIELD_SYSTEM_NAME,
+    FIELD_WNAME,
+    "deviceId",
+    "devId",
+    "smartSocketId",
+    "subDeviceSn",
+    "systemId",
+    "systemName",
 })
 
 # Shared entity description defaults (formerly entity_contract.py).
@@ -2866,7 +2861,6 @@ _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: (
         DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
     ),
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS: DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS,
 }
 
 _ENTITY_CREATING_OPTION_KEYS: frozenset[str] = frozenset({
@@ -2877,4 +2871,4 @@ _ENTITY_CREATING_OPTION_KEYS: frozenset[str] = frozenset({
 
 _RECONFIGURE_IN_PLACE_OPTION_KEYS: frozenset[str] = (
     frozenset(_OPTION_DEFAULTS) - _ENTITY_CREATING_OPTION_KEYS
-)
+) | {CONF_ENABLE_PAYLOAD_DEBUG_LOG}

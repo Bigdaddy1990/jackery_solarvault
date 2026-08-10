@@ -49,6 +49,8 @@
     "aiohttp",
     "aiomqtt"
   ],
+  "mdns": [],
+  "mqtt": [],
   "quality_scale": "custom",
   "requirements": [
     "aiomqtt>=2.5.0",

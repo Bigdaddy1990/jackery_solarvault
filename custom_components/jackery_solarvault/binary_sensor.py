@@ -39,7 +39,12 @@ from .const import (
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
 )
 from .coordinator import subdevice_accessories
-from .entity import JackeryEntity
+from .entity import (
+    ALL_LIVE_DATA_SOURCES,
+    HTTP_DATA_SOURCES,
+    JackeryEntity,
+    property_data_sources,
+)
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -74,6 +79,24 @@ class JackeryBinaryDescription(BinarySensorEntityDescription):
 
     getter: Callable[[dict[str, Any], dict[str, Any]], Any]
     required_property_keys: tuple[str, ...] = ()
+    app_fields: tuple[str, ...] = ()
+    data_sources: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Resolve property-field and source metadata."""
+        app_fields = self.app_fields or self.required_property_keys
+        object.__setattr__(self, "app_fields", app_fields)
+        if not self.data_sources:
+            object.__setattr__(
+                self,
+                "data_sources",
+                property_data_sources(
+                    *app_fields,
+                    layer5_proven=bool(app_fields),
+                )
+                if app_fields
+                else HTTP_DATA_SOURCES,
+            )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -81,6 +104,7 @@ class JackerySubdeviceAlarmBinarySensorDescription(BinarySensorEntityDescription
     """Describes a Jackery subdevice alarm binary sensor."""
 
     field: str
+    data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES
 
 
 # Getter receives (properties, device_meta). Field constants mirror the app/API
@@ -148,7 +172,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     coordinator data, de-duplicates entities across rebuilds, and calls the provided
     `async_add_entities` callback to register newly discovered entities when the
     coordinator's entity signature changes.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -164,7 +188,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             unique ID is new.
             entity (BinarySensorEntity): Binary sensor entity whose unique ID will be
             checked and recorded.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -260,7 +284,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Compute the coordinator entity signature and, if it differs from the previously
         recorded signature, collect entities and register them via `async_add_entities`;
         update the stored signature. No action is taken when the signature is unchanged.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -310,6 +334,8 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     _attr_translation_key = "smart_plug_switch_state"
     _attr_device_class = BinarySensorDeviceClass.POWER
+    data_sources = ALL_LIVE_DATA_SOURCES
+    app_fields = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
 
     def __init__(
         self,
@@ -360,7 +386,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: The matching smart-plug dictionary from the current payload,
             or an empty dict if no match is found.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         payload = self._payload
         if payload:
             for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
@@ -393,7 +419,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains
             `plug_index`.
-        """  # ruff:ignore[property-docstring-starts-with-verb]  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, D421, RUF105
         plug = self._plug
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
@@ -447,7 +473,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the alert count is positive."""  # ruff:ignore[property-docstring-starts-with-verb]
+        """Return true if the alert count is positive."""  # noqa: D421, RUF105
         raw = self._sub_device.get(self.entity_description.field)
         val = safe_int(raw)
         return val > 0 if val is not None else None
@@ -459,7 +485,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
         Overrides the description's fixed `safety` class so a smoke or
         water-leak accessory reports its own `smoke`/`moisture` class instead
         of the generic one every subdevice alarm otherwise shares.
-        """  # ruff:ignore[property-docstring-starts-with-verb]
+        """  # noqa: D421, RUF105
         dev_type = safe_int(self._sub_device.get(FIELD_DEV_TYPE))
         if dev_type is None:
             return self.entity_description.device_class

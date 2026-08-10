@@ -982,14 +982,6 @@ get_smart_schedule_prediction:
       selector:
         device:
           integration: jackery_solarvault
-get_aiems_energy_prediction:
-  fields:
-    device_id:
-      required: true
-      example: '573702884982521856'
-      selector:
-        device:
-          integration: jackery_solarvault
 unbind_accessories:
   fields:
     device_id:

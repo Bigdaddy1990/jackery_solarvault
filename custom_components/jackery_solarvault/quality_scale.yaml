@@ -2,135 +2,138 @@
 # Source: https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/
 # Status values are intentionally conservative: this custom integration targets
 # Platinum behavior, but only rules with local code/test evidence are marked done.
-action-setup:
-  status: done
-appropriate-polling:
-  status: done
-brands:
-  status: done
-common-modules:
-  status: done
-config-flow-test-coverage:
-  status: todo
-config-flow:
-  status: done
-dependency-transparency:
-  status: done
-docs-actions:
-  status: done
-  comment: README.md "Actions (services)" section.
-docs-high-level-description:
-  status: done
-  comment: README.md "High-level description" section.
-docs-installation-instructions:
-  status: done
-  comment: README.md "Installation" section.
-docs-removal-instructions:
-  status: done
-  comment: README.md "Removal" section.
-entity-event-setup:
-  status: done
-entity-unique-id:
-  status: done
-has-entity-name:
-  status: done
-runtime-data:
-  status: done
-test-before-configure:
-  status: done
-test-before-setup:
-  status: done
-unique-config-entry:
-  status: done
+rules:
+  action-setup:
+    status: done
+  appropriate-polling:
+    status: done
+  brands:
+    status: done
+  common-modules:
+    status: done
+  config-flow-test-coverage:
+    status: todo
+  config-flow:
+    status: done
+  dependency-transparency:
+    status: done
+  docs-actions:
+    status: done
+    comment: README.md "Actions (services)" section.
+  docs-high-level-description:
+    status: done
+    comment: README.md "High-level description" section.
+  docs-installation-instructions:
+    status: done
+    comment: README.md "Installation" section.
+  docs-removal-instructions:
+    status: done
+    comment: README.md "Removal" section.
+  entity-event-setup:
+    status: done
+  entity-unique-id:
+    status: done
+  has-entity-name:
+    status: done
+  runtime-data:
+    status: done
+  test-before-configure:
+    status: done
+  test-before-setup:
+    status: done
+  unique-config-entry:
+    status: done
 
-action-exceptions:
-  status: done
-config-entry-unloading:
-  status: done
-docs-configuration-parameters:
-  status: done
-  comment: README.md "Configuration parameters" section.
-docs-installation-parameters:
-  status: done
-  comment: README.md "Configuration" / "Configuration parameters" sections.
-entity-unavailable:
-  status: done
-integration-owner:
-  status: done
-log-when-unavailable:
-  status: done
-  comment: >-
-    Coordinator-based integration: _async_update_data raises UpdateFailed on a
-    cold cycle (see tests test_hung_cycle_raises_update_failed and
-    test_auth_failure_starts_reauth_but_keeps_polling), so the
-    DataUpdateCoordinator base class emits the once-only unavailable and
-    recovered log messages.
-parallel-updates:
-  status: done
-reauthentication-flow:
-  status: done
-test-coverage:
-  status: todo
+  action-exceptions:
+    status: done
+  config-entry-unloading:
+    status: done
+  docs-configuration-parameters:
+    status: done
+    comment: README.md "Configuration parameters" section.
+  docs-installation-parameters:
+    status: done
+    comment: README.md "Configuration" / "Configuration parameters" sections.
+  entity-unavailable:
+    status: done
+  integration-owner:
+    status: done
+  log-when-unavailable:
+    status: done
+    comment: >-
+      Coordinator-based integration: _async_update_data raises UpdateFailed on a
+      cold cycle (see tests test_hung_cycle_raises_update_failed and
+      test_auth_failure_starts_reauth_but_keeps_polling), so the
+      DataUpdateCoordinator base class emits the once-only unavailable and
+      recovered log messages.
+  parallel-updates:
+    status: done
+  reauthentication-flow:
+    status: done
+  test-coverage:
+    status: todo
 
-devices:
-  status: done
-diagnostics:
-  status: done
-discovery-update-info:
-  status: exempt
-  comment: >-
-    Cloud-account integration. Bluetooth/DHCP/Zeroconf/MQTT discovery only prompt
-    the single cloud-account setup (see async_step_dhcp/zeroconf/bluetooth/mqtt);
-    device identity is the Jackery account, not a per-device network address, so
-    there is no stored host/IP to update on rediscovery.
-discovery:
-  status: done
-docs-data-update:
-  status: done
-  comment: README.md "Data updates" section.
-docs-examples:
-  status: done
-  comment: README.md "Examples" section.
-docs-known-limitations:
-  status: done
-  comment: README.md "Known limitations" section.
-docs-supported-devices:
-  status: done
-  comment: README.md "Supported devices" section.
-docs-supported-functions:
-  status: done
-  comment: README.md "Supported functions" section.
-docs-troubleshooting:
-  status: done
-  comment: README.md "Troubleshooting" section.
-docs-use-cases:
-  status: done
-  comment: README.md "Use cases" section.
-dynamic-devices:
-  status: done
-entity-category:
-  status: done
-entity-device-class:
-  status: done
-entity-disabled-by-default:
-  status: done
-entity-translations:
-  status: done
-exception-translations:
-  status: done
-icon-translations:
-  status: done
-reconfiguration-flow:
-  status: done
-repair-issues:
-  status: done
-stale-devices:
-  status: done
+  devices:
+    status: done
+  diagnostics:
+    status: done
+  discovery-update-info:
+    status: exempt
+    comment: >-
+      Cloud-account integration. Bluetooth/DHCP/Zeroconf/MQTT discovery only prompt
+      the single cloud-account setup (see async_step_dhcp/zeroconf/bluetooth/mqtt);
+      device identity is the Jackery account, not a per-device network address, so
+      there is no stored host/IP to update on rediscovery.
+  discovery:
+    status: done
+  docs-data-update:
+    status: done
+    comment: README.md "Data updates" section.
+  docs-examples:
+    status: done
+    comment: README.md "Examples" section.
+  docs-known-limitations:
+    status: done
+    comment: README.md "Known limitations" section.
+  docs-supported-devices:
+    status: done
+    comment: README.md "Supported devices" section.
+  docs-supported-functions:
+    status: done
+    comment: README.md "Supported functions" section.
+  docs-troubleshooting:
+    status: done
+    comment: README.md "Troubleshooting" section.
+  docs-use-cases:
+    status: done
+    comment: README.md "Use cases" section.
+  dynamic-devices:
+    status: done
+  entity-category:
+    status: done
+  entity-device-class:
+    status: done
+  entity-disabled-by-default:
+    status: done
+  entity-translations:
+    status: done
+  exception-translations:
+    status: done
+  icon-translations:
+    status: done
+  reconfiguration-flow:
+    status: done
+  repair-issues:
+    status: done
+  stale-devices:
+    status: done
 
-async-dependency:
-  status: done
-inject-websession:
-  status: exempt
-  comment: Custom integration client owns its HTTP session boundary.
-strict-typing:
-  status: done
+  async-dependency:
+    status: done
+  inject-websession:
+    status: done
+    comment: >-
+      JackeryApi requires an injected ClientSession; setup, reauth, and
+      reconfigure construct it with Home Assistant's async_get_clientsession.
+  strict-typing:
+    status: done
