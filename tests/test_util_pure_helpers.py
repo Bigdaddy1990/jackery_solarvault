@@ -41,7 +41,7 @@ from custom_components.jackery_solarvault.const import (
     APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
     APP_STAT_UNIT,
     APP_UNIT_KWH,
-    CONF_ENABLE_UNREDACTED_DIAGNOSTICS,
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATE_TYPE_DAY,
@@ -135,9 +135,9 @@ def test_config_entry_int_option_returns_default_on_bad_value() -> None:
 
 def test_entry_bool_option_delegates() -> None:
     """The thin alias resolves the same value as the underlying reader."""
-    entry = _entry(options={CONF_ENABLE_UNREDACTED_DIAGNOSTICS: "yes"})
+    entry = _entry(options={CONF_ENABLE_PAYLOAD_DEBUG_LOG: "yes"})
     resolved = util.entry_bool_option(
-        entry, CONF_ENABLE_UNREDACTED_DIAGNOSTICS, default=False
+        entry, CONF_ENABLE_PAYLOAD_DEBUG_LOG, default=False
     )
     assert resolved is True
 
@@ -647,12 +647,12 @@ def test_compact_year_parts() -> None:
     whole-number buckets. Values without a packed non-zero fraction stay a
     plain scalar in the current bucket.
     """
-    assert util._compact_year_parts("13.26") == (13.0, 26.0)
-    assert util._compact_year_parts("2.00") == (0.0, 2.0)
-    assert util._compact_year_parts("3") == (0.0, 3.0)
-    assert util._compact_year_parts(None) is None
-    assert util._compact_year_parts(True) is None
-    assert util._compact_year_parts(float("nan")) is None
+    assert util._compact_year_parts("13.26") == (13.0, 26.0)  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts("2.00") == (0.0, 2.0)  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts("3") == (0.0, 3.0)  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts(None) is None  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts(True) is None  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts(float("nan")) is None  # ruff: ignore[private-member-access]
 
 
 def test_effective_trend_series_values_normalizes() -> None:
@@ -754,22 +754,22 @@ def test_corrected_home_consumption_none_when_no_inputs() -> None:
 def test_chart_series_key_for_stat() -> None:
     """Section/stat pairs map to their chart-series keys, else None."""
     assert (
-        util._chart_series_key_for_stat(APP_SECTION_PV_STAT, APP_STAT_PV1_ENERGY)
+        util._chart_series_key_for_stat(APP_SECTION_PV_STAT, APP_STAT_PV1_ENERGY)  # ruff: ignore[private-member-access]
         == APP_CHART_SERIES_Y1
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_PV_STAT, APP_STAT_TOTAL_SOLAR_ENERGY
         )
         == APP_CHART_SERIES_Y
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_HOME_STAT, APP_STAT_TOTAL_IN_GRID_ENERGY
         )
         == APP_CHART_SERIES_Y1
     )
-    assert util._chart_series_key_for_stat("mystery", "x") is None
+    assert util._chart_series_key_for_stat("mystery", "x") is None  # ruff: ignore[private-member-access]
 
 
 def test_trend_series_key_requires_period_suffix() -> None:
@@ -786,9 +786,9 @@ def test_trend_series_key_requires_period_suffix() -> None:
 
 def test_series_contains_negative_samples() -> None:
     """Negative-sample detection scans a numeric chart series list."""
-    assert util._series_contains_negative_samples({"y1": [1, -2, 3]}, "y1") is True
-    assert util._series_contains_negative_samples({"y1": [1, 2]}, "y1") is False
-    assert util._series_contains_negative_samples({"y1": "x"}, "y1") is False
+    assert util._series_contains_negative_samples({"y1": [1, -2, 3]}, "y1") is True  # ruff: ignore[private-member-access]
+    assert util._series_contains_negative_samples({"y1": [1, 2]}, "y1") is False  # ruff: ignore[private-member-access]
+    assert util._series_contains_negative_samples({"y1": "x"}, "y1") is False  # ruff: ignore[private-member-access]
 
 
 def test_trend_series_total_sums_series() -> None:
@@ -865,10 +865,10 @@ def test_task_plan_value_search_order() -> None:
 
 def test_signed_curve_classifiers() -> None:
     """Home grid energy day totals may be distributed; other sections may not."""
-    assert util._can_distribute_scalar_day_total(
+    assert util._can_distribute_scalar_day_total(  # ruff: ignore[private-member-access]
         APP_SECTION_HOME_STAT, APP_STAT_TOTAL_OUT_GRID_ENERGY
     )
-    assert not util._can_distribute_scalar_day_total(APP_SECTION_PV_STAT, "x")
+    assert not util._can_distribute_scalar_day_total(APP_SECTION_PV_STAT, "x")  # ruff: ignore[private-member-access]
 
 
 def test_normalize_account() -> None:
@@ -970,37 +970,37 @@ def test_corrected_home_consumption_reported_and_calculated() -> None:
 def test_chart_series_key_for_stat_all_sections() -> None:
     """Every documented section/stat pair resolves to its Y-series key."""
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_HOME_STAT, APP_STAT_TOTAL_OUT_GRID_ENERGY
         )
         == APP_CHART_SERIES_Y2
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_CT_STAT, APP_STAT_TOTAL_CT_OUTPUT_ENERGY
         )
         == APP_CHART_SERIES_Y2
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_EPS_STAT, APP_STAT_TOTAL_IN_EPS_ENERGY
         )
         == APP_CHART_SERIES_Y1
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_EPS_STAT, APP_STAT_TOTAL_OUT_EPS_ENERGY
         )
         == APP_CHART_SERIES_Y2
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_BATTERY_TRENDS, APP_STAT_TOTAL_TREND_CHARGE_ENERGY
         )
         == APP_CHART_SERIES_Y1
     )
     assert (
-        util._chart_series_key_for_stat(
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_BATTERY_STAT, APP_STAT_TOTAL_DISCHARGE
         )
         == APP_CHART_SERIES_Y2
@@ -1019,10 +1019,10 @@ def test_day_power_series_key_signed_battery_discharge() -> None:
 
 def test_is_signed_battery_energy_curve() -> None:
     """Signed battery curves are recognized only for charge/discharge stats."""
-    assert util._is_signed_battery_energy_curve(
+    assert util._is_signed_battery_energy_curve(  # ruff: ignore[private-member-access]
         APP_SECTION_BATTERY_STAT, APP_STAT_TOTAL_CHARGE
     )
-    assert not util._is_signed_battery_energy_curve(
+    assert not util._is_signed_battery_energy_curve(  # ruff: ignore[private-member-access]
         APP_SECTION_PV_STAT, APP_STAT_TOTAL_CHARGE
     )
 
@@ -1069,17 +1069,17 @@ def test_pv_revenue_value_direct_and_derived() -> None:
     """Direct solar revenue wins; otherwise profit is scaled to currency units."""
     expected_direct = 12.5
     assert (
-        util._pv_revenue_value({APP_STAT_TOTAL_SOLAR_REVENUE: "12.5"})
+        util._pv_revenue_value({APP_STAT_TOTAL_SOLAR_REVENUE: "12.5"})  # ruff: ignore[private-member-access]
         == expected_direct
     )
-    derived = util._pv_revenue_value({APP_STAT_PV_PROFIT: 100_000_000})
+    derived = util._pv_revenue_value({APP_STAT_PV_PROFIT: 100_000_000})  # ruff: ignore[private-member-access]
     expected_derived = 10.0
     assert derived == expected_derived
-    assert util._pv_revenue_value({}) is None
+    assert util._pv_revenue_value({}) is None  # ruff: ignore[private-member-access]
 
 
 def test_can_distribute_scalar_day_total_in_grid() -> None:
     """Home in-grid energy day totals are eligible for scalar distribution."""
-    assert util._can_distribute_scalar_day_total(
+    assert util._can_distribute_scalar_day_total(  # ruff: ignore[private-member-access]
         APP_SECTION_HOME_STAT, APP_STAT_TOTAL_IN_GRID_ENERGY
     )

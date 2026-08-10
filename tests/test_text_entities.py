@@ -7,6 +7,8 @@ method, plus validation and portable-vs-home family gating in
 ``async_setup_entry``.
 """
 
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -16,6 +18,7 @@ import pytest
 from custom_components.jackery_solarvault import text as text_mod
 from custom_components.jackery_solarvault.const import (
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
+    FIELD_DEVICE_NAME,
     FIELD_GRID_STANDARD,
     FIELD_ID,
     FIELD_PV1,
@@ -26,11 +29,13 @@ from custom_components.jackery_solarvault.const import (
     FIELD_SYSTEM_NAME,
     FIELD_THIRD_PARTY_MQTT_IP,
     PAYLOAD_DEVICE,
+    PAYLOAD_DISCOVERY,
     PAYLOAD_DISCOVERY_SOURCE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
 )
 from custom_components.jackery_solarvault.text import (
+    JackeryDeviceNameText,
     JackeryPvNameText,
     JackerySystemNameText,
     JackeryThirdPartyMqttText,
@@ -41,12 +46,27 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 _DEVICE_ID = "dev-1"
 
 _ASYNC_METHODS = (
+    "async_set_device_name",
+    "async_set_device_nickname",
     "async_set_pv_name",
     "async_set_system_name",
     "async_update_third_party_mqtt_config",
 )
 
 _PV_FIELDS = (FIELD_PV1, FIELD_PV2, FIELD_PV3, FIELD_PV4)
+
+
+def test_grid_standard_text_has_one_class_definition() -> None:
+    """A duplicate class cannot silently replace the stable entity contract."""
+    module = ast.parse(Path(text_mod.__file__).read_text(encoding="utf-8"))
+
+    definitions = [
+        node
+        for node in module.body
+        if isinstance(node, ast.ClassDef) and node.name == "JackeryGridStandardText"
+    ]
+
+    assert len(definitions) == 1
 
 
 def _coordinator(data: dict[str, Any]) -> MagicMock:
@@ -66,9 +86,69 @@ def _system_name(data: dict[str, Any]) -> JackerySystemNameText:
     entity = JackerySystemNameText.__new__(JackerySystemNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
     return entity
+
+
+def _device_name(data: dict[str, Any]) -> JackeryDeviceNameText:
+    entity = JackeryDeviceNameText.__new__(JackeryDeviceNameText)
+    mutable = cast("Any", entity)
+    mutable.coordinator = _coordinator(data)
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable.async_write_ha_state = MagicMock()
+    return entity
+
+
+def test_device_name_native_value_prefers_http_device_metadata() -> None:
+    """The editable device label reads the HTTP property/device response."""
+    entity = _device_name({
+        _DEVICE_ID: {
+            PAYLOAD_DEVICE: {FIELD_DEVICE_NAME: "SolarVault"},
+            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: "Discovery fallback"},
+        },
+    })
+
+    assert entity.native_value == "SolarVault"
+
+
+async def test_home_device_name_uses_explicit_diy_http_setter() -> None:
+    """A Home/D-I-Y device uses device/system/deviceName without Layer 5."""
+    entity = _device_name({
+        _DEVICE_ID: {
+            PAYLOAD_DEVICE: {FIELD_DEVICE_NAME: "Old"},
+            PAYLOAD_SYSTEM: {FIELD_ID: "sys-1"},
+        },
+    })
+
+    await entity.async_set_value("  New Device  ")
+
+    entity.coordinator.async_set_device_name.assert_awaited_once_with(
+        _DEVICE_ID,
+        "New Device",
+    )
+    entity.coordinator.async_set_device_nickname.assert_not_awaited()
+    entity.async_write_ha_state.assert_called_once()
+
+
+async def test_portable_device_name_uses_explicit_bind_nickname_setter() -> None:
+    """A legacy portable device keeps using the App's bind/nickname endpoint."""
+    entity = _device_name({
+        _DEVICE_ID: {
+            PAYLOAD_DEVICE: {
+                FIELD_DEVICE_NAME: "Old",
+                PAYLOAD_DISCOVERY_SOURCE: DISCOVERY_SOURCE_LEGACY_BIND_LIST,
+            },
+        },
+    })
+
+    await entity.async_set_value("Portable")
+
+    entity.coordinator.async_set_device_nickname.assert_awaited_once_with(
+        _DEVICE_ID,
+        "Portable",
+    )
+    entity.coordinator.async_set_device_name.assert_not_awaited()
 
 
 def test_system_name_native_value_prefers_system_name() -> None:
@@ -137,9 +217,9 @@ def _third_party(field: str, data: dict[str, Any]) -> JackeryThirdPartyMqttText:
     entity = JackeryThirdPartyMqttText.__new__(JackeryThirdPartyMqttText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
-    mutable._field = field
-    mutable._attr_translation_key = "third_party_mqtt_ip"
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._field = field  # ruff: ignore[private-member-access]
+    mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
     return entity
 
 
@@ -180,6 +260,7 @@ async def test_setup_entry_creates_home_text_family() -> None:
     await async_setup_entry(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
+    assert f"{_DEVICE_ID}_device_name" in unique_ids
     assert f"{_DEVICE_ID}_system_name" in unique_ids
     assert f"{_DEVICE_ID}_grid_standard" in unique_ids
     assert f"{_DEVICE_ID}_third_party_mqtt_ip" in unique_ids
@@ -210,10 +291,10 @@ def _pv_name(data: dict[str, Any], index: int) -> JackeryPvNameText:
     entity = JackeryPvNameText.__new__(JackeryPvNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
-    mutable._index = index
-    mutable._field = _PV_FIELDS[index]
-    mutable._attr_translation_key = f"pv{index + 1}_name"
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._index = index  # ruff: ignore[private-member-access]
+    mutable._field = _PV_FIELDS[index]  # ruff: ignore[private-member-access]
+    mutable._attr_translation_key = f"pv{index + 1}_name"  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -339,4 +420,5 @@ async def test_setup_entry_portable_skips_pv_name() -> None:
     await async_setup_entry(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
+    assert f"{_DEVICE_ID}_device_name" in unique_ids
     assert f"{_DEVICE_ID}_pv1_name" not in unique_ids

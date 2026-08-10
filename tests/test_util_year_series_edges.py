@@ -9,8 +9,8 @@ from datetime import date
 
 from custom_components.jackery_solarvault.const import APP_SECTION_PV_STAT
 from custom_components.jackery_solarvault.util import (
-    _compact_year_parts,
-    _prefer_raw_year_series_for_real_payload,
+    _compact_year_parts,  # ruff: ignore[import-private-name]
+    _prefer_raw_year_series_for_real_payload,  # ruff: ignore[import-private-name]
     is_day_period_payload,
     iter_calendar_months,
     iter_calendar_weeks,

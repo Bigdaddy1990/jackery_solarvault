@@ -16,6 +16,7 @@ import pytest
 
 from custom_components.jackery_solarvault import number as number_mod
 from custom_components.jackery_solarvault.const import (
+    ACTION_ID_PORTABLE_SET_CHARGE_POWER,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     FIELD_DT,
     FIELD_MAX_OUT_PW,
@@ -74,7 +75,7 @@ def _number(key: str, data: dict[str, Any]) -> JackeryNumber:
     entity = JackeryNumber.__new__(JackeryNumber)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
     return entity
 
@@ -109,7 +110,7 @@ def test_integer_value_description_rounds_to_int() -> None:
 
     value = entity.native_value
 
-    assert value == 1883
+    assert value == 1883  # ruff: ignore[magic-value-comparison]
     assert isinstance(value, int)
 
 
@@ -140,7 +141,7 @@ def test_dynamic_max_and_allowed_values_scale_with_capability() -> None:
     )
 
     assert entity.native_max_value == pytest.approx(2500.0)
-    assert entity._allowed_values() == (800.0, 2500.0)
+    assert entity._allowed_values() == (800.0, 2500.0)  # ruff: ignore[private-member-access]
 
 
 def test_dynamic_max_limits_low_power_device_to_single_choice() -> None:
@@ -151,7 +152,7 @@ def test_dynamic_max_limits_low_power_device_to_single_choice() -> None:
     )
 
     assert entity.native_max_value == pytest.approx(800.0)
-    assert entity._allowed_values() == (800.0,)
+    assert entity._allowed_values() == (800.0,)  # ruff: ignore[private-member-access]
 
 
 def test_dynamic_unit_prefers_price_currency() -> None:
@@ -204,8 +205,9 @@ async def test_portable_setter_forwards_action_and_field() -> None:
 
     entity.coordinator.async_portable_set_number.assert_awaited_once()
     _args, kwargs = entity.coordinator.async_portable_set_number.call_args
+    assert kwargs["action_id"] == ACTION_ID_PORTABLE_SET_CHARGE_POWER
     assert kwargs["field"] == "csc"
-    assert kwargs["value"] == 600
+    assert kwargs["value"] == 600  # ruff: ignore[magic-value-comparison]
 
 
 def test_portable_charge_power_reads_csc_the_field_its_setter_writes() -> None:

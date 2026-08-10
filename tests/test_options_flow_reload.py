@@ -82,7 +82,7 @@ async def _async_setup_entry(hass: HomeAssistant) -> MockConfigEntry:
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):

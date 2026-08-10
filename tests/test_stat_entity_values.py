@@ -10,7 +10,7 @@ from custom_components.jackery_solarvault.const import DATE_TYPE_DAY, DATE_TYPE_
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
-    _period_from_stat_description,
+    _period_from_stat_description,  # ruff: ignore[import-private-name]
 )
 from homeassistant.components.sensor import SensorStateClass
 
@@ -34,12 +34,12 @@ def _stat_sensor() -> JackeryStatSensor:
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
-    mutable._reset_period = description.reset_period
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    mutable._cached_source_section = description.section
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -48,9 +48,9 @@ def test_stat_entity_does_not_clamp_negative_period_values() -> None:
     sensor = _stat_sensor()
 
     payload = sensor.coordinator.data[_DEVICE_ID]
-    context = sensor._capture_refresh_context(payload)
-    snapshot = sensor._refresh_cache(context, {})
-    sensor._apply_cache_snapshot(snapshot)
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_NEGATIVE_KWH)
 
@@ -79,17 +79,17 @@ def test_device_daily_flow_converts_local_wh_delta_to_kwh(sensor_key: str) -> No
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
-    mutable._reset_period = description.reset_period
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    mutable._cached_source_section = description.section
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
 
     payload = sensor.coordinator.data[_DEVICE_ID]
-    context = sensor._capture_refresh_context(payload)
-    snapshot = sensor._refresh_cache(context, {})
-    sensor._apply_cache_snapshot(snapshot)
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(3.58)
 
@@ -108,15 +108,15 @@ def _period_sensor(reset_period: str) -> JackeryStatSensor:
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
-    mutable._reset_period = reset_period
+    mutable._reset_period = reset_period  # ruff: ignore[private-member-access]
     # All period totals (day/week/month/year) are TOTAL so HA compiles their
     # long-term statistics (reverted 2026-07-18).
-    mutable._attr_state_class = SensorStateClass.TOTAL
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    mutable._cached_source_section = description.section
+    mutable._attr_state_class = SensorStateClass.TOTAL  # ruff: ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -130,7 +130,7 @@ def test_week_period_sensor_is_total_with_last_reset() -> None:
     """
     sensor = _period_sensor(DATE_TYPE_WEEK)
 
-    assert sensor._attr_state_class is SensorStateClass.TOTAL
+    assert sensor._attr_state_class is SensorStateClass.TOTAL  # ruff: ignore[private-member-access]
     assert sensor.last_reset is not None
 
 
@@ -138,5 +138,5 @@ def test_day_period_sensor_still_reports_last_reset() -> None:
     """The TOTAL day total keeps its last_reset (guards against over-correction)."""
     sensor = _period_sensor(DATE_TYPE_DAY)
 
-    assert sensor._attr_state_class is SensorStateClass.TOTAL
+    assert sensor._attr_state_class is SensorStateClass.TOTAL  # ruff: ignore[private-member-access]
     assert isinstance(sensor.last_reset, datetime)

@@ -16,14 +16,14 @@ from custom_components.jackery_solarvault.util import statistics_http_backfill_d
 def test_startup_backfill_floor_reaches_mid_april_from_late_july() -> None:
     """The startup HTTP fallback horizon covers the requested mid-April data."""
     expected_startup_min_days = 120
-    startup_min_days = coordinator._STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
+    startup_min_days = coordinator._STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS  # ruff: ignore[private-member-access]
     assert startup_min_days == expected_startup_min_days
 
 
 def test_current_year_backfill_window_starts_january_first() -> None:
     """Current-year seeding starts at Jan 1 and ends on the last completed day."""
     today = date(2026, 7, 20)
-    startup_min_days = coordinator._STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
+    startup_min_days = coordinator._STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS  # ruff: ignore[private-member-access]
     dates = statistics_http_backfill_dates(
         today,
         window_days=startup_min_days,

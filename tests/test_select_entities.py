@@ -31,7 +31,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.select import (
     SELECT_DESCRIPTIONS,
     JackerySelect,
-    _SelectState,
+    _SelectState,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -70,9 +70,9 @@ def _select(key: str, data: dict[str, Any]) -> JackerySelect:
     entity = JackerySelect.__new__(JackerySelect)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
-    mutable._state = _SelectState()
+    mutable._state = _SelectState()  # ruff: ignore[private-member-access]
     return entity
 
 
@@ -94,7 +94,7 @@ def test_work_mode_unknown_code_reports_none_and_warns_once() -> None:
     )
 
     assert entity.current_option is None
-    assert 99 in entity._state.warned_unknown_values
+    assert 99 in entity._state.warned_unknown_values  # ruff: ignore[magic-value-comparison, private-member-access]
 
 
 def test_temp_unit_options_and_current() -> None:
@@ -215,7 +215,7 @@ async def test_portable_power_mode_forwards_via_portable_setter() -> None:
     entity.coordinator.async_portable_set_select.assert_awaited_once()
     _args, kwargs = entity.coordinator.async_portable_set_select.call_args
     assert kwargs["field"] == FIELD_PM
-    assert kwargs["value"] == 2
+    assert kwargs["value"] == 2  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.parametrize(

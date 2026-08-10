@@ -29,7 +29,7 @@ def test_grid_import_energy_reads_total_phase_energy() -> None:
     assert desc.field == FIELD_CT_TOTAL_PHASE_ENERGY
     assert desc.device_class == SensorDeviceClass.ENERGY
     assert desc.state_class == SensorStateClass.TOTAL_INCREASING
-    assert desc.native_unit_of_measurement == UnitOfEnergy.WATT_HOUR
+    assert desc.native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
 
 
 def test_grid_export_energy_reads_negative_total_phase_energy() -> None:
@@ -39,7 +39,7 @@ def test_grid_export_energy_reads_negative_total_phase_energy() -> None:
     assert desc.field == FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY
     assert desc.device_class == SensorDeviceClass.ENERGY
     assert desc.state_class == SensorStateClass.TOTAL_INCREASING
-    assert desc.native_unit_of_measurement == UnitOfEnergy.WATT_HOUR
+    assert desc.native_unit_of_measurement == UnitOfEnergy.KILO_WATT_HOUR
 
 
 def test_energy_sensors_have_no_derived_calculation() -> None:

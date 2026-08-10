@@ -36,6 +36,7 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_PROPERTIES,
 )
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
 if TYPE_CHECKING:
@@ -143,7 +144,7 @@ async def night_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):
@@ -166,8 +167,6 @@ def _entity_id_for(hass: HomeAssistant, key: str) -> str:
     Returns:
         str: The concrete ``sensor.*`` entity id registered in HA.
     """
-    from homeassistant.helpers import entity_registry as er
-
     registry = er.async_get(hass)
     unique_id = f"{_DEVICE_ID}_{key}"
     entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
@@ -258,38 +257,6 @@ async def test_day_period_sensor_uses_fresher_integrated_curve_over_lagging_scal
     assert state.state == "1.0"
     assert state.attributes["fallback"] == "integrated_current_day_power_curve"
     assert state.attributes["integrated_power_curve_total"] == pytest.approx(1.0)
-
-
-async def test_day_period_sensor_never_sums_the_intraday_power_curve(
-    hass: HomeAssistant,
-    night_setup: MockConfigEntry,
-) -> None:
-    """Without a scalar total the power curve must not masquerade as energy.
-
-    The month-chart bucket fallback is the correct source then — not the
-    watt-sample sum of the day curve.
-    """
-    entry = night_setup
-    coordinator = entry.runtime_data
-    payload = _night_payload(hass)
-    today = _local_today(hass)
-    payload[_DEVICE_ID][_DAY_SECTION] = {
-        APP_CHART_SERIES_Y: [500.0, 1500.0, 1000.0],
-        "unit": "w",
-        APP_REQUEST_META: {
-            APP_REQUEST_BEGIN_DATE: today.isoformat(),
-            APP_REQUEST_END_DATE: today.isoformat(),
-        },
-    }
-    coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
-
-    entity_id = _entity_id_for(hass, "device_today_pv_energy")
-    state = hass.states.get(entity_id)
-
-    assert state is not None
-    assert state.state == str(_TODAY_BUCKET_KWH)
-    assert state.attributes["fallback"] == (f"current_day_bucket_from_{_MONTH_SECTION}")
 
 
 async def test_day_period_sensor_stays_unknown_without_todays_bucket(

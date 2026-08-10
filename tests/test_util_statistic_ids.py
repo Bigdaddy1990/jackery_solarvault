@@ -7,12 +7,13 @@ from custom_components.jackery_solarvault.const import (
     APP_REQUEST_DATE_TYPE,
     APP_REQUEST_META,
     DATE_TYPE_MONTH,
+    DOMAIN,
     FIELD_DEVICE_NAME,
     PAYLOAD_SYSTEM,
 )
 from custom_components.jackery_solarvault.util import (
-    _parse_iso_date,
-    _trend_date_type,
+    _parse_iso_date,  # ruff: ignore[import-private-name]
+    _trend_date_type,  # ruff: ignore[import-private-name]
     app_chart_name_prefix,
     app_chart_period_meta,
     external_trend_statistic_id,
@@ -37,9 +38,9 @@ def test_statistic_id_part_defaults_to_unknown() -> None:
 
 def test_external_trend_statistic_id_composes_normalised_parts() -> None:
     """The external id joins normalised device/metric/bucket under the domain."""
-    result = external_trend_statistic_id("sensor", "Dev 1", "PV Energy", "Day")
+    result = external_trend_statistic_id(DOMAIN, "Dev 1", "PV Energy", "Day")
 
-    assert result == "sensor:dev_1_pv_energy_day"
+    assert result == "jackery_solarvault:dev_1_pv_energy_day"
 
 
 def test_parse_iso_date_variants() -> None:

@@ -87,7 +87,6 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_TARGET_DEV_ID,
     SERVICE_FIELD_TIMEZONE_OFFSET,
     SERVICE_FIELD_ZONE_ID,
-    SERVICE_GET_AIEMS_ENERGY_PREDICTION,
     SERVICE_GET_ALARM_DETAIL,
     SERVICE_GET_DEVICE_CURRENCY,
     SERVICE_GET_DYNAMIC_PRICE_LOGIN_URL,
@@ -525,12 +524,6 @@ _CASES: tuple[_HandlerCase, ...] = (
         portable=True,
     ),
     _case(
-        SERVICE_GET_AIEMS_ENERGY_PREDICTION,
-        "async_get_aiems_energy_prediction",
-        is_response=True,
-        portable=True,
-    ),
-    _case(
         SERVICE_UNBIND_ACCESSORIES,
         "async_unbind_accessories",
         extra={SERVICE_FIELD_BIND_IDS: [_NUM_ID]},
@@ -919,7 +912,7 @@ def test_is_portable_device_detects_legacy_bind_list_source() -> None:
         ),
     )
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is True
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is True  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_device_rejects_home_payload_evidence() -> None:
@@ -938,22 +931,22 @@ def test_is_portable_device_rejects_home_payload_evidence() -> None:
         ),
     )
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is False
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is False  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_device_defaults_to_false_without_evidence() -> None:
     """An empty payload is treated as a non-portable Home device."""
     coordinator = cast("Any", SimpleNamespace(data={_DEVICE_ID: {}}))
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is False
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is False  # ruff: ignore[private-member-access]
 
 
 def test_payload_home_evidence_recognizes_system_body() -> None:
     """A populated system body is recognized as Home-payload evidence."""
-    assert services._payload_has_home_payload_evidence(
+    assert services._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
         {PAYLOAD_SYSTEM: {"id": "1"}},
     )
-    assert not services._payload_has_home_payload_evidence({})
+    assert not services._payload_has_home_payload_evidence({})  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -973,7 +966,7 @@ def test_notify_share_qr_code_publishes_scannable_image(hass: HomeAssistant) -> 
             "homeassistant.components.persistent_notification.async_create",
         ) as create,
     ):
-        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")
+        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")  # ruff: ignore[private-member-access]
 
     create.assert_called_once()
 
@@ -985,7 +978,7 @@ def test_notify_share_qr_code_skips_when_qr_code_missing(
     with patch(
         "homeassistant.components.persistent_notification.async_create",
     ) as create:
-        services._notify_share_qr_code(hass, qr_code_id=None, user_id="user-1")
+        services._notify_share_qr_code(hass, qr_code_id=None, user_id="user-1")  # ruff: ignore[private-member-access]
 
     create.assert_not_called()
 
@@ -996,12 +989,12 @@ def test_notify_share_qr_code_swallows_render_failure(hass: HomeAssistant) -> No
         "custom_components.jackery_solarvault.services._render_share_qr_png_data_uri",
         side_effect=RuntimeError("render boom"),
     ):
-        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")
+        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")  # ruff: ignore[private-member-access]
 
 
 def test_render_share_qr_png_data_uri_encodes_png() -> None:
     """The QR renderer returns a base64 PNG data URI for the qrCodeId."""
-    data_uri = services._render_share_qr_png_data_uri("qr-code-1")
+    data_uri = services._render_share_qr_png_data_uri("qr-code-1")  # ruff: ignore[private-member-access]
 
     assert data_uri.startswith("data:image/png;base64,")
 
@@ -1105,21 +1098,21 @@ async def test_get_share_qr_code_maps_auth_error_to_reauth(
 
 def test_tou_tasks_parser_unwraps_object_and_validates_items() -> None:
     """TOU parsing accepts a wrapping object and rejects non-object tasks."""
-    assert services._tou_tasks_from_service(
+    assert services._tou_tasks_from_service(  # ruff: ignore[private-member-access]
         '{"tasks": [{"slot": 1}]}',
         _DEVICE_ID,
     ) == [{"slot": 1}]
-    assert services._tou_tasks_from_service([{"slot": 2}], _DEVICE_ID) == [{"slot": 2}]
+    assert services._tou_tasks_from_service([{"slot": 2}], _DEVICE_ID) == [{"slot": 2}]  # ruff: ignore[private-member-access]
 
     for raw in ('{"tasks": 5}', "{not json", [5]):
         with pytest.raises(ServiceValidationError):
-            services._tou_tasks_from_service(raw, _DEVICE_ID)
+            services._tou_tasks_from_service(raw, _DEVICE_ID)  # ruff: ignore[private-member-access]
 
 
 def test_reject_json_constant_rejects_non_standard_tokens() -> None:
     """Non-standard JSON constants (NaN/Infinity) are rejected during parsing."""
     with pytest.raises(ValueError, match="invalid JSON constant"):
-        services._reject_json_constant("NaN")
+        services._reject_json_constant("NaN")  # ruff: ignore[private-member-access]
 
 
 def test_resolve_jackery_device_id_maps_registry_identifier() -> None:
@@ -1133,7 +1126,7 @@ def test_resolve_jackery_device_id_maps_registry_identifier() -> None:
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1160,7 +1153,7 @@ def test_resolve_jackery_device_id_follows_accessory_via_parent() -> None:
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1183,7 +1176,7 @@ def test_resolve_jackery_device_id_returns_raw_without_matching_identifier() -> 
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1193,19 +1186,19 @@ def test_resolve_jackery_device_id_returns_raw_without_matching_identifier() -> 
 
 def test_payload_home_evidence_recognizes_http_properties() -> None:
     """Home-body fields inside the http_properties section count as evidence."""
-    assert services._payload_has_home_payload_evidence(
+    assert services._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
         {"http_properties": {"pvPw": 120}},
     )
 
 
 def test_json_native_value_normalizes_nested_containers() -> None:
     """JSON-native normalization passes finite scalars and nested containers."""
-    assert services._json_native_value({"a": [1, 2.5, "x", None, True]}) == {
+    assert services._json_native_value({"a": [1, 2.5, "x", None, True]}) == {  # ruff: ignore[private-member-access]
         "a": [1, 2.5, "x", None, True]
     }
 
     with pytest.raises(ValueError, match="finite"):
-        services._json_native_value(float("inf"))
+        services._json_native_value(float("inf"))  # ruff: ignore[private-member-access]
 
 
 def test_resolve_jackery_device_id_returns_raw_when_unknown() -> None:
@@ -1215,7 +1208,7 @@ def test_resolve_jackery_device_id_returns_raw_when_unknown() -> None:
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "legacy-123",
         )

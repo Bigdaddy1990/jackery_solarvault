@@ -49,6 +49,7 @@ from custom_components.jackery_solarvault.sensor import (
 )
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.helpers import entity_registry as er
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -141,7 +142,7 @@ async def savings_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):
@@ -175,8 +176,6 @@ async def test_conversion_loss_balances_at_the_inverter_boundary(
     historical export-only formula reported 1995 W — the household
     consumption disguised as "loss".
     """
-    from homeassistant.helpers import entity_registry as er
-
     await hass.async_block_till_done()
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id(
@@ -216,11 +215,11 @@ def test_portable_power_uses_primary_then_nested_ac_fallback(
     })
     entity = JackerySensor(coordinator, _DEVICE_ID, description)
 
-    assert entity.native_value == 321
+    assert entity.native_value == 321  # ruff: ignore[magic-value-comparison]
 
     properties[primary_key] = 123
 
-    assert entity.native_value == 123
+    assert entity.native_value == 123  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.parametrize(

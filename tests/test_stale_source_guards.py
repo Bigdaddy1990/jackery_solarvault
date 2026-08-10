@@ -38,9 +38,9 @@ def _bare_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the guard helpers without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._system_info_cache = {}
-    coordinator._system_info_cache_monotonic = {}
-    coordinator._configured_update_interval = timedelta(seconds=15)
+    coordinator._system_info_cache = {}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache_monotonic = {}  # ruff: ignore[private-member-access]
+    coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
     if monkeypatch is not None:
         monkeypatch.setattr(
             "custom_components.jackery_solarvault.coordinator.time.monotonic",
@@ -54,10 +54,10 @@ def test_system_info_cache_never_overwrites_a_delivered_value(
 ) -> None:
     """Fill-only: a fresh workModel from HTTP/MQTT must survive the overlay."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}
-    coordinator._system_info_cache_monotonic[_DEVICE] = _NOW
+    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache_monotonic[_DEVICE] = _NOW  # ruff: ignore[private-member-access]
 
-    filled = coordinator._overlay_cached_system_info(
+    filled = coordinator._overlay_cached_system_info(  # ruff: ignore[private-member-access]
         _DEVICE,
         {"workModel": _FRESH_WORK_MODEL, "standbyPw": None},
     )
@@ -70,10 +70,10 @@ def test_system_info_cache_fills_missing_keys_while_fresh(
 ) -> None:
     """The cache still bridges MQTT disconnects for keys HTTP never carries."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}
-    coordinator._system_info_cache_monotonic[_DEVICE] = _NOW - 10.0
+    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache_monotonic[_DEVICE] = _NOW - 10.0  # ruff: ignore[private-member-access]
 
-    filled = coordinator._overlay_cached_system_info(
+    filled = coordinator._overlay_cached_system_info(  # ruff: ignore[private-member-access]
         _DEVICE,
         {"soc": _PASSTHROUGH_SOC},
     )
@@ -87,12 +87,12 @@ def test_system_info_cache_expires_instead_of_lying(
 ) -> None:
     """An expired cache stops filling — hours-old config is not current state."""
     coordinator = _bare_coordinator(monkeypatch)
-    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}
-    coordinator._system_info_cache_monotonic[_DEVICE] = (
+    coordinator._system_info_cache[_DEVICE] = {"workModel": _CACHED_WORK_MODEL}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache_monotonic[_DEVICE] = (  # ruff: ignore[private-member-access]
         _NOW - SYSTEM_INFO_CACHE_MAX_AGE_SEC - 1.0
     )
 
-    filled = coordinator._overlay_cached_system_info(
+    filled = coordinator._overlay_cached_system_info(  # ruff: ignore[private-member-access]
         _DEVICE,
         {"soc": _PASSTHROUGH_SOC},
     )
@@ -107,11 +107,11 @@ async def test_system_info_query_runs_ble_first_without_cloud_mqtt() -> None:
     the BLE-first query must run even while the broker bans the session.
     """
     coordinator = _bare_coordinator(None)
-    coordinator._mqtt = None
-    coordinator._ble_listener = SimpleNamespace()
-    coordinator._system_info_query_interval_sec = 180
-    coordinator._last_system_info_query = {
-        _DEVICE: time.monotonic() - coordinator._system_info_query_interval_sec - 1
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = SimpleNamespace()  # ruff: ignore[private-member-access]
+    coordinator._system_info_query_interval_sec = 180  # ruff: ignore[private-member-access]
+    coordinator._last_system_info_query = {  # ruff: ignore[private-member-access]
+        _DEVICE: time.monotonic() - coordinator._system_info_query_interval_sec - 1  # ruff: ignore[private-member-access]
     }
     coordinator.data = {_DEVICE: {PAYLOAD_PROPERTIES: {}}}
     query_device_info = AsyncMock(return_value=None)
@@ -119,7 +119,7 @@ async def test_system_info_query_runs_ble_first_without_cloud_mqtt() -> None:
     cast("Any", coordinator).async_query_device_info = query_device_info
     cast("Any", coordinator).async_query_system_info = query_system_info
 
-    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)
+    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)  # ruff: ignore[private-member-access]
 
     query_system_info.assert_awaited_once()
 
@@ -127,14 +127,14 @@ async def test_system_info_query_runs_ble_first_without_cloud_mqtt() -> None:
 async def test_system_info_query_skips_without_any_command_transport() -> None:
     """No BLE and no connected cloud client: the query stays skipped."""
     coordinator = _bare_coordinator(None)
-    coordinator._mqtt = None
-    coordinator._ble_listener = None
-    coordinator._last_system_info_query = {}
-    coordinator._system_info_query_interval_sec = 180
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+    coordinator._last_system_info_query = {}  # ruff: ignore[private-member-access]
+    coordinator._system_info_query_interval_sec = 180  # ruff: ignore[private-member-access]
     coordinator.data = {_DEVICE: {PAYLOAD_PROPERTIES: {}}}
     query_system_info = AsyncMock(return_value=None)
     cast("Any", coordinator).async_query_system_info = query_system_info
 
-    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)
+    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)  # ruff: ignore[private-member-access]
 
     query_system_info.assert_not_awaited()

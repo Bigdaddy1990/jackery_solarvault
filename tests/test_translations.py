@@ -22,7 +22,7 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # ruff: ignore[any-t
     Returns:
         set[str]: A set of dotted key paths representing all leaf nodes found
         (the prefix itself is a leaf when `value` is not a dict).
-    """
+    """  # ruff: ignore[line-too-long]
     if not isinstance(value, dict):
         return {prefix}
 
@@ -34,11 +34,11 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # ruff: ignore[any-t
 
 
 def test_language_files_cover_all_string_keys() -> None:
-    """Ensure each per-language translation file contains exactly the same set of leaf string keys as strings.json.
+    """Ensure every language contains the same leaf keys as strings.json.
 
-    Loads the base key set from `strings.json` and asserts, for every language in LANGUAGES,
-    that `translations/{lang}.json` has an identical set of leaf key paths. The assertion includes the language
-    code on failure for diagnostic context.
+    Loads the base key set from `strings.json` and asserts that every
+    `translations/{lang}.json` file has identical leaf paths. The assertion
+    includes the language code for diagnostic context.
     """
     base = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
     base_paths = _leaf_paths(base)
@@ -53,10 +53,10 @@ def test_language_files_cover_all_string_keys() -> None:
 
 
 def test_service_actions_use_translation_files() -> None:
-    """Verify that service names and descriptions are provided via translation files rather than hardcoded in services.yaml.
+    """Verify that service labels come from translations, not services.yaml.
 
-    Asserts that services.yaml does not contain the literals "  name:" or "  description:", that the expected service IDs are
-    present in both strings.json and icons.json, and that each listed service in icons.json contains a "service" key.
+    The service IDs in services.yaml must be present in strings.json and
+    icons.json, and each icon entry must contain a `service` key.
     """
     services_yaml = (TRANSLATION_ROOT / "services.yaml").read_text(encoding="utf-8")
     strings = json.loads(
@@ -116,7 +116,20 @@ def test_battery_power_labels_keep_main_battery_and_stack_distinct() -> None:
         ), lang
 
 
-def _assert_keys_sorted(value: Any, path: str = "") -> None:
+def test_max_grid_standard_power_has_a_base_translation() -> None:
+    """The App-proven maxGridStdPw sensor must have a generated translation key."""
+    strings = json.loads(
+        (TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8")
+    )
+
+    entry = strings["entity"]["sensor"]["max_grid_standard_power"]
+    assert entry["name"] == "Maximum grid standard power"
+
+
+def _assert_keys_sorted(
+    value: Any,  # ruff: ignore[any-type]
+    path: str = "",
+) -> None:
     """Recursively assert every JSON object in ``value`` has alphabetically sorted keys.
 
     Parameters:

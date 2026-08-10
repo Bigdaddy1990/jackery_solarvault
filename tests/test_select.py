@@ -11,11 +11,11 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_PRICE_SOURCES,
 )
 from custom_components.jackery_solarvault.select import (
-    _price_mode_dynamic_available,
-    _price_provider_current,
-    _price_source_label,
-    _price_source_matches_current,
-    _price_sources_from_payload,
+    _price_mode_dynamic_available,  # ruff: ignore[import-private-name]
+    _price_provider_current,  # ruff: ignore[import-private-name]
+    _price_source_label,  # ruff: ignore[import-private-name]
+    _price_source_matches_current,  # ruff: ignore[import-private-name]
+    _price_sources_from_payload,  # ruff: ignore[import-private-name]
 )
 
 
@@ -100,6 +100,6 @@ def test_price_provider_current_ignores_blank_company_id() -> None:
     assert _price_provider_current(entity) is None
     assert not _price_mode_dynamic_available(entity)
 
-    entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"
+    entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"  # ruff: ignore[private-member-access]
     assert _price_provider_current(entity) is None
     assert not _price_mode_dynamic_available(entity)

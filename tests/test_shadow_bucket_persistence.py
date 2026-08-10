@@ -30,7 +30,7 @@ def test_empty_cycle_keeps_last_known_tou_bucket() -> None:
     coordinator = _coordinator({PAYLOAD_TOU_SCHEDULE: {"tasks": [{"month": "1"}]}})
     working: dict[str, Any] = {}
 
-    coordinator._carry_forward_shadow_buckets(_DEVICE, working)
+    coordinator._carry_forward_shadow_buckets(_DEVICE, working)  # ruff: ignore[private-member-access]
 
     assert working[PAYLOAD_TOU_SCHEDULE] == {"tasks": [{"month": "1"}]}
 
@@ -40,7 +40,7 @@ def test_fresh_bucket_is_not_overwritten() -> None:
     coordinator = _coordinator({PAYLOAD_SMART_MODE: {"isActive": 0}})
     working: dict[str, Any] = {PAYLOAD_SMART_MODE: {"isActive": 1}}
 
-    coordinator._carry_forward_shadow_buckets(_DEVICE, working)
+    coordinator._carry_forward_shadow_buckets(_DEVICE, working)  # ruff: ignore[private-member-access]
 
     assert working[PAYLOAD_SMART_MODE] == {"isActive": 1}
 
@@ -50,7 +50,7 @@ def test_missing_previous_bucket_is_left_absent() -> None:
     coordinator = _coordinator({})
     working: dict[str, Any] = {}
 
-    coordinator._carry_forward_shadow_buckets(_DEVICE, working)
+    coordinator._carry_forward_shadow_buckets(_DEVICE, working)  # ruff: ignore[private-member-access]
 
     assert PAYLOAD_TOU_SCHEDULE not in working
 
@@ -60,6 +60,6 @@ def test_empty_previous_bucket_is_not_carried() -> None:
     coordinator = _coordinator({PAYLOAD_TOU_SCHEDULE: {}})
     working: dict[str, Any] = {}
 
-    coordinator._carry_forward_shadow_buckets(_DEVICE, working)
+    coordinator._carry_forward_shadow_buckets(_DEVICE, working)  # ruff: ignore[private-member-access]
 
     assert PAYLOAD_TOU_SCHEDULE not in working

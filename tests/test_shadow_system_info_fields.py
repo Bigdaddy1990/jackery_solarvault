@@ -14,6 +14,7 @@ CombineData handler does.
 from typing import Any
 
 from custom_components.jackery_solarvault.const import (
+    FIELD_BAT_STATE,
     FIELD_CT_STAT,
     FIELD_ENERGY_PLAN_PW,
     FIELD_FUNC_ENABLE,
@@ -21,6 +22,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_MAX_SYS_IN_PW,
     FIELD_MAX_SYS_OUT_PW,
     FIELD_ONGRID_STAT,
+    FIELD_SOC,
     FIELD_STAT,
     PAYLOAD_PROPERTIES,
 )
@@ -38,20 +40,23 @@ _STAT = 3
 _ONGRID_STAT = 1
 _GRID_STATE = 2
 _EXISTING_SOC = 55
+_BAT_STATE = 1
 
 
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the property-merge path without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._property_overrides = {}
-    coordinator._system_info_cache = {}
-    coordinator._system_info_cache_monotonic = {}
+    coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache = {}  # ruff: ignore[private-member-access]
+    coordinator._system_info_cache_monotonic = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
 def _system_body() -> dict[str, Any]:
     """A SystemBody shadow body carrying the SYSTEM_INFO-only fields."""
     return {
+        FIELD_SOC: _EXISTING_SOC,
+        FIELD_BAT_STATE: _BAT_STATE,
         FIELD_STAT: _STAT,
         FIELD_ONGRID_STAT: _ONGRID_STAT,
         FIELD_CT_STAT: _CT_STAT,
@@ -68,7 +73,7 @@ def test_system_info_fields_reach_main_properties() -> None:
     coordinator = _bare_coordinator()
     working: dict[str, Any] = {}
 
-    merged = coordinator._merge_system_info_fields(
+    merged = coordinator._merge_system_info_fields(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         working,
         _system_body(),
@@ -84,8 +89,10 @@ def test_system_info_fields_reach_main_properties() -> None:
     assert props[FIELD_GRID_STATE] == _GRID_STATE
     assert props[FIELD_ENERGY_PLAN_PW] == _ENERGY_PLAN_PW
     assert props[FIELD_FUNC_ENABLE] == _FUNC_ENABLE
+    assert props[FIELD_SOC] == _EXISTING_SOC
+    assert props[FIELD_BAT_STATE] == _BAT_STATE
     # Cached so the fields survive a later MQTT-only cycle.
-    assert coordinator._system_info_cache[_DEVICE_ID][FIELD_CT_STAT] == _CT_STAT
+    assert coordinator._system_info_cache[_DEVICE_ID][FIELD_CT_STAT] == _CT_STAT  # ruff: ignore[private-member-access]
 
 
 def test_system_info_merge_preserves_existing_properties() -> None:
@@ -93,7 +100,7 @@ def test_system_info_merge_preserves_existing_properties() -> None:
     coordinator = _bare_coordinator()
     working: dict[str, Any] = {PAYLOAD_PROPERTIES: {"soc": _EXISTING_SOC}}
 
-    coordinator._merge_system_info_fields(_DEVICE_ID, working, _system_body())
+    coordinator._merge_system_info_fields(_DEVICE_ID, working, _system_body())  # ruff: ignore[private-member-access]
 
     props = working[PAYLOAD_PROPERTIES]
     assert props["soc"] == _EXISTING_SOC
@@ -105,7 +112,7 @@ def test_system_info_merge_noop_without_fields() -> None:
     coordinator = _bare_coordinator()
     working: dict[str, Any] = {}
 
-    merged = coordinator._merge_system_info_fields(
+    merged = coordinator._merge_system_info_fields(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         working,
         {"someUnrelatedKey": 1},

@@ -34,7 +34,7 @@ def _read(name: str) -> str:
 
     Returns:
         str: File contents decoded as UTF-8.
-    """
+    """  # ruff: ignore[line-too-long]
     base = CLIENT_COMPONENT if name == "mqtt_push.py" else INTEGRATION_COMPONENT
     return (base / name).read_text(encoding="utf-8")
 
@@ -64,7 +64,7 @@ def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
     """Ensure the MQTT client's credential-change detection does not retain raw password data.
 
     Verifies the module computes and stores a hashed credential fingerprint (using `hashlib.sha256` and `_credential_fingerprint`) and exposes a `_fingerprint` member, and asserts the source does not contain a stored tuple of raw credentials `(client_id, username, password)`.
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
     assert "import hashlib" in src, src
     assert "self._fingerprint: str | None = None" in src, src
@@ -78,10 +78,10 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """Ensure the broker CONNACK failure reason is preserved when the broker rejects the connection and closes the socket.
 
     Asserts that the disconnect handler does not overwrite an actionable CONNACK reason (the `"connect rc=..."` signature) and that the connect-failure mapper exposes broker CONNACK reasons via `MQTT_CONNACK_REASONS` and formats them as `f"connect rc={rc}"`.
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -94,7 +94,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     # And the connect-failure mapper itself must produce the rc=… signature
     # so ``_is_connect_failure_error`` can detect it.
     fail_match = re.search(
-        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -108,7 +108,7 @@ def test_aiomqtt_passive_reset_log_is_filtered() -> None:
     """Ensure passive broker socket reset messages are filtered from Home Assistant error logs.
 
     Asserts that mqtt_push.py defines `_AioMqttPassiveDisconnectFilter`, contains common passive-reset message substrings (e.g. "failed to receive on socket", "Errno 104", "Connection reset by peer", "WinError 10054"), registers the filter with `_AIOMQTT_LOGGER`, and does not register the filter on the general `_LOGGER`.
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
 
     assert "_AioMqttPassiveDisconnectFilter" in src
@@ -126,10 +126,10 @@ def test_diagnostics_exposes_stale_subscription_signals() -> None:
 
     Raises:
         AssertionError: If the diagnostics_snapshot method is missing or either key/flag is not present.
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
     diag_match = re.search(
-        r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",
+        r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -137,6 +137,19 @@ def test_diagnostics_exposes_stale_subscription_signals() -> None:
     body = diag_match.group(0)
     assert "seconds_since_last_message" in body, body
     assert "mqtt_silent_for_too_long" in body, body
+
+
+def test_getter_response_correlation_is_bounded_and_diagnostic() -> None:
+    """Getter waiters are bounded session state and cannot replace ingest."""
+    src = _read("mqtt_push.py")
+
+    assert "_MAX_PENDING_RESPONSES" in src
+    assert "_MQTT_RESPONSE_TIMEOUT_SEC" in src
+    assert "_resolve_pending_response(data)" in src
+    assert "self._message_callback(topic, data)" in src
+    assert '"pending_responses"' in src
+    assert '"responses_correlated"' in src
+    assert '"responses_expired"' in src
 
 
 def test_silent_threshold_constant_is_sane() -> None:
@@ -147,7 +160,7 @@ def test_silent_threshold_constant_is_sane() -> None:
     threshold = int(match.group(1))
     # Real Jackery heartbeats every ~30 s; we want to flag silence
     # well after that but before users complain about stale data.
-    assert 60 <= threshold <= 1800, threshold
+    assert 60 <= threshold <= 1800, threshold  # ruff: ignore[magic-value-comparison]
 
 
 def test_seconds_since_last_message_handles_no_messages() -> None:
@@ -249,7 +262,7 @@ def test_optional_background_jobs_are_not_setup_tracked() -> None:
     - statistics import scheduler
     - MQTT poll queries scheduler
     - battery pack OTA enrichment scheduler
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("coordinator.py")
 
     schedule_import = re.search(
@@ -284,7 +297,7 @@ def test_mqtt_ensure_uses_stable_client_handle_across_awaits() -> None:
     """Ensure the coordinator preserves a stable MQTT client reference across awaits to avoid NoneType errors during reload or shutdown.
 
     Asserts that the `_async_ensure_mqtt` implementation captures `self._mqtt` into a local `mqtt` variable, checks for replacement (`if self._mqtt is not mqtt:`), awaits lifecycle calls on the local handle (`async_start`, `async_wait_until_connected`), reads diagnostics via `mqtt.diagnostics.get`, and does not call `self._mqtt.async_wait_until_connected` directly.
-    """
+    """  # ruff: ignore[line-too-long]
     src = _read("coordinator.py")
     match = re.search(
         r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",

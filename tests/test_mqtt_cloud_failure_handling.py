@@ -9,6 +9,7 @@ snapshot ERRORs.
 """
 
 import logging
+from pathlib import Path
 import time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
@@ -42,9 +43,9 @@ _TWO_ATTEMPTS = 2
 def test_connack_ban_class_codes_are_auth_failures() -> None:
     """MQTT v5 reason codes 128-135 must pause like credential rejections."""
     for rc in (4, 5, 128, 133, 134, 135):
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff: ignore[private-member-access]
     for rc in (0, 2, 3, 136):
-        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc
+        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff: ignore[private-member-access]
 
 
 def test_is_mqtt_auth_failure_matches_rc133_and_code128() -> None:
@@ -135,6 +136,25 @@ def test_aiomqtt_real_warnings_still_pass_the_filter(
     )
 
 
+def test_aiomqtt_real_disconnect_exceptions_stay_visible(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Only the known cancellation race may be demoted during disconnect."""
+    logger = logging.getLogger(_AIOMQTT_LOGGER)
+    with caplog.at_level(logging.INFO):
+        logger.error(
+            "Caught exception in on_disconnect: RuntimeError('callback failed')",
+        )
+
+    records = [
+        record
+        for record in caplog.records
+        if "RuntimeError('callback failed')" in record.getMessage()
+    ]
+    assert records
+    assert records[0].levelno == logging.ERROR
+
+
 # ---------------------------------------------------------------------------
 # Fix C: birth snapshot — dispatch only while connected, quiet failure path
 # ---------------------------------------------------------------------------
@@ -150,7 +170,7 @@ async def test_birth_snapshot_not_dispatched_when_connection_lost(
     assert client.is_connected is False
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)
+        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
         await hass.async_block_till_done()
 
     callback.assert_not_awaited()
@@ -168,12 +188,12 @@ async def test_birth_snapshot_not_connected_error_is_debug_and_deduplicated(
     error = RuntimeError(f"MQTT not connected yet ({_RC133_MESSAGE})")
     callback = AsyncMock(side_effect=error)
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True
+    client._connected = True  # ruff: ignore[private-member-access]
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)
+        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
         await hass.async_block_till_done()
-        client._schedule_birth_snapshot(callback)
+        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
         await hass.async_block_till_done()
 
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
@@ -189,10 +209,10 @@ async def test_birth_snapshot_unexpected_error_still_logged_as_error(
     """Genuine handler bugs keep surfacing at ERROR."""
     callback = AsyncMock(side_effect=ValueError("boom"))
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True
+    client._connected = True  # ruff: ignore[private-member-access]
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)
+        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
         await hass.async_block_till_done()
 
     assert any(
@@ -224,6 +244,24 @@ def test_pause_after_auth_failure_repeat_cycle_logs_debug(
         manager.pause_after_auth_failure(_RC133_MESSAGE, streak=2)
     assert not [r for r in caplog.records if r.levelno >= logging.INFO]
     assert manager.app_conflict_pause_cycles == _TWO_ATTEMPTS
+
+
+def test_cloud_disconnect_preserves_cache_and_peer_transports() -> None:
+    """A Cloud MQTT reconnect must not clear credentials or restart BLE/local MQTT."""
+    root = Path(__file__).resolve().parents[1]
+    source = (
+        root / "custom_components" / "jackery_solarvault" / "coordinator.py"
+    ).read_text(encoding="utf-8")
+    start = source.index("    async def _async_handle_mqtt_disconnect(")
+    end = source.index("\n    @property\n", start)
+    handler = source[start:end]
+
+    assert "_async_ensure_mqtt(force=False, wait_connected=False)" in handler
+    assert "async_clear_mqtt_session" not in handler
+    assert "async_start_ble" not in handler
+    assert "async_start_local_mqtt" not in handler
+    assert "_async_invalidate_mqtt_session_cache" not in source
+    assert "async_clear_mqtt_session" not in source
 
 
 def test_note_connect_failure_repeated_signature_logs_debug(

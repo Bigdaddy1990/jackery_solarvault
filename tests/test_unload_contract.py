@@ -8,9 +8,10 @@ INIT = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 
 
 def _async_unload_entry() -> ast.AsyncFunctionDef:
-    """Locate the AST node for the `async_unload_entry` coroutine defined in the integration's __init__.py.
+    """Locate the integration's `async_unload_entry` AST node.
 
-    Parses the file at INIT into an AST and returns the first ast.AsyncFunctionDef node whose name is "async_unload_entry". Raises an AssertionError if no such function is present.
+    Parses INIT and returns the first matching async function. Raises an
+    assertion if the function is absent.
 
     Returns:
         ast.AsyncFunctionDef: The AST node representing `async_unload_entry`.
@@ -23,11 +24,11 @@ def _async_unload_entry() -> ast.AsyncFunctionDef:
 
 
 def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
-    """Find the source-line number of the first attribute call with the given name inside an async function AST node.
+    """Find the first line that calls an attribute or name.
 
     Parameters:
-        function (ast.AsyncFunctionDef): The async function AST node to search.
-        attr (str): The attribute name of the call to locate (e.g., "async_shutdown").
+        function: Async function AST node to search.
+        attr: Attribute or function name to locate.
 
     Returns:
         int: The line number where the first matching attribute call occurs.
@@ -49,8 +50,8 @@ def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
 def test_unload_platforms_before_coordinator_shutdown() -> None:
     """Verify platforms are unloaded before the coordinator is shut down.
 
-    Asserts that the call to `async_unload_platforms` appears earlier in `async_unload_entry`
-    than the call to `async_shutdown`, ensuring the coordinator is not stopped while the entry may still be considered loaded.
+    The platform unload must appear before bounded coordinator shutdown, so
+    the coordinator remains alive while the entry can still be loaded.
     """
     function = _async_unload_entry()
 
@@ -60,9 +61,9 @@ def test_unload_platforms_before_coordinator_shutdown() -> None:
 
 
 def test_coordinator_shutdown_is_success_gated() -> None:
-    """Assert that coordinator shutdown is executed only after a successful platform unload.
+    """Require successful platform unload before coordinator shutdown.
 
-    Checks the AST of `async_unload_entry` and fails unless an `if not unload_ok: ... return` block appears before the call to `async_shutdown`, ensuring shutdown is gated on unload success.
+    An `if not unload_ok: ... return` block must precede bounded shutdown.
     """
     function = _async_unload_entry()
     shutdown_line = _call_line(function, "_async_shutdown_coordinator_bounded")

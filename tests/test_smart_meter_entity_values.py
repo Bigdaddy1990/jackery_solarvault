@@ -26,14 +26,14 @@ def _lifetime_import_sensor() -> JackerySmartMeterSensor:
     sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(data={})
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = next(
         desc
         for desc in SMART_METER_SENSOR_DESCRIPTIONS
         if desc.key == "lifetime_import_energy"
     )
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -52,12 +52,12 @@ def test_smart_meter_total_increasing_reports_current_coordinator_value() -> Non
     sensor = _lifetime_import_sensor()
 
     _set_ct_total(sensor, _HIGH_WATT_HOURS)
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_HIGH_KWH)
 
     _set_ct_total(sensor, _LOWER_WATT_HOURS)
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_LOWER_KWH)
 
@@ -66,12 +66,12 @@ def _sensor_by_key(key: str) -> JackerySmartMeterSensor:
     sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(data={})
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = next(
         desc for desc in SMART_METER_SENSOR_DESCRIPTIONS if desc.key == key
     )
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -88,7 +88,7 @@ def test_import_energy_falls_back_to_per_phase_sum_when_total_absent() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(6.0)
 
@@ -105,7 +105,7 @@ def test_import_energy_prefers_reported_total_over_phase_sum() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     # 62_598 Wh -> 62.598 kWh, rounded to two decimals at the entity layer.
     assert sensor.native_value == pytest.approx(62.6)
@@ -124,7 +124,7 @@ def test_export_energy_falls_back_to_per_phase_negative_sum() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(2.0)
 
@@ -138,6 +138,6 @@ def test_mac_address_falls_back_to_device_sn_when_mac_absent() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == "5c013b048e3c"

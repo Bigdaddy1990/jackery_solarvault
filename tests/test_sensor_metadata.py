@@ -9,6 +9,7 @@ import pytest
 
 from custom_components.jackery_solarvault import sensor as sensor_module
 from custom_components.jackery_solarvault.const import (
+    APP_SECTION_SYMMETRY_STAT,
     DATE_TYPE_DAY,
     DATE_TYPE_WEEK,
     FIELD_GRID_STANDARD,
@@ -82,7 +83,11 @@ def test_default_power_is_a_disabled_diagnostic() -> None:
     assert description.entity_category == EntityCategory.DIAGNOSTIC
 
 
-async def _setup_grid_standard_entities(value: object) -> list[Any]:
+async def _setup_grid_standard_entities(
+    value: object,
+    *,
+    extra_payload: dict[str, Any] | None = None,
+) -> list[Any]:
     """Set up sensors against one isolated grid-standard payload value."""
     device_id = "dev-1"
     coordinator = MagicMock(name="coordinator")
@@ -90,11 +95,12 @@ async def _setup_grid_standard_entities(value: object) -> list[Any]:
         device_id: {
             PAYLOAD_PROPERTIES: {},
             PAYLOAD_SYSTEM: {FIELD_GRID_STANDARD: value},
+            **(extra_payload or {}),
         },
     }
     coordinator.last_update_success = True
     coordinator.async_add_listener.return_value = lambda: None
-    coordinator._has_smart_meter_accessory.return_value = False
+    coordinator._has_smart_meter_accessory.return_value = False  # ruff: ignore[private-member-access]
     entry = SimpleNamespace(
         data={},
         options={},
@@ -132,6 +138,38 @@ async def test_malformed_grid_standard_does_not_abort_sensor_setup(
     added = await _setup_grid_standard_entities(value)
 
     assert all(candidate.unique_id != "dev-1_grid_standard" for candidate in added)
+
+
+async def test_empty_optional_symmetry_stats_do_not_create_unknown_entities() -> None:
+    """An absent ATS statistics family must not create enabled unknown sensors."""
+    added = await _setup_grid_standard_entities(None)
+
+    assert all(
+        candidate.unique_id
+        not in {
+            "dev-1_symmetry_total_positive",
+            "dev-1_symmetry_total_negative",
+        }
+        for candidate in added
+    )
+
+
+async def test_observed_symmetry_stats_register_both_entities() -> None:
+    """The optional ATS entities appear once the HTTP endpoint proves support."""
+    added = await _setup_grid_standard_entities(
+        None,
+        extra_payload={
+            f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}": {
+                "totalP": "1.25",
+                "totalN": "0.75",
+                "unit": "kWh",
+            },
+        },
+    )
+
+    unique_ids = {candidate.unique_id for candidate in added}
+    assert "dev-1_symmetry_total_positive" in unique_ids
+    assert "dev-1_symmetry_total_negative" in unique_ids
 
 
 def test_sensor_descriptions_never_use_config_category() -> None:

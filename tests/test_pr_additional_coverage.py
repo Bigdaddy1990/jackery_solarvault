@@ -12,12 +12,12 @@ Covers gaps not addressed by the existing PR test files:
    must be coerced to None before being given to JackeryLocalMqttClient
 7. Regression: parse_hex16 accepts lowercase input (documented in expanded docstring)
 8. Regression: _rsa_pkcs1v15_encrypt with empty plaintext (boundary case)
-9. local_mqtt._handle_message: bytearray non-UTF8 increments dropped counter
+9. local_mqtt._handle_message: bytearray non-UTF8 reaches the binary ingest candidate path
 10. local_mqtt diagnostics: topics_seen_count matches len(topics_seen) invariant
 
 NOTE: Where the source module has a known SyntaxError (local_mqtt.py, __init__.py)
 the tests are skipped gracefully.
-"""
+"""  # ruff: ignore[line-too-long]
 
 import asyncio
 from typing import Any
@@ -31,11 +31,12 @@ import pytest
 
 try:
     from custom_components.jackery_solarvault.client.local_mqtt import (
-        LOCAL_MQTT_DEFAULT_TOPIC,
-        LOCAL_MQTT_MAX_TOPIC_NAMES,
         JackeryLocalMqttClient,
     )
     from custom_components.jackery_solarvault.const import (
+        DOMAIN,
+        LOCAL_MQTT_DEFAULT_TOPIC,
+        LOCAL_MQTT_MAX_TOPIC_NAMES,
         MQTT_CLIENT_LIBRARY,
         REDACTED_VALUE,
     )
@@ -51,7 +52,7 @@ except SyntaxError:
 
 _skip_local_mqtt = pytest.mark.skipif(
     not _LOCAL_MQTT_OK,
-    reason="client/local_mqtt.py has a SyntaxError — fix except clause first",
+    reason="client/local_mqtt.py could not be imported — fix first",
 )
 
 try:
@@ -60,13 +61,15 @@ try:
         _async_start_local_mqtt,
     )
     from custom_components.jackery_solarvault.const import (
-        CONF_THIRD_PARTY_MQTT_ENABLE,
-        CONF_THIRD_PARTY_MQTT_IP,
-        CONF_THIRD_PARTY_MQTT_PASSWORD,
-        CONF_THIRD_PARTY_MQTT_PORT,
-        CONF_THIRD_PARTY_MQTT_USERNAME,
-        DEFAULT_THIRD_PARTY_MQTT_PORT,
+        CONF_LOCAL_MQTT_ENABLE,
+        CONF_LOCAL_MQTT_HOST,
+        CONF_LOCAL_MQTT_PASSWORD,
+        CONF_LOCAL_MQTT_PORT,
+        CONF_LOCAL_MQTT_TOPIC,
+        CONF_LOCAL_MQTT_USERNAME,
+        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
         DOMAIN,
+        LOCAL_MQTT_RUNTIME_KEY,
     )
 
     _INIT_OK = True
@@ -75,12 +78,14 @@ except SyntaxError, ImportError:
     _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"  # type: ignore[assignment]
     _async_start_local_mqtt = None  # type: ignore[assignment]
     DOMAIN = "jackery_solarvault"
-    CONF_THIRD_PARTY_MQTT_ENABLE = "third_party_mqtt_enable"
-    CONF_THIRD_PARTY_MQTT_IP = "third_party_mqtt_ip"
-    CONF_THIRD_PARTY_MQTT_PORT = "third_party_mqtt_port"
-    CONF_THIRD_PARTY_MQTT_USERNAME = "third_party_mqtt_username"
-    CONF_THIRD_PARTY_MQTT_PASSWORD = "third_party_mqtt_password"
-    DEFAULT_THIRD_PARTY_MQTT_PORT = 1883
+    LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
+    CONF_LOCAL_MQTT_ENABLE = "local_mqtt_enable"
+    CONF_LOCAL_MQTT_HOST = "local_mqtt_host"
+    CONF_LOCAL_MQTT_PORT = "local_mqtt_port"
+    CONF_LOCAL_MQTT_USERNAME = "local_mqtt_username"
+    CONF_LOCAL_MQTT_PASSWORD = "local_mqtt_password"
+    CONF_LOCAL_MQTT_TOPIC = "local_mqtt_topic"
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER = "homeassistant"
 
 _skip_init = pytest.mark.skipif(
     not _INIT_OK,
@@ -89,7 +94,7 @@ _skip_init = pytest.mark.skipif(
 
 from custom_components.jackery_solarvault.client.api import (  # ruff: ignore[module-import-not-at-top-of-file]
     JackeryApi,
-    _rsa_pkcs1v15_encrypt,
+    _rsa_pkcs1v15_encrypt,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (  # ruff: ignore[module-import-not-at-top-of-file]
     DEVICE_EPS_STAT_PATH,
@@ -189,11 +194,12 @@ def _make_local_mqtt_entry(  # ruff: ignore[too-many-arguments]
     return _FakeEntry(
         entry_id=entry_id,
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: enable,
-            CONF_THIRD_PARTY_MQTT_IP: host,
-            CONF_THIRD_PARTY_MQTT_PORT: port,
-            CONF_THIRD_PARTY_MQTT_USERNAME: username,
-            CONF_THIRD_PARTY_MQTT_PASSWORD: password,
+            CONF_LOCAL_MQTT_ENABLE: enable,
+            CONF_LOCAL_MQTT_HOST: host,
+            CONF_LOCAL_MQTT_PORT: port,
+            CONF_LOCAL_MQTT_USERNAME: username,
+            CONF_LOCAL_MQTT_PASSWORD: password,
+            CONF_LOCAL_MQTT_TOPIC: DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
         },
     )
 
@@ -208,25 +214,35 @@ def test_handle_message_bytearray_utf8_json_dict_is_accepted() -> None:
     """A bytearray payload with a valid UTF-8 JSON object must be parsed correctly."""
     client = _make_client()
     payload = bytearray(b'{"batSoc": 80}')
-    client._handle_message("jackery/data", payload)
-    assert client._messages_received == 1
-    assert client._messages_dropped == 0
+    client._handle_message("jackery/data", payload)  # ruff: ignore[private-member-access]
+    assert client._messages_received == 1  # ruff: ignore[private-member-access]
+    assert client._messages_dropped == 0  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
-def test_handle_message_bytearray_non_utf8_increments_dropped() -> None:
-    """A bytearray payload that is not valid UTF-8 must increment messages_dropped."""
+@pytest.mark.asyncio()
+async def test_handle_message_bytearray_non_utf8_is_rejected_by_foreign_gate() -> None:
+    """Non-UTF-8 data without Jackery markers is rejected by the foreign-traffic gate before sink."""  # noqa: E501, RUF105
     # A matching topic filter is required so the message reaches the decode
     # path — the default empty/`homeassistant` filter would block a foreign
-    # topic before the drop counter (the topic filter is user-set). A sink is
-    # required too: the no-sink hot-path CPU guard skips decode+drop counting.
-    # The payload carries a Jackery marker so it passes the foreign-traffic
-    # prescan and reaches the UTF-8 decode path, where the invalid tail drops.
-    client = _make_client(topic_filter="jackery/data", sink=_noop_sink)
-    payload = bytearray(b'"deviceSn"\xff\xfe\xfd')  # invalid UTF-8 sequence
-    client._handle_message("jackery/data", payload)
-    assert client._messages_received == 1
-    assert client._messages_dropped == 1
+    # topic before the foreign-traffic gate (the topic filter is user-set).
+    # A sink is required too: the no-sink hot-path CPU guard skips decode+drop counting.
+    # App-proven Layer-C frames are opaque bytes, so UTF-8 failure alone cannot
+    # reject a candidate. But without Jackery markers, the foreign-traffic gate
+    # discards the frame before it reaches the sink.
+    sink = AsyncMock(return_value=False)
+    client = _make_client(topic_filter="jackery/data", sink=sink)
+    # Payload with NO Jackery marker keys and invalid UTF-8
+    payload = bytearray(b'"foreignKey"\xff\xfe\xfd')
+    client._handle_message("jackery/data", payload)  # ruff: ignore[private-member-access]
+    await asyncio.sleep(0)
+
+    assert client._messages_received == 1  # ruff: ignore[private-member-access]
+    # Foreign traffic gate discards before sink — sink never called
+    sink.assert_not_awaited()
+    assert client._messages_ignored_foreign == 1  # ruff: ignore[private-member-access]
+    assert client._messages_dropped == 0  # ruff: ignore[private-member-access]
+    assert client._messages_forwarded == 0  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
@@ -236,16 +252,16 @@ def test_handle_message_bytearray_json_array_increments_dropped() -> None:
     # shape is then counted as dropped.
     client = _make_client(topic_filter="jackery/data", sink=_noop_sink)
     payload = bytearray(b'["deviceSn", 2, 3]')
-    client._handle_message("jackery/data", payload)
-    assert client._messages_dropped == 1
+    client._handle_message("jackery/data", payload)  # ruff: ignore[private-member-access]
+    assert client._messages_dropped == 1  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
 def test_handle_message_bytearray_updates_last_topic() -> None:
     """Bytearray messages must update last_topic the same as bytes messages."""
     client = _make_client()
-    client._handle_message("some/topic", bytearray(b'{"x":1}'))
-    assert client._last_topic == "some/topic"
+    client._handle_message("some/topic", bytearray(b'{"x":1}'))  # ruff: ignore[private-member-access]
+    assert client._last_topic == "some/topic"  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
@@ -253,16 +269,16 @@ def test_handle_message_bytearray_raw_bytes_forwarded_to_sink() -> None:
     """raw_bytes forwarded to sink must be bytes, even when payload was bytearray."""
     received: list[bytes] = []
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # ruff: ignore[unused-async]
         received.append(raw)
 
     client = _make_client(topic_filter="t", sink=_sink)
-    client._handle_message("t", bytearray(b'{"batSoc": 1}'))
+    client._handle_message("t", bytearray(b'{"batSoc": 1}'))  # ruff: ignore[private-member-access]
     # Sink is scheduled as background task; verify it's queued (raw_bytes is bytes).
     # We verify type conversion by inspecting the bytearray → bytes path.
     # The conversion bytes(payload) in the code always produces bytes.
-    assert client._messages_received == 1
-    assert client._messages_forwarded == 1
+    assert client._messages_received == 1  # ruff: ignore[private-member-access]
+    assert client._messages_forwarded == 1  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
@@ -277,18 +293,18 @@ def test_handle_message_foreign_json_is_ignored_without_sink_dispatch() -> None:
     """
     sink_calls: list[str] = []
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # ruff: ignore[unused-async]
         sink_calls.append(topic)
 
     client = _make_client(topic_filter="homeassistant", sink=_sink)
-    client._handle_message(
+    client._handle_message(  # ruff: ignore[private-member-access]
         "homeassistant/sensor/plug/state",
         bytearray(b'{"battery": 100, "linkquality": 72, "state": "ON"}'),
     )
-    assert client._messages_received == 1
-    assert client._messages_ignored_foreign == 1
-    assert client._messages_forwarded == 0
-    assert client._messages_dropped == 0
+    assert client._messages_received == 1  # ruff: ignore[private-member-access]
+    assert client._messages_ignored_foreign == 1  # ruff: ignore[private-member-access]
+    assert client._messages_forwarded == 0  # ruff: ignore[private-member-access]
+    assert client._messages_dropped == 0  # ruff: ignore[private-member-access]
     assert not sink_calls
 
 
@@ -296,12 +312,12 @@ def test_handle_message_foreign_json_is_ignored_without_sink_dispatch() -> None:
 def test_handle_message_foreign_dict_with_marker_in_value_is_ignored() -> None:
     """A marker byte inside a VALUE must not smuggle a foreign dict through."""
     client = _make_client(topic_filter="homeassistant", sink=_noop_sink)
-    client._handle_message(
+    client._handle_message(  # ruff: ignore[private-member-access]
         "homeassistant/sensor/x/attributes",
         bytearray(b'{"tracked_keys": ["deviceSn"], "battery": 5}'),
     )
-    assert client._messages_ignored_foreign == 1
-    assert client._messages_forwarded == 0
+    assert client._messages_ignored_foreign == 1  # ruff: ignore[private-member-access]
+    assert client._messages_forwarded == 0  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
@@ -309,21 +325,21 @@ def test_handle_message_jackery_body_only_payload_is_forwarded() -> None:
     """A body-only bridge payload (cmd/deviceSn keys) reaches the sink once."""
     forwarded: list[dict | None] = []
 
-    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def _sink(topic: str, data: dict | None, raw: bytes) -> None:  # ruff: ignore[unused-async]
         forwarded.append(data)
 
     client = _make_client(topic_filter="homeassistant", sink=_sink)
-    client._handle_message(
+    client._handle_message(  # ruff: ignore[private-member-access]
         "homeassistant/device",
         bytearray(b'{"cmd": 113, "deviceSn": "HR2C04000280HH3", "enable": 1}'),
     )
-    assert client._messages_forwarded == 1
-    assert client._messages_ignored_foreign == 0
+    assert client._messages_forwarded == 1  # ruff: ignore[private-member-access]
+    assert client._messages_ignored_foreign == 0  # ruff: ignore[private-member-access]
 
 
 def test_payload_has_jackery_marker_prescan() -> None:
     """The shared prescan accepts Jackery shapes and rejects foreign ones."""
-    from custom_components.jackery_solarvault.client.local_mqtt import (
+    from custom_components.jackery_solarvault.client.local_mqtt import (  # ruff: ignore[import-outside-top-level]
         payload_has_jackery_marker,
     )
 
@@ -349,7 +365,7 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
 
     api.payload_debug_callback = _callback
     event = {"kind": "http", "path": "/test"}
-    await api._emit_payload_debug(event)
+    await api._emit_payload_debug(event)  # ruff: ignore[private-member-access]
     assert len(received) == 1
     assert received[0] is event
 
@@ -367,7 +383,7 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
     def factory():  # ruff: ignore[missing-return-type-private-function]
         return {"kind": "http", "path": "/lazy"}
 
-    await api._emit_payload_debug(factory)
+    await api._emit_payload_debug(factory)  # ruff: ignore[private-member-access]
     assert len(received) == 1
     assert received[0] is factory
 
@@ -377,8 +393,8 @@ async def test_emit_payload_debug_noop_when_callback_is_none() -> None:
     api = JackeryApi.__new__(JackeryApi)
     api.payload_debug_callback = None
     # Must not raise regardless of input type.
-    await api._emit_payload_debug({"kind": "http"})
-    await api._emit_payload_debug(lambda: {"kind": "http"})
+    await api._emit_payload_debug({"kind": "http"})  # ruff: ignore[private-member-access]
+    await api._emit_payload_debug(lambda: {"kind": "http"})  # ruff: ignore[private-member-access]
 
 
 async def test_emit_payload_debug_suppresses_callback_exception() -> None:
@@ -390,7 +406,7 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
 
     api.payload_debug_callback = _exploding_callback
     # Must not raise.
-    await api._emit_payload_debug({"kind": "test"})
+    await api._emit_payload_debug({"kind": "test"})  # ruff: ignore[private-member-access]
 
 
 async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
@@ -398,11 +414,11 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
     api = JackeryApi.__new__(JackeryApi)
     results: list[str] = []
 
-    async def _async_callback(event: Any) -> None:  # ruff: ignore[any-type]
+    async def _async_callback(event: Any) -> None:  # ruff: ignore[any-type]  # ruff: ignore[unused-async]
         results.append("done")
 
     api.payload_debug_callback = _async_callback
-    await api._emit_payload_debug({"kind": "async"})
+    await api._emit_payload_debug({"kind": "async"})  # ruff: ignore[private-member-access]
     assert results == ["done"]
 
 
@@ -413,7 +429,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
 
 def test_http_payload_debug_returns_required_keys() -> None:
     """_http_payload_debug must return a dict with all mandatory keys."""
-    result = JackeryApi._http_payload_debug(
+    result = JackeryApi._http_payload_debug(  # ruff: ignore[private-member-access]
         method="GET",
         path="/v1/test",
         params={"k": "v"},
@@ -439,32 +455,32 @@ def test_http_payload_debug_returns_required_keys() -> None:
 
 def test_http_payload_debug_none_params_becomes_empty_dict() -> None:
     """When params is None, the result must have an empty dict under 'params'."""
-    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")
+    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # ruff: ignore[private-member-access]
     assert result["params"] == {}
 
 
 def test_http_payload_debug_none_body_becomes_empty_dict() -> None:
     """When body is None, 'request_body' must be an empty dict."""
-    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")
+    result = JackeryApi._http_payload_debug(method="POST", path="/v1/test")  # ruff: ignore[private-member-access]
     assert result["request_body"] == {}
 
 
 def test_http_payload_debug_none_response_becomes_empty_dict() -> None:
     """When response is None, 'response' must be an empty dict."""
-    result = JackeryApi._http_payload_debug(method="GET", path="/v1/test")
+    result = JackeryApi._http_payload_debug(method="GET", path="/v1/test")  # ruff: ignore[private-member-access]
     assert result["response"] == {}
 
 
 def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
     """response_data_type must name the type of response['data']."""
-    result = JackeryApi._http_payload_debug(
+    result = JackeryApi._http_payload_debug(  # ruff: ignore[private-member-access]
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": {"key": "val"}},
     )
     assert result["response_data_type"] == "dict"
 
-    result2 = JackeryApi._http_payload_debug(
+    result2 = JackeryApi._http_payload_debug(  # ruff: ignore[private-member-access]
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": None},
@@ -474,7 +490,7 @@ def test_http_payload_debug_response_data_type_reflects_actual_type() -> None:
 
 def test_http_payload_debug_response_data_type_for_list() -> None:
     """When data is a list, response_data_type must be 'list'."""
-    result = JackeryApi._http_payload_debug(
+    result = JackeryApi._http_payload_debug(  # ruff: ignore[private-member-access]
         method="GET",
         path="/v1/test",
         response={"code": 0, "data": [1, 2, 3]},
@@ -493,12 +509,12 @@ async def test_async_get_device_eps_stat_without_dates_uses_defaults() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured["path"] = path
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: {"totalInEpsEnergy": "2.0"}}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
 
     payload = await api.async_get_device_eps_stat("dev42")
 
@@ -517,11 +533,11 @@ async def test_async_get_device_eps_stat_with_month_date_type() -> None:
     api.last_device_period_stat_responses = {}
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured["params"] = dict(params)
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
 
     await api.async_get_device_eps_stat("dev1", date_type="month")
 
@@ -549,7 +565,7 @@ def test_diagnostics_snapshot_started_true_when_runner_task_set() -> None:
     # returns a truthy ``done()``, so pin it to a live (not-done) task.
     runner = MagicMock()
     runner.done.return_value = False
-    client._runner_task = runner  # type: ignore[assignment]
+    client._runner_task = runner  # type: ignore[assignment]  # ruff: ignore[private-member-access]
     snap = client.diagnostics_snapshot()
     assert snap["started"] is True
 
@@ -558,11 +574,11 @@ def test_diagnostics_snapshot_started_true_when_runner_task_set() -> None:
 def test_diagnostics_snapshot_topics_seen_count_matches_len() -> None:
     """topics_seen_count in snapshot must equal len(topics_seen)."""
     client = _make_client()
-    client._handle_message("a/b", b"{}")
-    client._handle_message("c/d", b"{}")
+    client._handle_message("a/b", b"{}")  # ruff: ignore[private-member-access]
+    client._handle_message("c/d", b"{}")  # ruff: ignore[private-member-access]
     snap = client.diagnostics_snapshot()
     assert snap["topics_seen_count"] == len(snap["topics_seen"])
-    assert snap["topics_seen_count"] == 2
+    assert snap["topics_seen_count"] == 2  # ruff: ignore[magic-value-comparison]
 
 
 @_skip_local_mqtt
@@ -570,7 +586,7 @@ def test_diagnostics_snapshot_messages_dropped_in_snapshot() -> None:
     """messages_dropped in snapshot must reflect actual dropped count."""
     client = _make_client(topic_filter="t", sink=_noop_sink)
     # Marker passes the foreign prescan; non-dict JSON then counts as dropped.
-    client._handle_message("t", b'["deviceSn",2,3]')
+    client._handle_message("t", b'["deviceSn",2,3]')  # ruff: ignore[private-member-access]
     snap = client.diagnostics_snapshot()
     assert snap["messages_dropped"] == 1
     assert snap["messages_ignored_foreign"] == 0
@@ -602,7 +618,7 @@ async def test_async_start_local_mqtt_empty_username_stored_as_none_in_client() 
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # Empty string username must become None (the constructor does `username or None`).
-    assert client._username is None
+    assert client._username is None  # ruff: ignore[private-member-access]
 
 
 @_skip_init
@@ -617,7 +633,7 @@ async def test_async_start_local_mqtt_empty_password_stored_as_none_in_client() 
         await _async_start_local_mqtt(hass, entry, entry.runtime_data)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._password is None
+    assert client._password is None  # ruff: ignore[private-member-access]
 
 
 @_skip_init
@@ -632,8 +648,8 @@ async def test_async_start_local_mqtt_non_empty_credentials_preserved() -> None:
         await _async_start_local_mqtt(hass, entry, entry.runtime_data)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._username == "mqttuser"
-    assert client._password == "mqttpass"
+    assert client._username == "mqttuser"  # ruff: ignore[private-member-access]
+    assert client._password == "mqttpass"  # ruff: ignore[private-member-access]
 
 
 @_skip_init
@@ -646,7 +662,7 @@ async def test_async_start_local_mqtt_port_passed_to_client() -> None:
         await _async_start_local_mqtt(hass, entry, entry.runtime_data)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._port == 8883
+    assert client._port == 8883  # ruff: ignore[magic-value-comparison, private-member-access]
 
 
 @_skip_init
@@ -660,7 +676,7 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
     # The _async_start_local_mqtt strips the host before passing it.
-    assert client._host == "mqtt.local"
+    assert client._host == "mqtt.local"  # ruff: ignore[private-member-access]
 
 
 # ===========================================================================
@@ -670,27 +686,33 @@ async def test_async_start_local_mqtt_host_passed_to_client() -> None:
 
 def test_parse_hex16_accepts_lowercase_hex_string() -> None:
     """parse_hex16 must accept lowercase hex strings (case-insensitive)."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]
+        parse_hex16,
+    )
 
-    assert parse_hex16("00ff") == 0x00FF
-    assert parse_hex16("beef") == 0xBEEF
+    assert parse_hex16("00ff") == 0x00FF  # ruff: ignore[magic-value-comparison]
+    assert parse_hex16("beef") == 0xBEEF  # ruff: ignore[magic-value-comparison]
     assert parse_hex16("0001") == 1
 
 
 def test_parse_hex16_accepts_mixed_case_hex_string() -> None:
     """parse_hex16 must accept mixed-case hex strings."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]
+        parse_hex16,
+    )
 
-    assert parse_hex16("BeEF") == 0xBEEF
-    assert parse_hex16("Ff0A") == 0xFF0A
+    assert parse_hex16("BeEF") == 0xBEEF  # ruff: ignore[magic-value-comparison]
+    assert parse_hex16("Ff0A") == 0xFF0A  # ruff: ignore[magic-value-comparison]
 
 
 def test_parse_hex16_boundary_values() -> None:
     """parse_hex16 must correctly handle min and max 16-bit values."""
-    from custom_components.jackery_solarvault.client.ble import parse_hex16
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]
+        parse_hex16,
+    )
 
     assert parse_hex16("0000") == 0
-    assert parse_hex16("FFFF") == 0xFFFF
+    assert parse_hex16("FFFF") == 0xFFFF  # ruff: ignore[magic-value-comparison]
 
 
 # ===========================================================================
@@ -714,11 +736,11 @@ def test_rsa_pkcs1v15_encrypt_empty_plaintext_succeeds() -> None:
     result = _rsa_pkcs1v15_encrypt(b"", key_b64)
     assert isinstance(result, bytes)
     # RSA-1024 ciphertext is always 128 bytes regardless of plaintext length.
-    assert len(result) == 128
+    assert len(result) == 128  # ruff: ignore[magic-value-comparison]
 
 
 def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
-    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""
+    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""  # ruff: ignore[line-too-long]
     key_b64 = _make_rsa_public_key_b64()
     c1 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
     c2 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
@@ -726,8 +748,8 @@ def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
     # (Extremely unlikely to match; test provides regression guard.)
     assert isinstance(c1, bytes)
     assert isinstance(c2, bytes)
-    assert len(c1) == 128
-    assert len(c2) == 128
+    assert len(c1) == 128  # ruff: ignore[magic-value-comparison]
+    assert len(c2) == 128  # ruff: ignore[magic-value-comparison]
 
 
 # ===========================================================================
@@ -740,11 +762,11 @@ async def test_async_get_today_energy_with_special_chars_in_sn() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured["params"] = dict(params)
         return {}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
     await api.async_get_today_energy("HR2C-0001:AB")
     assert captured["params"][FIELD_DEVICE_SN] == "HR2C-0001:AB"
 
@@ -754,11 +776,11 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: dict[str, Any] = {}
 
-    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured["path"] = path
         return {}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
     await api.async_get_today_energy("SN001")
     assert captured["path"] == DEVICE_TODAY_ENERGY_PATH
 
@@ -770,30 +792,30 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
 
 @_skip_local_mqtt
 def test_handle_connect_failure_sets_connected_event_and_marks_not_connected() -> None:
-    """After _handle_connect_failure, both is_connected and the event must be in sync."""
+    """After _handle_connect_failure, both is_connected and the event must be in sync."""  # ruff: ignore[line-too-long]
     client = _make_client()
-    client._connected = True  # simulate was connected
-    client._connected_event.clear()
+    client._connected = True  # simulate was connected  # ruff: ignore[private-member-access]
+    client._connected_event.clear()  # ruff: ignore[private-member-access]
 
-    client._handle_connect_failure(3)
+    client._handle_connect_failure(3)  # ruff: ignore[private-member-access]
 
     assert client.is_connected is False
-    assert client._connected_event.is_set()
-    assert client._last_error is not None
-    assert "rc=3" in client._last_error
+    assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
+    assert client._last_error is not None  # ruff: ignore[private-member-access]
+    assert "rc=3" in client._last_error  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
 def test_handle_message_first_message_sets_last_message_at_and_last_topic() -> None:
     """After the first message, last_message_at and last_topic must be set."""
     client = _make_client()
-    assert client._last_message_at is None
-    assert client._last_topic is None
+    assert client._last_message_at is None  # ruff: ignore[private-member-access]
+    assert client._last_topic is None  # ruff: ignore[private-member-access]
 
-    client._handle_message("dev/props", b'{"soc": 95}')
+    client._handle_message("dev/props", b'{"soc": 95}')  # ruff: ignore[private-member-access]
 
-    assert client._last_message_at is not None
-    assert client._last_topic == "dev/props"
+    assert client._last_message_at is not None  # ruff: ignore[private-member-access]
+    assert client._last_topic == "dev/props"  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
@@ -801,17 +823,17 @@ def test_topics_seen_set_and_list_stay_synchronized() -> None:
     """_topics_seen and _topics_seen_set must always contain the same elements."""
     client = _make_client()
     for i in range(5):
-        client._handle_message(f"topic/{i}", b"{}")
+        client._handle_message(f"topic/{i}", b"{}")  # ruff: ignore[private-member-access]
     # Both must have the same topics.
-    assert set(client._topics_seen) == client._topics_seen_set
+    assert set(client._topics_seen) == client._topics_seen_set  # ruff: ignore[private-member-access]
 
 
 @_skip_local_mqtt
 def test_diagnostics_snapshot_redacted_topics_count_matches() -> None:
     """With redact=True, the number of REDACTED entries must equal topics_seen_count."""
     client = _make_client()
-    client._handle_message("a", b"{}")
-    client._handle_message("b", b"{}")
-    snap = client.diagnostics_snapshot(redact=True)
+    client._handle_message("a", b"{}")  # ruff: ignore[private-member-access]
+    client._handle_message("b", b"{}")  # ruff: ignore[private-member-access]
+    snap = client.diagnostics_snapshot()
     assert len(snap["topics_seen"]) == snap["topics_seen_count"]
     assert all(t == REDACTED_VALUE for t in snap["topics_seen"])

@@ -35,7 +35,9 @@ async def test_setup_and_unload_round_trip(
     mock_jackery_login: None,
 ) -> None:
     """A clean setup followed by unload must leave HA without dangling state."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.common import (  # ruff: ignore[import-outside-top-level]
+        MockConfigEntry,
+    )
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -77,7 +79,7 @@ async def test_setup_and_unload_round_trip(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):
@@ -98,7 +100,7 @@ async def test_services_register_on_setup(
     mock_jackery_login: None,
 ) -> None:
     """The three integration services must be registered after setup."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff:ignore[unsorted-imports]
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff:ignore[unsorted-imports]  # ruff: ignore[import-outside-top-level]
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -137,7 +139,7 @@ async def test_services_register_on_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):

@@ -15,7 +15,7 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_YEAR,
 )
 from custom_components.jackery_solarvault.util import (
-    _app_period_bound_to_date,
+    _app_period_bound_to_date,  # ruff: ignore[import-private-name]
     app_month_request_kwargs,
     app_period_date_bounds,
     app_period_range,
