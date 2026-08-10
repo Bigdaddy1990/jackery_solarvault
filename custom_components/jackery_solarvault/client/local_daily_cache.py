@@ -21,41 +21,40 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
-
 import asyncio
-from collections.abc import Mapping
 from datetime import date
 import json
-import logging
+from typing import TYPE_CHECKING, Any, Final
 
-from typing import TYPE_CHECKING, Any, Final, cast
-
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from ..const import DOMAIN
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from homeassistant.core import HomeAssistant
 
-_LOGGER = logging.getLogger(__name__)  # noqa: RUF067
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
-_RUNTIME_KEY: Final = f"{_STORAGE_KEY}.runtime"
+_LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
 _KEY_ENTRIES: Final = "entries"
 _KEY_DAY: Final = "day"
 _KEY_VALUES: Final = "values"
 
-type _StoreRuntime = tuple[Store[dict[str, Any]], asyncio.Lock]
+
+def _store_lock(hass: HomeAssistant) -> asyncio.Lock:
+    """Return the disposable runtime lock protecting this shared Store file."""
+    lock = hass.data.get(_LOCK_KEY)
+    if not isinstance(lock, asyncio.Lock):
+        lock = asyncio.Lock()
+        hass.data[_LOCK_KEY] = lock
+    return lock
 
 
-def _runtime(hass: HomeAssistant) -> _StoreRuntime:
-    """Return the shared store and transaction lock for this HA runtime."""
-    runtime = hass.data.get(_RUNTIME_KEY)
-    if runtime is None:
-        runtime = (Store(hass, _STORAGE_VERSION, _STORAGE_KEY), asyncio.Lock())
-        hass.data[_RUNTIME_KEY] = runtime
-    return cast("_StoreRuntime", runtime)
+def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
+    """Return the persistent Home Assistant store."""
+    return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
 
 def _isoformat_day(today: date) -> str:
@@ -67,17 +66,16 @@ def _isoformat_day(today: date) -> str:
     return today.isoformat()
 
 
-async def async_load_daily_cache(
+async def async_load_daily_cache(  # ruff: ignore[too-many-branches]
     hass: HomeAssistant, entry_id: str
 ) -> dict[str, dict[str, Any]]:
     """Load cached midnight snapshots for a config entry.
 
-    Returns a mapping keyed by device_id where each value is a snapshot object with the
-    shape
-    {"day": "YYYY-MM-DD", "values": {metric: wh}}. Malformed store entries are ignored; an
-    empty dict is returned when the store is missing or contains no valid snapshots.
-    Callers
-    should compare each snapshot's "day" to the current date before using its values.
+    Returns a mapping keyed by device_id where each value is a snapshot object
+    with the shape ``{"day": "YYYY-MM-DD", "values": {metric: wh}}``.
+    Malformed store entries are ignored; an empty dict is returned when the
+    store is missing or contains no valid snapshots. Callers should compare
+    each snapshot's day to the current date before using its values.
 
     Parameters:
         entry_id (str): Config entry identifier whose snapshots to load.
@@ -86,37 +84,85 @@ async def async_load_daily_cache(
         dict[str, dict[str, Any]]: Device-id -> snapshot mapping containing validated
         and normalized snapshot data.
     """
-    store, transaction_lock = _runtime(hass)
-    async with transaction_lock:
-        data = await store.async_load()
+    async with _store_lock(hass):
+        data = await _store(hass).async_load()
     if not isinstance(data, dict):
         return {}
     entries = data.get(_KEY_ENTRIES)
     if not isinstance(entries, dict):
         return {}
-    row = entries.get(entry_id)
-    if not isinstance(row, dict):
-        return {}
+    # A reauth/reconfigure cycle can replace the config-entry id while the
+    # physical device and its monotonic lifetime counters stay the same.  Read
+    # the requested row first, then recover same-device anchors from older
+    # rows.  For one day/metric the lowest counter is the earliest observation
+    # and therefore the best available midnight-side anchor.
+    requested_row = entries.get(entry_id)
+    rows = [requested_row] if isinstance(requested_row, dict) else []
+    rows.extend(
+        row
+        for candidate_entry_id, row in entries.items()
+        if candidate_entry_id != entry_id and isinstance(row, dict)
+    )
     result: dict[str, dict[str, Any]] = {}
-    for device_id, payload in row.items():
-        if not isinstance(payload, dict):
-            continue
-        day = payload.get(_KEY_DAY)
-        values = payload.get(_KEY_VALUES)
-        if not isinstance(day, str) or not isinstance(values, dict):
-            continue
-        clean_values: dict[str, int] = {}
-        for metric, value in values.items():
-            if not isinstance(metric, str):
+    for row in rows:
+        for device_id, payload in row.items():
+            if not isinstance(payload, dict):
+                continue
+            day = payload.get(_KEY_DAY)
+            values = payload.get(_KEY_VALUES)
+            if not isinstance(day, str) or not isinstance(values, dict):
                 continue
             try:
-                clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+                parsed_day = date.fromisoformat(day)
+                if parsed_day.isoformat() != day:
+                    continue
+            except ValueError:
                 continue
-        result[str(device_id)] = {
-            _KEY_DAY: day,
-            _KEY_VALUES: clean_values,
-        }
+            clean_values: dict[str, int] = {}
+            for metric, value in values.items():
+                if not isinstance(metric, str):
+                    continue
+                try:
+                    normalized = int(value)
+                except TypeError, ValueError:
+                    continue
+                if normalized < 0:
+                    continue
+                clean_values[metric] = normalized
+            if not clean_values:
+                continue
+            normalized_device_id = str(device_id)
+            existing = result.get(normalized_device_id)
+            if not isinstance(existing, dict):
+                result[normalized_device_id] = {
+                    _KEY_DAY: day,
+                    _KEY_VALUES: clean_values,
+                }
+                continue
+            existing_day = existing.get(_KEY_DAY)
+            if not isinstance(existing_day, str) or day > existing_day:
+                result[normalized_device_id] = {
+                    _KEY_DAY: day,
+                    _KEY_VALUES: clean_values,
+                }
+                continue
+            if day != existing_day:
+                continue
+            existing_values = existing.get(_KEY_VALUES)
+            if not isinstance(existing_values, dict):
+                existing_values = {}
+            result[normalized_device_id] = {
+                _KEY_DAY: day,
+                _KEY_VALUES: {
+                    metric: min(clean_values.get(metric, value), value)
+                    for metric, value in existing_values.items()
+                }
+                | {
+                    metric: value
+                    for metric, value in clean_values.items()
+                    if metric not in existing_values
+                },
+            }
     return result
 
 
@@ -124,11 +170,15 @@ async def async_save_daily_cache(
     hass: HomeAssistant,
     entry_id: str,
     *,
-    snapshots: dict[str, dict[str, Any]],
+    snapshots: dict[str, dict[str, Any] | Any],
 ) -> None:
     """Persist per-device midnight snapshot data for a configuration entry.
 
-    Cleans and writes `snapshots` into the module's persistent store for `entry_id`. The function accepts a mapping of device IDs to payloads of the form `{"day": "YYYY-MM-DD", "values": {metric: number}}`; non-dict payloads, non-string days, non-dict values, non-string metric keys, and values that cannot be converted to `int` are omitted. Existing store data for other entries is preserved; invalid fields in the provided snapshots are dropped rather than raising errors.
+    Cleans and writes ``snapshots`` into the module's persistent store for
+    ``entry_id``. The function accepts a mapping of device IDs to payloads of
+    the form ``{"day": "YYYY-MM-DD", "values": {metric: number}}``. Invalid
+    payloads, dates, keys, and values are omitted. Existing data for other
+    entries is preserved.
 
     Parameters:
         hass: HomeAssistant instance (provided by the caller).
@@ -141,71 +191,71 @@ async def async_save_daily_cache(
     cleaned: dict[str, dict[str, Any]] = {}
     for device_id, payload in snapshots.items():
         if not isinstance(payload, dict):
-            continue  # type: ignore[unreachable]
+            continue
         day = payload.get(_KEY_DAY)
         values = payload.get(_KEY_VALUES)
         if not isinstance(day, str) or not isinstance(values, dict):
+            continue
+        try:
+            if date.fromisoformat(day).isoformat() != day:
+                continue
+        except ValueError:
             continue
         clean_values: dict[str, int] = {}
         for metric, value in values.items():
             if not isinstance(metric, str):
                 continue
             try:
-                clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+                normalized = int(value)
+            except TypeError, ValueError:
                 continue
+            if normalized < 0:
+                continue
+            clean_values[metric] = normalized
+        if not clean_values:
+            continue
         cleaned[str(device_id)] = {
             _KEY_DAY: day,
             _KEY_VALUES: clean_values,
         }
 
-    store, transaction_lock = _runtime(hass)
-
-    async def _async_save_transaction() -> None:
-        """Merge this entry's cleaned daily values under the shared lock."""
-        async with transaction_lock:
-            loaded = await store.async_load()
-            data = dict(loaded) if isinstance(loaded, dict) else {}
-            raw_entries = data.get(_KEY_ENTRIES)
-            entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
-            entries[entry_id] = cleaned
-            data[_KEY_ENTRIES] = entries
-            await store.async_save(data)
-
-    task = hass.async_create_task(
-        _async_save_transaction(),
-        name=f"{DOMAIN}_local_daily_cache_save_{entry_id}",
-        eager_start=False,
-    )
-    await asyncio.shield(task)
+    async with _store_lock(hass):
+        store = _store(hass)
+        loaded = await store.async_load()
+        data = dict(loaded) if isinstance(loaded, dict) else {}
+        raw_entries = data.get(_KEY_ENTRIES)
+        entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
+        entries[entry_id] = cleaned
+        data[_KEY_ENTRIES] = entries
+        await store.async_save(data)
 
 
-def daily_delta(  # noqa: PLR0911
+def daily_delta(  # ruff: ignore[too-many-return-statements]
     snapshot: dict[str, Any] | None,
     metric_key: str,
-    current_lifetime_wh: int | float | None,
+    current_lifetime_wh: float | None,
     *,
     today: date,
 ) -> int | None:
     """Compute today's energy delta for a metric using a stored midnight anchor.
 
     Parameters:
-        snapshot (dict | None): Stored snapshot with keys `"day"` (ISO date string) and `"values"` (mapping metric keys to anchored Wh values).
+        snapshot (dict | None): Stored snapshot with an ISO ``day`` and a
+            ``values`` mapping containing anchored Wh values.
         metric_key (str): Metric key to read from `snapshot["values"]`.
         current_lifetime_wh (int | float | None): Current lifetime energy counter for
         the metric; if `None` the delta is disabled.
-        today (date): Local date used to validate that `snapshot["day"]` matches the current day.
+        today (date): Local date used to validate the snapshot day.
 
     Returns:
-        int | None: The computed delta in watt‑hours as an `int` if the snapshot is
-        valid for `today`, `current_lifetime_wh` and the stored anchor convert to
-        integers, the anchor exists, and `current >= anchor`; `None` otherwise.
+        int | None: The computed delta in watt-hours when the snapshot and
+        current lifetime counter are valid; otherwise ``None``.
     """
     if current_lifetime_wh is None:
         return None
     try:
         current = int(current_lifetime_wh)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not isinstance(snapshot, dict):
         return None
@@ -220,7 +270,7 @@ def daily_delta(  # noqa: PLR0911
         return None
     try:
         anchor_int = int(anchor)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if current < anchor_int:
         return None
@@ -233,15 +283,11 @@ def refresh_snapshot(
     today: date,
     current_values: dict[str, int | float | None],
 ) -> dict[str, Any]:
-    """Produce a snapshot for today containing integer anchors for available lifetime
-    metrics.
+    """Produce today's snapshot with integer anchors for lifetime metrics.
 
-    If `snapshot` is missing or its recorded day differs from `today`, create a new
-    snapshot by anchoring every metric in `current_values` whose value is not `None` and
-    can be converted to `int`. If the snapshot is already for `today`, preserve existing
-    integer anchors and add metrics from `current_values` only when an anchor does not
-    already exist and the value is convertible to `int`. Entries with `None` or
-    non-convertible values are omitted.
+    If the snapshot is missing or belongs to another day, every usable current
+    metric becomes a new anchor. For an existing same-day snapshot, existing
+    anchors are preserved and newly available metrics are added.
 
     Parameters:
         snapshot (dict[str, Any] | None): Existing per-device snapshot; may be `None`.
@@ -250,7 +296,8 @@ def refresh_snapshot(
         readings; `None` or non-numeric values are ignored.
 
     Returns:
-        dict[str, Any]: Snapshot with keys `"day"` (ISO `YYYY-MM-DD`) and `"values"` (mapping metric keys to integer Wh anchors).
+        dict[str, Any]: Snapshot with an ISO ``day`` and a ``values`` mapping
+        containing integer Wh anchors.
     """
     today_iso = _isoformat_day(today)
     if not isinstance(snapshot, dict) or snapshot.get(_KEY_DAY) != today_iso:
@@ -260,7 +307,7 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
         return {_KEY_DAY: today_iso, _KEY_VALUES: clean_values}
     existing_values = snapshot.get(_KEY_VALUES)
@@ -272,7 +319,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     for metric, value in current_values.items():
         if metric in merged:
@@ -281,17 +328,17 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
     return {_KEY_DAY: today_iso, _KEY_VALUES: merged}
 
 
 def is_new_day(snapshot: dict[str, Any] | None, today: date) -> bool:
-    """Determine if the provided snapshot represents a different day than the given
-    date.
+    """Determine whether the snapshot represents a different day.
 
     Returns:
-        `True` if the snapshot is missing or its stored `"day"` value does not equal `today.isoformat()`, `False` otherwise.
+        ``True`` when the snapshot is missing or its stored day differs from
+        ``today``; otherwise ``False``.
     """
     if not isinstance(snapshot, dict):
         return True
@@ -316,8 +363,7 @@ def snapshot_day(snapshot: dict[str, Any] | None) -> str | None:
 
 
 def local_daily_signature(snapshots: Mapping[str, Any]) -> str:
-    """
-    Produce a stable JSON signature for a snapshots mapping.
+    """Produce a stable JSON signature for a snapshots mapping.
 
     Parameters:
         snapshots (Mapping[str, Any]): Mapping of device IDs to per-device snapshot

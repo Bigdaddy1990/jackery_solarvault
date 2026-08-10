@@ -167,7 +167,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """  # noqa: D205, RUF105
     return data.hex().upper()
 
 
@@ -295,7 +295,10 @@ def random_iv() -> bytes:
 _BINARY_FRAME_HEADER_LEN: int = 16
 _BINARY_FRAME_TRAILER_LEN: int = 4
 _BINARY_FRAME_MAGIC_BE: bytes = b"\xdf\xed"
-_BINARY_FRAME_VERSION_BE: bytes = b"\x00\x64"
+# App 2.4.0 ``HomeControlFormat`` emits 0x0001 on writes. Live device
+# notifications use 0x0064, so the directions must not share one constant.
+_BINARY_FRAME_OUTBOUND_VERSION_BE: bytes = b"\x00\x01"
+_BINARY_FRAME_INBOUND_VERSION_BE: bytes = b"\x00\x64"
 _BINARY_FRAME_PAYLOAD_MARKER_BE: bytes = b"\x00\x01"
 
 
@@ -351,13 +354,19 @@ def build_binary_frame(  # ruff:ignore[too-many-arguments]
     flags: int = 0,
     frame_index: int = 1,
     chunk_count: int = 1,
-    trailer: bytes = b"\x00\x00\x00\x00",
+    trailer: bytes | None = None,
+    security: int | None = None,
 ) -> bytes:
-    """Serialise the binary header + body + trailer for the wire (no AES).
+    """Serialise one App-compatible outbound Home BLE frame (without AES).
 
-    Returns the **plaintext** that goes into :func:`encrypt_binary_notify`.
-    The default ``trailer`` of four zero bytes is a placeholder until the
-    firmware-side checksum algorithm is identified.
+    App 2.4.0 appends a random 16-bit security value followed by the
+    Modbus CRC-16 of ``header + body + security`` in little-endian byte
+    order. ``security`` exists for deterministic tests; live calls use a
+    cryptographically secure value in the app's range 1..65535.
+
+    ``trailer`` remains an explicit compatibility hook for captured or
+    intentionally malformed inbound-frame fixtures. Production callers
+    must leave it unset so the valid App trailer is generated.
     """
     if not 0 <= cmd <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
         raise ValueError(f"cmd {cmd} does not fit into 16 bits")  # ruff:ignore[raise-vanilla-args]
@@ -369,13 +378,17 @@ def build_binary_frame(  # ruff:ignore[too-many-arguments]
         raise ValueError(f"chunk_count {chunk_count} out of range")  # ruff:ignore[raise-vanilla-args]
     if len(body) > 0xFFFF:  # ruff:ignore[magic-value-comparison]
         raise ValueError(f"body too long: {len(body)} bytes")  # ruff:ignore[raise-vanilla-args]
-    if len(trailer) != _BINARY_FRAME_TRAILER_LEN:
+    if trailer is not None and len(trailer) != _BINARY_FRAME_TRAILER_LEN:
         raise ValueError(  # ruff:ignore[raise-vanilla-args]
             f"trailer must be {_BINARY_FRAME_TRAILER_LEN} bytes, got {len(trailer)}"
         )
+    if security is not None and not 1 <= security <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
+        raise ValueError(f"security {security} out of range")  # ruff:ignore[raise-vanilla-args]
+    if trailer is not None and security is not None:
+        raise ValueError("trailer and security are mutually exclusive")  # ruff:ignore[raise-vanilla-args]
     header = (
         _BINARY_FRAME_MAGIC_BE
-        + _BINARY_FRAME_VERSION_BE
+        + _BINARY_FRAME_OUTBOUND_VERSION_BE
         + frame_index.to_bytes(2, "big")
         + chunk_count.to_bytes(2, "big")
         + flags.to_bytes(2, "big")
@@ -386,7 +399,12 @@ def build_binary_frame(  # ruff:ignore[too-many-arguments]
     if len(header) != _BINARY_FRAME_HEADER_LEN:
         msg = f"Invalid BLE binary header length: {len(header)}"
         raise ValueError(msg)
-    return header + body + trailer
+    if trailer is not None:
+        return header + body + trailer
+    actual_security = secrets.randbelow(0xFFFF) + 1 if security is None else security
+    protected = header + body + actual_security.to_bytes(2, "big")
+    crc = crc16_modbus(protected).to_bytes(2, "little")
+    return protected + crc
 
 
 def encrypt_binary_notify(
@@ -436,8 +454,12 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         raise ValueError(  # ruff:ignore[raise-vanilla-args]
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
-    if plaintext[2:4] != _BINARY_FRAME_VERSION_BE:
-        # Soft assertion — every frame seen so far carries 0x0064 here.
+    if plaintext[2:4] not in {
+        _BINARY_FRAME_INBOUND_VERSION_BE,
+        _BINARY_FRAME_OUTBOUND_VERSION_BE,
+    }:
+        # Soft assertion — live notifications carry 0x0064 while App writes
+        # carry 0x0001. Preserve forward compatibility for future firmware.
         # We do not refuse parsing on mismatch, but the caller's debug
         # log will surface unexpected values for analysis.
         pass

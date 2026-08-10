@@ -14,7 +14,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from custom_components.jackery_solarvault.const import (
+from ..const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_RCS,
@@ -40,78 +40,24 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
-_AIOMQTT_LOGGER.setLevel(logging.WARNING)
+# Keep this logger at NOTSET and unfiltered. Home Assistant owns the effective
+# level; enabling integration DEBUG must expose every aiomqtt connection,
+# subscription, publish and teardown record.
 _MQTT_STOP_TIMEOUT_SEC = 5.0
 _MAX_PENDING_MESSAGE_TASKS = 32
-_AIOMQTT_LATE_ACK_TEMPLATES = frozenset({
-    'Unexpected message ID "%d" in on_subscribe callback',
-    'Unexpected message ID "%d" in on_unsubscribe callback',
-})
-# paho's on_disconnect callback races our stop/reconnect teardown and logs
-# the swallowed CancelledError at ERROR; same expected-noise class as the
-# late SUBACK/UNSUBACK templates above.
-_AIOMQTT_TEARDOWN_MESSAGE_PREFIX = "Caught exception in on_disconnect"
-
-
-class _AioMqttPassiveDisconnectFilter(logging.Filter):
-    """Hide expected passive broker reset noise from aiomqtt internals."""
-
-    def filter(self, record: logging.LogRecord) -> bool:  # ruff:ignore[no-self-use]
-        """Filter out common aiomqtt passive socket-reset log messages.
-
-        Parameters:
-            record (logging.LogRecord): The log record to evaluate.
-
-        Returns:
-            bool: `True` if the record should be logged, `False` if suppressed.
-        """
-        message = record.getMessage()
-        if "failed to receive on socket" not in message:
-            return True
-        return not any(
-            marker in message
-            for marker in (
-                "Errno 104",
-                "Connection reset by peer",
-                "WinError 10054",
-            )
-        )
-
-
-class _AioMqttTeardownNoiseFilter(logging.Filter):
-    """Demote late SUBACK/UNSUBACK teardown noise from aiomqtt internals.
-
-    During stop/reconnect the broker's late SUBACK/UNSUBACK callbacks can race
-    teardown. Only aiomqtt's two literal logger templates for that race are
-    expected on the optional push layer. Other callback failures remain visible.
-    """
-
-    def filter(self, record: logging.LogRecord) -> bool:  # ruff:ignore[no-self-use]
-        """Suppress or demote known teardown-race records.
-
-        Parameters:
-            record (logging.LogRecord): The log record to evaluate.
-
-        Returns:
-            bool: `True` if the record should be logged, `False` if suppressed.
-        """
-        if record.msg not in _AIOMQTT_LATE_ACK_TEMPLATES and not str(
-            record.msg
-        ).startswith(_AIOMQTT_TEARDOWN_MESSAGE_PREFIX):
-            return True
-        if not _AIOMQTT_LOGGER.isEnabledFor(logging.DEBUG):
-            return False
-        record.levelno = logging.DEBUG
-        record.levelname = logging.getLevelName(logging.DEBUG)
-        return True
-
-
-_AIOMQTT_LOGGER.addFilter(_AioMqttPassiveDisconnectFilter())
-_AIOMQTT_LOGGER.addFilter(_AioMqttTeardownNoiseFilter())
+# Getter response correlation constants
+_MAX_PENDING_RESPONSES = 100
+_MQTT_RESPONSE_TIMEOUT_SEC = 10.0
 
 
 class JackeryMqttPushClient:
-    """Async-native MQTT client for Jackery cloud topics in PROTOCOL.md §3."""
+    """Async-native MQTT client for Jackery cloud topics in PROTOCOL.md §3.
+
+    Internal state keys:
+    - "pending_responses": dict[int, asyncio.Future] — getter request waiters
+    - "responses_correlated": int — successful correlations
+    - "responses_expired": int — timed-out correlations
+    """
 
     def __init__(
         self,
@@ -134,7 +80,7 @@ class JackeryMqttPushClient:
             disconnect_callback (Callable[[], Awaitable[None]] | None): Optional async
             callback invoked after a prior successful connection when the client
             disconnects.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         self._hass = hass
         self._message_callback = message_callback
         self._connect_callback = connect_callback
@@ -164,6 +110,10 @@ class JackeryMqttPushClient:
         self._tls_custom_ca_loaded = False
         self._tls_certificate_source = "jackery_ca.crt"
         self._tls_x509_strict_disabled = False
+        # Getter response correlation (bounded session state)
+        self._pending_responses: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self._responses_correlated = 0
+        self._responses_expired = 0
         # "Birth" = the on-connect app-snapshot publish the broker expects
         # after every successful CONNACK (MQTT_PROTOCOL.md §3: publish
         # QueryCombineData / QueryWeatherPlan / QuerySubDeviceGroupProperty).
@@ -332,6 +282,8 @@ class JackeryMqttPushClient:
             raise RuntimeError(msg)
         try:
             await client.publish(topic, text, qos=qos, retain=retain)
+        except asyncio.CancelledError:
+            raise
         except MqttError as err:
             if self._session_is_current(generation, owner_task):
                 self._connected = False
@@ -354,7 +306,7 @@ class JackeryMqttPushClient:
         Raises:
             RuntimeError: If the MQTT client runner is not started, or if the client
             fails to connect within `timeout_sec`.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if not self.is_started:
             msg = "MQTT client is not running"
             raise RuntimeError(msg)
@@ -373,7 +325,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
+        """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -495,7 +447,7 @@ class JackeryMqttPushClient:
         connected and schedules the disconnect callback when a previously established
         session ends. On errors, updates internal error state and sets or clears the
         connected event to reflect whether the termination was a connect failure.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         runner_task = asyncio.current_task()
         broker_connected = False
         subscription_error: str | None = None
@@ -576,7 +528,7 @@ class JackeryMqttPushClient:
                 )
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # ruff:ignore[blind-except]
+        except Exception as err:  # noqa: BLE001, RUF105
             if self._session_is_current(generation, runner_task):
                 self._last_error = f"connect failed: {err}"
                 self._connected_event.set()
@@ -620,7 +572,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         message = f"connect rc={rc} ({reason})"
@@ -667,7 +619,7 @@ class JackeryMqttPushClient:
                 error (str): The error message to record.
                 was_connected (bool): If True, record the error as a disconnect; if
                 False, record it as a connect failure.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if self._is_connect_failure_error(self._last_error):
             return
         if was_connected:
@@ -707,7 +659,7 @@ class JackeryMqttPushClient:
         Returns:
             True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes),
             False otherwise.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         return rc in MQTT_AUTH_FAILURE_RCS
 
     @staticmethod
@@ -738,7 +690,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and
             `verify_mode = ssl.CERT_REQUIRED`.
-        """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
+        """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -806,7 +758,7 @@ class JackeryMqttPushClient:
                 `_messages_seen`, records `_last_message_at` (UTC ISO), clears
                 `_last_message_error`, and schedules the configured message callback
                 with `(topic, data)`.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if generation is not None and not self._session_is_current(
             generation, runner_task
         ):
@@ -839,6 +791,8 @@ class JackeryMqttPushClient:
         self._messages_seen += 1
         self._last_message_at = self._utc_now_iso()
         self._last_message_error = None
+        # Resolve any pending getter response correlation
+        self._resolve_pending_response(data)
         body_value = data.get(FIELD_BODY)
         body_keys = (
             sorted(str(key) for key in body_value)[:24]
@@ -895,7 +849,7 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:  # ruff:ignore[blind-except]
+            except Exception as err:  # noqa: BLE001, RUF105
                 _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)  # ruff:ignore[error-instead-of-exception]
 
         task.add_done_callback(_log_task_result)
@@ -975,7 +929,7 @@ class JackeryMqttPushClient:
         async def _publish() -> None:
             try:
                 await publish()
-            except Exception as err:  # ruff:ignore[blind-except]
+            except Exception as err:  # noqa: BLE001, RUF105
                 if not self._session_is_current(callback_generation):
                     return
                 self._birth_publish_failed += 1
@@ -1019,7 +973,7 @@ class JackeryMqttPushClient:
 
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if topic is None:
             return None
         parts = topic.split("/")
@@ -1027,14 +981,62 @@ class JackeryMqttPushClient:
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 
-    def diagnostics_snapshot(self, *, redact_topics: bool = True) -> dict[str, Any]:
-        """Provide a snapshot of the client's current diagnostics and computed metrics.
+    # Getter response correlation (bounded session state)
+    async def _wait_for_response(
+        self, request_id: int, timeout_sec: float = _MQTT_RESPONSE_TIMEOUT_SEC
+    ) -> dict[str, Any]:
+        """Wait for a response to a getter request.
 
-        Parameters:
-            redact_topics (bool): If True, redact identifying parts of topic strings in
-            the returned
-                `topics` list and `last_published_topic`; if False, return topics
-                unchanged.
+        Args:
+            request_id: The request ID to wait for.
+            timeout_sec: Maximum seconds to wait for response.
+
+        Returns:
+            The response data dictionary.
+
+        Raises:
+            asyncio.TimeoutError: If the response is not received within timeout.
+            RuntimeError: If the response queue is full.
+        """
+        if len(self._pending_responses) >= _MAX_PENDING_RESPONSES:
+            msg = "MQTT getter response queue full"
+            raise RuntimeError(msg)
+
+        future: asyncio.Future[dict[str, Any]] = asyncio.Future()
+        self._pending_responses[request_id] = future
+        try:
+            return await asyncio.wait_for(future, timeout=timeout_sec)
+        except TimeoutError:
+            self._responses_expired += 1
+            raise
+        finally:
+            self._pending_responses.pop(request_id, None)
+
+    def _resolve_pending_response(self, data: dict[str, Any]) -> None:
+        """Resolve a pending getter response from an incoming message.
+
+        Args:
+            data: The parsed MQTT message data containing request_id and response.
+        """
+        request_id = data.get("request_id")
+        if isinstance(request_id, int) and request_id in self._pending_responses:
+            future = self._pending_responses.pop(request_id)
+            if not future.done():
+                future.set_result(data)
+                self._responses_correlated += 1
+
+    @property
+    def responses_correlated(self) -> int:
+        """Number of getter responses successfully correlated to requests."""
+        return self._responses_correlated
+
+    @property
+    def responses_expired(self) -> int:
+        """Number of getter requests that timed out waiting for response."""
+        return self._responses_expired
+
+    def diagnostics_snapshot(self) -> dict[str, Any]:
+        """Provide a snapshot of the client's current diagnostics and computed metrics.
 
         Returns:
             dict[str, Any]: Mapping containing connection state, counters, timestamps,
@@ -1043,7 +1045,7 @@ class JackeryMqttPushClient:
               - "connected": whether the client is currently connected
               - "started": whether the client runner task exists
               - "messages_seen", "messages_dropped": message counters
-              - "topics": list of subscribed topics (redacted when `redact_topics` is True)
+              - "topics": list of subscribed topics with identifying segments redacted
               - "topic_count": number of subscribed topics
               - "last_error", "last_message_error": last observed error strings
               - "last_published_topic", "last_connect_at", "last_disconnect_at",
@@ -1058,17 +1060,15 @@ class JackeryMqttPushClient:
         """  # ruff: ignore[line-too-long]
 
         def topic_value(topic: str | None) -> str | None:
-            """Produce the topic with the user-specific segment redacted when redaction
-            is enabled.
+            """Produce a topic with its user-specific segment redacted.
 
             Parameters:
                 topic (str | None): MQTT topic to process; may be None.
 
             Returns:
-                str | None: The redacted topic when redaction is enabled, the original
-                topic when redaction is disabled, or `None` if `topic` is `None`.
-            """  # ruff: ignore[missing-blank-line-after-summary]
-            return self._redact_topic(topic) if redact_topics else topic
+                str | None: The redacted topic, or `None` if `topic` is `None`.
+            """
+            return self._redact_topic(topic)
 
         requested_topics = [topic_value(topic) for topic in self._topics]
         subscribed_topics = [topic_value(topic) for topic in self._subscribed_topics]
@@ -1136,7 +1136,7 @@ class JackeryMqttPushClient:
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if
             unavailable or invalid.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if self._last_message_at is None:
             return None
         try:
@@ -1177,7 +1177,7 @@ class JackeryMqttPushClient:
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds
             MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
-        """  # ruff: ignore[missing-blank-line-after-summary]
+        """  # noqa: D205, RUF105
         if not self._connected:
             return False
         elapsed = self._seconds_since_last_message()
@@ -1188,7 +1188,7 @@ class JackeryMqttPushClient:
                 then = datetime.fromisoformat(self._last_connect_at)
             except ValueError:
                 return False
-            now = datetime.now(tz=then.tzinfo)
+            now: datetime = datetime.now(tz=then.tzinfo)
             return (now - then).total_seconds() > MQTT_SILENT_THRESHOLD_SEC
         return elapsed > MQTT_SILENT_THRESHOLD_SEC
 
@@ -1213,3 +1213,8 @@ class JackeryMqttPushClient:
             True if the client is connected to the MQTT broker, False otherwise.
         """
         return self._connected
+
+    @property
+    def session_generation(self) -> int:
+        """Synchronous ownership generation of the current session."""
+        return self._session_generation

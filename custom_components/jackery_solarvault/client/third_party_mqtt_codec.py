@@ -5,7 +5,7 @@ import logging
 import secrets
 from typing import Any
 
-from custom_components.jackery_solarvault.const import (
+from ..const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
@@ -32,11 +32,87 @@ from custom_components.jackery_solarvault.const import (
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
-from custom_components.jackery_solarvault.util import safe_bool
-
+from ..util import safe_bool
 from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 
 _LOGGER = logging.getLogger(__name__)
+
+_THIRD_PARTY_MQTT_TOKEN_LEN = 9
+
+
+def generate_third_party_mqtt_token() -> str:
+    """Mint a fresh, stable 9-digit decimal token for ThirdPartMQTTConfig."""
+    return f"{secrets.randbelow(10**_THIRD_PARTY_MQTT_TOKEN_LEN):09d}"
+
+
+def stable_third_party_mqtt_token(
+    token: object,
+    prior_generated: object,
+) -> tuple[str, bool, str | None]:
+    """Resolve the effective third-party MQTT token to publish.
+
+    Accepts a user-provided ``token`` and an optional ``prior_generated`` token
+    that the integration minted in a previous session. Returns a tuple of
+    ``(token, use_generated, new)``:
+
+    - ``token``: the value that should be sent to the device.
+    - ``use_generated``: ``True`` if the returned token was produced by this
+      integration (and therefore not a user-supplied secret), ``False`` if the
+      caller passed a valid user-provided token.
+    - ``new``: when a new generated token was minted during this call, returns
+      that value so callers can persist it; otherwise ``None``.
+
+    The token must be exactly nine decimal digits. Empty/whitespace-only input
+    falls back to ``prior_generated`` (if valid) or to a freshly minted token.
+    """
+    raw_token = "" if token is None else str(token).strip()
+
+    if raw_token:
+        if not (
+            len(raw_token) == _THIRD_PARTY_MQTT_TOKEN_LEN and raw_token.isdecimal()
+        ):
+            msg = (
+                "third-party MQTT token must be a "
+                f"{_THIRD_PARTY_MQTT_TOKEN_LEN}-digit decimal string"
+            )
+            raise ValueError(msg)
+        prior = "" if prior_generated is None else str(prior_generated).strip()
+        if prior and prior == raw_token:
+            return (raw_token, True, None)
+        return (raw_token, False, None)
+
+    prior = "" if prior_generated is None else str(prior_generated).strip()
+    if prior and len(prior) == _THIRD_PARTY_MQTT_TOKEN_LEN and prior.isdecimal():
+        return (prior, True, None)
+
+    new_token = generate_third_party_mqtt_token()
+    return (new_token, True, new_token)
+
+
+def resolve_third_party_mqtt_token(
+    options: dict[str, Any],
+    prior_generated: object = None,
+) -> tuple[str, bool]:
+    """Resolve the third-party MQTT token from options, generating a new one if needed.
+
+    This is the public helper for code paths that need to push config to the
+    device (e.g. local MQTT bridge setup). It reads the token from ``options``
+    and falls back to ``prior_generated`` via ``stable_third_party_mqtt_token``.
+    Returns a tuple of ``(token, newly_generated)`` where ``newly_generated``
+    is ``True`` iff a fresh token was minted during this call.
+
+    Parameters:
+        options (dict[str, Any]): Home Assistant config-entry options.
+        prior_generated (object | None): Token previously minted by this
+            integration; reused when ``options`` lacks a usable token.
+
+    Returns:
+        tuple[str, bool]: The resolved token and a flag indicating whether it
+        was newly generated.
+    """
+    raw_token = options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN)
+    token, _, new = stable_third_party_mqtt_token(raw_token, prior_generated)
+    return (token, new is not None)
 
 
 def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
@@ -75,49 +151,38 @@ def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
         raise ValueError(msg) from err
 
 
-def generate_third_party_mqtt_token() -> str:
-    """Generate a 9-digit numeric token used as the app fallback token.
-
-    Returns:
-        str: A 9-character string consisting only of decimal digits (0-9).
-    """
-    return "".join(str(secrets.randbelow(10)) for _ in range(9))
-
-
 def third_party_mqtt_config_from_options(
     options: dict[str, Any],
-    generated_token: str | None,
+    prior_generated: object = None,
 ) -> dict[str, Any]:
     """Build a device-ready app field mapping for ThirdPartMQTTConfig from Home.
 
     Assistant options.
 
-    Selects the token from options (trimmed); if that token is empty and
-    `generated_token`
-    is provided, uses `generated_token`. Local listener options
-    (``local_mqtt_*``) are preferred for enable/host/port/user/password and
-    the legacy ``third_party_mqtt_*`` values are used as fallback. Maps option
-    values into app fields:
+    Selects the token from options, falling back to ``prior_generated`` (the
+    token previously minted by this integration) when the configured token is
+    blank. Local listener options (``local_mqtt_*``) are preferred for host
+    credentials and the legacy ``third_party_mqtt_*`` values are used as
+    fallback. Maps option values into app fields:
     - enable: `1` if configured truthy, else `0`
     - ip: string (empty if absent/falsey)
     - port: integer (defaults if absent/falsey)
     - username/password: strings (empty if absent/falsey)
-    - token: selected token
+    - token: resolved via ``stable_third_party_mqtt_token``
 
     Parameters:
         options (dict[str, Any]): Home Assistant config-entry options.
-        generated_token (str | None): Fallback token to use when the configured token
-        is empty.
+        prior_generated (object | None): Token previously minted by this
+            integration; reused when ``options`` lacks a usable token.
 
     Returns:
         dict[str, Any]: Mapping of app field constants to values ready for publishing
         to the device.
     """
-    token = str(
-        options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN) or "",
-    ).strip()
-    if not token and generated_token is not None:
-        token = generated_token
+    raw_token = options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN)
+    token, _use_generated, _new = stable_third_party_mqtt_token(
+        raw_token, prior_generated
+    )
     if CONF_LOCAL_MQTT_ENABLE in options:
         enabled_value = options.get(CONF_LOCAL_MQTT_ENABLE)
         enabled_default = DEFAULT_LOCAL_MQTT_ENABLE
@@ -157,51 +222,6 @@ def third_party_mqtt_config_from_options(
         ),
         FIELD_THIRD_PARTY_MQTT_TOKEN: token,
     }
-
-
-def stable_third_party_mqtt_token(
-    token: str,
-    generated_token: str | None,
-) -> tuple[str, bool, str | None]:
-    """Normalize and validate a ThirdParty MQTT token and determine whether a generated.
-
-    token should be used.
-
-    Parameters:
-        token (str): Candidate token value; will be coerced to string and stripped of
-        surrounding whitespace.
-        generated_token (str | None): Previously generated 9-digit token, or `None` if
-        none exists.
-
-    Returns:
-        (token_str (str), use_generated (bool), new_generated_token (str | None)):
-            - token_str: The 9-digit token to use.
-            - use_generated: `True` if the chosen token is (or should be treated as) a
-            generated token, `False` if it is a valid user-provided token.
-            - new_generated_token: The newly generated token when one was created,
-            otherwise `None`.
-
-    Raises:
-        ValueError: If a provided non-empty token is not exactly nine decimal digits.
-    """
-    raw_token = str(token).strip()
-    if raw_token:
-        if len(raw_token) != 9 or not raw_token.isdecimal():  # ruff:ignore[magic-value-comparison]
-            msg = (
-                "Third-party MQTT token must be a separate 9-digit decimal "
-                "value; topic belongs in the topic filter option"
-            )
-            raise ValueError(
-                msg,
-            )
-        if raw_token == generated_token:
-            return raw_token, True, None
-        return raw_token, False, None
-
-    if generated_token is None:
-        new_token = generate_third_party_mqtt_token()
-        return new_token, True, new_token
-    return generated_token, True, None
 
 
 def decode_third_party_mqtt_config_body(
@@ -267,15 +287,15 @@ def decode_third_party_mqtt_config_body(
 
 def third_party_mqtt_config_plaintext(
     options: dict[str, Any],
-    generated_token: str | None,
+    prior_generated: object,
     device_data: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Build a plaintext ThirdPartMQTTConfig dictionary by merging HA options with.
 
     device-reported values.
 
-    Starts from the config derived from `options` and `generated_token`. If
-    `device_data` contains a `PAYLOAD_THIRD_PARTY_MQTT_CONFIG` mapping, values for
+    Starts from the config derived from `options`. If `device_data` contains a
+    `PAYLOAD_THIRD_PARTY_MQTT_CONFIG` mapping, values for
     enable, IP, and port present in the device payload overwrite the corresponding
     entries. If that device payload has `_ha_plaintext` set to `True`, present
     credential fields (username, password, token) also overwrite the config. Inputs are
@@ -284,8 +304,9 @@ def third_party_mqtt_config_plaintext(
     Parameters:
         options (dict[str, Any]): Home Assistant option values used to build the base
         config.
-        generated_token (str | None): A pre-generated 9-digit token to use when the
-        options token is empty.
+        prior_generated (object | None): Token previously minted by this integration;
+        forwarded to ``third_party_mqtt_config_from_options`` so a generated token
+        persists across sessions.
         device_data (dict[str, Any] | None): Device GET payload that may contain the
         current ThirdPartMQTTConfig.
 
@@ -293,7 +314,7 @@ def third_party_mqtt_config_plaintext(
         dict[str, Any]: The merged plaintext ThirdPartMQTTConfig ready for entity
         setters.
     """
-    config = third_party_mqtt_config_from_options(options, generated_token)
+    config = third_party_mqtt_config_from_options(options, prior_generated)
     if isinstance(device_data, dict):
         current = device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
         if isinstance(current, dict):

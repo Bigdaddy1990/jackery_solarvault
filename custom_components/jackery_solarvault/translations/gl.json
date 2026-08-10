@@ -83,7 +83,7 @@
           "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
-        "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
+        "description": "Update the password, optional sensor toggles, and the experimental Third-Party MQTT bridge for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
         "title": "Reconfigure Jackery SolarVault"
       },
       "user": {
@@ -1505,7 +1505,7 @@
         "name": "Weather plan"
       },
       "wifi_ip": {
-        "name": "IP address"
+        "name": "WiFi IP address"
       },
       "wifi_name": {
         "name": "WiFi name"
@@ -1924,7 +1924,7 @@
           "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
-        "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",
+        "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values. The Third-Party MQTT bridge is experimental and asks the SolarVault to publish telemetry to your local broker as documented in PROTOCOL.md §5.",
         "title": "Jackery options"
       }
     }
