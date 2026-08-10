@@ -7,9 +7,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_SUB_DEVICE,
     SUBDEVICE_DEV_TYPE_BATTERY_PACK,
 )
-from custom_components.jackery_solarvault.coordinator import (
-    battery_packs_from_source,
-)
+from custom_components.jackery_solarvault.coordinator import battery_packs_from_source
 
 
 def test_battery_pack_dev_type_detects_identity_only_cmd110_payload() -> None:

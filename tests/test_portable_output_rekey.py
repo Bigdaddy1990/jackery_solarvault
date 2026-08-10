@@ -70,7 +70,7 @@ _CUSTOM_UPPER = 85
 _ANY_PRIORITY_OPTION = next(iter(_OPTION_TO_OUTPUT_PRIORITY))
 
 
-def _coord() -> Any:  # ruff:ignore[any-type]
+def _coord() -> Any:
     """Coordinator stub exposing the two portable command seams as mocks."""
     coord = type("_C", (), {})()
     coord.async_portable_toggle_output = AsyncMock()
@@ -78,7 +78,7 @@ def _coord() -> Any:  # ruff:ignore[any-type]
     return coord
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_output_priority_switch_writes_out_prio() -> None:
     """MsgId 47 master toggle writes PortableBody ``outPrio`` (not ``pss``)."""
     coord = _coord()
@@ -91,7 +91,7 @@ async def test_output_priority_switch_writes_out_prio() -> None:
     assert kwargs["enabled"] is True
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_discharge_memory_writes_dhg_recall() -> None:
     """MsgId 53 discharge memory writes ``dhg_recall`` (not ``dl``)."""
     coord = _coord()
@@ -104,7 +104,7 @@ async def test_discharge_memory_writes_dhg_recall() -> None:
     assert kwargs["enabled"] is False
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_bluetooth_sleep_writes_tmt() -> None:
     """MsgId 44 Bluetooth sleep time writes ``tmt`` minutes (not ``ast``)."""
     coord = _coord()
@@ -117,7 +117,7 @@ async def test_bluetooth_sleep_writes_tmt() -> None:
     assert kwargs["value"] == _SLEEP_MINUTES
 
 
-def _select_entity() -> Any:  # ruff:ignore[any-type]
+def _select_entity() -> Any:
     """Select-entity stub exposing the portable set-select command seam."""
     entity = type("_E", (), {})()
     entity._device_id = _DEVICE
@@ -134,9 +134,9 @@ def _select_entity() -> Any:  # ruff:ignore[any-type]
         [_portable_dc_priority_select, "odcPrio"],
     ],
 )
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_per_port_priority_uses_priority_action_not_soc(
-    select_fn: Any,  # ruff:ignore[any-type]
+    select_fn: Any,
     field: str,
 ) -> None:
     """Per-port priority (oacNPrio/odcPrio) is msgId 48, not the SOC msgId 49."""
@@ -157,9 +157,9 @@ async def test_per_port_priority_uses_priority_action_not_soc(
         [_set_portable_dc_priority_soc, "odcPrioSoc"],
     ],
 )
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_per_port_priority_soc_writes_per_port_field(
-    soc_setter: Any,  # ruff:ignore[any-type]
+    soc_setter: Any,
     field: str,
 ) -> None:
     """Per-port priority SOC (msgId 49) writes oacNPrioSoc/odcPrioSoc, not ``pss``."""
@@ -173,7 +173,7 @@ async def test_per_port_priority_soc_writes_per_port_field(
     assert kwargs["value"] == _PRIORITY_SOC_PCT
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ac_output_delay_writes_acdt_via_delay_action() -> None:
     """MsgId 41 AC output delay writes ``acdt`` seconds (distinct from oact/34)."""
     coord = _coord()
@@ -186,7 +186,7 @@ async def test_ac_output_delay_writes_acdt_via_delay_action() -> None:
     assert kwargs["value"] == _AC_DELAY_SECONDS
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_battery_mode_writes_lps_via_setting_battery() -> None:
     """MsgId 22 battery mode writes ``lps`` (0/1/2) via SETTING_BATTERY."""
     entity = _select_entity()
@@ -200,7 +200,7 @@ async def test_battery_mode_writes_lps_via_setting_battery() -> None:
     assert kwargs["value"] == _OPTION_TO_BATTERY_MODE[option]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_charge_mode_writes_cs_via_setting_charge() -> None:
     """MsgId 21 charge mode writes ``cs`` (0/1/2) via SETTING_CHARGE."""
     entity = _select_entity()
@@ -214,7 +214,7 @@ async def test_charge_mode_writes_cs_via_setting_charge() -> None:
     assert kwargs["value"] == _OPTION_TO_CHARGE_MODE[option]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_custom_use_discharge_limit_delegates_to_lower_bound() -> None:
     """The dl number delegates to the custom-use multi-field write as lower bound."""
     coord = type("_C", (), {})()
@@ -226,7 +226,7 @@ async def test_custom_use_discharge_limit_delegates_to_lower_bound() -> None:
     assert kwargs["discharge_limit"] == _CUSTOM_LOWER
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_custom_use_charge_limit_delegates_to_upper_bound() -> None:
     """The cl number delegates to the custom-use multi-field write as upper bound."""
     coord = type("_C", (), {})()
@@ -247,7 +247,7 @@ _DC_USB_COUNTDOWN_SECONDS = 600
 _DC_CAR_COUNTDOWN_SECONDS = 1200
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_portable_set_number_forwards_action_field_and_int_value() -> None:
     """The shared helper forwards action_id/field and coerces value to int."""
     coord = _coord()
@@ -268,7 +268,7 @@ async def test_async_portable_set_number_forwards_action_field_and_int_value() -
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_portable_set_number_truncates_float_toward_zero() -> None:
     """A fractional value is truncated via ``int()``, not rounded."""
     coord = _coord()
@@ -332,9 +332,9 @@ async def test_async_portable_set_number_truncates_float_toward_zero() -> None:
         ],
     ],
 )
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_number_setter_routes_through_shared_helper_with_correct_key(
-    setter: Any,  # ruff:ignore[any-type]
+    setter: Any,
     action_id: int,
     field: str,
     raw_value: int,

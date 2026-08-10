@@ -192,8 +192,7 @@ def ingest_observation(
                 received_at - current_provenance.received_at_monotonic,
             )
             keep_current = (
-                incoming_tier < current_tier
-                and current_age < freshness_window_seconds
+                incoming_tier < current_tier and current_age < freshness_window_seconds
             ) or (
                 incoming.source is current_provenance.source
                 and incoming.observed_at is not None

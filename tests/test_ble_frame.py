@@ -70,9 +70,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from homeassistant.exceptions import (
-    ServiceValidationError,
-)
+from homeassistant.exceptions import ServiceValidationError
 
 # ---------------------------------------------------------------------------
 # Constants — pinned to the smali-verified literals
@@ -84,13 +82,13 @@ def test_wire_format_constants_match_smali() -> None:
     assert BLE_FRAME_MAGIC == "DFED"
     assert BLE_FRAME_VERSION == "0001"
     assert BLE_FRAME_PAYLOAD_MARKER == "0001"
-    assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]
+    assert BLE_AES_IV_LEN == 16
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
     # A SolarVault 3 Pro Max captured 2026-05-16 returned a 16-byte key
     # ("hr2c0hh361336138" → AES-128), so the helpers must accept that too.
-    assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
-    assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]
+    assert BLE_AES_KEY_LEN_AES128 == 16
+    assert BLE_AES_KEY_LEN_AES256 == 32
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
     # The legacy single-value alias points at AES-128 because that is the
     # observed wild-type for SolarVault.
@@ -102,7 +100,7 @@ def test_gatt_uuids_match_smali_and_live_capture() -> None:
     assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"
     assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"
     assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"
-    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data  # ruff: ignore[magic-value-comparison]
+    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data
 
 
 # ---------------------------------------------------------------------------
@@ -121,9 +119,9 @@ def test_hex16_upper_case_4_digit_format() -> None:
 
 def test_hex16_rejects_out_of_range() -> None:
     """``hex16`` refuses values that do not fit into 16 bits."""
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         hex16(-1)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         hex16(0x10000)
 
 
@@ -135,9 +133,9 @@ def test_parse_hex16_round_trips() -> None:
 
 def test_parse_hex16_rejects_wrong_width() -> None:
     """``parse_hex16`` enforces the 4-char width."""
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         parse_hex16("BEE")
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         parse_hex16("00BEE")
 
 
@@ -161,7 +159,7 @@ def test_hex_encode_decode_round_trip() -> None:
 def test_crc16_modbus_reference_vector() -> None:
     """Standard Modbus CRC-16 of ``"123456789"`` is ``0x4B37``."""
     # https://crccalc.com — CRC-16/MODBUS (poly 0xA001, init 0xFFFF, reflected).
-    assert crc16_modbus(b"123456789") == 0x4B37  # ruff: ignore[magic-value-comparison]
+    assert crc16_modbus(b"123456789") == 0x4B37
 
 
 def test_crc16_hex_is_4_chars_upper() -> None:
@@ -192,7 +190,7 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     accepting both key lengths.
     """
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
+    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
@@ -203,14 +201,14 @@ def test_aes_rejects_wrong_key_or_iv_length() -> None:
     """Length validation catches caller mistakes before they hit OpenSSL."""
     # Reject key lengths that are neither AES-128 nor AES-256.
     for bad_key_len in (15, 17, 24, 31, 33, 64):
-        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+        with pytest.raises(ValueError):
             aes_encrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
-        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+        with pytest.raises(ValueError):
             aes_decrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
     # Reject wrong IV lengths.
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         aes_encrypt(b"x", b"\x00" * 32, b"\x00" * 15)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         aes_decrypt(b"x", b"\x00" * 32, b"\x00" * 17)
 
 
@@ -281,9 +279,9 @@ def test_parse_plaintext_frame_rejects_bad_magic_or_marker() -> None:
             chunk_payload=b"",
         )
     )
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         parse_plaintext_frame("BEEF" + valid[4:])
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad, pytest-raises-with-multiple-statements]
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-with-multiple-statements]
         # Corrupt the payload marker (position after header fields).
         broken = valid[:24] + "BEEF" + valid[28:]
         parse_plaintext_frame(broken)
@@ -300,7 +298,7 @@ def test_parse_plaintext_frame_detects_truncation() -> None:
             chunk_payload=b"deadbeef",
         )
     )
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         parse_plaintext_frame(valid[:-4])
 
 
@@ -370,7 +368,7 @@ def test_decrypt_rejects_crc_tampering() -> None:
     )
     blob = bytearray(encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN)))
     blob[-1] ^= 0x01
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         decrypt_frame(bytes(blob), key)
 
 
@@ -381,16 +379,16 @@ def test_decrypt_rejects_crc_tampering() -> None:
 
 def test_chunk_size_matches_smali_formula() -> None:
     """``chunk_size_for_mtu(mtu) == mtu - 60`` exactly."""
-    assert chunk_size_for_mtu(247) == 187  # ruff: ignore[magic-value-comparison]
-    assert chunk_size_for_mtu(100) == 40  # ruff: ignore[magic-value-comparison]
+    assert chunk_size_for_mtu(247) == 187
+    assert chunk_size_for_mtu(100) == 40
     assert chunk_size_for_mtu(61) == 1
 
 
 def test_chunk_size_refuses_too_small_mtu() -> None:
     """MTU at or below the 60-byte overhead is rejected."""
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         chunk_size_for_mtu(60)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         chunk_size_for_mtu(0)
 
 
@@ -403,10 +401,10 @@ def test_split_payload_emits_correct_number_of_frames() -> None:
         ble_cmd=120,
         mtu=247,
     )
-    assert len(frames) == 3  # ruff: ignore[magic-value-comparison]
+    assert len(frames) == 3
     assert frames[0].frame_index == 1
-    assert frames[0].chunk_count == 3  # ruff: ignore[magic-value-comparison]
-    assert frames[-1].frame_index == 3  # ruff: ignore[magic-value-comparison]
+    assert frames[0].chunk_count == 3
+    assert frames[-1].frame_index == 3
     assert b"".join(f.chunk_payload for f in frames) == payload
     # All but the last chunk are at the MTU-derived max length.
     for f in frames[:-1]:
@@ -503,13 +501,13 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
         assert isinstance(payload, dict)
         assert payload.get("cmd") == expected_cmd
         # Trailer is always 4 bytes — assumed CRC; opaque for now.
-        assert len(frame.trailer) == 4  # ruff: ignore[magic-value-comparison]
+        assert len(frame.trailer) == 4
 
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
     key = base64.b64decode(_LIVE_KEY_B64)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         decrypt_binary_notify(b"too short", key)
 
 
@@ -527,8 +525,8 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     plain = build_binary_frame(cmd=107, body=body, flags=42, security=0x1234)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
     parsed = decrypt_binary_notify(blob, key)
-    assert parsed.cmd == 107  # ruff: ignore[magic-value-comparison]
-    assert parsed.flags == 42  # ruff: ignore[magic-value-comparison]
+    assert parsed.cmd == 107
+    assert parsed.flags == 42
     assert parsed.frame_index == 1
     assert parsed.chunk_count == 1
     assert parsed.body == body
@@ -600,8 +598,8 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         assert captured["uuid"] == BLE_WRITE_CHAR_UUID
         assert captured["response"] is False
         parsed = decrypt_binary_notify(captured["blob"], key)  # type: ignore[arg-type]
-        assert parsed.cmd == 107  # ruff: ignore[magic-value-comparison]
-        assert parsed.flags == 3022  # ruff: ignore[magic-value-comparison]
+        assert parsed.cmd == 107
+        assert parsed.flags == 3022
         assert parsed.body == b'{"swEps":1}'
 
     asyncio.run(_run())
@@ -609,17 +607,17 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
 def test_build_binary_frame_rejects_oversized_fields() -> None:
     """Every header field is range-checked before encryption."""
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=107, body=b"x", frame_index=0)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=107, body=b"x", chunk_count=0x1_0000)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=107, body=b"x", flags=-1)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=0x1_0000, body=b"x")
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=107, body=b"x" * 0x1_0001)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError):
         build_binary_frame(cmd=107, body=b"x", trailer=b"\x00\x00\x00")
 
 
@@ -632,7 +630,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
     """Assert the integration manifest declares the BLE service matcher, manufacturer, dependency, and requirement.
 
     Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
-    """  # ruff: ignore[line-too-long]
+    """
     import json  # ruff: ignore[import-outside-top-level]
     from pathlib import Path  # ruff: ignore[import-outside-top-level]
 
@@ -658,9 +656,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
 def test_const_exposes_ble_option_and_field() -> None:
     """Config option + bluetoothKey field constants exist in const.py."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415, RUF105
-        const,
-    )
+    from custom_components.jackery_solarvault import const  # noqa: PLC0415, RUF105
 
     assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
     assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
@@ -719,7 +715,7 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
-            """  # ruff: ignore[line-too-long]
+            """
             await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)  # ruff: ignore[private-member-access]
 
         task = asyncio.create_task(_stuck())
@@ -747,8 +743,8 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]
-        options = {  # ruff: ignore[mutable-class-default]
+        data: dict[str, object] = {}
+        options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -759,14 +755,14 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
             Raises:
                 AssertionError: Always raised with the message "BLE listener must not be called".
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("BLE listener must not be called")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("BLE listener must not be called")
 
     async def _run() -> None:
         """Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
 
         Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.entry = _Entry()
         self._ble_listener = _Listener()
@@ -788,8 +784,8 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]
-        options = {  # ruff: ignore[mutable-class-default]
+        data: dict[str, object] = {}
+        options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -802,7 +798,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
             Returns:
                 stats (dict[str, object]): A snapshot mapping statistic names to their current values.
-            """  # ruff: ignore[line-too-long]
+            """
             return {}
 
         def mtu_for_device(self, device_id: str) -> int:  # ruff: ignore[no-self-use]
@@ -834,7 +830,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     assert running["enabled"] is True
     assert running["running"] is True
     assert running["frames_decoded"] == 0
-    assert running["mtu"] == 517  # ruff: ignore[magic-value-comparison]
+    assert running["mtu"] == 517
 
 
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
@@ -846,8 +842,8 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]
-        options = {  # ruff: ignore[mutable-class-default]
+        data: dict[str, object] = {}
+        options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -855,7 +851,7 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # ruff: ignore[too-many-arguments, no-self-use]
+        async def async_send_command(  # ruff: ignore[no-self-use]
             self,
             device_id: str,
             *,
@@ -915,7 +911,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
     """Verify that when BLE send succeeds, the coordinator does not call the MQTT fallback and forwards the expected BLE send options.
 
     Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
-    """  # ruff: ignore[line-too-long]
+    """
     import asyncio  # ruff: ignore[import-outside-top-level]
 
     from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
@@ -930,7 +926,7 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
     async def _run() -> None:
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
-        async def _send_ble(  # ruff: ignore[too-many-arguments]  # ruff: ignore[unused-async]
+        async def _send_ble(  # ruff: ignore[unused-async]
             device_id: str,
             *,
             cmd: int,
@@ -959,8 +955,8 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
 
             Raises:
                 AssertionError: Always raised with the message "MQTT fallback must not be called".
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("MQTT fallback must not be called")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("MQTT fallback must not be called")
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
@@ -976,8 +972,8 @@ def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
         # falls back to MQTT instead of being swallowed. ``flags``
         # carries the actionId (wire-header naming).
         assert captured["device_id"] == "dev1"
-        assert captured["cmd"] == 107  # ruff: ignore[magic-value-comparison]
-        assert captured["flags"] == 3022  # ruff: ignore[magic-value-comparison]
+        assert captured["cmd"] == 107
+        assert captured["flags"] == 3022
         assert captured["body"] == {FIELD_SW_EPS: 1, "cmd": 107}
         assert captured["wait_for_ack"] is True
         assert captured["connect_timeout_sec"] > 0
@@ -993,13 +989,13 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
         """Run the coordinator's BLE-first publish flow with BLE unavailable and assert the MQTT publish is invoked with the expected arguments.
 
         This coroutine configures a coordinator instance so BLE sends always fail and replaces the MQTT publish method with a captor, then invokes `_async_publish_command_ble_first` and verifies the captured MQTT parameters match the expected values.
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
             return False
 
-        async def _publish_mqtt(  # ruff: ignore[too-many-arguments]  # ruff: ignore[unused-async]
+        async def _publish_mqtt(  # ruff: ignore[unused-async]
             device_id: str,
             *,
             message_type: str,
@@ -1017,7 +1013,7 @@ def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """  # ruff: ignore[line-too-long]
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1058,7 +1054,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
         """Run a BLE-first publish scenario that forces a BLE ack timeout and captures the MQTT fallback call.
 
         This coroutine constructs a Coordinator instance stub, replaces its BLE send method with one that raises a `RuntimeError("BLE ack timeout")`, and replaces its MQTT publish method with a recorder that stores the call arguments into the surrounding `captured` mapping. It then invokes `_async_publish_command_ble_first` for device `"dev1"` with `message_type="DevicePropertyChange"`, `action_id=3022`, `cmd=107`, and `body_fields={FIELD_SW_EPS: 1}` to drive the BLE-fails-then-MQTT flow.
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
@@ -1069,10 +1065,10 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
 
             Raises:
                 RuntimeError: If waiting for the ACK times out.
-            """  # ruff: ignore[line-too-long]
-            raise RuntimeError("BLE ack timeout")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise RuntimeError("BLE ack timeout")
 
-        async def _publish_mqtt(  # ruff: ignore[too-many-arguments]  # ruff: ignore[unused-async]
+        async def _publish_mqtt(  # ruff: ignore[unused-async]
             device_id: str,
             *,
             message_type: str,
@@ -1090,7 +1086,7 @@ def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """  # ruff: ignore[line-too-long]
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1129,7 +1125,7 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
         """Exercise the coordinator's BLE-first publish path by invoking _async_publish_command_ble_first on a stubbed coordinator instance.
 
         This coroutine constructs a bare coordinator object, replaces its BLE send and MQTT publish callables with stubs that raise RuntimeError("BLE ack timeout") and RuntimeError("MQTT publish timeout") respectively, and then calls _async_publish_command_ble_first for device "dev1" with a DevicePropertyChange message (action_id 3022, cmd 107, and a body containing FIELD_SW_EPS: 1). The call will propagate the RuntimeError raised by the underlying stubbed publish operation.
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
@@ -1140,10 +1136,10 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
             Raises:
                 RuntimeError: If waiting for the ACK times out.
-            """  # ruff: ignore[line-too-long]
-            raise RuntimeError("BLE ack timeout")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise RuntimeError("BLE ack timeout")
 
-        async def _publish_mqtt(  # ruff: ignore[too-many-arguments]  # ruff: ignore[unused-async]
+        async def _publish_mqtt(  # ruff: ignore[unused-async]
             device_id: str,
             *,
             message_type: str,
@@ -1164,8 +1160,8 @@ def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
 
             Raises:
                 RuntimeError: If the MQTT publish operation times out (message: "MQTT publish timeout").
-            """  # ruff: ignore[line-too-long]
-            raise RuntimeError("MQTT publish timeout")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise RuntimeError("MQTT publish timeout")
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
@@ -1204,10 +1200,10 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
             Raises:
                 AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("cmd=0 must not attempt BLE")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("cmd=0 must not attempt BLE")
 
-        async def _publish_mqtt(  # ruff: ignore[too-many-arguments]  # ruff: ignore[unused-async]
+        async def _publish_mqtt(  # ruff: ignore[unused-async]
             device_id: str,
             *,
             message_type: str,
@@ -1225,7 +1221,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """  # ruff: ignore[line-too-long]
+            """
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1278,9 +1274,7 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    from custom_components.jackery_solarvault import (  # noqa: PLC0415, RUF105
-        services,
-    )
+    from custom_components.jackery_solarvault import services  # noqa: PLC0415, RUF105
 
     assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # ruff: ignore[private-member-access]
     assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # ruff: ignore[private-member-access]
@@ -1499,7 +1493,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
-    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]
+    """  # ruff: ignore[missing-blank-line-after-summary]
 
     class _FakeClient:
         is_connected = True
@@ -1643,7 +1637,7 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
 
         Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
-        """  # ruff: ignore[line-too-long]
+        """
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
@@ -1680,13 +1674,13 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             Raises:
                 RuntimeError: Always raised with message "simulated GATT failure".
             """
-            raise RuntimeError("simulated GATT failure")  # ruff: ignore[raise-vanilla-args]
+            raise RuntimeError("simulated GATT failure")
 
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
 
         Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """  # ruff: ignore[line-too-long]
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
@@ -1718,8 +1712,8 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]
-        options = {  # ruff: ignore[mutable-class-default]
+        data: dict[str, object] = {}
+        options = {
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -1727,7 +1721,7 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # ruff: ignore[too-many-arguments, no-self-use]
+        async def async_send_command(  # ruff: ignore[no-self-use]
             self,
             device_id: str,
             *,
@@ -1764,11 +1758,11 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             mtu_override=120,
         )
         assert sent is True
-        assert captured["msg_id"] == 3022  # ruff: ignore[magic-value-comparison]
-        assert captured["ble_msg_type"] == 107  # ruff: ignore[magic-value-comparison]
+        assert captured["msg_id"] == 3022
+        assert captured["ble_msg_type"] == 107
         assert captured["wait_for_ack"] is True
-        assert captured["ack_timeout_sec"] == 3.5  # ruff: ignore[magic-value-comparison, float-equality-comparison]
-        assert captured["mtu_override"] == 120  # ruff: ignore[magic-value-comparison]
+        assert captured["ack_timeout_sec"] == 3.5  # ruff: ignore[float-equality-comparison]
+        assert captured["mtu_override"] == 120
 
     asyncio.run(_run())
 
@@ -1785,7 +1779,7 @@ def test_split_body_for_mtu_matches_smali_budget() -> None:
     )
 
     # Default MTU (247) → 187 bytes per chunk, matching the Android app.
-    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187  # ruff: ignore[magic-value-comparison]
+    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187
     body = b"a" * 400
     chunks = split_body_for_mtu(body, DEFAULT_BLE_MTU)
     assert [len(c) for c in chunks] == [187, 187, 26]
@@ -1815,7 +1809,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
 
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
-    """  # ruff: ignore[line-too-long]
+    """
     import asyncio  # ruff: ignore[import-outside-top-level]
     import base64  # ruff: ignore[import-outside-top-level]
 
@@ -1851,16 +1845,16 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         )
         assert sent is True
         # Two writes for 209 bytes at MTU 247 (187 + 22).
-        assert len(writes) == 2  # ruff: ignore[magic-value-comparison]
+        assert len(writes) == 2
         first = decrypt_binary_notify(writes[0], key)
         second = decrypt_binary_notify(writes[1], key)
         assert first.frame_index == 1
-        assert first.chunk_count == 2  # ruff: ignore[magic-value-comparison]
-        assert first.cmd == 107  # ruff: ignore[magic-value-comparison]
-        assert len(first.body) == 187  # ruff: ignore[magic-value-comparison]
-        assert second.frame_index == 2  # ruff: ignore[magic-value-comparison]
-        assert second.chunk_count == 2  # ruff: ignore[magic-value-comparison]
-        assert second.cmd == 107  # ruff: ignore[magic-value-comparison]
+        assert first.chunk_count == 2
+        assert first.cmd == 107
+        assert len(first.body) == 187
+        assert second.frame_index == 2
+        assert second.chunk_count == 2
+        assert second.cmd == 107
         assert second.body == body[187:]
         assert first.body + second.body == body
 
@@ -1903,10 +1897,10 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
             mtu_override=70,
         )
         assert sent is True
-        assert len(writes) == 3  # ruff: ignore[magic-value-comparison]
+        assert len(writes) == 3
         parsed = [decrypt_binary_notify(w, key) for w in writes]
         assert [p.frame_index for p in parsed] == [1, 2, 3]
-        assert all(p.chunk_count == 3 for p in parsed)  # ruff: ignore[magic-value-comparison]
+        assert all(p.chunk_count == 3 for p in parsed)
         assert b"".join(p.body for p in parsed) == body
 
     asyncio.run(_run())
@@ -1924,7 +1918,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             """Fail fast when an invalid MTU write attempt occurs."""
-            raise AssertionError("invalid MTU must not write to GATT")  # ruff: ignore[raise-vanilla-args]
+            raise AssertionError("invalid MTU must not write to GATT")
 
     async def _run() -> None:
         """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
@@ -1934,7 +1928,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """  # ruff: ignore[line-too-long]
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
@@ -1956,7 +1950,7 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     listener = _build_bare_listener()
     assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
     listener._mtu["known"] = 120  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-    assert listener.mtu_for_device("known") == 120  # type: ignore[attr-defined]  # ruff: ignore[magic-value-comparison]
+    assert listener.mtu_for_device("known") == 120  # type: ignore[attr-defined]
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -1967,7 +1961,7 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
         mtu_size = 185
 
     listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]  # ruff: ignore[magic-value-comparison]
+    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]
 
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
@@ -1991,7 +1985,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
 
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
-    """  # ruff: ignore[line-too-long]
+    """
     import asyncio  # ruff: ignore[import-outside-top-level]
     import base64  # ruff: ignore[import-outside-top-level]
 
@@ -2004,7 +1998,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
 
         This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """  # ruff: ignore[line-too-long]
+        """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")
@@ -2053,7 +2047,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
             # Wait until both chunked writes have hit the wire, then push
             # one echo frame — that single notify must complete the ack.
             for _ in range(100):
-                if len(writes) >= 2:  # ruff: ignore[magic-value-comparison]
+                if len(writes) >= 2:
                     break
                 await asyncio.sleep(0.005)
             echo = encrypt_binary_notify(
@@ -2077,7 +2071,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         )
         sent, _ = await asyncio.gather(sender, _drive_ack_after_writes())
         assert sent is True
-        assert len(writes) == 2  # ruff: ignore[magic-value-comparison]
+        assert len(writes) == 2
         stats = listener.stats_for("dev")
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
@@ -2124,12 +2118,12 @@ def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
     )
     assert touched is True
     pack = updated["battery_packs"][0]
-    assert pack["inEgy"] == 5648  # ruff: ignore[magic-value-comparison]
-    assert pack["outEgy"] == 5095  # ruff: ignore[magic-value-comparison]
+    assert pack["inEgy"] == 5648
+    assert pack["outEgy"] == 5095
     # Existing fields preserved.
-    assert pack["batSoc"] == 53  # ruff: ignore[magic-value-comparison]
+    assert pack["batSoc"] == 53
     assert pack["inPw"] == 0
-    assert pack["outPw"] == 200  # ruff: ignore[magic-value-comparison]
+    assert pack["outPw"] == 200
 
 
 def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
@@ -2164,13 +2158,13 @@ def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
         updated, body
     )
     assert touched is True
-    assert len(updated["battery_packs"]) == 2  # ruff: ignore[magic-value-comparison]
+    assert len(updated["battery_packs"]) == 2
     pack = updated["battery_packs"][1]
     assert pack["deviceSn"] == "DIFFERENT_PACK_SN"
     assert pack["devType"] == 1
     assert pack["subType"] == 0
-    assert pack["inEgy"] == 88  # ruff: ignore[magic-value-comparison]
-    assert pack["outEgy"] == 99  # ruff: ignore[magic-value-comparison]
+    assert pack["inEgy"] == 88
+    assert pack["outEgy"] == 99
     assert "_last_seen_at" in pack
 
 

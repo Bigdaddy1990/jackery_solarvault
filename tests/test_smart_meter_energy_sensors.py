@@ -11,9 +11,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
 )
-from custom_components.jackery_solarvault.sensor import (
-    SMART_METER_SENSOR_DESCRIPTIONS,
-)
+from custom_components.jackery_solarvault.sensor import SMART_METER_SENSOR_DESCRIPTIONS
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy
 

@@ -20,7 +20,7 @@ PERCENT_PLACEHOLDER = re.compile(
 )
 
 
-def _load_util_module():  # ruff: ignore[missing-return-type-private-function]
+def _load_util_module():
     package_dir = CUSTOM_COMPONENT
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
@@ -300,7 +300,7 @@ def test_mqtt_wire_message_literals_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{node.lineno} uses raw MQTT messageType {node.value!r}; "
                     "use const.py instead"
                 )
@@ -319,7 +319,7 @@ def test_period_reset_descriptions_use_date_type_constants() -> None:
                 if isinstance(keyword.value, ast.Constant) and isinstance(
                     keyword.value.value, str
                 ):
-                    raise AssertionError(  # ruff: ignore[raise-vanilla-args, type-check-without-type-error]
+                    raise AssertionError(  # ruff: ignore[type-check-without-type-error]
                         f"{path}:{keyword.value.lineno} uses raw reset_period "
                         f"{keyword.value.value!r}; use DATE_TYPE_* constants"
                     )
@@ -342,7 +342,7 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # ruff: ignore[line-too-long]
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
         )
         seen[name] = node.lineno
 
@@ -368,7 +368,7 @@ def test_ct_wire_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{node.lineno} uses raw CT wire key {node.value!r}; "
                     "use const.py instead"
                 )
@@ -383,8 +383,8 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # ruff: ignore[line-too-long]
+                raise AssertionError(
+                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "
                     "use const.py instead"
                 )
 
@@ -398,7 +398,7 @@ def test_mqtt_topic_literals_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{node.lineno} uses raw MQTT topic prefix {node.value!r}; "
                     "use MQTT_TOPIC_PREFIX from const.py instead"
                 )
@@ -418,7 +418,7 @@ def test_app_period_stat_keys_are_centralized() -> None:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{node.lineno} uses raw app stat key {node.value!r}; "
                     "use APP_STAT_* constants from const.py instead"
                 )
@@ -453,7 +453,7 @@ def _const_string_values(name: str) -> tuple[str, ...]:
             and node.func.id == "frozenset"
         ):
             return tuple(eval_node(item) for item in node.args[0].elts)  # type: ignore[index,union-attr]
-        raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+        raise AssertionError(
             f"Unsupported const expression in {name}: {ast.dump(node)}"
         )
 
@@ -476,7 +476,7 @@ def test_app_specific_subdevice_markers_are_centralized() -> None:
                 continue
             line = source.splitlines()[node.lineno - 1]
             if any(context in line for context in forbidden_contexts):
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{node.lineno} uses raw subdevice marker {node.value!r}; "
                     "use SUBDEVICE_TYPE_* constants"
                 )
@@ -498,7 +498,7 @@ def _class_constant_int(tree: ast.Module, class_name: str, attr_name: str) -> in
                 stmt.value.value, int
             ):
                 return stmt.value.value
-    raise AssertionError(f"Missing {class_name}.{attr_name} integer constant")  # ruff: ignore[raise-vanilla-args]
+    raise AssertionError(f"Missing {class_name}.{attr_name} integer constant")
 
 
 def test_config_entries_do_not_use_internal_version_ladder() -> None:
@@ -692,7 +692,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
         binary_source
         .split("class JackerySmartPlugStateBinarySensor", 1)[1]
         .split(
-            "# ---------------------------------------------------------------------------",  # ruff: ignore[line-too-long]
+            "# ---------------------------------------------------------------------------",
             1,
         )[0]
         .split("def extra_state_attributes", 1)[1]
@@ -759,7 +759,7 @@ def test_payload_debug_redaction_is_recursive_casefolded_and_mandatory() -> None
 
     assert util.active_redact_keys() is util.REDACT_KEYS
     assert util._payload_debug_redacted.__code__.co_argcount == 1  # ruff: ignore[private-member-access]
-    assert util.append_payload_debug_line.__code__.co_argcount == 2  # ruff: ignore[magic-value-comparison]
+    assert util.append_payload_debug_line.__code__.co_argcount == 2
     assert redacted["password"] == "**REDACTED**"
     assert redacted["nested"]["MQTTPASSWORD"] == "**REDACTED**"
     assert redacted["nested"]["LATITUDE"] == "**REDACTED**"
@@ -979,7 +979,7 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # ruff: ignore[line-too-long]
+    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
@@ -1021,7 +1021,7 @@ def test_number_setter_rejects_non_finite_values_before_transform() -> None:
     """Number service writes must not let NaN/Infinity reach int(round(...))."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # ruff: ignore[line-too-long]
+        "\n\n# ---------------------------------------------------------------------------\n"
         "# Setup",
         1,
     )[0]
@@ -1052,7 +1052,7 @@ def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
     """Discrete number validation should centralize round/int conversion."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # ruff: ignore[line-too-long]
+        "\n\n# ---------------------------------------------------------------------------\n"
         "# Setup",
         1,
     )[0]
@@ -1159,7 +1159,7 @@ def test_runtime_code_has_no_unreachable_statements_after_terminal_nodes() -> No
         terminal_node: ast.stmt | None = None
         for stmt in body:
             if terminal_node is not None:
-                raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+                raise AssertionError(
                     f"{path}:{stmt.lineno} unreachable statement after "
                     f"line {terminal_node.lineno}"
                 )
@@ -1196,8 +1196,8 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     ]
     assert calls
     for call in calls:
-        assert len(call.args) == 3, (  # ruff: ignore[magic-value-comparison]
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # ruff: ignore[line-too-long]
+        assert len(call.args) == 3, (
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1333,7 +1333,7 @@ def test_rename_service_name_validates_direct_call_values() -> None:
 
 
 def test_delete_storm_alert_validates_direct_alert_id() -> None:
-    """Delete service alert_id constraints must not rely only on HA schema validation."""  # ruff: ignore[line-too-long]
+    """Delete service alert_id constraints must not rely only on HA schema validation."""
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert "def _storm_alert_id_from_service(" in services_source
@@ -1368,7 +1368,7 @@ def test_service_boolean_fields_use_safe_bool_parser() -> None:
     assert "field_name=SERVICE_FIELD_WAIT_FOR_ACK" in services_source
     # _service_bool raises ServiceValidationError itself; handlers must preserve it
     # so the field-specific translated error does not get wrapped again.
-    assert services_source.count("except ServiceValidationError:\n        raise") >= 2  # ruff: ignore[magic-value-comparison]
+    assert services_source.count("except ServiceValidationError:\n        raise") >= 2
 
 
 def test_standby_switch_uses_strict_numeric_mode_parser() -> None:
@@ -1550,7 +1550,7 @@ def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload(
     assert "http_props," in refresh_block
 
 
-def test_component_modules_import_all_referenced_const_names() -> None:  # ruff: ignore[too-many-branches]
+def test_component_modules_import_all_referenced_const_names() -> None:
     """Catch runtime NameError regressions from missing .const imports in any module."""
     const_tree = ast.parse((CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8"))
     const_names: set[str] = set()
@@ -1684,7 +1684,7 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     """Pack firmware/update diagnostics must read the OTA-enriched fields."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
 
-    # The implementation lives in the module-level function _battery_pack_description_value  # noqa: E501, RUF105
+    # The implementation lives in the module-level function _battery_pack_description_value  # noqa: RUF105
     # which is called by JackeryBatteryPackSensor._value_from_pack
     impl_block = sensor_source.split("def _battery_pack_description_value(", 1)[
         1
@@ -1698,7 +1698,7 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     )[1].split("class JackerySmartMeterSensor", 1)[0]
     assert "_battery_pack_description_value" in class_block
     assert "def _refresh_cache(self) -> None:" in class_block
-    # Fields that are actually used in the fallback logic within _battery_pack_description_value  # noqa: E501, RUF105
+    # Fields that are actually used in the fallback logic within _battery_pack_description_value  # noqa: RUF105
     for field in (
         "FIELD_VERSION",
         "FIELD_CURRENT_VERSION",
@@ -1770,7 +1770,7 @@ def test_local_helper_calls_match_their_declared_arity() -> None:
                 actual_count = len(call.args)
                 too_few = actual_count < required_count
                 too_many = max_count is not None and actual_count > max_count
-                assert not (too_few or too_many), (  # ruff: ignore[pytest-composite-assertion]
+                assert not (too_few or too_many), (
                     f"{path}:{call.lineno} calls local helper {call.func.id}() "
                     f"with {actual_count} positional args; definition at line "
                     f"{definition_line} expects {required_count}..{max_count}"
@@ -1832,13 +1832,13 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",  # ruff: ignore[line-too-long]
+        "# ---------------------------------------------------------------------------\n# Entities",
         1,
     )[0]
 
     assert "config_entry_bool_option" in sensor_source
     assert "def _entry_bool_option(" not in sensor_source
-    assert setup_block.count("config_entry_bool_option(") == 3  # ruff: ignore[magic-value-comparison]
+    assert setup_block.count("config_entry_bool_option(") == 3
     assert ".options.get(" not in setup_block
 
 
@@ -1877,8 +1877,8 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                 elif isinstance(call.func, ast.Attribute):
                     name = call.func.attr
                 if name in forbidden:
-                    raise AssertionError(  # ruff: ignore[raise-vanilla-args]
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"  # ruff: ignore[line-too-long]
+                    raise AssertionError(
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"
                     )
 
 
@@ -1914,7 +1914,7 @@ def test_gate_ruff_scope_excludes_embedded_non_integration_trees() -> None:
     assert '"check", "--fix", "."' not in source
 
 
-def _load_py314_exception_guard_module():  # ruff: ignore[missing-return-type-private-function]
+def _load_py314_exception_guard_module():
     """Load the local Python 3.14 exception-style guard script."""
     spec = importlib.util.spec_from_file_location(
         "verify_py314_exception_style",
@@ -1972,7 +1972,7 @@ def test_brand_assets_are_packaged_without_runtime_sync() -> None:
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""  # ruff: ignore[line-too-long]
+    """Read-only custom component mounts are safe because setup writes no brand files."""
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")

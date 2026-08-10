@@ -39,7 +39,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shutdown_drains_local_mqtt_unsubs() -> None:
     """Every registered HA-MQTT unsub callable must fire on shutdown."""
     coordinator = _bare_coordinator()
@@ -54,7 +54,7 @@ async def test_shutdown_drains_local_mqtt_unsubs() -> None:
     assert coordinator._local_mqtt_unsubs == []
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shutdown_tolerates_a_raising_unsub_callable() -> None:
     """A bad unsub must not stop the others from being drained.
 
@@ -73,7 +73,7 @@ async def test_shutdown_tolerates_a_raising_unsub_callable() -> None:
     assert coordinator._local_mqtt_unsubs == []
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shutdown_is_a_noop_when_no_local_mqtt_subscriptions_exist() -> None:
     """Shutdown must not raise when the local MQTT listener never started."""
     coordinator = _bare_coordinator()

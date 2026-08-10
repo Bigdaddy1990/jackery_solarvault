@@ -46,7 +46,7 @@ def _entry(**options: object) -> SimpleNamespace:
     return SimpleNamespace(options=dict(options), data={})
 
 
-def _coordinator(entry: SimpleNamespace | None = None) -> Any:  # ruff:ignore[any-type]
+def _coordinator(entry: SimpleNamespace | None = None) -> Any:
     """Build a bare coordinator wired with only a config entry."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator).entry = entry if entry is not None else _entry()
@@ -61,7 +61,7 @@ def _backfill_store_double() -> SimpleNamespace:
     )
 
 
-def _ready_backfill_coordinator() -> Any:  # ruff:ignore[any-type]
+def _ready_backfill_coordinator() -> Any:
     """Return a coordinator with an empty, pre-loaded backfill state."""
     coordinator = _coordinator()
     coordinator._statistics_backfill_store = (  # ruff: ignore[private-member-access]

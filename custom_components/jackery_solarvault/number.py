@@ -16,12 +16,7 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import (
-    PERCENTAGE,
-    EntityCategory,
-    UnitOfPower,
-    UnitOfTime,
-)
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPower, UnitOfTime
 from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
@@ -165,7 +160,7 @@ def _is_portable_payload(
 # ---------------------------------------------------------------------------
 
 
-def _rounded_int(value: Any) -> int:  # noqa: ANN401, RUF105
+def _rounded_int(value: Any) -> int:  # noqa: RUF105
     """Round a value accepted by Home Assistant as a number to the nearest integer.
 
     Parameters:
@@ -245,7 +240,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 # ---------------------------------------------------------------------------
 
 
-def _wire_int(value: Any) -> int:  # noqa: ANN401, RUF105
+def _wire_int(value: Any) -> int:  # noqa: RUF105
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
@@ -266,7 +261,7 @@ def _wire_int(value: Any) -> int:  # noqa: ANN401, RUF105
     return parsed
 
 
-def _wire_float(value: Any) -> float:  # noqa: ANN401, RUF105
+def _wire_float(value: Any) -> float:  # noqa: RUF105
     """Parse an arbitrary input into a float suitable for coordinator setter calls.
 
     Parameters:
@@ -311,7 +306,7 @@ async def _set_max_feed_grid(
 ) -> None:
     """Set the maximum grid feed-in power on a device."""
     parsed = _wire_int(value)
-    await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)  # ruff:ignore[magic-value-comparison]
+    await coord.async_set_max_feed_grid(dev_id, 800 if parsed <= 800 else 2500)
 
 
 async def _set_max_output_power(
@@ -613,17 +608,17 @@ def _max_feed_grid_dynamic_max(payload: dict[str, Any]) -> float:
     props = payload_properties_for_sources(payload)
     for key in (FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW):
         feed_limit = safe_int(props.get(key))
-        if feed_limit is not None and feed_limit > 800:  # ruff:ignore[magic-value-comparison]
+        if feed_limit is not None and feed_limit > 800:
             return 2500.0
     max_out_int = safe_int(props.get(FIELD_MAX_OUT_PW))
     if max_out_int is None:
         max_out_int = 2500
-    return 800.0 if max_out_int <= 800 else 2500.0  # ruff:ignore[magic-value-comparison]
+    return 800.0 if max_out_int <= 800 else 2500.0
 
 
 def _max_feed_grid_allowed_values(payload: dict[str, Any]) -> tuple[float, ...]:
     """Jackery's app exposes feed-in as a binary 800/2500W selection."""
-    if _max_feed_grid_dynamic_max(payload) <= 800:  # ruff:ignore[magic-value-comparison]
+    if _max_feed_grid_dynamic_max(payload) <= 800:
         return (800.0,)
     return (800.0, 2500.0)
 

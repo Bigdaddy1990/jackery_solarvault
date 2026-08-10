@@ -101,7 +101,7 @@ def test_current_period_is_never_closed(
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_two_empty_responses_only_terminalize_closed_months(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -128,7 +128,7 @@ async def test_two_empty_responses_only_terminalize_closed_months(
     assert "completed_at" not in month_states["2026-03-01"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_legacy_unavailable_state_is_migrated_back_to_retryable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -174,7 +174,7 @@ async def test_legacy_unavailable_state_is_migrated_back_to_retryable(
     assert month_states["2026-03-01"]["status"] == BackfillStatus.RETRYABLE
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_imported_open_period_is_merged_into_coordinator_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -222,8 +222,8 @@ def test_current_month_is_included_in_current_year_reconstruction() -> None:
         },
     )
 
-    assert result[APP_STAT_TOTAL_SOLAR_ENERGY] == 7.0  # ruff: ignore[magic-value-comparison, float-equality-comparison]
-    assert result["y"][6] == 4.0  # ruff: ignore[magic-value-comparison, float-equality-comparison]
+    assert result[APP_STAT_TOTAL_SOLAR_ENERGY] == 7.0  # ruff: ignore[float-equality-comparison]
+    assert result["y"][6] == 4.0  # ruff: ignore[float-equality-comparison]
 
 
 def test_large_cloud_local_divergence_keeps_conservative_minimum() -> None:
@@ -237,6 +237,6 @@ def test_large_cloud_local_divergence_keeps_conservative_minimum() -> None:
             label="pv_energy",
             on_rejection=rejections.append,
         )
-        == 8.0  # ruff: ignore[magic-value-comparison]
+        == 8.0
     )
     assert rejections == ["pv_energy:divergence"]

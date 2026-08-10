@@ -183,7 +183,7 @@ def _is_portable_payload(
 
 
 def _standby_is_on(
-    raw: Any,  # noqa: ANN401, RUF105
+    raw: Any,  # noqa: RUF105
 ) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
@@ -673,7 +673,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return None
         return description.is_on_transform(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Turn this switch on.
 
         If the entity is writable, requests the configured setter to apply the on state
@@ -704,7 +704,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Turn the described switch off for the device.
 
         If the description has no setter this is a no-op.
@@ -909,14 +909,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Turn the bound smart plug on.
 
         Set the smart plug's switch to the requested state through the coordinator.
         """
         await self._async_set_state(True)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Turn the smart plug off."""
         await self._async_set_state(False)
 
@@ -998,13 +998,13 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
         """Return true if the breaker relay is closed."""  # noqa: D421, RUF105
         return safe_bool(self._breaker.get(FIELD_SW))
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, True
         )
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, False
@@ -1173,7 +1173,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  # HA awaits this entry point
+async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -1225,7 +1225,7 @@ async def async_setup_entry(  # ruff:ignore[too-many-statements, unused-async]  
         "third_party_mqtt_enable": lambda _props, adv: adv,
     }
 
-    def _collect_entities() -> list[SwitchEntity]:  # ruff:ignore[too-many-branches]
+    def _collect_entities() -> list[SwitchEntity]:
         """Build a list of switch entities to register for every device present in the
         coordinator data.
 

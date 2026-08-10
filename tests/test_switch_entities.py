@@ -60,7 +60,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # ruff:ignore[any-type]
+def _description(key: str) -> Any:
     return next(desc for desc in SWITCH_DESCRIPTIONS if desc.key == key)
 
 
@@ -147,7 +147,7 @@ async def test_portable_switch_routes_through_toggle_output() -> None:
 
     entity.coordinator.async_portable_toggle_output.assert_awaited_once()
     _args, kwargs = entity.coordinator.async_portable_toggle_output.call_args
-    assert kwargs["action_id"] == 10  # ACTION_ID_PORTABLE_OUTPUT_DC  # noqa: PLR2004, RUF105
+    assert kwargs["action_id"] == 10  # ACTION_ID_PORTABLE_OUTPUT_DC  # noqa: RUF105
     assert kwargs["field"] == "odc"
     assert kwargs["enabled"] is True
 

@@ -1,4 +1,4 @@
-"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""  # ruff: ignore[line-too-long]
+"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""
 
 from typing import TYPE_CHECKING
 
@@ -24,7 +24,7 @@ def test_payload_has_jackery_marker() -> None:
     assert payload_has_jackery_marker(b"raw non-json binary data") is False
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
 ) -> None:
@@ -73,7 +73,7 @@ def test_local_mqtt_topic_matching(hass: HomeAssistant) -> None:
     assert client._topic_matches("jackery/#", "other/topic") is False  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     """Test message parsing, marker checks, and dropping logic."""
     forwarded = []
@@ -114,7 +114,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert diag["messages_dropped"] > 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
     """Test start and stop lifecycle without real connection."""
     client = JackeryLocalMqttClient(

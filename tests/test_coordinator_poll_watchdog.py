@@ -53,7 +53,7 @@ def _make_api_stub() -> MagicMock:
     return api
 
 
-@pytest.fixture()
+@pytest.fixture
 async def watchdog_setup(
     hass: HomeAssistant,
 ) -> AsyncGenerator[MockConfigEntry]:
@@ -157,7 +157,7 @@ async def test_watchdog_stays_silent_while_polling_is_healthy(
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_background_slow_metrics_wait_for_scheduled_http_poll(
     hass: HomeAssistant,
 ) -> None:

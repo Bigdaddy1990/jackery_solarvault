@@ -37,7 +37,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_day_backfill_shares_slow_http_concurrency_gate() -> None:
     """A bounded historical day request must wait for the shared HTTP gate."""
     coordinator = _coordinator()
@@ -86,7 +86,7 @@ def test_automatic_day_backfill_horizon_reaches_mid_april() -> None:
     assert days[-1] == date(2026, 7, 22)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_historical_payload_is_not_reported_as_success() -> None:
     """An empty/gated cloud response cannot complete a source/day pair."""
     coordinator = _coordinator()
@@ -100,7 +100,7 @@ async def test_empty_historical_payload_is_not_reported_as_success() -> None:
     assert result == (False, 0)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ["response", "expected_status"],
     [
@@ -130,7 +130,7 @@ async def test_single_source_fetch_distinguishes_empty_from_data(
     assert bool(source) is bool(response)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_single_source_timeout_remains_retryable() -> None:
     """A temporary network timeout is persisted as pending transport failure."""
     coordinator = _coordinator()
@@ -150,7 +150,7 @@ async def test_single_source_timeout_remains_retryable() -> None:
     assert source == {}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ct_day_uses_cloud_response_directly() -> None:
     """The Jackery CT day endpoint is the only historical CT source."""
     coordinator = _coordinator()
@@ -178,7 +178,7 @@ async def test_ct_day_uses_cloud_response_directly() -> None:
     assert source == cloud_source
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
     """An empty CT envelope is reported ambiguous; no LAN fallback exists."""
     coordinator = _coordinator()
@@ -198,7 +198,7 @@ async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
     assert source == {}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
     """Success for one source never marks another source/day as complete."""
     coordinator = _coordinator()
@@ -240,7 +240,7 @@ async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
     assert sources["ct"]["days"][day_key]["status"] == "retryable"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_old_day_does_not_block_later_source_days() -> None:
     """An unavailable old bucket remains pending while newer days still advance."""
     coordinator = _coordinator()
@@ -280,7 +280,7 @@ async def test_empty_old_day_does_not_block_later_source_days() -> None:
     assert requested_days[1] > requested_days[0]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
     """Repeated network failures leave a cooldown-backed retry, not unavailable."""
     coordinator = _coordinator()
@@ -318,7 +318,7 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
     assert immediate_retry["requests"] == 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_repeated_empty_day_becomes_terminal_without_queue_loop() -> None:
     """A completed historical day with no source data stops rapid retries."""
     coordinator = _coordinator()

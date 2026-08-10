@@ -10,10 +10,7 @@ from homeassistant.components.repairs import RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
-from .const import (
-    DOMAIN,
-    REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
-)
+from .const import DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ACTIVATED
 from .coordinator import BACKGROUND_TASK_ERRORS, JackerySolarVaultCoordinator
 
 if TYPE_CHECKING:

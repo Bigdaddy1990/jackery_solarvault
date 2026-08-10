@@ -46,7 +46,7 @@ async def _teardown(hass: HomeAssistant, entry_id: str) -> None:
     await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_day_rollover_wipes_day_bounded_caches(
     hass: HomeAssistant,
 ) -> None:
@@ -79,7 +79,7 @@ async def test_day_rollover_wipes_day_bounded_caches(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_activation_zero_creates_repair_issue(
     hass: HomeAssistant,
 ) -> None:
@@ -107,7 +107,7 @@ async def test_activation_zero_creates_repair_issue(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_activation_recovers_and_dismisses_repair_issue(
     hass: HomeAssistant,
 ) -> None:
@@ -136,7 +136,7 @@ async def test_activation_recovers_and_dismisses_repair_issue(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_currency_mirrored_from_price_section(
     hass: HomeAssistant,
 ) -> None:
@@ -159,7 +159,7 @@ async def test_currency_mirrored_from_price_section(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_price_override_merged_within_ttl(
     hass: HomeAssistant,
 ) -> None:
@@ -176,11 +176,11 @@ async def test_price_override_merged_within_ttl(
     await hass.async_block_till_done()
 
     price_section = result[DEVICE_ID].get(PAYLOAD_PRICE) or {}
-    assert price_section.get("overriddenRate") == 42  # ruff: ignore[magic-value-comparison]
+    assert price_section.get("overriddenRate") == 42
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_expired_price_override_is_evicted(
     hass: HomeAssistant,
 ) -> None:
@@ -200,7 +200,7 @@ async def test_expired_price_override_is_evicted(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_no_devices_discovered_raises_update_failed(
     hass: HomeAssistant,
 ) -> None:

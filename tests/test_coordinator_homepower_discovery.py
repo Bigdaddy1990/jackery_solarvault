@@ -60,7 +60,7 @@ from custom_components.jackery_solarvault.entity import payload_properties_for_s
 from custom_components.jackery_solarvault.sensor import (
     SMART_MODE_SENSOR_DESCRIPTIONS,
     JackerySensor,
-    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier  # ruff: ignore[line-too-long, import-private-name]
+    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
     _is_portable_payload,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
 )
 
@@ -186,7 +186,7 @@ def test_home_modelcode_is_admitted_as_property_device_candidate(
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_home_modelcode_is_discovered_into_device_index(
     model_code: int,
 ) -> None:
@@ -218,7 +218,7 @@ async def test_home_modelcode_is_discovered_into_device_index(
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_outer_system_list_is_not_parent_removal_evidence() -> None:
     """A transient explicit ``data=[]`` keeps a known system parent."""
     system_entry = {
@@ -237,7 +237,7 @@ async def test_empty_outer_system_list_is_not_parent_removal_evidence() -> None:
     assert _home_power_dev_id(3002) in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_identified_system_with_empty_devices_confirms_parent_removal() -> None:
     """Two complete system omissions remove the previously indexed parent."""
     populated = {

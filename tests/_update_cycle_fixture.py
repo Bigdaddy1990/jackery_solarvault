@@ -127,7 +127,7 @@ def _default_system_list() -> list[dict[str, Any]]:
     ]
 
 
-def make_update_cycle_api(**overrides: Any) -> MagicMock:  # ruff:ignore[any-type]
+def make_update_cycle_api(**overrides: Any) -> MagicMock:
     """Build a mock Jackery ``api`` wired for the guarded update cycle.
 
     Every endpoint the cycle calls is an :class:`AsyncMock` with a

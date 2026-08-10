@@ -35,7 +35,7 @@ def _api() -> JackeryApi:
         ["async_get_power_price", POWER_PRICE_PATH],
     ],
 )
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_system_id_dict_endpoints(method: str, path: str) -> None:
     """system_id GET endpoints unwrap the data dict with a systemId param."""
     api = _api()
@@ -49,7 +49,7 @@ async def test_system_id_dict_endpoints(method: str, path: str) -> None:
     get_json.assert_awaited_once_with(path, params={FIELD_SYSTEM_ID: _SYS})
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_alarm_returns_raw_data_field() -> None:
     """The alarm endpoint returns the raw data payload (list or dict)."""
     api = _api()
@@ -63,7 +63,7 @@ async def test_get_alarm_returns_raw_data_field() -> None:
     get_json.assert_awaited_once_with(ALARM_PATH, params={FIELD_SYSTEM_ID: _SYS})
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_price_sources_unwraps_list() -> None:
     """The price-source endpoint unwraps a data list."""
     api = _api()
@@ -79,7 +79,7 @@ async def test_get_price_sources_unwraps_list() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_device_property_uses_device_id_param() -> None:
     """The device-property GET keys on deviceId and unwraps the dict."""
     api = _api()
@@ -95,7 +95,7 @@ async def test_get_device_property_uses_device_id_param() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_device_property_empty_when_no_data() -> None:
     """A missing data envelope yields an empty dict, not an error."""
     api = _api()

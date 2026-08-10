@@ -148,7 +148,7 @@ def _live_local_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> None:
     """A live local MQTT channel must NOT gate the cloud MQTT channel.
 
@@ -171,7 +171,7 @@ async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> No
     mgr.should_skip_reconnect.assert_called_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     """Command publishes (force=True) must keep the MQTT fallback working.
 
@@ -187,7 +187,7 @@ async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_connected_but_silent_local_client_does_not_pause_cloud(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -213,7 +213,7 @@ async def test_connected_but_silent_local_client_does_not_pause_cloud(
     cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_message_marks_local_channel_live() -> None:
     """HA/local MQTT frames count as local activity even without direct-client state."""
     coordinator = _bare_coordinator()

@@ -28,8 +28,8 @@ from custom_components.jackery_solarvault.const import (
 
 def test_extract_code_uses_shared_integer_parser() -> None:
     """API code parsing rejects bool/non-finite malformed response values."""
-    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # ruff: ignore[magic-value-comparison, private-member-access]
-    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # ruff: ignore[private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # ruff: ignore[private-member-access]
     assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # ruff: ignore[private-member-access]
     assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # ruff: ignore[private-member-access]
     assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # ruff: ignore[private-member-access]
@@ -164,8 +164,8 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
 
         Raises:
             AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
-        """  # ruff: ignore[line-too-long]
-        raise AssertionError("invalid tariff input must stop before HTTP post")  # ruff: ignore[raise-vanilla-args]
+        """
+        raise AssertionError("invalid tariff input must stop before HTTP post")
 
     api._post_form = _post_form  # ruff: ignore[private-member-access]
 

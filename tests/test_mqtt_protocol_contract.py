@@ -37,7 +37,7 @@ def _function_source(path: Path, name: str) -> str:
 
     Raises:
         AssertionError: If the named function is not found in the given file.
-    """  # ruff: ignore[line-too-long]
+    """
     source = _read(path)
     tree = ast.parse(source)
     lines = source.splitlines()
@@ -48,7 +48,7 @@ def _function_source(path: Path, name: str) -> str:
         ):
             assert node.end_lineno is not None
             return "\n".join(lines[node.lineno - 1 : node.end_lineno])
-    raise AssertionError(f"{name} not found in {path}")  # ruff: ignore[raise-vanilla-args]
+    raise AssertionError(f"{name} not found in {path}")
 
 
 def test_mqtt_setter_commands_match_app_protocol() -> None:
@@ -142,7 +142,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 
         Raises:
             AssertionError: If any of the expected storage or sanitization conditions are not met.
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"soc": 40}}}
         self._device_index = {"dev": {}}
@@ -154,7 +154,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
-            """  # ruff: ignore[line-too-long]
+            """
             return
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
@@ -162,7 +162,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 
             Parameters:
                 new_data (dict[str, object]): Partial update payload to capture under the key "data".
-            """  # ruff: ignore[line-too-long]
+            """
             captured["data"] = new_data
 
         self._async_payload_debug_event = _debug_event
@@ -348,7 +348,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         """Run a minimal coordinator test that sends an MQTT action message containing a text-form command and verifies the device property update is applied.
 
         This helper constructs a minimal JackerySolarVaultCoordinator instance with stubbed debug and push callbacks, delivers an MQTT "action" payload whose `FIELD_CMD` is a text string (e.g., "{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0") and a body containing a `new` property, and asserts the coordinator merges that `new` value into the device's `PAYLOAD_PROPERTIES` and that a partial update was pushed.
-        """  # ruff: ignore[line-too-long]
+        """
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"old": 1}}}
         self._device_index = {"dev": {}}
@@ -360,7 +360,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
-            """  # ruff: ignore[line-too-long]
+            """
             return
 
         def _push_partial_update(new_data: dict[str, object]) -> None:
@@ -368,7 +368,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
             Parameters:
                 new_data (dict[str, object]): Partial update payload to capture under the key "data".
-            """  # ruff: ignore[line-too-long]
+            """
             captured["data"] = new_data
 
         self._async_payload_debug_event = _debug_event
@@ -388,7 +388,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
         data = captured["data"]
         assert isinstance(data, dict)
-        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2  # ruff: ignore[magic-value-comparison]
+        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2
 
     asyncio.run(_run())
 
@@ -397,7 +397,7 @@ def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> No
     """Verify _is_subdevice_payload accepts numeric action IDs provided as strings and rejects invalid non-numeric values.
 
     Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice action IDs, while `True` and `float('nan')` are rejected.
-    """  # ruff: ignore[line-too-long]
+    """
     from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
         FIELD_ACTION_ID,
     )
@@ -476,24 +476,24 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
 
     guarded = self._http_properties_with_live_overrides(entry, http_props)
 
-    assert guarded[FIELD_SOC] == 49  # ruff: ignore[magic-value-comparison]
-    assert guarded[FIELD_BAT_SOC] == 51  # ruff: ignore[magic-value-comparison]
-    assert guarded[FIELD_BAT_OUT_PW] == 300  # ruff: ignore[magic-value-comparison]
+    assert guarded[FIELD_SOC] == 49
+    assert guarded[FIELD_BAT_SOC] == 51
+    assert guarded[FIELD_BAT_OUT_PW] == 300
     assert guarded[FIELD_WNAME] == "new-wifi"
 
     entry[PAYLOAD_MQTT_LAST]["received_at_monotonic"] = time.monotonic() - 120
     unguarded = self._http_properties_with_live_overrides(entry, http_props)
 
-    assert unguarded[FIELD_SOC] == 78  # ruff: ignore[magic-value-comparison]
-    assert unguarded[FIELD_BAT_SOC] == 74  # ruff: ignore[magic-value-comparison]
-    assert unguarded[FIELD_BAT_OUT_PW] == 163  # ruff: ignore[magic-value-comparison]
+    assert unguarded[FIELD_SOC] == 78
+    assert unguarded[FIELD_BAT_SOC] == 74
+    assert unguarded[FIELD_BAT_OUT_PW] == 163
 
 
 def test_mqtt_uses_captured_qos_zero() -> None:
     """Verify MQTT publish and subscribe usage is configured to QoS 0.
 
     Asserts that the mqtt_push module declares a captured QoS of 0, that subscriptions use `qos=0`, and that the coordinator publishes JSON messages with `qos=0` and `retain=False`.
-    """  # ruff: ignore[line-too-long]
+    """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
@@ -517,7 +517,7 @@ def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
     """Verify MQTT payloads using the 'data' field are normalized to the 'body' field across the codebase.
 
     Asserts that the relevant constants for `data`/`body` and the ControlCombine message/cmd exist in const.py, and that mqtt_push and the coordinator normalize `FIELD_DATA` into `FIELD_BODY` by reading `data.get(FIELD_DATA)` and assigning it to `data[FIELD_BODY]` / `payload[FIELD_DATA]`.
-    """  # ruff: ignore[line-too-long]
+    """
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     const_source = _read(CONST_PATH)

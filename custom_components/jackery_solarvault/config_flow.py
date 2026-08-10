@@ -5,11 +5,7 @@ from typing import TYPE_CHECKING, Any, Self, cast, override
 
 import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigFlow,
-    OptionsFlow,
-    UnknownEntry,
-)
+from homeassistant.config_entries import ConfigFlow, OptionsFlow, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -91,10 +87,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-    from homeassistant.config_entries import (
-        ConfigEntry,
-        ConfigFlowResult,
-    )
+    from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
     from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -294,13 +287,13 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     options: Mapping[str, Any] = entry.options
     data: Mapping[str, Any] = entry.data
 
-    def _entry_value(key: str, default: Any = None) -> Any:  # noqa: ANN401, RUF105
+    def _entry_value(key: str, default: Any = None) -> Any:  # noqa: RUF105
         value = options.get(key)
         if value is None:
             value = data.get(key, default)
         return value
 
-    def _first_entry_value(*keys: str, default: Any = "") -> Any:  # noqa: ANN401, RUF105
+    def _first_entry_value(*keys: str, default: Any = "") -> Any:  # noqa: RUF105
         for key in keys:
             value = _entry_value(key)
             if value not in {None, ""}:

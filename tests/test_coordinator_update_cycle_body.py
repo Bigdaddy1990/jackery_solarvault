@@ -63,7 +63,7 @@ async def _teardown(hass: HomeAssistant, entry_id: str) -> None:
     await hass.async_block_till_done()
 
 
-@pytest.fixture()
+@pytest.fixture
 async def cycle(
     hass: HomeAssistant,
 ) -> AsyncGenerator[JackerySolarVaultCoordinator]:
@@ -73,7 +73,7 @@ async def cycle(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_full_cycle_populates_live_properties(
     cycle: JackerySolarVaultCoordinator,
     hass: HomeAssistant,
@@ -86,12 +86,12 @@ async def test_full_cycle_populates_live_properties(
     entry_data = result[DEVICE_ID]
     # HTTP-first merge: the pristine HTTP body and the merged properties both
     # carry the live battery SOC from the property payload.
-    assert entry_data["http_properties"]["batSoc"] == 62  # ruff: ignore[magic-value-comparison]
-    assert entry_data["properties"]["batSoc"] == 62  # ruff: ignore[magic-value-comparison]
+    assert entry_data["http_properties"]["batSoc"] == 62
+    assert entry_data["properties"]["batSoc"] == 62
     assert cycle._polling_diagnostics["property_fetch_completed"] is True  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_device_property_fetches_run_concurrently(
     hass: HomeAssistant,
 ) -> None:
@@ -130,11 +130,11 @@ async def test_device_property_fetches_run_concurrently(
     await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
-    assert max_in_flight >= 2  # ruff: ignore[magic-value-comparison]
+    assert max_in_flight >= 2
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_property_failure_keeps_stale_data(
     hass: HomeAssistant,
 ) -> None:
@@ -158,7 +158,7 @@ async def test_property_failure_keeps_stale_data(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_cold_device_failure_keeps_other_device_result(
     hass: HomeAssistant,
 ) -> None:
@@ -184,11 +184,11 @@ async def test_cold_device_failure_keeps_other_device_result(
     await hass.async_block_till_done()
 
     assert DEVICE_ID not in result
-    assert result[second_id][PAYLOAD_PROPERTIES]["batSoc"] == 55  # ruff: ignore[magic-value-comparison]
+    assert result[second_id][PAYLOAD_PROPERTIES]["batSoc"] == 55
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_historical_home_months_refresh_off_the_http_hot_path(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -229,11 +229,11 @@ async def test_historical_home_months_refresh_off_the_http_hot_path(
     repaired_result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
 
     repaired_year = repaired_result[DEVICE_ID][year_section]
-    assert repaired_year[APP_STAT_TOTAL_HOME_ENERGY] == 10  # ruff: ignore[magic-value-comparison]
+    assert repaired_year[APP_STAT_TOTAL_HOME_ENERGY] == 10
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_property_10600_without_prior_data_keeps_first_refresh_failed(
     hass: HomeAssistant,
 ) -> None:
@@ -268,7 +268,7 @@ async def test_property_10600_without_prior_data_keeps_first_refresh_failed(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_invalid_device_code_20000_is_dropped_and_rediscovered(
     hass: HomeAssistant,
 ) -> None:
@@ -286,12 +286,12 @@ async def test_invalid_device_code_20000_is_dropped_and_rediscovered(
 
     # Rediscovery ran a second time (drop -> empty index -> async_discover),
     # and the stale entry was preserved because prior data existed.
-    assert api.async_get_system_list.await_count >= 2  # ruff: ignore[magic-value-comparison]
+    assert api.async_get_system_list.await_count >= 2
     assert result[DEVICE_ID] == {"marker": "stale"}
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_property_payload_is_handled(
     hass: HomeAssistant,
 ) -> None:
@@ -309,7 +309,7 @@ async def test_empty_property_payload_is_handled(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_broken_shelly_enrichment_never_breaks_l3(
     hass: HomeAssistant,
 ) -> None:
@@ -325,11 +325,11 @@ async def test_broken_shelly_enrichment_never_breaks_l3(
     await hass.async_block_till_done()
 
     # L3 property data is present despite the third-party enrichment failure.
-    assert result[DEVICE_ID]["properties"]["batSoc"] == 62  # ruff: ignore[magic-value-comparison]
+    assert result[DEVICE_ID]["properties"]["batSoc"] == 62
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_statistics_import_dispatched_then_throttled(
     hass: HomeAssistant,
 ) -> None:
@@ -350,7 +350,7 @@ async def test_statistics_import_dispatched_then_throttled(
     await _teardown(hass, entry.entry_id)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_auth_rejection_raises_config_entry_auth_failed(
     hass: HomeAssistant,
 ) -> None:

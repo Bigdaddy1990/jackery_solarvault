@@ -90,7 +90,7 @@ def _healthy_property(dev_id: str) -> dict[str, Any]:
     return {PAYLOAD_DEVICE: {"deviceId": dev_id, "activated": 1, "online": 1}}
 
 
-def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str) -> Any:  # ruff:ignore[any-type]
+def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str) -> Any:
     """Return a background-task stub that captures one coroutine, closes the rest.
 
     Mirrors ``_consume_background_task`` in ``test_coordinator_update_cycle.py``
@@ -102,7 +102,7 @@ def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str)
     """
 
     def _stub(
-        coro: Any,  # ruff:ignore[any-type]
+        coro: Any,
         name: str,
         *,
         eager_start: bool,
@@ -120,14 +120,14 @@ def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str)
 # --- F-SW2-6: symmetry endpoint backoff must be per-device -----------------
 
 
-def _symmetry_side_effect(*, device_sn: str, **_kwargs: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
+def _symmetry_side_effect(*, device_sn: str, **_kwargs: Any) -> dict[str, Any]:
     """Fail every call attributed to device A, succeed for device B."""
     if device_sn == _DEVICE_A_ID:
         raise _UNSUPPORTED_ERROR
     return {}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_symmetry_backoff_does_not_suppress_sibling_device(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -184,7 +184,7 @@ async def test_symmetry_backoff_does_not_suppress_sibling_device(
 # --- F-SW2-7: not-activated repair issues must not cross-delete ------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_two_unactivated_devices_both_keep_repair_issues(
     hass: HomeAssistant,
 ) -> None:

@@ -65,7 +65,7 @@ class _OverflowFloat:
         Raises:
             OverflowError: always raised with the message "too large".
         """
-        raise OverflowError("too large")  # ruff: ignore[raise-vanilla-args]
+        raise OverflowError("too large")
 
 
 def test_service_integer_parser_rejects_oversized_digit_strings() -> None:
@@ -100,7 +100,7 @@ class _Coordinator:
         # result instead of the service inspecting the raw boolean.
         ok = await self.api.async_set_system_name(system_id, new_name)
         if not ok:
-            raise JackeryError("server returned false")  # ruff: ignore[raise-vanilla-args]
+            raise JackeryError("server returned false")
         await self.async_request_refresh()
 
     async def async_request_refresh(self) -> None:
@@ -120,8 +120,8 @@ class _AuthApi:
 
         Raises:
             JackeryAuthError: If the request fails due to authentication (invalid or expired credentials).
-        """  # ruff: ignore[line-too-long]
-        raise JackeryAuthError("invalid token")  # ruff: ignore[raise-vanilla-args]
+        """
+        raise JackeryAuthError("invalid token")
 
 
 class _AuthCoordinator:
@@ -137,7 +137,7 @@ class _AuthCoordinator:
         Raises:
             AssertionError: Always raised to fail the test if a refresh is attempted.
         """
-        raise AssertionError("auth failures must not refresh")  # ruff: ignore[raise-vanilla-args]
+        raise AssertionError("auth failures must not refresh")
 
 
 def test_resolve_jackery_device_id_follows_subdevice_parent(
@@ -242,8 +242,8 @@ async def test_rename_service_rejects_direct_invalid_system_id(
 
         Raises:
             AssertionError: Always raised with message "invalid system_id must stop before coordinator lookup".
-        """  # ruff: ignore[line-too-long]
-        raise AssertionError("invalid system_id must stop before coordinator lookup")  # ruff: ignore[raise-vanilla-args]
+        """
+        raise AssertionError("invalid system_id must stop before coordinator lookup")
 
     monkeypatch.setattr(services, "_coordinator_for_system", _fail_coordinator_lookup)
 
@@ -307,7 +307,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     """MQTT command errors are surfaced through the service translation key."""
 
     class _FailingCoordinator:
-        data = {"dev1": {}}  # ruff: ignore[mutable-class-default]
+        data = {"dev1": {}}
 
         async def async_query_weather_plan(self, device_id: str) -> None:  # ruff: ignore[no-self-use]
             """Request a weather plan update for the given device.
@@ -317,8 +317,8 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
 
             Raises:
                 HomeAssistantError: If the MQTT command fails for the device (message includes the device_id).
-            """  # ruff: ignore[line-too-long]
-            raise HomeAssistantError(f"MQTT command failed for {device_id}")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise HomeAssistantError(f"MQTT command failed for {device_id}")
 
     monkeypatch.setattr(
         services,
@@ -362,8 +362,8 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
         """Stub resolver used in tests to ensure device-id validation halts before registry lookup.
 
         Always raises an AssertionError with the message "invalid device_id must stop before registry lookup" when invoked.
-        """  # ruff: ignore[line-too-long]
-        raise AssertionError("invalid device_id must stop before registry lookup")  # ruff: ignore[raise-vanilla-args]
+        """
+        raise AssertionError("invalid device_id must stop before registry lookup")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", _fail_resolve)
 
@@ -393,8 +393,8 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator should not be reached for invalid input.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("blank alert_id must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("blank alert_id must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -431,7 +431,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []
 
-        async def async_set_third_party_mqtt_config(  # ruff: ignore[too-many-arguments]
+        async def async_set_third_party_mqtt_config(
             self,
             device_id: str,
             *,
@@ -445,7 +445,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # ruff: ignore[line-too-long]
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -499,7 +499,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []
 
-        async def async_set_third_party_mqtt_config(  # ruff: ignore[too-many-arguments]
+        async def async_set_third_party_mqtt_config(
             self,
             device_id: str,
             *,
@@ -513,7 +513,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # ruff: ignore[line-too-long]
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -572,8 +572,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
 
             Raises:
                 AssertionError: with message "non-text credentials must stop before coordinator call"
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError(
                 "non-text credentials must stop before coordinator call"
             )
 
@@ -615,8 +615,8 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
             """Apply third-party MQTT configuration to the coordinator.
 
             Test-only stub: raises AssertionError if invoked to assert that input validation prevented the coordinator from being called.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("invalid boolean must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("invalid boolean must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -667,8 +667,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
 
             Raises:
                 AssertionError: In the test stub, always raised to indicate the coordinator should not be called.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("invalid port must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("invalid port must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -747,8 +747,8 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
 
             Returns:
                 None
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("blank IP must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("blank IP must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -784,7 +784,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
         data: ClassVar[dict[str, object]] = {}
 
         async def async_set_third_party_mqtt_config(self, *args: object) -> None:  # ruff: ignore[no-self-use]
-            raise AssertionError("long token must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            raise AssertionError("long token must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -821,7 +821,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []
 
-        async def async_send_ble_command(  # ruff: ignore[too-many-arguments]
+        async def async_send_ble_command(
             self,
             device_id: str,
             *,
@@ -845,7 +845,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
 
             Returns:
                 bool: `True` if the command was accepted, `False` otherwise.
-            """  # ruff: ignore[line-too-long]
+            """
             self.calls.append({
                 "device_id": device_id,
                 "cmd": cmd,
@@ -890,8 +890,8 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
 
             Returns:
                 bool: `True` if the device acknowledged the command, `False` otherwise.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("invalid boolean must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("invalid boolean must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -939,7 +939,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     Parameters:
         body (object): The raw `body` value passed to the service; must be a non-JSON-native case to trigger validation.
         expected_error (str): The exact error message expected in the service error translation placeholders.
-    """  # ruff: ignore[line-too-long]
+    """
 
     class _BleCoordinator:
         async def async_send_ble_command(self, *args: object) -> bool:  # ruff: ignore[no-self-use]
@@ -950,8 +950,8 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
 
             Returns:
                 bool: `True` if the BLE command succeeded, `False` otherwise.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError("invalid body must stop before coordinator call")  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError("invalid body must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
     monkeypatch.setattr(
@@ -1012,7 +1012,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
                 "invalid numeric field must stop before coordinator call" to signal that
                 input validation should have prevented invocation.
             """
-            raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+            raise AssertionError(
                 "invalid numeric field must stop before coordinator call"
             )
 
@@ -1047,8 +1047,8 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator method should not be called during validation tests.
-            """  # ruff: ignore[line-too-long]
-            raise AssertionError(  # ruff: ignore[raise-vanilla-args]
+            """
+            raise AssertionError(
                 "invalid ack_timeout must stop before coordinator call"
             )
 

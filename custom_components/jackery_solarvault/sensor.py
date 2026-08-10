@@ -69,7 +69,7 @@ Unique IDs follow ``PROTOCOL.md §11`` strictly:
 The ``key`` attribute of each ``JackerySensorDescription`` is the
 ``<stable_key_suffix>``; translation keys, names and any localized text
 must never affect ``unique_id``.
-"""  # ruff: ignore[line-too-long]
+"""
 
 import asyncio
 from copy import deepcopy
@@ -521,9 +521,7 @@ if TYPE_CHECKING:
 
     from . import JackeryConfigEntry
     from .coordinator import JackerySolarVaultCoordinator
-    from .util import (
-        HomeConsumptionPower,
-    )
+    from .util import HomeConsumptionPower
 
     class _AppFieldGetter(Protocol):
         """Callable property getter carrying source-review metadata."""
@@ -679,7 +677,7 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
     """  # noqa: D205, RUF105
 
     def _f(
-        value: Any,  # noqa: ANN401, RUF105
+        value: Any,  # noqa: RUF105
     ) -> float | None:  # arbitrary payload value, coerced via float() at runtime
         try:
             return round(float(value) / divisor, 2)
@@ -853,7 +851,7 @@ def _no_property_value(_props: dict[str, Any]) -> None:
 def _payload_section_field(section: str, key: str) -> Callable[[dict[str, Any]], Any]:
     """Return a fallback getter for a top-level coordinator payload bucket."""
 
-    def _f(payload: dict[str, Any]) -> Any:  # cloud payload value  # noqa: ANN401, RUF105
+    def _f(payload: dict[str, Any]) -> Any:  # cloud payload value  # noqa: RUF105
         source = payload.get(section)
         if isinstance(source, dict):
             return source.get(key)
@@ -1702,7 +1700,7 @@ def _sensor_description_has_value(
 def _battery_pack_description_value(
     pack: dict[str, Any],
     description: JackeryBatteryPackSensorDescription,
-) -> Any:  # HA sensor values may be numeric or textual  # noqa: ANN401, RUF105
+) -> Any:  # HA sensor values may be numeric or textual  # noqa: RUF105
     """Return one app-backed battery-pack value from the current pack payload."""
     field = description.field
     raw = pack.get(field)
@@ -1744,7 +1742,7 @@ def _battery_pack_description_value(
 def _smart_meter_description_value(
     ct: dict[str, Any],
     description: JackerySmartMeterSensorDescription,
-) -> Any:  # HA sensor values may be numeric or textual  # noqa: ANN401, RUF105
+) -> Any:  # HA sensor values may be numeric or textual  # noqa: RUF105
     """Return one calculable Smart-Meter value from the current CT payload."""
     raw = None
     if description.calculation:
@@ -1832,7 +1830,7 @@ def _chart_value_for_day(
     return safe_float(values[index])
 
 
-def _chart_sum_for_date_range(  # ruff:ignore[too-many-return-statements]
+def _chart_sum_for_date_range(
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -1907,7 +1905,7 @@ def _day_power_curve_total(
     return total if total > 0 else None
 
 
-def _stat_description_has_value(  # ruff:ignore[too-many-return-statements]  # flat has-value guard chain over stat variants; clearest as-is
+def _stat_description_has_value(  # flat has-value guard chain over stat variants; clearest as-is
     payload: dict[str, Any],
     description: JackeryStatSensorDescription,
 ) -> bool:
@@ -2407,7 +2405,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_DAY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_week_energy",
         translation_key="home_week_energy",
@@ -2419,7 +2417,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_month_energy",
         translation_key="home_month_energy",
@@ -2431,7 +2429,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY  # ruff: ignore[line-too-long]
+    # Source: section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}" field APP_STAT_TOTAL_HOME_ENERGY
     JackeryStatSensorDescription(
         key="home_year_energy",
         translation_key="home_year_energy",
@@ -2446,7 +2444,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # --- PROTOCOL.md §2: /v1/device/stat/onGrid --------------------
     # Jackery device grid-side input/output. This is NOT the public utility
     # meter, so never expose it as grid_import/grid_export.
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_week_energy",
         translation_key="device_ongrid_input_week_energy",
@@ -2458,7 +2456,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_month_energy",
         translation_key="device_ongrid_input_month_energy",
@@ -2470,7 +2468,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_IN_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_input_year_energy",
         translation_key="device_ongrid_input_year_energy",
@@ -2482,7 +2480,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_YEAR,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=week) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_week_energy",
         translation_key="device_ongrid_output_week_energy",
@@ -2494,7 +2492,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=month) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_month_energy",
         translation_key="device_ongrid_output_month_energy",
@@ -2506,7 +2504,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_MONTH,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/home (dateType=year) field APP_STAT_TOTAL_OUT_GRID_ENERGY
     # APP_STAT_TOTAL_OUT_GRID_ENERGY
     JackeryStatSensorDescription(
         key="device_ongrid_output_year_energy",
@@ -2660,7 +2658,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_WEEK,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE  # ruff: ignore[line-too-long]
+    # Source: /v1/device/stat/sys/battery (dateType=month) field APP_STAT_TOTAL_DISCHARGE
     JackeryStatSensorDescription(
         key="battery_discharge_month_energy",
         translation_key="battery_discharge_month_energy",
@@ -2873,9 +2871,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_battery_charge",
         stat_key=APP_STAT_TOTAL_CHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
-        fallback_sources=(
-            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_CHARGE),
-        ),
+        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_CHARGE),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2916,9 +2912,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="device_today_ongrid_output",
         stat_key=APP_STAT_TOTAL_OUT_GRID_ENERGY,
         section=f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
-        fallback_sources=(
-            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_ONGRID_OUTPUT),
-        ),
+        fallback_sources=((PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_ONGRID_OUTPUT),),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -4770,7 +4764,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(  # ruff:ignore[unused-async, too-many-statements]  # HA entry point; entity-build logic lives in the nested _collect_entities closure over coordinator/options  # noqa: C901, RUF105
+async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; entity-build logic lives in the nested _collect_entities closure over coordinator/options  # noqa: C901, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -4863,7 +4857,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async, too-many-statements]  
                 eligible.add((dev_id, "derived", "home_consumption_power"))
         return eligible
 
-    def _collect_entities(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
+    def _collect_entities(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
         option_signature: tuple[bool, bool, bool],
     ) -> list[SensorEntity]:
         """Collect and instantiate all sensor entities for each device payload present
@@ -5245,7 +5239,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async, too-many-statements]  
                     # Create entity if discovery confirms smart meter,
                     # even without current values. Entities with no current
                     # value will show as unavailable.
-                    if not _smart_meter_description_has_value(payload, ct_desc):  # noqa: RUF105, SIM102
+                    if not _smart_meter_description_has_value(payload, ct_desc):  # noqa: RUF105
                         if not coordinator._has_smart_meter_accessory(payload):  # noqa: RUF105, SLF001
                             continue
                     _append_unique(
@@ -5345,7 +5339,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """The entity's current value."""
         source_payload = self._payload_for_sources(self.entity_description.data_sources)
         props = source_payload.get(PAYLOAD_PROPERTIES) or {}
@@ -5578,7 +5572,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             return None
         return begin
 
-    def _source_for_section(  # ruff:ignore[too-many-return-statements]
+    def _source_for_section(
         self,
         section: str,
         payload: dict[str, Any] | None = None,
@@ -5760,7 +5754,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         period_cache[cache_key] = resolution
         return resolution
 
-    def _refresh_cache(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
+    def _refresh_cache(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
         self,
         context: _StatRefreshContext,
         period_cache: _PeriodResolutionCache,
@@ -5797,9 +5791,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                 # stale placeholder, so prefer the integrated curve total.
                 day_series_key = _trend_series_key(section, stat_key)
                 day_series = (
-                    source.get(day_series_key)
-                    if day_series_key is not None
-                    else None
+                    source.get(day_series_key) if day_series_key is not None else None
                 )
                 if isinstance(day_series, list):
                     day_curve_has_activity = any(
@@ -5863,9 +5855,8 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
                         fb_source, fb_section
                     ):
                         fb_total = fb_chart_sum
-                    if (
-                        fb_total is not None
-                        and not (day_curve_has_activity and not fb_total)
+                    if fb_total is not None and not (
+                        day_curve_has_activity and not fb_total
                     ):
                         raw = fb_total
                         section = fb_section
@@ -6002,9 +5993,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
             )
             fb_numeric = safe_float(fb_raw)
             if fb_curve_total is not None and (
-                fb_numeric is None
-                or fb_numeric <= 0
-                or fb_curve_total > fb_numeric
+                fb_numeric is None or fb_numeric <= 0 or fb_curve_total > fb_numeric
             ):
                 fb_raw = fb_curve_total
             current_value = safe_float(raw)
@@ -6235,7 +6224,7 @@ class JackeryStatSensor(JackeryEntity, SensorEntity):
         await super().async_will_remove_from_hass()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """The entity's current value."""
         return self._cached_native_value
 
@@ -6554,7 +6543,7 @@ class _StatRefreshBatch:
         for entity in entities:
             self.discard(entity)
 
-    async def _async_run(self, hass: HomeAssistant) -> None:  # ruff:ignore[too-many-branches]
+    async def _async_run(self, hass: HomeAssistant) -> None:
         """Drain coalesced generations through HA's managed executor."""
         in_flight: dict[JackeryStatSensor, tuple[int, bool]] = {}
         try:  # ruff:ignore[too-many-statements-in-try-clause]
@@ -6584,7 +6573,7 @@ class _StatRefreshBatch:
                         result.request is not request
                         for result, request in zip(results, requests, strict=True)
                     ):
-                        raise RuntimeError(  # ruff:ignore[raise-vanilla-args, raise-within-try]
+                        raise RuntimeError(  # ruff:ignore[raise-within-try]
                             "Statistic refresh executor returned an incomplete batch"
                         )
                 except asyncio.CancelledError:
@@ -6649,7 +6638,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackeryBatteryPackSensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -6767,7 +6756,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
 
     def _value_from_pack(
         self, pack: dict[str, Any]
-    ) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    ) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """Return this description's app-backed value from one pack payload."""
         return _battery_pack_description_value(pack, self.entity_description)
 
@@ -6834,7 +6823,7 @@ class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """The entity's last cached native value.
 
         Returns:
@@ -6906,7 +6895,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackerySmartPlugSensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]  # entity constructor takes distinct plug-identity fields
+    def __init__(  # entity constructor takes distinct plug-identity fields
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -6975,7 +6964,7 @@ class JackerySmartPlugSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """The smart plug entity's current sensor value from its plug payload.
 
         Reads the configured field from the plug data, falls back to known alias fields
@@ -7049,7 +7038,7 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackeryBreakerSensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -7150,7 +7139,7 @@ class JackerySubdeviceAlarmSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackerySubdeviceAlarmSensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -7244,7 +7233,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     entity_description: JackeryMeterHeadSensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]  # entity constructor takes distinct meter-head identity fields
+    def __init__(  # entity constructor takes distinct meter-head identity fields
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
@@ -7304,7 +7293,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """Provide the current value for this meter-head sensor.
 
         Returns:
@@ -7472,7 +7461,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
 
     def _value_from_ct(
         self, ct: dict[str, Any]
-    ) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    ) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """Calculate the current value from a CT payload."""
         return _smart_meter_description_value(ct, self.entity_description)
 
@@ -7491,7 +7480,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         Returns:
             dict[str, Any]: Mapping of diagnostic attribute names to their values (may
             be empty if no diagnostics are available).
-        """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]
+        """  # ruff:ignore[ambiguous-unicode-character-docstring]
         if self.entity_description.calculation:
             return {
                 "calculation": self.entity_description.calculation,
@@ -7580,7 +7569,7 @@ class JackerySmartMeterSensor(JackeryEntity, SensorEntity):
         await super().async_added_to_hass()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: ANN401, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
         """Return the entity's current value."""  # noqa: D421, RUF105
         return self._cached_native_value
 
@@ -8226,7 +8215,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 "max(smart_meter_net_power - jackery_grid_side_input_power "
                 "+ jackery_grid_side_output_power, 0)"
             ),
-            "source": "http_primary_otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",  # ruff: ignore[line-too-long]
+            "source": "http_primary_otherLoadPw_preferred_then_smart_meter_ct_plus_jackery_ac_grid_side_fields",
             "scope": (
                 "Jackery-corrected home load; external non-Jackery generation"
                 " must be measured separately"

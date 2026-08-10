@@ -20,7 +20,7 @@ def _async_unload_entry() -> ast.AsyncFunctionDef:
     for node in ast.walk(tree):
         if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_unload_entry":
             return node
-    raise AssertionError("async_unload_entry not found")  # ruff: ignore[raise-vanilla-args]
+    raise AssertionError("async_unload_entry not found")
 
 
 def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
@@ -44,7 +44,7 @@ def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
             return node.lineno
         if isinstance(func, ast.Name) and func.id == attr:
             return node.lineno
-    raise AssertionError(f"{attr} call not found")  # ruff: ignore[raise-vanilla-args]
+    raise AssertionError(f"{attr} call not found")
 
 
 def test_unload_platforms_before_coordinator_shutdown() -> None:

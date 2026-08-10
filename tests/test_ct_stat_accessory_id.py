@@ -95,7 +95,7 @@ def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_update_cycle_uses_accessory_id_for_ct_stats(
     hass: HomeAssistant,
 ) -> None:

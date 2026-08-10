@@ -53,7 +53,7 @@ def test_null_free_maps_none_to_empty_string() -> None:
     result = _diagnostic_json_null_free(None)
 
     assert isinstance(result, str)
-    assert result == ""  # ruff:ignore[compare-to-empty-string]  # asserts the exact "" value, not truthiness
+    assert result == ""  # asserts the exact "" value, not truthiness
 
 
 def test_null_free_recurses_into_nested_dicts() -> None:
@@ -82,7 +82,7 @@ def test_null_free_converts_tuples_to_normalized_lists() -> None:
 
 def test_null_free_passes_through_non_none_scalars_unchanged() -> None:
     """int/str/bool/float scalars are returned unchanged, not stringified."""
-    assert _diagnostic_json_null_free(42) == 42  # ruff: ignore[magic-value-comparison]
+    assert _diagnostic_json_null_free(42) == 42
     assert _diagnostic_json_null_free("text") == "text"
     assert _diagnostic_json_null_free(value=True) is True
     assert _diagnostic_json_null_free(math.pi) == math.pi

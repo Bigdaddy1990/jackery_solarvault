@@ -44,7 +44,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_normal_cycle_returns_guarded_result() -> None:
     """When the guarded update completes, its result passes straight through."""
     coordinator = _bare_coordinator()
@@ -58,7 +58,7 @@ async def test_normal_cycle_returns_guarded_result() -> None:
     assert result == data
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_hung_cycle_raises_update_failed() -> None:
     """A cycle that exceeds the ceiling is turned into UpdateFailed."""
     coordinator = _bare_coordinator()
@@ -76,7 +76,7 @@ async def test_hung_cycle_raises_update_failed() -> None:
         await coordinator._async_update_data()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_cold_auth_failure_starts_reauth_and_propagates() -> None:
     """A cold coordinator propagates an auth failure after starting reauth.
 

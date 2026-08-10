@@ -133,8 +133,8 @@ def hex16(value: int) -> str:
     if the value does not fit into 16 bits — the caller is responsible for
     range-checking inputs (e.g. ``CHUNK_LEN <= (MTU - 60)``).
     """
-    if not 0 <= value <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"hex16: {value} does not fit into 16 bits")  # ruff:ignore[raise-vanilla-args]
+    if not 0 <= value <= 0xFFFF:
+        raise ValueError(f"hex16: {value} does not fit into 16 bits")
     return f"{value:04X}"
 
 
@@ -152,13 +152,13 @@ def parse_hex16(text: str) -> int:
         hexadecimal digits.
     """
     if len(text) != _HEX16_WIDTH:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"parse_hex16: expected {_HEX16_WIDTH} hex chars, got {len(text)}"
         )
     try:
         return int(text, 16)
     except ValueError as err:
-        raise ValueError("parse_hex16: expected hex chars") from err  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("parse_hex16: expected hex chars") from err
 
 
 def hex_encode(data: bytes) -> str:
@@ -214,7 +214,7 @@ def crc16_hex(data: bytes) -> str:
 def _validate_key_len(key: bytes, *, fn: str) -> None:
     """Reject keys whose length does not match AES-128 or AES-256."""
     if len(key) not in BLE_AES_KEY_LENGTHS:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"{fn}: key must be one of {BLE_AES_KEY_LENGTHS} bytes "
             f"(got {len(key)} bytes)"
         )
@@ -232,7 +232,7 @@ def aes_encrypt(plaintext: bytes, key: bytes, iv: bytes) -> bytes:
     """
     _validate_key_len(key, fn="aes_encrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"aes_encrypt: iv must be {BLE_AES_IV_LEN} bytes")
     padder = PKCS7(algorithms.AES.block_size).padder()
     padded = padder.update(plaintext) + padder.finalize()
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
@@ -248,7 +248,7 @@ def aes_decrypt(ciphertext: bytes, key: bytes, iv: bytes) -> bytes:
     """
     _validate_key_len(key, fn="aes_decrypt")
     if len(iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"aes_decrypt: iv must be {BLE_AES_IV_LEN} bytes")
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
     decryptor = cipher.decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
@@ -347,7 +347,7 @@ class BleBinaryFrame:
 # from the captured request frames.
 
 
-def build_binary_frame(  # ruff:ignore[too-many-arguments]
+def build_binary_frame(
     *,
     cmd: int,
     body: bytes,
@@ -368,24 +368,24 @@ def build_binary_frame(  # ruff:ignore[too-many-arguments]
     intentionally malformed inbound-frame fixtures. Production callers
     must leave it unset so the valid App trailer is generated.
     """
-    if not 0 <= cmd <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"cmd {cmd} does not fit into 16 bits")  # ruff:ignore[raise-vanilla-args]
-    if not 0 <= flags <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"flags {flags} does not fit into 16 bits")  # ruff:ignore[raise-vanilla-args]
-    if not 1 <= frame_index <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"frame_index {frame_index} out of range")  # ruff:ignore[raise-vanilla-args]
-    if not 1 <= chunk_count <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"chunk_count {chunk_count} out of range")  # ruff:ignore[raise-vanilla-args]
-    if len(body) > 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"body too long: {len(body)} bytes")  # ruff:ignore[raise-vanilla-args]
+    if not 0 <= cmd <= 0xFFFF:
+        raise ValueError(f"cmd {cmd} does not fit into 16 bits")
+    if not 0 <= flags <= 0xFFFF:
+        raise ValueError(f"flags {flags} does not fit into 16 bits")
+    if not 1 <= frame_index <= 0xFFFF:
+        raise ValueError(f"frame_index {frame_index} out of range")
+    if not 1 <= chunk_count <= 0xFFFF:
+        raise ValueError(f"chunk_count {chunk_count} out of range")
+    if len(body) > 0xFFFF:
+        raise ValueError(f"body too long: {len(body)} bytes")
     if trailer is not None and len(trailer) != _BINARY_FRAME_TRAILER_LEN:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"trailer must be {_BINARY_FRAME_TRAILER_LEN} bytes, got {len(trailer)}"
         )
-    if security is not None and not 1 <= security <= 0xFFFF:  # ruff:ignore[magic-value-comparison]
-        raise ValueError(f"security {security} out of range")  # ruff:ignore[raise-vanilla-args]
+    if security is not None and not 1 <= security <= 0xFFFF:
+        raise ValueError(f"security {security} out of range")
     if trailer is not None and security is not None:
-        raise ValueError("trailer and security are mutually exclusive")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("trailer and security are mutually exclusive")
     header = (
         _BINARY_FRAME_MAGIC_BE
         + _BINARY_FRAME_OUTBOUND_VERSION_BE
@@ -422,7 +422,7 @@ def encrypt_binary_notify(
     """
     actual_iv = random_iv() if iv is None else iv
     if len(actual_iv) != BLE_AES_IV_LEN:
-        raise ValueError(f"iv must be {BLE_AES_IV_LEN} bytes")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"iv must be {BLE_AES_IV_LEN} bytes")
     ciphertext = aes_encrypt(plaintext_frame, key, actual_iv)
     return actual_iv + ciphertext
 
@@ -442,16 +442,16 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
     full raw bytes for offline analysis.
     """
     if len(raw) < BLE_AES_IV_LEN + _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
-        raise ValueError(f"notify too short: {len(raw)} bytes")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"notify too short: {len(raw)} bytes")
     iv = raw[:BLE_AES_IV_LEN]
     ciphertext = raw[BLE_AES_IV_LEN:]
     if len(ciphertext) % 16 != 0:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"ciphertext is not aligned to AES block size: {len(ciphertext)} bytes"
         )
     plaintext = aes_decrypt(ciphertext, key, iv)
     if not plaintext.startswith(_BINARY_FRAME_MAGIC_BE):
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         )
     if plaintext[2:4] not in {
@@ -464,7 +464,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         # log will surface unexpected values for analysis.
         pass
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
-        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"unexpected payload marker {plaintext[12:14].hex()!r}")
     frame_index = int.from_bytes(plaintext[4:6], "big")
     chunk_count = int.from_bytes(plaintext[6:8], "big")
     flags = int.from_bytes(plaintext[8:10], "big")
@@ -474,7 +474,7 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         len(plaintext)
         < _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
     ):
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"frame truncated: body_length={body_length} but plaintext is "
             f"{len(plaintext)} bytes"
         )
@@ -523,7 +523,7 @@ def build_plaintext_frame(frame: BleFrame) -> str:
     """
     chunk_hex = hex_encode(frame.chunk_payload)
     if len(chunk_hex) % 2 != 0:
-        raise ValueError("chunk_payload must serialise to an even hex length")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("chunk_payload must serialise to an even hex length")
     return (
         BLE_FRAME_MAGIC
         + BLE_FRAME_VERSION
@@ -550,13 +550,13 @@ def parse_plaintext_frame(text: str) -> BleFrame:
     not match the expected literals.
     """
     if len(text) < _HEADER_HEX_LEN:
-        raise ValueError("frame too short")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("frame too short")
     if not text.startswith(BLE_FRAME_MAGIC):
-        raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"frame does not start with {BLE_FRAME_MAGIC!r}")
     cursor = len(BLE_FRAME_MAGIC)
     version = text[cursor : cursor + _HEX16_WIDTH]
     if version != BLE_FRAME_VERSION:
-        raise ValueError(f"unexpected protocol version {version!r}")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"unexpected protocol version {version!r}")
     cursor += _HEX16_WIDTH
     frame_index = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
@@ -568,14 +568,14 @@ def parse_plaintext_frame(text: str) -> BleFrame:
     cursor += _HEX16_WIDTH
     marker = text[cursor : cursor + _HEX16_WIDTH]
     if marker != BLE_FRAME_PAYLOAD_MARKER:
-        raise ValueError(f"unexpected payload marker {marker!r}")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(f"unexpected payload marker {marker!r}")
     cursor += _HEX16_WIDTH
     chunk_len = parse_hex16(text[cursor : cursor + _HEX16_WIDTH])
     cursor += _HEX16_WIDTH
     expected_hex_len = chunk_len * 2
     chunk_hex = text[cursor : cursor + expected_hex_len]
     if len(chunk_hex) != expected_hex_len:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"chunk payload truncated: expected {expected_hex_len} hex chars, "
             f"have {len(chunk_hex)}"
         )
@@ -637,17 +637,17 @@ def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
     the CRC suffix, strips magic and returns the parsed :class:`BleFrame`.
     """
     if len(blob) < BLE_AES_IV_LEN + algorithms.AES.block_size // 8:
-        raise ValueError("ciphertext blob too short")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("ciphertext blob too short")
     iv = blob[:BLE_AES_IV_LEN]
     ciphertext = blob[BLE_AES_IV_LEN:]
     plaintext = aes_decrypt(ciphertext, key, iv).decode("utf-8")
     if len(plaintext) < _HEX16_WIDTH * 2:
-        raise ValueError("plaintext too short to carry random tag + CRC")  # ruff:ignore[raise-vanilla-args]
+        raise ValueError("plaintext too short to carry random tag + CRC")
     crc_received = plaintext[-_HEX16_WIDTH:]
     body = plaintext[:-_HEX16_WIDTH]
     crc_expected = crc16_hex(body.encode("utf-8"))
     if crc_received.upper() != crc_expected.upper():
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"CRC mismatch: payload says {crc_received!r}, computed {crc_expected!r}"
         )
     # Strip the trailing 16-bit random tag the app appends before the CRC.
@@ -686,7 +686,7 @@ def chunk_size_for_mtu(mtu: int) -> int:
     to at least 61 before frames can be sent at all.
     """
     if mtu <= _BLE_FRAME_OVERHEAD:
-        raise ValueError(  # ruff:ignore[raise-vanilla-args]
+        raise ValueError(
             f"BLE MTU {mtu} is below the {_BLE_FRAME_OVERHEAD}-byte frame overhead"
         )
     return mtu - _BLE_FRAME_OVERHEAD

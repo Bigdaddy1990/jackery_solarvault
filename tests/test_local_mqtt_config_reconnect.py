@@ -32,7 +32,7 @@ class _TaskHass:
         return asyncio.create_task(coro, name=name)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_reconnect_during_config_push_replays_without_overlap() -> None:
     """A second cloud connect coalesces one post-flight 3046/BLE-113 retry."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -92,7 +92,7 @@ async def test_reconnect_during_config_push_replays_without_overlap() -> None:
     mqtt_mgr.record_connect_success.assert_called()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_failed_config_push_retries_without_cloud_reconnect() -> None:
     """A transient 3046/BLE-113 failure retries without requiring reconnect."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -132,7 +132,7 @@ def _rediscovery_coordinator(*, connected: bool) -> tuple[Any, MagicMock]:
     return obj, schedule
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_runtime_discovery_pushes_config_to_new_device_when_connected() -> None:
     """A device added after startup receives 3046/BLE-113 without reconnect."""
     coordinator, schedule = _rediscovery_coordinator(connected=True)
@@ -149,7 +149,7 @@ async def test_runtime_discovery_pushes_config_to_new_device_when_connected() ->
     schedule.assert_called_once_with()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_runtime_discovery_schedules_config_while_cloud_disconnected() -> None:
     """BLE can configure a newly discovered device without Cloud-MQTT state."""
     coordinator, schedule = _rediscovery_coordinator(connected=False)
@@ -166,7 +166,7 @@ async def test_runtime_discovery_schedules_config_while_cloud_disconnected() -> 
     schedule.assert_called_once_with()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_runtime_discovery_without_new_device_does_not_push_config() -> None:
     """An unchanged discovery snapshot does not emit redundant cmd=113 work."""
     coordinator, schedule = _rediscovery_coordinator(connected=True)

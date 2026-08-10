@@ -37,7 +37,7 @@ _STALE_POWER = 5
 _FILL_VALUE = 7
 
 
-def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:  # ruff:ignore[any-type]
+def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:
     """Build a bare coordinator exposing only merge-relevant state."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
@@ -273,7 +273,7 @@ def test_merge_main_properties_for_device_overrides_win(
         {"workModel": 2},
     )
 
-    assert merged["workModel"] == 9  # ruff: ignore[magic-value-comparison]
+    assert merged["workModel"] == 9
 
 
 def test_apply_local_property_patch_updates_data_and_records_override(
@@ -290,9 +290,9 @@ def test_apply_local_property_patch_updates_data_and_records_override(
 
     coordinator._apply_local_property_patch("dev-1", {"workModel": 4})  # ruff: ignore[private-member-access]
 
-    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["workModel"] == 4  # ruff: ignore[magic-value-comparison]
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["workModel"] == 4
     assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["pvPw"] == _HTTP_POWER
-    assert coordinator._property_overrides["dev-1"][1]["workModel"] == 4  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert coordinator._property_overrides["dev-1"][1]["workModel"] == 4  # ruff: ignore[private-member-access]
 
 
 def test_apply_local_property_patch_is_noop_for_unknown_device() -> None:

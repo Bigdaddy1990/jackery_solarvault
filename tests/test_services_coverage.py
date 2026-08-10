@@ -75,7 +75,7 @@ def test_json_native_body_rejects_non_dict_normalization() -> None:
 
 
 def test_ble_body_from_service_rejects_invalid_types() -> None:
-    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""  # ruff: ignore[line-too-long]
+    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""
     with pytest.raises(ServiceValidationError) as exc:
         services._ble_body_from_service("[1, 2, 3]", "dev1")  # ruff: ignore[private-member-access]
     assert "must be an object" in exc.value.translation_placeholders["error"]
@@ -189,7 +189,7 @@ def test_service_integer_parser_rejects_bools() -> None:
 
 def test_service_integer_parser_accepts_whole_floats() -> None:
     """Test integer parser accepts whole floats."""
-    assert services._coerce_service_int(42.0) == 42  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert services._coerce_service_int(42.0) == 42  # ruff: ignore[private-member-access]
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int(42.5)  # ruff: ignore[private-member-access]
 

@@ -75,7 +75,7 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant) -> None:
     """Show a "cannot_connect" form error when the API raises a network error during the user config flow.
 
     Verifies the flow returns a FORM and sets errors to {"base": "cannot_connect"}.
-    """  # ruff: ignore[line-too-long]
+    """
     from custom_components.jackery_solarvault.client.api import JackeryError  # ruff:ignore[unsorted-imports]  # ruff: ignore[import-outside-top-level]
 
     with patch(
@@ -160,7 +160,7 @@ async def test_reauth_flow_updates_password_and_reloads(
 async def test_options_flow_persists_local_mqtt_topic_filter_default(
     hass: HomeAssistant,
 ) -> None:
-    """Options flow must persist the local MQTT topic-filter option and default it to empty."""  # ruff: ignore[line-too-long]
+    """Options flow must persist the local MQTT topic-filter option and default it to empty."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff:ignore[unsorted-imports]  # ruff: ignore[import-outside-top-level]
 
     entry = MockConfigEntry(
@@ -180,7 +180,7 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
 
     result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""  # ruff:ignore[compare-to-empty-string]
+    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""
 
 
 async def test_options_flow_accepts_local_mqtt_topic_filter_value(

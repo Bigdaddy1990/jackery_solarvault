@@ -49,7 +49,7 @@ def _make_api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_box_stat_contract_includes_explicit_period() -> None:
     """The catalog-only box-stat endpoint keeps the app request shape stable."""
     api = _make_api()
@@ -78,7 +78,7 @@ async def test_async_get_box_stat_contract_includes_explicit_period() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_device_property_uses_get_with_device_id_query() -> None:
     """DeviceDetailApi (/device/property) is a GET with a deviceId query param.
 
@@ -106,7 +106,7 @@ async def test_async_get_device_property_uses_get_with_device_id_query() -> None
     assert result == payload
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_today_energy_uses_get_with_device_sn_query() -> None:
     """device/stat/today is a GET with a deviceSn query param, not a POST body.
 
@@ -134,7 +134,7 @@ async def test_async_get_today_energy_uses_get_with_device_sn_query() -> None:
     assert result == payload
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_ota_info_uses_get_with_device_sn_list_query() -> None:
     """DeviceMqttOTASelectApi (/device/ota/list) is a GET with a deviceSnList query.
 
@@ -159,7 +159,7 @@ async def test_async_get_ota_info_uses_get_with_device_sn_list_query() -> None:
     post_json.assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_accessories_contract_stringifies_ids() -> None:
     """device/accessories stringifies its ids on each of its two real verbs.
 
@@ -194,7 +194,7 @@ async def test_async_accessories_contract_stringifies_ids() -> None:
     delete_json.assert_awaited_once_with(ACCESSORIES_PATH, {"id": "123"})
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_check_verification_code_contract_sends_code() -> None:
     """Verification-code checks send the app catalog's code field."""
     api = _make_api()
@@ -218,7 +218,7 @@ async def test_async_check_verification_code_contract_sends_code() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_register_contract_sends_app_identity_and_region() -> None:
     """Registration wrapper preserves source-of-truth request fields."""
     api = JackeryApi(Mock(), "tester@example.com", "secret", region_code="de")
@@ -245,7 +245,7 @@ async def test_async_register_contract_sends_app_identity_and_region() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_send_verification_code_contract_posts_app_fields() -> None:
     """Verification-code issuance POSTs the app catalog body fields.
 
@@ -268,7 +268,7 @@ async def test_async_send_verification_code_contract_posts_app_fields() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_logout_contract_has_empty_body() -> None:
     """Logout wrapper sends the app catalog's body-less POST."""
     api = _make_api()
@@ -281,7 +281,7 @@ async def test_async_logout_contract_has_empty_body() -> None:
     post_json.assert_awaited_once_with(LOGOUT_PATH, {})
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_qr_code_contract_has_no_query_params() -> None:
     """QR-code wrapper requests the account share code without parameters."""
     api = _make_api()
@@ -295,7 +295,7 @@ async def test_async_get_qr_code_contract_has_no_query_params() -> None:
     get_json.assert_awaited_once_with(DEVICE_QR_CODE_PATH)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_check_accessories_exist_contract() -> None:
     """Accessory existence check remains available without wiring an entity."""
     api = _make_api()
@@ -312,7 +312,7 @@ async def test_async_check_accessories_exist_contract() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_check_jackery_accessories_exist_contract() -> None:
     """Jackery accessory existence check keeps the app's serial-info parameter."""
     api = _make_api()
@@ -331,7 +331,7 @@ async def test_async_check_jackery_accessories_exist_contract() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_bind_accessories_contract() -> None:
     """Accessory bind hits the bind path and passes the response through.
 
@@ -354,7 +354,7 @@ async def test_async_bind_accessories_contract() -> None:
     assert post_json.await_args.args[0] == ACCESSORIES_BIND_PATH
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_check_scannable_accessories_contract() -> None:
     """Scannable-accessory check hits the scannable path and passes data through.
 
@@ -377,7 +377,7 @@ async def test_async_check_scannable_accessories_contract() -> None:
     assert post_json.await_args.args[0] == ACCESSORIES_SCANNABLE_PATH
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_orphan_endpoint_contracts_normalize_non_dict_payloads() -> None:
     """Catalog-only dict wrappers do not leak unexpected payload shapes."""
     api = _make_api()
@@ -389,7 +389,7 @@ async def test_orphan_endpoint_contracts_normalize_non_dict_payloads() -> None:
     assert result == {}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_device_period_diagnostics_keep_context_for_null_payload() -> None:
     """Diagnostics keep request metadata even when the backend sends data:null."""
     api = _make_api()
@@ -424,7 +424,7 @@ async def test_device_period_diagnostics_keep_context_for_null_payload() -> None
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() -> None:
     """Battery-pack diagnostics keep request metadata for empty app responses."""
     api = _make_api()
@@ -440,7 +440,7 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_carbon_stat_uses_get_with_device_sn_query() -> None:
     """device/stat/carbon is a GET with a deviceSn query, not a POST body.
 
@@ -467,7 +467,7 @@ async def test_async_get_carbon_stat_uses_get_with_device_sn_query() -> None:
     assert result == payload
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_ble_ota_link_uses_get_with_query() -> None:
     """device/ota/bluetooth is a GET query (DeviceBleOTALinkQuiryApi).
 
@@ -502,7 +502,7 @@ async def test_async_get_ble_ota_link_uses_get_with_query() -> None:
     post_json.assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_check_system_bound_uses_get_with_query() -> None:
     """device/system/exist (SystemBindExistApi) is a read/existence GET check.
 
@@ -531,7 +531,7 @@ async def test_async_check_system_bound_uses_get_with_query() -> None:
     assert result == {FIELD_DATA: {"exist": True}}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_async_get_device_shared_managers_posts_form_body() -> None:
     """device/bind/share/list is a POST form body, not a read-only GET query.
 

@@ -60,7 +60,7 @@ def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() ->
         rejection_callback=rejection_reasons.append,
     )
 
-    assert dev_type == 3  # ruff: ignore[magic-value-comparison]
+    assert dev_type == 3
     assert rejection_reasons == []
 
 
@@ -77,7 +77,7 @@ def test_unknown_textual_device_type_records_schema_rejection() -> None:
     assert rejection_reasons == ["subdevice_dev_type_value_error"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_legacy_shelly_is_not_a_property_device() -> None:
     """A bound Shelly (bindKey=0, no model metadata) stays out of the index."""
     shelly = {FIELD_BIND_KEY: 0, FIELD_DEV_SN: "5c013b048e3c"}
@@ -94,7 +94,7 @@ async def test_legacy_shelly_is_not_a_property_device() -> None:
     assert "portable-1" in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_legacy_real_portable_still_discovered() -> None:
     """A genuine Jackery portable from bind/list is still indexed as a device."""
     portable = {
@@ -109,7 +109,7 @@ async def test_legacy_real_portable_still_discovered() -> None:
     assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     """Explicit empty outer lists are valid fallback, not removal evidence."""
     portable = {

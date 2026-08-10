@@ -6,9 +6,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_DEVICE_SN,
     PAYLOAD_SUBDEVICES,
 )
-from custom_components.jackery_solarvault.coordinator import (
-    merge_present_dict_values,
-)
+from custom_components.jackery_solarvault.coordinator import merge_present_dict_values
 
 _BASE_POWER = 10
 

@@ -68,9 +68,9 @@ def test_ct_bucket_is_merged_into_local_daily_counter_properties() -> None:
         payload,
     )
 
-    assert result["batSoc"] == 50  # ruff: ignore[magic-value-comparison]
-    assert result[FIELD_CT_TOTAL_PHASE_ENERGY] == 77_913  # ruff: ignore[magic-value-comparison]
-    assert result[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 103_495  # ruff: ignore[magic-value-comparison]
+    assert result["batSoc"] == 50
+    assert result[FIELD_CT_TOTAL_PHASE_ENERGY] == 77_913
+    assert result[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 103_495
 
 
 def test_ct_daily_deltas_are_reported_in_kwh() -> None:
@@ -93,8 +93,8 @@ def test_ct_daily_deltas_are_reported_in_kwh() -> None:
         allow_new_anchor_delta=False,
     )
 
-    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 913  # ruff: ignore[magic-value-comparison]
-    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 495  # ruff: ignore[magic-value-comparison]
+    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 913
+    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 495
     cast("Any", coordinator).data = {
         _DEVICE_ID: {"local_daily_energy": deltas},
     }
@@ -133,4 +133,4 @@ def test_cold_start_seeds_anchor_then_reports_same_day_growth() -> None:
         allow_new_anchor_delta=False,
     )
 
-    assert second[FIELD_CT_TOTAL_PHASE_ENERGY] == 913  # ruff: ignore[magic-value-comparison]
+    assert second[FIELD_CT_TOTAL_PHASE_ENERGY] == 913

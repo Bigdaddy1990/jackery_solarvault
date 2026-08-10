@@ -14,17 +14,13 @@ from unittest.mock import PropertyMock, patch
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.jackery_solarvault import (
-    __init__ as _jackery_init,
-)
+from custom_components.jackery_solarvault import __init__ as _jackery_init
 from custom_components.jackery_solarvault.const import DOMAIN, PAYLOAD_BATTERY_PACKS
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     battery_pack_serial,
 )
-from custom_components.jackery_solarvault.sensor import (
-    JackeryBatteryPackSensor,
-)
+from custom_components.jackery_solarvault.sensor import JackeryBatteryPackSensor
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 

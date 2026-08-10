@@ -5,7 +5,7 @@ import logging
 import secrets
 from typing import Any
 
-from ..const import (
+from jackery_solarvault.const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
@@ -32,7 +32,8 @@ from ..const import (
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
-from ..util import safe_bool
+from jackery_solarvault.util import safe_bool
+
 from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 
 _LOGGER = logging.getLogger(__name__)
