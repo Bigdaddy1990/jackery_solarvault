@@ -24,6 +24,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+    subdevice_dev_type,
 )
 
 
@@ -34,8 +35,8 @@ def _discovery_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Build a bare coordinator whose discovery boundaries are mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {}
-    coordinator._pending_discovery_parent_removals = set()
+    coordinator._device_index = {}  # ruff: ignore[private-member-access]
+    coordinator._pending_discovery_parent_removals = set()  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_system_list=AsyncMock(return_value=systems),
         async_list_devices_legacy=AsyncMock(return_value=legacy),
@@ -45,9 +46,35 @@ def _discovery_coordinator(
         last_legacy_device_list_response={FIELD_CODE: 0, FIELD_DATA: legacy},
     )
     mutable = cast("Any", coordinator)
-    mutable._async_save_discovery_cache = AsyncMock()
-    mutable._schedule_background_once = lambda *_args, **_kwargs: None
+    mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
+    mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
     return coordinator
+
+
+def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() -> None:
+    """A documented Shelly deviceType may fall back to its proven scanName."""
+    rejection_reasons: list[str] = []
+
+    dev_type = subdevice_dev_type(
+        {"deviceType": "emeter", "scanName": "shellypro3em"},
+        rejection_callback=rejection_reasons.append,
+    )
+
+    assert dev_type == 3  # ruff: ignore[magic-value-comparison]
+    assert rejection_reasons == []
+
+
+def test_unknown_textual_device_type_records_schema_rejection() -> None:
+    """An unresolved textual type remains visible in rejection diagnostics."""
+    rejection_reasons: list[str] = []
+
+    dev_type = subdevice_dev_type(
+        {"deviceType": "unknown-device-family", "scanName": "unknown"},
+        rejection_callback=rejection_reasons.append,
+    )
+
+    assert dev_type is None
+    assert rejection_reasons == ["subdevice_dev_type_value_error"]
 
 
 @pytest.mark.asyncio()
@@ -63,8 +90,8 @@ async def test_legacy_shelly_is_not_a_property_device() -> None:
 
     await coordinator.async_discover()
 
-    assert "5c013b048e3c" not in coordinator._device_index
-    assert "portable-1" in coordinator._device_index
+    assert "5c013b048e3c" not in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert "portable-1" in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -79,7 +106,7 @@ async def test_legacy_real_portable_still_discovered() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -92,7 +119,7 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     }
     coordinator = _discovery_coordinator(systems=[], legacy=[portable])
     await coordinator.async_discover()
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
     cast("Any", coordinator).api.async_get_system_list = AsyncMock(return_value=[])
     cast("Any", coordinator).api.async_list_devices_legacy = AsyncMock(return_value=[])
@@ -107,4 +134,4 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]

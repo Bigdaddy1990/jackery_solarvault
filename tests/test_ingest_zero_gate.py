@@ -30,8 +30,8 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.ingest import (
     TransportSource,
-    _has_populated_series,
-    _zero_period_payload_confirmed,
+    _has_populated_series,  # ruff: ignore[import-private-name]
+    _zero_period_payload_confirmed,  # ruff: ignore[import-private-name]
     gate_payload_section,
     gate_period_hierarchy_for_recorder,
 )

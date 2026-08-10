@@ -29,17 +29,17 @@ def _coordinator(props: dict[str, Any] | None = None) -> Any:  # ruff:ignore[any
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
     shell.data = {_DEVICE: {PAYLOAD_PROPERTIES: dict(props or {})}}
-    shell._shutdown_started = False
-    shell._property_overrides = {}
-    shell._live_property_key_monotonic = {}
-    shell._listeners = {}
-    shell._async_publish_command_ble_first = AsyncMock()
+    shell._shutdown_started = False  # ruff: ignore[private-member-access]
+    shell._property_overrides = {}  # ruff: ignore[private-member-access]
+    shell._live_property_key_monotonic = {}  # ruff: ignore[private-member-access]
+    shell._listeners = {}  # ruff: ignore[private-member-access]
+    shell._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]
     return shell
 
 
 def _sent_body(coordinator: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
     """Return the body_fields the setter asked the dispatcher to send."""
-    return coordinator._async_publish_command_ble_first.await_args.kwargs["body_fields"]
+    return coordinator._async_publish_command_ble_first.await_args.kwargs["body_fields"]  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -71,7 +71,7 @@ async def test_set_work_model_coerces_and_patches_local_state() -> None:
 
     assert _sent_body(coordinator) == {coord_mod.FIELD_WORK_MODEL: 2}
     assert (
-        coordinator.data[_DEVICE][PAYLOAD_PROPERTIES][coord_mod.FIELD_WORK_MODEL] == 2
+        coordinator.data[_DEVICE][PAYLOAD_PROPERTIES][coord_mod.FIELD_WORK_MODEL] == 2  # ruff: ignore[magic-value-comparison]
     )
 
 
@@ -126,7 +126,7 @@ async def test_set_soc_limits_requires_at_least_one_side() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_set_soc_limits(_DEVICE)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()
+    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -139,8 +139,8 @@ async def test_set_soc_limits_fills_missing_side_from_current_state() -> None:
     await coordinator.async_set_soc_limits(_DEVICE, charge_limit=90)
 
     body = _sent_body(coordinator)
-    assert body[coord_mod.FIELD_SOC_CHG_LIMIT] == 90
-    assert body[coord_mod.FIELD_SOC_DISCHG_LIMIT] == 20
+    assert body[coord_mod.FIELD_SOC_CHG_LIMIT] == 90  # ruff: ignore[magic-value-comparison]
+    assert body[coord_mod.FIELD_SOC_DISCHG_LIMIT] == 20  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.asyncio()
@@ -151,7 +151,7 @@ async def test_set_soc_limits_rejects_out_of_range_charge() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_set_soc_limits(_DEVICE, charge_limit=150)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()
+    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -182,7 +182,7 @@ async def test_custom_use_battery_requires_a_bound() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_portable_set_custom_use_battery(_DEVICE)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()
+    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()

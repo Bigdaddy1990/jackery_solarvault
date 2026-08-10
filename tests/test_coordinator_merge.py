@@ -42,18 +42,18 @@ def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:  # ruff:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
     shell.data = data
-    shell._shutdown_started = False
-    shell._property_overrides = {}
-    shell._price_overrides = {}
-    shell._listeners = {}
-    shell._device_index = {}
-    shell._ble_pending_updates = {}
+    shell._shutdown_started = False  # ruff: ignore[private-member-access]
+    shell._property_overrides = {}  # ruff: ignore[private-member-access]
+    shell._price_overrides = {}  # ruff: ignore[private-member-access]
+    shell._listeners = {}  # ruff: ignore[private-member-access]
+    shell._device_index = {}  # ruff: ignore[private-member-access]
+    shell._ble_pending_updates = {}  # ruff: ignore[private-member-access]
     return shell
 
 
 def test_property_value_present_rejects_empty_sentinels() -> None:
     """None, blank strings and empty containers do not count as present."""
-    present = JackerySolarVaultCoordinator._property_value_present
+    present = JackerySolarVaultCoordinator._property_value_present  # ruff: ignore[private-member-access]
 
     assert present(0) is True
     assert present("ok") is True
@@ -106,7 +106,7 @@ def test_concurrent_live_push_is_reapplied_without_reverting_fresh_http() -> Non
         }
     })
 
-    merged = coordinator._merge_concurrent_coordinator_updates(
+    merged = coordinator._merge_concurrent_coordinator_updates(  # ruff: ignore[private-member-access]
         baseline,
         fresh_http,
     )
@@ -127,17 +127,17 @@ def test_http_rebuild_preserves_circuit_and_generic_subdevice_buckets() -> None:
 def test_local_system_patch_updates_http_rebuild_index() -> None:
     """Accepted live grid metadata must not revert on the next HTTP rebuild."""
     coordinator = _coordinator({"dev-1": {PAYLOAD_SYSTEM: {}}})
-    coordinator._device_index = {
+    coordinator._device_index = {  # ruff: ignore[private-member-access]
         "dev-1": {PAYLOAD_SYSTEM_META: {"timezone": "Europe/Berlin"}}
     }
 
-    coordinator._apply_local_system_patch(
+    coordinator._apply_local_system_patch(  # ruff: ignore[private-member-access]
         "dev-1",
         {FIELD_GRID_STANDARD: "VDE-AR-N 4105"},
     )
 
     assert (
-        coordinator._device_index["dev-1"][PAYLOAD_SYSTEM_META][FIELD_GRID_STANDARD]
+        coordinator._device_index["dev-1"][PAYLOAD_SYSTEM_META][FIELD_GRID_STANDARD]  # ruff: ignore[private-member-access]
         == "VDE-AR-N 4105"
     )
 
@@ -146,9 +146,9 @@ def test_ble_coalescer_uses_pending_snapshot_as_next_frame_base() -> None:
     """Two BLE frames in one coalescing window must accumulate."""
     coordinator = _coordinator({"dev-1": {PAYLOAD_PROPERTIES: {"pvPw": 100}}})
     pending = {PAYLOAD_PROPERTIES: {"pvPw": 200, "soc": 50}}
-    coordinator._ble_pending_updates["dev-1"] = pending
+    coordinator._ble_pending_updates["dev-1"] = pending  # ruff: ignore[private-member-access]
 
-    assert coordinator._ble_partial_update_base("dev-1") is pending
+    assert coordinator._ble_partial_update_base("dev-1") is pending  # ruff: ignore[private-member-access]
 
 
 def test_subdevice_merge_appends_new_identified_serial() -> None:
@@ -193,17 +193,17 @@ def test_active_property_overrides_expire_after_ttl(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         lambda: clock["now"],
     )
-    coordinator._property_overrides["dev-1"] = (
+    coordinator._property_overrides["dev-1"] = (  # ruff: ignore[private-member-access]
         clock["now"],
         {"workModel": 3},
     )
 
-    assert coordinator._active_property_overrides("dev-1") == {"workModel": 3}
+    assert coordinator._active_property_overrides("dev-1") == {"workModel": 3}  # ruff: ignore[private-member-access]
 
-    clock["now"] += JackerySolarVaultCoordinator._PROPERTY_OVERRIDE_TTL_SEC + 1
+    clock["now"] += JackerySolarVaultCoordinator._PROPERTY_OVERRIDE_TTL_SEC + 1  # ruff: ignore[private-member-access]
 
-    assert coordinator._active_property_overrides("dev-1") == {}
-    assert "dev-1" not in coordinator._property_overrides
+    assert coordinator._active_property_overrides("dev-1") == {}  # ruff: ignore[private-member-access]
+    assert "dev-1" not in coordinator._property_overrides  # ruff: ignore[private-member-access]
 
 
 def test_merge_partial_update_live_push_wins() -> None:
@@ -223,7 +223,7 @@ def test_merge_partial_update_live_push_wins() -> None:
         PAYLOAD_PROPERTIES: {"pvPw": _STALE_POWER, "extra": _FILL_VALUE},
     }
 
-    merged = coordinator._merge_partial_device_update(
+    merged = coordinator._merge_partial_device_update(  # ruff: ignore[private-member-access]
         "dev-1",
         current,
         incoming,
@@ -246,7 +246,7 @@ def test_merge_main_properties_for_device_live_updates_win() -> None:
         {"dev-1": {PAYLOAD_HTTP_PROPERTIES: {"workModel": _HTTP_POWER}}},
     )
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         {"workModel": _HTTP_POWER},
         {"workModel": _STALE_POWER, "extra": _FILL_VALUE},
@@ -265,15 +265,15 @@ def test_merge_main_properties_for_device_overrides_win(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         lambda: 1_000.0,
     )
-    coordinator._property_overrides["dev-1"] = (1_000.0, {"workModel": 9})
+    coordinator._property_overrides["dev-1"] = (1_000.0, {"workModel": 9})  # ruff: ignore[private-member-access]
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         {"workModel": 1},
         {"workModel": 2},
     )
 
-    assert merged["workModel"] == 9
+    assert merged["workModel"] == 9  # ruff: ignore[magic-value-comparison]
 
 
 def test_apply_local_property_patch_updates_data_and_records_override(
@@ -288,18 +288,18 @@ def test_apply_local_property_patch_updates_data_and_records_override(
         lambda: 2_000.0,
     )
 
-    coordinator._apply_local_property_patch("dev-1", {"workModel": 4})
+    coordinator._apply_local_property_patch("dev-1", {"workModel": 4})  # ruff: ignore[private-member-access]
 
-    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["workModel"] == 4
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["workModel"] == 4  # ruff: ignore[magic-value-comparison]
     assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES]["pvPw"] == _HTTP_POWER
-    assert coordinator._property_overrides["dev-1"][1]["workModel"] == 4
+    assert coordinator._property_overrides["dev-1"][1]["workModel"] == 4  # ruff: ignore[magic-value-comparison, private-member-access]
 
 
 def test_apply_local_property_patch_is_noop_for_unknown_device() -> None:
     """Patching a device absent from data leaves coordinator state untouched."""
     coordinator = _coordinator({"dev-1": {PAYLOAD_PROPERTIES: {}}})
 
-    coordinator._apply_local_property_patch("ghost", {"workModel": 4})
+    coordinator._apply_local_property_patch("ghost", {"workModel": 4})  # ruff: ignore[private-member-access]
 
     assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES] == {}
     assert "ghost" not in coordinator.data

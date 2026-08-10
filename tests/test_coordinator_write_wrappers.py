@@ -16,14 +16,18 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryError
 from custom_components.jackery_solarvault.const import (
+    FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_LATITUDE,
     FIELD_LONGITUDE,
     FIELD_PV1,
     FIELD_PV_NAME,
+    PAYLOAD_DEVICE,
     PAYLOAD_DEVICE_META,
+    PAYLOAD_DISCOVERY,
     PAYLOAD_LOCATION,
     PAYLOAD_PROPERTIES,
+    PAYLOAD_SYSTEM,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -46,10 +50,10 @@ def _coordinator(
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.data = data
-    obj._device_index = device_index or {}
-    obj._property_overrides = {}
-    obj._listeners = {}
-    obj._shutdown_started = False
+    obj._device_index = device_index or {}  # ruff: ignore[private-member-access]
+    obj._property_overrides = {}  # ruff: ignore[private-member-access]
+    obj._listeners = {}  # ruff: ignore[private-member-access]
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
     obj.last_update_success = True
     obj.last_update_exception = None
     obj.api = MagicMock()
@@ -62,6 +66,40 @@ def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff:ignore[any-t
 
 
 # --- async_set_pv_name (Finding 1a/1b + Finding 2) ------------------------
+
+
+@pytest.mark.asyncio()
+async def test_set_device_name_uses_diy_http_endpoint_and_patches_metadata() -> None:
+    """The explicit App REST setter updates only the addressed device metadata."""
+    data = {
+        _DEVICE: {
+            PAYLOAD_DEVICE: {FIELD_DEVICE_NAME: "Old"},
+            PAYLOAD_DISCOVERY: {FIELD_DEVICE_NAME: "Old"},
+            PAYLOAD_SYSTEM: {FIELD_DEVICE_NAME: "Old"},
+        },
+        _OTHER: {
+            PAYLOAD_DEVICE: {FIELD_DEVICE_NAME: "Other"},
+        },
+    }
+    coordinator = _coordinator(data)
+    _api(coordinator).async_modify_device_name = AsyncMock()
+    original = coordinator.data
+    snapshot = copy.deepcopy(original)
+
+    await coordinator.async_set_device_name(_DEVICE, "New Device")
+
+    _api(coordinator).async_modify_device_name.assert_awaited_once_with(
+        device_name="New Device",
+        id=_DEVICE,
+    )
+    assert coordinator.data[_DEVICE][PAYLOAD_DEVICE][FIELD_DEVICE_NAME] == "New Device"
+    assert (
+        coordinator.data[_DEVICE][PAYLOAD_DISCOVERY][FIELD_DEVICE_NAME] == "New Device"
+    )
+    assert coordinator.data[_DEVICE][PAYLOAD_SYSTEM][FIELD_DEVICE_NAME] == "New Device"
+    assert coordinator.data[_OTHER][PAYLOAD_DEVICE][FIELD_DEVICE_NAME] == "Other"
+    assert original == snapshot
+    cast("Any", coordinator).async_request_refresh.assert_awaited_once()
 
 
 @pytest.mark.asyncio()

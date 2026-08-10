@@ -39,7 +39,7 @@ def _coordinator(
     data: dict[str, Any] | None = None,
 ) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = index or {}
+    coordinator._device_index = index or {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).data = data or {}
     return coordinator
 
@@ -53,7 +53,7 @@ def test_resolve_device_id_matches_known_id_in_body() -> None:
     """A device id nested in the body resolves against the index."""
     coordinator = _coordinator(index={"dev-1": {}})
 
-    resolved = coordinator._resolve_device_id_from_mqtt(
+    resolved = coordinator._resolve_device_id_from_mqtt(  # ruff: ignore[private-member-access]
         {"body": {FIELD_DEVICE_ID: "dev-1"}},
     )
 
@@ -69,7 +69,7 @@ def test_resolve_device_id_by_serial_from_index_meta() -> None:
         },
     )
 
-    resolved = coordinator._resolve_device_id_from_mqtt(
+    resolved = coordinator._resolve_device_id_from_mqtt(  # ruff: ignore[private-member-access]
         {FIELD_DEVICE_SN: "SN-B"},
     )
 
@@ -80,7 +80,7 @@ def test_resolve_device_id_falls_back_to_sole_device() -> None:
     """An unidentifiable payload maps to the only known device."""
     coordinator = _coordinator(index={"only": {}})
 
-    resolved = coordinator._resolve_device_id_from_mqtt({"body": {}})
+    resolved = coordinator._resolve_device_id_from_mqtt({"body": {}})  # ruff: ignore[private-member-access]
 
     assert resolved == "only"
 
@@ -89,9 +89,34 @@ def test_resolve_device_id_returns_none_when_ambiguous() -> None:
     """With multiple devices and no identifier, resolution abstains."""
     coordinator = _coordinator(index={"a": {}, "b": {}})
 
-    resolved = coordinator._resolve_device_id_from_mqtt({"body": {}})
+    resolved = coordinator._resolve_device_id_from_mqtt({"body": {}})  # ruff: ignore[private-member-access]
 
     assert resolved is None
+
+
+def test_resolve_device_id_rejects_unknown_explicit_serial_for_sole_device() -> None:
+    """An explicit foreign serial never falls through to the sole-device shortcut."""
+    coordinator = _coordinator(
+        index={"only": {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "KNOWN"}}},
+    )
+
+    assert (
+        coordinator._resolve_device_id_from_mqtt({FIELD_DEVICE_SN: "FOREIGN"}) is None  # ruff: ignore[private-member-access]
+    )
+
+
+def test_resolve_device_id_rejects_duplicate_serial_match() -> None:
+    """Ambiguous cached serial identity fails closed instead of cross-wiring state."""
+    coordinator = _coordinator(
+        index={
+            "dev-1": {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "DUPLICATE"}},
+            "dev-2": {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "DUPLICATE"}},
+        },
+    )
+
+    assert (
+        coordinator._resolve_device_id_from_mqtt({FIELD_DEVICE_SN: "DUPLICATE"}) is None  # ruff: ignore[private-member-access]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +131,7 @@ def test_resolve_device_sn_prefers_index_meta() -> None:
         data={"dev-1": {PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "DATA-SN"}}},
     )
 
-    assert coordinator._resolve_device_sn("dev-1") == "META-SN"
+    assert coordinator._resolve_device_sn("dev-1") == "META-SN"  # ruff: ignore[private-member-access]
 
 
 def test_resolve_device_sn_falls_back_to_live_data() -> None:
@@ -116,14 +141,14 @@ def test_resolve_device_sn_falls_back_to_live_data() -> None:
         data={"dev-1": {PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "DATA-SN"}}},
     )
 
-    assert coordinator._resolve_device_sn("dev-1") == "DATA-SN"
+    assert coordinator._resolve_device_sn("dev-1") == "DATA-SN"  # ruff: ignore[private-member-access]
 
 
 def test_resolve_system_id_prefers_index() -> None:
     """The index systemId takes precedence."""
     coordinator = _coordinator(index={"dev-1": {FIELD_SYSTEM_ID: 42}})
 
-    assert coordinator._resolve_system_id("dev-1") == "42"
+    assert coordinator._resolve_system_id("dev-1") == "42"  # ruff: ignore[private-member-access]
 
 
 def test_resolve_system_id_from_live_system_payload() -> None:
@@ -133,14 +158,14 @@ def test_resolve_system_id_from_live_system_payload() -> None:
         data={"dev-1": {PAYLOAD_SYSTEM: {FIELD_ID: 7}}},
     )
 
-    assert coordinator._resolve_system_id("dev-1") == "7"
+    assert coordinator._resolve_system_id("dev-1") == "7"  # ruff: ignore[private-member-access]
 
 
 def test_resolve_system_id_returns_none_when_absent() -> None:
     """A device with no system context yields None."""
     coordinator = _coordinator(index={"dev-1": {}}, data={"dev-1": {}})
 
-    assert coordinator._resolve_system_id("dev-1") is None
+    assert coordinator._resolve_system_id("dev-1") is None  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -318,18 +343,18 @@ def test_is_portable_true_for_legacy_bind_source() -> None:
         },
     )
 
-    assert coordinator._is_portable_device_id("dev-1") is True
+    assert coordinator._is_portable_device_id("dev-1") is True  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_false_for_regular_device() -> None:
     """A device without the legacy marker is not portable."""
     coordinator = _coordinator(data={"dev-1": {PAYLOAD_DEVICE: {}}})
 
-    assert coordinator._is_portable_device_id("dev-1") is False
+    assert coordinator._is_portable_device_id("dev-1") is False  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_false_when_unknown_device() -> None:
     """An unknown device id is not portable."""
     coordinator = _coordinator(data={})
 
-    assert coordinator._is_portable_device_id("ghost") is False
+    assert coordinator._is_portable_device_id("ghost") is False  # ruff: ignore[private-member-access]

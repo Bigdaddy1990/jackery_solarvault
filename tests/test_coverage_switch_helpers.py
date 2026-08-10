@@ -1,6 +1,8 @@
 """Tests for helper functions in switch.py."""
 
-from custom_components.jackery_solarvault.switch import _standby_is_on
+from custom_components.jackery_solarvault.switch import (
+    _standby_is_on,  # ruff: ignore[import-private-name]
+)
 
 
 def test_standby_is_on() -> None:

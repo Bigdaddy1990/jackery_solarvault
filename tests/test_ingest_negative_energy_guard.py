@@ -41,7 +41,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.ingest import (
     TransportSource,
-    _reject_negative_generation_section,
+    _reject_negative_generation_section,  # ruff: ignore[import-private-name]
     gate_payload_section,
 )
 

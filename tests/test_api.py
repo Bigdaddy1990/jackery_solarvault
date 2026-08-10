@@ -28,11 +28,11 @@ from custom_components.jackery_solarvault.const import (
 
 def test_extract_code_uses_shared_integer_parser() -> None:
     """API code parsing rejects bool/non-finite malformed response values."""
-    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200
-    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200
-    assert JackeryApi._extract_code({FIELD_CODE: True}) is None
-    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None
-    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None
+    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # ruff: ignore[private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # ruff: ignore[private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # ruff: ignore[private-member-access]
 
 
 async def test_set_system_name_accepts_only_boolean_true_response() -> None:
@@ -47,11 +47,11 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
         {},
     ))
 
-    async def _put_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _put_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured.append((path, payload))
         return next(responses)
 
-    api._put_json = _put_json
+    api._put_json = _put_json  # ruff: ignore[private-member-access]
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
@@ -77,11 +77,11 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         {FIELD_DATA: 0},
     ))
 
-    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured.append((path, payload))
         return next(responses)
 
-    api._post_form = _post_form
+    api._post_form = _post_form  # ruff: ignore[private-member-access]
 
     assert (
         await api.async_set_single_mode(
@@ -153,7 +153,7 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
     """Invalid tariff writer inputs must fail before the HTTP request."""
     api = JackeryApi.__new__(JackeryApi)
 
-    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(_path: str, _payload: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         """Test stub that prevents performing an HTTP form POST for tariff-related operations.
 
         Used in unit tests to ensure input validation stops execution before any network request is made.
@@ -164,10 +164,10 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
 
         Raises:
             AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
-        """
+        """  # ruff: ignore[line-too-long]
         raise AssertionError("invalid tariff input must stop before HTTP post")  # ruff: ignore[raise-vanilla-args]
 
-    api._post_form = _post_form
+    api._post_form = _post_form  # ruff: ignore[private-member-access]
 
     with pytest.raises(JackeryApiError, match="single_price"):
         await api.async_set_single_mode(
@@ -188,11 +188,11 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
     api = JackeryApi.__new__(JackeryApi)
     captured: list[tuple[str, dict[str, Any]]] = []
 
-    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post_form(path: str, payload: dict[str, Any]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         captured.append((path, payload))
         return {FIELD_DATA: True}
 
-    api._post_form = _post_form
+    api._post_form = _post_form  # ruff: ignore[private-member-access]
 
     assert (
         await api.async_set_dynamic_mode(
@@ -221,11 +221,11 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
     api = JackeryApi.__new__(JackeryApi)
     api.last_device_period_stat_responses = {}
 
-    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
 
     payload = await api.async_get_device_pv_stat(
         "dev1",
@@ -259,11 +259,11 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
     api = JackeryApi.__new__(JackeryApi)
     api.last_battery_pack_responses = {}
 
-    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:
+    async def _get_json(path: str, params: dict[str, str]) -> dict[str, Any]:  # ruff: ignore[unused-async]
         assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json
+    api._get_json = _get_json  # ruff: ignore[private-member-access]
 
     assert await api.async_get_battery_pack_list("sn1") == []
 

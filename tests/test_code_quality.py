@@ -55,6 +55,11 @@ def _python_sources() -> list[pathlib.Path]:
     return sorted(CUSTOM_COMPONENT.glob("*.py"))
 
 
+def _runtime_python_sources() -> list[pathlib.Path]:
+    """Return every Python module shipped inside the integration package."""
+    return sorted(CUSTOM_COMPONENT.rglob("*.py"))
+
+
 def _translation_sources() -> dict[str, str]:
     """Return strings.json and every locale translation file."""
     paths = [
@@ -93,6 +98,47 @@ def _handler_aborts_reauth_entry_missing(handler: ast.ExceptHandler) -> bool:
             ):
                 return True
     return False
+
+
+def test_internal_runtime_imports_are_package_relative() -> None:
+    """Internal imports must remain relocatable with the custom component."""
+    package = "custom_components.jackery_solarvault"
+    failures: list[str] = []
+    for path in _runtime_python_sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if module == package or module.startswith(f"{package}."):
+                    failures.append(f"{path}:{node.lineno}: from {module}")
+            elif isinstance(node, ast.Import):
+                failures.extend(
+                    f"{path}:{node.lineno}: import {alias.name}"
+                    for alias in node.names
+                    if alias.name == package or alias.name.startswith(f"{package}.")
+                )
+
+    assert not failures, (
+        f"Integration-internal imports must use relative package syntax: {failures}"
+    )
+
+
+def test_api_handles_explicit_binascii_decode_errors() -> None:
+    """Malformed cached MQTT seed data must name its concrete decode error."""
+    tree = ast.parse(API_IMPLEMENTATION.read_text(encoding="utf-8"))
+
+    assert any(
+        isinstance(node, ast.Import)
+        and any(alias.name == "binascii" for alias in node.names)
+        for node in tree.body
+    )
+    assert any(
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "binascii"
+        and node.attr == "Error"
+        for node in ast.walk(tree)
+    )
 
 
 def test_manifest_treats_recorder_as_optional_after_dependency() -> None:
@@ -296,7 +342,7 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # ruff: ignore[line-too-long]
         )
         seen[name] = node.lineno
 
@@ -338,7 +384,7 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
                 raise AssertionError(  # ruff: ignore[raise-vanilla-args]
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "
+                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # ruff: ignore[line-too-long]
                     "use const.py instead"
                 )
 
@@ -591,30 +637,34 @@ def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
 
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
     """Keep diagnostics aligned with HA's share-safe diagnostics rule."""
-    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    redaction_block = const_source.split("REDACT_KEYS: Final = {", 1)[1].split(
-        "}\n\n# MQTT", 1
-    )[0]
-    for required in (
-        "CONF_MQTT_MAC_ID",
-        "CONF_REGION_CODE",
-        "FIELD_TOKEN",
-        "FIELD_MQTT_PASSWORD",
-        "FIELD_DEVICE_ID",
-        "FIELD_SYSTEM_ID",
-        "FIELD_DEVICE_SN",
-        "FIELD_SYSTEM_SN",
-        "FIELD_LONGITUDE",
-        "FIELD_LATITUDE",
-        '"base64_encoded"',
-        '"body_preview"',
-        '"email"',
-        '"phone"',
-        '"raw_bytes"',
-        '"raw_hex"',
-        '"trailer_hex"',
-    ):
-        assert required in redaction_block
+    const_module = sys.modules["custom_components.jackery_solarvault.const"]
+    required = {
+        getattr(const_module, name)
+        for name in (
+            "CONF_MQTT_MAC_ID",
+            "CONF_REGION_CODE",
+            "FIELD_TOKEN",
+            "FIELD_MQTT_PASSWORD",
+            "FIELD_DEVICE_ID",
+            "FIELD_SYSTEM_ID",
+            "FIELD_DEVICE_SN",
+            "FIELD_SYSTEM_SN",
+            "FIELD_LONGITUDE",
+            "FIELD_LATITUDE",
+        )
+    }
+    required.update({
+        "base64_encoded",
+        "body_preview",
+        "email",
+        "phone",
+        "raw_bytes",
+        "raw_hex",
+        "trailer_hex",
+    })
+
+    assert isinstance(util.REDACT_KEYS, frozenset)
+    assert required <= util.REDACT_KEYS
 
 
 def test_ble_transport_debug_logs_do_not_expose_raw_payloads() -> None:
@@ -642,7 +692,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
         binary_source
         .split("class JackerySmartPlugStateBinarySensor", 1)[1]
         .split(
-            "# ---------------------------------------------------------------------------",
+            "# ---------------------------------------------------------------------------",  # ruff: ignore[line-too-long]
             1,
         )[0]
         .split("def extra_state_attributes", 1)[1]
@@ -673,54 +723,51 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
             assert field not in block
 
 
-def test_unredacted_diagnostics_option_reaches_redaction_surfaces() -> None:
-    """Diagnostics and JSONL payload debug must share the same raw-data toggle."""
+def test_diagnostics_redaction_has_no_runtime_bypass_surface() -> None:
+    """Diagnostics and JSONL payload debug must always redact sensitive values."""
     diagnostics_source = (CUSTOM_COMPONENT / "diagnostics.py").read_text(
         encoding="utf-8"
     )
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
+    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
     mqtt_source = MQTT_IMPLEMENTATION.read_text(encoding="utf-8")
 
-    assert "active_redact_keys(entry)" in diagnostics_source
-    assert "diagnostic_redactions_disabled(entry)" in diagnostics_source
+    for source in (diagnostics_source, coordinator_source, util_source):
+        assert "diagnostic_redactions_disabled" not in source
+        assert "dev_mode_redactions_disabled" not in source
+        assert "redactions_disabled" not in source
     assert "mqtt_diagnostics_snapshot(" in diagnostics_source
-    assert "redact_topics=not redactions_disabled" in diagnostics_source
-    assert "diagnostic_redactions_disabled(self.entry)" in coordinator_source
-    assert (
-        "def diagnostics_snapshot(self, *, redact_topics: bool = True)" in mqtt_source
-    )
+    assert "redact_topics=False" not in diagnostics_source
+    assert "redact_topics" not in mqtt_source
+    assert "def diagnostics_snapshot(self) -> dict[str, Any]:" in mqtt_source
 
 
-def test_payload_debug_redaction_can_be_disabled_by_entry_option(monkeypatch) -> None:  # ruff: ignore[missing-type-function-argument]
-    """The HAOS-friendly option should replace the env-var for local raw logs."""
-    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
-    entry = types.SimpleNamespace(
-        options={"enable_unredacted_diagnostics": True},
-        data={},
-    )
-
-    assert util.diagnostic_redactions_disabled(entry) is True
-    assert util.active_redact_keys(entry) == frozenset()
-
+def test_payload_debug_redaction_is_recursive_casefolded_and_mandatory() -> None:
+    """Every payload-log path applies the same recursive mandatory redaction."""
     event = {
         "password": "account-secret",
-        "nested": {"mqttPassWord": "mqtt-seed"},
-        "items": ({"bluetoothKey": "ble-key"},),
+        "nested": {
+            "MQTTPASSWORD": "mqtt-seed",
+            "LATITUDE": "52.520008",
+        },
+        "items": ({"BLUETOOTHKEY": "ble-key"},),
     }
-    redacted = util._payload_debug_redacted(event, False)
-    raw = util._payload_debug_redacted(event, True)
+    redacted = util._payload_debug_redacted(event)  # ruff: ignore[private-member-access]
     entity_attrs = util.redacted_json_safe_payload(event)
 
+    assert util.active_redact_keys() is util.REDACT_KEYS
+    assert util._payload_debug_redacted.__code__.co_argcount == 1  # ruff: ignore[private-member-access]
+    assert util.append_payload_debug_line.__code__.co_argcount == 2  # ruff: ignore[magic-value-comparison]
     assert redacted["password"] == "**REDACTED**"
-    assert redacted["nested"]["mqttPassWord"] == "**REDACTED**"
-    assert raw["password"] == "account-secret"
-    assert raw["nested"]["mqttPassWord"] == "mqtt-seed"
-    assert raw["items"][0]["bluetoothKey"] == "ble-key"
+    assert redacted["nested"]["MQTTPASSWORD"] == "**REDACTED**"
+    assert redacted["nested"]["LATITUDE"] == "**REDACTED**"
+    assert redacted["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
     assert entity_attrs["password"] == "**REDACTED**"
-    assert entity_attrs["nested"]["mqttPassWord"] == "**REDACTED**"
-    assert entity_attrs["items"][0]["bluetoothKey"] == "**REDACTED**"
+    assert entity_attrs["nested"]["MQTTPASSWORD"] == "**REDACTED**"
+    assert entity_attrs["nested"]["LATITUDE"] == "**REDACTED**"
+    assert entity_attrs["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
 
 
 def test_config_flow_connection_failures_are_not_error_logged() -> None:
@@ -932,7 +979,7 @@ def test_data_quality_diagnostics_include_request_context_keys() -> None:
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""
+    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # ruff: ignore[line-too-long]
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
@@ -974,7 +1021,7 @@ def test_number_setter_rejects_non_finite_values_before_transform() -> None:
     """Number service writes must not let NaN/Infinity reach int(round(...))."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"
+        "\n\n# ---------------------------------------------------------------------------\n"  # ruff: ignore[line-too-long]
         "# Setup",
         1,
     )[0]
@@ -1005,7 +1052,7 @@ def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
     """Discrete number validation should centralize round/int conversion."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"
+        "\n\n# ---------------------------------------------------------------------------\n"  # ruff: ignore[line-too-long]
         "# Setup",
         1,
     )[0]
@@ -1043,8 +1090,7 @@ def test_property_setters_keep_local_override_during_stale_refresh_window() -> N
 
 def test_redact_keys_cover_mqtt_credential_aliases() -> None:
     """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
-    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    redact_block = const_source.split("REDACT_KEYS: Final =", 1)[1].split(")", 1)[0]
+    const_module = sys.modules["custom_components.jackery_solarvault.const"]
 
     for key_name in (
         "FIELD_MQTT_PASSWORD",
@@ -1054,7 +1100,7 @@ def test_redact_keys_cover_mqtt_credential_aliases() -> None:
         "MQTT_CREDENTIAL_USER_ID",
         "MQTT_CREDENTIAL_USERNAME",
     ):
-        assert key_name in redact_block
+        assert getattr(const_module, key_name) in util.REDACT_KEYS
 
 
 def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
@@ -1150,8 +1196,8 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     ]
     assert calls
     for call in calls:
-        assert len(call.args) == 3, (
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"
+        assert len(call.args) == 3, (  # ruff: ignore[magic-value-comparison]
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # ruff: ignore[line-too-long]
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1287,7 +1333,7 @@ def test_rename_service_name_validates_direct_call_values() -> None:
 
 
 def test_delete_storm_alert_validates_direct_alert_id() -> None:
-    """Delete service alert_id constraints must not rely only on HA schema validation."""
+    """Delete service alert_id constraints must not rely only on HA schema validation."""  # ruff: ignore[line-too-long]
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert "def _storm_alert_id_from_service(" in services_source
@@ -1322,7 +1368,7 @@ def test_service_boolean_fields_use_safe_bool_parser() -> None:
     assert "field_name=SERVICE_FIELD_WAIT_FOR_ACK" in services_source
     # _service_bool raises ServiceValidationError itself; handlers must preserve it
     # so the field-specific translated error does not get wrapped again.
-    assert services_source.count("except ServiceValidationError:\n        raise") >= 2
+    assert services_source.count("except ServiceValidationError:\n        raise") >= 2  # ruff: ignore[magic-value-comparison]
 
 
 def test_standby_switch_uses_strict_numeric_mode_parser() -> None:
@@ -1443,11 +1489,16 @@ def test_ble_first_setter_routing_is_scoped_to_positive_cmd_commands() -> None:
         "async_set_default_power",
         "async_set_follow_meter",
         "async_set_temp_unit",
-        "async_set_third_party_mqtt_config",
-        "async_query_third_party_mqtt_config",
         "async_set_smart_plug_switch",
         "async_set_smart_plug_priority",
         "async_set_ct_phase",
+    ):
+        block = _block(name)
+        assert "_async_publish_command_ble_first(" in block, name
+
+    for name in (
+        "async_set_third_party_mqtt_config",
+        "async_query_third_party_mqtt_config",
     ):
         block = _block(name)
         assert "_async_publish_command_ble_first(" in block, name
@@ -1632,23 +1683,50 @@ def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> Non
 def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     """Pack firmware/update diagnostics must read the OTA-enriched fields."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
-    block = sensor_source.split(
+
+    # The implementation lives in the module-level function _battery_pack_description_value  # noqa: E501, RUF105
+    # which is called by JackeryBatteryPackSensor._value_from_pack
+    impl_block = sensor_source.split("def _battery_pack_description_value(", 1)[
+        1
+    ].split("def _smart_meter_description_value", 1)[0]
+
+    assert "raw = pack.get(FIELD_CURRENT_VERSION)" in impl_block
+    assert "raw = pack.get(FIELD_IS_FIRMWARE_UPGRADE)" in impl_block
+    # Verify the class calls the implementation
+    class_block = sensor_source.split(
         "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
     )[1].split("class JackerySmartMeterSensor", 1)[0]
-
-    assert "raw = pack.get(FIELD_CURRENT_VERSION)" in block
-    assert "raw = pack.get(FIELD_IS_FIRMWARE_UPGRADE)" in block
-    assert "def _refresh_cache(self) -> None:" in block
+    assert "_battery_pack_description_value" in class_block
+    assert "def _refresh_cache(self) -> None:" in class_block
+    # Fields that are actually used in the fallback logic within _battery_pack_description_value  # noqa: E501, RUF105
     for field in (
         "FIELD_VERSION",
         "FIELD_CURRENT_VERSION",
         "FIELD_UPDATE_STATUS",
+        "FIELD_IS_FIRMWARE_UPGRADE",
+        "FIELD_IN_PW",
+        "FIELD_OUT_PW",
+        "FIELD_IP",
+        "FIELD_OP",
+        "FIELD_DEV_SN",
+        "FIELD_SN",
+        "FIELD_DEVICE_SN",
+        "FIELD_COMM_STATE",
+        "FIELD_BAT_SOC",
+        "FIELD_CELL_TEMP",
+    ):
+        assert field in impl_block
+    # OTA/diagnostic fields are collected in _attrs_from_pack for DIAGNOSTIC entities
+    attrs_block = sensor_source.split("def _attrs_from_pack(", 1)[1].split(
+        "def _refresh_cache", 1
+    )[0]
+    for field in (
         "FIELD_TARGET_VERSION",
         "FIELD_TARGET_MODULE_VERSION",
         "FIELD_UPDATE_CONTENT",
         "FIELD_UPGRADE_TYPE",
     ):
-        assert field in block
+        assert field in attrs_block
 
 
 def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
@@ -1701,8 +1779,8 @@ def test_local_helper_calls_match_their_declared_arity() -> None:
 
 def test_component_modules_have_no_unresolved_global_names() -> None:
     """Catch NameError-class bugs caused by missing imports or renamed locals."""
-    import builtins
-    import symtable
+    import builtins  # ruff: ignore[import-outside-top-level]
+    import symtable  # ruff: ignore[import-outside-top-level]
 
     builtins_names = set(dir(builtins))
     # Python's symtable surfaces compiler-generated module dunders as
@@ -1754,13 +1832,13 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",
+        "# ---------------------------------------------------------------------------\n# Entities",  # ruff: ignore[line-too-long]
         1,
     )[0]
 
     assert "config_entry_bool_option" in sensor_source
     assert "def _entry_bool_option(" not in sensor_source
-    assert setup_block.count("config_entry_bool_option(") == 3
+    assert setup_block.count("config_entry_bool_option(") == 3  # ruff: ignore[magic-value-comparison]
     assert ".options.get(" not in setup_block
 
 
@@ -1800,7 +1878,7 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                     name = call.func.attr
                 if name in forbidden:
                     raise AssertionError(  # ruff: ignore[raise-vanilla-args]
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"  # ruff: ignore[line-too-long]
                     )
 
 
@@ -1822,6 +1900,18 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py314-plus" in config
     assert "python3.13" not in config
     assert "--py313-plus" not in config
+
+
+def test_gate_ruff_scope_excludes_embedded_non_integration_trees() -> None:
+    """Ruff gates must inspect Jackery sources/tests, not embedded tool examples."""
+    source = pathlib.Path("scripts/gate.py").read_text(encoding="utf-8")
+
+    assert "RUFF_TARGETS: Final = (" in source
+    assert '"custom_components/jackery_solarvault"' in source
+    assert '"tests"' in source
+    assert '"format", "--check", "."' not in source
+    assert '"check", "."' not in source
+    assert '"check", "--fix", "."' not in source
 
 
 def _load_py314_exception_guard_module():  # ruff: ignore[missing-return-type-private-function]
@@ -1882,7 +1972,7 @@ def test_brand_assets_are_packaged_without_runtime_sync() -> None:
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""
+    """Read-only custom component mounts are safe because setup writes no brand files."""  # ruff: ignore[line-too-long]
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")

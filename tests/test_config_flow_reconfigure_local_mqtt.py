@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -88,7 +89,7 @@ async def _submit_reconfigure_credentials(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):
@@ -172,3 +173,32 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
     assert entry.options[CONF_LOCAL_MQTT_HOST] == "10.0.0.5"
+
+
+async def test_reconfigure_replaces_obsolete_raw_diagnostics_option(
+    hass: HomeAssistant,
+) -> None:
+    """Reconfigure drops the old bypass and persists redacted payload capture."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "secret"},
+        options={"enable_unredacted_diagnostics": True},
+        unique_id=_ACCOUNT,
+        title="Jackery",
+    )
+    entry.add_to_hass(hass)
+
+    result = await _submit_reconfigure_credentials(
+        hass,
+        entry,
+        {
+            CONF_USERNAME: _ACCOUNT,
+            CONF_PASSWORD: "secret",
+            CONF_ENABLE_PAYLOAD_DEBUG_LOG: True,
+        },
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
+    assert entry.options[CONF_ENABLE_PAYLOAD_DEBUG_LOG] is True
+    assert "enable_unredacted_diagnostics" not in entry.options

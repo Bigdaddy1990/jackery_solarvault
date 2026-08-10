@@ -42,7 +42,7 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
 
     Returns:
         JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
-    """
+    """  # ruff: ignore[line-too-long]
     return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
 
 
@@ -55,7 +55,7 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # ruff: 
 
     Returns:
         Any: An instance of `cls` initialized with the given payload.
-    """
+    """  # ruff: ignore[line-too-long]
     entity = cls.__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
         entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"
@@ -93,7 +93,7 @@ def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
         PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
     })
 
-    info = entity._build_smart_plug_device_info(
+    info = entity._build_smart_plug_device_info(  # ruff: ignore[private-member-access]
         2,
         {
             FIELD_DEVICE_NAME: " ",
@@ -133,11 +133,11 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._pack_index = 1
+    entity._pack_index = 1  # ruff: ignore[private-member-access]
     # Anonymous pack (no registry-pinned serial): device_info falls back to
     # the payload serial fields.
-    entity._pack_sn = None
-    entity._pack_key = "battery_pack_1"
+    entity._pack_sn = None  # ruff: ignore[private-member-access]
+    entity._pack_key = "battery_pack_1"  # ruff: ignore[private-member-access]
 
     info = entity.device_info
 
@@ -168,7 +168,7 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._meter_head_index = 1
+    entity._meter_head_index = 1  # ruff: ignore[private-member-access]
 
     info = entity.device_info
 

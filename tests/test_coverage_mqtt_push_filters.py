@@ -3,8 +3,8 @@
 import logging
 
 from custom_components.jackery_solarvault.client.mqtt_push import (
-    _AioMqttPassiveDisconnectFilter,
-    _AioMqttTeardownNoiseFilter,
+    _AioMqttPassiveDisconnectFilter,  # ruff: ignore[import-private-name]
+    _AioMqttTeardownNoiseFilter,  # ruff: ignore[import-private-name]
 )
 
 

@@ -2,11 +2,9 @@
 
 Two logging rules are covered:
 
-1. Raw-payload JSONL capture is controlled exclusively through Home
-   Assistant's logging system (deep review 2026-07-25): only raising the
-   dedicated ``payload_debug`` logger to DEBUG activates it.
-   ``JACKERY_DEV_MODE=1`` alone must NOT — coupling capture to the env
-   flag made the trace grow unbounded on every dev-mode install.
+1. Redacted payload JSONL capture is opt-in. The config-entry option or the
+   effective DEBUG level of the dedicated ``payload_debug`` logger activates
+   it. ``JACKERY_DEV_MODE=1`` alone must not.
 2. Local MQTT connection failures must be visible at WARNING in the default
    Home Assistant log, not swallowed at DEBUG.
 """
@@ -20,12 +18,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from aiomqtt import MqttError
 import pytest
 
-from custom_components.jackery_solarvault import util as util_module
 from custom_components.jackery_solarvault.client import local_mqtt as local_mqtt_module
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
 )
-from custom_components.jackery_solarvault.const import PAYLOAD_DEBUG_LOGGER_NAME
+from custom_components.jackery_solarvault.const import (
+    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+    PAYLOAD_DEBUG_LOGGER_NAME,
+)
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
@@ -36,36 +36,40 @@ if TYPE_CHECKING:
 _LOCAL_MQTT_LOGGER = "custom_components.jackery_solarvault.client.local_mqtt"
 
 
-@pytest.fixture(autouse=True)
-def _reset_dev_mode_cache(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the JACKERY_DEV_MODE cache deterministic for every test."""
-    monkeypatch.setattr(util_module, "_DEV_MODE_CACHED", None)
-
-
 @pytest.fixture()
 def restore_payload_debug_logger() -> Iterator[logging.Logger]:
-    """Yield the dedicated payload-debug logger and restore its level after."""
+    """Yield the payload logger and restore its and its parent's levels."""
     logger = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
+    parent = logger.parent
     old_level = logger.level
+    old_parent_level = parent.level
     try:
         yield logger
     finally:
         logger.setLevel(old_level)
+        parent.setLevel(old_parent_level)
 
 
-def _payload_debug_coordinator() -> JackerySolarVaultCoordinator:
+def _payload_debug_coordinator(
+    *,
+    options: dict[str, Any] | None = None,
+) -> JackerySolarVaultCoordinator:
     """Build the minimal coordinator shell the payload-debug writer touches."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
-    obj.entry = SimpleNamespace(data={}, options={}, entry_id="log-test-entry")
+    obj.entry = SimpleNamespace(
+        data={},
+        options=options or {},
+        entry_id="log-test-entry",
+    )
     obj.hass = SimpleNamespace(
         config=SimpleNamespace(path=lambda *_a: "payload_debug.jsonl"),
         async_add_executor_job=AsyncMock(side_effect=lambda func, *args: func(*args)),
     )
-    obj._shutdown_started = False
-    obj._payload_debug_pending_events = deque()
-    obj._payload_debug_last_sig = {}
-    obj._payload_debug_last_emit_ts = {}
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._payload_debug_pending_events = deque()  # ruff: ignore[private-member-access]
+    obj._payload_debug_last_sig = {}  # ruff: ignore[private-member-access]
+    obj._payload_debug_last_emit_ts = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -74,31 +78,50 @@ async def test_dev_mode_alone_does_not_activate_payload_debug_capture(
     restore_payload_debug_logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """JACKERY_DEV_MODE=1 alone must NOT switch on raw-payload capture.
-
-    Capture is steered exclusively through HA's logging controls (deep
-    review 2026-07-25); the env flag no longer force-enables the JSONL
-    trace.
-    """
+    """JACKERY_DEV_MODE=1 alone must not switch on payload capture."""
     restore_payload_debug_logger.setLevel(logging.WARNING)
     monkeypatch.setenv("JACKERY_DEV_MODE", "1")
-    monkeypatch.setattr(util_module, "_DEV_MODE_CACHED", None)
 
     coordinator = _payload_debug_coordinator()
     writes: list[dict[str, Any]] = []
 
-    def _capture(_path: str, event: dict[str, Any], _redactions: bool) -> None:
+    def _capture(_path: str, event: dict[str, Any]) -> None:
         writes.append(event)
 
     with patch(
         "custom_components.jackery_solarvault.coordinator.append_payload_debug_line",
         side_effect=_capture,
     ):
-        await coordinator._async_payload_debug_event(
+        await coordinator._async_payload_debug_event(  # ruff: ignore[private-member-access]
             {"kind": "http", "path": "/v1/x", "payload": {"soc": 55}},
         )
 
-    assert not writes, "dev mode alone must not run the raw-payload writer"
+    assert not writes, "dev mode alone must not run the payload writer"
+
+
+@pytest.mark.asyncio()
+async def test_payload_debug_option_activates_capture(
+    restore_payload_debug_logger: logging.Logger,
+) -> None:
+    """The explicit config-entry option activates redacted payload capture."""
+    restore_payload_debug_logger.setLevel(logging.WARNING)
+    coordinator = _payload_debug_coordinator(
+        options={CONF_ENABLE_PAYLOAD_DEBUG_LOG: True},
+    )
+    writes: list[dict[str, Any]] = []
+
+    def _capture(_path: str, event: dict[str, Any]) -> None:
+        writes.append(event)
+
+    with patch(
+        "custom_components.jackery_solarvault.coordinator.append_payload_debug_line",
+        side_effect=_capture,
+    ):
+        await coordinator._async_payload_debug_event(  # ruff: ignore[private-member-access]
+            {"kind": "http", "path": "/v1/x", "payload": {"soc": 55}},
+        )
+
+    assert writes, "the payload-debug option must activate the payload writer"
 
 
 @pytest.mark.asyncio()
@@ -109,23 +132,46 @@ async def test_debug_logger_activates_payload_debug_capture(
     """Raising the dedicated logger to DEBUG activates the JSONL capture."""
     restore_payload_debug_logger.setLevel(logging.DEBUG)
     monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
-    monkeypatch.setattr(util_module, "_DEV_MODE_CACHED", None)
 
     coordinator = _payload_debug_coordinator()
     writes: list[dict[str, Any]] = []
 
-    def _capture(_path: str, event: dict[str, Any], _redactions: bool) -> None:
+    def _capture(_path: str, event: dict[str, Any]) -> None:
         writes.append(event)
 
     with patch(
         "custom_components.jackery_solarvault.coordinator.append_payload_debug_line",
         side_effect=_capture,
     ):
-        await coordinator._async_payload_debug_event(
+        await coordinator._async_payload_debug_event(  # ruff: ignore[private-member-access]
             {"kind": "http", "path": "/v1/x", "payload": {"soc": 55}},
         )
 
     assert writes, "a DEBUG payload_debug logger must run the raw-payload writer"
+
+
+@pytest.mark.asyncio()
+async def test_inherited_effective_debug_logger_activates_capture(
+    restore_payload_debug_logger: logging.Logger,
+) -> None:
+    """An inherited DEBUG level is honored when the child level is NOTSET."""
+    restore_payload_debug_logger.setLevel(logging.NOTSET)
+    restore_payload_debug_logger.parent.setLevel(logging.DEBUG)
+    coordinator = _payload_debug_coordinator()
+    writes: list[dict[str, Any]] = []
+
+    def _capture(_path: str, event: dict[str, Any]) -> None:
+        writes.append(event)
+
+    with patch(
+        "custom_components.jackery_solarvault.coordinator.append_payload_debug_line",
+        side_effect=_capture,
+    ):
+        await coordinator._async_payload_debug_event(  # ruff: ignore[private-member-access]
+            {"kind": "http", "path": "/v1/x", "payload": {"soc": 55}},
+        )
+
+    assert writes, "an inherited effective DEBUG level must activate capture"
 
 
 @pytest.mark.asyncio()
@@ -136,19 +182,18 @@ async def test_payload_debug_capture_off_without_dev_mode_or_debug_logger(
     """With dev mode off and the logger below DEBUG the file stays unwritten."""
     restore_payload_debug_logger.setLevel(logging.WARNING)
     monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
-    monkeypatch.setattr(util_module, "_DEV_MODE_CACHED", None)
 
     coordinator = _payload_debug_coordinator()
     writes: list[dict[str, Any]] = []
 
-    def _capture(_path: str, event: dict[str, Any], _redactions: bool) -> None:
+    def _capture(_path: str, event: dict[str, Any]) -> None:
         writes.append(event)
 
     with patch(
         "custom_components.jackery_solarvault.coordinator.append_payload_debug_line",
         side_effect=_capture,
     ):
-        await coordinator._async_payload_debug_event(
+        await coordinator._async_payload_debug_event(  # ruff: ignore[private-member-access]
             {"kind": "http", "path": "/v1/x", "payload": {"soc": 55}},
         )
 
@@ -194,7 +239,7 @@ async def test_local_mqtt_connect_failure_logs_warning(
     )
 
     with caplog.at_level(logging.WARNING, logger=_LOCAL_MQTT_LOGGER):
-        await client._async_run_session()
+        await client._async_run_session()  # ruff: ignore[private-member-access]
 
     warnings = [
         record

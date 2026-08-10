@@ -6,9 +6,9 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_migrate_grid_standard_entity,
-    _async_migrate_portable_screen_entity,
-    _legacy_suffix_matches,
+    _async_migrate_grid_standard_entity,  # ruff: ignore[import-private-name]
+    _async_migrate_portable_screen_entity,  # ruff: ignore[import-private-name]
+    _legacy_suffix_matches,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import DOMAIN
 from homeassistant.helpers import area_registry as ar, entity_registry as er

@@ -1,4 +1,4 @@
-"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""
+"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""  # ruff: ignore[line-too-long]
 
 from typing import TYPE_CHECKING
 
@@ -6,7 +6,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    _local_mqtt_client,
+    _local_mqtt_client,  # ruff: ignore[import-private-name]
     payload_has_jackery_marker,
 )
 from custom_components.jackery_solarvault.const import DOMAIN
@@ -25,7 +25,7 @@ def test_payload_has_jackery_marker() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_local_mqtt_client_initialization_and_diagnostics(
+async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
 ) -> None:
     """Test client initialization, properties, and diagnostic dictionary output."""
@@ -42,13 +42,15 @@ async def test_local_mqtt_client_initialization_and_diagnostics(
     assert client.is_connected is False
     assert client.is_started is False
 
-    diag_redacted = client.diagnostics_snapshot(redact=True)
-    assert diag_redacted["configured_target"]["host"] == "**REDACTED**"
-    assert diag_redacted["connected"] is False
-
-    diag_unredacted = client.diagnostics_snapshot(redact=False)
-    assert diag_unredacted["configured_target"]["host"] == "192.168.1.100"
-    assert diag_unredacted["configured_target"]["port"] == 1883
+    diagnostics = client.diagnostics_snapshot()
+    assert diagnostics["configured_target"]["host"] == "**REDACTED**"
+    assert diagnostics["configured_target"]["port"] == "**REDACTED**"
+    assert diagnostics["topic_filter"] == "**REDACTED**"
+    assert diagnostics["connected"] is False
+    rendered = repr(diagnostics)
+    assert "192.168.1.100" not in rendered
+    assert "secret_password" not in rendered
+    assert "jackery/#" not in rendered
 
 
 def test_local_mqtt_topic_matching(hass: HomeAssistant) -> None:
@@ -64,11 +66,11 @@ def test_local_mqtt_topic_matching(hass: HomeAssistant) -> None:
     )
 
     assert (
-        client._topic_matches("jackery/+/telemetry", "jackery/e2000/telemetry") is True
+        client._topic_matches("jackery/+/telemetry", "jackery/e2000/telemetry") is True  # ruff: ignore[private-member-access]
     )
-    assert client._topic_matches("jackery/+/telemetry", "jackery/e2000/status") is False
-    assert client._topic_matches("jackery/#", "jackery/sub/topic") is True
-    assert client._topic_matches("jackery/#", "other/topic") is False
+    assert client._topic_matches("jackery/+/telemetry", "jackery/e2000/status") is False  # ruff: ignore[private-member-access]
+    assert client._topic_matches("jackery/#", "jackery/sub/topic") is True  # ruff: ignore[private-member-access]
+    assert client._topic_matches("jackery/#", "other/topic") is False  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -76,7 +78,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     """Test message parsing, marker checks, and dropping logic."""
     forwarded = []
 
-    async def mock_sink(topic: str, data: dict | None, raw: bytes) -> None:
+    async def mock_sink(topic: str, data: dict | None, raw: bytes) -> None:  # ruff: ignore[unused-async]
         forwarded.append((topic, data, raw))
 
     client = JackeryLocalMqttClient(
@@ -91,14 +93,14 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     )
 
     # 1. Foreign message without marker -> ignored
-    client._handle_message("jackery/device1", b'{"temperature": 25}')
+    client._handle_message("jackery/device1", b'{"temperature": 25}')  # ruff: ignore[private-member-access]
     diag = client.diagnostics_snapshot()
     assert diag["messages_ignored_foreign"] == 1
     assert len(forwarded) == 0
 
     # 2. Message with Jackery marker -> forwarded
     valid_payload = b'{"devSn": "12345", "batSoc": 95}'
-    client._handle_message("jackery/device1", valid_payload)
+    client._handle_message("jackery/device1", valid_payload)  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
     diag = client.diagnostics_snapshot()
     assert diag["messages_forwarded"] == 1
@@ -107,7 +109,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
 
     # 3. Payload too large -> dropped
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
-    client._handle_message("jackery/device1", large_payload)
+    client._handle_message("jackery/device1", large_payload)  # ruff: ignore[private-member-access]
     diag = client.diagnostics_snapshot()
     assert diag["messages_dropped"] > 0
 

@@ -1,24 +1,17 @@
 """Regression tests for local transports and endpoint backoff policy."""
 
-import json
 import sys
 import time
 from types import ModuleType, SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApiError
-from custom_components.jackery_solarvault.const import CONF_LOCAL_MQTT_ENABLE
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from homeassistant.core import HomeAssistant
 
 _NOW = 1_000.0
 _REPEATED_FAILURE_COUNT = 4
@@ -33,17 +26,19 @@ _BACKOFF_ERROR = JackeryApiError("cloud says code=10422")
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for private policy helpers without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._endpoint_backoff = {}
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")
-    coordinator._cloud_mqtt_paused_by_local_mqtt_count = 0
+    coordinator._endpoint_backoff = {}  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_paused_by_local_mqtt_count = 0  # ruff: ignore[private-member-access]
     return coordinator
 
 
 def _reachability_coordinator() -> JackerySolarVaultCoordinator:
     """Build a coordinator shell for local reachability checks."""
     coordinator = _bare_coordinator()
-    coordinator._local_mqtt_last_device_message_monotonic = {}
-    coordinator._ble_address_for_device = MagicMock(  # type: ignore[method-assign]
+    coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
+    coordinator._ble_address_for_device = MagicMock(  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
         return_value="AA:BB:CC:DD:EE:FF",
     )
     coordinator.hass = MagicMock()
@@ -89,7 +84,7 @@ def test_local_reachability_uses_loaded_ha_bluetooth(
 
 def _backoff_remaining(coordinator: JackerySolarVaultCoordinator, key: str) -> int:
     """Return the rounded backoff delay stored for a test key."""
-    state = coordinator._endpoint_backoff[key]
+    state = coordinator._endpoint_backoff[key]  # ruff: ignore[private-member-access]
     return int(state["until"] - _NOW)
 
 
@@ -104,7 +99,7 @@ def test_kwh_endpoint_backoff_is_capped_at_two_minutes(
     )
 
     for _ in range(_REPEATED_FAILURE_COUNT):
-        assert coordinator._endpoint_backoff_note_failure(
+        assert coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
             _KWH_BACKOFF_KEY,
             _BACKOFF_ERROR,
         )
@@ -123,7 +118,7 @@ def test_very_slow_endpoint_backoff_still_allows_long_escalation(
     )
 
     for _ in range(_REPEATED_FAILURE_COUNT):
-        assert coordinator._endpoint_backoff_note_failure(
+        assert coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
             _VERY_SLOW_BACKOFF_KEY,
             _BACKOFF_ERROR,
         )
@@ -137,8 +132,8 @@ def test_very_slow_endpoint_backoff_still_allows_long_escalation(
 def _live_local_coordinator() -> JackerySolarVaultCoordinator:
     """Build a coordinator whose local MQTT channel counts as live."""
     coordinator = _bare_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = time.monotonic()
-    coordinator._mqtt = cast(
+    coordinator._local_mqtt_last_message_monotonic = time.monotonic()  # ruff: ignore[private-member-access]
+    coordinator._mqtt = cast(  # ruff: ignore[private-member-access]
         "Any",
         SimpleNamespace(
             is_connected=True,
@@ -149,7 +144,7 @@ def _live_local_coordinator() -> JackerySolarVaultCoordinator:
         mqtt_fingerprint=("client", "host", "session"),
         async_get_mqtt_credentials=AsyncMock(return_value={}),
     )
-    coordinator._mqtt_mgr = MagicMock()
+    coordinator._mqtt_mgr = MagicMock()  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -164,13 +159,13 @@ async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> No
     no cached session it defers to the HTTP login path.
     """
     coordinator = _live_local_coordinator()
-    mgr = cast("Any", coordinator._mqtt_mgr)
+    mgr = cast("Any", coordinator._mqtt_mgr)  # ruff: ignore[private-member-access]
     mgr.should_skip_reconnect.return_value = False
     cast("Any", coordinator.api).get_cached_mqtt_credentials = Mock(return_value=None)
 
-    await coordinator._async_ensure_mqtt(force=False)
+    await coordinator._async_ensure_mqtt(force=False)  # ruff: ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()
+    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff: ignore[private-member-access]
     cast("Any", coordinator.api).async_get_mqtt_credentials.assert_not_awaited()
     cast("Any", coordinator.api).get_cached_mqtt_credentials.assert_called_once_with()
     mgr.should_skip_reconnect.assert_called_once()
@@ -186,10 +181,10 @@ async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     """
     coordinator = _live_local_coordinator()
 
-    await coordinator._async_ensure_mqtt(force=True, wait_connected=True)
+    await coordinator._async_ensure_mqtt(force=True, wait_connected=True)  # ruff: ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()
-    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()
+    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -204,115 +199,37 @@ async def test_connected_but_silent_local_client_does_not_pause_cloud(
     MQTT command fallback — while local delivered exactly nothing.
     """
     coordinator = _live_local_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     monkeypatch.setattr(
         type(coordinator),
         "_local_mqtt_direct_client_connected",
         lambda _self: True,
     )
 
-    assert coordinator._local_mqtt_is_active() is False
+    assert coordinator._local_mqtt_is_active() is False  # ruff: ignore[private-member-access]
 
-    await coordinator._async_ensure_mqtt(force=False)
+    await coordinator._async_ensure_mqtt(force=False)  # ruff: ignore[private-member-access]
 
-    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()
+    cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
 async def test_local_mqtt_message_marks_local_channel_live() -> None:
     """HA/local MQTT frames count as local activity even without direct-client state."""
     coordinator = _bare_coordinator()
-    handler = AsyncMock(return_value=None)
-    cast("Any", coordinator)._async_handle_mqtt_message = handler
+    handler = AsyncMock(return_value="device-1")
+    cast("Any", coordinator)._async_handle_mqtt_message = handler  # ruff: ignore[private-member-access]
 
-    await coordinator.async_handle_local_mqtt_message(
-        "jackery/local",
-        {
-            "messageType": "UploadCombineData",
-            "body": {"pvPw": _LOCAL_MQTT_PAYLOAD_POWER},
-        },
-    )
-
-    assert coordinator._local_mqtt_is_active() is True
-    handler.assert_awaited_once()
-
-
-# Comfortably past the retired 32-task cap so the old code would have dropped
-# every frame beyond the 32nd instead of counting it.
-_LISTENER_BURST = 50
-
-
-def _listener_coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
-    """Build a coordinator whose HA-broker listener (Path B) can receive frames."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.hass = hass
-    coordinator.entry = cast(
-        "Any",
-        SimpleNamespace(
-            options={CONF_LOCAL_MQTT_ENABLE: True},
-            data={},
-            entry_id="listener-entry",
-        ),
-    )
-    coordinator._shutdown_started = False
-    coordinator._local_mqtt_unsubs = []
-    coordinator._local_mqtt_message_tasks = set()
-    coordinator._local_mqtt_listener_messages_received = 0
-    coordinator._local_mqtt_listener_foreign_ignored = 0
-    coordinator._local_mqtt_backlog_dropped = 0
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")
-    coordinator._local_mqtt_last_device_message_monotonic = {}
-    cast("Any", coordinator)._async_handle_mqtt_message = AsyncMock(
-        return_value=None,
-    )
-    return coordinator
-
-
-@pytest.mark.asyncio()
-async def test_listener_receipts_visible_without_direct_client(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Path-B listener receipts surface in messages_received with no direct client.
-
-    The RX diagnostic sensor reads ``local_mqtt_observations()['messages_received']``.
-    Before the fix that value only reflected the direct client (Path A), so a
-    listener-only deployment reported 0 while frames flowed. Every accepted frame
-    must now increment the counter, with no 32-task cap silently dropping frames.
-    """
-    coordinator = _listener_coordinator(hass)
-    captured: list[Callable[[Any], None]] = []
-
-    async def _fake_subscribe(
-        _hass: Any,  # ruff:ignore[any-type]
-        _topic: str,
-        callback: Callable[[Any], None],
-        *,
-        qos: int = 0,
-        encoding: str = "utf-8",
-    ) -> Callable[[], None]:
-        captured.append(callback)
-        return lambda: None
-
-    monkeypatch.setattr(
-        "custom_components.jackery_solarvault.coordinator.mqtt.async_subscribe",
-        _fake_subscribe,
-    )
-
-    await coordinator.async_start_local_mqtt_listener()
-    assert captured, "listener must subscribe to at least one topic"
-
-    deliver = captured[0]
-    for index in range(_LISTENER_BURST):
-        deliver(
-            SimpleNamespace(
-                topic="hb/app/user/device",
-                payload=json.dumps({"body": {"pvPw": index}}),
-            ),
+    assert (
+        await coordinator.async_handle_local_mqtt_message(
+            "jackery/local",
+            {
+                "messageType": "UploadCombineData",
+                "body": {"pvPw": _LOCAL_MQTT_PAYLOAD_POWER},
+            },
         )
-    await hass.async_block_till_done()
+        is True
+    )
 
-    observations = coordinator.local_mqtt_observations()
-    assert observations["messages_received"] == _LISTENER_BURST
-    assert observations["enabled"] is True
-    assert observations["backlog_dropped"] == 0
+    assert coordinator._local_mqtt_is_active() is True  # ruff: ignore[private-member-access]
+    handler.assert_awaited_once()

@@ -56,7 +56,7 @@ async def test_period_stat_builds_params_and_meta() -> None:
     get_json = AsyncMock(return_value={FIELD_DATA: dict(series)})
 
     with patch.object(api, "_get_json", get_json):
-        result = await api._async_get_device_period_stat(
+        result = await api._async_get_device_period_stat(  # ruff: ignore[private-member-access]
             DEVICE_PV_STAT_PATH,
             device_id=7,
             date_type=DATE_TYPE_DAY,
@@ -87,7 +87,7 @@ async def test_period_stat_includes_system_id_when_given() -> None:
     get_json = AsyncMock(return_value={FIELD_DATA: {}})
 
     with patch.object(api, "_get_json", get_json):
-        await api._async_get_device_period_stat(
+        await api._async_get_device_period_stat(  # ruff: ignore[private-member-access]
             DEVICE_PV_STAT_PATH,
             device_id=7,
             system_id=3,

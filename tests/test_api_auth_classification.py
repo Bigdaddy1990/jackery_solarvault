@@ -40,7 +40,7 @@ def test_contract_auth_business_error_is_not_classified_as_auth_failure() -> Non
         FIELD_MSG: "Contract authorization not found for this system",
     }
 
-    assert api._is_auth_failure_response(200, data) is False
+    assert api._is_auth_failure_response(200, data) is False  # ruff: ignore[private-member-access]
 
 
 def test_token_expired_code_is_classified_as_auth_failure() -> None:
@@ -48,7 +48,7 @@ def test_token_expired_code_is_classified_as_auth_failure() -> None:
     api = _make_api()
     data = {FIELD_CODE: CODE_TOKEN_EXPIRED, FIELD_MSG: "token expired"}
 
-    assert api._is_auth_failure_response(200, data) is True
+    assert api._is_auth_failure_response(200, data) is True  # ruff: ignore[private-member-access]
 
 
 def test_http_401_status_is_still_classified_as_auth_failure() -> None:
@@ -56,4 +56,4 @@ def test_http_401_status_is_still_classified_as_auth_failure() -> None:
     api = _make_api()
     data = {FIELD_MSG: "Unauthorized"}
 
-    assert api._is_auth_failure_response(401, data) is True
+    assert api._is_auth_failure_response(401, data) is True  # ruff: ignore[private-member-access]

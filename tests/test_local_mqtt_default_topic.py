@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_start_local_mqtt,  # tests exercise the module-private setup helper directly
+    _async_start_local_mqtt,  # setup helper is the test subject  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
-    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
@@ -34,7 +34,7 @@ async def test_empty_filter_falls_back_to_local_device_default(
         domain=DOMAIN,
         data={},
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
         },
         entry_id="local-mqtt-topic-default",
@@ -57,6 +57,7 @@ async def test_empty_filter_falls_back_to_local_device_default(
         == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
     )
     client.async_start.assert_awaited_once()
+    coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
 
 async def test_local_device_topic_is_used_verbatim(
@@ -67,7 +68,7 @@ async def test_local_device_topic_is_used_verbatim(
         domain=DOMAIN,
         data={},
         options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant",
         },
@@ -87,3 +88,4 @@ async def test_local_device_topic_is_used_verbatim(
 
     client_cls.assert_called_once()
     assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant"
+    coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()

@@ -1,5 +1,6 @@
 """Behavioral tests for independent week/month/year HTTP backfill queues."""
 
+import asyncio
 from datetime import date
 from types import SimpleNamespace
 from typing import Any, cast
@@ -20,6 +21,9 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+)
+from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
+    SYSTEM_ID,
 )
 
 _DEVICE_ID = "device-1"
@@ -43,15 +47,82 @@ def _coordinator(
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.entry = SimpleNamespace(options=options, data={})
-    obj._statistics_import_diagnostics = {}
-    obj._statistics_backfill_state = {"devices": {}}
-    obj._statistics_backfill_state_loaded = True
-    obj._async_save_statistics_backfill_state = AsyncMock()
-    obj._local_today = lambda: today
-    obj._device_index = {}
-    obj._repair_containment_violations = lambda **_kwargs: set()
-    obj._import_collected_repair_buckets = AsyncMock(return_value=(1, 0))
+    obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._statistics_backfill_state = {  # noqa: RUF105, SLF001
+        "devices": {
+            _DEVICE_ID: {
+                "http_period_backfill": {
+                    "sources": {
+                        "device_pv_stat": {
+                            "month": {
+                                "2026-01-01": {
+                                    "status": "pending",
+                                    "period_open": False,
+                                },
+                                "2026-02-01": {
+                                    "status": "pending",
+                                    "period_open": False,
+                                },
+                            },
+                            "year": {
+                                "2026-01-01": {
+                                    "status": "pending",
+                                    "period_open": True,
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+    obj._statistics_backfill_state_loaded = True  # ruff: ignore[private-member-access]
+    obj._async_save_statistics_backfill_state = AsyncMock()  # ruff: ignore[private-member-access]
+    obj._local_today = lambda: today  # ruff: ignore[private-member-access]
+    obj._device_index = {_DEVICE_ID: {"id": SYSTEM_ID, "systemId": SYSTEM_ID}}  # noqa: RUF105, SLF001
+    obj._slow_http_request_semaphore = asyncio.Semaphore(2)  # ruff: ignore[private-member-access]
+    obj._repair_containment_violations = lambda **_kwargs: set()  # ruff: ignore[private-member-access]
+    obj._import_collected_repair_buckets = AsyncMock(return_value=(1, 0))  # ruff: ignore[private-member-access]
     return coordinator
+
+
+@pytest.mark.asyncio()
+async def test_period_backfill_shares_slow_http_concurrency_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bounded period request must wait for the shared slow-HTTP gate."""
+    monkeypatch.setattr(
+        coordinator_module,
+        "APP_CHART_STAT_METRICS",
+        _ONE_PV_METRIC,
+    )
+    coordinator = _coordinator()
+    coordinator._slow_http_request_semaphore = asyncio.Semaphore(1)  # ruff: ignore[private-member-access]
+    fetch_started = asyncio.Event()
+
+    # Mock the API call that _async_fetch_historical_app_chart_source makes
+    async def _mock_pv_stat(*_args: object, **_kwargs: object) -> dict[str, object]:  # ruff: ignore[unused-async]
+        fetch_started.set()
+        return {}
+
+    coordinator.api = SimpleNamespace(async_get_device_pv_stat=_mock_pv_stat)
+    await coordinator._slow_http_request_semaphore.acquire()  # ruff: ignore[private-member-access]
+    task = asyncio.create_task(
+        coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
+            {_DEVICE_ID: {"id": SYSTEM_ID, "systemId": SYSTEM_ID}},
+            request_budget=1,
+        ),
+    )
+
+    # Yield control to let the task start and block on the semaphore
+    await asyncio.sleep(0)
+    try:
+        assert not fetch_started.is_set()
+    finally:
+        coordinator._slow_http_request_semaphore.release()  # ruff: ignore[private-member-access]
+
+    await task
+    assert fetch_started.is_set()
 
 
 def _source(period_start: date) -> dict[str, object]:
@@ -88,11 +159,11 @@ async def test_month_then_year_then_week_priority(
         requested.append((date_type, period_start))
         return _source(period_start)
 
-    cast("Any", coordinator)._async_fetch_historical_app_chart_source = AsyncMock(
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
         side_effect=_fetch,
     )
 
-    await coordinator._async_http_backfill_period_statistics(
+    await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=8,
     )
@@ -119,9 +190,9 @@ async def test_disabled_periods_are_never_queued(
         },
     )
     fetch = AsyncMock(return_value=_source(date(2026, 1, 1)))
-    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
 
-    await coordinator._async_http_backfill_period_statistics(
+    await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=1,
     )
@@ -147,9 +218,9 @@ async def test_all_period_opt_outs_make_no_http_request(
         },
     )
     fetch = AsyncMock()
-    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
 
-    result = await coordinator._async_http_backfill_period_statistics(
+    result = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
     )
 
@@ -185,21 +256,23 @@ async def test_new_calendar_period_is_added_incrementally(
         requested.append(period_start)
         return _source(period_start)
 
-    cast("Any", coordinator)._async_fetch_historical_app_chart_source = AsyncMock(
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
         side_effect=_fetch,
     )
-    await coordinator._async_http_backfill_period_statistics(
+    await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=1,
     )
 
-    cast("Any", coordinator)._local_today = lambda: date(2026, 2, 1)
-    await coordinator._async_http_backfill_period_statistics(
+    cast("Any", coordinator)._local_today = lambda: date(2026, 2, 1)  # ruff: ignore[private-member-access]
+    await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=1,
     )
 
-    assert requested == [date(2026, 1, 1), date(2026, 2, 1)]
+    # January was sampled while still open, so the first February run finalizes
+    # that now-closed bucket before sampling the new active month.
+    assert requested == [date(2026, 1, 1), date(2026, 1, 1)]
 
 
 @pytest.mark.asyncio()
@@ -220,26 +293,26 @@ async def test_period_transport_failure_uses_retry_cooldown(
         },
     )
     fetch = AsyncMock(side_effect=TimeoutError)
-    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
 
     for _attempt in range(
-        coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
+        coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS  # ruff: ignore[private-member-access]
     ):
-        result = await coordinator._async_http_backfill_period_statistics(
+        result = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
             {_DEVICE_ID: {}},
             request_budget=1,
         )
 
-    bucket_state = cast("Any", coordinator)._statistics_backfill_state["devices"][
+    bucket_state = cast("Any", coordinator)._statistics_backfill_state["devices"][  # ruff: ignore[private-member-access]
         _DEVICE_ID
     ]["http_period_backfill"]["sources"][APP_SECTION_PV_STAT][DATE_TYPE_MONTH][
         "2026-01-01"
     ]
-    assert bucket_state["status"] == "deferred"
+    assert bucket_state["status"] == "retryable"
     assert bucket_state["retry_after_epoch"] > 0
     assert result["pending_sources"] == 0
 
-    immediate_retry = await coordinator._async_http_backfill_period_statistics(
+    immediate_retry = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=1,
     )

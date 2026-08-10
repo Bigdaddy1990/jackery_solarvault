@@ -21,9 +21,10 @@ from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
+    REDACT_KEYS,
 )
 from custom_components.jackery_solarvault.diagnostics import (
-    _diagnostic_json_null_free,  # test drives the module-private normalizer
+    _diagnostic_json_null_free,  # test drives the module-private normalizer  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.util import active_redact_keys
 from homeassistant.components.diagnostics import REDACTED, async_redact_data
@@ -81,7 +82,7 @@ def test_null_free_converts_tuples_to_normalized_lists() -> None:
 
 def test_null_free_passes_through_non_none_scalars_unchanged() -> None:
     """int/str/bool/float scalars are returned unchanged, not stringified."""
-    assert _diagnostic_json_null_free(42) == 42
+    assert _diagnostic_json_null_free(42) == 42  # ruff: ignore[magic-value-comparison]
     assert _diagnostic_json_null_free("text") == "text"
     assert _diagnostic_json_null_free(value=True) is True
     assert _diagnostic_json_null_free(math.pi) == math.pi
@@ -154,7 +155,7 @@ def test_local_and_third_party_mqtt_credentials_redacted_from_options() -> None:
         },
     )
 
-    redacted = async_redact_data(dict(entry.options), active_redact_keys(entry))
+    redacted = async_redact_data(dict(entry.options), active_redact_keys())
 
     assert redacted[CONF_LOCAL_MQTT_HOST] == REDACTED
     assert redacted[CONF_LOCAL_MQTT_USERNAME] == REDACTED
@@ -163,3 +164,10 @@ def test_local_and_third_party_mqtt_credentials_redacted_from_options() -> None:
     assert redacted[CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_TOKEN] == REDACTED
+
+
+def test_redaction_key_contract_is_immutable_and_mandatory() -> None:
+    """The share-safe redaction key set cannot be cleared per config entry."""
+    assert isinstance(REDACT_KEYS, frozenset)
+    assert active_redact_keys() == REDACT_KEYS
+    assert REDACT_KEYS

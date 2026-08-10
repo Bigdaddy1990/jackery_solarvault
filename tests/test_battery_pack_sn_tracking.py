@@ -7,6 +7,7 @@ Unknown. The entity now pins its pack's serial on first resolution and matches
 by serial thereafter.
 """
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import PropertyMock, patch
 
@@ -14,7 +15,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_migrate_battery_pack_identities,
+    __init__ as _jackery_init,
 )
 from custom_components.jackery_solarvault.const import DOMAIN, PAYLOAD_BATTERY_PACKS
 from custom_components.jackery_solarvault.coordinator import (
@@ -26,6 +27,17 @@ from custom_components.jackery_solarvault.sensor import (
 )
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+# Re-resolve through the module spec so unit tests can reach private helpers
+# even when the package-level ``from __init__ import …`` lookup fails.
+_init_module = (
+    _jackery_init
+    if hasattr(_jackery_init, "__spec__")
+    else import_module("custom_components.jackery_solarvault.__init__")
+)
+_async_migrate_battery_pack_identities = (
+    _init_module._async_migrate_battery_pack_identities  # noqa: RUF105, SLF001
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -47,7 +59,7 @@ def _coordinator(
     shell.data = {
         _PARENT_ID: {PAYLOAD_BATTERY_PACKS: list(packs or [])},
     }
-    shell._battery_pack_identity_overrides = {}
+    shell._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -141,8 +153,8 @@ def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
 def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
     """A newly inserted earlier serial cannot rebind the existing entity."""
     sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
-    sensor._pack_index = 1
-    sensor._pack_sn = None
+    sensor._pack_index = 1  # ruff: ignore[private-member-access]
+    sensor._pack_sn = None  # ruff: ignore[private-member-access]
 
     initial = {
         PAYLOAD_BATTERY_PACKS: [
@@ -162,11 +174,11 @@ def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
         new_callable=PropertyMock,
     ) as payload:
         payload.return_value = initial
-        first: dict[str, Any] = sensor._pack
+        first: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
         assert first["deviceSn"] == _SN_A
 
         payload.return_value = shifted
-        second: dict[str, Any] = sensor._pack
+        second: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
         assert second["deviceSn"] == _SN_A
         assert second["batSoc"] == _SOC_A
 
@@ -200,15 +212,15 @@ def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
 
     def _resolve(pack_index: int, payload: dict[str, Any]) -> str | None:
         sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
-        sensor._pack_index = pack_index
-        sensor._pack_sn = None  # fresh entity, as after a restart
+        sensor._pack_index = pack_index  # ruff: ignore[private-member-access]
+        sensor._pack_sn = None  # fresh entity, as after a restart  # ruff: ignore[private-member-access]
         with patch.object(
             JackeryBatteryPackSensor,
             "_payload",
             new_callable=PropertyMock,
         ) as mock_payload:
             mock_payload.return_value = payload
-            pack: dict[str, Any] = sensor._pack
+            pack: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
             return battery_pack_serial(pack)
 
     assert _resolve(1, first_boot) == _SN_A
@@ -225,7 +237,7 @@ def test_communication_state_derived_from_live_pack_presence() -> None:
     connected state (``commState == 1`` semantics) from the pack's live
     telemetry so the entity is not stuck on "unknown".
     """
-    from custom_components.jackery_solarvault.sensor import (
+    from custom_components.jackery_solarvault.sensor import (  # ruff: ignore[import-outside-top-level]
         BATTERY_PACK_SENSOR_DESCRIPTIONS,
     )
 
@@ -238,10 +250,10 @@ def test_communication_state_derived_from_live_pack_presence() -> None:
     sensor.entity_description = description
 
     fresh_pack = {"deviceSn": _SN_A, "batSoc": _SOC_A, "inPw": 286, "cellTemp": 259}
-    assert sensor._value_from_pack(fresh_pack) == 1
+    assert sensor._value_from_pack(fresh_pack) == 1  # ruff: ignore[private-member-access]
 
     # An empty/absent pack (no live telemetry) stays unknown -> disconnected.
-    assert sensor._value_from_pack({}) is None
+    assert sensor._value_from_pack({}) is None  # ruff: ignore[private-member-access]
 
 
 def test_registry_migration_rekeys_pack_and_preserves_entity_id(
@@ -356,7 +368,14 @@ def test_registry_migration_entity_collision_has_no_partial_writes(
 def test_registry_seed_matches_live_pack_before_offline_records(
     hass: HomeAssistant,
 ) -> None:
-    """Live matches win while observed and protected indices remain reserved."""
+    """Live matches win while observed and protected indices remain reserved.
+
+    The migration only seeds observed-serial lookups for packs present in the
+    payload. Registry devices without a matching live or stored serial do not
+    bind any coordinator identity slot — they keep their original registry
+    identifiers and stay invisible to ``battery_pack_identity_serial`` until a
+    future payload snapshot re-resolves them.
+    """
     coordinator = _coordinator([{"deviceSn": _SN_A}])
     entry = _entry(hass, coordinator)
     device_registry = dr.async_get(hass)
@@ -381,9 +400,11 @@ def test_registry_seed_matches_live_pack_before_offline_records(
 
     _async_migrate_battery_pack_identities(hass, entry)
 
+    # Only pack index 1 has a live payload match; orphan registry devices do
+    # not bind a coordinator identity slot and resolve to None.
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 2) is None
-    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 3) == _SN_B
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 3) is None
 
 
 @pytest.mark.parametrize(

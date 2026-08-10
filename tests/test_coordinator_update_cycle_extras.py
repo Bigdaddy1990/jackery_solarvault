@@ -59,23 +59,23 @@ async def test_day_rollover_wipes_day_bounded_caches(
     year clear branches together.
     """
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
-    today = coordinator._local_today()
-    coordinator._cached_date = date(today.year - 1, 1, 1)
+    today = coordinator._local_today()  # ruff: ignore[private-member-access]
+    coordinator._cached_date = date(today.year - 1, 1, 1)  # ruff: ignore[private-member-access]
     # Seed a day-bounded slow-cache entry and a stat-import signature that must
     # both be evicted by the rollover.
-    coordinator._slow_cache["some-system"] = {
+    coordinator._slow_cache["some-system"] = {  # ruff: ignore[private-member-access]
         PAYLOAD_STATISTIC: (0.0, {"stale": "yesterday"}),
     }
-    coordinator._stat_import_last_sig["dev"] = "yesterday-sig"
+    coordinator._stat_import_last_sig["dev"] = "yesterday-sig"  # ruff: ignore[private-member-access]
 
-    await coordinator._async_update_data_guarded()
+    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
     # The day-bounded statistic cache key was popped and the stat-import dedup
     # cache emptied; the cached date advanced to today.
-    assert PAYLOAD_STATISTIC not in coordinator._slow_cache["some-system"]
-    assert coordinator._stat_import_last_sig == {}
-    assert coordinator._cached_date == today
+    assert PAYLOAD_STATISTIC not in coordinator._slow_cache["some-system"]  # ruff: ignore[private-member-access]
+    assert coordinator._stat_import_last_sig == {}  # ruff: ignore[private-member-access]
+    assert coordinator._cached_date == today  # ruff: ignore[private-member-access]
     await _teardown(hass, entry.entry_id)
 
 
@@ -94,12 +94,12 @@ async def test_activation_zero_creates_repair_issue(
     api.async_get_device_property = AsyncMock(side_effect=_inactive)
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
-    result = await coordinator._async_update_data_guarded()
+    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
     assert DEVICE_ID in result
     issue_id = f"{entry.entry_id}_{DEVICE_ID}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
-    assert issue_id in coordinator._activation_issue_active
+    assert issue_id in coordinator._activation_issue_active  # ruff: ignore[private-member-access]
     assert ir.async_get(hass).async_get_issue(
         "jackery_solarvault",
         issue_id,
@@ -121,17 +121,17 @@ async def test_activation_recovers_and_dismisses_repair_issue(
     api.async_get_device_property = AsyncMock(side_effect=_property)
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
-    await coordinator._async_update_data_guarded()
+    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
     issue_id = f"{entry.entry_id}_{DEVICE_ID}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
-    assert issue_id in coordinator._activation_issue_active
+    assert issue_id in coordinator._activation_issue_active  # ruff: ignore[private-member-access]
 
     # The device comes back activated on the next cycle: the issue clears.
     activated["value"] = 1
-    await coordinator._async_update_data_guarded()
+    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
-    assert issue_id not in coordinator._activation_issue_active
+    assert issue_id not in coordinator._activation_issue_active  # ruff: ignore[private-member-access]
     assert ir.async_get(hass).async_get_issue("jackery_solarvault", issue_id) is None
     await _teardown(hass, entry.entry_id)
 
@@ -141,17 +141,17 @@ async def test_currency_mirrored_from_price_section(
     hass: HomeAssistant,
 ) -> None:
     """The device meta currency is backfilled from the system price section."""
-    import time
+    import time  # ruff: ignore[import-outside-top-level]
 
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
     # Pre-warm the per-system price cache: on the fast critical path the price
     # endpoint is served ``stale_ok`` and never re-fetched synchronously, so the
     # currency must already be in the slow cache for this cycle to mirror it.
-    coordinator._slow_cache[SYSTEM_ID] = {
+    coordinator._slow_cache[SYSTEM_ID] = {  # ruff: ignore[private-member-access]
         PAYLOAD_PRICE: (time.monotonic(), {FIELD_SINGLE_CURRENCY: "EUR"}),
     }
 
-    result = await coordinator._async_update_data_guarded()
+    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
     device_meta = result[DEVICE_ID][PAYLOAD_DEVICE]
@@ -164,19 +164,19 @@ async def test_price_override_merged_within_ttl(
     hass: HomeAssistant,
 ) -> None:
     """A fresh price override is merged into the device's price section."""
-    import time
+    import time  # ruff: ignore[import-outside-top-level]
 
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
-    coordinator._price_overrides[DEVICE_ID] = (
+    coordinator._price_overrides[DEVICE_ID] = (  # ruff: ignore[private-member-access]
         time.monotonic(),
         {"overriddenRate": 42},
     )
 
-    result = await coordinator._async_update_data_guarded()
+    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
     price_section = result[DEVICE_ID].get(PAYLOAD_PRICE) or {}
-    assert price_section.get("overriddenRate") == 42
+    assert price_section.get("overriddenRate") == 42  # ruff: ignore[magic-value-comparison]
     await _teardown(hass, entry.entry_id)
 
 
@@ -185,18 +185,18 @@ async def test_expired_price_override_is_evicted(
     hass: HomeAssistant,
 ) -> None:
     """A stale price override past its TTL is dropped and never merged."""
-    import time
+    import time  # ruff: ignore[import-outside-top-level]
 
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
-    stale_ts = time.monotonic() - coordinator._PRICE_OVERRIDE_TTL_SEC - 1
-    coordinator._price_overrides[DEVICE_ID] = (stale_ts, {"overriddenRate": 42})
+    stale_ts = time.monotonic() - coordinator._PRICE_OVERRIDE_TTL_SEC - 1  # ruff: ignore[private-member-access]
+    coordinator._price_overrides[DEVICE_ID] = (stale_ts, {"overriddenRate": 42})  # ruff: ignore[private-member-access]
 
-    result = await coordinator._async_update_data_guarded()
+    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
     price_section = result[DEVICE_ID].get(PAYLOAD_PRICE) or {}
     assert "overriddenRate" not in price_section
-    assert DEVICE_ID not in coordinator._price_overrides
+    assert DEVICE_ID not in coordinator._price_overrides  # ruff: ignore[private-member-access]
     await _teardown(hass, entry.entry_id)
 
 
@@ -214,8 +214,8 @@ async def test_no_devices_discovered_raises_update_failed(
         api=api,
         discover=False,
     )
-    coordinator._device_index = {}
+    coordinator._device_index = {}  # ruff: ignore[private-member-access]
 
     with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data_guarded()
+        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await _teardown(hass, entry.entry_id)

@@ -86,7 +86,7 @@ class _FakeClock:
 def _make_api(session: _FakeSession) -> JackeryApi:
     """Build a logged-in API client whose transport boundary is scripted."""
     api = JackeryApi(cast("Any", session), "tester@example.com", "secret")
-    api._token = "token-1"  # seed an active session without real login IO
+    api._token = "token-1"  # seed an active session without real login IO  # ruff: ignore[private-member-access]
     return api
 
 
@@ -94,7 +94,7 @@ def _login_mock(api: JackeryApi) -> AsyncMock:
     """Successful full re-login boundary mock that rotates the session token."""
 
     def _login() -> str:
-        api._token = "token-2"
+        api._token = "token-2"  # ruff: ignore[private-member-access]
         return "token-2"
 
     return AsyncMock(side_effect=_login)
@@ -205,7 +205,7 @@ async def test_cancelled_relogin_restores_cooldown_state() -> None:
     api = _make_api(session)
     login = AsyncMock(side_effect=asyncio.CancelledError)
 
-    assert api._last_auto_relogin_monotonic is None
+    assert api._last_auto_relogin_monotonic is None  # ruff: ignore[private-member-access]
 
     with (
         patch.object(api, "async_login", login),
@@ -214,7 +214,7 @@ async def test_cancelled_relogin_restores_cooldown_state() -> None:
         await api.async_get_user_info()
 
     login.assert_awaited_once()
-    assert api._last_auto_relogin_monotonic is None
+    assert api._last_auto_relogin_monotonic is None  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
@@ -287,7 +287,7 @@ class _ConcurrentFakeSession:
 def _make_concurrent_api(session: _ConcurrentFakeSession) -> JackeryApi:
     """Build a logged-in API client backed by the concurrency-aware fake session."""
     api = JackeryApi(cast("Any", session), "tester@example.com", "secret")
-    api._token = "token-1"  # seed an active session without real login IO
+    api._token = "token-1"  # seed an active session without real login IO  # ruff: ignore[private-member-access]
     return api
 
 

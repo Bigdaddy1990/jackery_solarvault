@@ -38,9 +38,9 @@ def _bare_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the live-merge policy without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._property_overrides = {}
-    coordinator._configured_update_interval = timedelta(seconds=15)
-    coordinator._mqtt = None
+    coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
+    coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
     coordinator.data = {}
     monkeypatch.setattr(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
@@ -59,11 +59,11 @@ def test_fresh_live_frame_overrides_http_for_live_keys(
         PAYLOAD_PROPERTIES: {FIELD_PV_PW: _LIVE_PV_W},
     }
 
-    live_guarded = coordinator._http_properties_with_live_overrides(
+    live_guarded = coordinator._http_properties_with_live_overrides(  # ruff: ignore[private-member-access]
         entry,
         {FIELD_PV_PW: _HTTP_PV_W},
     )
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         entry[PAYLOAD_PROPERTIES],
         live_guarded,
@@ -81,7 +81,7 @@ def test_live_delivered_combine_field_survives_a_later_http_poll(
     prior_props = {FIELD_PV_PW: _HTTP_PV_W, FIELD_GRID_IN_PW: _LIVE_GRID_IN_PW}
     http_props = {FIELD_PV_PW: _HTTP_PV_W}
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         prior_props,
         http_props,

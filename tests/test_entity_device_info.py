@@ -41,7 +41,7 @@ def _entity(payload: dict[str, Any]) -> JackeryEntity:
     """
     entity = JackeryEntity.__new__(JackeryEntity)
     mutable = cast("Any", entity)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
     return entity
 
@@ -57,7 +57,7 @@ def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:  # ruf
     """
     instance = cls.__new__(cls)
     mutable = cast("Any", instance)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
     for name, value in extra.items():
         setattr(mutable, name, value)
@@ -81,7 +81,7 @@ def test_device_info_model_uses_reported_model_when_present() -> None:
 
 def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     """Blank name fields yield a "Jackery {device_id}" prefix, not "SolarVault"."""
-    info = _entity({})._build_smart_plug_device_info(1, {})
+    info = _entity({})._build_smart_plug_device_info(1, {})  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in info["name"]
@@ -90,7 +90,7 @@ def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
 def test_breaker_switch_falls_back_to_jackery() -> None:
     """A HomePower breaker with blank name fields is never labelled "SolarVault"."""
     entity = _bound(JackeryBreakerSwitch, {})
-    info = entity._build_breaker_device_info(0, {}, "breaker_0")
+    info = entity._build_breaker_device_info(0, {}, "breaker_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert info["model"] == "Jackery Sicherung"
@@ -101,7 +101,7 @@ def test_breaker_switch_falls_back_to_jackery() -> None:
 def test_subdevice_alarm_binary_sensor_falls_back_to_jackery() -> None:
     """A HomePower accessory with blank name/model fields is never "SolarVault"."""
     entity = _bound(JackerySubdeviceAlarmBinarySensor, {}, _sub_device_sn="SN1")
-    info = entity._build_sub_device_device_info(0, {}, "sub_0")
+    info = entity._build_sub_device_device_info(0, {}, "sub_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert info["model"] == "Jackery Zubehör"
@@ -129,7 +129,7 @@ def test_battery_pack_sensor_falls_back_to_jackery() -> None:
 def test_breaker_sensor_falls_back_to_jackery() -> None:
     """A HomePower breaker sensor with blank name fields is never "SolarVault"."""
     entity = _bound(JackeryBreakerSensor, {})
-    info = entity._build_breaker_device_info(0, {}, "breaker_0")
+    info = entity._build_breaker_device_info(0, {}, "breaker_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert info["model"] == "Jackery Sicherung"
@@ -140,7 +140,7 @@ def test_breaker_sensor_falls_back_to_jackery() -> None:
 def test_subdevice_alarm_sensor_falls_back_to_jackery() -> None:
     """A HomePower accessory sensor with blank fields is never "SolarVault"."""
     entity = _bound(JackerySubdeviceAlarmSensor, {}, _sub_device_sn="SN1")
-    info = entity._build_sub_device_device_info(0, {}, "sub_0")
+    info = entity._build_sub_device_device_info(0, {}, "sub_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert info["model"] == "Jackery Zubehör"

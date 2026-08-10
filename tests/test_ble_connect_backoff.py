@@ -8,9 +8,9 @@ without any BLE hardware:
 * connect attempts are spaced by an exponential per-device backoff
   (initial 30 s, doubling on repeated failures, capped at 10 minutes),
 * only a stable notify session resets the escalation,
-* while a backoff window is open, ``async_ensure_connected`` must not
-  spawn a new connection runner — a failed connect earlier in the same
-  coordinator cycle may not trigger an immediate second attempt.
+* while a backoff window is open, ``async_ensure_connected`` must not spawn
+  an extra runner; a cache/advertisement-owned runner waits before the next
+  physical connect attempt.
 """
 
 import asyncio
@@ -153,7 +153,7 @@ class _StubHass:
         return _StubTask()
 
 
-async def _noop_sink(
+async def _noop_sink(  # ruff: ignore[unused-async]
     _device_id: str, _observation: object
 ) -> None:  # listener sink must be a coroutine function
     return None
@@ -179,7 +179,7 @@ def _make_listener(
         keep_alive_msg_id=None,
         keep_alive_ble_msg_type=None,
     )
-    listener._device_addresses[_DEVICE_ID] = _ADDRESS
+    listener._device_addresses[_DEVICE_ID] = _ADDRESS  # ruff: ignore[private-member-access]
     return listener
 
 
@@ -208,31 +208,50 @@ async def test_ensure_connected_spawns_runner_when_backoff_clear() -> None:
     assert hass.spawned == [f"jackery_ble_{_DEVICE_ID}"]
 
 
-async def test_advertisement_callback_does_not_spawn_during_backoff() -> None:
-    """Advertisements cannot bypass the same proxy-protection gate."""
+async def test_advertisement_callback_owns_runner_during_backoff() -> None:
+    """An advertisement owns one runner while its connect attempt stays paced."""
     await asyncio.sleep(0)
     hass = _StubHass()
     backoff = BleConnectBackoff()
     listener = _make_listener(hass, backoff)
-    cast("Any", listener)._device_id_from_service_info = lambda _info: _DEVICE_ID
+    cast("Any", listener)._device_id_from_service_info = lambda _info: _DEVICE_ID  # ruff: ignore[private-member-access]
     backoff.record_failure(asyncio.get_running_loop().time())
 
-    listener._on_advertisement(
+    listener._on_advertisement(  # ruff: ignore[private-member-access]
         SimpleNamespace(address=_ADDRESS, source="proxy"),  # type: ignore[arg-type]
         MagicMock(),
     )
 
-    assert hass.spawned == []
+    assert hass.spawned == [f"jackery_ble_{_DEVICE_ID}"]
+
+
+async def test_owned_runner_waits_before_physical_connect_during_backoff() -> None:
+    """Runner ownership during backoff does not contact the BLE stack early."""
+    hass = _StubHass()
+    backoff = BleConnectBackoff()
+    listener = _make_listener(hass, backoff)
+    bluetooth = MagicMock()
+    listener._ha_bluetooth = bluetooth  # ruff: ignore[private-member-access]
+    backoff.record_failure(asyncio.get_running_loop().time())
+
+    runner = asyncio.create_task(
+        listener._async_run_connection(_DEVICE_ID, _ADDRESS),  # ruff: ignore[private-member-access]
+    )
+    await asyncio.sleep(0)
+
+    bluetooth.async_ble_device_from_address.assert_not_called()
+    listener._stop_event.set()  # ruff: ignore[private-member-access]
+    await runner
 
 
 def test_short_session_does_not_reset_connect_backoff() -> None:
     """A bare GATT connect is not success until notify traffic stays stable."""
     listener = _make_listener(_StubHass())
     reset = MagicMock()
-    cast("Any", listener)._connect_backoff_note_success = reset
+    cast("Any", listener)._connect_backoff_note_success = reset  # ruff: ignore[private-member-access]
 
     assert (
-        listener._reset_backoff_after_stable_session(
+        listener._reset_backoff_after_stable_session(  # ruff: ignore[private-member-access]
             _DEVICE_ID,
             started_at=100.0,
             now=159.0,
@@ -241,7 +260,7 @@ def test_short_session_does_not_reset_connect_backoff() -> None:
     )
     reset.assert_not_called()
     assert (
-        listener._reset_backoff_after_stable_session(
+        listener._reset_backoff_after_stable_session(  # ruff: ignore[private-member-access]
             _DEVICE_ID,
             started_at=100.0,
             now=160.0,

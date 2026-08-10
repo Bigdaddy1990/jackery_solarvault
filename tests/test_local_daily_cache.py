@@ -228,3 +228,40 @@ async def test_async_load_daily_cache_drops_non_str_metric(
         result = await cache.async_load_daily_cache(hass, "e")
 
     assert result == {"dev": {"day": _TODAY_ISO, "values": {"pvEgy": 3}}}
+
+
+@pytest.mark.asyncio()
+async def test_async_load_daily_cache_rejects_invalid_day_and_negative_anchor(
+    hass: HomeAssistant,
+) -> None:
+    """Malformed dates and impossible negative lifetime anchors cannot bootstrap."""
+    stored = {
+        "entries": {
+            "e": {
+                "bad-day": {"day": "20-05-2024", "values": {"pvEgy": 3}},
+                "negative": {"day": _TODAY_ISO, "values": {"pvEgy": -1}},
+                "valid": {"day": _TODAY_ISO, "values": {"pvEgy": 4}},
+            },
+        },
+    }
+    with patch.object(cache, "Store", return_value=_fake_store(stored)):
+        result = await cache.async_load_daily_cache(hass, "e")
+
+    assert result == {
+        "valid": {"day": _TODAY_ISO, "values": {"pvEgy": 4}},
+    }
+
+
+@pytest.mark.asyncio()
+async def test_daily_cache_survives_runtime_lock_recreation(
+    hass: HomeAssistant,
+) -> None:
+    """The runtime lock is disposable; Store data survives a simulated reboot."""
+    snapshots = {
+        "dev": {"day": _TODAY_ISO, "values": {"pvEgy": 1234}},
+    }
+
+    await cache.async_save_daily_cache(hass, "restart-entry", snapshots=snapshots)
+    hass.data.pop(cache._LOCK_KEY, None)
+
+    assert await cache.async_load_daily_cache(hass, "restart-entry") == snapshots

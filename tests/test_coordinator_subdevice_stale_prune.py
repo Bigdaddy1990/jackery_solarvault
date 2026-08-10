@@ -60,11 +60,11 @@ def _pack_coordinator() -> JackerySolarVaultCoordinator:
     """Build a real coordinator shell for stale-pack and reload policy."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
-    shell._pending_device_removals = []
-    shell._pending_battery_pack_removal_serials = {}
-    shell._battery_pack_identity_overrides = {}
-    shell._stale_battery_packs_dropped = 0
-    shell._battery_pack_topology_reload_required = False
+    shell._pending_device_removals = []  # ruff: ignore[private-member-access]
+    shell._pending_battery_pack_removal_serials = {}  # ruff: ignore[private-member-access]
+    shell._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
+    shell._stale_battery_packs_dropped = 0  # ruff: ignore[private-member-access]
+    shell._battery_pack_topology_reload_required = False  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -218,7 +218,7 @@ def test_stale_pack_removal_uses_frozen_registry_identity() -> None:
         ],
     }
 
-    stale_count = coordinator._prune_stale_battery_pack_bucket(
+    stale_count = coordinator._prune_stale_battery_pack_bucket(  # ruff: ignore[private-member-access]
         updated,
         device_id=DEVICE_ID,
     )
@@ -226,11 +226,11 @@ def test_stale_pack_removal_uses_frozen_registry_identity() -> None:
     frozen_identifier = _pack_identifier(_FROZEN_PACK_SN, 1)
     assert stale_count == 1
     assert updated[PAYLOAD_BATTERY_PACKS] == []
-    assert coordinator._pending_device_removals == [frozen_identifier]
-    assert coordinator._pending_battery_pack_removal_serials == {
+    assert coordinator._pending_device_removals == [frozen_identifier]  # ruff: ignore[private-member-access]
+    assert coordinator._pending_battery_pack_removal_serials == {  # ruff: ignore[private-member-access]
         frozen_identifier: _FROZEN_PACK_SN,
     }
-    assert coordinator._battery_pack_topology_reload_required is True
+    assert coordinator._battery_pack_topology_reload_required is True  # ruff: ignore[private-member-access]
 
 
 def test_serial_identified_survivor_is_not_queued_after_earlier_drop() -> None:
@@ -251,7 +251,7 @@ def test_serial_identified_survivor_is_not_queued_after_earlier_drop() -> None:
         ],
     }
 
-    stale_count = coordinator._prune_stale_battery_pack_bucket(
+    stale_count = coordinator._prune_stale_battery_pack_bucket(  # ruff: ignore[private-member-access]
         updated,
         device_id=DEVICE_ID,
     )
@@ -262,8 +262,8 @@ def test_serial_identified_survivor_is_not_queued_after_earlier_drop() -> None:
     assert [pack[FIELD_DEVICE_SN] for pack in updated[PAYLOAD_BATTERY_PACKS]] == [
         _SURVIVOR_PACK_SN
     ]
-    assert coordinator._pending_device_removals == [stale_identifier]
-    assert survivor_identifier not in coordinator._pending_device_removals
+    assert coordinator._pending_device_removals == [stale_identifier]  # ruff: ignore[private-member-access]
+    assert survivor_identifier not in coordinator._pending_device_removals  # ruff: ignore[private-member-access]
 
 
 async def test_topology_reload_transfers_removals_not_position_overrides(
@@ -274,16 +274,16 @@ async def test_topology_reload_transfers_removals_not_position_overrides(
     source = _pack_coordinator()
     replacement = _pack_coordinator()
     identifier = _pack_identifier(_FROZEN_PACK_SN, 1)
-    source._pending_device_removals.append(identifier)
-    source._pending_battery_pack_removal_serials[identifier] = _FROZEN_PACK_SN
+    source._pending_device_removals.append(identifier)  # ruff: ignore[private-member-access]
+    source._pending_battery_pack_removal_serials[identifier] = _FROZEN_PACK_SN  # ruff: ignore[private-member-access]
     source.set_battery_pack_identity_override(
         DEVICE_ID,
         1,
         _FROZEN_PACK_SN,
     )
-    source._battery_pack_topology_reload_required = True
-    source._shutdown_started = False
-    source._topology_reload_task = None
+    source._battery_pack_topology_reload_required = True  # ruff: ignore[private-member-access]
+    source._shutdown_started = False  # ruff: ignore[private-member-access]
+    source._topology_reload_task = None  # ruff: ignore[private-member-access]
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=source)
     source.entry = entry
     source.hass = hass
@@ -306,21 +306,21 @@ async def test_topology_reload_transfers_removals_not_position_overrides(
     monkeypatch.setattr(coordinator_mod, "asyncio", asyncio_proxy)
     monkeypatch.setattr(hass.config_entries, "async_reload", reload_mock)
 
-    source._schedule_topology_reload()
-    reload_task = source._topology_reload_task
+    source._schedule_topology_reload()  # ruff: ignore[private-member-access]
+    reload_task = source._topology_reload_task  # ruff: ignore[private-member-access]
     assert reload_task is not None
     await reload_task
 
     reload_mock.assert_awaited_once_with(entry.entry_id)
-    assert replacement._pending_device_removals == [identifier]
-    assert replacement._pending_battery_pack_removal_serials == {
+    assert replacement._pending_device_removals == [identifier]  # ruff: ignore[private-member-access]
+    assert replacement._pending_battery_pack_removal_serials == {  # ruff: ignore[private-member-access]
         identifier: _FROZEN_PACK_SN,
     }
-    assert replacement._battery_pack_identity_overrides == {}
-    assert source._pending_device_removals == []
-    assert source._pending_battery_pack_removal_serials == {}
-    assert source._battery_pack_identity_overrides == {}
-    assert source._battery_pack_topology_reload_required is False
+    assert replacement._battery_pack_identity_overrides == {}  # ruff: ignore[private-member-access]
+    assert source._pending_device_removals == []  # ruff: ignore[private-member-access]
+    assert source._pending_battery_pack_removal_serials == {}  # ruff: ignore[private-member-access]
+    assert source._battery_pack_identity_overrides == {}  # ruff: ignore[private-member-access]
+    assert source._battery_pack_topology_reload_required is False  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ async def test_smart_plug_absent_from_one_partial_push_is_not_dropped(
         ],
     }
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {FIELD_PLUGS: [{FIELD_DEVICE_SN: _FRESH_SN, "power": 10}]},
         device_id=DEVICE_ID,
@@ -386,7 +386,7 @@ async def test_smart_plug_silent_past_the_threshold_is_dropped(
         ],
     }
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {FIELD_PLUGS: [{FIELD_DEVICE_SN: _FRESH_SN, "power": 10}]},
         device_id=DEVICE_ID,
@@ -428,7 +428,7 @@ async def test_generic_sub_device_absent_from_one_partial_push_is_not_dropped(
         ],
     }
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {
             FIELD_SUB_DEVICE: [
@@ -466,7 +466,7 @@ async def test_generic_sub_device_silent_past_the_threshold_is_dropped(
         ],
     }
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {
             FIELD_SUB_DEVICE: [

@@ -43,7 +43,7 @@ def test_live_entry_gate_drops_violating_period_but_keeps_live_properties() -> N
         "expected a period-hierarchy warning naming the month section"
     )
 
-    result = JackerySolarVaultCoordinator._gate_period_hierarchy_from_warnings(
+    result = JackerySolarVaultCoordinator._gate_period_hierarchy_from_warnings(  # ruff: ignore[private-member-access]
         entry,
         warnings,
     )
@@ -66,7 +66,7 @@ def test_live_entry_gate_returns_entry_unchanged_without_warnings() -> None:
     warnings = app_data_quality_warnings(entry)
     assert warnings == []
 
-    result = JackerySolarVaultCoordinator._gate_period_hierarchy_from_warnings(
+    result = JackerySolarVaultCoordinator._gate_period_hierarchy_from_warnings(  # ruff: ignore[private-member-access]
         entry,
         warnings,
     )

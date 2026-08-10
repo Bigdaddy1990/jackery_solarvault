@@ -35,7 +35,7 @@ _ACCESSORIES_SYNC_BACKOFF_KEY = "accessories_sync"
 def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
-    obj._device_index = {}
+    obj._device_index = {}  # ruff: ignore[private-member-access]
     obj.data = (
         {_DEVICE: {PAYLOAD_SYSTEM: {"id": "sys-1"}}} if home_config else {_DEVICE: {}}
     )
@@ -434,21 +434,21 @@ async def test_accessory_sync_backs_off_after_persistent_10600() -> None:
     """
     coordinator = _coordinator()
     obj = cast("Any", coordinator)
-    obj._endpoint_backoff = {}
+    obj._endpoint_backoff = {}  # ruff: ignore[private-member-access]
     api = _api(coordinator)
     api.async_sync_smart_accessories = AsyncMock(
         side_effect=JackeryApiError("code=10600 msg=''"),
     )
     api.async_get_accessories_list = AsyncMock(return_value=[])
-    obj._overlay_http_accessories = MagicMock()
+    obj._overlay_http_accessories = MagicMock()  # ruff: ignore[private-member-access]
     index = {_DEVICE: {PAYLOAD_SYSTEM: {}}}
 
-    await coordinator._async_enumerate_http_accessories(index)
-    await coordinator._async_enumerate_http_accessories(index)
+    await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
+    await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
 
     assert api.async_sync_smart_accessories.await_count == 1
     assert (
-        coordinator._endpoint_backoff_active(
+        coordinator._endpoint_backoff_active(  # ruff: ignore[private-member-access]
             _ACCESSORIES_SYNC_BACKOFF_KEY,
             time.monotonic(),
         )

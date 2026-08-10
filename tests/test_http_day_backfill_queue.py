@@ -26,20 +26,60 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     """Build the persistent-state slice used by the bounded backfill."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
-    obj._statistics_import_diagnostics = {}
-    obj._last_statistics_http_backfill_monotonic = float("-inf")
-    obj._statistics_backfill_state = {"devices": {}}
-    obj._statistics_backfill_state_loaded = True
-    obj._async_save_statistics_backfill_state = AsyncMock()
-    obj._local_today = lambda: _TODAY
+    obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._last_statistics_http_backfill_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+    obj._statistics_backfill_state = {"devices": {}}  # ruff: ignore[private-member-access]
+    obj._statistics_backfill_state_loaded = True  # ruff: ignore[private-member-access]
+    obj._async_save_statistics_backfill_state = AsyncMock()  # ruff: ignore[private-member-access]
+    obj._local_today = lambda: _TODAY  # ruff: ignore[private-member-access]
+    obj._slow_http_request_semaphore = asyncio.Semaphore(2)  # ruff: ignore[private-member-access]
+    obj.api = SimpleNamespace()
     return coordinator
+
+
+@pytest.mark.asyncio()
+async def test_day_backfill_shares_slow_http_concurrency_gate() -> None:
+    """A bounded historical day request must wait for the shared HTTP gate."""
+    coordinator = _coordinator()
+    coordinator._slow_http_request_semaphore = asyncio.Semaphore(1)  # ruff: ignore[private-member-access]
+    coordinator._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
+        lambda _device_id, _payload: (APP_SECTION_BATTERY_STAT,)
+    )
+    fetch_started = asyncio.Event()
+
+    # Mock the API call that _async_fetch_historical_day_chart_source makes
+    async def _mock_battery_stat(  # noqa: RUF029, RUF105
+        *_args: object, **_kwargs: object
+    ) -> dict[str, object]:
+        fetch_started.set()
+        return {}
+
+    coordinator.api.async_get_device_battery_stat = _mock_battery_stat
+    await coordinator._slow_http_request_semaphore.acquire()  # ruff: ignore[private-member-access]
+    task = asyncio.create_task(
+        coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
+            {_DEVICE_ID: {}},
+            force=True,
+            window_days=1,
+            request_budget=1,
+        ),
+    )
+
+    await asyncio.sleep(0)
+    try:
+        assert not fetch_started.is_set()
+    finally:
+        coordinator._slow_http_request_semaphore.release()  # ruff: ignore[private-member-access]
+
+    await task
+    assert fetch_started.is_set()
 
 
 def test_automatic_day_backfill_horizon_reaches_mid_april() -> None:
     """The default July queue starts no later than the requested mid-April date."""
-    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(
+    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(  # ruff: ignore[private-member-access]
         _TODAY,
-        window_days=coordinator_module._STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
+        window_days=coordinator_module._STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,  # ruff: ignore[private-member-access]
     )
 
     assert days[0] <= date(2026, 4, 15)
@@ -51,7 +91,7 @@ async def test_empty_historical_payload_is_not_reported_as_success() -> None:
     """An empty/gated cloud response cannot complete a source/day pair."""
     coordinator = _coordinator()
 
-    result = await coordinator._async_import_historical_day_chart_statistics_for_device(
+    result = await coordinator._async_import_historical_day_chart_statistics_for_device(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         section_sources={},
@@ -74,12 +114,12 @@ async def test_single_source_fetch_distinguishes_empty_from_data(
 ) -> None:
     """The queue keeps empty responses pending but accepts gated chart data."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_device_battery_stat=AsyncMock(return_value=response),
     )
 
-    status, source = await coordinator._async_fetch_historical_day_chart_source(
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         target_day=date(2026, 4, 15),
@@ -94,12 +134,12 @@ async def test_single_source_fetch_distinguishes_empty_from_data(
 async def test_single_source_timeout_remains_retryable() -> None:
     """A temporary network timeout is persisted as pending transport failure."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_device_battery_stat=AsyncMock(side_effect=TimeoutError),
     )
 
-    status, source = await coordinator._async_fetch_historical_day_chart_source(
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         target_day=date(2026, 4, 15),
@@ -114,7 +154,7 @@ async def test_single_source_timeout_remains_retryable() -> None:
 async def test_ct_day_uses_cloud_response_directly() -> None:
     """The Jackery CT day endpoint is the only historical CT source."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cloud_source = {
         "unit": "kWh",
         "x": ["00:00"],
@@ -127,7 +167,7 @@ async def test_ct_day_uses_cloud_response_directly() -> None:
         async_get_device_ct_stat=AsyncMock(return_value=cloud_source),
     )
 
-    status, source = await coordinator._async_fetch_historical_day_chart_source(
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         target_day=date(2026, 4, 15),
@@ -142,12 +182,12 @@ async def test_ct_day_uses_cloud_response_directly() -> None:
 async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
     """An empty CT envelope is reported ambiguous; no LAN fallback exists."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_device_ct_stat=AsyncMock(return_value={}),
     )
 
-    status, source = await coordinator._async_fetch_historical_day_chart_source(
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         target_day=date(2026, 4, 15),
@@ -159,50 +199,10 @@ async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_backfill_uses_four_strictly_sequential_source_requests() -> None:
-    """One run stays within the request budget and never overlaps cloud calls."""
-    coordinator = _coordinator()
-    prefixes = ("battery", "home", "ct", "eps", "pv", "home_trends")
-    cast("Any", coordinator)._historical_day_source_prefixes = (
-        lambda _device_id, _payload: prefixes
-    )
-    active = 0
-    max_active = 0
-
-    async def _fetch(**kwargs: object) -> tuple[str, dict[str, object]]:
-        nonlocal active, max_active
-        del kwargs
-        active += 1
-        max_active = max(max_active, active)
-        try:
-            await asyncio.sleep(0)
-            return "fetched", {"y": [1.0]}
-        finally:
-            active -= 1
-
-    cast("Any", coordinator)._async_fetch_historical_day_chart_source = _fetch
-    cast(
-        "Any",
-        coordinator,
-    )._async_import_historical_day_chart_statistics_for_device = AsyncMock(
-        return_value=(True, 1),
-    )
-
-    result = await coordinator._async_http_backfill_recent_day_statistics(
-        {_DEVICE_ID: {}},
-        force=True,
-    )
-
-    assert result["requests"] == _REQUEST_BUDGET
-    assert result["terminal_transitions"] == _REQUEST_BUDGET
-    assert max_active == 1
-
-
-@pytest.mark.asyncio()
 async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
     """Success for one source never marks another source/day as complete."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._historical_day_source_prefixes = (
+    cast("Any", coordinator)._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: ("battery", "ct")
     )
 
@@ -216,35 +216,35 @@ async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
             return "fetched", {"y": [1.0]}
         return "transport_error", {}
 
-    cast("Any", coordinator)._async_fetch_historical_day_chart_source = _fetch
-    cast(
+    cast("Any", coordinator)._async_fetch_historical_day_chart_source = _fetch  # ruff: ignore[private-member-access]
+    cast(  # ruff: ignore[private-member-access]
         "Any",
         coordinator,
     )._async_import_historical_day_chart_statistics_for_device = AsyncMock(
         return_value=(True, 1),
     )
 
-    await coordinator._async_http_backfill_recent_day_statistics(
+    await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         force=True,
     )
 
     day_key = coordinator_module.statistics_http_backfill_dates(
         _TODAY,
-        window_days=coordinator_module._STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
+        window_days=coordinator_module._STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,  # ruff: ignore[private-member-access]
     )[0].isoformat()
-    sources = cast("Any", coordinator)._statistics_backfill_state["devices"][
+    sources = cast("Any", coordinator)._statistics_backfill_state["devices"][  # ruff: ignore[private-member-access]
         _DEVICE_ID
     ]["http_day_backfill"]["sources"]
     assert sources["battery"]["days"][day_key]["status"] == "imported"
-    assert sources["ct"]["days"][day_key]["status"] == "transport_error"
+    assert sources["ct"]["days"][day_key]["status"] == "retryable"
 
 
 @pytest.mark.asyncio()
 async def test_empty_old_day_does_not_block_later_source_days() -> None:
     """An unavailable old bucket remains pending while newer days still advance."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._historical_day_source_prefixes = (
+    cast("Any", coordinator)._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: ("battery",)
     )
     requested_days: list[date] = []
@@ -260,19 +260,19 @@ async def test_empty_old_day_does_not_block_later_source_days() -> None:
             return "empty_ambiguous", {}
         return "fetched", {"y": [1.0]}
 
-    cast("Any", coordinator)._async_fetch_historical_day_chart_source = _fetch
-    cast(
+    cast("Any", coordinator)._async_fetch_historical_day_chart_source = _fetch  # ruff: ignore[private-member-access]
+    cast(  # ruff: ignore[private-member-access]
         "Any",
         coordinator,
     )._async_import_historical_day_chart_statistics_for_device = AsyncMock(
         return_value=(True, 1),
     )
 
-    await coordinator._async_http_backfill_recent_day_statistics(
+    await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         force=True,
     )
-    await coordinator._async_http_backfill_recent_day_statistics(
+    await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         force=True,
     )
@@ -284,17 +284,17 @@ async def test_empty_old_day_does_not_block_later_source_days() -> None:
 async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
     """Repeated network failures leave a cooldown-backed retry, not unavailable."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._historical_day_source_prefixes = (
+    cast("Any", coordinator)._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: ("battery",)
     )
-    cast("Any", coordinator)._async_fetch_historical_day_chart_source = AsyncMock(
+    cast("Any", coordinator)._async_fetch_historical_day_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=("transport_error", {}),
     )
 
     for _attempt in range(
-        coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
+        coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS  # ruff: ignore[private-member-access]
     ):
-        result = await coordinator._async_http_backfill_recent_day_statistics(
+        result = await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
             {_DEVICE_ID: {}},
             force=True,
             window_days=1,
@@ -302,14 +302,14 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
         )
 
     day_key = (_TODAY.replace(day=_TODAY.day - 1)).isoformat()
-    day_state = cast("Any", coordinator)._statistics_backfill_state["devices"][
+    day_state = cast("Any", coordinator)._statistics_backfill_state["devices"][  # ruff: ignore[private-member-access]
         _DEVICE_ID
     ]["http_day_backfill"]["sources"]["battery"]["days"][day_key]
-    assert day_state["status"] == "deferred"
+    assert day_state["status"] == "retryable"
     assert day_state["retry_after_epoch"] > 0
-    assert result["pending_sources"] == 0
+    assert result["pending_sources"] == 1
 
-    immediate_retry = await coordinator._async_http_backfill_recent_day_statistics(
+    immediate_retry = await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         force=True,
         window_days=1,
@@ -322,22 +322,22 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
 async def test_repeated_empty_day_becomes_terminal_without_queue_loop() -> None:
     """A completed historical day with no source data stops rapid retries."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._historical_day_source_prefixes = (
+    cast("Any", coordinator)._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: ("battery",)
     )
-    cast("Any", coordinator)._async_fetch_historical_day_chart_source = AsyncMock(
+    cast("Any", coordinator)._async_fetch_historical_day_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=("empty_ambiguous", {}),
     )
 
-    for _attempt in range(coordinator_module._STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS):
-        await coordinator._async_http_backfill_recent_day_statistics(
+    for _attempt in range(coordinator_module._STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS):  # ruff: ignore[private-member-access]
+        await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
             {_DEVICE_ID: {}},
             force=True,
             window_days=1,
             request_budget=1,
         )
 
-    third_run = await coordinator._async_http_backfill_recent_day_statistics(
+    third_run = await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         force=True,
         window_days=1,

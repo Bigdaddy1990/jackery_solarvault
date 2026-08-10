@@ -14,6 +14,10 @@ from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
+    CONF_LOCAL_MQTT_TLS_CA_CERT,
+    CONF_LOCAL_MQTT_TLS_CLIENT_CERT,
+    CONF_LOCAL_MQTT_TLS_CLIENT_KEY,
+    CONF_LOCAL_MQTT_TLS_INSECURE,
     CONF_LOCAL_MQTT_TOPIC,
     CONF_LOCAL_MQTT_USERNAME,
     CONF_REGION_CODE,
@@ -43,12 +47,12 @@ _SUBMITTED_PORT = 1886
 
 def test_normalize_account_strips_whitespace() -> None:
     """Account ids are normalized before unique-id and reauth checks."""
-    assert config_flow._normalize_account(" owner@example.com ") == _ACCOUNT
+    assert config_flow._normalize_account(" owner@example.com ") == _ACCOUNT  # ruff: ignore[private-member-access]
 
 
 def test_flow_options_preserves_current_and_third_party_fields() -> None:
     """Option merging includes the full persistable option surface."""
-    result = config_flow._flow_options(
+    result = config_flow._flow_options(  # ruff: ignore[private-member-access]
         {CONF_ENABLE_WEEK_STATISTICS: True},
         {
             CONF_ENABLE_BLE_TRANSPORT: False,
@@ -74,7 +78,7 @@ def test_entry_data_from_api_login_keeps_region_and_mqtt_bootstrap() -> None:
         data={CONF_REGION_CODE: _REGION},
     )
 
-    data = config_flow._entry_data_from_api_login(
+    data = config_flow._entry_data_from_api_login(  # ruff: ignore[private-member-access]
         _ACCOUNT,
         _PASSWORD,
         cast("JackeryApi", api),
@@ -100,7 +104,7 @@ def test_entry_data_from_api_login_prefers_api_region() -> None:
         data={CONF_REGION_CODE: _REGION},
     )
 
-    data = config_flow._entry_data_from_api_login(
+    data = config_flow._entry_data_from_api_login(  # ruff: ignore[private-member-access]
         _ACCOUNT,
         _PASSWORD,
         cast("JackeryApi", api),
@@ -113,11 +117,11 @@ def test_entry_data_from_api_login_prefers_api_region() -> None:
 
 def test_local_mqtt_port_coercion_falls_back_to_default() -> None:
     """Invalid stored Local-MQTT port values cannot poison config options."""
-    assert config_flow._coerce_local_mqtt_port(None) == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port("") == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port(str(_LOCAL_PORT)) == _LOCAL_PORT
-    assert config_flow._coerce_local_mqtt_port(object()) == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port("not-a-port") == DEFAULT_LOCAL_MQTT_PORT
+    assert config_flow._coerce_local_mqtt_port(None) == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port("") == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port(str(_LOCAL_PORT)) == _LOCAL_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port(object()) == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port("not-a-port") == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
 
 
 def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
@@ -134,7 +138,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
         },
     )
 
-    result = config_flow._current_local_mqtt_options(entry)
+    result = config_flow._current_local_mqtt_options(entry)  # ruff: ignore[private-member-access]
 
     assert result == {
         CONF_LOCAL_MQTT_ENABLE: True,
@@ -143,6 +147,10 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "user",
         CONF_LOCAL_MQTT_PASSWORD: " pass ",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "jackery/#",
+        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
+        CONF_LOCAL_MQTT_TLS_INSECURE: False,
     }
 
 
@@ -157,7 +165,7 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
     }
 
-    result = config_flow._merge_local_mqtt_options(
+    result = config_flow._merge_local_mqtt_options(  # ruff: ignore[private-member-access]
         {
             CONF_LOCAL_MQTT_ENABLE: True,
             CONF_LOCAL_MQTT_HOST: " local.new ",
@@ -177,6 +185,10 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "new-user",
         CONF_LOCAL_MQTT_PASSWORD: "new-pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "new/#",
+        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
+        CONF_LOCAL_MQTT_TLS_INSECURE: False,
     }
 
 
@@ -196,7 +208,7 @@ def test_reconfigure_options_preserves_unexposed_existing_options() -> None:
         },
     )
 
-    result = config_flow._reconfigure_options(
+    result = config_flow._reconfigure_options(  # ruff: ignore[private-member-access]
         entry,
         {
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: True,
@@ -213,3 +225,64 @@ def test_reconfigure_options_preserves_unexposed_existing_options() -> None:
     assert result[CONF_LOCAL_MQTT_USERNAME] == "old-user"
     assert result[CONF_LOCAL_MQTT_PASSWORD] == "old-pass"
     assert result[CONF_THIRD_PARTY_MQTT_TOKEN] == "token"
+
+
+def test_flow_options_preserves_third_party_mqtt_token() -> None:
+    """Token persists when options flow merges user_input without token field."""
+    current_options = {
+        CONF_ENABLE_BLE_TRANSPORT: False,
+        CONF_THIRD_PARTY_MQTT_IP: "broker.local",
+        CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_PORT,
+        CONF_THIRD_PARTY_MQTT_TOKEN: "existing-token-123",
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "jackery/#",
+    }
+
+    # Simulate user_input that omits the token field (user doesn't touch it)
+    user_input = {
+        CONF_ENABLE_BLE_TRANSPORT: True,
+        CONF_THIRD_PARTY_MQTT_IP: "new-broker.local",
+    }
+
+    result = config_flow._flow_options(user_input, current_options)  # noqa: RUF105, SLF001
+
+    # Token should be preserved from current_options
+    assert result[CONF_THIRD_PARTY_MQTT_TOKEN] == "existing-token-123"
+    # Other fields should be updated
+    assert result[CONF_ENABLE_BLE_TRANSPORT] is True
+    assert result[CONF_THIRD_PARTY_MQTT_IP] == "new-broker.local"
+    assert result[CONF_THIRD_PARTY_MQTT_PORT] == _LOCAL_PORT
+    assert result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "jackery/#"
+
+
+def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
+    """Token from current_options flows through merge_local_mqtt_options correctly."""
+    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # noqa: E501, RUF105
+    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # noqa: E501, RUF105
+    current_options = {
+        CONF_ENABLE_BLE_TRANSPORT: False,
+        CONF_THIRD_PARTY_MQTT_TOKEN: "token-from-options",
+    }
+    current_local_mqtt = {
+        CONF_LOCAL_MQTT_ENABLE: False,
+        CONF_LOCAL_MQTT_HOST: "old.local",
+        CONF_LOCAL_MQTT_PORT: _LOCAL_PORT,
+        CONF_LOCAL_MQTT_USERNAME: "user",
+        CONF_LOCAL_MQTT_PASSWORD: "pass",
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
+        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
+        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
+        CONF_LOCAL_MQTT_TLS_INSECURE: False,
+    }
+    user_input = {
+        CONF_ENABLE_BLE_TRANSPORT: True,
+    }
+
+    merged = config_flow._flow_options(user_input, current_options)  # noqa: RUF105, SLF001
+    merged.update(config_flow._merge_local_mqtt_options(user_input, current_local_mqtt))  # noqa: RUF105, SLF001
+
+    # Token must come from _flow_options (which reads current_options)
+    assert merged[CONF_THIRD_PARTY_MQTT_TOKEN] == "token-from-options"
+    # Local MQTT fields should be updated/preserved
+    assert merged[CONF_LOCAL_MQTT_ENABLE] is False
+    assert merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "old/#"

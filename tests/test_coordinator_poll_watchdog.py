@@ -22,6 +22,9 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.jackery_solarvault.const import DOMAIN
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.util import dt as dt_util
 
@@ -83,7 +86,7 @@ async def watchdog_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._register_deferred_layer5_start",
+            "custom_components.jackery_solarvault._defer_layer5_start_task",
             return_value=None,
         ),
     ):
@@ -91,7 +94,7 @@ async def watchdog_setup(
         await hass.async_block_till_done()
 
     coordinator = entry.runtime_data
-    coordinator._async_update_data = AsyncMock(return_value={})
+    coordinator._async_update_data = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
 
     yield entry
 
@@ -112,7 +115,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
 ) -> None:
     """A silent poll stall triggers a warning and a forced refresh."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _STALL_AGE_SEC
+    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _STALL_AGE_SEC  # ruff: ignore[private-member-access]
 
     with (
         caplog.at_level(
@@ -126,7 +129,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
         ) as forced_refresh,
     ):
         await _tick_watchdog(hass)
-        coordinator._last_http_cycle_completed_monotonic = time.monotonic()
+        coordinator._last_http_cycle_completed_monotonic = time.monotonic()  # ruff: ignore[private-member-access]
 
     assert any(
         "poll watchdog" in record.getMessage().lower() for record in caplog.records
@@ -141,7 +144,7 @@ async def test_watchdog_stays_silent_while_polling_is_healthy(
 ) -> None:
     """A recent completed refresh must not trigger the watchdog."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _FRESH_AGE_SEC
+    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _FRESH_AGE_SEC  # ruff: ignore[private-member-access]
 
     with caplog.at_level(
         logging.WARNING,
@@ -152,3 +155,26 @@ async def test_watchdog_stays_silent_while_polling_is_healthy(
     assert not any(
         "poll watchdog" in record.getMessage().lower() for record in caplog.records
     )
+
+
+@pytest.mark.asyncio()
+async def test_background_slow_metrics_wait_for_scheduled_http_poll(
+    hass: HomeAssistant,
+) -> None:
+    """Slow-cache completion neither fetches nor shifts the regular poll timer."""
+    coordinator = JackerySolarVaultCoordinator.__new__(
+        JackerySolarVaultCoordinator,
+    )
+    coordinator.hass = hass
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]
+    coordinator.data = {"device": {"statistic": {"todayGeneration": "1.0"}}}
+    coordinator.async_request_refresh = AsyncMock()
+    coordinator.async_set_updated_data = MagicMock()
+
+    coordinator._launch_background_slow_refresh(set(), AsyncMock())  # ruff: ignore[private-member-access]
+    assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+    await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+
+    coordinator.async_set_updated_data.assert_not_called()
+    coordinator.async_request_refresh.assert_not_awaited()

@@ -1,6 +1,9 @@
 """Tests for Jackery API client internal logging helpers and shape formatters."""
 
-from custom_components.jackery_solarvault.client.api import _log_body, _log_value_shape
+from custom_components.jackery_solarvault.client.api import (
+    _log_body,  # ruff: ignore[import-private-name]
+    _log_value_shape,  # ruff: ignore[import-private-name]
+)
 
 
 def test_log_value_shape() -> None:

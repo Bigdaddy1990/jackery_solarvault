@@ -34,7 +34,11 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from custom_components.jackery_solarvault.util import external_trend_statistic_id
 from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.components.recorder.statistics import (
+    adjust_statistics,
+    statistics_during_period,
+)
+from homeassistant.const import UnitOfEnergy
 
 if TYPE_CHECKING:
     from homeassistant.components.recorder import Recorder
@@ -56,8 +60,8 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.hass = hass
-    obj._stat_import_last_sig = {}
-    obj._device_index = {}
+    obj._stat_import_last_sig = {}  # ruff: ignore[private-member-access]
+    obj._device_index = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -72,7 +76,7 @@ async def _import(
     points: list[SimpleNamespace],
 ) -> tuple[bool, int]:
     """Import a day-hourly series and block until the recorder has committed."""
-    result = await coordinator._async_add_app_chart_statistics(
+    result = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         name_prefix="Jackery",
         metric_key=_METRIC_KEY,
@@ -251,3 +255,45 @@ async def test_earlier_day_correction_rebases_later_day(
     assert day1_last == pytest.approx(12.0)
     assert day2_first == pytest.approx(16.0)
     assert day1_last <= day2_first
+
+
+async def test_user_adjusted_prior_sums_are_preserved(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+) -> None:
+    """An intentional HA sum adjustment must remain the cumulative baseline."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    recorder = get_instance(hass)
+    d1 = datetime(2026, 7, 6, 10, tzinfo=UTC)
+    d2 = datetime(2026, 7, 7, 10, tzinfo=UTC)
+
+    await _import(
+        coordinator,
+        hass,
+        [_point(d1, 1.0), _point(d1 + timedelta(hours=1), 2.0)],
+    )
+    await recorder.async_add_executor_job(
+        adjust_statistics,
+        recorder,
+        _STAT_ID,
+        d1,
+        100_000.0,
+        UnitOfEnergy.KILO_WATT_HOUR,
+    )
+    adjusted = await _read_rows(hass)
+    assert _row_at(adjusted, d1 + timedelta(hours=1))["sum"] == pytest.approx(
+        100_003.0,
+    )
+
+    await _import(
+        coordinator,
+        hass,
+        [_point(d2, 4.0), _point(d2 + timedelta(hours=1), 5.0)],
+    )
+
+    continued = await _read_rows(hass)
+    assert [row["sum"] for row in continued] == pytest.approx(
+        [100_001.0, 100_003.0, 100_007.0, 100_012.0],
+    )
+    _assert_monotonic(continued)

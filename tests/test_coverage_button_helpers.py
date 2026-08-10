@@ -1,16 +1,10 @@
 """Tests for helper functions in button.py."""
 
 from custom_components.jackery_solarvault.button import (
-    _has_home_payload_evidence,
-    _is_portable_payload,
-    _payload_has_home_payload_evidence,
-    _portable_cmd,
+    _has_home_payload_evidence,  # ruff: ignore[import-private-name]
+    _is_portable_payload,  # ruff: ignore[import-private-name]
+    _payload_has_home_payload_evidence,  # ruff: ignore[import-private-name]
 )
-
-
-def test_portable_cmd() -> None:
-    """Test mapping action_id to portable BLE message type."""
-    assert isinstance(_portable_cmd(1), int)
 
 
 def test_has_home_payload_evidence() -> None:

@@ -84,7 +84,7 @@ async def test_accept_shared_device_posts_ids() -> None:
 
 @pytest.mark.asyncio()
 async def test_get_device_shared_list_unwraps_list() -> None:
-    """The shared-device list endpoint unwraps a data list."""
+    """The shared-device list endpoint unwraps a bare data list."""
     api = _api()
     shared = [{"deviceId": 1}]
     get_json = AsyncMock(return_value={FIELD_DATA: shared})
@@ -93,6 +93,46 @@ async def test_get_device_shared_list_unwraps_list() -> None:
         result = await api.async_get_device_shared_list()
 
     assert result == shared
+    get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
+
+
+@pytest.mark.asyncio()
+async def test_get_device_shared_list_unwraps_receive_share_bean() -> None:
+    """The shared-device list endpoint merges the receive/share bean dict."""
+    api = _api()
+    get_json = AsyncMock(
+        return_value={
+            FIELD_DATA: {
+                "receive": [{"shareId": "r1", "username": "alice"}],
+                "share": [{"shareId": "s1", "username": "bob"}],
+            }
+        }
+    )
+
+    with patch.object(api, "_get_json", get_json):
+        result = await api.async_get_device_shared_list()
+
+    assert result == [
+        {"shareId": "r1", "username": "alice"},
+        {"shareId": "s1", "username": "bob"},
+    ]
+    get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
+
+
+@pytest.mark.asyncio()
+async def test_get_device_shared_list_skips_non_dict_entries() -> None:
+    """The shared-device list endpoint filters non-dict entries in both shapes."""
+    api = _api()
+    get_json = AsyncMock(
+        return_value={
+            FIELD_DATA: {"receive": [{"shareId": "r1"}, "junk"], "share": None}
+        }
+    )
+
+    with patch.object(api, "_get_json", get_json):
+        result = await api.async_get_device_shared_list()
+
+    assert result == [{"shareId": "r1"}]
     get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
 
 

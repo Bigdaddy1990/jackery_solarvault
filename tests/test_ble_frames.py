@@ -10,14 +10,10 @@ The layout is pinned to the live capture documented in ``const.py``
 (2026-05-16): 16-byte header of big-endian uint16 fields, then the body,
 then a 4-byte trailer.
 
-The trailer is deliberately treated as **opaque**. It is a probable
-CRC-32 that has never been re-derived from the firmware, so the builder
-takes it as a caller-supplied parameter and the parser hands it back
-verbatim. These tests assert exactly that round-trip and nothing more —
-pinning a computed checksum here would fabricate protocol behaviour the
-capture does not support. The Modbus CRC-16 in ``crc16_modbus`` belongs
-to the legacy hex path (``crc16_hex``) and is pinned by its canonical
-vector in ``test_ble_codec_pure.py``; it is not part of this frame.
+App 2.4.0 proves that the four-byte trailer is a two-byte random security
+value followed by a Modbus CRC-16 in little-endian wire order. These tests
+pin that exact outbound contract while retaining explicit trailer injection
+only for malformed/inbound parser fixtures.
 """
 
 import pytest
@@ -40,6 +36,8 @@ _BODY = b'{"a":1}'  # 7 bytes.
 _IDX = 2
 _CNT = 3
 _TRAILER = b"\xde\xad\xbe\xef"  # Opaque 4 bytes; contents are never derived.
+_SECURITY = 0x1234
+_APP_CRC_FOR_DEFAULT_FRAME = b"\xed\x27"
 
 _HEADER_LEN = 16
 _TRAILER_LEN = 4
@@ -65,7 +63,7 @@ def test_build_binary_frame_packs_the_documented_header_layout() -> None:
 
     assert frame[:_HEADER_LEN] == (
         b"\xdf\xed"  # magic
-        b"\x00\x64"  # framing version — constant in every observed frame
+        b"\x00\x01"  # outbound version — HomeControlFormat 2.4.0 literal
         b"\x00\x02"  # frame_index
         b"\x00\x03"  # chunk_count
         b"\x00\x2a"  # flags / HomeCmdAction.msgId
@@ -78,14 +76,14 @@ def test_build_binary_frame_packs_the_documented_header_layout() -> None:
     assert len(frame) == _HEADER_LEN + len(_BODY) + _TRAILER_LEN
 
 
-def test_build_binary_frame_defaults_to_a_single_unflagged_zero_trailer_frame() -> None:
-    """Only `cmd` and `body` are required; the rest carry documented defaults."""
-    frame = build_binary_frame(cmd=_CMD, body=_BODY)
+def test_build_binary_frame_appends_app_security_and_little_endian_crc() -> None:
+    """The App 2.4.0 security tag and CRC replace the invalid zero trailer."""
+    frame = build_binary_frame(cmd=_CMD, body=_BODY, security=_SECURITY)
 
     assert frame[4:6] == b"\x00\x01"  # frame_index defaults to 1.
     assert frame[6:8] == b"\x00\x01"  # chunk_count defaults to 1.
     assert frame[8:10] == b"\x00\x00"  # flags is optional and defaults to 0.
-    assert frame[-_TRAILER_LEN:] == b"\x00\x00\x00\x00"  # Placeholder trailer.
+    assert frame[-_TRAILER_LEN:] == b"\x12\x34" + _APP_CRC_FOR_DEFAULT_FRAME
 
 
 def test_build_binary_frame_passes_the_opaque_trailer_through_untouched() -> None:
