@@ -16,7 +16,7 @@ lookup, and ``async_create_fix_flow``'s dispatch logic all run unmodified
 against a real ``hass``.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -24,14 +24,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
-    REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
     REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.repairs import (
-    AppDataInconsistencyRepairFlow,
     DeviceNotActivatedRepairFlow,
     async_create_fix_flow,
 )
@@ -39,17 +37,19 @@ from homeassistant.data_entry_flow import FlowResultType, UnknownFlow
 from homeassistant.exceptions import ConfigEntryAuthFailed
 
 if TYPE_CHECKING:
-    from homeassistant.components.repairs import RepairsFlow
     from homeassistant.core import HomeAssistant
 
-_FLOW_CLASSES = (AppDataInconsistencyRepairFlow, DeviceNotActivatedRepairFlow)
+_FLOW_CLASSES: tuple[type[DeviceNotActivatedRepairFlow], ...] = (
+    DeviceNotActivatedRepairFlow,
+)
 
 
-def _bare_coordinator() -> JackerySolarVaultCoordinator:
+def _bare_coordinator() -> tuple[JackerySolarVaultCoordinator, AsyncMock]:
     """Build a coordinator double whose refresh call is fully controllable."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.async_request_refresh = AsyncMock()
-    return coordinator
+    refresh = AsyncMock()
+    cast("Any", coordinator).async_request_refresh = refresh
+    return coordinator, refresh
 
 
 def _entry_with_coordinator(
@@ -69,7 +69,7 @@ def _entry_with_coordinator(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_init_step_routes_to_the_confirm_form(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """The init step is a pass-through that immediately shows confirmation."""
     flow = flow_cls(None, {"key": "value"})
@@ -85,7 +85,7 @@ async def test_init_step_routes_to_the_confirm_form(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_step_without_input_shows_the_form(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """Calling confirm with no submission redisplays the confirmation form."""
     flow = flow_cls(None, {"key": "value"})
@@ -104,10 +104,10 @@ async def test_confirm_step_without_input_shows_the_form(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_refreshes_the_coordinator_and_completes(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """Submitting the form refreshes cloud data and finishes the flow."""
-    coordinator = _bare_coordinator()
+    coordinator, refresh = _bare_coordinator()
     entry = _entry_with_coordinator(hass, coordinator)
     flow = flow_cls(entry.entry_id, {})
     flow.hass = hass
@@ -116,13 +116,13 @@ async def test_confirm_submission_refreshes_the_coordinator_and_completes(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {}
-    coordinator.async_request_refresh.assert_awaited_once()
+    refresh.assert_awaited_once()
 
 
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_swallows_background_task_errors(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """A failed refresh does not block the flow from completing.
 
@@ -131,8 +131,8 @@ async def test_confirm_submission_swallows_background_task_errors(
     task error, the flow must still finish instead of surfacing an error to
     the user for something it can't fix anyway.
     """
-    coordinator = _bare_coordinator()
-    coordinator.async_request_refresh.side_effect = TimeoutError("cloud stalled")
+    coordinator, refresh = _bare_coordinator()
+    refresh.side_effect = TimeoutError("cloud stalled")
     entry = _entry_with_coordinator(hass, coordinator)
     flow = flow_cls(entry.entry_id, {})
     flow.hass = hass
@@ -145,15 +145,15 @@ async def test_confirm_submission_swallows_background_task_errors(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_propagates_auth_failure(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """Auth failures are not background-task noise; they must propagate.
 
     Unlike a transient cloud error, ``ConfigEntryAuthFailed`` means the
     integration needs reauth, so the fix flow must not swallow it.
     """
-    coordinator = _bare_coordinator()
-    coordinator.async_request_refresh.side_effect = ConfigEntryAuthFailed("expired")
+    coordinator, refresh = _bare_coordinator()
+    refresh.side_effect = ConfigEntryAuthFailed("expired")
     entry = _entry_with_coordinator(hass, coordinator)
     flow = flow_cls(entry.entry_id, {})
     flow.hass = hass
@@ -168,7 +168,7 @@ async def test_confirm_submission_propagates_auth_failure(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_without_entry_id_still_completes(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """No entry_id (e.g. malformed issue data) skips the refresh, not the fix."""
     flow = flow_cls(None, {})
@@ -182,7 +182,7 @@ async def test_confirm_submission_without_entry_id_still_completes(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_with_unknown_entry_id_still_completes(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """An entry_id that no longer resolves in hass also skips the refresh."""
     flow = flow_cls("stale-entry-id", {})
@@ -196,7 +196,7 @@ async def test_confirm_submission_with_unknown_entry_id_still_completes(
 @pytest.mark.parametrize("flow_cls", _FLOW_CLASSES)
 async def test_confirm_submission_with_unset_up_entry_still_completes(
     hass: HomeAssistant,
-    flow_cls: type[RepairsFlow],
+    flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """A config entry whose runtime_data isn't a coordinator also skips refresh.
 
@@ -214,30 +214,6 @@ async def test_confirm_submission_with_unset_up_entry_still_completes(
 
 
 # --- async_create_fix_flow dispatch -----------------------------------------
-
-
-async def test_dispatches_app_data_inconsistency_issues(
-    hass: HomeAssistant,
-) -> None:
-    """An issue id ending in the app-data-inconsistency suffix builds that flow."""
-    issue_id = f"entry-1_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"
-    data = {
-        "entry_id": "entry-1",
-        "count": 3,
-        "metric": "totalSolarEnergy",
-        "examples": "2026-07-01: 10 < 2026-06-30: 12",
-    }
-
-    flow = await async_create_fix_flow(hass, issue_id, data)
-
-    assert isinstance(flow, AppDataInconsistencyRepairFlow)
-    flow.hass = hass
-    result = await flow.async_step_init()
-    assert result["description_placeholders"] == {
-        "count": "3",
-        "metric": "totalSolarEnergy",
-        "examples": "2026-07-01: 10 < 2026-06-30: 12",
-    }
 
 
 async def test_dispatches_device_not_activated_issues(
@@ -259,11 +235,6 @@ async def test_dispatches_device_not_activated_issues(
     ["suffix", "expected_flow_cls", "expected_placeholders"],
     [
         [
-            REPAIR_ISSUE_APP_DATA_INCONSISTENCY,
-            AppDataInconsistencyRepairFlow,
-            {"count": "unknown", "metric": "unknown", "examples": "unknown"},
-        ],
-        [
             REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
             DeviceNotActivatedRepairFlow,
             {"device_id": "unknown"},
@@ -273,7 +244,7 @@ async def test_dispatches_device_not_activated_issues(
 async def test_dispatch_defaults_missing_issue_data_to_unknown(
     hass: HomeAssistant,
     suffix: str,
-    expected_flow_cls: type[RepairsFlow],
+    expected_flow_cls: type[DeviceNotActivatedRepairFlow],
     expected_placeholders: dict[str, str],
 ) -> None:
     """Missing ``data`` (None) still builds a flow with 'unknown' placeholders."""

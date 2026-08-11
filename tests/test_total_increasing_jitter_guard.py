@@ -35,6 +35,7 @@ def _smart_meter_sensor(key: str) -> JackerySmartMeterSensor:
     )
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -118,6 +119,7 @@ def test_battery_pack_small_counter_regression_keeps_last_state() -> None:
     )
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
 
     mutable.coordinator.data = {
         _DEVICE_ID: {
@@ -128,11 +130,11 @@ def test_battery_pack_small_counter_regression_keeps_last_state() -> None:
     }
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     mutable.coordinator.data[_DEVICE_ID][PAYLOAD_BATTERY_PACKS][0][FIELD_IN_EGY] = (
-        21_730
+        21_738
     )
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
-    assert sensor.native_value == pytest.approx(21.74)
+    assert sensor.native_value == pytest.approx(217.4)
 
 
 def test_missing_battery_pack_sample_keeps_jitter_anchor() -> None:
@@ -162,10 +164,10 @@ def test_missing_battery_pack_sample_keeps_jitter_anchor() -> None:
 
     mutable.coordinator.data[_DEVICE_ID][PAYLOAD_BATTERY_PACKS] = []
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
-    assert sensor.native_value == pytest.approx(21.74)
+    assert sensor.native_value == pytest.approx(217.4)
 
     mutable.coordinator.data[_DEVICE_ID][PAYLOAD_BATTERY_PACKS] = [
-        {FIELD_DEVICE_SN: "PACK-1", FIELD_IN_EGY: 21_730},
+        {FIELD_DEVICE_SN: "PACK-1", FIELD_IN_EGY: 21_738},
     ]
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
-    assert sensor.native_value == pytest.approx(21.74)
+    assert sensor.native_value == pytest.approx(217.4)

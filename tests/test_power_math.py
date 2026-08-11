@@ -9,9 +9,10 @@ import importlib.util
 from pathlib import Path
 import sys
 import types
+from typing import Any
 
 
-def _load_util_module():
+def _load_util_module() -> types.ModuleType:
     """Load and return the local `custom_components.jackery_solarvault.util` module for tests.
 
     This function locates the component directory relative to the test file, registers minimal package module entries in `sys.modules` for `custom_components` and `custom_components.jackery_solarvault`, loads and executes the component's `const.py` and `util.py` files, and returns the executed `util` module object. It mutates `sys.modules` as part of preparing the import environment for testing.
@@ -22,6 +23,10 @@ def _load_util_module():
     package_dir = (
         Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
+    previous_namespace = sys.modules.get("custom_components")
+    previous_package = sys.modules.get("custom_components.jackery_solarvault")
+    previous_const = sys.modules.get("custom_components.jackery_solarvault.const")
+    previous_util = sys.modules.get("custom_components.jackery_solarvault.util")
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
     package.__path__ = [str(package_dir)]
@@ -44,7 +49,25 @@ def _load_util_module():
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous_namespace is None:
+            sys.modules.pop("custom_components", None)
+        else:
+            sys.modules["custom_components"] = previous_namespace
+        if previous_package is None:
+            sys.modules.pop("custom_components.jackery_solarvault", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault"] = previous_package
+        if previous_const is None:
+            sys.modules.pop("custom_components.jackery_solarvault.const", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault.const"] = previous_const
+        if previous_util is None:
+            sys.modules.pop("custom_components.jackery_solarvault.util", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault.util"] = previous_util
     return module
 
 
@@ -294,8 +317,8 @@ def test_day_power_energy_points_scales_total_across_minute_curve() -> None:
     ]
 
 
-def test_day_power_energy_points_preserves_null_gaps_as_zero_buckets() -> None:
-    """App null samples represent zero-power gaps in a completed day curve."""
+def test_day_power_energy_points_skips_unverified_null_gaps() -> None:
+    """App null samples do not create synthetic zero-energy observations."""
     source = {
         util.APP_REQUEST_META: {
             util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
@@ -318,8 +341,7 @@ def test_day_power_energy_points_preserves_null_gaps_as_zero_buckets() -> None:
     )
 
     assert points == [
-        util.TrendStatisticPoint(util.datetime(2026, 7, 28, 8), 0.0),
-        util.TrendStatisticPoint(util.datetime(2026, 7, 28, 9), 0.05),
+        util.TrendStatisticPoint(util.datetime(2026, 7, 28, 9), 0.05)
     ]
 
 
@@ -377,10 +399,8 @@ def test_day_power_energy_points_never_scales_live_curve_down_to_lagging_scalar(
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 1.0)]
 
 
-def test_blank_unit_day_curve_is_inferred_as_power_before_scalar_reconciliation() -> (
-    None
-):
-    """A blank-unit live PV curve must not be shrunk to Jackery's stale scalar."""
+def test_blank_unit_day_curve_is_rejected_without_unit_evidence() -> None:
+    """A blank unit cannot prove whether chart samples are power or energy."""
     source = {
         util.APP_REQUEST_META: {
             util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
@@ -402,9 +422,7 @@ def test_blank_unit_day_curve_is_inferred_as_power_before_scalar_reconciliation(
         now=util.datetime(2026, 7, 23, 15, 40),
     )
 
-    assert points == [
-        util.TrendStatisticPoint(util.datetime(2026, 7, 23, 15, 0), 9.9765)
-    ]
+    assert points == []
 
 
 def test_day_battery_discharge_curve_ignores_positive_charge_samples() -> None:
@@ -1078,6 +1096,29 @@ def test_trend_series_points_build_week_daily_buckets() -> None:
     ]
 
 
+def test_trend_series_points_rejects_unconfirmed_all_zero_chart() -> None:
+    """One all-zero HTTP chart must not create external Recorder buckets."""
+    source = {
+        "unit": "kWh",
+        "_request": {
+            "dateType": "week",
+            "beginDate": "2026-08-10",
+            "endDate": "2026-08-16",
+        },
+        "y": [0, "", None, "0.0"],
+    }
+
+    assert (
+        util.trend_series_points(
+            source,
+            "device_pv_stat_week",
+            "totalSolarEnergy",
+            today=util.date(2026, 8, 11),
+        )
+        == []
+    )
+
+
 def test_trend_series_points_build_month_daily_buckets_and_skip_future() -> None:
     """Implement test trend series points build month daily buckets and skip future."""
     source = {
@@ -1152,205 +1193,9 @@ def test_external_trend_statistic_id_uses_colon_external_id() -> None:
     )
 
 
-def test_app_data_quality_warns_without_repairing_cross_period_totals() -> None:
-    """Surface contradictions as warnings, never silent cross-period repairs.
-
-    The statistic year backfill contract is what this test enforces.
-
-    Setup: year payload encodes May as compact ``30.28`` (April=30 + May=28)
-    with documented ``totalOutGridEnergy=58`` confirming the encoding.
-    The full week (89.08 kWh) lies inside the same year, so 58 < 89.08
-    is a real contradiction in Jackery's data.
-    """
-    payload = {
-        "device_home_stat_week": {
-            "unit": "kWh",
-            "_request": {
-                "dateType": "week",
-                "beginDate": "2026-04-27",
-                "endDate": "2026-05-03",
-            },
-            "totalOutGridEnergy": "89.08",
-            "x": ["1", "2", "3", "4", "5", "6", "7"],
-            "y2": [15.0, 12.0, 10.0, 11.8, 14.0, 12.0, 14.28],
-        },
-        "device_home_stat_month": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "30.28",
-            "x": list(range(1, 32)),
-            "y2": [15.0, 14.0, 1.28] + [0.0] * 28,
-        },
-        "device_home_stat_year": {
-            "unit": "kWh",
-            "_request": {
-                "dateType": "year",
-                "beginDate": "2026-01-01",
-                "endDate": "2026-12-31",
-            },
-            # Anchor confirming compact: 30.28 in slot[4] -> April=30 + May=28 = 58
-            "totalOutGridEnergy": "58",
-            "x": [str(i) for i in range(1, 13)],
-            "y2": [0.0, 0.0, 0.0, 0.0, 30.28, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
-
-    assert [warning.reason for warning in warnings] == ["year_less_than_week"]
-    assert warnings[0].source_section == "device_home_stat_year"
-    assert warnings[0].source_value == 58.0  # ruff: ignore[float-equality-comparison]
-    assert warnings[0].reference_section == "device_home_stat_week"
-    assert warnings[0].reference_value == 89.08  # ruff: ignore[float-equality-comparison]
-    assert warnings[0].source_request == {
-        "dateType": "year",
-        "beginDate": "2026-01-01",
-        "endDate": "2026-12-31",
-    }
-    assert warnings[0].reference_request == {
-        "dateType": "week",
-        "beginDate": "2026-04-27",
-        "endDate": "2026-05-03",
-    }
-    assert warnings[0].source_chart_series_key == "y2"
-    assert warnings[0].reference_chart_series_key == "y2"
-    assert warnings[0].total_method == "chart_series_sum"
-
-
-def test_app_data_quality_does_not_warn_month_less_than_week_across_month_boundary() -> (
-    None
-):
-    """Implement test app data quality does not warn month less than week across month boundary."""
-    payload = {
-        "device_home_stat_week": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "89.08",
-            "y2": [15.0, 12.0, 10.0, 11.8, 14.0, 12.0, 14.28],
-        },
-        "device_home_stat_month": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "30.28",
-            "y2": [15.0, 14.0, 1.28] + [0.0] * 28,
-        },
-        "device_home_stat_year": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "100.00",
-            "y2": [0.0, 0.0, 0.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
-
-    assert not warnings
-
-
-def test_app_data_quality_warns_when_lifetime_generation_is_lower_than_year() -> None:
-    """Implement test app data quality warns when lifetime generation is lower than year."""
-    payload = {
-        "statistic": {"totalGeneration": "41.31"},
-        "device_pv_stat_year": {
-            "unit": "kWh",
-            "totalSolarEnergy": "126.97",
-            "y": [0.0, 0.0, 0.0, 0.0, 126.97, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    warnings = util.app_data_quality_warnings(payload, today=util.date(2026, 5, 3))
-
-    assert [warning.reason for warning in warnings] == ["lifetime_less_than_year"]
-    assert warnings[0].source_section == "statistic"
-    assert warnings[0].reference_section == "device_pv_stat_year"
-
-
-def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> None:
-    """Implement test data quality warnings are normalized and formatted for repairs."""
-    warning_a = util.AppDataQualityWarning(
-        level="warning",
-        reason="year_less_than_week",
-        metric_key="device_ongrid_output_energy",
-        label="Device grid-side output energy",
-        source_section="device_home_stat_year",
-        source_value=30.28,
-        reference_section="device_home_stat_week",
-        reference_value=89.08,
-    ).as_dict()
-    warning_b = dict(warning_a)
-    warning_c = util.AppDataQualityWarning(
-        level="warning",
-        reason="lifetime_less_than_year",
-        metric_key="pv_energy",
-        label="PV energy",
-        source_section="statistic",
-        source_value=41.31,
-        reference_section="device_pv_stat_year",
-        reference_value=126.97,
-    ).as_dict()
-
-    normalized = util.normalized_data_quality_warnings([
-        warning_b,
-        warning_c,
-        warning_a,
-    ])
-
-    assert normalized == [warning_c, warning_a]
-    assert util.format_data_quality_warning(normalized[0]) == (
-        "PV energy: statistic=41.31 < device_pv_stat_year=126.97"
-    )
-    assert util.format_data_quality_warning(normalized[1]) == (
-        "Device grid-side output energy: device_home_stat_year=30.28 "
-        "< device_home_stat_week=89.08"
-    )
-
-
-def test_data_quality_warning_format_includes_request_ranges_when_available() -> None:
-    """Implement test data quality warning format includes request ranges when available."""
-    warning = util.AppDataQualityWarning(
-        level="warning",
-        reason="year_less_than_week",
-        metric_key="device_ongrid_output_energy",
-        label="Device grid-side output energy",
-        source_section="device_home_stat_year",
-        source_value=40.45,
-        reference_section="device_home_stat_week",
-        reference_value=99.25,
-        source_request={
-            "dateType": "year",
-            "beginDate": "2026-01-01",
-            "endDate": "2026-12-31",
-        },
-        reference_request={
-            "dateType": "week",
-            "beginDate": "2026-04-27",
-            "endDate": "2026-05-03",
-        },
-        source_chart_series_key="y2",
-        reference_chart_series_key="y2",
-        total_method="chart_series_sum",
-    ).as_dict()
-
-    assert warning["source_request"] == {
-        "dateType": "year",
-        "beginDate": "2026-01-01",
-        "endDate": "2026-12-31",
-    }
-    assert warning["reference_request"] == {
-        "dateType": "week",
-        "beginDate": "2026-04-27",
-        "endDate": "2026-05-03",
-    }
-    assert warning["source_chart_series_key"] == "y2"
-    assert warning["reference_chart_series_key"] == "y2"
-    assert warning["total_method"] == "chart_series_sum"
-    assert util.format_data_quality_warning(warning) == (
-        "Device grid-side output energy: device_home_stat_year=40.45 "
-        "< device_home_stat_week=99.25 "
-        "[device_home_stat_year: year 2026-01-01..2026-12-31; "
-        "device_home_stat_week: week 2026-04-27..2026-05-03]"
-    )
-
-
 def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> None:
     """May-only cloud year values are guarded by explicit monthly app payloads."""
-    payload = {
+    payload: dict[str, Any] = {
         "price": {"singlePrice": "0.28"},
         "statistic": {
             "totalGeneration": "85.57",
@@ -1458,7 +1303,6 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
     }
 
     util.apply_year_month_backfill(payload, month_history)
-    util.guard_statistic_totals_from_year(payload)
 
     year = payload["device_pv_stat_year"]
     assert year["totalSolarEnergy"] == 228.02  # ruff: ignore[float-equality-comparison]
@@ -1483,33 +1327,17 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         "series_key": "y",
         "months": [4, 5],
     }
-    assert payload["statistic"]["totalGeneration"] == 228.02  # ruff: ignore[float-equality-comparison]
+    # Chart backfill repairs only the explicit period payload. It must not
+    # rewrite the independent lifetime KPI or synthesize savings metadata.
+    assert payload["statistic"]["totalGeneration"] == "85.57"
     assert payload["statistic"]["totalRevenue"] == "23.96"
-    assert payload["statistic"]["totalCarbon"] == 227.33  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.72  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 166.86  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_savings_calculation"]["source_energy"] == {
-        "pv_year_kwh": 228.02,
-        "device_grid_side_input_year_kwh": 0.11,
-        "device_grid_side_output_year_kwh": 166.97,
-        "device_grid_side_net_output_year_kwh": 166.86,
-        "savings_basis_ac_year_kwh": 166.86,
-        "home_consumption_year_kwh": 166.97,
-        "ct_public_export_year_kwh": 0.0,
-        "ct_public_export_year_kwh_present": False,
-        "battery_charge_year_kwh": 68.01,
-        "battery_discharge_year_kwh": 54.53,
-        "battery_charge_discharge_gap_kwh": 13.48,
-        "conversion_loss_year_kwh": 47.68,
-        "conversion_loss_year_kwh_signed": 47.68,
-        "pv_residual_after_self_consumption_year_kwh": 61.16,
-        "pv_not_savings_ac_energy_kwh": 61.16,
-    }
+    assert payload["statistic"]["totalCarbon"] == "85.31"
+    assert "_savings_calculation" not in payload["statistic"]
 
 
 def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
     """Correct future cloud year payloads must win over partial month history."""
-    payload = {
+    payload: dict[str, Any] = {
         "price": {"singlePrice": "0.28"},
         "statistic": {
             "totalGeneration": "300.00",
@@ -1549,157 +1377,12 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
     }
 
     util.apply_year_month_backfill(payload, month_history)
-    util.guard_statistic_totals_from_year(payload)
 
     assert payload["device_pv_stat_year"]["totalSolarEnergy"] == "228.02"
     assert "_year_month_backfill" not in payload["device_pv_stat_year"]
     assert payload["statistic"]["totalGeneration"] == "300.00"
     assert payload["statistic"]["totalRevenue"] == "84.00"
-    assert (
-        payload["statistic"]["_savings_calculation"]["published_value_source"]
-        == "cloud_total"
-    )
-    assert (
-        # totalGeneration (300) exceeds the current-year PV total (228.02),
-        # so the cloud revenue is a lifetime figure — the refined verdict
-        # names that explicitly.
-        payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_is_lifetime_higher_than_ytd_calculated"
-    )
-    assert "_total_lower_bound_guard" not in payload["statistic"]
-
-
-def test_total_generation_keeps_previous_published_lower_bound() -> None:
-    """A transient cloud regression must not lower the PV Energy source."""
-    payload = {
-        "statistic": {
-            "totalGeneration": "85.57",
-            "totalRevenue": "23.96",
-            "totalCarbon": "85.31",
-        },
-        "device_pv_stat_year": {
-            "unit": "kWh",
-            "totalSolarEnergy": "81.51",
-            "x": [str(i) for i in range(1, 13)],
-            "y": [0.0, 0.0, 0.0, 0.0, 81.51, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    util.guard_statistic_totals_from_year(
-        payload,
-        previous_statistic={"totalGeneration": "228.02"},
-    )
-
-    assert payload["statistic"]["totalGeneration"] == 228.02  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_total_lower_bound_guard"]["corrected"][
-        "totalGeneration"
-    ] == {
-        "raw_total": 85.57,
-        "corrected_total": 228.02,
-        "current_year_total": 81.51,
-        "previous_total": 228.02,
-    }
-
-
-def test_total_generation_keeps_previous_value_when_year_payload_missing() -> None:
-    """Missing year payloads must not make totalGeneration go backwards."""
-    payload = {
-        "statistic": {
-            "totalGeneration": "85.57",
-            "totalRevenue": "23.96",
-            "totalCarbon": "85.31",
-        },
-    }
-
-    util.guard_statistic_totals_from_year(
-        payload,
-        previous_statistic={"totalGeneration": "228.02"},
-    )
-
-    assert payload["statistic"]["totalGeneration"] == 228.02  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_total_lower_bound_guard"]["method"] == (
-        "previous_total_lower_bound"
-    )
-
-
-def test_total_savings_uses_house_side_energy_not_pv_revenue() -> None:
-    """A PV-revenue shaped cloud total is kept raw beside calculated savings."""
-    payload = {
-        "price": {"singlePrice": "0.28"},
-        "statistic": {
-            "totalGeneration": "228.02",
-            "totalRevenue": "63.86",
-            "totalCarbon": "227.33",
-        },
-        "device_pv_stat_year": {
-            "unit": "kWh",
-            "totalSolarEnergy": "228.02",
-            "totalSolarRevenue": "63.86",
-            "x": [str(i) for i in range(1, 13)],
-            "y": [0.0, 0.0, 0.0, 146.51, 81.51, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-        "device_home_stat_year": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "166.97",
-            "x": [str(i) for i in range(1, 13)],
-            "y2": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-        "home_trends_year": {
-            "unit": "kWh",
-            "totalHomeEgy": "166.97",
-            "x": [str(i) for i in range(1, 13)],
-            "y": [0.0, 0.0, 0.0, 107.17, 59.80, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        },
-    }
-
-    util.guard_statistic_totals_from_year(payload)
-
-    assert payload["statistic"]["totalRevenue"] == "63.86"
-    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 46.75  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_savings_calculation"]["would_replace_cloud_total"]
-    assert (
-        payload["statistic"]["_savings_calculation"]["decision"]
-        == "cloud_total_matches_pv_revenue_not_savings"
-    )
-
-
-def test_total_savings_subtracts_ct_export_when_available() -> None:
-    """Public CT export is subtracted before house-consumption bounding."""
-    payload = {
-        "price": {"singlePrice": "0.28"},
-        "statistic": {
-            "totalGeneration": "228.02",
-            "totalRevenue": "63.86",
-            "totalCarbon": "227.33",
-        },
-        "device_pv_stat_year": {
-            "unit": "kWh",
-            "totalSolarEnergy": "228.02",
-            "totalSolarRevenue": "63.86",
-        },
-        "device_home_stat_year": {
-            "unit": "kWh",
-            "totalOutGridEnergy": "180.00",
-        },
-        "device_ct_stat_year": {
-            "unit": "kWh",
-            "totalOutCtEnergy": "20.00",
-        },
-        "home_trends_year": {
-            "unit": "kWh",
-            "totalHomeEgy": "166.97",
-        },
-    }
-
-    util.guard_statistic_totals_from_year(payload)
-
-    assert payload["statistic"]["totalRevenue"] == "63.86"
-    assert payload["statistic"]["_savings_calculation"]["calculated_total"] == 44.8  # ruff: ignore[float-equality-comparison]
-    assert payload["statistic"]["_savings_calculation"]["energy_kwh"] == 160.0  # ruff: ignore[float-equality-comparison]
-    assert (
-        payload["statistic"]["_savings_calculation"]["method"]
-        == "device_grid_side_output_minus_ct_export_bounded_by_home"
-    )
+    assert "_savings_calculation" not in payload["statistic"]
 
 
 def test_safe_int_decimal_strings_and_bad_values() -> None:

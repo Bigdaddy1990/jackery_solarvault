@@ -6,6 +6,7 @@ device-year buckets exactly as the app encodes them.
 """
 
 from datetime import date
+from typing import cast
 
 from custom_components.jackery_solarvault.const import APP_SECTION_PV_STAT
 from custom_components.jackery_solarvault.util import (
@@ -59,7 +60,7 @@ def test_compact_year_parts_rejects_non_finite() -> None:
 
 def test_prefer_raw_year_series_true_for_single_nonzero_pv_snapshot() -> None:
     """A 12-month PV series with one nonzero month matching the total stays raw."""
-    raw = [0.0] * 11 + [42.0]
+    raw = cast("list[float | None]", [0.0] * 11 + [42.0])
 
     assert _prefer_raw_year_series_for_real_payload(
         APP_SECTION_PV_STAT,
@@ -71,7 +72,7 @@ def test_prefer_raw_year_series_true_for_single_nonzero_pv_snapshot() -> None:
 
 def test_prefer_raw_year_series_false_for_non_pv_section() -> None:
     """Only PV year snapshots qualify for the raw-preference shortcut."""
-    raw = [0.0] * 11 + [42.0]
+    raw = cast("list[float | None]", [0.0] * 11 + [42.0])
 
     assert not _prefer_raw_year_series_for_real_payload(
         "device_home_stat",
@@ -89,9 +90,10 @@ def test_prefer_raw_year_series_false_when_short_or_no_total() -> None:
         1.0,
         tolerance=0.01,
     )
+    raw = cast("list[float | None]", [0.0] * 11 + [42.0])
     assert not _prefer_raw_year_series_for_real_payload(
         APP_SECTION_PV_STAT,
-        [0.0] * 11 + [42.0],
+        raw,
         None,
         tolerance=0.01,
     )

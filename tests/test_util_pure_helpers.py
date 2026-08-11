@@ -75,7 +75,10 @@ _FIVE = 5.0
 # ---------------------------------------------------------------------------
 # config-entry option readers
 # ---------------------------------------------------------------------------
-def _entry(options: dict | None = None, data: dict | None = None) -> object:
+def _entry(
+    options: dict[str, object] | None = None,
+    data: dict[str, object] | None = None,
+) -> object:
     """Build a config-entry-like stub with options and legacy data mappings."""
     return SimpleNamespace(options=options or {}, data=data or {})
 
@@ -656,16 +659,35 @@ def test_compact_year_parts() -> None:
 
 
 def test_effective_trend_series_values_normalizes() -> None:
-    """Series values coerce to floats (bad entries become 0.0), rounded to 5dp."""
+    """Series values coerce to floats without inventing zeroes for placeholders."""
     section = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}"
     source = {APP_CHART_SERIES_Y: ["1.5", "bad", 2]}
     assert util.effective_trend_series_values(
         source, section, APP_STAT_TOTAL_SOLAR_ENERGY
-    ) == [1.5, 0.0, 2.0]
+    ) == [1.5, None, 2.0]
     assert (
         util.effective_trend_series_values({}, section, APP_STAT_TOTAL_SOLAR_ENERGY)
         is None
     )
+
+
+def test_effective_device_year_series_preserves_placeholder_positions() -> None:
+    """Year-series disambiguation must not fabricate a zero for bad buckets."""
+    source = {
+        APP_CHART_SERIES_Y: ["bad", 2],
+        APP_STAT_TOTAL_SOLAR_ENERGY: 2,
+        "_request": {
+            "dateType": DATE_TYPE_YEAR,
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
+    }
+
+    assert util.effective_trend_series_values(
+        source,
+        f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
+        APP_STAT_TOTAL_SOLAR_ENERGY,
+    ) == [None, 2.0]
 
 
 def test_effective_period_total_value_scalar() -> None:
@@ -683,7 +705,7 @@ def test_effective_period_total_value_scalar() -> None:
 # ---------------------------------------------------------------------------
 # power flow
 # ---------------------------------------------------------------------------
-def _ct(net: float) -> dict:
+def _ct(net: float) -> dict[str, float | int]:
     """Build a CT payload whose total net power equals ``net`` watts."""
     if net >= 0:
         return {_CT_TOTAL_POS: net, _CT_TOTAL_NEG: 0}
@@ -899,7 +921,7 @@ class _Ent(NamedTuple):
 
 def test_append_unique_entity_dedupes() -> None:
     """Entities append once; duplicate unique ids are skipped."""
-    entities: list = []
+    entities: list[_Ent] = []
     seen: set[str] = set()
     assert util.append_unique_entity(entities, seen, _Ent("u1"))
     assert not util.append_unique_entity(entities, seen, _Ent("u1"))
@@ -909,9 +931,9 @@ def test_append_unique_entity_dedupes() -> None:
 # ---------------------------------------------------------------------------
 # additional cheap pure-branch coverage
 # ---------------------------------------------------------------------------
-def _phase_ct(a: float, b: float, c: float) -> dict:
+def _phase_ct(a: float, b: float, c: float) -> dict[str, float | int]:
     """Build a CT payload with explicit signed per-phase powers."""
-    payload: dict = {}
+    payload: dict[str, float | int] = {}
     for (pos_key, neg_key), value in zip(CT_PHASE_POWER_PAIRS, (a, b, c), strict=True):
         if value >= 0:
             payload[pos_key] = value

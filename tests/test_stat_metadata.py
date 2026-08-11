@@ -253,9 +253,9 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
 
     found: dict[str, tuple[str | None, object | None]] = {}
     for call in _stat_description_calls():
-        key = _const_keyword(call, "key")
-        if isinstance(key, str) and key in expected:
-            found[key] = (
+        call_key = _const_keyword(call, "key")
+        if isinstance(call_key, str) and call_key in expected:
+            found[call_key] = (
                 _state_class_keyword(call),
                 _const_keyword(call, "reset_period"),
             )
@@ -636,7 +636,7 @@ def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
     """Day sensors use today's month/week bucket when the day endpoint is empty."""
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     stat_block = sensor_source.split(
-        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryStatSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
     assert "def _chart_value_for_day" in sensor_source
@@ -688,39 +688,49 @@ def test_statistics_backfill_state_is_persisted_on_demand() -> None:
 
 
 def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
-    """Bounded period/day queues run independently before current imports."""
+    """Bounded HTTP queues run independently from current Recorder imports."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
     import_source = coordinator_source.split(
         "async def _async_import_current_app_chart_statistics_job", 1
     )[1].split(
         "\n    # ------------------------------------------------------------------", 1
     )[0]
+    backfill_source = coordinator_source.split(
+        "async def _async_advance_statistics_backfill", 1
+    )[1].split(
+        "\n    # ------------------------------------------------------------------", 1
+    )[0]
 
-    period_backfill = import_source.index("_async_http_backfill_period_statistics(")
-    day_backfill = import_source.index("_async_http_backfill_recent_day_statistics(")
     current_day_import = import_source.index(
         "_async_import_day_chart_statistics(snapshot)"
     )
     current_period_import = import_source.index("_async_import_app_chart_statistics(")
-    assert period_backfill < day_backfill < current_day_import < current_period_import
+    assert current_day_import < current_period_import
 
-    assert "period_pending = period_backfill_result.get(" in import_source
-    assert "day_pending = backfill_result.get(" in import_source
-    assert "include_current_year=startup_sync" in import_source
-    assert "if startup_sync and period_pending > 0" in import_source
-    assert "else _STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET" in import_source
-    assert "period_pending == 0 and day_pending == 0" in import_source
+    assert "_async_http_backfill_period_statistics(" not in import_source
+    assert "_async_http_backfill_recent_day_statistics(" not in import_source
+
+    day_backfill = backfill_source.index("_async_http_backfill_recent_day_statistics(")
+    period_backfill = backfill_source.index("_async_http_backfill_period_statistics(")
+    assert day_backfill < period_backfill
+
+    assert "period_pending = period_backfill_result.get(" in backfill_source
+    assert "day_pending = backfill_result.get(" in backfill_source
+    assert "include_current_year=startup_sync" in backfill_source
+    assert "else _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS" in backfill_source
+    assert "period_pending == 0 and day_pending == 0" in backfill_source
 
     # The active bounded job must never call the old unbounded repair state.
-    assert "_async_repair_missing_app_chart_statistics(" not in import_source
-    assert "_statistics_repair_from_date(" not in import_source
-    assert "_statistics_rolling_backfill_from_date(" not in import_source
+    combined_current_backfill = import_source + backfill_source
+    assert "_async_repair_missing_app_chart_statistics(" not in combined_current_backfill
+    assert "_statistics_repair_from_date(" not in combined_current_backfill
+    assert "_statistics_rolling_backfill_from_date(" not in combined_current_backfill
     for legacy_state in (
         "_STATISTICS_BACKFILL_LAST_REPAIR",
         "_STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION",
         "_STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION",
     ):
-        assert legacy_state not in import_source
+        assert legacy_state not in combined_current_backfill
 
     # A retained compatibility entry point is safe only when it delegates to
     # the same bounded job instead of reviving the old repair implementation.
@@ -892,13 +902,20 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
     )[1].split(
         "\n    # ------------------------------------------------------------------", 1
     )[0]
+    backfill_job = src.split(
+        "async def _async_advance_statistics_backfill", 1
+    )[1].split(
+        "\n    # ------------------------------------------------------------------", 1
+    )[0]
     assert "_statistics_repair_from_date(device_id, today)" not in import_job
     assert "_statistics_rolling_backfill_from_date(" not in import_job
     assert "_async_repair_missing_app_chart_statistics(" not in import_job
-    assert "_async_http_backfill_period_statistics(" in import_job
-    assert "_async_http_backfill_recent_day_statistics(" in import_job
-    assert import_job.index("_async_http_backfill_period_statistics(") < (
-        import_job.index("_async_http_backfill_recent_day_statistics(")
+    assert "_async_http_backfill_period_statistics(" not in import_job
+    assert "_async_http_backfill_recent_day_statistics(" not in import_job
+    assert "_async_http_backfill_period_statistics(" in backfill_job
+    assert "_async_http_backfill_recent_day_statistics(" in backfill_job
+    assert backfill_job.index("_async_http_backfill_recent_day_statistics(") < (
+        backfill_job.index("_async_http_backfill_period_statistics(")
     )
 
 

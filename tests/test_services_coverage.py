@@ -1,6 +1,6 @@
 """Unit tests for services coverage gaps."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -19,10 +19,19 @@ from .test_services import (  # ruff: ignore[banned-api]
 )
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import HomeAssistant, ServiceCall
 
 
-def test_loaded_coordinators_finds_valid_coordinator(hass: HomeAssistant) -> None:
+def _translation_error(error: ServiceValidationError) -> str:
+    """Return the required error placeholder from a validation error."""
+    placeholders = error.translation_placeholders
+    assert placeholders is not None
+    return placeholders["error"]
+
+
+def test_loaded_coordinators_finds_valid_coordinator(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test _loaded_coordinators yields a valid coordinator from runtime_data."""
     mock_entry = Mock(spec=ConfigEntry)
     mock_entry.domain = DOMAIN
@@ -31,7 +40,11 @@ def test_loaded_coordinators_finds_valid_coordinator(hass: HomeAssistant) -> Non
     coordinator = Mock(spec=services.JackerySolarVaultCoordinator)
     mock_entry.runtime_data = coordinator
 
-    hass.config_entries.async_loaded_entries = Mock(return_value=[mock_entry])
+    monkeypatch.setattr(
+        hass.config_entries,
+        "async_loaded_entries",
+        Mock(return_value=[mock_entry]),
+    )
     assert services._loaded_coordinators(hass) == [coordinator]  # ruff: ignore[private-member-access]
 
 
@@ -57,32 +70,34 @@ def test_rename_name_from_service_rejects_non_string() -> None:
     """Test _rename_name_from_service rejects non-string types."""
     with pytest.raises(ServiceValidationError) as exc:
         services._rename_name_from_service(123, "sys1")  # ruff: ignore[private-member-access]
-    assert "must be text" in exc.value.translation_placeholders["error"]
+    assert "must be text" in _translation_error(exc.value)
 
 
 def test_storm_alert_id_from_service_rejects_non_string() -> None:
     """Test _storm_alert_id_from_service rejects non-string types."""
     with pytest.raises(ServiceValidationError) as exc:
         services._storm_alert_id_from_service(123, "dev1")  # ruff: ignore[private-member-access]
-    assert "must be text" in exc.value.translation_placeholders["error"]
+    assert "must be text" in _translation_error(exc.value)
 
 
 def test_json_native_body_rejects_non_dict_normalization() -> None:
     """Test _json_native_body rejects a string body after normalization."""
     with pytest.raises(ServiceValidationError) as exc:
-        services._json_native_body([1, 2, 3], "dev1")  # ruff: ignore[private-member-access]
-    assert "Expected dict body" in exc.value.translation_placeholders["error"]
+        services._json_native_body(  # ruff: ignore[private-member-access]
+            cast("dict[Any, Any]", [1, 2, 3]), "dev1"
+        )
+    assert "Expected dict body" in _translation_error(exc.value)
 
 
 def test_ble_body_from_service_rejects_invalid_types() -> None:
     """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""
     with pytest.raises(ServiceValidationError) as exc:
         services._ble_body_from_service("[1, 2, 3]", "dev1")  # ruff: ignore[private-member-access]
-    assert "must be an object" in exc.value.translation_placeholders["error"]
+    assert "must be an object" in _translation_error(exc.value)
 
     with pytest.raises(ServiceValidationError) as exc2:
         services._ble_body_from_service(123, "dev1")  # ruff: ignore[private-member-access]
-    assert "must be a mapping or JSON" in exc2.value.translation_placeholders["error"]
+    assert "must be a mapping or JSON" in _translation_error(exc2.value)
 
 
 def test_ble_body_from_service_accepts_valid_string() -> None:
@@ -96,13 +111,13 @@ def test_service_required_text_rejects_invalid() -> None:
         services._service_required_text(  # ruff: ignore[private-member-access]
             123, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "must be text" in exc.value.translation_placeholders["error"]
+    assert "must be text" in _translation_error(exc.value)
 
     with pytest.raises(ServiceValidationError) as exc2:
         services._service_required_text(  # ruff: ignore[private-member-access]
             "a" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "must be at most 10" in exc2.value.translation_placeholders["error"]
+    assert "must be at most 10" in _translation_error(exc2.value)
 
 
 def test_service_float_rejects_invalid() -> None:
@@ -116,7 +131,7 @@ def test_service_float_rejects_invalid() -> None:
             min_value=0,
             max_value=100,
         )
-    assert "must be a number" in exc.value.translation_placeholders["error"]
+    assert "must be a number" in _translation_error(exc.value)
 
     with pytest.raises(ServiceValidationError) as exc2:
         services._service_float(  # ruff: ignore[private-member-access]
@@ -127,7 +142,7 @@ def test_service_float_rejects_invalid() -> None:
             min_value=0,
             max_value=100,
         )
-    assert "must be between 0 and 100" in exc2.value.translation_placeholders["error"]
+    assert "must be between 0 and 100" in _translation_error(exc2.value)
 
     with pytest.raises(ServiceValidationError) as exc3:
         services._service_float(  # ruff: ignore[private-member-access]
@@ -138,19 +153,22 @@ def test_service_float_rejects_invalid() -> None:
             min_value=0,
             max_value=100,
         )
-    assert "must be between 0 and 100" in exc3.value.translation_placeholders["error"]
+    assert "must be between 0 and 100" in _translation_error(exc3.value)
 
 
 async def test_async_handle_get_share_qr_code_success(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test successful QR code share retrieval."""
-    mock_call = _Call(
-        data={
-            SERVICE_FIELD_DEVICE_ID: "jackery_dev1",
-            "qr_code_id": "q1",
-            "user_id": "u1",
-        }
+    mock_call = cast(
+        "ServiceCall",
+        _Call(
+            data={
+                SERVICE_FIELD_DEVICE_ID: "jackery_dev1",
+                "qr_code_id": "q1",
+                "user_id": "u1",
+            }
+        ),
     )
 
     registry = _Registry({"jackery_dev1": _Device({(DOMAIN, "d1")})})
@@ -161,7 +179,7 @@ async def test_async_handle_get_share_qr_code_success(
     from unittest.mock import AsyncMock  # ruff: ignore[import-outside-top-level]
 
     coordinator = _Coordinator(True)
-    coordinator.async_get_share_qr_code = AsyncMock(return_value={})
+    cast(Any, coordinator).async_get_share_qr_code = AsyncMock(return_value={})
 
     def mock_coordinator_for_device(h: HomeAssistant, d: str) -> _Coordinator:
         return coordinator

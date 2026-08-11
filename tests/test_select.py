@@ -1,6 +1,7 @@
 """Unit tests for Jackery select helpers."""
 
 from dataclasses import dataclass
+from typing import Any, cast
 
 from custom_components.jackery_solarvault.const import (
     FIELD_COMPANY_NAME,
@@ -27,7 +28,7 @@ class _Entity:
 
 def test_price_sources_from_payload_filters_invalid_entries() -> None:
     """Only selectable price providers should count as available sources."""
-    payload = {
+    payload: dict[str, object] = {
         PAYLOAD_PRICE_SOURCES: [
             {"name": "missing ids"},
             {FIELD_PLATFORM_COMPANY_ID: "", FIELD_COUNTRY: "DE"},
@@ -53,7 +54,7 @@ def test_price_sources_from_payload_filters_invalid_entries() -> None:
 
 def test_price_provider_helpers_normalize_whitespace() -> None:
     """Current provider matching should ignore harmless whitespace."""
-    source = {
+    source: dict[str, object] = {
         FIELD_PLATFORM_COMPANY_ID: "8",
         FIELD_COUNTRY: "DE, AT",
         FIELD_COMPANY_NAME: "Grid Co",
@@ -62,6 +63,7 @@ def test_price_provider_helpers_normalize_whitespace() -> None:
         _price={FIELD_PLATFORM_COMPANY_ID: " 8 ", FIELD_SYSTEM_REGION: " DE "},
         _payload={PAYLOAD_PRICE_SOURCES: [source]},
     )
+    select_entity = cast("Any", entity)
 
     assert (
         _price_source_label({
@@ -73,8 +75,8 @@ def test_price_provider_helpers_normalize_whitespace() -> None:
         == "Grid Co (DE) #8"
     )
     assert _price_source_matches_current(source, " 8.0 ", " de ")
-    assert _price_mode_dynamic_available(entity)
-    assert _price_provider_current(entity) == "Grid Co (DE, AT) #8"
+    assert _price_mode_dynamic_available(select_entity)
+    assert _price_provider_current(select_entity) == "Grid Co (DE, AT) #8"
 
 
 def test_price_source_label_falls_back_from_blank_company_name() -> None:
@@ -96,10 +98,11 @@ def test_price_provider_current_ignores_blank_company_id() -> None:
         _price={FIELD_PLATFORM_COMPANY_ID: "  ", FIELD_SYSTEM_REGION: "DE"},
         _payload={PAYLOAD_PRICE_SOURCES: []},
     )
+    select_entity = cast("Any", entity)
 
-    assert _price_provider_current(entity) is None
-    assert not _price_mode_dynamic_available(entity)
+    assert _price_provider_current(select_entity) is None
+    assert not _price_mode_dynamic_available(select_entity)
 
     entity._price[FIELD_PLATFORM_COMPANY_ID] = "abc"  # ruff: ignore[private-member-access]
-    assert _price_provider_current(entity) is None
-    assert not _price_mode_dynamic_available(entity)
+    assert _price_provider_current(select_entity) is None
+    assert not _price_mode_dynamic_available(select_entity)

@@ -30,7 +30,6 @@ from custom_components.jackery_solarvault.const import (
     DOMAIN,
     FIELD_DEVICE_SN,
     PAYLOAD_DEVICE,
-    PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_DISCOVERY,
     PAYLOAD_LOCAL_DAILY_ENERGY,
     PAYLOAD_PROPERTIES,
@@ -255,8 +254,7 @@ async def test_day_period_sensor_uses_fresher_integrated_curve_over_lagging_scal
 
     assert state is not None
     assert state.state == "1.0"
-    assert state.attributes["fallback"] == "integrated_current_day_power_curve"
-    assert state.attributes["integrated_power_curve_total"] == pytest.approx(1.0)
+    assert state.attributes["day_power_curve_has_activity"] is True
 
 
 async def test_day_period_sensor_stays_unknown_without_todays_bucket(
@@ -291,11 +289,11 @@ async def test_day_period_sensor_stays_unknown_without_todays_bucket(
     assert state.state == "unknown"
 
 
-async def test_day_period_sensor_ignores_raw_lifetime_wh_fallback(
+async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """A lifetime Wh counter must never become a daily kWh entity state."""
+    """A raw lifetime counter must never become a daily kWh entity state."""
     entry = night_setup
     coordinator = entry.runtime_data
     payload = _night_payload(hass)
@@ -308,7 +306,7 @@ async def test_day_period_sensor_ignores_raw_lifetime_wh_fallback(
             APP_REQUEST_END_DATE: today.isoformat(),
         },
     }
-    payload[_DEVICE_ID][PAYLOAD_DEVICE_STATISTIC] = {
+    payload[_DEVICE_ID][PAYLOAD_PROPERTIES] = {
         APP_DEVICE_STAT_PV_ENERGY: 174_597.0,
     }
     coordinator.async_set_updated_data(payload)
@@ -325,7 +323,7 @@ async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """The persisted daily Wh delta is divided by 1000 before publication."""
+    """The persisted Jackery 0.01 kWh delta is normalized before publication."""
     entry = night_setup
     coordinator = entry.runtime_data
     payload = _night_payload(hass)
@@ -338,7 +336,7 @@ async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
             APP_REQUEST_END_DATE: today.isoformat(),
         },
     }
-    payload[_DEVICE_ID][PAYLOAD_DEVICE_STATISTIC] = {
+    payload[_DEVICE_ID][PAYLOAD_PROPERTIES] = {
         APP_DEVICE_STAT_PV_ENERGY: 174_597.0,
     }
     payload[_DEVICE_ID][PAYLOAD_LOCAL_DAILY_ENERGY] = {
@@ -351,5 +349,5 @@ async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "3.58"
+    assert state.state == "35.8"
     assert state.attributes["fallback"] == "local_lifetime_delta"

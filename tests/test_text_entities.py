@@ -128,7 +128,7 @@ async def test_home_device_name_uses_explicit_diy_http_setter() -> None:
         "New Device",
     )
     entity.coordinator.async_set_device_nickname.assert_not_awaited()
-    entity.async_write_ha_state.assert_called_once()
+    cast("MagicMock", entity.async_write_ha_state).assert_called_once()
 
 
 async def test_portable_device_name_uses_explicit_bind_nickname_setter() -> None:
@@ -172,7 +172,7 @@ async def test_system_name_set_trims_and_forwards() -> None:
         "sys-1",
         "New Name",
     )
-    entity.async_write_ha_state.assert_called_once()
+    cast("MagicMock", entity.async_write_ha_state).assert_called_once()
 
 
 async def test_system_name_missing_id_raises() -> None:
@@ -257,7 +257,7 @@ async def test_setup_entry_creates_home_text_family() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     assert f"{_DEVICE_ID}_device_name" in unique_ids
@@ -279,7 +279,7 @@ async def test_setup_entry_without_advanced_skips_third_party_fields() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     assert f"{_DEVICE_ID}_system_name" in unique_ids
@@ -330,7 +330,7 @@ async def test_pv_name_set_trims_and_forwards_index_and_name() -> None:
         index=2,
         name="Carport",
     )
-    entity.async_write_ha_state.assert_called_once()
+    cast("MagicMock", entity.async_write_ha_state).assert_called_once()
 
 
 async def test_pv_name_empty_value_raises() -> None:
@@ -394,7 +394,7 @@ async def test_setup_entry_creates_pv_name_only_for_present_channels() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     assert f"{_DEVICE_ID}_pv1_name" in unique_ids
@@ -417,7 +417,7 @@ async def test_setup_entry_portable_skips_pv_name() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     assert f"{_DEVICE_ID}_device_name" in unique_ids

@@ -2,7 +2,7 @@
 
 from collections import Counter
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -109,7 +109,7 @@ async def _setup_grid_standard_entities(
     )
     added: list[Any] = []
 
-    await sensor_module.async_setup_entry(None, entry, added.extend)
+    await cast("Any", sensor_module.async_setup_entry)(None, entry, added.extend)
     return added
 
 

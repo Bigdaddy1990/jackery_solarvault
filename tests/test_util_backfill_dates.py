@@ -77,7 +77,7 @@ def test_historical_payload_maps_home_trends_section() -> None:
 # --- filter_completed_app_points -----------------------------------------
 
 
-def _pt(day: date | datetime) -> SimpleNamespace:
+def _pt(day: object) -> SimpleNamespace:
     return SimpleNamespace(start_date=day)
 
 

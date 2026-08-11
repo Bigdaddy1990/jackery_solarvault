@@ -311,7 +311,7 @@ async def test_setup_entry_creates_gated_home_numbers() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     keys = {ent.entity_description.key for ent in added}
     assert "soc_charge_limit_set" in keys
@@ -332,7 +332,7 @@ async def test_setup_entry_creates_portable_family_for_legacy_device() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     keys = {ent.entity_description.key for ent in added}
     assert keys

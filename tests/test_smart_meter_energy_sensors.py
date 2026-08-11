@@ -7,6 +7,8 @@ non-native meters. Without dedicated energy sensors the smart meter had no kWh
 values at all.
 """
 
+from typing import Any, cast
+
 from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
@@ -16,8 +18,10 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy
 
 
-def _by_key(key: str) -> object:
-    return next(d for d in SMART_METER_SENSOR_DESCRIPTIONS if d.key == key)
+def _by_key(key: str) -> Any:
+    return cast(
+        "Any", next(d for d in SMART_METER_SENSOR_DESCRIPTIONS if d.key == key)
+    )
 
 
 def test_grid_import_energy_reads_total_phase_energy() -> None:

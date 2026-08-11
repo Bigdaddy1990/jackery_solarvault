@@ -1,5 +1,7 @@
 """Unit tests for coordinator price writer behavior."""
 
+from typing import Any, cast
+
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -67,7 +69,8 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
     """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.api = _RejectingPriceApi()
+    obj = cast("Any", coordinator)
+    obj.api = _RejectingPriceApi()
     coordinator.data = {
         "dev1": {
             # Price setters are Home/System-only; the system-id context marks
@@ -97,7 +100,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         """
         raise AssertionError("rejected writer must not patch local price data")
 
-    coordinator._push_partial_update = _fail_push  # ruff: ignore[private-member-access]
+    obj._push_partial_update = _fail_push  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -169,12 +172,16 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
     """Dynamic tariff writes should send normalized provider fields."""
     api = _AcceptingPriceApi()
     coordinator = _coordinator()
-    coordinator.api = api
+    cast("Any", coordinator).api = api
     coordinator.data["dev1"][PAYLOAD_PRICE] = {
         FIELD_PLATFORM_COMPANY_ID: " 8.0 ",
         FIELD_SYSTEM_REGION: " DE ",
     }
-    coordinator._push_partial_update = lambda data: setattr(coordinator, "data", data)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._push_partial_update = lambda data: setattr(  # ruff: ignore[private-member-access]
+        coordinator,
+        "data",
+        data,
+    )
 
     await coordinator.async_set_price_mode_dynamic("dev1")
 
@@ -188,8 +195,12 @@ async def test_price_source_write_normalizes_blank_company_name() -> None:
     """Selected provider metadata should use the first nonblank name."""
     api = _AcceptingPriceApi()
     coordinator = _coordinator()
-    coordinator.api = api
-    coordinator._push_partial_update = lambda data: setattr(coordinator, "data", data)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator).api = api
+    cast("Any", coordinator)._push_partial_update = lambda data: setattr(  # ruff: ignore[private-member-access]
+        coordinator,
+        "data",
+        data,
+    )
 
     await coordinator.async_set_price_source(
         "dev1",

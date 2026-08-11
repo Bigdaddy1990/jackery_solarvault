@@ -297,7 +297,7 @@ async def test_setup_entry_gates_home_switches_and_smart_plug() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     assert f"{_DEVICE_ID}_eps_output" in unique_ids
@@ -317,7 +317,7 @@ async def test_setup_entry_registers_eps_from_advanced_capability() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     assert f"{_DEVICE_ID}_eps_output" in {ent.unique_id for ent in added}
 
@@ -334,7 +334,7 @@ async def test_setup_entry_registers_eps_without_optional_transport_snapshot() -
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     assert f"{_DEVICE_ID}_eps_output" in {ent.unique_id for ent in added}
 
@@ -359,7 +359,7 @@ async def test_setup_entry_registers_home_and_plug_switches_from_discovery() -> 
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     unique_ids = {ent.unique_id for ent in added}
     for description in SWITCH_DESCRIPTIONS:
@@ -382,7 +382,7 @@ async def test_setup_entry_creates_portable_switch_family() -> None:
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []
 
-    await async_setup_entry(None, entry, added.extend)
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
 
     keys = {ent.entity_description.key for ent in added}
     assert keys
