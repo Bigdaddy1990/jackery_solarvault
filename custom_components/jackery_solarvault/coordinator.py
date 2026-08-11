@@ -14,7 +14,7 @@ import asyncio  # ruff:ignore[unsorted-imports]
 import base64
 import binascii
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Coroutine, Mapping
 import contextlib
 import copy
 from dataclasses import dataclass, field as dataclass_field
@@ -44,6 +44,7 @@ from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
     statistics_during_period,
 )
+from homeassistant.components.recorder.tasks import SynchronizeTask
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import CoreState, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -70,6 +71,8 @@ from .client.local_daily_cache import (
     async_save_daily_cache,
     daily_delta,
     local_daily_signature,
+    period_delta,
+    record_latest_deltas,
     refresh_snapshot,
 )
 from .client.local_mqtt import JackeryLocalMqttClient
@@ -79,7 +82,7 @@ from .client.mqtt_session_cache import (
 from .client.third_party_mqtt_codec import (
     decode_third_party_mqtt_config_body,
     encode_third_party_mqtt_field,
-    resolve_third_party_mqtt_token,
+    stable_third_party_mqtt_token,
     third_party_mqtt_config_plaintext,
 )
 from .const import (
@@ -169,6 +172,11 @@ from .const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_TODAY_BATTERY_ENERGY,
+    APP_STAT_TODAY_GRID_IMPORT_ENERGY,
+    APP_STAT_TODAY_HOME_LOAD_ENERGY,
+    APP_STAT_TODAY_SOLAR_ENERGY,
+    APP_TODAY_ENERGY_SOURCE_META,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
@@ -217,6 +225,7 @@ from .const import (
     DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DIAGNOSTICS_SCHEMA_VERSION,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DISCOVERY_SOURCE_SYSTEM_LIST,
@@ -379,6 +388,8 @@ from .const import (
     FIELD_WORK_MODEL,
     FIELD_WPC,
     FIELD_WPS,
+    CT_LIVE_ENERGY_UNITS_PER_KWH,
+    JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
     LOCAL_DAILY_LIFETIME_METRICS,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_RUNTIME_KEY,
@@ -476,6 +487,7 @@ from .const import (
     PAYLOAD_HOME_TRENDS,
     PAYLOAD_HTTP_PROPERTIES,
     PAYLOAD_LOCAL_DAILY_ENERGY,
+    PAYLOAD_VERIFIED_DAY_STATISTICS,
     PAYLOAD_LOCATION,
     PAYLOAD_METER_HEADS,
     PAYLOAD_MQTT_CONNECT_INFO,
@@ -544,7 +556,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine, Sequence
+    from collections.abc import Awaitable, Sequence
     from datetime import tzinfo
 
     from homeassistant.config_entries import ConfigEntry
@@ -839,7 +851,7 @@ def _normalize_backfill_status(
     """Map legacy/transient cache values onto the durable state contract."""
     try:
         status = BackfillStatus(str(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         if value in {
             "auth_error",
             "deferred",
@@ -1079,6 +1091,7 @@ class MqttConnectionManager:
         self.last_connect_attempt: float = 0.0
         self.paused_until_monotonic: float = 0.0
         self.app_conflict_pause_cycles: int = 0
+        self.auth_failure_message: str | None = None
         self.backoff_until_monotonic: float = 0.0
         self.backoff_step: int = -1
         self.backoff_signature: str | None = None
@@ -1186,6 +1199,7 @@ class MqttConnectionManager:
         now = time.monotonic()
         if self.paused_until_monotonic > now:
             return
+        self.auth_failure_message = str(message or "unknown")
         self.app_conflict_pause_cycles += 1
         self.paused_until_monotonic = now + MQTT_APP_CONFLICT_PAUSE_SEC
         # First pause cycle of an incident is actionable (shared account /
@@ -1311,6 +1325,7 @@ class MqttConnectionManager:
             self.clear_connect_backoff()
             self.paused_until_monotonic = 0.0
             self.app_conflict_pause_cycles = 0
+            self.auth_failure_message = None
 
     def handle_connect_error(
         self,
@@ -2181,7 +2196,7 @@ def subdevice_dev_type(
     if raw_device_type is not None and raw_device_type != "":
         try:
             return int(str(raw_device_type))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
     resolved_type = SUBDEVICE_SCAN_NAME_DEV_TYPES.get(scan_name)
@@ -2420,7 +2435,7 @@ def battery_packs_need_query(
             if rejection_callback is not None:
                 rejection_callback("battery_pack_bat_num_type_error")
             expected = 0
-        except ValueError, OverflowError:
+        except (ValueError, OverflowError):
             if rejection_callback is not None:
                 rejection_callback("battery_pack_bat_num_value_error")
             expected = 0
@@ -3288,10 +3303,18 @@ _STATISTICS_HTTP_TRANSIENT_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 # so empty high-priority periods cannot starve independent year/week/day queues.
 _STATISTICS_HTTP_EMPTY_RETRY_SEC = _ENDPOINT_BACKOFF_DELAYS_SEC[-1]
 _STATISTICS_HTTP_RETRY_AFTER_EPOCH = "retry_after_epoch"
+_STATISTICS_HTTP_VERIFIED_TOTALS = "verified_totals"
+_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY = "sum_chain_version"
+_STATISTICS_HTTP_SUM_CHAIN_VERSION = 1
 _STATISTICS_IMPORT_THROTTLE_SEC = 300
 _STATISTICS_IMPORT_STATE_TOLERANCE = 1e-4
+_STATISTICS_RECORDER_VERIFICATION_TIMEOUT_SEC = 10.0
+_STATISTICS_RECORDER_VERIFICATION_POLL_SEC = 0.1
 _LOCAL_MQTT_CONFIG_RETRY_DELAYS_SEC = (15.0, 60.0)
 _THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC = 15.0
+_THIRD_PARTY_MQTT_READBACK_ATTEMPTS = 3
+_THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC = 5.0
+_THIRD_PARTY_MQTT_READBACK_RETRY_DELAY_SEC = 1.0
 _ACCESSORY_IDENTITY_FIELDS: Final[frozenset[str]] = frozenset({
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,
@@ -3484,6 +3507,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         FIELD_SW_EPS_OUT_PW,
         FIELD_SW_EPS,
         FIELD_SW_EPS_STATE,
+        FIELD_WORK_MODEL,
     })
     # devType -> coordinator live bucket holding that accessory's telemetry.
     # AGENTS.md HTTP-primary: the shadow fallback fills these buckets when the
@@ -3693,8 +3717,27 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._local_mqtt_last_message_monotonic: float = float("-inf")
         self._local_mqtt_last_device_message_monotonic: dict[str, float] = {}
         self._local_mqtt_config_retry_pending = False
+        self._generated_third_party_mqtt_token: str | None = None
         self._local_mqtt_config_applied_signature: (
-            tuple[str, int, str, str, str, tuple[str, ...]] | None
+            tuple[
+                str,
+                int,
+                str,
+                str,
+                tuple[tuple[str, str], ...],
+                tuple[str, ...],
+            ]
+            | None
+        ) = None
+        # The entry runtime owns the direct broker client.  A confirmed 3047
+        # readback invokes this narrow callback so that runtime can reconcile
+        # its listener without coupling the coordinator to ``__init__`` or
+        # reloading (and therefore pausing) the HTTP coordinator.
+        self._local_mqtt_config_observer: Callable[[dict[str, Any]], None] | None = (
+            None
+        )
+        self._device_registry_observer: (
+            Callable[[Mapping[str, dict[str, Any]]], None] | None
         ) = None
         self._third_party_mqtt_config_waiters: dict[
             str,
@@ -4507,7 +4550,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Pause MQTT after a broker auth rejection while HTTP keeps polling."""
         self.rejection_metrics.increment("mqtt_broker_rejections", str(message))
-        self.api.invalidate_mqtt_session_for_http_refresh()
         self._mqtt_mgr.fingerprint = None
         self._mqtt_mgr.pause_after_auth_failure(message, streak=streak)
 
@@ -4678,17 +4720,27 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _synchronize_mqtt_session_generation(self) -> int:
         """Synchronize session state with the MQTT client's ownership counter."""
+        mqtt = getattr(self, "_mqtt", None)
+        current_generation = getattr(self, "_mqtt_session_generation", 0)
         generation = (
-            self._mqtt.session_generation
-            if self._mqtt is not None
-            else self._mqtt_session_generation
+            mqtt.session_generation
+            if mqtt is not None
+            else current_generation
         )
-        if generation == self._mqtt_session_generation:
+        if not hasattr(self, "_mqtt_session_generation"):
+            self._mqtt_session_generation = generation
+        if generation == current_generation:
             return generation
         self._mqtt_session_generation = generation
+        if not hasattr(self, "_mqtt_session_actions_seen"):
+            self._mqtt_session_actions_seen = set()
         self._mqtt_session_actions_seen.clear()
         self._mqtt_birth_snapshot_pending = True
+        if not hasattr(self, "_cloud_mqtt_command_failures"):
+            self._cloud_mqtt_command_failures = {}
         self._cloud_mqtt_command_failures.clear()
+        if not hasattr(self, "_cloud_mqtt_command_attempts"):
+            self._cloud_mqtt_command_attempts = {}
         self._cloud_mqtt_command_attempts.clear()
         return generation
 
@@ -5140,7 +5192,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # JSON-Validierung
             try:
                 json.dumps(body)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 _LOGGER.exception(
                     "Invalid JSON in BLE command body for device %s", device_id
                 )
@@ -6454,7 +6506,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return None
         try:
             key = base64.b64decode(str(raw))
-        except ValueError, binascii.Error:
+        except (ValueError, binascii.Error):
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -6581,6 +6633,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         interval = getattr(self, "_configured_update_interval", timedelta(seconds=15))
         return max(60.0, interval.total_seconds() * 2)
 
+    @staticmethod
+    def _property_update_was_accepted(
+        accepted: Mapping[str, Any],
+        key: str,
+        value: Any,
+    ) -> bool:
+        """Return whether an incoming scalar or sparse mapping reached the merge."""
+        accepted_value = accepted.get(key)
+        if isinstance(value, Mapping):
+            return isinstance(accepted_value, Mapping) and all(
+                accepted_value.get(nested_key) == nested_value
+                for nested_key, nested_value in value.items()
+            )
+        return bool(accepted_value == value)
+
     def _property_updates_for_source(
         self,
         device_id: str,
@@ -6601,12 +6668,28 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         device_state = source_state.setdefault(device_id, {})
         now = time.monotonic()
         current_values: dict[str, Any] = dict(base) if isinstance(base, Mapping) else {}
+        live_updates = {
+            key: value
+            for key, value in clean.items()
+            if key in self._MAIN_LIVE_PROPERTY_KEYS
+        }
+        non_live_updates = {
+            key: value
+            for key, value in clean.items()
+            if key not in self._MAIN_LIVE_PROPERTY_KEYS
+        }
+
+        # Only live telemetry receives the short Layer-5-over-HTTP freshness
+        # preference. Static/configuration properties must remain replaceable
+        # by the authoritative HTTP snapshot even when an MQTT frame arrived
+        # moments earlier. This keeps the live overlay independent without
+        # allowing it to freeze unrelated HTTP configuration fields.
         result = ingest_observation(
             Observation(
                 source=source,
                 device_id=device_id,
                 section=PAYLOAD_PROPERTIES,
-                payload=clean,
+                payload=live_updates,
                 received_at_monotonic=now,
             ),
             current=current_values,
@@ -6614,6 +6697,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             received_at_monotonic=now,
             freshness_window_seconds=self._transport_source_freshness_window(),
         )
+        if non_live_updates:
+            result = ingest_observation(
+                Observation(
+                    source=source,
+                    device_id=device_id,
+                    section=PAYLOAD_PROPERTIES,
+                    payload=non_live_updates,
+                    received_at_monotonic=now,
+                ),
+                current=result.payload,
+                provenance=result.provenance,
+                received_at_monotonic=now,
+                freshness_window_seconds=0.0,
+            )
         source_state[device_id] = result.provenance
         return result.payload
 
@@ -6682,7 +6779,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             base=base,
         )
         if source is not TransportSource.HTTP:
-            self._note_property_equivalent_push(device_id, accepted)
+            incoming_live_updates = {
+                key: value
+                for key, value in self._sanitize_main_properties(updates).items()
+                if key in self._MAIN_LIVE_PROPERTY_KEYS
+                and self._property_value_present(value)
+                and self._property_update_was_accepted(accepted, key, value)
+            }
+            self._note_property_equivalent_push(device_id, incoming_live_updates)
         merged = self._merge_main_properties(base, accepted)
         overrides = self._active_property_overrides(device_id)
         if not overrides:
@@ -7449,6 +7553,133 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return the normalized payload key for documented app period sections."""
         return _app_period_section_fn(prefix, date_type)
 
+    @staticmethod
+    def _reconcile_compact_today_local_energy(
+        entry: dict[str, Any],
+        compact: dict[str, Any],
+        provenance: dict[str, Any],
+    ) -> bool:
+        """Apply documented local lifetime-delta fallbacks to compact totals."""
+        local_source = entry.get(PAYLOAD_LOCAL_DAILY_ENERGY)
+        local = local_source if isinstance(local_source, dict) else {}
+        changed = False
+        for compact_key, local_key in (
+            (APP_STAT_TODAY_SOLAR_ENERGY, APP_DEVICE_STAT_PV_ENERGY),
+            (APP_STAT_TODAY_GRID_IMPORT_ENERGY, APP_DEVICE_STAT_ONGRID_INPUT),
+            (APP_STAT_TODAY_BATTERY_ENERGY, APP_DEVICE_STAT_BATTERY_DISCHARGE),
+        ):
+            local_units = safe_float(local.get(local_key))
+            candidate = (
+                None
+                if local_units is None
+                else local_units / JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+            )
+            current = safe_float(compact.get(compact_key))
+            if candidate is not None and candidate > 0 and (
+                current is None or candidate > current
+            ):
+                compact[compact_key] = candidate
+                provenance[compact_key] = {
+                    "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                    "source_key": local_key,
+                    "fallback": "local_lifetime_delta",
+                }
+                changed = True
+        return changed
+
+    @staticmethod
+    def _reconcile_compact_today_home_energy(
+        entry: dict[str, Any],
+        compact: dict[str, Any],
+        provenance: dict[str, Any],
+        *,
+        today: date,
+    ) -> bool:
+        """Apply documented HTTP day/month home-trend fallbacks."""
+        changed = False
+        home_source = entry.get(PAYLOAD_HOME_TRENDS)
+        home_candidate = (
+            safe_float(home_source.get(APP_STAT_TOTAL_HOME_ENERGY))
+            if isinstance(home_source, dict)
+            else None
+        )
+        current = safe_float(compact.get(APP_STAT_TODAY_HOME_LOAD_ENERGY))
+        if home_candidate is not None and home_candidate > 0 and (
+            current is None or home_candidate > current
+        ):
+            compact[APP_STAT_TODAY_HOME_LOAD_ENERGY] = home_candidate
+            provenance[APP_STAT_TODAY_HOME_LOAD_ENERGY] = {
+                "source_section": PAYLOAD_HOME_TRENDS,
+                "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+                "fallback": "documented_http_fallback",
+            }
+            changed = True
+
+        month_section = _app_period_section_fn(APP_SECTION_HOME_TRENDS, DATE_TYPE_MONTH)
+        month_source = entry.get(month_section)
+        month_candidate = next(
+            (
+                point.value
+                for point in trend_series_points(
+                    month_source if isinstance(month_source, dict) else {},
+                    month_section,
+                    APP_STAT_TOTAL_HOME_ENERGY,
+                    today=today,
+                )
+                if point.start_date == today
+            ),
+            None,
+        )
+        current = safe_float(compact.get(APP_STAT_TODAY_HOME_LOAD_ENERGY))
+        if month_candidate is not None and month_candidate > 0 and (
+            current is None or month_candidate > current
+        ):
+            compact[APP_STAT_TODAY_HOME_LOAD_ENERGY] = month_candidate
+            provenance[APP_STAT_TODAY_HOME_LOAD_ENERGY] = {
+                "source_section": month_section,
+                "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+                "fallback": "current_month_bucket",
+            }
+            changed = True
+        return changed
+
+    @staticmethod
+    def _reconcile_compact_today_energy(
+        entry: dict[str, Any],
+        *,
+        today: date,
+    ) -> None:
+        """Replace lagging compact-day scalars with documented positive fallbacks.
+
+        App 2.4.0 can return zero placeholders from ``device/stat/today`` while
+        its same-cycle trend or lifetime-delta DTO already contains the current
+        day total. ``SENSOR_SOURCE_PATHS.md`` maps ``dh`` to the HTTP day/month
+        home trends and maps ``ds``/``dg``/``de`` to the corresponding local
+        lifetime-counter deltas. Only a strictly greater, positive candidate is
+        accepted, so an uncorroborated zero never becomes observed energy and a
+        fresher compact scalar is never reduced.
+        """
+        compact_source = entry.get(APP_SECTION_TODAY_ENERGY)
+        compact = dict(compact_source) if isinstance(compact_source, dict) else {}
+        provenance_source = compact.get(APP_TODAY_ENERGY_SOURCE_META)
+        provenance = (
+            dict(provenance_source) if isinstance(provenance_source, dict) else {}
+        )
+        changed = JackerySolarVaultCoordinator._reconcile_compact_today_local_energy(
+            entry,
+            compact,
+            provenance,
+        )
+        changed |= JackerySolarVaultCoordinator._reconcile_compact_today_home_energy(
+            entry,
+            compact,
+            provenance,
+            today=today,
+        )
+        if changed:
+            compact[APP_TODAY_ENERGY_SOURCE_META] = provenance
+            entry[APP_SECTION_TODAY_ENERGY] = compact
+
     def _needs_year_month_backfill(
         self,
         payload: dict[str, Any],
@@ -7690,6 +7921,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _endpoint_backoff_active(self, key: str, now_monotonic: float) -> bool:
         """Return True when the endpoint key is currently in backoff."""
+        if self._endpoint_backoff_is_energy_key(key):
+            return False
         state = self._endpoint_backoff.get(key)
         if not isinstance(state, dict):
             return False
@@ -7700,7 +7933,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Return the number of slow HTTP endpoint keys currently in backoff."""
         now = time.monotonic() if now_monotonic is None else now_monotonic
         active_count = 0
-        for state in self._endpoint_backoff.values():
+        for key, state in self._endpoint_backoff.items():
+            if self._endpoint_backoff_is_energy_key(key):
+                continue
             until = safe_float(state.get("until")) or 0.0
             if until > now:
                 active_count += 1
@@ -7746,7 +7981,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 code = None
         if code is None or code not in _ENDPOINT_BACKOFF_CODES:
             return False
@@ -7835,6 +8070,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         now_monotonic = time.monotonic()
         active: dict[str, dict[str, int]] = {}
         for key, state in self._endpoint_backoff.items():
+            if self._endpoint_backoff_is_energy_key(key):
+                continue
             until = safe_float(state.get("until")) or 0.0
             remaining_raw = until - now_monotonic
             if remaining_raw <= 0:
@@ -7862,6 +8099,19 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         AGENTS.md §1.2: local transports are preferred for live values.
         """
         merged = merge_present_dict_values(current, incoming)
+        incoming_verified_days = incoming.get(PAYLOAD_VERIFIED_DAY_STATISTICS)
+        if isinstance(incoming_verified_days, dict):
+            # This section is already a complete, current-week-bounded view.
+            # Replacing it prevents recursive partial merging from retaining
+            # dates from a previous week indefinitely.
+            merged[PAYLOAD_VERIFIED_DAY_STATISTICS] = copy.deepcopy(
+                incoming_verified_days,
+            )
+        merged_verified_days = merged.get(PAYLOAD_VERIFIED_DAY_STATISTICS)
+        if isinstance(merged_verified_days, dict):
+            merged[PAYLOAD_VERIFIED_DAY_STATISTICS] = (
+                self._current_week_verified_day_statistics(merged_verified_days)
+            )
         current_props = current.get(PAYLOAD_PROPERTIES)
         incoming_props = incoming.get(PAYLOAD_PROPERTIES)
         current_http_props = current.get(PAYLOAD_HTTP_PROPERTIES)
@@ -7911,6 +8161,28 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             guarded_props = self._merge_main_properties(guarded_props, overrides)
         merged[PAYLOAD_PROPERTIES] = guarded_props
         return merged
+
+    def _current_week_verified_day_statistics(
+        self,
+        value: object,
+    ) -> dict[str, Any]:
+        """Return only completed days in the coordinator's current week."""
+        if not isinstance(value, dict):
+            return {}
+        today = self._local_today()
+        week_start = today - timedelta(days=today.weekday())
+        return {
+            day_key: day_value
+            for day_key, day_value in value.items()
+            if week_start.isoformat() <= day_key < today.isoformat()
+            and isinstance(day_value, dict)
+        }
+
+    def _preserved_fast_payload_value(self, key: str, value: object) -> object:
+        """Normalize one payload carried across a full HTTP rebuild."""
+        if key == PAYLOAD_VERIFIED_DAY_STATISTICS:
+            return self._current_week_verified_day_statistics(value)
+        return value
 
     def _merge_concurrent_coordinator_updates(
         self,
@@ -7963,6 +8235,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
         if self.data == merged:
             return
+        if self._device_registry_observer is not None:
+            self._device_registry_observer(merged)
         self.data = merged
         self.last_update_success = True
         self.last_update_exception = None
@@ -8171,11 +8445,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ):
             return
         command_key = cloud_attempt.command_key
+        if not hasattr(self, "_cloud_mqtt_command_failures"):
+            self._cloud_mqtt_command_failures = {}
         if "Cloud MQTT" in succeeded:
             self._cloud_mqtt_command_failures.pop(command_key, None)
             return
         cloud_failure = next(
-            (failure for failure in failures if failure.startswith("Cloud MQTT=")),
+            (
+                failure
+                for failure in failures
+                if failure.startswith("Cloud MQTT=")
+            ),
             None,
         )
         if cloud_failure is None:
@@ -8187,7 +8467,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # Retain this Cloud-specific failure so its own retry decision does
             # not depend on BLE availability or success.
             return
-        log = _LOGGER.warning if previous_failure != cloud_failure else _LOGGER.debug
+        log = (
+            _LOGGER.warning if previous_failure != cloud_failure else _LOGGER.debug
+        )
         device_id, action_id, cmd = command_key
         log(
             "Jackery Cloud MQTT command failed independently for %s "
@@ -8204,6 +8486,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Bind an attempt immediately before use of the current MQTT session."""
         cloud_attempt.session_generation = self._synchronize_mqtt_session_generation()
+        if not hasattr(self, "_cloud_mqtt_command_attempts"):
+            self._cloud_mqtt_command_attempts = {}
         previous_attempt = self._cloud_mqtt_command_attempts.get(
             cloud_attempt.command_key,
             0,
@@ -8276,7 +8560,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             action_id,
             cmd_value,
             ", ".join(succeeded),
-            f"; independent failures: {", ".join(failures)}" if failures else "",
+            f"; independent failures: {', '.join(failures)}" if failures else "",
         )
 
     async def _async_finish_independent_command_transports(
@@ -8303,7 +8587,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             failures,
         )
 
-    async def _async_publish_command_ble_first(
+    async def _async_publish_command_ble_first(  # ruff:ignore[too-many-locals]
         self,
         device_id: str,
         *,
@@ -8322,11 +8606,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         The historical method name is retained for call-site compatibility.
         """
         cmd_value = self._coerce_transport_cmd(cmd)
-        self._cloud_mqtt_command_attempt_sequence += 1
+        self._cloud_mqtt_command_attempt_sequence = (
+            getattr(self, "_cloud_mqtt_command_attempt_sequence", 0) + 1
+        )
         cloud_attempt = _CloudCommandAttempt(
             command_key=(device_id, action_id, cmd_value),
             attempt_id=self._cloud_mqtt_command_attempt_sequence,
-            session_generation=self._mqtt_session_generation,
+            session_generation=getattr(self, "_mqtt_session_generation", 0),
         )
         # Bind once for failures that occur before a socket publish (for
         # example missing cached credentials). The publish loop rebinds this
@@ -8385,19 +8671,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             return True
 
         operations.append(("Cloud MQTT", _async_send_cloud_mqtt()))
-        task_operations: list[tuple[str, asyncio.Task[bool]]] = [
-            (
-                label,
-                self.entry.async_create_background_task(
-                    self.hass,
-                    operation,
-                    name=(
-                        f"{DOMAIN}_command_{action_id}_{cmd_value}_"
-                        f"{label.lower().replace(" ", "_")}"
-                    ),
-                    eager_start=False,
-                ),
+
+        def _create_command_task(
+            label: str,
+            operation: Coroutine[Any, Any, bool],
+        ) -> asyncio.Task[bool]:
+            """Create a tracked command task, falling back for test shells."""
+            task_name = (
+                f"{DOMAIN}_command_{action_id}_{cmd_value}_"
+                f"{label.lower().replace(' ', '_')}"
             )
+            entry = getattr(self, "entry", None)
+            if entry is not None:
+                return cast(
+                    "asyncio.Task[bool]",
+                    entry.async_create_background_task(
+                        self.hass,
+                        operation,
+                        name=task_name,
+                        eager_start=False,
+                    ),
+                )
+            return asyncio.create_task(operation, name=task_name)
+
+        task_operations: list[tuple[str, asyncio.Task[bool]]] = [
+            (label, _create_command_task(label, operation))
             for label, operation in operations
         ]
         pending = {task for _label, task in task_operations}
@@ -8411,7 +8709,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 completed_operations = [
-                    (label, task) for label, task in task_operations if task in done
+                    (label, task)
+                    for label, task in task_operations
+                    if task in done
                 ]
                 results = await asyncio.gather(
                     *(task for _label, task in completed_operations),
@@ -8431,17 +8731,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         for label, task in task_operations
                         if task in pending
                     ]
-                    self.entry.async_create_background_task(
-                        self.hass,
-                        self._async_finish_independent_command_transports(
-                            cloud_attempt,
-                            pending_operations,
-                            list(succeeded),
-                            list(failures),
-                        ),
-                        name=f"{DOMAIN}_command_remainder_{action_id}_{cmd_value}",
-                        eager_start=False,
+                    remainder = self._async_finish_independent_command_transports(
+                        cloud_attempt,
+                        pending_operations,
+                        list(succeeded),
+                        list(failures),
                     )
+                    remainder_name = f"{DOMAIN}_command_remainder_{action_id}_{cmd_value}"
+                    entry = getattr(self, "entry", None)
+                    if entry is not None:
+                        entry.async_create_background_task(
+                            self.hass,
+                            remainder,
+                            name=remainder_name,
+                            eager_start=False,
+                        )
+                    else:
+                        remainder_task = asyncio.create_task(
+                            remainder,
+                            name=remainder_name,
+                        )
+                        remainder_task.add_done_callback(
+                            lambda done: done.exception(),
+                        )
                 else:
                     self._record_successful_command_transports(
                         cloud_attempt,
@@ -10126,11 +10438,33 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # These methods bypass the REST relay and publish the same app command
     # body to the device over the available write transport.
     #
-    # MqttMsgActivity creates a fallback token by iterating range 0..8 and
-    # appending Random.nextInt(10). HomeDeviceController.g1(...) then sends
+    # App 2.4.0 ``MqttMsgActivity.initData$lambda$10`` reuses a decoded token
+    # when present and otherwise generates nine decimal digits with
+    # ``Random.nextInt(10)``. ``HomeDeviceController.t1`` then sends
     # ``userName``/``password``/``token`` through the bb/* codec before
     # publishing. For SolarVault home devices the concrete codec is AES/CBC
     # with the decoded bluetoothKey as key+IV and Base64 ciphertext output.
+
+    def _stable_third_party_mqtt_token(self, token: object) -> tuple[str, bool]:
+        """Return a stable App-style token and persist a generated fallback."""
+        options = dict(self.entry.options)
+        prior_token = self._generated_third_party_mqtt_token or options.get(
+            CONF_THIRD_PARTY_MQTT_TOKEN,
+        )
+        result_token, use_generated, new_generated = stable_third_party_mqtt_token(
+            token,
+            prior_token,
+        )
+        if new_generated is not None:
+            self._generated_third_party_mqtt_token = new_generated
+            if options.get(CONF_THIRD_PARTY_MQTT_TOKEN) != new_generated:
+                options[CONF_THIRD_PARTY_MQTT_TOKEN] = new_generated
+                self.hass.config_entries.async_update_entry(
+                    self.entry,
+                    options=options,
+                )
+            _LOGGER.debug("Jackery: generated stable 9-digit third-party MQTT token")
+        return result_token, use_generated
 
     def _decode_third_party_mqtt_config_body(
         self,
@@ -10165,15 +10499,73 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         config: dict[str, Any] = {
             key: decoded[key] for key in config_keys if key in decoded
         }
-        for meta_key in ("_ha_plaintext", "_decoded_fields"):
+        for meta_key in (
+            "_ha_plaintext",
+            "_decoded_fields",
+            "_decode_failed_fields",
+            "_decode_error",
+        ):
             if meta_key in decoded:
                 config[meta_key] = decoded[meta_key]
-        if action_id == ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG:
+        is_complete_readback = (
+            action_id == ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG
+            and self._third_party_mqtt_config_readback_complete(config)
+        )
+        waiter_was_active = False
+        if is_complete_readback:
             waiters = self._third_party_mqtt_config_waiters.get(device_id, [])
             for waiter in tuple(waiters):
                 if not waiter.done():
+                    waiter_was_active = True
                     waiter.set_result(dict(config))
+        if (
+            is_complete_readback
+            and not waiter_was_active
+            and self._local_mqtt_config_observer is not None
+        ):
+            self._local_mqtt_config_observer(dict(config))
         return config
+
+    @staticmethod
+    def _third_party_mqtt_config_readback_complete(
+        config: dict[str, Any],
+    ) -> bool:
+        """Return whether a 3047 body can confirm all documented fields."""
+        required_fields = {
+            FIELD_THIRD_PARTY_MQTT_ENABLE,
+            FIELD_THIRD_PARTY_MQTT_IP,
+            FIELD_THIRD_PARTY_MQTT_PORT,
+            FIELD_THIRD_PARTY_MQTT_USERNAME,
+            FIELD_THIRD_PARTY_MQTT_PASSWORD,
+            FIELD_THIRD_PARTY_MQTT_TOKEN,
+        }
+        failed_fields = config.get("_decode_failed_fields")
+        decode_error = config.get("_decode_error")
+        return (
+            required_fields <= config.keys()
+            and not failed_fields
+            and not decode_error
+            and bool(str(config.get(FIELD_THIRD_PARTY_MQTT_IP) or "").strip())
+            and (safe_int(config.get(FIELD_THIRD_PARTY_MQTT_PORT)) or 0) > 0
+            and all(
+                bool(str(config.get(key) or "").strip())
+                for key in _THIRD_PARTY_MQTT_CONFIG_KEYS
+            )
+        )
+
+    def set_local_mqtt_config_observer(
+        self,
+        observer: Callable[[dict[str, Any]], None],
+    ) -> None:
+        """Register the entry-runtime callback for confirmed 3047 readbacks."""
+        self._local_mqtt_config_observer = observer
+
+    def set_device_registry_observer(
+        self,
+        observer: Callable[[Mapping[str, dict[str, Any]]], None],
+    ) -> None:
+        """Register a synchronous parent-device hook before listener updates."""
+        self._device_registry_observer = observer
 
     @staticmethod
     def _has_encoded_third_party_mqtt_field(body: dict[str, Any]) -> bool:
@@ -10184,7 +10576,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 continue
             try:
                 decoded = base64.b64decode(value, validate=True)
-            except binascii.Error, ValueError:
+            except (binascii.Error, ValueError):
                 continue
             if decoded and len(decoded) % 16 == 0:
                 return True
@@ -10237,29 +10629,28 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 if safe_int(observed.get(key)) != safe_int(expected.get(key)):
                     mismatches.append(key)
                 continue
-            if (
-                str(observed.get(key) or "").strip()
-                != str(
-                    expected.get(key) or "",
-                ).strip()
-            ):
+            if str(observed.get(key) or "").strip() != str(
+                expected.get(key) or "",
+            ).strip():
                 mismatches.append(key)
         return tuple(mismatches)
 
     async def _async_query_third_party_mqtt_config_readback(
         self,
         device_id: str,
+        *,
+        timeout: float = _THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC,
     ) -> dict[str, Any] | None:
-        """Publish 3047 and wait briefly for the device-reported config."""
-        future = asyncio.get_running_loop().create_future()
+        """Publish 3047 and wait for one complete device-reported config."""
+        future: asyncio.Future[dict[str, Any]] = (
+            asyncio.get_running_loop().create_future()
+        )
         waiters = self._third_party_mqtt_config_waiters.setdefault(device_id, [])
         waiters.append(future)
         try:
-            await self.async_query_third_party_mqtt_config(device_id)
-            return await asyncio.wait_for(
-                future,
-                timeout=_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC,
-            )
+            async with asyncio.timeout(timeout):
+                await self.async_query_third_party_mqtt_config(device_id)
+                return await future
         except TimeoutError:
             return None
         finally:
@@ -10312,7 +10703,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ``userName``, ``password`` and ``token`` use the App's AES/Base64
         codec; ``enable``, ``ip`` and ``port`` remain plain body fields.
         """
-        normalized_token = str(token)
+        normalized_token, _use_generated_token = (
+            self._stable_third_party_mqtt_token(token)
+        )
         bluetooth_key = self.device_bluetooth_key(device_id)
         if bluetooth_key is None:
             msg = "Cannot set third-party MQTT config without device bluetoothKey"
@@ -10369,23 +10762,50 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             FIELD_THIRD_PARTY_MQTT_PASSWORD: str(password),
             FIELD_THIRD_PARTY_MQTT_TOKEN: normalized_token,
         }
-        readback = await self._async_query_third_party_mqtt_config_readback(device_id)
+        readback: dict[str, Any] | None = None
+        mismatches: tuple[str, ...] = ()
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + _THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC
+        for attempt in range(_THIRD_PARTY_MQTT_READBACK_ATTEMPTS):
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            readback = await self._async_query_third_party_mqtt_config_readback(
+                device_id,
+                timeout=min(
+                    remaining,
+                    _THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC,
+                ),
+            )
+            if readback is not None:
+                mismatches = self._third_party_mqtt_config_mismatches(
+                    readback,
+                    expected_plaintext,
+                )
+                if not mismatches:
+                    break
+            if attempt + 1 >= _THIRD_PARTY_MQTT_READBACK_ATTEMPTS:
+                continue
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(
+                min(_THIRD_PARTY_MQTT_READBACK_RETRY_DELAY_SEC, remaining),
+            )
         if readback is None:
             msg = (
                 "Third-party MQTT config write was not confirmed by "
                 f"3047 readback within {_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC:.0f}s"
             )
             raise HomeAssistantError(msg)
-        mismatches = self._third_party_mqtt_config_mismatches(
-            readback,
-            expected_plaintext,
-        )
         if mismatches:
             msg = (
                 "Third-party MQTT config readback did not match written fields: "
-                f"{", ".join(mismatches)}"
+                f"{', '.join(mismatches)}"
             )
             raise HomeAssistantError(msg)
+        if self._local_mqtt_config_observer is not None:
+            self._local_mqtt_config_observer(dict(readback))
         _LOGGER.info(
             "Jackery: confirmed SET_THIRD_PARTY_MQTT_CONFIG (3046) for %s "
             "via 3047 readback",
@@ -11273,6 +11693,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> None:
         """Advance historical queues while the current import remains schedulable."""
         try:
+            # A cold HTTP start populates the current day/week/month/year slots in
+            # ``_slow_metrics_bg_task``.  Historical day backfill must not race
+            # those required current reads: the Jackery backend serializes/busy-
+            # rejects the resulting request burst, which made current entities and
+            # systemShadow wait behind old dates for minutes.  Shielding preserves
+            # the independent current HTTP refresh when this optional history task
+            # is cancelled; no MQTT/BLE/local transport participates in this wait.
+            slow_refresh = self._slow_metrics_bg_task
+            if slow_refresh is not None and not slow_refresh.done():
+                await asyncio.shield(slow_refresh)
             await self._async_advance_statistics_backfill(snapshot)
         except asyncio.CancelledError:
             raise
@@ -11304,7 +11734,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             include_current_year=startup_sync,
             request_budget=_STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET,
         )
-        day_pending = backfill_result.get("pending_sources", 0)
+        day_pending = backfill_result.get("actionable_sources", 0)
         if backfill_result.get("rate_limited") is True:
             self._statistics_import_diagnostics[
                 "last_period_backfill_skipped_reason"
@@ -11317,7 +11747,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         period_backfill_result = await self._async_http_backfill_period_statistics(
             snapshot,
         )
-        period_pending = period_backfill_result.get("pending_sources", 0)
+        period_pending = period_backfill_result.get("actionable_sources", 0)
         if startup_sync and period_pending == 0 and day_pending == 0:
             self._statistics_startup_sync_pending = False
 
@@ -11725,27 +12155,68 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "unit_class": EnergyConverter.UNIT_CLASS,
             "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
         }
-        try:
+        verified_sums: dict[float, float] = {}
+        try:  # ruff:ignore[too-many-statements-in-try-clause]
             recorder = get_instance(self.hass)
             async_add_external_statistics(
                 self.hass,
                 metadata_dict,  # type: ignore[arg-type]
                 statistics,
             )
-            # Home Assistant queues an ImportStatisticsTask here.  Wait for its
-            # SynchronizeTask commit barrier while the single-writer lock is
-            # held, then verify exact persisted sums before deduplicating.
-            await recorder.async_block_till_done()
-            verified = await recorder.async_add_executor_job(
-                statistics_during_period,
-                self.hass,
-                earliest,
-                latest + timedelta(seconds=1),
-                {statistic_id},
-                "hour",
-                None,
-                {"start", "sum"},
+            # ``async_block_till_done`` can return without a future after the
+            # recorder thread dequeues ImportStatisticsTask but before its DB
+            # transaction commits. Queue an unconditional FIFO synchronization
+            # task instead. HA can append a retryable replacement import *behind*
+            # a synchronization task while processing the preceding import, so a
+            # fixed number of immediate barriers can always stop one generation
+            # too early. Keep draining and verifying within one bounded deadline;
+            # the short pause also permits a committed row to become visible on a
+            # separate recorder DB connection.
+            verification_deadline = (
+                self.hass.loop.time()
+                + _STATISTICS_RECORDER_VERIFICATION_TIMEOUT_SEC
             )
+            while True:
+                remaining = verification_deadline - self.hass.loop.time()
+                if remaining <= 0:
+                    break
+                commit_future = self.hass.loop.create_future()
+                recorder.queue_task(SynchronizeTask(commit_future))
+                async with asyncio.timeout(remaining):
+                    await commit_future
+                remaining = verification_deadline - self.hass.loop.time()
+                if remaining <= 0:
+                    break
+                async with asyncio.timeout(remaining):
+                    verified = await recorder.async_add_executor_job(
+                        statistics_during_period,
+                        self.hass,
+                        earliest,
+                        latest + timedelta(seconds=1),
+                        {statistic_id},
+                        "hour",
+                        None,
+                        {"start", "sum"},
+                    )
+                verified_sums = {}
+                for row in verified.get(statistic_id, []):
+                    row_start = self._stat_row_start(row)
+                    row_sum = safe_float(row.get("sum"))
+                    if row_start is not None and row_sum is not None:
+                        verified_sums[row_start] = row_sum
+                if all(
+                    (actual := verified_sums.get(start_ts)) is not None
+                    and abs(actual - expected_sum)
+                    < _STATISTICS_IMPORT_STATE_TOLERANCE
+                    for start_ts, expected_sum in expected_import_sums.items()
+                ):
+                    break
+                remaining = verification_deadline - self.hass.loop.time()
+                if remaining <= 0:
+                    break
+                await asyncio.sleep(
+                    min(_STATISTICS_RECORDER_VERIFICATION_POLL_SEC, remaining),
+                )
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.warning(
                 "Could not import %d app chart statistics for %s: %s",
@@ -11754,24 +12225,45 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 exception_debug_message(err),
             )
             return False, 0
-        verified_sums: dict[float, float] = {}
-        for row in verified.get(statistic_id, []):
-            row_start = self._stat_row_start(row)
-            row_sum = safe_float(row.get("sum"))
-            if row_start is not None and row_sum is not None:
-                verified_sums[row_start] = row_sum
-        if any(
-            (actual := verified_sums.get(start_ts)) is None
-            or abs(actual - expected_sum) >= _STATISTICS_IMPORT_STATE_TOLERANCE
+        verification_failures = [
+            (start_ts, expected_sum, verified_sums.get(start_ts))
             for start_ts, expected_sum in expected_import_sums.items()
-        ):
+            if (actual := verified_sums.get(start_ts)) is None
+            or abs(actual - expected_sum) >= _STATISTICS_IMPORT_STATE_TOLERANCE
+        ]
+        if verification_failures:
+            first_start, first_expected, first_actual = verification_failures[0]
+            self._statistics_import_diagnostics[
+                "last_recorder_verification_failure"
+            ] = {
+                "statistic_id": statistic_id,
+                "start": first_start,
+                "expected_sum": first_expected,
+                "actual_sum": first_actual,
+                "failed_bucket_count": len(verification_failures),
+            }
             _LOGGER.warning(
                 "Home Assistant recorder did not verify %d queued app chart "
-                "bucket(s) for %s; leaving the import retryable",
-                len(expected_import_sums),
+                "bucket(s) for %s; first_start=%s expected_sum=%.5f "
+                "actual_sum=%s; leaving the import retryable",
+                len(verification_failures),
                 statistic_id,
+                first_start,
+                first_expected,
+                first_actual if first_actual is not None else "missing",
             )
             return False, 0
+        last_verification_failure = self._statistics_import_diagnostics.get(
+            "last_recorder_verification_failure",
+        )
+        if (
+            isinstance(last_verification_failure, dict)
+            and last_verification_failure.get("statistic_id") == statistic_id
+        ):
+            self._statistics_import_diagnostics.pop(
+                "last_recorder_verification_failure",
+                None,
+            )
         self._stat_import_last_sig[statistic_id] = series_signature
         _LOGGER.debug(
             "Imported %d Jackery app chart statistic bucket(s) for %s",
@@ -12094,16 +12586,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             raise UpdateFailed(msg) from err
         else:
             self._recover_polling_timeout()
-            return self._merge_concurrent_coordinator_updates(
+            merged = self._merge_concurrent_coordinator_updates(
                 cycle_baseline,
                 result,
             )
+            if self._device_registry_observer is not None:
+                self._device_registry_observer(merged)
+            return merged
 
     async def _async_update_data_guarded(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
         self,
         _retry_discovery_once: bool = True,
     ) -> dict[str, dict[str, Any]]:
         """Run one HTTP-primary update and reconcile supplementary snapshots."""
+        mqtt_mgr = getattr(self, "_mqtt_mgr", None)
+        if mqtt_mgr is not None and hasattr(mqtt_mgr, "auth_failure_message"):
+            mqtt_auth_notice = mqtt_mgr.auth_failure_message
+            if mqtt_auth_notice is not None:
+                _LOGGER.debug(
+                    "Jackery MQTT auth notice consumed by HTTP poll; HTTP/API "
+                    "remains the auth authority and polling continues: %s",
+                    mqtt_auth_notice,
+                )
+                mqtt_mgr.auth_failure_message = None
+
         # The passive reconnect path (``_async_ensure_mqtt`` without
         # ``wait_connected=True``) does not observe the CONNACK outcome
         # directly. If the MQTT client recorded broker auth rejections, treat
@@ -13722,7 +14228,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 entry[PAYLOAD_LOCAL_DAILY_ENERGY] = local_daily_energy
             for cached_key in PRESERVED_FAST_PAYLOAD_KEYS:
                 if cached_key in old_entry:
-                    entry[cached_key] = old_entry[cached_key]
+                    entry[cached_key] = self._preserved_fast_payload_value(
+                        cached_key,
+                        old_entry[cached_key],
+                    )
             # Overlay cached MQTT CombineData system-info fields back onto
             # PAYLOAD_PROPERTIES.  The HTTP property endpoint (HomeBody)
             # never returns these keys (SystemBody only), so without this
@@ -13798,6 +14307,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     system = dict(entry.get(PAYLOAD_SYSTEM) or {})
                     system.update(live_system_fields)
                     entry[PAYLOAD_SYSTEM] = system
+                self._reconcile_compact_today_energy(entry, today=today)
             override = self._price_overrides.get(dev_id)
             if override:
                 override_ts, price_updates = override
@@ -14474,10 +14984,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # Consume the newly populated caches immediately. The follow-up
                 # coordinator cycle only performs the fast property request;
                 # every slow slot just filled above is still inside its TTL.
+                slow_cache = getattr(self, "_slow_cache", None)
+                if slow_cache is None:
+                    slow_cache = self._slow_cache = {}
                 periodic_cache_advanced = any(
                     is_periodic_section(cache_key)
                     and (safe_float(cache_entry[0]) or 0.0) >= started_monotonic
-                    for cache in self._slow_cache.values()
+                    for cache in slow_cache.values()
                     for cache_key, cache_entry in cache.items()
                 )
                 if periodic_cache_advanced:
@@ -14552,7 +15065,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         diag["connect_backoff_signature"] = self._mqtt_mgr.backoff_signature
         diag["birth_snapshot_pending"] = self._mqtt_birth_snapshot_pending
         diag["session_action_ids_seen"] = sorted({
-            action_id for _device_id, action_id in self._mqtt_session_actions_seen
+            action_id
+            for _device_id, action_id in self._mqtt_session_actions_seen
         })
         diag["session_action_device_pairs_seen"] = len(
             self._mqtt_session_actions_seen,
@@ -14760,7 +15274,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     def _command_source_available(self, device_id: str, source: str) -> bool:
         """Return whether one configured supervisor can execute a command."""
-        if self._shutdown_started:
+        if getattr(self, "_shutdown_started", False):
             return False
         if source == "http":
             return self.api is not None
@@ -14986,7 +15500,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         continue
                     try:
                         normalized_values[metric] = int(value)
-                    except TypeError, ValueError:
+                    except (TypeError, ValueError):
                         continue
                 normalized_device_id = str(device_id)
                 reconciled[normalized_device_id] = refresh_snapshot(
@@ -15043,12 +15557,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Update the midnight snapshot and return today's energy deltas.
 
         ``properties`` is the merged ``PAYLOAD_PROPERTIES`` dict produced by
-        the regular update cycle. Returns a dict ``{metric_key: today_wh}``
-        for the documented :data:`LOCAL_DAILY_LIFETIME_METRICS`. Missing
-        counters (firmware variant without that field) are skipped. A new
-        anchor is only trusted during an observed coordinator day rollover;
-        cold-start anchors stay silent so a mid-day restart cannot create
-        artificial 0 kWh daily values.
+        the regular update cycle. Returns raw same-day counter deltas for the
+        documented :data:`LOCAL_DAILY_LIFETIME_METRICS`. Jackery main-device
+        values use 0.01 kWh units; CT values remain Wh. Missing counters are
+        skipped. A new anchor is only trusted during an observed coordinator
+        day rollover; cold-start anchors stay silent so a mid-day restart
+        cannot create artificial 0 kWh daily values.
         """
         current_values: dict[str, int | float | None] = {
             metric: properties.get(metric) for metric in LOCAL_DAILY_LIFETIME_METRICS
@@ -15083,6 +15597,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if delta is None:
                 continue
             deltas[metric] = delta
+        if deltas:
+            self._local_daily_snapshots[device_id] = record_latest_deltas(
+                snapshot,
+                deltas,
+            )
         return deltas
 
     def local_daily_energy_kwh(
@@ -15092,12 +15611,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     ) -> float | None:
         """Return today's local energy delta for a device + metric, in kWh.
 
-        ``coordinator.data[device_id][PAYLOAD_LOCAL_DAILY_ENERGY]`` stores
-        the deltas in Wh as integers. Sensors that prefer the cloud
-        ``/v1/device/stat/*?dateType=day`` total can fall back to this value
-        when the cloud response is stale or missing. Returns ``None`` when
-        the device has no snapshot yet, the metric is not tracked, or the
-        coordinator has not run a successful refresh.
+        ``coordinator.data[device_id][PAYLOAD_LOCAL_DAILY_ENERGY]`` stores raw
+        counter deltas. Jackery main-device counters use 0.01 kWh units; the
+        two CT counters use Wh. Sensors that prefer a cloud day total can fall
+        back to this normalized value when the cloud response is stale or
+        missing. Returns ``None`` when no usable delta exists.
         """
         payload = (self.data or {}).get(device_id) or {}
         section = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
@@ -15107,9 +15625,57 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         if value is None:
             return None
         try:
-            return round(float(value) / 1000.0, 5)
-        except TypeError, ValueError:
+            divisor = (
+                CT_LIVE_ENERGY_UNITS_PER_KWH
+                if metric_key
+                in {
+                    FIELD_CT_TOTAL_PHASE_ENERGY,
+                    FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
+                }
+                else JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+            )
+            return round(float(value) / divisor, 5)
+        except (TypeError, ValueError):
             return None
+
+    def local_period_energy_kwh(
+        self,
+        device_id: str,
+        metric_key: str,
+        *,
+        period: str,
+        today: date,
+    ) -> float | None:
+        """Return a fully covered local day/week/month/year delta in kWh.
+
+        Completed-day rows are persisted from the latest observed same-day
+        lifetime-counter delta. A period is returned only when every elapsed
+        local calendar day is present; a restart or transport gap therefore
+        produces ``None`` instead of a guessed partial total.
+        """
+        payload = (self.data or {}).get(device_id) or {}
+        section = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
+        if not isinstance(section, dict):
+            return None
+        raw_period_delta = period_delta(
+            self._local_daily_snapshots.get(device_id),
+            metric_key,
+            section.get(metric_key),
+            today=today,
+            period=period,
+        )
+        if raw_period_delta is None:
+            return None
+        divisor = (
+            CT_LIVE_ENERGY_UNITS_PER_KWH
+            if metric_key
+            in {
+                FIELD_CT_TOTAL_PHASE_ENERGY,
+                FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
+            }
+            else JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+        )
+        return round(raw_period_delta / divisor, 5)
 
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:
         """Return a minimal coordinator payload from cached discovery metadata."""
@@ -15163,7 +15729,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         return time.monotonic() - received_at <= freshness_window
 
-    async def async_apply_local_mqtt_config_to_devices(  # ruff:ignore[too-many-locals]
+    def _local_mqtt_device_token(self, device_id: str) -> str:
+        """Return the persisted, read-back, or App-generated bridge token."""
+        configured_token = config_entry_str_option(
+            self.entry,
+            CONF_THIRD_PARTY_MQTT_TOKEN,
+            DEFAULT_THIRD_PARTY_MQTT_TOKEN,
+        ).strip()
+        device_data = (self.data or {}).get(device_id)
+        current_config = (
+            device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
+            if isinstance(device_data, dict)
+            else None
+        )
+        readback_token = (
+            current_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+            if isinstance(current_config, dict)
+            else None
+        )
+        token, _use_generated = self._stable_third_party_mqtt_token(
+            configured_token or readback_token,
+        )
+        return token
+
+    async def async_apply_local_mqtt_config_to_devices(
         self,
     ) -> bool:
         """Push the user's local-MQTT bridge config to every known device.
@@ -15246,36 +15835,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             CONF_LOCAL_MQTT_PASSWORD,
             "",
         ) or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
-        # Resolve the third-party MQTT token, generating a new one if needed.
-        # The prior_generated token comes from the device data stored in coordinator
-        # data so it persists across reloads.
-        prior_generated = None
-        if self.data:
-            for device_data in self.data.values():
-                current = device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
-                if isinstance(current, dict):
-                    prior_generated = current.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
-                    if prior_generated:
-                        break
-        token, newly_generated = resolve_third_party_mqtt_token(
-            dict(self.entry.options), prior_generated
-        )
-        # If a new token was generated, persist it to the config entry options
-        # so it survives reloads and is reused on subsequent pushes.
-        if newly_generated:
-            new_options = dict(self.entry.options)
-            new_options[CONF_THIRD_PARTY_MQTT_TOKEN] = token
-            self.hass.config_entries.async_update_entry(self.entry, options=new_options)
-            _LOGGER.info(
-                "Jackery: generated and persisted new third-party MQTT token "
-                "for local MQTT bridge"
-            )
+        # Prefer the hidden persisted token, then a valid decoded 3047 token for
+        # that device. If neither exists, mirror App 2.4.0's nine-digit fallback
+        # generator and persist it before sending 3046. HomeDeviceController.D0
+        # rejects an otherwise complete config when the decoded token is empty.
+        per_device_tokens = {
+            str(device_id): self._local_mqtt_device_token(device_id)
+            for device_id in self._device_index
+        }
         signature = (
             host,
             port,
             username,
             password,
-            token,
+            tuple(sorted(per_device_tokens.items())),
             tuple(sorted(self._device_index)),
         )
         if self._local_mqtt_config_applied_signature == signature:
@@ -15284,6 +15857,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         success = True
         config_errors: dict[str, str] = {}
         for device_id in tuple(self._device_index):
+            device_token = per_device_tokens[str(device_id)]
             try:
                 await self.async_set_third_party_mqtt_config(
                     device_id,
@@ -15292,7 +15866,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     port=port,
                     username=username,
                     password=password,
-                    token=token,
+                    token=device_token,
                 )
                 config_errors.pop(str(device_id), None)
             except BACKGROUND_TASK_ERRORS as err:
@@ -15311,7 +15885,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     error,
                 )
         diagnostics["last_errors"] = dict(config_errors)
-        diagnostics["last_status"] = "success" if success else "transport_failed"
+        diagnostics["last_status"] = (
+            "success"
+            if success
+            else "transport_failed"
+        )
         if success:
             self._local_mqtt_config_applied_signature = signature
             diagnostics["last_success_at"] = datetime.now(UTC).isoformat()
@@ -15344,6 +15922,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             and self._mqtt.is_connected
         )
         try:
+            if force_birth_snapshot:
+                await self._async_query_third_party_mqtt_configs(snapshot)
             await self._async_query_subdevices_for_missing(
                 force=force_birth_snapshot,
                 snapshot=snapshot,
@@ -15372,6 +15952,36 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 and session_generation == self._mqtt_session_generation
             ):
                 self._mqtt_birth_snapshot_pending = False
+
+    async def _async_query_third_party_mqtt_configs(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+    ) -> None:
+        """Read each supported device's local-MQTT bridge once per MQTT birth.
+
+        A 3047 response is the device-authoritative bridge state.  It lets the
+        entry runtime start or stop its direct broker listener after restart
+        without HTTP owning a Layer-5 connection and without a user pressing a
+        readback button first.
+        """
+        device_ids = tuple(
+            device_id
+            for device_id in snapshot
+            if self.device_supports_third_party_mqtt(device_id)
+        )
+        if not device_ids:
+            return
+        results = await asyncio.gather(
+            *(self.async_query_third_party_mqtt_config(device_id) for device_id in device_ids),
+            return_exceptions=True,
+        )
+        for device_id, result in zip(device_ids, results, strict=True):
+            if isinstance(result, BaseException):
+                _LOGGER.debug(
+                    "Jackery third-party MQTT readback query failed for %s: %s",
+                    device_id,
+                    exception_debug_message(result),
+                )
 
     def _schedule_shadow_fallback(
         self,
@@ -16074,6 +16684,338 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             imported_rows += bucket_count
         return success and handled_points, imported_rows
 
+    def _verified_historical_day_totals(
+        self,
+        *,
+        section_prefix: str,
+        source: dict[str, Any],
+    ) -> dict[str, float]:
+        """Return verified kWh totals from one fetched HTTP day curve.
+
+        This deliberately reuses the Recorder import converter.  A scalar
+        without curve points therefore cannot become entity data, while an
+        explicit all-zero curve remains valid corroboration for a zero day.
+        """
+        historical_payload = self._historical_day_payload_from_sources(
+            {section_prefix: source},
+        )
+        now = self._local_now()
+        totals: dict[str, float] = {}
+        for metric_section, stat_key, metric_key, _label in APP_CHART_STAT_METRICS:
+            if metric_section != section_prefix:
+                continue
+            points = self._day_chart_points_for_metric(
+                historical_payload,
+                section_prefix,
+                stat_key,
+                metric_key,
+                bucket_minutes=60,
+                now=now,
+            )
+            if points:
+                totals[stat_key] = round(sum(point.value for point in points), 5)
+        return totals
+
+    def _merge_verified_day_totals_update(
+        self,
+        updates: dict[str, dict[str, Any]],
+        *,
+        device_id: str,
+        target_day: date,
+        section_prefix: str,
+        day_totals: dict[str, float],
+        week_start: date,
+        today: date,
+    ) -> None:
+        """Merge verified totals for one completed day into a batched update."""
+        if not week_start <= target_day < today:
+            return
+        if not day_totals:
+            return
+
+        device_days = updates.get(device_id)
+        if device_days is None:
+            current_payload = (self.data or {}).get(device_id)
+            current_days = (
+                current_payload.get(PAYLOAD_VERIFIED_DAY_STATISTICS)
+                if isinstance(current_payload, dict)
+                else None
+            )
+            device_days = {
+                day_key: copy.deepcopy(day_value)
+                for day_key, day_value in (
+                    current_days.items() if isinstance(current_days, dict) else ()
+                )
+                if week_start.isoformat() <= day_key < today.isoformat()
+                and isinstance(day_value, dict)
+            }
+            updates[device_id] = device_days
+
+        target_sources = device_days.setdefault(target_day.isoformat(), {})
+        if isinstance(target_sources, dict):
+            target_sources[section_prefix] = day_totals
+
+    def _record_verified_day_totals_update(
+        self,
+        updates: dict[str, dict[str, Any]],
+        *,
+        device_id: str,
+        target_day: date,
+        section_prefix: str,
+        source: dict[str, Any],
+        day_state: dict[str, Any],
+        week_start: date,
+        today: date,
+    ) -> dict[str, float]:
+        """Convert and batch one completed current-week HTTP curve."""
+        day_totals = self._verified_historical_day_totals(
+            section_prefix=section_prefix,
+            source=source,
+        )
+        self._merge_verified_day_totals_update(
+            updates,
+            device_id=device_id,
+            target_day=target_day,
+            section_prefix=section_prefix,
+            day_totals=day_totals,
+            week_start=week_start,
+            today=today,
+        )
+        if day_totals and week_start <= target_day < today:
+            # Persist the small derived totals alongside the source/day queue.
+            # On restart, an already-imported Recorder bucket can restore
+            # entity data without another cloud request.
+            day_state[_STATISTICS_HTTP_VERIFIED_TOTALS] = day_totals
+        return day_totals
+
+    def _restore_or_reopen_imported_day_totals(
+        self,
+        updates: dict[str, dict[str, Any]],
+        *,
+        state_status: BackfillStatus,
+        day_state: dict[str, Any],
+        device_id: str,
+        target_day: date,
+        section_prefix: str,
+        week_start: date,
+        today: date,
+    ) -> tuple[bool, bool, bool]:
+        """Restore cached current-week totals or reopen a legacy imported row.
+
+        Returns ``(skip_candidate, state_changed, has_verified_totals)``.
+        """
+        in_current_week = week_start <= target_day < today
+        cached_totals = (
+            day_state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
+            if in_current_week
+            else None
+        )
+        has_verified_totals = False
+        if isinstance(cached_totals, dict) and cached_totals:
+            expected_keys = {
+                stat_key
+                for metric_section, stat_key, _metric_key, _label in (
+                    APP_CHART_STAT_METRICS
+                )
+                if metric_section == section_prefix
+            }
+            usable_totals = {
+                key: value
+                for key, raw_value in cached_totals.items()
+                if key in expected_keys
+                if (value := safe_float(raw_value)) is not None and value >= 0
+            }
+            if usable_totals:
+                has_verified_totals = True
+                self._merge_verified_day_totals_update(
+                    updates,
+                    device_id=device_id,
+                    target_day=target_day,
+                    section_prefix=section_prefix,
+                    day_totals=usable_totals,
+                    week_start=week_start,
+                    today=today,
+                )
+        if state_status is not BackfillStatus.IMPORTED:
+            return False, False, has_verified_totals
+        if not in_current_week:
+            return True, False, False
+        if has_verified_totals:
+            return True, False, True
+
+        # Older stores predate the verified totals cache. Re-open only the
+        # current week's completed days so restart/upgrade can rebuild entity
+        # data without replaying the full historical Recorder queue.
+        day_state["status"] = BackfillStatus.PENDING.value
+        day_state["attempts"] = 0
+        day_state.pop("completed_at", None)
+        day_state.pop("imported_rows", None)
+        day_state.pop("last_attempt_at", None)
+        day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+        day_state.pop(_STATISTICS_HTTP_VERIFIED_TOTALS, None)
+        return False, True, False
+
+    @staticmethod
+    def _ensure_http_day_sum_chain_version(
+        source_state: dict[str, Any],
+        days_state: dict[str, Any],
+    ) -> bool:
+        """Reopen once any rows written by the old newest-first scheduler."""
+        if (
+            safe_int(source_state.get(_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY))
+            == _STATISTICS_HTTP_SUM_CHAIN_VERSION
+        ):
+            return False
+        for existing_state in days_state.values():
+            if not isinstance(existing_state, dict):
+                continue
+            if (
+                _normalize_backfill_status(
+                    existing_state.get("status"),
+                    closed=True,
+                )
+                is not BackfillStatus.IMPORTED
+            ):
+                continue
+            existing_state["status"] = BackfillStatus.PENDING.value
+            existing_state["attempts"] = 0
+            existing_state.pop("completed_at", None)
+            existing_state.pop("imported_rows", None)
+            existing_state.pop("last_attempt_at", None)
+            existing_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+        source_state[_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY] = (
+            _STATISTICS_HTTP_SUM_CHAIN_VERSION
+        )
+        return True
+
+    @staticmethod
+    def _reopen_later_imported_day_states(
+        days_state: dict[str, Any],
+        *,
+        target_day: date,
+    ) -> int:
+        """Reopen later rows when an older cumulative-sum gap is filled.
+
+        External energy statistics carry a running ``sum``.  Importing an older
+        day changes the correct offset of every later row in the same series, so
+        those later rows must be replayed in chronological order.  Verified
+        current-week totals are deliberately retained because they are entity
+        evidence independent of the Recorder sum chain.
+        """
+        reopened = 0
+        target_key = target_day.isoformat()
+        for day_key, later_state in days_state.items():
+            if day_key <= target_key or not isinstance(later_state, dict):
+                continue
+            if (
+                _normalize_backfill_status(later_state.get("status"), closed=True)
+                is not BackfillStatus.IMPORTED
+            ):
+                continue
+            later_state["status"] = BackfillStatus.PENDING.value
+            later_state["attempts"] = 0
+            later_state.pop("completed_at", None)
+            later_state.pop("imported_rows", None)
+            later_state.pop("last_attempt_at", None)
+            later_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            reopened += 1
+        return reopened
+
+    @staticmethod
+    def _ensure_http_period_sum_chain_version(
+        type_state: dict[str, Any],
+    ) -> bool:
+        """Reopen period rows written before chronological sum-chain repair."""
+        if (
+            safe_int(type_state.get(_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY))
+            == _STATISTICS_HTTP_SUM_CHAIN_VERSION
+        ):
+            return False
+        for existing_state in type_state.values():
+            if not isinstance(existing_state, dict):
+                continue
+            if (
+                _normalize_backfill_status(
+                    existing_state.get("status"),
+                    closed=True,
+                )
+                is not BackfillStatus.IMPORTED
+            ):
+                continue
+            existing_state["status"] = BackfillStatus.PENDING.value
+            existing_state["attempts"] = 0
+            existing_state.pop("completed_at", None)
+            existing_state.pop("imported_rows", None)
+            existing_state.pop("last_attempt_at", None)
+            existing_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+        type_state[_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY] = (
+            _STATISTICS_HTTP_SUM_CHAIN_VERSION
+        )
+        return True
+
+    @staticmethod
+    def _reopen_later_imported_period_states(
+        type_state: dict[str, Any],
+        *,
+        target_period: date,
+    ) -> int:
+        """Reopen later period rows after filling an older sum-chain gap."""
+        reopened = 0
+        target_key = target_period.isoformat()
+        for period_key, later_state in type_state.items():
+            if period_key <= target_key or not isinstance(later_state, dict):
+                continue
+            if (
+                _normalize_backfill_status(later_state.get("status"), closed=True)
+                is not BackfillStatus.IMPORTED
+            ):
+                continue
+            later_state["status"] = BackfillStatus.PENDING.value
+            later_state["attempts"] = 0
+            later_state.pop("completed_at", None)
+            later_state.pop("imported_rows", None)
+            later_state.pop("last_attempt_at", None)
+            later_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            reopened += 1
+        return reopened
+
+    @staticmethod
+    def _apply_unfetched_day_backfill_status(
+        day_state: dict[str, Any],
+        *,
+        status: str,
+    ) -> bool:
+        """Apply retry state for one unsuccessful day fetch.
+
+        Returns whether the complete HTTP backfill batch must stop because the
+        cloud reported its system-busy/rate-limit response.
+        """
+        attempts = day_state.get("attempts")
+        attempts_now = attempts if isinstance(attempts, int) else 0
+        if status == "rate_limited":
+            day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+            )
+            return True
+        if (
+            status == "empty_ambiguous"
+            and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
+        ):
+            day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
+            )
+            day_state.pop("completed_at", None)
+        elif (
+            status in {"auth_error", "transport_error"}
+            and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
+        ):
+            # Temporary network/auth-service failures remain retryable. The
+            # primary property poll, not history, owns reauthentication.
+            day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
+                time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+            )
+        return False
+
     async def _async_http_backfill_recent_day_statistics(  # ruff:ignore[too-many-locals]
         self,
         snapshot: dict[str, dict[str, Any]],
@@ -16123,14 +17065,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         rate_limited = False
         pending_sources_total = 0
         state_changed = False
+        verified_day_updates: dict[str, dict[str, Any]] = {}
+        week_start = today - timedelta(days=today.weekday())
         candidates: list[
             tuple[
+                int,
                 int,
                 str,
                 date,
                 int,
                 str,
                 str,
+                dict[str, Any],
                 dict[str, Any],
                 dict[str, Any],
             ]
@@ -16161,6 +17107,15 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     days_state = {}
                     source_state["days"] = days_state
 
+                # Older builds imported day-hourly rows newest-first. Since
+                # every row contains a cumulative sum, that produced a
+                # backwards/resetting chain. Reopen those rows once and let
+                # the chronological queue rewrite them safely.
+                state_changed |= self._ensure_http_day_sum_chain_version(
+                    source_state,
+                    days_state,
+                )
+
                 for stale_day in set(days_state) - target_day_keys:
                     days_state.pop(stale_day, None)
                     state_changed = True
@@ -16176,13 +17131,30 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         raw_status,
                         closed=True,
                     )
-                    if raw_status != state_status:
+                    if raw_status != state_status.value:
                         day_state["status"] = state_status.value
                         if state_status is not BackfillStatus.IMPORTED:
                             day_state["attempts"] = 0
                             day_state.pop("completed_at", None)
                         state_changed = True
-                    if state_status is BackfillStatus.IMPORTED:
+                    (
+                        skip_candidate,
+                        imported_state_changed,
+                        has_verified_totals,
+                    ) = (
+                        self._restore_or_reopen_imported_day_totals(
+                            verified_day_updates,
+                            state_status=state_status,
+                            day_state=day_state,
+                            device_id=device_id,
+                            target_day=target_day,
+                            section_prefix=section_prefix,
+                            week_start=week_start,
+                            today=today,
+                        )
+                    )
+                    state_changed = state_changed or imported_state_changed
+                    if skip_candidate:
                         continue
                     pending_sources_total += 1
                     retry_after = safe_float(
@@ -16198,7 +17170,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if not isinstance(attempts, int) or attempts < 0:
                         attempts = 0
                     last_attempt = day_state.get("last_attempt_at")
+                    verification_only = (
+                        week_start <= target_day < today
+                        and not has_verified_totals
+                    )
                     candidates.append((
+                        0 if verification_only else 1,
                         1 if last_attempt is not None else 0,
                         str(last_attempt) if last_attempt is not None else "",
                         target_day,
@@ -16207,23 +17184,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         section_prefix,
                         payload,
                         day_state,
+                        days_state,
                     ))
 
-        # Prioritise the newest missing days. A bounded queue that starts with
-        # the oldest date leaves yesterday's Energy-Dashboard curve pending for
-        # many runs while it walks months of history first. Previously-attempted
-        # rows still retain fair ordering by their oldest attempt timestamp.
+        # Current-week curves are fetched first only to feed verified period
+        # entity values. Recorder rows themselves must be written oldest-first:
+        # their ``sum`` field is cumulative, so newest-first imports create
+        # false resets and misallocated Energy-Dashboard bars.
         candidates.sort(
             key=lambda candidate: (
                 candidate[0],
                 candidate[1],
-                -candidate[2].toordinal(),
-                candidate[3],
+                candidate[2],
+                (
+                    -candidate[3].toordinal()
+                    if candidate[0] == 0
+                    else candidate[3].toordinal()
+                ),
                 candidate[4],
                 candidate[5],
+                candidate[6],
             ),
         )
+        actionable_sources_total = len(candidates)
         for (
+            priority,
             _attempted,
             _last_attempt,
             target_day,
@@ -16232,6 +17217,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             section_prefix,
             payload,
             day_state,
+            days_state,
         ) in candidates[: max(0, request_budget)]:
             requests += 1
             status, source = await self._async_fetch_historical_day_chart_source(
@@ -16250,38 +17236,49 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             state_changed = True
 
             if status != "fetched":
-                attempts_now = day_state["attempts"]
-                if status == "rate_limited":
-                    rate_limited = True
-                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                        time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
-                    )
+                rate_limited = self._apply_unfetched_day_backfill_status(
+                    day_state,
+                    status=status,
+                )
+                actionable_sources_total -= int(
+                    day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH) is not None
+                )
+                if rate_limited:
                     break
-                if (
-                    status == "empty_ambiguous"
-                    and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
-                ):
-                    day_state["status"] = BackfillStatus.RETRYABLE.value
-                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
-                    )
-                    day_state.pop("completed_at", None)
-                elif (
-                    status in {"auth_error", "transport_error"}
-                    and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
-                ):
-                    # A temporary internet/auth-service failure must end the
-                    # rapid bootstrap pass without becoming permanent data
-                    # loss. The normal five-minute statistics scheduler will
-                    # retry this exact source/day after the cooldown.
-                    day_state["status"] = BackfillStatus.RETRYABLE.value
-                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                        time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
-                    )
                 await asyncio.sleep(0)
                 continue
 
             source_days += 1
+            day_totals = self._record_verified_day_totals_update(
+                verified_day_updates,
+                device_id=device_id,
+                target_day=target_day,
+                section_prefix=section_prefix,
+                source=source,
+                day_state=day_state,
+                week_start=week_start,
+                today=today,
+            )
+            if priority == 0:
+                # This prefetch exists solely so current-week entities do not
+                # wait behind months of Recorder history. Keep the day pending;
+                # its hourly rows will be fetched again when the chronological
+                # cumulative-sum chain reaches it.
+                if day_totals:
+                    day_state["status"] = BackfillStatus.PENDING.value
+                    day_state["attempts"] = 0
+                    day_state.pop("last_attempt_at", None)
+                    day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+                else:
+                    self._apply_unfetched_day_backfill_status(
+                        day_state,
+                        status="empty_ambiguous",
+                    )
+                    actionable_sources_total -= int(
+                        day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH) is not None
+                    )
+                await asyncio.sleep(0)
+                continue
             (
                 ok,
                 imported,
@@ -16292,12 +17289,20 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             external_rows += imported
             if ok:
+                reopened = self._reopen_later_imported_day_states(
+                    days_state,
+                    target_day=target_day,
+                )
+                pending_sources_total += reopened
+                actionable_sources_total += reopened
+                state_changed |= bool(reopened)
                 day_state["status"] = BackfillStatus.IMPORTED.value
                 day_state["imported_rows"] = imported
                 day_state["completed_at"] = utc_now().isoformat()
                 successful_devices.add(device_id)
                 terminal_transitions += 1
                 pending_sources_total -= 1
+                actionable_sources_total -= 1
             else:
                 # A non-empty HTTP envelope can still contain no usable series
                 # for this metric/day. Keep it retryable after a long cooldown;
@@ -16311,11 +17316,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 else:
                     day_state["status"] = BackfillStatus.RETRYABLE.value
                 day_state.pop("imported_rows", None)
+                actionable_sources_total -= int(
+                    day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH) is not None
+                )
             # Entity-backed (``sensor.xxx``) day import remains removed: it
             # collides with HA's recorder on the same statistic_id.
             await asyncio.sleep(0)
 
         pending_sources = pending_sources_total
+
+        if verified_day_updates:
+            self._push_partial_update({
+                device_id: {
+                    PAYLOAD_VERIFIED_DAY_STATISTICS: device_days,
+                }
+                for device_id, device_days in verified_day_updates.items()
+            })
 
         if state_changed:
             await self._async_save_statistics_backfill_state()
@@ -16338,6 +17354,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "requests": requests,
             "terminal_transitions": terminal_transitions,
             "pending_sources": pending_sources,
+            "actionable_sources": actionable_sources_total,
             "rate_limited": rate_limited,
         }
         diag.update({
@@ -16365,6 +17382,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "last_http_backfill_requests": requests,
             "last_http_backfill_terminal_transitions": terminal_transitions,
             "last_http_backfill_pending_sources": pending_sources,
+            "last_http_backfill_actionable_sources": actionable_sources_total,
             "last_http_backfill_rate_limited": rate_limited,
             "next_http_backfill_allowed_in_seconds": retry_after_sec,
         })
@@ -16432,6 +17450,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 str,
                 dict[str, Any],
                 dict[str, Any],
+                dict[str, Any],
             ]
         ] = []
         state_changed = False
@@ -16460,6 +17479,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     if not isinstance(type_state, dict):
                         type_state = {}
                         source_state[date_type] = type_state
+                    state_changed |= self._ensure_http_period_sum_chain_version(
+                        type_state,
+                    )
                     for period_start in period_starts:
                         period_key = period_start.isoformat()
                         bucket_state = type_state.setdefault(period_key, {})
@@ -16490,14 +17512,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                                 None,
                             )
                         elif (
-                            raw_status != state_status
+                            raw_status != state_status.value
                             and state_status is not BackfillStatus.IMPORTED
                         ):
                             # Any obsolete/transient status is reopened. Only a
                             # successful Recorder import is terminal.
                             bucket_state["attempts"] = 0
                             bucket_state.pop("completed_at", None)
-                        if raw_status != state_status or was_open is not (not closed):
+                        if (
+                            raw_status != state_status.value
+                            or was_open is not (not closed)
+                        ):
                             bucket_state["status"] = state_status.value
                             bucket_state["period_open"] = not closed
                             state_changed = True
@@ -16527,22 +17552,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             date_type,
                             payload,
                             bucket_state,
+                            type_state,
                         ))
 
-        # Within each documented period type, make the newest missing closed
-        # bucket visible first. With several source prefixes and a bounded
-        # request budget, oldest-first ordering can otherwise leave the most
-        # recent Energy-Dashboard history pending for many scheduler cycles.
-        # Previously attempted rows still sort by their oldest attempt time.
+        # Every external energy statistic carries a cumulative ``sum``. Import
+        # closed buckets oldest-first so an older repair cannot seed a later
+        # Energy-Dashboard bar with an incomplete offset.
         candidates.sort(
             key=lambda candidate: (
                 candidate[0],
-                candidate[1],
-                candidate[2],
-                -candidate[3].toordinal(),
+                candidate[3].toordinal(),
                 candidate[4],
                 candidate[5],
                 candidate[6],
+                candidate[1],
+                candidate[2],
             ),
         )
         _LOGGER.debug(
@@ -16563,6 +17587,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         else:
             _LOGGER.debug("Period backfill: no closed-period candidates")
+        actionable_sources_total = len(candidates)
         requests = 0
         imported_sources = 0
         terminal_transitions = 0
@@ -16578,6 +17603,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             date_type,
             payload,
             bucket_state,
+            type_state,
         ) in candidates[: max(0, request_budget)]:
             _LOGGER.debug(
                 "Period backfill processing: device=%s prefix=%s "
@@ -16616,7 +17642,9 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
             except (TimeoutError, HomeAssistantError, JackeryError) as err:
                 status = (
-                    "rate_limited" if _is_system_busy_error(err) else "transport_error"
+                    "rate_limited"
+                    if _is_system_busy_error(err)
+                    else "transport_error"
                 )
                 _LOGGER.debug(
                     "Jackery period backfill failed for %s %s %s: %s",
@@ -16673,8 +17701,16 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         "status": BackfillStatus.IMPORTED.value,
                         "completed_at": utc_now().isoformat(),
                     })
+                    reopened = self._reopen_later_imported_period_states(
+                        type_state,
+                        target_period=period_start,
+                    )
+                    state_changed |= bool(reopened)
+                    pending_sources_total += reopened
+                    actionable_sources_total += reopened
                     terminal_transitions += 1
                     pending_sources_total -= 1
+                    actionable_sources_total -= 1
                 elif failed:
                     status = "recorder_error"
                 else:
@@ -16688,6 +17724,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
                     ),
                 })
+                actionable_sources_total -= 1
                 await asyncio.sleep(0)
                 break
             if (
@@ -16701,6 +17738,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     ),
                 })
                 bucket_state.pop("completed_at", None)
+                actionable_sources_total -= 1
             elif (
                 status in {"auth_error", "transport_error", "recorder_error"}
                 and attempts_now >= _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS
@@ -16711,6 +17749,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
                     ),
                 })
+                actionable_sources_total -= 1
             await asyncio.sleep(0)
 
         pending_sources = pending_sources_total
@@ -16721,6 +17760,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "last_period_backfill_imported_sources": imported_sources,
             "last_period_backfill_terminal_transitions": terminal_transitions,
             "last_period_backfill_pending_sources": pending_sources,
+            "last_period_backfill_actionable_sources": actionable_sources_total,
             "last_period_backfill_open_sources": open_sources,
             "last_period_backfill_rate_limited": rate_limited,
         })
@@ -16729,6 +17769,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "imported_sources": imported_sources,
             "terminal_transitions": terminal_transitions,
             "pending_sources": pending_sources,
+            "actionable_sources": actionable_sources_total,
             "open_sources": open_sources,
             "rate_limited": rate_limited,
         }
@@ -16807,130 +17848,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
         )
 
-    async def _async_import_local_daily_lifetime_statistics(
-        self,
-        snapshot: dict[str, dict[str, Any]],
-    ) -> set[str]:
-        """Import local daily energy deltas as lifetime TOTAL_INCREASING statistics.
-
-        The coordinator computes local daily energy deltas (Wh) from midnight
-        lifetime counter snapshots and stores them in PAYLOAD_LOCAL_DAILY_ENERGY.
-        These deltas need to be aggregated into lifetime TOTAL_INCREASING
-        external statistics for the Energy Dashboard.
-
-        For each device and each LOCAL_DAILY_LIFETIME_METRIC, we import the
-        accumulated lifetime sum as a TOTAL_INCREASING statistic.
-        """
-        if not snapshot:
-            return set()
-
-        successful_devices: set[str] = set()
-        today = self._local_today()
-
-        for device_id, payload in snapshot.items():
-            local_daily = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
-            if not isinstance(local_daily, dict):
-                continue
-
-            name_prefix = self._app_chart_name_prefix(device_id, payload)
-            for metric_key in LOCAL_DAILY_LIFETIME_METRICS:
-                daily_wh = safe_float(local_daily.get(metric_key))
-                if daily_wh is None:
-                    continue
-
-                daily_kwh = round(daily_wh / 1000.0, 5)
-
-                # Map metric_key to a stable statistic label
-                label = self._local_daily_metric_to_label(metric_key)
-                if not label:
-                    continue
-
-                statistic_id = external_trend_statistic_id(
-                    DOMAIN,
-                    device_id,
-                    f"{metric_key}_lifetime",
-                    EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-                )
-
-                # Import one cumulative sum point at local midnight. External
-                # energy statistics use ``has_sum=True``; fold the daily
-                # increment into the previous sum instead of exposing a
-                # non-monotonic daily value as the statistic state.
-                start_dt = datetime.combine(
-                    today, datetime.min.time(), tzinfo=self._local_timezone()
-                )
-
-                async with self._statistics_recorder_lock:
-                    # Get existing offset to maintain monotonic sum. Keep the
-                    # read, queued import, and recorder commit together so a
-                    # concurrent chart/backfill import cannot compute from an
-                    # older sum and then mark a stale write as complete.
-                    offset = await self._async_statistic_sum_offset(
-                        statistic_id,
-                        [start_dt],
-                        [daily_kwh],
-                    )
-                    cumulative = round(offset + daily_kwh, 5)
-
-                    metadata_dict: dict[str, Any] = {
-                        "mean_type": StatisticMeanType.NONE,
-                        "has_sum": True,
-                        "name": f"{name_prefix} {label} (lifetime)",
-                        "source": DOMAIN,
-                        "statistic_id": statistic_id,
-                        "unit_class": EnergyConverter.UNIT_CLASS,
-                        "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
-                    }
-
-                    statistics = [StatisticData(start=start_dt, sum=cumulative)]
-
-                    try:
-                        async_add_external_statistics(
-                            self.hass,
-                            metadata_dict,  # type: ignore[arg-type]
-                            statistics,
-                        )
-                        await get_instance(self.hass).async_block_till_done()
-                        successful_devices.add(device_id)
-                    except BACKGROUND_TASK_ERRORS as err:
-                        _LOGGER.debug(
-                            "Could not import local daily lifetime statistic for "
-                            "%s (%s): %s",
-                            device_id,
-                            metric_key,
-                            exception_debug_message(err),
-                        )
-
-        return successful_devices
-
-    def _local_daily_metric_to_label(self, metric_key: str) -> str | None:  # noqa: PLR6301, RUF105
-        """Map LOCAL_DAILY_LIFETIME_METRIC to a human-readable label."""
-        mapping = {
-            APP_DEVICE_STAT_PV_ENERGY: "PV energy",
-            APP_STAT_PV1_ENERGY: "PV1 energy",
-            APP_STAT_PV2_ENERGY: "PV2 energy",
-            APP_STAT_PV3_ENERGY: "PV3 energy",
-            APP_STAT_PV4_ENERGY: "PV4 energy",
-            APP_DEVICE_STAT_BATTERY_CHARGE: "Battery charge",
-            APP_DEVICE_STAT_BATTERY_DISCHARGE: "Battery discharge",
-            APP_DEVICE_STAT_ONGRID_INPUT: "On-grid input",
-            APP_DEVICE_STAT_ONGRID_OUTPUT: "On-grid output",
-            APP_DEVICE_STAT_BATTERY_TO_GRID: "Battery to grid",
-            APP_DEVICE_STAT_PV_TO_BATTERY: "PV to battery",
-            APP_DEVICE_STAT_PV_TO_ONGRID: "PV to on-grid",
-            APP_DEVICE_STAT_ONGRID_TO_BATTERY: "On-grid to battery",
-            APP_DEVICE_STAT_EPS_INPUT: "EPS input",
-            APP_DEVICE_STAT_EPS_OUTPUT: "EPS output",
-            FIELD_CT_TOTAL_PHASE_ENERGY: "CT total phase energy",
-            FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: "CT negative phase energy",
-        }
-        return mapping.get(metric_key)
-
     async def _async_import_current_app_chart_statistics_job(
         self,
         snapshot: dict[str, dict[str, Any]],
     ) -> set[str]:
-        """Import current app-chart and local-delta buckets without HTTP waits.
+        """Import current verified app-chart buckets without HTTP waits.
 
         Returns:
             Device ids whose external statistics imported successfully, so
@@ -16945,11 +17867,6 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             snapshot,
         )
         successful_devices.update(period_successful_devices)
-        # Import local daily energy deltas as lifetime TOTAL_INCREASING statistics
-        local_import_result = await self._async_import_local_daily_lifetime_statistics(
-            snapshot
-        )
-        successful_devices.update(local_import_result)
         # Entity-backed (``sensor.xxx``) statistics import removed here too: it
         # collided with HA's own sensor recorder on the same statistic_id. The
         # external ``jackery_solarvault:`` statistics above are authoritative;

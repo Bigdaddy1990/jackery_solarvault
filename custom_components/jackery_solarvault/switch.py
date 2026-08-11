@@ -239,6 +239,7 @@ class JackerySwitchDescription(SwitchEntityDescription):
     app_fields: tuple[str, ...] = ()
     data_sources: tuple[str, ...] = ()
     command_sources: tuple[str, ...] = ()
+    device_registry_role: str = "head"
     null_semantics: str = DEFAULT_NULL_SEMANTICS
     recorder_allowed: bool = True
     ha_derived: bool = False
@@ -524,6 +525,7 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         fallback_section=PAYLOAD_WEATHER_PLAN,
         use_task_plan_fallback=True,
         setter=_set_storm_warning,
+        device_registry_role="system",
     ),
     JackerySwitchDescription(
         key="third_party_mqtt_enable",
@@ -619,6 +621,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
+        self.device_registry_role = description.device_registry_role
 
     def _raise_action_error(self, error: object) -> None:
         """Raise a translatable HA action error for this switch."""

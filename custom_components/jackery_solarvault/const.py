@@ -151,13 +151,10 @@ CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
 # surface it to the user.
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
-# Safe narrow default from app traces / user reports. Still configurable.
-# Broad wildcards (for example ``#``) remain blocked separately.
-# Default is the topic the device actually publishes on in this deployment:
-# the device is configured to ``homeassistant`` and the local broker subscribes
-# ``#`` plus ``homeassistant``. ``hb/app/#`` is the CLOUD-MQTT namespace only
-# and must never be forced onto the local listener (owner decision 2026-07-22;
-# the narrowing override in __init__.py is removed together with this value).
+# The device-side bridge publishes on one exact broker topic. Command 3046 has
+# no topic field, so the app-compatible default remains the literal topic used
+# by the working integration and owner broker configuration. Never replace an
+# empty option with a broker-wide wildcard.
 DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
 
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
@@ -924,9 +921,9 @@ FIELD_BAT_STATE: Final = "batState"
 FIELD_BAT_SOC: Final = "batSoc"
 FIELD_ACC_CT_BODY: Final = "AccCTBody"
 FIELD_CELL_TEMP: Final = "cellTemp"
-FIELD_IN_EGY: Final = "inEgy"  # Pack lifetime charged energy in Wh (BLE cmd=120)
+FIELD_IN_EGY: Final = "inEgy"  # Pack lifetime charged energy in 0.01 kWh units
 FIELD_IN_PW: Final = "inPw"
-FIELD_OUT_EGY: Final = "outEgy"  # Pack lifetime discharged energy in Wh (BLE cmd=120)
+FIELD_OUT_EGY: Final = "outEgy"  # Pack lifetime discharged energy in 0.01 kWh units
 FIELD_OUT_PW: Final = "outPw"
 FIELD_SWITCH_STATE: Final = "switchSta"  # PlugSub current on/off state (0/1)
 FIELD_SYS_SWITCH: Final = "sysSwitch"  # PlugSub desired on/off setter (0/1)
@@ -951,8 +948,6 @@ FIELD_MAX_SYS_OUT_PW: Final = "maxSysOutPw"
 FIELD_MAX_SYS_IN_PW: Final = "maxSysInPw"
 FIELD_FUNC_ENABLE: Final = "funcEnable"
 FIELD_IS_FIRMWARE_UPGRADE: Final = "isFirmwareUpgrade"
-FIELD_HOME_LOAD_PW: Final = "homeLoadPw"
-FIELD_LOAD_PW: Final = "loadPw"
 FIELD_IN_ONGRID_PW: Final = "inOngridPw"
 FIELD_GRID_IN_PW: Final = "gridInPw"
 FIELD_IN_GRID_SIDE_PW: Final = "inGridSidePw"
@@ -1499,6 +1494,10 @@ APP_STAT_TODAY_BATTERY_ENERGY: Final = "de"
 APP_STAT_TODAY_GRID_IMPORT_ENERGY: Final = "dg"
 APP_STAT_TODAY_HOME_LOAD_ENERGY: Final = "dh"
 APP_STAT_TODAY_SOLAR_ENERGY: Final = "ds"
+# Internal metadata kept inside the compact-day payload when a documented
+# fallback replaces a lagging App scalar. This preserves diagnostic provenance
+# without changing any App-owned field name or value.
+APP_TODAY_ENERGY_SOURCE_META: Final = "_source_provenance"
 APP_STAT_TOTAL_TREND_CHARGE_ENERGY: Final = "totalChgEgy"
 APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: Final = "totalDisChgEgy"
 APP_STAT_TOTAL_HOME_ENERGY: Final = "totalHomeEgy"
@@ -1827,6 +1826,12 @@ NON_BATTERY_SUBDEVICE_TYPES: Final = frozenset({
     SUBDEVICE_TYPE_WATER_LEAK,
 })
 
+# Verified kWh totals integrated from completed HTTP ``dateType=day`` curves.
+# The coordinator bounds this mapping to the current open week; period entities
+# use it only when Jackery's matching month bucket is missing or an unconfirmed
+# zero.  Shape: ``{YYYY-MM-DD: {section_prefix: {stat_key: kWh}}}``.
+PAYLOAD_VERIFIED_DAY_STATISTICS: Final = "verified_day_statistics"
+
 # Payload sections that must survive a slow HTTP refresh when they were last
 # updated via MQTT. These are integration payload keys, not MQTT message types.
 PRESERVED_FAST_PAYLOAD_KEYS: Final = (
@@ -1846,6 +1851,7 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_MQTT_CONNECT_INFO,
     PAYLOAD_ELECTRICITY_STRATEGY,
     PAYLOAD_BATTERY_BOUNDARY,
+    PAYLOAD_VERIFIED_DAY_STATISTICS,
     # Shadow-config buckets: filled only by the background getSmartMode /
     # getSmartSchedulePrediction fallback (TOU via MQTT), never by the fast HTTP
     # poll's fresh entry dict. Without preservation a transient/failed/skipped
@@ -2673,6 +2679,11 @@ CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
 DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
 CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
 DEFAULT_ENABLE_DAY_STATISTICS: Final = True
+# Live Jackery main-device and battery-pack energy counters use hundredths of
+# one kWh. Owner diagnostics on 2026-08-11 match raw day deltas (pvEgy=1817)
+# to HTTP day kWh (pvEgy=17.88). Third-party CT counters remain Wh.
+JACKERY_LIVE_ENERGY_UNITS_PER_KWH: Final = 100
+CT_LIVE_ENERGY_UNITS_PER_KWH: Final = 1000
 LOCAL_DAILY_LIFETIME_METRICS: Final[tuple[str, ...]] = (
     APP_DEVICE_STAT_PV_ENERGY,
     APP_STAT_PV1_ENERGY,

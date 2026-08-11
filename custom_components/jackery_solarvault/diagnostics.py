@@ -269,10 +269,11 @@ def _local_mqtt_diagnostics(
         config_entry_str_option(entry, CONF_LOCAL_MQTT_PASSWORD, "")
         or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
     ).strip()
-    configured_topic_filter = (
+    raw_topic_filter = (
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
         or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
     ).strip()
+    configured_topic_filter = raw_topic_filter
     effective_topic_filter: str | None = (
         configured_topic_filter or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
     )
@@ -287,7 +288,7 @@ def _local_mqtt_diagnostics(
             reason = "bridge_disabled"
         elif not host:
             reason = "missing_broker_host"
-        elif configured_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
+        elif raw_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
             reason = "broad_topic_filter_blocked"
         else:
             reason = "client_not_started"

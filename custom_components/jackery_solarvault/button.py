@@ -142,6 +142,7 @@ class JackeryQueryButtonDescription:
     http_subdevice_dev_type: int | None = None
     data_sources: tuple[str, ...] = ()
     command_sources: tuple[str, ...] = ()
+    device_registry_role: str = "head"
 
     def __post_init__(self) -> None:
         """Resolve direct read and command transports for this App command."""
@@ -639,6 +640,7 @@ QUERY_BUTTON_DESCRIPTIONS: tuple[JackeryQueryButtonDescription, ...] = (
         action_id=ACTION_ID_QUERY_COMBINE_DATA,
         cmd=MQTT_CMD_QUERY_COMBINE_DATA,
         http_system_shadow=True,
+        device_registry_role="system",
     ),
     JackeryQueryButtonDescription(
         key="refresh_device_info",
@@ -1116,6 +1118,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self._query_description = description
+        self.device_registry_role = description.device_registry_role
         self._attr_translation_key = description.translation_key
 
     @property
@@ -1283,6 +1286,7 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
 class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
     """Query the app weather/storm plan via ``QueryWeatherPlan``."""
 
+    device_registry_role = "system"
     _attr_translation_key = "refresh_weather_plan"
     _attr_entity_category = EntityCategory.CONFIG
     data_sources = LAYER5_DATA_SOURCES
@@ -1454,6 +1458,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
 class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
     """Delete one active app storm alert via ``CancelWeatherAlert``."""
 
+    device_registry_role = "system"
     _attr_translation_key = "delete_storm_alert"
     _attr_entity_category = EntityCategory.CONFIG
     data_sources = ("cloud_mqtt",)

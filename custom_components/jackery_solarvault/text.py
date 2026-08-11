@@ -341,6 +341,7 @@ class JackeryDeviceNameText(JackeryEntity, TextEntity):
 class JackerySystemNameText(JackeryEntity, TextEntity):
     """Rename the SolarVault system using SYSTEM_NAME_PATH from const.py."""
 
+    device_registry_role = "system"
     _attr_translation_key = "system_name"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_native_min = 1
@@ -436,6 +437,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 class JackeryGridStandardText(JackeryEntity, TextEntity):
     """Write the app grid-standard code via SYNC_GRID_STANDARD."""
 
+    device_registry_role = "system"
     _attr_translation_key = "grid_standard"
     _attr_entity_category = EntityCategory.CONFIG
     _attr_icon = "mdi:transmission-tower"

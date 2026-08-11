@@ -277,8 +277,8 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     - CONF_LOCAL_MQTT_PORT: int — MQTT port (defaults to DEFAULT_LOCAL_MQTT_PORT)
     - CONF_LOCAL_MQTT_USERNAME: str — MQTT username (empty string when not set)
     - CONF_LOCAL_MQTT_PASSWORD: str — MQTT password (empty string when not set)
-    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — topic filter trimmed of surrounding
-    whitespace (empty string when not set)
+    - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — exact topic trimmed of surrounding
+    whitespace (the app-compatible default when not set)
 
     Returns:
         dict[str, Any]: Normalized local MQTT option values suitable for storing in
@@ -345,6 +345,7 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
             _first_entry_value(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 CONF_LOCAL_MQTT_TOPIC,
+                default=DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
             ),
         ).strip(),
     }
@@ -440,7 +441,7 @@ def _merge_local_mqtt_options(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
             )
-            or "",
+            or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
         ).strip(),
     }
 

@@ -2,6 +2,7 @@
 
 import calendar
 import contextlib
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 import json
 import math
@@ -44,6 +45,7 @@ from .const import (
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
     APP_STAT_PV_PROFIT,
+    APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
@@ -83,6 +85,7 @@ from .const import (
     FIELD_IDX,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
+    FIELD_MAC,
     FIELD_OTHER_LOAD_PW,
     FIELD_OUT_GRID_SIDE_PW,
     FIELD_OUT_ONGRID_PW,
@@ -1111,11 +1114,7 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(
-    value: bool | float | str | None,
-) -> (
-    bool | None
-):  # boolean payload value; flat type-dispatch guard chain is clearest as-is
+def safe_bool(value: bool | float | str | None) -> bool | None:  # boolean payload value; flat type-dispatch guard chain is clearest as-is
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -1203,6 +1202,20 @@ def meter_head_serial(meter_head: object) -> str | None:
         meter_head.get(FIELD_DEVICE_ID),
         meter_head.get(FIELD_ID),
         meter_head.get(FIELD_DEV_ID),
+    )
+
+
+def smart_meter_identity(smart_meter: object) -> str | None:
+    """Extract a stable serial/id identity from a CT smart-meter payload."""
+    if not isinstance(smart_meter, dict):
+        return None
+    return first_nonblank_text(
+        smart_meter.get(FIELD_DEVICE_SN),
+        smart_meter.get(FIELD_SN),
+        smart_meter.get(FIELD_MAC),
+        smart_meter.get(FIELD_DEVICE_ID),
+        smart_meter.get(FIELD_ID),
+        smart_meter.get(FIELD_DEV_ID),
     )
 
 
@@ -1489,7 +1502,7 @@ def _compact_year_parts(value: object) -> tuple[float, float] | None:
 
 def _prefer_raw_year_series_for_real_payload(
     section: str,
-    raw_values: list[float],
+    raw_values: list[float | None],
     direct_total: float | None,
     tolerance: float,
 ) -> bool:
@@ -1500,15 +1513,21 @@ def _prefer_raw_year_series_for_real_payload(
         or len(raw_values) < 12
     ):
         return False
-    nonzero = [value for value in raw_values if abs(value) > _NEAR_ZERO_EPSILON]
-    return len(nonzero) == 1 and abs(sum(raw_values) - direct_total) <= tolerance
+    numeric_values = [value for value in raw_values if value is not None]
+    nonzero = [
+        value for value in numeric_values if abs(value) > _NEAR_ZERO_EPSILON
+    ]
+    return (
+        len(nonzero) == 1
+        and abs(sum(numeric_values) - direct_total) <= tolerance
+    )
 
 
 def expanded_year_series_values(
     source: dict[str, Any],
     section: str,
     stat_key: str,
-) -> list[float] | None:
+) -> list[float | None] | None:
     """Expand Jackery device-year compact chart buckets into a full per-bucket (monthly)
     value list.
 
@@ -1518,7 +1537,7 @@ def expanded_year_series_values(
         stat_key (str): Statistic key whose documented total may anchor expansion.
 
     Returns:
-        list[float] | None: A list of per-bucket values (rounded to 5 decimals) when a
+        list[float | None] | None: Per-bucket numeric values/placeholders when a
         chart series is present.
             - If a documented scalar total (`stat_key`) is present, returns the expanded list only when its sum matches
               the documented total within a small tolerance; otherwise returns the raw
@@ -1532,10 +1551,15 @@ def expanded_year_series_values(
     if not isinstance(series, list):
         return None
 
-    raw_values = [round(safe_float(item) or 0.0, 5) for item in series]
+    raw_values = [
+        None if (value := safe_float(item)) is None else round(value, 5)
+        for item in series
+    ]
     direct_total = safe_float(source.get(stat_key))
 
-    expanded = [0.0 for _ in series]
+    expanded: list[float | None] = [
+        None if value is None else 0.0 for value in raw_values
+    ]
     has_compact_bucket = False
     for index, raw_value in enumerate(series):
         parts = _compact_year_parts(raw_value)
@@ -1545,11 +1569,11 @@ def expanded_year_series_values(
         if previous_value:
             has_compact_bucket = True
             target = index - 1 if index > 0 else index
-            expanded[target] += previous_value
+            expanded[target] = (expanded[target] or 0.0) + previous_value
         if current_value:
-            expanded[index] += current_value
+            expanded[index] = (expanded[index] or 0.0) + current_value
 
-    expanded = [round(value, 5) for value in expanded]
+    expanded = [None if value is None else round(value, 5) for value in expanded]
 
     if direct_total is None:
         return raw_values
@@ -1564,12 +1588,12 @@ def expanded_year_series_values(
 
 def _disambiguate_year_series(
     section: str,
-    raw_values: list[float],
-    expanded: list[float],
+    raw_values: list[float | None],
+    expanded: list[float | None],
     direct_total: float,
     *,
     has_compact_bucket: bool,
-) -> list[float]:
+) -> list[float | None]:
     """Pick raw vs. compact-expanded year buckets against the documented total.
 
     When compact encoding is in effect the expanded series is authoritative even
@@ -1580,12 +1604,14 @@ def _disambiguate_year_series(
     :func:`_prefer_raw_year_series_for_real_payload`.
 
     Returns:
-        list[float]: The chosen series (expanded when it reconciles the total and
-        compact encoding applies, otherwise raw).
+        list[float | None]: The chosen series (expanded when it reconciles the
+        total and compact encoding applies, otherwise raw).
     """
     tolerance = max(0.05, abs(direct_total) * 0.005)
-    raw_matches = abs(round(sum(raw_values), 2) - direct_total) <= tolerance
-    expanded_matches = abs(round(sum(expanded), 2) - direct_total) <= tolerance
+    raw_total = sum(value for value in raw_values if value is not None)
+    expanded_total = sum(value for value in expanded if value is not None)
+    raw_matches = abs(round(raw_total, 2) - direct_total) <= tolerance
+    expanded_matches = abs(round(expanded_total, 2) - direct_total) <= tolerance
     prefer_expanded = (
         has_compact_bucket
         and expanded_matches
@@ -1609,13 +1635,13 @@ def effective_trend_series_values(
     source: dict[str, Any],
     section: str,
     stat_key: str,
-) -> list[float] | None:
+) -> list[float | None] | None:
     """Return the normalized series of numeric values for a given section and statistic
     key.
 
     For device-year payloads, returns expanded year-series values when expansion is
-    applicable; for other payloads, returns a list where each entry is a float
-    (non-parsable entries become `0.0`) rounded to 5 decimal places.
+    applicable; for other payloads, returns a list where numeric entries are
+    rounded to 5 decimal places and non-parsable placeholders remain ``None``.
 
     Parameters:
         source (dict[str, Any]): Payload containing chart series and metadata.
@@ -1623,8 +1649,9 @@ def effective_trend_series_values(
         stat_key (str): Statistic key within the section to locate the chart series.
 
     Returns:
-        list[float] | None: Normalized list of floats rounded to 5 decimals, or `None`
-        if the chart series key is not applicable or the series value is not a list.
+        list[float | None] | None: Normalized numeric values/placeholders, or
+        ``None`` if the chart series key is not applicable or the series value
+        is not a list.
     """  # noqa: D205, RUF105
     # dateType=day arrays are W power curves (served through
     # day_power_series_key), never energy chart buckets — their energy
@@ -1641,7 +1668,7 @@ def effective_trend_series_values(
         return expanded_year_series_values(source, section, stat_key)
 
     return [
-        0.0 if (val := safe_float(raw)) is None else round(val, 5) for raw in series
+        None if (val := safe_float(raw)) is None else round(val, 5) for raw in series
     ]
 
 
@@ -1664,7 +1691,7 @@ def effective_period_total_value(
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
-            return round(sum(values), 2)
+            return round(sum(value for value in values if value is not None), 2)
     return safe_float(source.get(stat_key))
 
 
@@ -1678,7 +1705,7 @@ def _period_section(prefix: str, date_type: str) -> str:
     return f"{prefix}_{date_type}"
 
 
-def _nonzero_months(values: list[float]) -> list[int]:
+def _nonzero_months(values: list[float | None]) -> list[int]:
     """Return one-based month numbers with non-zero app values."""
     return [
         index + 1
@@ -2278,6 +2305,158 @@ def attach_calculated_savings_metadata(payload: dict[str, Any]) -> None:
     }
 
 
+def guard_statistic_totals_from_year(  # ruff:ignore[too-many-locals]
+    payload: dict[str, Any],
+    *,
+    previous_statistic: dict[str, Any] | None = None,
+) -> None:
+    """Preserve non-decreasing lifetime KPIs and attach savings diagnostics.
+
+    The app occasionally returns lifetime ``statistic.totalGeneration`` below the
+    current-year PV total. Per the period hierarchy, that smaller lifetime value is
+    not allowed to replace a verified longer lower bound. The raw cloud revenue is
+    still kept as its own KPI; calculated savings remain metadata/detail-sensor input.
+    """
+    statistic = payload.get(PAYLOAD_STATISTIC)
+    if not isinstance(statistic, dict):
+        return
+
+    pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+    pv_year = payload.get(pv_year_section)
+    year_generation = (
+        effective_period_total_value(
+            pv_year,
+            pv_year_section,
+            APP_STAT_TOTAL_SOLAR_ENERGY,
+        )
+        if isinstance(pv_year, dict)
+        else None
+    )
+    year_revenue = _pv_revenue_value(pv_year) if isinstance(pv_year, dict) else None
+
+    raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
+    previous_generation = (
+        safe_float(previous_statistic.get(APP_STAT_TOTAL_GENERATION))
+        if isinstance(previous_statistic, dict)
+        else None
+    )
+    candidates = [
+        value
+        for value in (raw_generation, year_generation, previous_generation)
+        if value is not None
+    ]
+    corrected_generation = max(candidates) if candidates else None
+    guard_meta: dict[str, Any] | None = None
+    if (
+        raw_generation is not None
+        and corrected_generation is not None
+        and corrected_generation
+        > raw_generation + _tolerance_for_values(corrected_generation, raw_generation)
+    ):
+        statistic = dict(statistic)
+        statistic[APP_STAT_TOTAL_GENERATION] = round(corrected_generation, 2)
+        method = (
+            "previous_total_lower_bound"
+            if previous_generation is not None
+            and previous_generation
+            >= corrected_generation
+            - _tolerance_for_values(previous_generation, corrected_generation)
+            else "year_total_lower_bound"
+        )
+        guard_meta = {
+            "method": method,
+            "corrected": {
+                APP_STAT_TOTAL_GENERATION: {
+                    "raw_total": round(raw_generation, 2),
+                    "corrected_total": round(corrected_generation, 2),
+                    "current_year_total": _round_stat_value(year_generation),
+                    "previous_total": _round_stat_value(previous_generation),
+                }
+            },
+        }
+        statistic["_total_lower_bound_guard"] = guard_meta
+        raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
+        if (
+            raw_carbon is not None
+            and raw_generation > 0
+            and raw_carbon >= 0
+            and corrected_generation >= 0
+        ):
+            carbon_factor = raw_carbon / raw_generation
+            if 0 <= carbon_factor <= _MAX_CARBON_FACTOR:
+                statistic[APP_STAT_TOTAL_CARBON] = round(
+                    corrected_generation * carbon_factor,
+                    2,
+                )
+        payload[PAYLOAD_STATISTIC] = statistic
+    elif previous_generation is not None and raw_generation is None:
+        statistic = dict(statistic)
+        statistic[APP_STAT_TOTAL_GENERATION] = round(previous_generation, 2)
+        statistic["_total_lower_bound_guard"] = {
+            "method": "previous_total_lower_bound",
+            "corrected": {
+                APP_STAT_TOTAL_GENERATION: {
+                    "raw_total": None,
+                    "corrected_total": round(previous_generation, 2),
+                    "current_year_total": _round_stat_value(year_generation),
+                    "previous_total": round(previous_generation, 2),
+                }
+            },
+        }
+        payload[PAYLOAD_STATISTIC] = statistic
+
+    statistic = payload.get(PAYLOAD_STATISTIC)
+    if not isinstance(statistic, dict):
+        return
+    savings = _calculated_savings_from_year(
+        payload,
+        year_generation=year_generation,
+        year_revenue=year_revenue,
+    )
+    if savings is None:
+        return
+    raw_revenue = safe_float(statistic.get(APP_STAT_TOTAL_REVENUE))
+    raw_generation_after_guard = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
+    pv_revenue_candidates = (
+        _pv_revenue_candidates(
+            pv_year,
+            year_revenue=year_revenue,
+            raw_generation=raw_generation_after_guard,
+            price=safe_float(savings.get("price")),
+        )
+        if isinstance(pv_year, dict)
+        else []
+    )
+    calculated_total = safe_float(savings.get("calculated_total"))
+    should_publish, decision = (
+        _savings_publish_decision(
+            raw_revenue=raw_revenue,
+            calculated_revenue=calculated_total,
+            raw_generation=raw_generation_after_guard,
+            year_generation=year_generation,
+            pv_revenue_candidates=pv_revenue_candidates,
+        )
+        if calculated_total is not None
+        else (False, "missing_calculated_savings")
+    )
+    savings.update({
+        "raw_cloud_total": raw_revenue,
+        "pv_revenue_candidates": pv_revenue_candidates,
+        "would_replace_cloud_total": should_publish,
+        "decision": decision,
+        "published_value": calculated_total if should_publish else raw_revenue,
+        "published_value_source": "calculated_savings"
+        if should_publish
+        else "cloud_total",
+    })
+    if guard_meta is not None:
+        savings["total_lower_bound_guard"] = guard_meta
+    payload[PAYLOAD_STATISTIC] = {
+        **statistic,
+        APP_SAVINGS_CALC_META: savings,
+    }
+
+
 def compact_json(value: object) -> str:
     """Produce a compact JSON string of the given value suitable for diagnostics.
 
@@ -2320,6 +2499,15 @@ def trend_series_points(  # trend-series parsing dispatches over unit/label/seri
     if not isinstance(series, list) or not series:
         return []
     series_values = cast("list[Any]", series)
+    if not any(
+        (numeric := safe_float(value)) is not None
+        and abs(numeric) > _NEAR_ZERO_EPSILON
+        for value in series_values
+    ):
+        # A single all-zero HTTP chart is an unconfirmed no-data shape, not a
+        # Recorder series.  Zero buckets remain valid when another bucket in
+        # the same chart proves that the period contains real activity.
+        return []
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -2656,6 +2844,263 @@ def day_power_energy_points(  # ruff:ignore[too-many-locals]  # cohesive day-cur
             bucket_items, rounded_values, strict=False
         )
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class AppDataQualityWarning:
+    """One non-repairing app-statistics contradiction warning."""
+
+    level: str
+    reason: str
+    metric_key: str
+    label: str
+    source_section: str
+    source_value: float
+    reference_section: str
+    reference_value: float
+    source_request: dict[str, Any] | None = None
+    reference_request: dict[str, Any] | None = None
+    source_chart_series_key: str | None = None
+    reference_chart_series_key: str | None = None
+    total_method: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return a compact diagnostics-safe dict without empty optional fields."""
+        data: dict[str, Any] = {
+            "level": self.level,
+            "reason": self.reason,
+            "metric_key": self.metric_key,
+            "label": self.label,
+            "source_section": self.source_section,
+            "source_value": self.source_value,
+            "reference_section": self.reference_section,
+            "reference_value": self.reference_value,
+        }
+        if self.source_request is not None:
+            data["source_request"] = self.source_request
+        if self.reference_request is not None:
+            data["reference_request"] = self.reference_request
+        if self.source_chart_series_key is not None:
+            data["source_chart_series_key"] = self.source_chart_series_key
+        if self.reference_chart_series_key is not None:
+            data["reference_chart_series_key"] = self.reference_chart_series_key
+        if self.total_method is not None:
+            data["total_method"] = self.total_method
+        return data
+
+
+_DATA_QUALITY_PERIOD_METRICS: Final = (
+    (
+        "device_ongrid_output_energy",
+        "Device grid-side output energy",
+        APP_SECTION_HOME_STAT,
+        APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    ),
+    (
+        "device_ongrid_input_energy",
+        "Device grid-side input energy",
+        APP_SECTION_HOME_STAT,
+        APP_STAT_TOTAL_IN_GRID_ENERGY,
+    ),
+    (
+        "pv_energy",
+        "PV energy",
+        APP_SECTION_PV_STAT,
+        APP_STAT_TOTAL_SOLAR_ENERGY,
+    ),
+    (
+        "battery_charge_energy",
+        "Battery charge energy",
+        APP_SECTION_BATTERY_STAT,
+        APP_STAT_TOTAL_CHARGE,
+    ),
+    (
+        "battery_discharge_energy",
+        "Battery discharge energy",
+        APP_SECTION_BATTERY_STAT,
+        APP_STAT_TOTAL_DISCHARGE,
+    ),
+)
+
+
+def _request_dict(source: dict[str, Any]) -> dict[str, Any] | None:
+    request = source.get(APP_REQUEST_META)
+    return dict(request) if isinstance(request, dict) else None
+
+
+def _period_source(
+    payload: dict[str, Any],
+    section_prefix: str,
+    period: str,
+) -> tuple[str, dict[str, Any]] | None:
+    section = _period_section(section_prefix, period)
+    source = payload.get(section)
+    if not isinstance(source, dict):
+        return None
+    return section, source
+
+
+def _period_warning(
+    *,
+    reason: str,
+    metric_key: str,
+    label: str,
+    source_section: str,
+    source_source: dict[str, Any],
+    source_value: float,
+    reference_section: str,
+    reference_source: dict[str, Any],
+    reference_value: float,
+    stat_key: str,
+) -> AppDataQualityWarning:
+    return AppDataQualityWarning(
+        level="warning",
+        reason=reason,
+        metric_key=metric_key,
+        label=label,
+        source_section=source_section,
+        source_value=source_value,
+        reference_section=reference_section,
+        reference_value=reference_value,
+        source_request=_request_dict(source_source),
+        reference_request=_request_dict(reference_source),
+        source_chart_series_key=trend_series_key(source_section, stat_key),
+        reference_chart_series_key=trend_series_key(reference_section, stat_key),
+        total_method="chart_series_sum",
+    )
+
+
+def app_data_quality_warnings(
+    payload: dict[str, Any],
+    *,
+    today: date | None = None,
+) -> list[AppDataQualityWarning]:
+    """Return contradictions without mutating or repairing app statistics."""
+    _ = today
+    warnings: list[AppDataQualityWarning] = []
+    for metric_key, label, section_prefix, stat_key in _DATA_QUALITY_PERIOD_METRICS:
+        year = _period_source(payload, section_prefix, DATE_TYPE_YEAR)
+        week = _period_source(payload, section_prefix, DATE_TYPE_WEEK)
+        if year is not None and week is not None:
+            year_section, year_source = year
+            week_section, week_source = week
+            year_total = effective_period_total_value(year_source, year_section, stat_key)
+            week_total = effective_period_total_value(week_source, week_section, stat_key)
+            if (
+                year_total is not None
+                and week_total is not None
+                and year_total + _NEAR_ZERO_EPSILON < week_total
+            ):
+                warnings.append(
+                    _period_warning(
+                        reason="year_less_than_week",
+                        metric_key=metric_key,
+                        label=label,
+                        source_section=year_section,
+                        source_source=year_source,
+                        source_value=year_total,
+                        reference_section=week_section,
+                        reference_source=week_source,
+                        reference_value=week_total,
+                        stat_key=stat_key,
+                    )
+                )
+
+    statistic = payload.get("statistic")
+    pv_year = _period_source(payload, APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+    if isinstance(statistic, dict) and pv_year is not None:
+        year_section, year_source = pv_year
+        lifetime_total = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
+        year_total = effective_period_total_value(
+            year_source,
+            year_section,
+            APP_STAT_TOTAL_SOLAR_ENERGY,
+        )
+        if (
+            lifetime_total is not None
+            and year_total is not None
+            and lifetime_total + _NEAR_ZERO_EPSILON < year_total
+        ):
+            warnings.append(
+                AppDataQualityWarning(
+                    level="warning",
+                    reason="lifetime_less_than_year",
+                    metric_key="pv_energy",
+                    label="PV energy",
+                    source_section="statistic",
+                    source_value=lifetime_total,
+                    reference_section=year_section,
+                    reference_value=year_total,
+                    reference_request=_request_dict(year_source),
+                    reference_chart_series_key=trend_series_key(
+                        year_section,
+                        APP_STAT_TOTAL_SOLAR_ENERGY,
+                    ),
+                    total_method="chart_series_sum",
+                )
+            )
+    return warnings
+
+
+def normalized_data_quality_warnings(
+    warnings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Deduplicate and sort warning dictionaries for stable diagnostics."""
+    unique: dict[str, dict[str, Any]] = {}
+    for warning in warnings:
+        key = json.dumps(warning, sort_keys=True, default=str, separators=(",", ":"))
+        unique[key] = warning
+    return sorted(
+        unique.values(),
+        key=lambda item: (
+            str(item.get("reason") or ""),
+            str(item.get("metric_key") or ""),
+            str(item.get("source_section") or ""),
+            str(item.get("reference_section") or ""),
+        ),
+    )
+
+
+def _request_range_text(section: str, request: object) -> str | None:
+    if not isinstance(request, dict):
+        return None
+    date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
+        APP_REQUEST_DATE_TYPE_ALT
+    )
+    begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
+        APP_REQUEST_BEGIN_DATE_ALT
+    )
+    end = request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+    if not date_type or not begin or not end:
+        return None
+    return f"{section}: {date_type} {begin}..{end}"
+
+
+def format_data_quality_warning(warning: dict[str, Any]) -> str:
+    """Format one data-quality warning for repairs/system-log messages."""
+    label = warning.get("label") or warning.get("metric_key") or "App statistic"
+    source_section = warning.get("source_section")
+    reference_section = warning.get("reference_section")
+    source_value = warning.get("source_value")
+    reference_value = warning.get("reference_value")
+    message = (
+        f"{label}: {source_section}={source_value} "
+        f"< {reference_section}={reference_value}"
+    )
+    ranges = [
+        value
+        for value in (
+            _request_range_text(str(source_section), warning.get("source_request")),
+            _request_range_text(
+                str(reference_section),
+                warning.get("reference_request"),
+            ),
+        )
+        if value is not None
+    ]
+    if ranges:
+        message = f"{message} [{'; '.join(ranges)}]"
+    return message
 
 
 # ---------------------------------------------------------------------------
@@ -3125,13 +3570,14 @@ def day_power_series_key(
     """  # noqa: D205, RUF105
     if not is_day_period_payload(source, section):
         return None
-    if section.startswith((
-        APP_SECTION_BATTERY_STAT,
-        APP_SECTION_BATTERY_TRENDS,
-    )) and stat_key in {
-        APP_STAT_TOTAL_DISCHARGE,
-        APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
-    }:
+    if (
+        section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
+        and stat_key
+        in {
+            APP_STAT_TOTAL_DISCHARGE,
+            APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+        }
+    ):
         # App payloads occur in both forms: a split positive y2 discharge
         # curve, and a signed y1 curve whose negative samples are discharge.
         # Select the dominant directional magnitude. This retains y2 when y1

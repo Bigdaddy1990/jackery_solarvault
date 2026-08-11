@@ -13,11 +13,15 @@ from .const import (
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEV_MODEL,
+    FIELD_ID,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
     FIELD_ONLINE_STATUS,
     FIELD_SCAN_NAME,
+    FIELD_SYSTEM_ID,
+    FIELD_SYSTEM_NAME,
+    FIELD_SYSTEM_SN,
     FIELD_TYPE_NAME,
     FIELD_VERSION,
     FIELD_WNAME,
@@ -76,6 +80,71 @@ _SOURCE_FIELD_SCALAR_ATTRIBUTES = ("field", "smali_field", "stat_key")
 _FALLBACK_SOURCE_FIELD_INDEX = 1
 
 
+def system_device_identifiers(
+    payload: dict[str, Any],
+) -> set[tuple[str, str]]:
+    """Return stable HA identifiers for a discovered SolarVault system."""
+    system = payload.get(PAYLOAD_SYSTEM) or {}
+    if not isinstance(system, dict):
+        return set()
+    identifiers: set[tuple[str, str]] = set()
+    system_id = first_nonblank_text(
+        system.get(FIELD_SYSTEM_ID),
+        system.get(FIELD_ID),
+    )
+    system_sn = nonblank_text(system.get(FIELD_SYSTEM_SN))
+    if system_id is not None:
+        identifiers.add((DOMAIN, f"system_{system_id}"))
+    if system_sn is not None:
+        identifiers.add((DOMAIN, f"system_sn_{system_sn}"))
+    return identifiers
+
+
+def system_primary_identifier(
+    payload: dict[str, Any],
+) -> tuple[str, str] | None:
+    """Return the deterministic identifier used by child ``via_device`` links."""
+    system = payload.get(PAYLOAD_SYSTEM) or {}
+    if not isinstance(system, dict):
+        return None
+    system_id = first_nonblank_text(
+        system.get(FIELD_SYSTEM_ID),
+        system.get(FIELD_ID),
+    )
+    if system_id is not None:
+        return (DOMAIN, f"system_{system_id}")
+    system_sn = nonblank_text(system.get(FIELD_SYSTEM_SN))
+    if system_sn is not None:
+        return (DOMAIN, f"system_sn_{system_sn}")
+    return None
+
+
+def system_device_info_from_payload(
+    payload: dict[str, Any],
+    device_id: str,
+) -> DeviceInfo | None:
+    """Build the parent-system record that must exist before child entities."""
+    identifiers = system_device_identifiers(payload)
+    if not identifiers:
+        return None
+    system = payload.get(PAYLOAD_SYSTEM) or {}
+    if not isinstance(system, dict):
+        return None
+    name = first_nonblank_text(
+        system.get(FIELD_SYSTEM_NAME),
+        system.get(FIELD_DEVICE_NAME),
+        fallback=f"Jackery SolarVault system {device_id}",
+    )
+    system_sn = nonblank_text(system.get(FIELD_SYSTEM_SN))
+    return DeviceInfo(
+        identifiers=identifiers,
+        manufacturer=MANUFACTURER,
+        name=str(name),
+        model=DEFAULT_DEVICE_MODEL_FALLBACK,
+        serial_number=system_sn,
+    )
+
+
 def property_data_sources(
     *fields: str,
     layer5_proven: bool = False,
@@ -118,6 +187,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     command_sources: tuple[str, ...] = ()
     app_fields: tuple[str, ...] = ()
     availability_uses_supervisor = False
+    device_registry_role = "head"
 
     def __init__(
         self,
@@ -261,9 +331,14 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         Returns:
             DeviceInfo: DeviceInfo populated for the parent SolarVault device.
         """
+        if self.device_registry_role == "system":
+            system_info = self._system_device_info()
+            if system_info is not None:
+                return system_info
+
         name = first_nonblank_text(
-            self._system.get(FIELD_DEVICE_NAME),
             self._discovery.get(FIELD_DEVICE_NAME),
+            self._device_meta.get(FIELD_DEVICE_NAME),
             self._properties.get(FIELD_WNAME),
             fallback=f"Jackery {self._device_id}",
         )
@@ -279,7 +354,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             self._discovery.get(FIELD_DEVICE_SN),
         )
 
-        return DeviceInfo(
+        device_info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             manufacturer=MANUFACTURER,
             name=str(name),
@@ -287,6 +362,21 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             serial_number=sn,
             sw_version=sw_version,
         )
+        if (parent_identifier := system_primary_identifier(self._payload)) is not None:
+            device_info["via_device"] = parent_identifier
+        return device_info
+
+    def _system_identifiers(self) -> set[tuple[str, str]]:
+        """Return stable HA identifiers for the parent SolarVault system."""
+        return system_device_identifiers(self._payload)
+
+    def _system_primary_identifier(self) -> tuple[str, str] | None:
+        """Return the deterministic parent identifier used by ``via_device``."""
+        return system_primary_identifier(self._payload)
+
+    def _system_device_info(self) -> DeviceInfo | None:
+        """Build the separate parent-system registry record when discovery proves it."""
+        return system_device_info_from_payload(self._payload, self._device_id)
 
     def _build_smart_plug_device_info(
         self,

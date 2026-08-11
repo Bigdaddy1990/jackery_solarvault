@@ -78,20 +78,21 @@ from .const import (
     ENTRY_BOOTSTRAP_MQTT_SESSION,
     FIELD_BAT_NUM,
     FIELD_DEVICE_NAME as FIELD_DEVICE_NAME,
-    FIELD_DEV_TYPE,
-    FIELD_FIRMWARE_VERSION,
-    FIELD_HARDWARE_VERSION,
-    FIELD_MODEL_CODE,
-    FIELD_MODEL_ID,
-    FIELD_MODEL_NAME,
-    FIELD_SCAN_NAME,
-    FIELD_SUB_TYPE,
+    FIELD_DEV_TYPE as FIELD_DEV_TYPE,
+    FIELD_FIRMWARE_VERSION as FIELD_FIRMWARE_VERSION,
+    FIELD_HARDWARE_VERSION as FIELD_HARDWARE_VERSION,
+    FIELD_MODEL_CODE as FIELD_MODEL_CODE,
+    FIELD_MODEL_ID as FIELD_MODEL_ID,
+    FIELD_MODEL_NAME as FIELD_MODEL_NAME,
+    FIELD_SCAN_NAME as FIELD_SCAN_NAME,
+    FIELD_SUB_TYPE as FIELD_SUB_TYPE,
     LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
     PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_CT_METER,
     PAYLOAD_PROPERTIES,
     PLATFORMS,
     REMOVED_SENSOR_SUFFIXES,
@@ -111,18 +112,21 @@ from .coordinator import (
     battery_pack_serial,
     sorted_battery_pack_payloads,
 )
+from .entity import system_device_info_from_payload
 from .services import async_setup_services
 from .util import (
     config_entry_bool_option,
     config_entry_int_option,
     config_entry_str_option,
     nonblank_text,
+    safe_bool,
     safe_int,
+    smart_meter_identity,
     stable_subdevice_key,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
     from homeassistant.core import HomeAssistant
 
@@ -229,6 +233,7 @@ def _async_clean_legacy_entities(  # noqa: RUF067, RUF105
     _async_remove_stale_energy_helpers(hass)
     _async_migrate_portable_screen_entity(hass, entry)
     _async_migrate_grid_standard_entity(hass, entry)
+    _async_migrate_smart_meter_identity(hass, entry)
     _async_migrate_battery_pack_identities(hass, entry)
     _async_remove_phantom_battery_pack_devices(hass, entry)
     _async_remove_entities_with_suffixes(
@@ -288,6 +293,36 @@ def _async_clean_legacy_entities(  # noqa: RUF067, RUF105
         suffixes=DUPLICATE_BINARY_SENSOR_SUFFIXES,
         log_label="duplicate binary sensor",
     )
+
+
+def _async_register_system_devices(  # noqa: RUF067, RUF105
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Create parent system records before platforms register child devices."""
+    _async_register_system_devices_from_data(
+        hass,
+        entry,
+        coordinator.data or {},
+    )
+
+
+def _async_register_system_devices_from_data(  # noqa: RUF067, RUF105
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    data: Mapping[str, dict[str, Any]],
+) -> None:
+    """Create parent system records before listeners consume one data snapshot."""
+    registry = dr.async_get(hass)
+    for device_id, payload in data.items():
+        device_info = system_device_info_from_payload(payload, device_id)
+        if device_info is None:
+            continue
+        registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            **device_info,
+        )
 
 
 def _local_mqtt_client(  # noqa: RUF067, RUF105
@@ -353,7 +388,9 @@ def _async_prune_removed_local_mqtt_tls_options(  # noqa: RUF105
     removed = REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS.intersection(entry.options)
     if not removed:
         return
-    options = {key: value for key, value in entry.options.items() if key not in removed}
+    options = {
+        key: value for key, value in entry.options.items() if key not in removed
+    }
     hass.config_entries.async_update_entry(entry, options=options)
     _LOGGER.info(
         "Removed obsolete Jackery local MQTT TLS options: %s",
@@ -948,10 +985,9 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
 ) -> None:
     """Start a per-entry local MQTT client when the entry is explicitly scoped.
 
-    The listener only starts when local MQTT is explicitly enabled, the
-    host is set, and a non-empty topic filter is configured. This prevents an
-    accidental broad wildcard subscription from ingesting unrelated broker
-    traffic and causing high CPU load.
+    The listener only starts when local MQTT is explicitly enabled and the
+    host is set. An empty option uses the single app-compatible exact topic;
+    the listener never falls back to a broker-wide wildcard.
     """
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
@@ -973,22 +1009,23 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
     # this is intentionally independent of the device-side bridge settings.
     # An empty value falls back to the central receiver default because the UI
     # tells users they may leave it empty.
-    configured_topic_filter = (
+    raw_topic_filter = (
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
         or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
         or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
     ).strip()
+    configured_topic_filter = raw_topic_filter
     topic_filter_blocked = (
         enabled
         and bool(host)
-        and configured_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
+        and raw_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
     )
     if topic_filter_blocked:
         _LOGGER.warning(
             "Jackery local MQTT listener not started: broad topic filter %r is"
             " blocked for CPU safety; configure a scoped filter or leave empty"
             " to use the configured default topic",
-            configured_topic_filter,
+            raw_topic_filter,
         )
     port = config_entry_int_option(
         entry,
@@ -1364,6 +1401,69 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         api,
         timedelta(seconds=interval_sec),
     )
+
+    def _adopt_device_local_mqtt_config(config: dict[str, Any]) -> None:
+        """Reconcile the direct listener from a confirmed device 3047 readback.
+
+        The 3046 writer and its 3047 readback are the authoritative state for
+        the device-side bridge.  Keeping a second, stale option copy disabled
+        left the device publishing to Home Assistant while no local listener
+        was ever created.  Updating options invokes the existing in-place
+        listener reconcile and never reloads the HTTP coordinator.
+        """
+        enabled = safe_bool(config.get("enable"))
+        if enabled is None:
+            return
+        host = str(config.get("ip") or "").strip()
+        port = safe_int(config.get("port"))
+        if enabled and (not host or port is None or not 1 <= port <= 65535):
+            return
+        username = str(config.get("userName") or "")
+        password = str(config.get("password") or "")
+        token = str(config.get("token") or "")
+        updates: dict[str, Any] = {
+            CONF_LOCAL_MQTT_ENABLE: enabled,
+            CONF_THIRD_PARTY_MQTT_ENABLE: enabled,
+        }
+        if enabled:
+            updates.update({
+                CONF_LOCAL_MQTT_HOST: host,
+                CONF_LOCAL_MQTT_PORT: port,
+                CONF_LOCAL_MQTT_USERNAME: username,
+                CONF_LOCAL_MQTT_PASSWORD: password,
+                CONF_THIRD_PARTY_MQTT_IP: host,
+                CONF_THIRD_PARTY_MQTT_PORT: port,
+                CONF_THIRD_PARTY_MQTT_USERNAME: username,
+                CONF_THIRD_PARTY_MQTT_PASSWORD: password,
+                CONF_THIRD_PARTY_MQTT_TOKEN: token,
+            })
+        options = dict(entry.options)
+        if all(options.get(key) == value for key, value in updates.items()):
+            return
+        options.update(updates)
+        hass.config_entries.async_update_entry(entry, options=options)
+        # A 3047 reply may arrive while entry setup is still forwarding
+        # platforms, before Home Assistant has installed the entry-update
+        # listener below.  Schedule the same in-place reconcile explicitly so
+        # that ordering cannot leave the direct listener disabled until a later
+        # options edit.  The existing task coalescer keeps duplicate callbacks
+        # from overlapping broker clients.
+        if _entry_owns_coordinator(hass, entry, coordinator):
+            _schedule_options_reconcile(
+                hass,
+                entry,
+                coordinator,
+                set(updates),
+            )
+
+    coordinator.set_local_mqtt_config_observer(_adopt_device_local_mqtt_config)
+    coordinator.set_device_registry_observer(
+        lambda snapshot: _async_register_system_devices_from_data(
+            hass,
+            entry,
+            snapshot,
+        )
+    )
     entry.runtime_data = coordinator
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
@@ -1406,15 +1506,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             )
             raise ConfigEntryNotReady(msg)
 
-        # HTTP is the sole authentication owner. Layer 5 may consume either
-        # the freshly persisted HTTP login session or, after a failed HTTP
-        # attempt, the validated session cache loaded above. Once started,
-        # Cloud MQTT, local MQTT and BLE own independent concurrent lifecycles.
-        _schedule_layer5_start_if_ready(hass, entry, coordinator)
-
         _async_clean_legacy_entities(hass, entry)
+        _async_register_system_devices(hass, entry, coordinator)
         platforms_started = True
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+        # HTTP is the sole authentication owner. Layer 5 may consume either
+        # the freshly persisted HTTP login session or, after a failed HTTP
+        # attempt, the validated session cache loaded above. Start the three
+        # independent transports only after all platforms have consumed the
+        # same registry-stable startup snapshot. Otherwise a Layer-5 system
+        # frame can add a parent id between system-device pre-registration and
+        # entity creation, producing an invalid ``via_device`` reference.
+        _schedule_layer5_start_if_ready(hass, entry, coordinator)
 
         # Entities now exist from either a live HTTP refresh or validated cached
         # discovery. This method only enables/schedules imports; no backfill is
@@ -1699,12 +1803,70 @@ def _battery_pack_registry_identity(  # noqa: RUF067, RUF105
         ]
         if len(pack_identifiers) == 1:
             pack_identifier = pack_identifiers[0]
-            return (
-                parent_device_id,
-                pack_identifier,
-                pack_identifier.removeprefix(prefix),
+            return parent_device_id, pack_identifier, pack_identifier.removeprefix(
+                prefix
             )
     return None
+
+
+def _async_migrate_smart_meter_identity(  # noqa: RUF067, RUF105
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+) -> None:
+    """Rekey the legacy parent-scoped smart-meter device to its accessory id."""
+    coordinator = entry.runtime_data
+    if not coordinator.data:
+        return
+
+    device_registry = dr.async_get(hass)
+    for parent_device_id, payload in coordinator.data.items():
+        if not isinstance(payload, dict):
+            continue
+        smart_meter = payload.get(PAYLOAD_CT_METER)
+        if not isinstance(smart_meter, dict) or not smart_meter:
+            continue
+
+        identity = smart_meter_identity(smart_meter)
+        target_key = stable_subdevice_key("smart_meter", identity, 1)
+        target_identifier = (DOMAIN, f"{parent_device_id}_{target_key}")
+        target_device = device_registry.async_get_device(
+            identifiers={target_identifier}
+        )
+        legacy_identifiers = (
+            (DOMAIN, f"{parent_device_id}_smart_meter"),
+            (DOMAIN, f"{parent_device_id}_smart_meter_1"),
+        )
+        for legacy_identifier in legacy_identifiers:
+            if legacy_identifier == target_identifier:
+                continue
+            legacy_device = device_registry.async_get_device(
+                identifiers={legacy_identifier}
+            )
+            if legacy_device is None:
+                continue
+            if target_device is not None and target_device.id != legacy_device.id:
+                _LOGGER.warning(
+                    "Skipping smart-meter registry migration for %s: target "
+                    "device %s already exists",
+                    legacy_identifier[1],
+                    target_identifier[1],
+                )
+                continue
+
+            new_identifiers = set(legacy_device.identifiers)
+            new_identifiers.discard(legacy_identifier)
+            new_identifiers.add(target_identifier)
+            device_registry.async_update_device(
+                legacy_device.id,
+                new_identifiers=new_identifiers,
+                serial_number=identity,
+            )
+            target_device = legacy_device
+            _LOGGER.info(
+                "Migrated smart-meter registry identity %s to %s",
+                legacy_identifier[1],
+                target_identifier[1],
+            )
 
 
 def _seed_battery_pack_registry_identities(  # noqa: RUF067, RUF105
@@ -1812,31 +1974,6 @@ def _seed_battery_pack_registry_identities(  # noqa: RUF067, RUF105
             )
 
 
-def _battery_pack_stable_identity(pack: dict[str, Any]) -> str:  # noqa: RUF067, RUF105
-    """Generate a stable identity key for a battery pack when serial is unavailable.
-
-    Uses a combination of model, firmware, hardware version, scan_name, and sub_type
-    to create a deterministic hash that uniquely identifies the physical pack.
-    This ensures idempotent migration even when the vendor doesn't provide a serial.
-    """
-    # Fields that are stable per physical device
-    identity_parts = [
-        pack.get(FIELD_MODEL_NAME)
-        or pack.get(FIELD_MODEL_CODE)
-        or pack.get(FIELD_MODEL_ID)
-        or "",
-        pack.get(FIELD_FIRMWARE_VERSION) or pack.get("firmware") or "",
-        pack.get(FIELD_HARDWARE_VERSION) or pack.get("hardware") or "",
-        pack.get(FIELD_SCAN_NAME) or "",
-        pack.get(FIELD_SUB_TYPE) or "",
-        pack.get(FIELD_DEV_TYPE) or "",
-    ]
-    # Create a deterministic hash from the identity parts
-    identity_str = "|".join(str(p).strip().lower() for p in identity_parts if p)
-    hash_digest = hashlib.sha256(identity_str.encode("utf-8")).hexdigest()[:12]
-    return f"gen_{hash_digest}"
-
-
 def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # noqa: RUF067, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -1851,7 +1988,7 @@ def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # n
     remaining_old_indices: dict[str, set[int]] = {}
     target_owners: dict[tuple[str, str], set[str]] = {}
 
-    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):  # noqa: PLR1702, RUF105
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):  # noqa: RUF105
         identity = _battery_pack_registry_identity(device_registry, device)
         if identity is None:
             continue
@@ -1893,20 +2030,6 @@ def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # n
             )
             continue
         serial = stored_serial or live_serial
-        # If no serial is available from either stored or live data,
-        # generate a stable identity from the pack's other attributes
-        if serial is None:
-            payload = (coordinator.data or {}).get(parent_device_id)
-            if isinstance(payload, dict):
-                packs = payload.get(PAYLOAD_BATTERY_PACKS)
-                if isinstance(packs, list):
-                    ordered = sorted_battery_pack_payloads(packs)
-                    try:
-                        pack = ordered[numeric_index - 1]
-                        if isinstance(pack, dict):
-                            serial = _battery_pack_stable_identity(pack)
-                    except IndexError:
-                        pass
         if serial is None:
             continue
         old_candidates.append((
@@ -2050,8 +2173,6 @@ def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF0
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
     for parent_device_id, payload in coordinator.data.items():
-        if not isinstance(payload, dict):
-            continue
         parent_device = device_registry.async_get_device(
             identifiers={(DOMAIN, parent_device_id)}
         )
@@ -2073,13 +2194,11 @@ def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF0
             and entity.unique_id is not None
         ]
         for index, pack in enumerate(packs[:_BATTERY_PACK_INDEX_MAX], start=1):
-            if not isinstance(pack, dict):
+            if index in remaining_old_indices.get(parent_device_id, set()):
                 continue
             serial = battery_pack_serial(
                 pack
             ) or coordinator.battery_pack_identity_serial(parent_device_id, index)
-            if serial is None:
-                serial = _battery_pack_stable_identity(pack)
             pack_key = stable_subdevice_key("battery_pack", serial, index)
             target_identifier = (DOMAIN, f"{parent_device_id}_{pack_key}")
             target_device = device_registry.async_get_or_create(
@@ -2131,10 +2250,11 @@ def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF0
                     parent_device_id, index, serial
                 )
                 remaining_old_indices.setdefault(parent_device_id, set()).discard(index)
-                record = (serial, index)
-                records = serial_records.setdefault(parent_device_id, [])
-                if record not in records:
-                    records.append(record)
+                if serial is not None:
+                    record = (serial, index)
+                    records = serial_records.setdefault(parent_device_id, [])
+                    if record not in records:
+                        records.append(record)
                 _LOGGER.info(
                     "Moved %d parent-attached battery-pack entit%s for %s pack %d "
                     "to child device %s",

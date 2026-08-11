@@ -18,10 +18,11 @@ The gate holds no Home Assistant dependencies and performs no transport I/O; it
 is pure data normalization so it stays unit-testable and reusable by every
 transport layer.
 
-The non-blank merge rule is deliberately transport-neutral: HTTP, cloud MQTT,
-local MQTT and BLE may all update the same live field. Decoded live observations
-are applied in arrival order; their source and timestamps are diagnostic
-provenance only and never gate a value.
+The non-blank merge rule is deliberately connection-neutral: HTTP, cloud MQTT,
+local MQTT and BLE may all update or fill the same live field. Per-field source
+provenance only protects a fresh local BLE/MQTT live value from being reversed
+by an immediate cloud fallback snapshot; it never stops independent transports
+from continuing to publish.
 """
 
 import time
@@ -53,11 +54,8 @@ if TYPE_CHECKING:
 TransportSource = DataSource
 
 
-# PROTOCOL.md section 10.1 defines HTTP as the complete startup/fallback
-# snapshot and every Layer-5 connection as an overlay for live fields.  The
-# Layer-5 transports deliberately share one tier: they remain independent and
-# the latest decoded L5 observation wins without one connection blocking
-# another.
+# docs/AGENTS.md §1.2 keeps HTTP cloud data active as the complete fallback,
+# treats every Layer-5 connection as an independent, equal live-data peer.
 _LIVE_SOURCE_TIER: Final[dict[DataSource, int]] = {
     DataSource.HTTP: 0,
     DataSource.CLOUD_MQTT: 1,
@@ -192,7 +190,8 @@ def ingest_observation(
                 received_at - current_provenance.received_at_monotonic,
             )
             keep_current = (
-                incoming_tier < current_tier and current_age < freshness_window_seconds
+                incoming_tier < current_tier
+                and current_age < freshness_window_seconds
             ) or (
                 incoming.source is current_provenance.source
                 and incoming.observed_at is not None

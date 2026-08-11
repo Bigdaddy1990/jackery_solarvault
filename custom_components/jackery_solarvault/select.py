@@ -458,6 +458,7 @@ class JackerySelectDescription(SelectEntityDescription):
     app_fields: tuple[str, ...] = ()
     data_sources: tuple[str, ...] = ()
     command_sources: tuple[str, ...] = ()
+    device_registry_role: str = "head"
     null_semantics: str = DEFAULT_NULL_SEMANTICS
     recorder_allowed: bool = True
     ha_derived: bool = False
@@ -513,6 +514,7 @@ class JackerySelect(JackeryEntity, SelectEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
+        self.device_registry_role = description.device_registry_role
         self._state = _SelectState()
 
     @property
@@ -1063,6 +1065,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         options_fn=_storm_minutes_options,
         current_fn=_storm_minutes_current,
         select_fn=_storm_minutes_select,
+        device_registry_role="system",
     ),
     JackerySelectDescription(
         key="electricity_price_mode",
@@ -1071,6 +1074,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         current_fn=_price_mode_current,
         select_fn=_price_mode_select,
         warn_unknown_kind="electricity price mode",
+        device_registry_role="system",
     ),
     JackerySelectDescription(
         key="electricity_price_provider",
@@ -1078,6 +1082,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         options_fn=_price_provider_options,
         current_fn=_price_provider_current,
         select_fn=_price_provider_select,
+        device_registry_role="system",
     ),
     JackerySelectDescription(
         key="ct_phase_select",

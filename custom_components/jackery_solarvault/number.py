@@ -210,6 +210,7 @@ class JackeryNumberDescription(NumberEntityDescription):
     app_fields: tuple[str, ...] = ()
     data_sources: tuple[str, ...] = ()
     command_sources: tuple[str, ...] = ()
+    device_registry_role: str = "head"
     null_semantics: str = DEFAULT_NULL_SEMANTICS
     recorder_allowed: bool = True
     ha_derived: bool = False
@@ -720,6 +721,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_section=PAYLOAD_PRICE,
         setter=_set_single_price,
         command_sources=HTTP_COMMAND_SOURCES,
+        device_registry_role="system",
         dynamic_unit=_single_tariff_dynamic_unit,
         value_transform=_wire_float,
     ),
@@ -923,6 +925,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
+        self.device_registry_role = description.device_registry_role
 
     def _raise_action_error(self, translation_key: str, **placeholders: object) -> None:
         """Raise a translatable HA action error for this entity."""
