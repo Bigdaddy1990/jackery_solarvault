@@ -111,7 +111,7 @@ def _night_payload(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 async def night_setup(
     hass: HomeAssistant,
 ) -> AsyncGenerator[MockConfigEntry]:

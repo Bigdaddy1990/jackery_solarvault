@@ -14,7 +14,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_RCS,
@@ -325,7 +325,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+        """  # noqa: D205, RUF105
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -428,7 +428,7 @@ class JackeryMqttPushClient:
             )
             raise RuntimeError(msg)
 
-    async def _async_run_session(  # ruff:ignore[too-many-branches, too-many-arguments, too-many-statements]
+    async def _async_run_session(
         self,
         *,
         client_id: str,
@@ -471,7 +471,7 @@ class JackeryMqttPushClient:
                 self._last_connect_failure_signature = None
                 self._consecutive_auth_failures = 0
                 _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # ruff: ignore[line-too-long]
+                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
                     len(topics),
                     self._tls_certificate_source,
                 )
@@ -672,7 +672,7 @@ class JackeryMqttPushClient:
 
         Returns:
             bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """  # ruff: ignore[line-too-long]
+        """
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
@@ -690,7 +690,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and
             `verify_mode = ssl.CERT_REQUIRED`.
-        """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+        """  # noqa: D205, RUF105
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -850,7 +850,7 @@ class JackeryMqttPushClient:
             except asyncio.CancelledError:
                 return
             except Exception as err:  # noqa: BLE001, RUF105
-                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)  # ruff:ignore[error-instead-of-exception]
+                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
 
         task.add_done_callback(_log_task_result)
 
@@ -941,9 +941,7 @@ class JackeryMqttPushClient:
                             err,
                         )
                     return
-                _LOGGER.error(  # ruff:ignore[error-instead-of-exception]
-                    "Jackery MQTT birth snapshot handler failed: %s", err
-                )
+                _LOGGER.error("Jackery MQTT birth snapshot handler failed: %s", err)
 
         self._schedule_lifecycle_callback(
             _publish,
@@ -977,7 +975,7 @@ class JackeryMqttPushClient:
         if topic is None:
             return None
         parts = topic.split("/")
-        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:  # ruff:ignore[magic-value-comparison]
+        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 
@@ -1057,7 +1055,7 @@ class JackeryMqttPushClient:
               - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
                 "tls_certificate_source": TLS and certificate source flags
               - "library": identifier of the MQTT client library
-        """  # ruff: ignore[line-too-long]
+        """
 
         def topic_value(topic: str | None) -> str | None:
             """Produce a topic with its user-specific segment redacted.

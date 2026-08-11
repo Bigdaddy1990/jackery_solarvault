@@ -32,11 +32,11 @@ def _coordinator(*, portable: bool = False) -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def _call(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff:ignore[any-type]
+def _call(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator)._async_publish_command_ble_first.await_args
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_system_info_uses_combine_family() -> None:
     """System info reads the combine-data snapshot."""
     coordinator = _coordinator()
@@ -49,7 +49,7 @@ async def test_query_system_info_uses_combine_family() -> None:
     assert call.kwargs["ensure_mqtt"] is True
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_system_info_can_skip_mqtt_ensure() -> None:
     """The ensure_mqtt flag is forwarded to the publish helper."""
     coordinator = _coordinator()
@@ -59,7 +59,7 @@ async def test_query_system_info_can_skip_mqtt_ensure() -> None:
     assert _call(coordinator).kwargs["ensure_mqtt"] is False
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_device_info_uses_property_family() -> None:
     """Device info reads the device-property snapshot."""
     coordinator = _coordinator()
@@ -71,7 +71,7 @@ async def test_query_device_info_uses_property_family() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_wifi_list_uses_read_wifi_action() -> None:
     """Wi-Fi list uses the READ_WIFI_LIST action id."""
     coordinator = _coordinator()
@@ -81,7 +81,7 @@ async def test_query_wifi_list_uses_read_wifi_action() -> None:
     assert _call(coordinator).kwargs["action_id"] == coord_mod.ACTION_ID_READ_WIFI_LIST
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_battery_packs_selects_battery_dev_type() -> None:
     """Battery-pack query carries devType for battery packs."""
     coordinator = _coordinator()
@@ -93,7 +93,7 @@ async def test_query_battery_packs_selects_battery_dev_type() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_smart_meter_selects_ct_dev_type() -> None:
     """Smart-meter query carries the CT devType."""
     coordinator = _coordinator()
@@ -105,7 +105,7 @@ async def test_query_smart_meter_selects_ct_dev_type() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_meter_heads_selects_meter_head_dev_type() -> None:
     """Meter-head query carries the meter-head devType."""
     coordinator = _coordinator()
@@ -117,7 +117,7 @@ async def test_query_meter_heads_selects_meter_head_dev_type() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_smart_plugs_selects_socket_dev_type() -> None:
     """Smart-plug query carries the socket devType."""
     coordinator = _coordinator()
@@ -129,7 +129,7 @@ async def test_query_smart_plugs_selects_socket_dev_type() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_subdevice_combo_selects_combo_dev_type() -> None:
     """Combo query carries the combo devType."""
     coordinator = _coordinator()
@@ -141,7 +141,7 @@ async def test_query_subdevice_combo_selects_combo_dev_type() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ota_version_home_device_uses_home_action() -> None:
     """A home device queries OTA version with the home action id."""
     coordinator = _coordinator(portable=False)
@@ -153,7 +153,7 @@ async def test_ota_version_home_device_uses_home_action() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ota_version_portable_device_uses_portable_action() -> None:
     """A portable device swaps to the portable OTA-version action id."""
     coordinator = _coordinator(portable=True)
@@ -165,7 +165,7 @@ async def test_ota_version_portable_device_uses_portable_action() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ota_total_page_forwards_page_count() -> None:
     """The total-page notify forwards the page count in the body."""
     coordinator = _coordinator()
@@ -175,7 +175,7 @@ async def test_ota_total_page_forwards_page_count() -> None:
     assert _call(coordinator).kwargs["body_fields"] == {"totalPages": 7}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ota_page_data_forwards_page_index() -> None:
     """The page-data request forwards the requested page index."""
     coordinator = _coordinator()
@@ -185,7 +185,7 @@ async def test_ota_page_data_forwards_page_index() -> None:
     assert _call(coordinator).kwargs["body_fields"] == {"pageIndex": 3}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_wifi_config_portable_swaps_action() -> None:
     """Portable Wi-Fi config uses the portable action id."""
     coordinator = _coordinator(portable=True)
@@ -197,7 +197,7 @@ async def test_query_wifi_config_portable_swaps_action() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_weather_plan_uses_weather_family() -> None:
     """Weather-plan query uses the weather-plan message family."""
     coordinator = _coordinator()
@@ -209,7 +209,7 @@ async def test_query_weather_plan_uses_weather_family() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_sync_grid_standard_patches_local_and_sends_safety() -> None:
     """Grid-standard sync sends the safety code and mirrors it as a string."""
     coordinator = _coordinator()
@@ -224,7 +224,7 @@ async def test_sync_grid_standard_patches_local_and_sends_safety() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_sync_mqtt_connect_info_carries_broker_host() -> None:
     """MQTT connect-info sync carries the integration's broker host."""
     coordinator = _coordinator()
@@ -235,7 +235,7 @@ async def test_sync_mqtt_connect_info_carries_broker_host() -> None:
     assert body[coord_mod.FIELD_HOST] == coord_mod.MQTT_HOST
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_send_time_zone_invalid_zone_raises() -> None:
     """An unresolvable time-zone name is a HomeAssistantError."""
     coordinator = _coordinator()
@@ -247,7 +247,7 @@ async def test_send_time_zone_invalid_zone_raises() -> None:
         await coordinator.async_send_time_zone(_DEVICE, timezone_name="Not/AZone")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_send_time_zone_patches_resolved_name() -> None:
     """A valid time zone is published and mirrored into the system cache."""
     coordinator = _coordinator()
@@ -265,7 +265,7 @@ async def test_send_time_zone_patches_resolved_name() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_query_third_party_mqtt_config_uses_query_family() -> None:
     """The third-party MQTT read uses the query config family with empty body."""
     coordinator = _coordinator()

@@ -255,7 +255,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def parse_utc_datetime(  # ruff:ignore[too-many-branches]
+def parse_utc_datetime(
     value: float | str | datetime,
 ) -> datetime:  # parsed timestamp types
     """Parse various timestamp representations and return a timezone-aware UTC datetime.
@@ -269,7 +269,7 @@ def parse_utc_datetime(  # ruff:ignore[too-many-branches]
     Raises:
         ValueError: If the input is an empty string, an unsupported type, or an invalid
         timestamp/ISO string.
-    """  # ruff: ignore[line-too-long]
+    """
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -332,7 +332,7 @@ def coordinator_entity_signature(  # ruff:ignore[too-many-locals]
         boolean indicating presence of a CT meter. **Live property keys and stat
         section usability are intentionally excluded** so routine poll updates do not
         re-trigger dynamic entity setup (which causes entity_registry spam).
-    """  # ruff: ignore[line-too-long]
+    """
     if not coordinator_data:
         return ()
 
@@ -777,7 +777,7 @@ def iter_calendar_months(start_date: date, end_date: date) -> list[date]:
     months: list[date] = []
     while cursor <= end_month:
         months.append(cursor)
-        if cursor.month == 12:  # ruff:ignore[magic-value-comparison]
+        if cursor.month == 12:
             cursor = cursor.replace(year=cursor.year + 1, month=1)
         else:
             cursor = cursor.replace(month=cursor.month + 1)
@@ -1111,7 +1111,11 @@ def append_payload_debug_line(
         file.write("\n")
 
 
-def safe_bool(value: bool | float | str | None) -> bool | None:  # ruff:ignore[too-many-return-statements]  # boolean payload value; flat type-dispatch guard chain is clearest as-is
+def safe_bool(
+    value: bool | float | str | None,
+) -> (
+    bool | None
+):  # boolean payload value; flat type-dispatch guard chain is clearest as-is
     """Interpret a payload value as a boolean.
 
     Returns:
@@ -1493,7 +1497,7 @@ def _prefer_raw_year_series_for_real_payload(
     if (
         not section.startswith(APP_SECTION_PV_STAT)
         or direct_total is None
-        or len(raw_values) < 12  # ruff:ignore[magic-value-comparison]
+        or len(raw_values) < 12
     ):
         return False
     nonzero = [value for value in raw_values if abs(value) > _NEAR_ZERO_EPSILON]
@@ -1520,7 +1524,7 @@ def expanded_year_series_values(
               the documented total within a small tolerance; otherwise returns the raw
               series values.
             - If the series key is missing or the series is not a list, returns `None`.
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1706,7 +1710,7 @@ def year_payload_appears_current_month_only(
     Returns:
         bool: `True` if any inspected series has non-zero values only for
         `current_month`, `False` otherwise.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1852,7 +1856,7 @@ def _calculated_savings_from_year(  # ruff:ignore[too-many-locals]  # cohesive s
             - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
         None: If required inputs are missing (no usable device/home/CT totals or no
         configured/derivable price).
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -2036,7 +2040,7 @@ def _backfill_pv_revenue(
     Side effects:
         - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -2069,7 +2073,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(  # ruff:ignore[too-many-branches]  # per-month aggregation dispatch; branch chain mirrors the section shape
+def backfill_year_payload_from_months(  # per-month aggregation dispatch; branch chain mirrors the section shape
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -2099,7 +2103,7 @@ def backfill_year_payload_from_months(  # ruff:ignore[too-many-branches]  # per-
         A dictionary payload: either the unchanged `year_source` or a modified copy with
         corrected series/stat fields and `APP_YEAR_BACKFILL_META` when corrections were
         applied.
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -2189,7 +2193,7 @@ def apply_year_month_backfill(
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section
         prefix to a mapping of 1-based month index -> month payload dict used to
         reconstruct year-series values.
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             APP_SECTION_PV_STAT,
@@ -2284,7 +2288,7 @@ def compact_json(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def trend_series_points(  # ruff:ignore[too-many-branches]  # trend-series parsing dispatches over unit/label/series shapes
+def trend_series_points(  # trend-series parsing dispatches over unit/label/series shapes
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2398,7 +2402,7 @@ def _day_power_sample_minute(
         minute_of_day (int | None): Minutes after local midnight (0–1439) for the
         sample, or `None` if the computed minute is outside the day range or no valid
         label/index mapping exists.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
         if minute is not None:
@@ -2517,7 +2521,7 @@ def _resolve_day_request_window(
     return begin, now
 
 
-def day_power_energy_points(  # ruff:ignore[too-many-return-statements, too-many-branches, too-many-arguments, too-many-locals]  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
+def day_power_energy_points(  # ruff:ignore[too-many-locals]  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2555,7 +2559,7 @@ def day_power_energy_points(  # ruff:ignore[too-many-return-statements, too-many
         (rounded to 5 decimal places). Returns an empty list for invalid inputs,
         unsupported units, out-of-range request dates, or when scaling rules prevent
         producing buckets.
-    """  # ruff: ignore[line-too-long]
+    """
     if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
         return []
     series_key = day_power_series_key(source, section, stat_key)
@@ -2735,7 +2739,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(  # ruff:ignore[too-many-return-statements]  # flat guard chain over CT calculation variants; clearest as-is
+def calculated_smart_meter_power(  # flat guard chain over CT calculation variants; clearest as-is
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -2755,7 +2759,7 @@ def calculated_smart_meter_power(  # ruff:ignore[too-many-return-statements]  # 
     Returns:
         float | None: Calculated power in the same units as the input values, or `None`
         when required inputs are missing or the calculation mode is unrecognized.
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -2954,7 +2958,7 @@ def jackery_corrected_home_consumption_power(
             - `source`: string indicating which data was used (`FIELD_OTHER_LOAD_PW` when reported, otherwise `"smart_meter_net_minus_input_plus_output"`).
         Returns `None` when insufficient inputs are available to compute a corrected
         consumption.
-    """  # ruff: ignore[line-too-long]
+    """
     meter_net = smart_meter_net_power(ct)
     jackery_input = jackery_grid_side_input_power(props) or 0.0
     jackery_output = jackery_grid_side_output_power(props) or 0.0
@@ -2985,7 +2989,7 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(  # ruff:ignore[too-many-return-statements, too-many-branches]  # exhaustive section/stat → series-key mapping table
+def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mapping table
     section: str, stat_key: str
 ) -> str | None:
     """Map an app section and statistic key to the corresponding chart-series key.
@@ -3096,7 +3100,7 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a period payload or no mapping exists.
-    """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+    """  # noqa: D205, RUF105
     if not section.endswith((
         f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
@@ -3121,14 +3125,13 @@ def day_power_series_key(
     """  # noqa: D205, RUF105
     if not is_day_period_payload(source, section):
         return None
-    if (
-        section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
-        and stat_key
-        in {
-            APP_STAT_TOTAL_DISCHARGE,
-            APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
-        }
-    ):
+    if section.startswith((
+        APP_SECTION_BATTERY_STAT,
+        APP_SECTION_BATTERY_TRENDS,
+    )) and stat_key in {
+        APP_STAT_TOTAL_DISCHARGE,
+        APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+    }:
         # App payloads occur in both forms: a split positive y2 discharge
         # curve, and a signed y1 curve whose negative samples are discharge.
         # Select the dominant directional magnitude. This retains y2 when y1
@@ -3149,7 +3152,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(  # ruff:ignore[too-many-return-statements]  # flat guard chain over series/total shapes; clearest as-is
+def trend_series_total(  # flat guard chain over series/total shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3167,7 +3170,7 @@ def trend_series_total(  # ruff:ignore[too-many-return-statements]  # flat guard
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total
         cannot be determined.
-    """  # ruff: ignore[line-too-long]
+    """
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
         return round(total, 2) if total is not None else None
@@ -3211,7 +3214,7 @@ def trend_series_total(  # ruff:ignore[too-many-return-statements]  # flat guard
     return round(sum(valid_values), 2)
 
 
-def trend_series_has_value(  # ruff:ignore[too-many-return-statements]  # flat guard chain over series/value shapes; clearest as-is
+def trend_series_has_value(  # flat guard chain over series/value shapes; clearest as-is
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3319,7 +3322,7 @@ def trend_payload_has_value(
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401, RUF105
+def first_nonblank(*values: Any) -> str | None:  # noqa: RUF105
     """Return the first value that still has content after stripping."""
     for value in values:
         if value is None:
@@ -3330,7 +3333,7 @@ def first_nonblank(*values: Any) -> str | None:  # noqa: ANN401, RUF105
     return None
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # ruff:ignore[too-many-return-statements]  # noqa: ANN401, RUF105
+def first_nonblank_int(*values: Any) -> int | None:  # noqa: RUF105
     """Return the first nonblank value parsed as an integer."""
     for value in values:
         if value is None:
@@ -3380,6 +3383,6 @@ def normalize_account(value: str) -> str:
     return value.strip()
 
 
-def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: ANN401, RUF105
+def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: RUF105
     """Return a config-entry boolean option with safe legacy value parsing."""
     return config_entry_bool_option(entry, key, default)

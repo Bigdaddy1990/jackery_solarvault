@@ -19,7 +19,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _DEVICE = "dev-1"
 
 
-def _coordinator(previous: dict[str, Any]) -> Any:  # ruff:ignore[any-type]
+def _coordinator(previous: dict[str, Any]) -> Any:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator).data = {_DEVICE: previous}
     return coordinator

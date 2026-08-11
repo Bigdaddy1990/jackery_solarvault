@@ -616,7 +616,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
     data_sources = LAYER5_DATA_SOURCES
     command_sources = LAYER5_COMMAND_SOURCES
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,

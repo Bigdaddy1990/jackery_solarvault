@@ -25,7 +25,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (
+from jackery_solarvault.const import (
     DOMAIN,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_MAX_TOPIC_NAMES,
@@ -99,7 +99,7 @@ LocalMqttSink = Callable[
 class JackeryLocalMqttClient:
     """Async-native subscriber for the user's local MQTT broker."""
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         hass: HomeAssistant,
         *,
@@ -400,7 +400,7 @@ class JackeryLocalMqttClient:
     # Message handling
     # ------------------------------------------------------------------
 
-    async def _handle_message(  # ruff:ignore[too-many-branches, too-many-statements, too-many-return-statements]  # flat hot-path guard chain; every reject is an early return
+    async def _handle_message(  # flat hot-path guard chain; every reject is an early return
         self,
         topic: str,
         payload: bytes | bytearray | str,
@@ -758,7 +758,7 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 def _local_mqtt_client(
     hass: HomeAssistant,
-    entry: Any,  # noqa: ANN401, RUF105
+    entry: Any,  # noqa: RUF105
 ) -> JackeryLocalMqttClient | None:
     """Retrieve the JackeryLocalMqttClient for a config entry from hass.data.
 

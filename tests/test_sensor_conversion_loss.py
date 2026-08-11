@@ -108,7 +108,7 @@ def _make_api_stub() -> MagicMock:
     return api
 
 
-@pytest.fixture()
+@pytest.fixture
 async def savings_setup(
     hass: HomeAssistant,
 ) -> AsyncGenerator[MockConfigEntry]:
@@ -215,11 +215,11 @@ def test_portable_power_uses_primary_then_nested_ac_fallback(
     })
     entity = JackerySensor(coordinator, _DEVICE_ID, description)
 
-    assert entity.native_value == 321  # ruff: ignore[magic-value-comparison]
+    assert entity.native_value == 321
 
     properties[primary_key] = 123
 
-    assert entity.native_value == 123  # ruff: ignore[magic-value-comparison]
+    assert entity.native_value == 123
 
 
 @pytest.mark.parametrize(

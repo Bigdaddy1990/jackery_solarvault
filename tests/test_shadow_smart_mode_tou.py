@@ -37,7 +37,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     return JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_smart_mode_bucket_filled_from_http() -> None:
     """A resolvable system id fills the smart-mode bucket from getSmartMode."""
     coordinator = _bare_coordinator()
@@ -56,7 +56,7 @@ async def test_smart_mode_bucket_filled_from_http() -> None:
     get_smart_mode.assert_awaited_once_with(_SYSTEM_ID)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_smart_mode_skipped_without_system_id() -> None:
     """No system id means no fetch and no bucket write."""
     coordinator = _bare_coordinator()
@@ -73,7 +73,7 @@ async def test_smart_mode_skipped_without_system_id() -> None:
     get_smart_mode.assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_tou_bucket_filled_from_http() -> None:
     """A resolvable numeric device id fills the TOU bucket from queryTouPlan."""
     coordinator = _bare_coordinator()
@@ -99,7 +99,7 @@ async def test_tou_bucket_filled_from_http() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_tou_skipped_without_device_id() -> None:
     """No numeric device id means no fetch and no bucket write."""
     coordinator = _bare_coordinator()

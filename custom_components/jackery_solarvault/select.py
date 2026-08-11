@@ -214,7 +214,7 @@ def _raise_select_action_error(
 # ---------------------------------------------------------------------------
 
 
-def _storm_minutes_value(  # ruff:ignore[too-many-branches]
+def _storm_minutes_value(
     properties: dict[str, object],
     weather_plan: dict[str, object],
     task_plan: dict[str, object],
@@ -389,7 +389,7 @@ def _price_mode_current_int(entity: JackerySelect) -> int | None:
         )
     if raw is None:
         work_mode = safe_int(entity._properties.get(FIELD_WORK_MODEL))  # noqa: RUF105, SLF001
-        if work_mode == 7:  # ruff:ignore[magic-value-comparison]
+        if work_mode == 7:
             return 1
         if entity._price.get(FIELD_SINGLE_PRICE) is not None:  # noqa: RUF105, SLF001
             return 2
@@ -696,7 +696,7 @@ async def _price_mode_select(entity: JackerySelect, option: str) -> None:
                 option=option,
             )
         await entity.coordinator.async_set_price_mode_dynamic(entity._device_id)  # noqa: RUF105, SLF001
-    elif mode == 2:  # ruff:ignore[magic-value-comparison]
+    elif mode == 2:
         await entity.coordinator.async_set_price_mode_single(entity._device_id)  # noqa: RUF105, SLF001
     else:
         _raise_select_action_error(entity, "invalid_select_option", option=option)
@@ -1198,7 +1198,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
 
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
-    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:  # ruff:ignore[too-many-return-statements]
+    def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
         """Determine whether a select entity identified by `key` should be created for a
         device described by `payload`.
 
@@ -1215,7 +1215,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Returns:
             bool: `True` if the select entity for `key` is supported for this device,
             `False` otherwise.
-        """  # ruff: ignore[line-too-long]  # noqa: D205, RUF105
+        """  # noqa: D205, RUF105
         props = payload_properties_for_sources(payload)
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":

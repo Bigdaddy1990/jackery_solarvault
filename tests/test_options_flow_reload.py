@@ -21,9 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.jackery_solarvault.const import (
-    DOMAIN,
-)
+from custom_components.jackery_solarvault.const import DOMAIN
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 if TYPE_CHECKING:

@@ -33,7 +33,7 @@ def _client() -> JackeryLocalMqttClient:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_runner_retries_and_caps_exponential_delay() -> None:
     """Repeated setup failures retry without a CPU loop or unbounded delay."""
     client = _client()
@@ -62,7 +62,7 @@ async def test_runner_retries_and_caps_exponential_delay() -> None:
     assert delays == [5.0, 10.0, 20.0, 40.0, 60.0, 60.0, 60.0]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_successful_session_resets_reconnect_delay() -> None:
     """A previously connected session restarts the retry ladder at five seconds."""
     client = _client()
@@ -99,7 +99,7 @@ def test_async_start_owns_the_reconnecting_runner() -> None:
     "configured_topic",
     ("homeassistant", "jackery/+/state"),  # ruff: ignore[pytest-parametrize-values-wrong-type]
 )
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_direct_client_subscribes_once_to_exact_configured_topic(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -112,7 +112,7 @@ async def test_direct_client_subscribes_once_to_exact_configured_topic(
         def __aiter__(self) -> _NoMessages:
             return self
 
-        async def __anext__(self) -> Any:  # ruff: ignore[any-type]
+        async def __anext__(self) -> Any:
             raise StopAsyncIteration
 
     class _BrokerClient:
@@ -121,7 +121,7 @@ async def test_direct_client_subscribes_once_to_exact_configured_topic(
         async def __aenter__(self) -> _BrokerClient:  # ruff: ignore[non-self-return-type]
             return self
 
-        async def __aexit__(self, *_args: Any) -> None:  # ruff: ignore[any-type, bad-exit-annotation]
+        async def __aexit__(self, *_args: Any) -> None:  # ruff: ignore[bad-exit-annotation]
             return None
 
         async def subscribe(self, topic: str, *, qos: int) -> None:  # ruff: ignore[no-self-use]
@@ -178,7 +178,7 @@ def test_broad_filter_still_blocks_home_assistant_noise(
     assert diagnostics["messages_forwarded"] == 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_foreign_frames_are_ignored_before_sink(  # noqa: RUF029, RUF105
     hass: HomeAssistant,
 ) -> None:
@@ -224,7 +224,7 @@ def test_transient_initial_broker_refusal_is_debug_not_warning(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A normal broker startup race must not create a HA warning on repeated failures."""  # noqa: E501, RUF105
+    """A normal broker startup race must not create a HA warning on repeated failures."""  # noqa: RUF105
     client = JackeryLocalMqttClient(
         hass,
         host="192.0.2.10",

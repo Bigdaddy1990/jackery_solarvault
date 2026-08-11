@@ -87,7 +87,7 @@ def test_non_timeout_slow_endpoint_failure_remains_warning() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_cmd113_log_does_not_expose_broker_or_credentials(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

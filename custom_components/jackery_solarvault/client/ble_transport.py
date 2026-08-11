@@ -48,7 +48,8 @@ from typing import TYPE_CHECKING, Any
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
+from jackery_solarvault.const import DEFAULT_BLE_ACK_TIMEOUT_SEC
+
 from . import ble
 
 if TYPE_CHECKING:
@@ -245,7 +246,7 @@ class JackeryBleListener:
     after the first successful HTTP discovery).
     """
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         hass: HomeAssistant,
         sink: FrameSink,
@@ -373,7 +374,7 @@ class JackeryBleListener:
     def _install_session(
         self,
         device_id: str,
-        client: Any,  # noqa: ANN401, RUF105
+        client: Any,  # noqa: RUF105
         generation: int,
     ) -> _GattSession:
         """Invalidate the prior session and install a new owned GATT session."""
@@ -568,7 +569,7 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    async def async_ensure_connected(  # ruff:ignore[too-many-return-statements]  # flat transport guard chain; the connect-backoff gate is the 7th early exit
+    async def async_ensure_connected(  # flat transport guard chain; the connect-backoff gate is the 7th early exit
         self,
         device_id: str,
         *,
@@ -623,7 +624,7 @@ class JackeryBleListener:
             await asyncio.sleep(min(0.25, remaining))
         return False
 
-    async def _async_keep_alive_loop(  # ruff:ignore[too-many-branches]
+    async def _async_keep_alive_loop(
         self,
         device_id: str,
         session: _GattSession | None = None,
@@ -675,7 +676,7 @@ class JackeryBleListener:
                         wait_for_ack=False,
                     )
                     if not sent:
-                        raise RuntimeError("no current connected GATT session")  # ruff:ignore[raise-vanilla-args, raise-within-try]
+                        raise RuntimeError("no current connected GATT session")  # ruff:ignore[raise-within-try]
                 except (RuntimeError, ValueError) as err:
                     error = f"keep-alive write failed: {err}"
                     if stats.last_keep_alive_error is None:
@@ -697,7 +698,7 @@ class JackeryBleListener:
         except asyncio.CancelledError:  # ruff:ignore[useless-try-except]
             raise
 
-    async def async_send_command(  # ruff:ignore[too-many-branches, too-many-arguments, too-many-statements]
+    async def async_send_command(
         self,
         device_id: str,
         *,
@@ -1143,7 +1144,7 @@ class JackeryBleListener:
             name=f"jackery_ble_{device_id}",
         )
 
-    async def async_stop(self) -> None:  # ruff:ignore[too-many-branches]
+    async def async_stop(self) -> None:
         """Stop the BLE listener and release its resources.
 
         Signals the listener to stop, unregisters Bluetooth advertisement callbacks,
@@ -1314,7 +1315,7 @@ class JackeryBleListener:
             )
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:  # ruff:ignore[too-many-branches, too-many-statements]
+    async def _async_run_connection(self, device_id: str, address: str) -> None:
         """Maintain a persistent BLE GATT session for one device.
 
         The session subscribes to notifications and reconnects on link loss.
@@ -1387,7 +1388,7 @@ class JackeryBleListener:
                 stats.connect_attempts += 1
                 generation = self._next_session_generation(device_id)
 
-                def _disconnected_callback(disconnected_client: Any) -> None:  # noqa: ANN401, RUF105
+                def _disconnected_callback(disconnected_client: Any) -> None:  # noqa: RUF105
                     """Record a disconnect for this session generation."""
                     self._on_disconnect(
                         device_id,
@@ -1568,7 +1569,7 @@ class JackeryBleListener:
         device_id: str,
         *,
         generation: int | None = None,
-        client: Any | None = None,  # noqa: ANN401, RUF105
+        client: Any | None = None,  # noqa: RUF105
     ) -> None:
         """Handle a peripheral disconnect for the given device.
 
@@ -1607,7 +1608,7 @@ class JackeryBleListener:
     # Notification handler
     # ------------------------------------------------------------------
 
-    def _reassemble_frame(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: C901, RUF105
+    def _reassemble_frame(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
         self,
         device_id: str,
         frame: ble.BleBinaryFrame,
@@ -1654,7 +1655,7 @@ class JackeryBleListener:
                 )
                 raise ValueError(msg)
             return frame, notify_sequence
-        if not 2 <= frame.chunk_count <= _REASSEMBLY_MAX_CHUNKS:  # ruff:ignore[magic-value-comparison]
+        if not 2 <= frame.chunk_count <= _REASSEMBLY_MAX_CHUNKS:
             msg = f"BLE chunk_count {frame.chunk_count} is outside the supported range"
             raise ValueError(msg)
         if not 1 <= frame.frame_index <= frame.chunk_count:
@@ -1752,7 +1753,7 @@ class JackeryBleListener:
         stats.multi_chunk_messages_assembled += 1
         return combined, first_notify_sequence
 
-    async def _handle_notification(  # ruff:ignore[too-many-branches, too-many-statements]
+    async def _handle_notification(
         self,
         device_id: str,
         raw: bytes,

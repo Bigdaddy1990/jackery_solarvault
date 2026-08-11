@@ -17,10 +17,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault import (
-    coordinator as co,
-    util as util_module,
-)
+from custom_components.jackery_solarvault import coordinator as co, util as util_module
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
 )
@@ -71,7 +68,7 @@ def _assert_secret_values_absent(
         assert secret not in rendered
 
 
-def _diagnostics_rig(  # ruff:ignore[too-many-arguments]  # test builder wires every accessor the export touches
+def _diagnostics_rig(  # test builder wires every accessor the export touches
     *,
     options: dict[str, Any] | None = None,
     data: dict[str, Any] | None = None,
@@ -83,7 +80,7 @@ def _diagnostics_rig(  # ruff:ignore[too-many-arguments]  # test builder wires e
     rejection_metrics: RejectionMetrics | None = None,
     hass_data: dict[str, Any] | None = None,
 ) -> tuple[Any, Any]:
-    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""  # ruff: ignore[line-too-long]
+    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     entry = SimpleNamespace(
@@ -134,7 +131,7 @@ def _diagnostics_rig(  # ruff:ignore[too-many-arguments]  # test builder wires e
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_has_expected_top_level_keys_and_no_raw_none() -> None:
     """The export carries its complete documented schema without raw nulls."""
     coordinator, entry = _diagnostics_rig(
@@ -169,7 +166,7 @@ async def test_export_has_expected_top_level_keys_and_no_raw_none() -> None:
     assert _contains_raw_none(result) is False
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_surfaces_recorded_rejection_metrics() -> None:
     """A recorded rejection reaches diagnostics with its structured context."""
     rejection_metrics = RejectionMetrics()
@@ -190,7 +187,7 @@ async def test_export_surfaces_recorded_rejection_metrics() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_redacts_token_from_entry_data() -> None:
     """A stored auth token never leaves the export in cleartext."""
     coordinator, entry = _diagnostics_rig(
@@ -203,7 +200,7 @@ async def test_export_redacts_token_from_entry_data() -> None:
     assert result["entry_data"]["unrelated"] == "kept"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
     """Local-MQTT broker credentials stored in options are redacted."""
     coordinator, entry = _diagnostics_rig(
@@ -226,7 +223,7 @@ async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None:
     """Device ids are replaced with stable, sorted `device_N` labels."""
     coordinator, entry = _diagnostics_rig(
@@ -240,9 +237,9 @@ async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None
 
     assert set(result["devices"]) == {"device_1", "device_2"}
     # "dev-a" sorts before "dev-b", so it becomes device_1.
-    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] == 42  # ruff: ignore[magic-value-comparison]
+    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] == 42
     assert result["devices"]["device_1"][PAYLOAD_PROPERTIES][FIELD_MAC_ID] == REDACTED
-    assert result["devices"]["device_2"][PAYLOAD_PROPERTIES]["soc"] == 55  # ruff: ignore[magic-value-comparison]
+    assert result["devices"]["device_2"][PAYLOAD_PROPERTIES]["soc"] == 55
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +247,7 @@ async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_raw_api_login_redacted_and_property_responses_labeled() -> None:
     """login_response secrets are redacted; per-device responses are labeled."""
     coordinator, entry = _diagnostics_rig(
@@ -273,11 +270,11 @@ async def test_raw_api_login_redacted_and_property_responses_labeled() -> None:
         "property_response_2",
     }
     # "dev-1" sorts before "dev-2".
-    assert raw["property_responses"]["property_response_1"]["soc"] == 10  # ruff: ignore[magic-value-comparison]
-    assert raw["property_responses"]["property_response_2"]["soc"] == 90  # ruff: ignore[magic-value-comparison]
+    assert raw["property_responses"]["property_response_1"]["soc"] == 10
+    assert raw["property_responses"]["property_response_2"]["soc"] == 90
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_raw_api_non_dict_payload_is_wrapped_before_redaction() -> None:
     """A non-dict per-device payload is wrapped as `{"value": ...}` before redaction."""
     coordinator, entry = _diagnostics_rig(
@@ -290,7 +287,7 @@ async def test_raw_api_non_dict_payload_is_wrapped_before_redaction() -> None:
     assert ota["ota_response_1"] == {"value": "not-a-dict-payload"}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_raw_api_coordinator_metadata_reflects_polling_interval() -> None:
     """The coordinator metadata block reports the configured poll interval."""
     coordinator, entry = _diagnostics_rig()
@@ -298,7 +295,7 @@ async def test_export_raw_api_coordinator_metadata_reflects_polling_interval() -
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     coordinator_meta = result["raw_api"]["coordinator"]
-    assert coordinator_meta["update_interval_seconds"] == 30  # ruff: ignore[magic-value-comparison]
+    assert coordinator_meta["update_interval_seconds"] == 30
     assert coordinator_meta["coordinator_polling"] is True
     assert coordinator_meta["redactions_enforced"] is True
 
@@ -308,7 +305,7 @@ async def test_export_raw_api_coordinator_metadata_reflects_polling_interval() -
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_raw_api_includes_active_endpoint_backoff_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -322,10 +319,10 @@ async def test_export_raw_api_includes_active_endpoint_backoff_window(
 
     backoff = result["raw_api"]["endpoint_backoff"]
     assert backoff["active_count"] == 1
-    assert backoff["active"]["device_list"]["code"] == 500  # ruff: ignore[magic-value-comparison]
+    assert backoff["active"]["device_list"]["code"] == 500
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_raw_api_statistics_backfill_reflects_coordinator_state() -> None:
     """The statistics-backfill block mirrors the coordinator's persisted state."""
     coordinator, entry = _diagnostics_rig(
@@ -342,7 +339,7 @@ async def test_export_raw_api_statistics_backfill_reflects_coordinator_state() -
     assert backfill["tracked_devices"] == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_export_raw_api_app_chart_import_empty_when_no_devices() -> None:
     """With no polled devices, the app-chart-import block reports no devices."""
     coordinator, entry = _diagnostics_rig()
@@ -357,7 +354,7 @@ async def test_export_raw_api_app_chart_import_empty_when_no_devices() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_bridge_disabled() -> None:
     """Neither local nor third-party bridge enabled yields bridge_disabled."""
     coordinator, entry = _diagnostics_rig(
@@ -371,7 +368,7 @@ async def test_local_mqtt_diagnostics_bridge_disabled() -> None:
     assert local_mqtt["disabled_reason"] == "bridge_disabled"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_missing_broker_host() -> None:
     """An enabled bridge with no configured host reports missing_broker_host."""
     coordinator, entry = _diagnostics_rig(
@@ -383,7 +380,7 @@ async def test_local_mqtt_diagnostics_missing_broker_host() -> None:
     assert result["raw_api"]["local_mqtt"]["disabled_reason"] == "missing_broker_host"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_broad_topic_filter_blocked() -> None:
     """A broker-wide `#` topic filter is blocked even with host/port set."""
     coordinator, entry = _diagnostics_rig(
@@ -403,7 +400,7 @@ async def test_local_mqtt_diagnostics_broad_topic_filter_blocked() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_redacts_valid_prefixed_custom_topic() -> None:
     """A valid Jackery topic remains private in the shareable export."""
     coordinator, entry = _diagnostics_rig(
@@ -421,7 +418,7 @@ async def test_local_mqtt_diagnostics_redacts_valid_prefixed_custom_topic() -> N
     assert configured["effective_topic_filter"] == REDACTED_VALUE
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
     """A device-specific local topic never appears in a diagnostics export."""
     coordinator, entry = _diagnostics_rig(
@@ -439,9 +436,9 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
     assert configured["effective_topic_filter"] == REDACTED_VALUE
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> None:
-    """A fully valid config with no registered client falls back to client_not_started."""  # ruff: ignore[line-too-long]
+    """A fully valid config with no registered client falls back to client_not_started."""
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
@@ -457,7 +454,7 @@ async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> 
     assert local_mqtt["configured_local_mqtt"]["port"] == REDACTED_VALUE
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_uses_registered_client_snapshot() -> None:
     """A real registered local-MQTT client's own snapshot is used verbatim."""
     client = MagicMock(spec=JackeryLocalMqttClient)
@@ -481,7 +478,7 @@ async def test_local_mqtt_diagnostics_uses_registered_client_snapshot() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_legacy_unredacted_option_cannot_disable_export_redaction() -> None:
     """A stale persisted raw-data option cannot bypass mandatory redaction."""
     token = "diag-token-secret"
@@ -531,7 +528,7 @@ async def test_legacy_unredacted_option_cannot_disable_export_redaction() -> Non
     assert "redactions_disabled" not in metadata
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_dev_mode_environment_cannot_disable_export_redaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -556,7 +553,7 @@ async def test_dev_mode_environment_cannot_disable_export_redaction(
     assert "dev_mode" not in metadata
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_sensitive_option_value_is_scrubbed_from_error_text() -> None:
     """Known credentials are removed even when echoed inside an error string."""
     broker_secret = "broker-password-echo-secret"

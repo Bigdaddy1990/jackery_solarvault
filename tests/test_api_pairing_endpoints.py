@@ -23,7 +23,7 @@ def _api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_bind_device_posts_full_body() -> None:
     """Binding posts bindKey/devId/guid/timezoneOffset and returns the response."""
     api = _api()
@@ -42,7 +42,7 @@ async def test_bind_device_posts_full_body() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_unbind_device_posts_device_id() -> None:
     """Unbinding posts the stringified deviceId."""
     api = _api()
@@ -54,7 +54,7 @@ async def test_unbind_device_posts_device_id() -> None:
     post.assert_awaited_once_with(DEVICE_UNBIND_PATH, {"deviceId": "42"})
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_device_nickname_posts_name() -> None:
     """Setting a nickname posts deviceId + nickname."""
     api = _api()
@@ -68,7 +68,7 @@ async def test_set_device_nickname_posts_name() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_device_posts_ids() -> None:
     """Accepting a share posts devId + qrCodeId."""
     api = _api()
@@ -82,7 +82,7 @@ async def test_accept_shared_device_posts_ids() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_device_shared_list_unwraps_list() -> None:
     """The shared-device list endpoint unwraps a bare data list."""
     api = _api()
@@ -96,7 +96,7 @@ async def test_get_device_shared_list_unwraps_list() -> None:
     get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_device_shared_list_unwraps_receive_share_bean() -> None:
     """The shared-device list endpoint merges the receive/share bean dict."""
     api = _api()
@@ -119,7 +119,7 @@ async def test_get_device_shared_list_unwraps_receive_share_bean() -> None:
     get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_device_shared_list_skips_non_dict_entries() -> None:
     """The shared-device list endpoint filters non-dict entries in both shapes."""
     api = _api()
@@ -136,7 +136,7 @@ async def test_get_device_shared_list_skips_non_dict_entries() -> None:
     get_json.assert_awaited_once_with(DEVICE_SHARED_LIST_PATH)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_qr_code_unwraps_dict() -> None:
     """The share-QR endpoint unwraps the data dict."""
     api = _api()

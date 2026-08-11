@@ -20,16 +20,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble_transport import (
-    JackeryBleListener,
-)
+from custom_components.jackery_solarvault.client.ble_transport import JackeryBleListener
 from custom_components.jackery_solarvault.const import (
     BLE_CONNECT_BACKOFF_INITIAL_SEC,
     BLE_CONNECT_BACKOFF_MAX_SEC,
 )
-from custom_components.jackery_solarvault.coordinator import (
-    BleConnectBackoff,
-)
+from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine

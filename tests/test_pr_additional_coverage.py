@@ -17,7 +17,7 @@ Covers gaps not addressed by the existing PR test files:
 
 NOTE: Where the source module has a known SyntaxError (local_mqtt.py, __init__.py)
 the tests are skipped gracefully.
-"""  # ruff: ignore[line-too-long]
+"""
 
 import asyncio
 from typing import Any
@@ -109,7 +109,7 @@ from custom_components.jackery_solarvault.const import (  # ruff: ignore[module-
 # ---------------------------------------------------------------------------
 
 
-def _make_hass() -> Any:  # ruff: ignore[any-type]
+def _make_hass() -> Any:
     """Minimal hass stub for JackeryLocalMqttClient and _async_start_local_mqtt."""
 
     class _Hass:
@@ -119,14 +119,14 @@ def _make_hass() -> Any:  # ruff: ignore[any-type]
 
         def async_create_background_task(
             self,
-            coro: Any,  # ruff: ignore[any-type]
+            coro: Any,
             name: str = "",
         ) -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
             self._tasks.append(task)
             return task
 
-        def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:  # ruff: ignore[any-type]
+        def async_create_task(self, coro: Any, name: str = "") -> asyncio.Task[Any]:
             task = asyncio.get_event_loop().create_task(coro)
             self._tasks.append(task)
             return task
@@ -134,18 +134,18 @@ def _make_hass() -> Any:  # ruff: ignore[any-type]
     return _Hass()
 
 
-async def _noop_sink(topic: str, data: Any, raw: bytes) -> None:  # ruff: ignore[any-type]
+async def _noop_sink(topic: str, data: Any, raw: bytes) -> None:
     """Inert sink so the client's decode/drop path runs (not the CPU guard)."""
 
 
-def _make_client(  # ruff: ignore[too-many-arguments]
+def _make_client(
     *,
     host: str = "192.168.1.100",
     port: int = 1883,
     username: str | None = None,
     password: str | None = None,
     client_id: str = "ha-jackery-test0001",
-    sink: Any = None,  # ruff: ignore[any-type]
+    sink: Any = None,
     topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
 ) -> JackeryLocalMqttClient:
     hass = _make_hass()
@@ -178,11 +178,11 @@ class _FakeEntry:
         # same object as the coordinator argument.
         self.runtime_data: Any = MagicMock(name="coordinator")
 
-    def async_on_unload(self, callback: Any) -> None:  # ruff: ignore[any-type]
+    def async_on_unload(self, callback: Any) -> None:
         self._unload_callbacks.append(callback)
 
 
-def _make_local_mqtt_entry(  # ruff: ignore[too-many-arguments]
+def _make_local_mqtt_entry(
     *,
     enable: bool = True,
     host: str = "192.168.1.100",
@@ -220,9 +220,9 @@ def test_handle_message_bytearray_utf8_json_dict_is_accepted() -> None:
 
 
 @_skip_local_mqtt
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_handle_message_bytearray_non_utf8_is_rejected_by_foreign_gate() -> None:
-    """Non-UTF-8 data without Jackery markers is rejected by the foreign-traffic gate before sink."""  # noqa: E501, RUF105
+    """Non-UTF-8 data without Jackery markers is rejected by the foreign-traffic gate before sink."""  # noqa: RUF105
     # A matching topic filter is required so the message reaches the decode
     # path — the default empty/`homeassistant` filter would block a foreign
     # topic before the foreign-traffic gate (the topic filter is user-set).
@@ -360,7 +360,7 @@ async def test_emit_payload_debug_with_dict_calls_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def _callback(event: Any) -> None:  # ruff: ignore[any-type]
+    def _callback(event: Any) -> None:
         received.append(event)
 
     api.payload_debug_callback = _callback
@@ -375,12 +375,12 @@ async def test_emit_payload_debug_with_callable_calls_callback() -> None:
     api = JackeryApi.__new__(JackeryApi)
     received: list[Any] = []
 
-    def _callback(event: Any) -> None:  # ruff: ignore[any-type]
+    def _callback(event: Any) -> None:
         received.append(event)
 
     api.payload_debug_callback = _callback
 
-    def factory():  # ruff: ignore[missing-return-type-private-function]
+    def factory():
         return {"kind": "http", "path": "/lazy"}
 
     await api._emit_payload_debug(factory)  # ruff: ignore[private-member-access]
@@ -401,8 +401,8 @@ async def test_emit_payload_debug_suppresses_callback_exception() -> None:
     """Exceptions raised by the callback must be caught, not propagated."""
     api = JackeryApi.__new__(JackeryApi)
 
-    def _exploding_callback(event: Any) -> None:  # ruff: ignore[any-type]
-        raise RuntimeError("callback exploded")  # ruff: ignore[raise-vanilla-args]
+    def _exploding_callback(event: Any) -> None:
+        raise RuntimeError("callback exploded")
 
     api.payload_debug_callback = _exploding_callback
     # Must not raise.
@@ -414,7 +414,7 @@ async def test_emit_payload_debug_awaits_awaitable_callback_result() -> None:
     api = JackeryApi.__new__(JackeryApi)
     results: list[str] = []
 
-    async def _async_callback(event: Any) -> None:  # ruff: ignore[any-type]  # ruff: ignore[unused-async]
+    async def _async_callback(event: Any) -> None:  # ruff: ignore[unused-async]
         results.append("done")
 
     api.payload_debug_callback = _async_callback
@@ -578,7 +578,7 @@ def test_diagnostics_snapshot_topics_seen_count_matches_len() -> None:
     client._handle_message("c/d", b"{}")  # ruff: ignore[private-member-access]
     snap = client.diagnostics_snapshot()
     assert snap["topics_seen_count"] == len(snap["topics_seen"])
-    assert snap["topics_seen_count"] == 2  # ruff: ignore[magic-value-comparison]
+    assert snap["topics_seen_count"] == 2
 
 
 @_skip_local_mqtt
@@ -662,7 +662,7 @@ async def test_async_start_local_mqtt_port_passed_to_client() -> None:
         await _async_start_local_mqtt(hass, entry, entry.runtime_data)
 
     client = hass.data[DOMAIN][entry.entry_id][_LOCAL_MQTT_RUNTIME_KEY]
-    assert client._port == 8883  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert client._port == 8883  # ruff: ignore[private-member-access]
 
 
 @_skip_init
@@ -690,8 +690,8 @@ def test_parse_hex16_accepts_lowercase_hex_string() -> None:
         parse_hex16,
     )
 
-    assert parse_hex16("00ff") == 0x00FF  # ruff: ignore[magic-value-comparison]
-    assert parse_hex16("beef") == 0xBEEF  # ruff: ignore[magic-value-comparison]
+    assert parse_hex16("00ff") == 0x00FF
+    assert parse_hex16("beef") == 0xBEEF
     assert parse_hex16("0001") == 1
 
 
@@ -701,8 +701,8 @@ def test_parse_hex16_accepts_mixed_case_hex_string() -> None:
         parse_hex16,
     )
 
-    assert parse_hex16("BeEF") == 0xBEEF  # ruff: ignore[magic-value-comparison]
-    assert parse_hex16("Ff0A") == 0xFF0A  # ruff: ignore[magic-value-comparison]
+    assert parse_hex16("BeEF") == 0xBEEF
+    assert parse_hex16("Ff0A") == 0xFF0A
 
 
 def test_parse_hex16_boundary_values() -> None:
@@ -712,7 +712,7 @@ def test_parse_hex16_boundary_values() -> None:
     )
 
     assert parse_hex16("0000") == 0
-    assert parse_hex16("FFFF") == 0xFFFF  # ruff: ignore[magic-value-comparison]
+    assert parse_hex16("FFFF") == 0xFFFF
 
 
 # ===========================================================================
@@ -736,11 +736,11 @@ def test_rsa_pkcs1v15_encrypt_empty_plaintext_succeeds() -> None:
     result = _rsa_pkcs1v15_encrypt(b"", key_b64)
     assert isinstance(result, bytes)
     # RSA-1024 ciphertext is always 128 bytes regardless of plaintext length.
-    assert len(result) == 128  # ruff: ignore[magic-value-comparison]
+    assert len(result) == 128
 
 
 def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
-    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""  # ruff: ignore[line-too-long]
+    """RSA PKCS#1 v1.5 is probabilistic — two encryptions of the same plaintext differ."""
     key_b64 = _make_rsa_public_key_b64()
     c1 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
     c2 = _rsa_pkcs1v15_encrypt(b"hello", key_b64)
@@ -748,8 +748,8 @@ def test_rsa_pkcs1v15_encrypt_produces_different_ciphertext_each_call() -> None:
     # (Extremely unlikely to match; test provides regression guard.)
     assert isinstance(c1, bytes)
     assert isinstance(c2, bytes)
-    assert len(c1) == 128  # ruff: ignore[magic-value-comparison]
-    assert len(c2) == 128  # ruff: ignore[magic-value-comparison]
+    assert len(c1) == 128
+    assert len(c2) == 128
 
 
 # ===========================================================================
@@ -792,7 +792,7 @@ async def test_async_get_today_energy_uses_device_today_energy_path() -> None:
 
 @_skip_local_mqtt
 def test_handle_connect_failure_sets_connected_event_and_marks_not_connected() -> None:
-    """After _handle_connect_failure, both is_connected and the event must be in sync."""  # ruff: ignore[line-too-long]
+    """After _handle_connect_failure, both is_connected and the event must be in sync."""
     client = _make_client()
     client._connected = True  # simulate was connected  # ruff: ignore[private-member-access]
     client._connected_event.clear()  # ruff: ignore[private-member-access]

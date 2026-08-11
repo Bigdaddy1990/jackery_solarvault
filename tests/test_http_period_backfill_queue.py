@@ -22,9 +22,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
-    SYSTEM_ID,
-)
+from tests._update_cycle_fixture import SYSTEM_ID  # ruff:ignore[banned-api]
 
 _DEVICE_ID = "device-1"
 _TODAY = date(2026, 7, 23)
@@ -86,7 +84,7 @@ def _coordinator(
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_period_backfill_shares_slow_http_concurrency_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -137,7 +135,7 @@ def _source(period_start: date) -> dict[str, object]:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_month_then_year_then_week_priority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -173,7 +171,7 @@ async def test_month_then_year_then_week_priority(
     assert DATE_TYPE_WEEK not in {date_type for date_type, _start in requested}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_disabled_periods_are_never_queued(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -200,7 +198,7 @@ async def test_disabled_periods_are_never_queued(
     assert fetch.await_args.kwargs["date_type"] == DATE_TYPE_WEEK
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_all_period_opt_outs_make_no_http_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -229,7 +227,7 @@ async def test_all_period_opt_outs_make_no_http_request(
     fetch.assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_new_calendar_period_is_added_incrementally(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -275,7 +273,7 @@ async def test_new_calendar_period_is_added_incrementally(
     assert requested == [date(2026, 1, 1), date(2026, 1, 1)]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_period_transport_failure_uses_retry_cooldown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -65,7 +65,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
     Returns:
         JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
-    """  # ruff: ignore[line-too-long]
+    """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = _RejectingPriceApi()
     coordinator.data = {
@@ -94,8 +94,8 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
         Raises:
             AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
-        """  # ruff: ignore[line-too-long]
-        raise AssertionError("rejected writer must not patch local price data")  # ruff: ignore[raise-vanilla-args]
+        """
+        raise AssertionError("rejected writer must not patch local price data")
 
     coordinator._push_partial_update = _fail_push  # ruff: ignore[private-member-access]
     return coordinator
@@ -180,7 +180,7 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
 
     assert api.dynamic_calls == [("sys1", 8, "DE")]
     price = coordinator.data["dev1"][PAYLOAD_PRICE]
-    assert price[FIELD_PLATFORM_COMPANY_ID] == 8  # ruff: ignore[magic-value-comparison]
+    assert price[FIELD_PLATFORM_COMPANY_ID] == 8
     assert price[FIELD_SYSTEM_REGION] == "DE"
 
 

@@ -23,7 +23,7 @@ def _coordinator_with_api(**api_methods: object) -> JackerySolarVaultCoordinator
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_system_shadow_fetch_is_transport_independent() -> None:
     """A system shadow is fetched directly through HTTP with no Layer 5 client."""
     get_shadow = AsyncMock(return_value={"soc": 73, "batState": 1})
@@ -42,7 +42,7 @@ async def test_http_system_shadow_fetch_is_transport_independent() -> None:
     assert not hasattr(coordinator, "_local_mqtt")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_system_shadow_auth_failure_is_not_downgraded_to_empty() -> None:
     """Credential rejection remains distinguishable from an optional empty body."""
     get_shadow = AsyncMock(side_effect=JackeryAuthError("token rejected"))
@@ -56,7 +56,7 @@ async def test_http_system_shadow_auth_failure_is_not_downgraded_to_empty() -> N
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_sub_shadow_auth_failure_is_not_downgraded_to_empty() -> None:
     """Accessory shadow authentication errors also reach the reauth boundary."""
     get_shadow = AsyncMock(side_effect=JackeryAuthError("token rejected"))
@@ -71,7 +71,7 @@ async def test_http_sub_shadow_auth_failure_is_not_downgraded_to_empty() -> None
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_optional_shadow_transport_failure_returns_no_replacement() -> None:
     """A temporary optional failure produces no value that could erase state."""
     get_shadow = AsyncMock(side_effect=JackeryApiError("temporarily unavailable"))
@@ -86,7 +86,7 @@ async def test_http_optional_shadow_transport_failure_returns_no_replacement() -
     assert result is None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_shadow_cancellation_propagates() -> None:
     """Shutdown cancellation is never converted into an optional empty body."""
     get_shadow = AsyncMock(side_effect=asyncio.CancelledError)

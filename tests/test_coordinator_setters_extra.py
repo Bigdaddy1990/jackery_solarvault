@@ -34,7 +34,7 @@ _DEFAULT_W = 1200
 _STORM_MIN = 45
 
 
-def _coordinator(entry: dict[str, Any] | None = None) -> Any:  # ruff:ignore[any-type]
+def _coordinator(entry: dict[str, Any] | None = None) -> Any:
     """Bare coordinator with both command-dispatch seams mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
@@ -49,12 +49,12 @@ def _coordinator(entry: dict[str, Any] | None = None) -> Any:  # ruff:ignore[any
     return shell
 
 
-def _ble_frame(coordinator: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
+def _ble_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last BLE-first command frame."""
     return coordinator._async_publish_command_ble_first.await_args.kwargs  # ruff: ignore[private-member-access]
 
 
-def _cmd_frame(coordinator: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
+def _cmd_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last direct command frame."""
     return coordinator._async_publish_command.await_args.kwargs  # ruff: ignore[private-member-access]
 
@@ -62,7 +62,7 @@ def _cmd_frame(coordinator: Any) -> dict[str, Any]:  # ruff:ignore[any-type]
 # --- property-frame setters ------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_max_output_power_routes_via_property_change() -> None:
     """3038 uses DevicePropertyChange, not ControlCombine."""
     coordinator = _coordinator()
@@ -79,7 +79,7 @@ async def test_set_max_output_power_routes_via_property_change() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_auto_standby_bool_delegates_to_hours() -> None:
     """The legacy bool switch maps True->1 hour flag."""
     coordinator = _coordinator()
@@ -89,7 +89,7 @@ async def test_set_auto_standby_bool_delegates_to_hours() -> None:
     assert _ble_frame(coordinator)["body_fields"][coord_mod.FIELD_IS_AUTO_STANDBY] == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_off_grid_time_coerces_int() -> None:
     """Off-grid time is coerced to int and sent via ControlCombine."""
     coordinator = _coordinator()
@@ -101,7 +101,7 @@ async def test_set_off_grid_time_coerces_int() -> None:
     assert frame["cmd"] == coord_mod.MQTT_CMD_CONTROL_COMBINE
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_default_power_frames_control_combine() -> None:
     """Default power carries the coerced watts in a ControlCombine frame."""
     coordinator = _coordinator()
@@ -113,7 +113,7 @@ async def test_set_default_power_frames_control_combine() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_follow_meter_encodes_boolean() -> None:
     """Follow-meter enable is encoded as the boolean flag field."""
     coordinator = _coordinator()
@@ -125,7 +125,7 @@ async def test_set_follow_meter_encodes_boolean() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_temp_unit_coerces_and_patches() -> None:
     """Temp unit coerces to int and lands in local properties."""
     coordinator = _coordinator()
@@ -139,7 +139,7 @@ async def test_set_temp_unit_coerces_and_patches() -> None:
 # --- weather / storm commands ---------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_storm_warning_uses_direct_command_seam() -> None:
     """Storm warning routes through the direct (non-BLE-first) command seam."""
     coordinator = _coordinator({PAYLOAD_PROPERTIES: {}, PAYLOAD_WEATHER_PLAN: {}})
@@ -152,7 +152,7 @@ async def test_set_storm_warning_uses_direct_command_seam() -> None:
     coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_storm_minutes_sends_weather_alert_frame() -> None:
     """Storm minutes emits a SendWeatherAlert frame with the interval field."""
     coordinator = _coordinator({PAYLOAD_PROPERTIES: {}, PAYLOAD_WEATHER_PLAN: {}})
@@ -164,7 +164,7 @@ async def test_set_storm_minutes_sends_weather_alert_frame() -> None:
     assert frame["body_fields"] == {coord_mod.FIELD_MINS_INTERVAL: _STORM_MIN}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_reboot_device_sends_reboot_flag() -> None:
     """Reboot emits the reboot flag through BLE-first with cloud-MQTT fallback."""
     coordinator = _coordinator()
@@ -178,7 +178,7 @@ async def test_reboot_device_sends_reboot_flag() -> None:
 # --- sub-device switches ---------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_smart_plug_switch_frames_and_mirrors_state() -> None:
     """Smart-plug on emits ControlSubDevice and mirrors the plug state."""
     plug = {coord_mod.FIELD_DEVICE_SN: "PLUG-9", coord_mod.FIELD_SYS_SWITCH: 0}
@@ -199,7 +199,7 @@ async def test_set_smart_plug_switch_frames_and_mirrors_state() -> None:
     assert mirrored[coord_mod.FIELD_SYS_SWITCH] == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_smart_plug_priority_frames_socket_priority() -> None:
     """Smart-plug priority toggles the socketPri field in a ControlSubDevice."""
     plug = {coord_mod.FIELD_DEVICE_SN: "PLUG-9"}
@@ -218,7 +218,7 @@ async def test_set_smart_plug_priority_frames_socket_priority() -> None:
     assert frame["body_fields"][coord_mod.FIELD_SOCKET_PRIORITY] == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_breaker_switch_frames_and_mirrors_state() -> None:
     """Breaker toggle emits ControlSubDevice with the breaker index and switch."""
     breaker = {coord_mod.FIELD_IDX: 2, coord_mod.FIELD_SW: 0}
@@ -236,7 +236,7 @@ async def test_set_breaker_switch_frames_and_mirrors_state() -> None:
     }
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_ct_phase_rejects_out_of_range_phase() -> None:
     """A CT phase outside 1..4 is rejected before any command is sent."""
     coordinator = _coordinator()
@@ -247,7 +247,7 @@ async def test_set_ct_phase_rejects_out_of_range_phase() -> None:
     coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_ct_phase_missing_sn_raises() -> None:
     """A missing CT serial is rejected before any command is sent."""
     coordinator = _coordinator()
@@ -258,7 +258,7 @@ async def test_set_ct_phase_missing_sn_raises() -> None:
     coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_ct_phase_valid_sends_combined_phase() -> None:
     """A valid CT phase (4 = combined) is forwarded with the CT devType."""
     coordinator = _coordinator()

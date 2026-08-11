@@ -48,7 +48,7 @@ async def _teardown(hass: HomeAssistant, entry_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_mqtt_only_sections_survive_http_rebuild(hass: HomeAssistant) -> None:
     """WiFi/MQTT-connect/electricity-strategy/battery-boundary sections survive.
 
@@ -81,7 +81,7 @@ async def test_mqtt_only_sections_survive_http_rebuild(hass: HomeAssistant) -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_mqtt_pushed_alarm_survives_http_rebuild(hass: HomeAssistant) -> None:
     """An MQTT-pushed alarm section must survive the next HTTP poll cycle."""
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
@@ -99,7 +99,7 @@ async def test_mqtt_pushed_alarm_survives_http_rebuild(hass: HomeAssistant) -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     hass: HomeAssistant,
 ) -> None:

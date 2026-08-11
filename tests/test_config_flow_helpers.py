@@ -256,8 +256,8 @@ def test_flow_options_preserves_third_party_mqtt_token() -> None:
 
 def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
     """Token from current_options flows through merge_local_mqtt_options correctly."""
-    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # noqa: E501, RUF105
-    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # noqa: E501, RUF105
+    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # noqa: RUF105
+    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # noqa: RUF105
     current_options = {
         CONF_ENABLE_BLE_TRANSPORT: False,
         CONF_THIRD_PARTY_MQTT_TOKEN: "token-from-options",

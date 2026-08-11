@@ -223,7 +223,7 @@ def _portable_device_payload() -> dict[str, dict[str, Any]]:
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 async def portable_setup(
     hass: HomeAssistant,
 ) -> AsyncGenerator[tuple[MockConfigEntry, _CapturingMqtt]]:

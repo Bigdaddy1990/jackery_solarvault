@@ -90,7 +90,7 @@ def test_cached_credentials_none_without_session() -> None:
     login.assert_not_called()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ensure_mqtt_without_creds_does_not_reauth() -> None:
     """Missing cached creds must not raise ConfigEntryAuthFailed or connect."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -113,7 +113,7 @@ async def test_ensure_mqtt_without_creds_does_not_reauth() -> None:
     mqtt.async_start.assert_not_called()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_connected_mqtt_clears_backoff_after_client_verifies_credentials() -> (
     None
 ):
@@ -148,7 +148,7 @@ async def test_connected_mqtt_clears_backoff_after_client_verifies_credentials()
     assert mgr.backoff_remaining() == pytest.approx(0.0)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_rotated_mqtt_session_waits_for_new_connection_success() -> None:
     """A credential-triggered restart is not marked successful before CONNACK."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -175,7 +175,7 @@ async def test_rotated_mqtt_session_waits_for_new_connection_success() -> None:
     assert mgr.backoff_remaining() > 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_publish_command_without_creds_raises_non_auth() -> None:
     """Missing cached creds fail the publish as a plain HomeAssistantError."""
     login = AsyncMock(
@@ -212,7 +212,7 @@ async def test_publish_command_without_creds_raises_non_auth() -> None:
     login.assert_not_called()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     """A foreground switch command must not depend on deferred Layer-5 startup."""
     creds = {
@@ -256,7 +256,7 @@ async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     mqtt.async_publish_json.assert_awaited_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_concurrent_cloud_mqtt_start_constructs_one_runtime() -> None:
     """Deferred startup and a command must not orphan a duplicate MQTT client."""
 

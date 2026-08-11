@@ -61,14 +61,14 @@ def _coordinator(
     return coordinator
 
 
-def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff:ignore[any-type]
+def _api(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator).api
 
 
 # --- async_set_pv_name (Finding 1a/1b + Finding 2) ------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_device_name_uses_diy_http_endpoint_and_patches_metadata() -> None:
     """The explicit App REST setter updates only the addressed device metadata."""
     data = {
@@ -102,7 +102,7 @@ async def test_set_device_name_uses_diy_http_endpoint_and_patches_metadata() -> 
     cast("Any", coordinator).async_request_refresh.assert_awaited_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_pv_name_resolves_device_sn_and_patches_channel() -> None:
     """Channel 0 resolves the device's SN, forwards it, and patches pv1.name."""
     data = {
@@ -131,7 +131,7 @@ async def test_set_pv_name_resolves_device_sn_and_patches_channel() -> None:
     cast("Any", coordinator).async_request_refresh.assert_awaited_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_pv_name_targets_addressed_device_on_multi_device_account() -> None:
     """The addressed device is renamed, not the first channel-bearing match."""
     data = {
@@ -157,7 +157,7 @@ async def test_set_pv_name_targets_addressed_device_on_multi_device_account() ->
     assert props[_OTHER][PAYLOAD_PROPERTIES][FIELD_PV1][FIELD_PV_NAME] == "Other"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_set_pv_name_without_device_sn_raises_and_skips_api() -> None:
     """A device with no resolvable SN raises before any API write."""
     data = {_DEVICE: {PAYLOAD_PROPERTIES: {FIELD_PV1: {FIELD_PV_NAME: "Old"}}}}
@@ -174,7 +174,7 @@ async def test_set_pv_name_without_device_sn_raises_and_skips_api() -> None:
 # --- async_update_storm_alert_location (Finding 1c) -----------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_update_storm_alert_location_forwards_and_patches_fresh_copy() -> None:
     """Coordinates forward to the client and land in a fresh location block."""
     data = {_DEVICE: {PAYLOAD_LOCATION: {FIELD_LATITUDE: 1.0, FIELD_LONGITUDE: 2.0}}}
@@ -206,7 +206,7 @@ async def test_update_storm_alert_location_forwards_and_patches_fresh_copy() -> 
 # --- async_update_user_info (Finding 1d) ----------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_update_user_info_forwards_nick_name_without_local_patch() -> None:
     """The nickname forwards to the client and applies no coordinator patch."""
     data = {_DEVICE: {PAYLOAD_PROPERTIES: {"batSoc": 55}}}

@@ -13,9 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault.const import (
-    BLE_COMMAND_CONNECT_TIMEOUT_SEC,
-)
+from custom_components.jackery_solarvault.const import BLE_COMMAND_CONNECT_TIMEOUT_SEC
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
@@ -36,7 +34,7 @@ def _ble_first_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ble_first_ensures_connection_before_write() -> None:
     """The BLE-first router passes a positive connect timeout to the write."""
     coordinator = _ble_first_coordinator()
@@ -59,7 +57,7 @@ async def test_ble_first_ensures_connection_before_write() -> None:
     assert kwargs["connect_timeout_sec"] > 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ble_write_unavailable_falls_back_to_mqtt() -> None:
     """A BLE write that reports "not sent" (False) falls back to MQTT.
 
@@ -91,7 +89,7 @@ async def test_ble_write_unavailable_falls_back_to_mqtt() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ble_error_and_mqtt_fallback_failure_both_raise() -> None:
     """When BLE fails and the MQTT fallback also fails, the MQTT error propagates.
 

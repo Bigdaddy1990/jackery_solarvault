@@ -21,7 +21,7 @@ def _api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_remove_shared_access_posts_user_and_device() -> None:
     """Removing one share posts bindUserId + stringified deviceId."""
     api = _api()
@@ -35,7 +35,7 @@ async def test_remove_shared_access_posts_user_and_device() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_remove_all_shared_access_posts_level() -> None:
     """Removing all shares posts bindUserId + level."""
     api = _api()
@@ -49,7 +49,7 @@ async def test_remove_all_shared_access_posts_level() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_check_system_bound_gets_with_params() -> None:
     """The system-bound check GETs with bindKey/deviceSn/guid params."""
     api = _api()
@@ -68,7 +68,7 @@ async def test_check_system_bound_gets_with_params() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_bluetooth_key_unwraps_dict() -> None:
     """The bluetooth-key endpoint GETs with deviceSn/guid and unwraps data."""
     api = _api()
@@ -84,7 +84,7 @@ async def test_get_bluetooth_key_unwraps_dict() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_create_system_forwards_kwargs_body() -> None:
     """System creation forwards its keyword arguments as the POST body."""
     api = _api()

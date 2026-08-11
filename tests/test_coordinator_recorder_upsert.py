@@ -122,7 +122,7 @@ def _assert_monotonic(rows: list[dict[str, Any]]) -> None:
         assert later >= earlier - 1e-6, f"sum went backwards: {sums}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_recorder_before_hass(recorder_db_url: str) -> None:
     """Prepare the recorder database before Home Assistant starts."""
     del recorder_db_url

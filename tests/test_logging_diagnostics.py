@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 _LOCAL_MQTT_LOGGER = "custom_components.jackery_solarvault.client.local_mqtt"
 
 
-@pytest.fixture()
+@pytest.fixture
 def restore_payload_debug_logger() -> Iterator[logging.Logger]:
     """Yield the payload logger and restore its and its parent's levels."""
     logger = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
@@ -73,7 +73,7 @@ def _payload_debug_coordinator(
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_dev_mode_alone_does_not_activate_payload_debug_capture(
     restore_payload_debug_logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
@@ -99,7 +99,7 @@ async def test_dev_mode_alone_does_not_activate_payload_debug_capture(
     assert not writes, "dev mode alone must not run the payload writer"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_payload_debug_option_activates_capture(
     restore_payload_debug_logger: logging.Logger,
 ) -> None:
@@ -124,7 +124,7 @@ async def test_payload_debug_option_activates_capture(
     assert writes, "the payload-debug option must activate the payload writer"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_debug_logger_activates_payload_debug_capture(
     restore_payload_debug_logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
@@ -150,7 +150,7 @@ async def test_debug_logger_activates_payload_debug_capture(
     assert writes, "a DEBUG payload_debug logger must run the raw-payload writer"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_inherited_effective_debug_logger_activates_capture(
     restore_payload_debug_logger: logging.Logger,
 ) -> None:
@@ -174,7 +174,7 @@ async def test_inherited_effective_debug_logger_activates_capture(
     assert writes, "an inherited effective DEBUG level must activate capture"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_payload_debug_capture_off_without_dev_mode_or_debug_logger(
     restore_payload_debug_logger: logging.Logger,
     monkeypatch: pytest.MonkeyPatch,
@@ -216,7 +216,7 @@ class _FailingAioMqttClient:
         return False
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_local_mqtt_connect_failure_logs_warning(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,

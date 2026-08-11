@@ -86,7 +86,7 @@ def test_home_day_description_names_the_system_home_trends_section() -> None:
     assert description.stat_key == APP_STAT_TOTAL_HOME_ENERGY
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     hass: HomeAssistant,
 ) -> None:
@@ -116,7 +116,7 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
         await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     hass: HomeAssistant,
 ) -> None:
@@ -151,7 +151,7 @@ async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
         await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_property(
     hass: HomeAssistant,
 ) -> None:
@@ -161,14 +161,14 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     active_slow_fetches = 0
     max_active_slow_fetches = 0
 
-    async def _hold_slow_fetch(result: Any) -> Any:  # ruff:ignore[any-type]
+    async def _hold_slow_fetch(result: Any) -> Any:
         nonlocal active_slow_fetches, max_active_slow_fetches
         active_slow_fetches += 1
         max_active_slow_fetches = max(
             max_active_slow_fetches,
             active_slow_fetches,
         )
-        if active_slow_fetches >= 2:  # ruff: ignore[magic-value-comparison]
+        if active_slow_fetches >= 2:
             concurrency_limit_reached.set()
         try:
             await release_slow_fetches.wait()
@@ -176,8 +176,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
             active_slow_fetches -= 1
         return result
 
-    def _blocking_endpoint(result: Any) -> AsyncMock:  # ruff:ignore[any-type]
-        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:  # ruff:ignore[any-type]
+    def _blocking_endpoint(result: Any) -> AsyncMock:
+        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:
             return await _hold_slow_fetch(result)
 
         return AsyncMock(side_effect=_fetch)
@@ -208,7 +208,7 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
         await asyncio.sleep(0)
 
         assert api.async_get_device_property.await_count == 1
-        assert max_active_slow_fetches <= 2  # ruff: ignore[magic-value-comparison]
+        assert max_active_slow_fetches <= 2
     finally:
         release_slow_fetches.set()
         if slow_refresh_task is not None:

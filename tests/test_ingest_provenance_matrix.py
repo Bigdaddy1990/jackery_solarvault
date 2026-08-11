@@ -15,16 +15,10 @@ from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import ingest_observation
-from custom_components.jackery_solarvault.types import (
-    DataSource,
-    Observation,
-)
+from custom_components.jackery_solarvault.types import DataSource, Observation
 
 if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.types import (
-        FieldProvenance,
-        IngestResult,
-    )
+    from custom_components.jackery_solarvault.types import FieldProvenance, IngestResult
 
 _DEVICE_ID = "device-1"
 _SECTION = PAYLOAD_PROPERTIES

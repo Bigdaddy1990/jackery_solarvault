@@ -49,7 +49,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # ruff:ignore[any-type]
+def _description(key: str) -> Any:
     return next(desc for desc in NUMBER_DESCRIPTIONS if desc.key == key)
 
 
@@ -110,7 +110,7 @@ def test_integer_value_description_rounds_to_int() -> None:
 
     value = entity.native_value
 
-    assert value == 1883  # ruff: ignore[magic-value-comparison]
+    assert value == 1883
     assert isinstance(value, int)
 
 
@@ -207,7 +207,7 @@ async def test_portable_setter_forwards_action_and_field() -> None:
     _args, kwargs = entity.coordinator.async_portable_set_number.call_args
     assert kwargs["action_id"] == ACTION_ID_PORTABLE_SET_CHARGE_POWER
     assert kwargs["field"] == "csc"
-    assert kwargs["value"] == 600  # ruff: ignore[magic-value-comparison]
+    assert kwargs["value"] == 600
 
 
 def test_portable_charge_power_reads_csc_the_field_its_setter_writes() -> None:

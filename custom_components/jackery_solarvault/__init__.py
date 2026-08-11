@@ -126,9 +126,7 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
 
-    from .client.local_mqtt import (
-        LocalMqttConfiguration,
-    )
+    from .client.local_mqtt import LocalMqttConfiguration
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
 # JackerySolarVaultCoordinator. Per HA developer guide (2024.4+) this
@@ -355,9 +353,7 @@ def _async_prune_removed_local_mqtt_tls_options(  # noqa: RUF105
     removed = REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS.intersection(entry.options)
     if not removed:
         return
-    options = {
-        key: value for key, value in entry.options.items() if key not in removed
-    }
+    options = {key: value for key, value in entry.options.items() if key not in removed}
     hass.config_entries.async_update_entry(entry, options=options)
     _LOGGER.info(
         "Removed obsolete Jackery local MQTT TLS options: %s",
@@ -572,7 +568,7 @@ def _defer_supplemental_transports(  # noqa: RUF067, RUF105
         )
 
 
-async def _async_cleanup_stale_supplemental(  # ruff:ignore[too-many-branches]  # noqa: RUF067, RUF105
+async def _async_cleanup_stale_supplemental(  # noqa: RUF067, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -945,7 +941,7 @@ def _schedule_layer5_start_if_ready(  # noqa: RUF067, RUF105
     entry.async_on_unload(_cancel_layer5_task)
 
 
-async def _async_start_local_mqtt(  # ruff:ignore[too-many-return-statements, too-many-statements]  # noqa: RUF067, RUF105
+async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -1319,7 +1315,7 @@ async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
     return rollback_ok and platforms_rolled_back and shutdown_ok
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # ruff:ignore[too-many-statements]  # noqa: RUF067, RUF105
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF105
     """Set up the Jackery SolarVault config entry and optional transports.
 
     Performs authentication, constructs the coordinator, runs discovery and the initial
@@ -1703,13 +1699,15 @@ def _battery_pack_registry_identity(  # noqa: RUF067, RUF105
         ]
         if len(pack_identifiers) == 1:
             pack_identifier = pack_identifiers[0]
-            return parent_device_id, pack_identifier, pack_identifier.removeprefix(
-                prefix
+            return (
+                parent_device_id,
+                pack_identifier,
+                pack_identifier.removeprefix(prefix),
             )
     return None
 
 
-def _seed_battery_pack_registry_identities(  # ruff:ignore[too-many-branches]  # noqa: RUF067, RUF105
+def _seed_battery_pack_registry_identities(  # noqa: RUF067, RUF105
     coordinator: JackerySolarVaultCoordinator,
     serial_records: dict[str, list[tuple[str, int | None]]],
     remaining_old_indices: dict[str, set[int]],
@@ -1839,7 +1837,7 @@ def _battery_pack_stable_identity(pack: dict[str, Any]) -> str:  # noqa: RUF067,
     return f"gen_{hash_digest}"
 
 
-def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-branches, too-many-locals, too-many-statements]  # noqa: RUF067, RUF105
+def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # noqa: RUF067, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -2038,7 +2036,7 @@ def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-branches, to
     )
 
 
-def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0912, PLR0914, RUF067, RUF105
+def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF067, RUF105
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     serial_records: dict[str, list[tuple[str, int | None]]],
@@ -2242,7 +2240,7 @@ def _async_remove_entities_with_suffixes(  # noqa: RUF067, RUF105
             registry.async_remove(ent.entity_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # ruff:ignore[too-many-branches]  # noqa: RUF067, RUF105
+async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF105
     """Unload the config entry and tear down its runtime resources.
 
     If platform unload succeeds, shuts down the coordinator (if present) and clears the

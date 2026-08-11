@@ -328,7 +328,7 @@ async def test_topology_reload_transfers_removals_not_position_overrides(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_smart_plug_absent_from_one_partial_push_is_not_dropped(
     hass: HomeAssistant,
 ) -> None:
@@ -365,7 +365,7 @@ async def test_smart_plug_absent_from_one_partial_push_is_not_dropped(
     await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_smart_plug_silent_past_the_threshold_is_dropped(
     hass: HomeAssistant,
 ) -> None:
@@ -403,7 +403,7 @@ async def test_smart_plug_silent_past_the_threshold_is_dropped(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_sub_device_absent_from_one_partial_push_is_not_dropped(
     hass: HomeAssistant,
 ) -> None:
@@ -444,7 +444,7 @@ async def test_generic_sub_device_absent_from_one_partial_push_is_not_dropped(
     await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_sub_device_silent_past_the_threshold_is_dropped(
     hass: HomeAssistant,
 ) -> None:

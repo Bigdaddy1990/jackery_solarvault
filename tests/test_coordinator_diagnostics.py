@@ -34,7 +34,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _Coordinator = JackerySolarVaultCoordinator
 
 
-def _bare() -> Any:  # ruff:ignore[any-type]
+def _bare() -> Any:
     """Return an uninitialised coordinator shell for attribute injection."""
     return cast("Any", _Coordinator.__new__(_Coordinator))
 
@@ -125,7 +125,7 @@ def test_statistics_backfill_diagnostics_redacts_device_ids() -> None:
     diagnostics = coordinator.statistics_backfill_diagnostics
 
     assert diagnostics["loaded"] is True
-    assert diagnostics["tracked_devices"] == 2  # ruff: ignore[magic-value-comparison]
+    assert diagnostics["tracked_devices"] == 2
     # Sorted by device id: SN-A first.
     assert diagnostics["devices"]["device_1"] == {"last_repair_date": "2026-01-01"}
     assert diagnostics["devices"]["device_2"] == {"last_repair_date": "2026-01-02"}
@@ -239,7 +239,7 @@ def test_statistics_repair_from_date_seeds_january_first_on_first_run() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_statistics_import_job_awaits_repair_wrapper() -> None:
     """The background import job drives the import+repair chain."""
     coordinator = _bare()
@@ -337,7 +337,7 @@ def test_polling_diagnostics_returns_defensive_copy() -> None:
     exported = coordinator.polling_diagnostics
     exported["last_cycle_seconds"] = 999
 
-    assert internal["last_cycle_seconds"] == 12  # ruff: ignore[magic-value-comparison]
+    assert internal["last_cycle_seconds"] == 12
 
 
 def test_statistics_import_diagnostics_returns_defensive_copy() -> None:
@@ -349,7 +349,7 @@ def test_statistics_import_diagnostics_returns_defensive_copy() -> None:
     exported = coordinator.statistics_import_diagnostics
     exported["last_import_device_count"] = 0
 
-    assert internal["last_import_device_count"] == 3  # ruff: ignore[magic-value-comparison]
+    assert internal["last_import_device_count"] == 3
 
 
 # ---------------------------------------------------------------------------

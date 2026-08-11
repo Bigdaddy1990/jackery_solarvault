@@ -4,7 +4,6 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import __init__ as _jackery_init
@@ -20,9 +19,13 @@ _init_module = (
     else import_module("custom_components.jackery_solarvault.__init__")
 )
 
-_async_migrate_portable_screen_entity = _init_module._async_migrate_portable_screen_entity
+_async_migrate_portable_screen_entity = (
+    _init_module._async_migrate_portable_screen_entity
+)
 _async_migrate_grid_standard_entity = _init_module._async_migrate_grid_standard_entity
-_async_migrate_battery_pack_identities = _init_module._async_migrate_battery_pack_identities
+_async_migrate_battery_pack_identities = (
+    _init_module._async_migrate_battery_pack_identities
+)
 
 _PORTABLE_SCREEN_UID = "12345_portable_screen"
 _GRID_STANDARD_UID = "system-abc_grid_standard"
@@ -30,13 +33,15 @@ _PARENT_ID = "device-1"
 _SN_A = "HQ2C01400955HP3"
 
 
-def _config_entry(hass: "HomeAssistant", entry_id: str = "entry-1") -> MockConfigEntry:
+def _config_entry(hass: HomeAssistant, entry_id: str = "entry-1") -> MockConfigEntry:
     entry = MockConfigEntry(domain=DOMAIN, entry_id=entry_id)
     entry.add_to_hass(hass)
     return entry
 
 
-def _portable_screen_switch(registry: "er.EntityRegistry", entry: MockConfigEntry) -> "er.RegistryEntry":
+def _portable_screen_switch(
+    registry: er.EntityRegistry, entry: MockConfigEntry
+) -> er.RegistryEntry:
     return registry.async_get_or_create(
         "switch",
         DOMAIN,
@@ -46,7 +51,9 @@ def _portable_screen_switch(registry: "er.EntityRegistry", entry: MockConfigEntr
     )
 
 
-def _grid_standard_text(registry: "er.EntityRegistry", entry: MockConfigEntry) -> "er.RegistryEntry":
+def _grid_standard_text(
+    registry: er.EntityRegistry, entry: MockConfigEntry
+) -> er.RegistryEntry:
     return registry.async_get_or_create(
         "text",
         DOMAIN,
@@ -56,7 +63,9 @@ def _grid_standard_text(registry: "er.EntityRegistry", entry: MockConfigEntry) -
     )
 
 
-def _grid_standard_sensor(registry: "er.EntityRegistry", entry: MockConfigEntry) -> "er.RegistryEntry":
+def _grid_standard_sensor(
+    registry: er.EntityRegistry, entry: MockConfigEntry
+) -> er.RegistryEntry:
     return registry.async_get_or_create(
         "sensor",
         DOMAIN,
@@ -66,9 +75,15 @@ def _grid_standard_sensor(registry: "er.EntityRegistry", entry: MockConfigEntry)
     )
 
 
-def _pack_device(registry: "er.EntityRegistry", entry: MockConfigEntry, identifier: str, serial: str | None = None) -> "dr.DeviceEntry":
+def _pack_device(
+    registry: er.EntityRegistry,
+    entry: MockConfigEntry,
+    identifier: str,
+    serial: str | None = None,
+) -> dr.DeviceEntry:
     """Create a device registry entry for a battery pack."""
     from homeassistant.helpers import device_registry as dr
+
     dr_registry = dr.async_get(registry.hass)
     return dr_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -77,7 +92,9 @@ def _pack_device(registry: "er.EntityRegistry", entry: MockConfigEntry, identifi
     )
 
 
-def _pack_entity(registry: "er.EntityRegistry", entry: MockConfigEntry, identifier: str, unique_id: str) -> "er.RegistryEntry":
+def _pack_entity(
+    registry: er.EntityRegistry, entry: MockConfigEntry, identifier: str, unique_id: str
+) -> er.RegistryEntry:
     return registry.async_get_or_create(
         "sensor",
         DOMAIN,
@@ -89,11 +106,12 @@ def _pack_entity(registry: "er.EntityRegistry", entry: MockConfigEntry, identifi
 
 def _serial_identifier(serial: str) -> str:
     from custom_components.jackery_solarvault.util import stable_subdevice_key
-    return f"{_PARENT_ID}_{stable_subdevice_key('battery_pack', serial, 1)}"
+
+    return f"{_PARENT_ID}_{stable_subdevice_key("battery_pack", serial, 1)}"
 
 
 async def test_portable_screen_migration_is_idempotent_no_registry_writes(
-    hass: "HomeAssistant",
+    hass: HomeAssistant,
 ) -> None:
     """Re-running migration on already-migrated entity does not call registry.update/remove."""
     entry = _config_entry(hass)
@@ -111,16 +129,24 @@ async def test_portable_screen_migration_is_idempotent_no_registry_writes(
 
     # Spy on registry operations
     with (
-        patch.object(registry, "async_update_entity", wraps=registry.async_update_entity) as mock_update,
-        patch.object(registry, "async_remove", wraps=registry.async_remove) as mock_remove,
+        patch.object(
+            registry, "async_update_entity", wraps=registry.async_update_entity
+        ) as mock_update,
+        patch.object(
+            registry, "async_remove", wraps=registry.async_remove
+        ) as mock_remove,
     ):
         # Run migration twice
         _async_migrate_portable_screen_entity(hass, entry)
         _async_migrate_portable_screen_entity(hass, entry)
 
         # No registry writes should occur on second run
-        assert mock_update.call_count == 0, "async_update_entity should not be called on idempotent re-run"
-        assert mock_remove.call_count == 0, "async_remove should not be called on idempotent re-run"
+        assert mock_update.call_count == 0, (
+            "async_update_entity should not be called on idempotent re-run"
+        )
+        assert mock_remove.call_count == 0, (
+            "async_remove should not be called on idempotent re-run"
+        )
 
         # Entity should remain unchanged
         preserved = registry.async_get(target_entity_id)
@@ -129,7 +155,7 @@ async def test_portable_screen_migration_is_idempotent_no_registry_writes(
 
 
 async def test_grid_standard_migration_is_idempotent_no_registry_writes(
-    hass: "HomeAssistant",
+    hass: HomeAssistant,
 ) -> None:
     """Re-running migration on already-migrated entity does not call registry.update/remove."""
     entry = _config_entry(hass)
@@ -140,14 +166,22 @@ async def test_grid_standard_migration_is_idempotent_no_registry_writes(
     target_entity_id = target.entity_id
 
     with (
-        patch.object(registry, "async_update_entity", wraps=registry.async_update_entity) as mock_update,
-        patch.object(registry, "async_remove", wraps=registry.async_remove) as mock_remove,
+        patch.object(
+            registry, "async_update_entity", wraps=registry.async_update_entity
+        ) as mock_update,
+        patch.object(
+            registry, "async_remove", wraps=registry.async_remove
+        ) as mock_remove,
     ):
         _async_migrate_grid_standard_entity(hass, entry)
         _async_migrate_grid_standard_entity(hass, entry)
 
-        assert mock_update.call_count == 0, "async_update_entity should not be called on idempotent re-run"
-        assert mock_remove.call_count == 0, "async_remove should not be called on idempotent re-run"
+        assert mock_update.call_count == 0, (
+            "async_update_entity should not be called on idempotent re-run"
+        )
+        assert mock_remove.call_count == 0, (
+            "async_remove should not be called on idempotent re-run"
+        )
 
         preserved = registry.async_get(target_entity_id)
         assert preserved is not None
@@ -155,12 +189,15 @@ async def test_grid_standard_migration_is_idempotent_no_registry_writes(
 
 
 async def test_battery_pack_migration_is_idempotent_no_registry_writes(
-    hass: "HomeAssistant",
+    hass: HomeAssistant,
 ) -> None:
     """Re-running migration on already-migrated pack does not call registry.update/remove."""
-    from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
-    from custom_components.jackery_solarvault.const import PAYLOAD_BATTERY_PACKS
     from typing import Any, cast
+
+    from custom_components.jackery_solarvault.const import PAYLOAD_BATTERY_PACKS
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
 
     entry = _config_entry(hass)
     registry = er.async_get(hass)
@@ -169,7 +206,9 @@ async def test_battery_pack_migration_is_idempotent_no_registry_writes(
     # Pre-create the migrated pack device + entity with serial-based identity
     new_identifier = _serial_identifier(_SN_A)
     pack = _pack_device(registry, entry, new_identifier, serial=_SN_A)
-    entity = _pack_entity(registry, entry, new_identifier, f"{new_identifier}_state_of_charge")
+    entity = _pack_entity(
+        registry, entry, new_identifier, f"{new_identifier}_state_of_charge"
+    )
     entity_id = entity.entity_id
 
     # Coordinator with matching live serial
@@ -180,19 +219,39 @@ async def test_battery_pack_migration_is_idempotent_no_registry_writes(
     entry.runtime_data = coordinator
 
     with (
-        patch.object(device_registry, "async_update_device", wraps=device_registry.async_update_device) as mock_dev_update,
-        patch.object(device_registry, "async_remove_device", wraps=device_registry.async_remove_device) as mock_dev_remove,
-        patch.object(registry, "async_update_entity", wraps=registry.async_update_entity) as mock_ent_update,
-        patch.object(registry, "async_remove", wraps=registry.async_remove) as mock_ent_remove,
+        patch.object(
+            device_registry,
+            "async_update_device",
+            wraps=device_registry.async_update_device,
+        ) as mock_dev_update,
+        patch.object(
+            device_registry,
+            "async_remove_device",
+            wraps=device_registry.async_remove_device,
+        ) as mock_dev_remove,
+        patch.object(
+            registry, "async_update_entity", wraps=registry.async_update_entity
+        ) as mock_ent_update,
+        patch.object(
+            registry, "async_remove", wraps=registry.async_remove
+        ) as mock_ent_remove,
     ):
         _async_migrate_battery_pack_identities(hass, entry)
         _async_migrate_battery_pack_identities(hass, entry)
 
         # No device/entity registry writes should occur on second run
-        assert mock_dev_update.call_count == 0, "device async_update_device should not be called on idempotent re-run"
-        assert mock_dev_remove.call_count == 0, "device async_remove_device should not be called on idempotent re-run"
-        assert mock_ent_update.call_count == 0, "entity async_update_entity should not be called on idempotent re-run"
-        assert mock_ent_remove.call_count == 0, "entity async_remove should not be called on idempotent re-run"
+        assert mock_dev_update.call_count == 0, (
+            "device async_update_device should not be called on idempotent re-run"
+        )
+        assert mock_dev_remove.call_count == 0, (
+            "device async_remove_device should not be called on idempotent re-run"
+        )
+        assert mock_ent_update.call_count == 0, (
+            "entity async_update_entity should not be called on idempotent re-run"
+        )
+        assert mock_ent_remove.call_count == 0, (
+            "entity async_remove should not be called on idempotent re-run"
+        )
 
         # Entity and device should remain unchanged
         preserved_ent = registry.async_get(entity_id)
@@ -200,6 +259,8 @@ async def test_battery_pack_migration_is_idempotent_no_registry_writes(
         assert preserved_ent.entity_id == entity_id
         assert preserved_ent.unique_id == f"{new_identifier}_state_of_charge"
 
-        preserved_dev = device_registry.async_get_device(identifiers={(DOMAIN, new_identifier)})
+        preserved_dev = device_registry.async_get_device(
+            identifiers={(DOMAIN, new_identifier)}
+        )
         assert preserved_dev is not None
         assert preserved_dev.id == pack.id

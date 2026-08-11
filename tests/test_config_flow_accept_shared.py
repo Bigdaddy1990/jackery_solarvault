@@ -39,7 +39,7 @@ def _flow_with_entry(coordinator: object) -> tuple[JackeryConfigFlow, SimpleName
     return flow, entry
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_step_shows_invitation_form() -> None:
     """Accept-shared reconfigure step asks for app invitation identifiers."""
     flow, entry = _flow_with_entry(SimpleNamespace())
@@ -52,7 +52,7 @@ async def test_accept_shared_step_shows_invitation_form() -> None:
     assert result["errors"] == {}
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_step_calls_cloud_and_reloads_entry() -> None:
     """Submitted invitation data is forwarded to the app accept-bind endpoint.
 
@@ -81,7 +81,7 @@ async def test_accept_shared_step_calls_cloud_and_reloads_entry() -> None:
     coordinator.async_schedule_discovery_refresh.assert_called_once_with()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_step_aborts_on_auth_failure() -> None:
     """Credential rejection does not pause live data through this flow."""
     api = SimpleNamespace(
@@ -99,7 +99,7 @@ async def test_accept_shared_step_aborts_on_auth_failure() -> None:
     assert result["reason"] == FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_step_aborts_when_runtime_data_missing() -> None:
     """Submitting without a live coordinator aborts instead of crashing.
 
@@ -118,7 +118,7 @@ async def test_accept_shared_step_aborts_when_runtime_data_missing() -> None:
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_ENTRY_MISSING
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_accept_shared_step_keeps_form_on_backend_error() -> None:
     """Non-auth backend failures keep the form open with a localized error."""
     api = SimpleNamespace(

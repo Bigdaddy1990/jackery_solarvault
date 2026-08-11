@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def _consume_background_task(
-    coro: Any,  # ruff:ignore[any-type]
+    coro: Any,
     *,
     name: str,
     eager_start: bool,
@@ -37,7 +37,7 @@ def _consume_background_task(
 def _guarded_coordinator(
     *,
     auth_failure_message: str | None = None,
-) -> Any:  # ruff:ignore[any-type]
+) -> Any:
     """Build a bare coordinator wired for the guarded-update guard paths."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
@@ -52,7 +52,7 @@ def _guarded_coordinator(
     return coordinator
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_guarded_update_raises_when_no_devices_discovered() -> None:
     """An empty index after discovery fails the cycle instead of returning data."""
     coordinator = _guarded_coordinator()
@@ -63,7 +63,7 @@ async def test_guarded_update_raises_when_no_devices_discovered() -> None:
     coordinator.async_discover.assert_awaited_once()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_guarded_update_clears_deferred_auth_notice_without_pausing() -> None:
     """A background auth notice is cleared; the HTTP poll continues to discovery.
 
@@ -81,7 +81,7 @@ async def test_guarded_update_clears_deferred_auth_notice_without_pausing() -> N
     assert coordinator._mqtt_mgr.auth_failure_message is None  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_guarded_update_dispatches_system_body_fill_off_critical_path() -> None:
     """The SystemBody fill is scheduled without ``ensure_mqtt`` on every cycle."""
     coordinator = _guarded_coordinator()

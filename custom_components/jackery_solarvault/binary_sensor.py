@@ -441,7 +441,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     entity_description: JackerySubdeviceAlarmBinarySensorDescription
 
-    def __init__(  # ruff:ignore[too-many-arguments]
+    def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,

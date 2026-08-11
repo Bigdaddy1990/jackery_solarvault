@@ -10,10 +10,10 @@ from homeassistant.exceptions import HomeAssistantError
 
 def test_rounded_int() -> None:
     """Test integer rounding and error raising in _rounded_int."""
-    assert _rounded_int(12.7) == 13  # ruff: ignore[magic-value-comparison]
-    assert _rounded_int(12.2) == 12  # ruff: ignore[magic-value-comparison]
-    assert _rounded_int("42") == 42  # ruff: ignore[magic-value-comparison]
-    assert _rounded_int(10) == 10  # ruff: ignore[magic-value-comparison]
+    assert _rounded_int(12.7) == 13
+    assert _rounded_int(12.2) == 12
+    assert _rounded_int("42") == 42
+    assert _rounded_int(10) == 10
 
     with pytest.raises(HomeAssistantError, match="invalid number value"):
         _rounded_int("invalid_string_val")

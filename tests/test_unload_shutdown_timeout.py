@@ -22,7 +22,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _MODULE = "custom_components.jackery_solarvault"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_unload_bounds_a_hung_shutdown() -> None:
     """A shutdown that never returns must not block the unload."""
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)

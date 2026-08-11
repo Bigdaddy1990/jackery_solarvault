@@ -32,7 +32,7 @@ def _api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_device_statistic_unwraps_dict() -> None:
     """Current-day device statistic unwraps the data dict with deviceId."""
     api = _api()
@@ -48,7 +48,7 @@ async def test_device_statistic_unwraps_dict() -> None:
     )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_period_stat_builds_params_and_meta() -> None:
     """The period-stat helper sends the full range and annotates request meta."""
     api = _api()
@@ -80,7 +80,7 @@ async def test_period_stat_builds_params_and_meta() -> None:
     assert result["y"] == [1.0]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_period_stat_includes_system_id_when_given() -> None:
     """A system_id is added to the query params when provided."""
     api = _api()
@@ -100,7 +100,7 @@ async def test_period_stat_includes_system_id_when_given() -> None:
     assert params[FIELD_SYSTEM_ID] == "3"
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ct_stat_omits_phase_type_for_combined_meter() -> None:
     """The CT-stat request must not pin ``type=0`` (phase L1).
 
@@ -120,7 +120,7 @@ async def test_ct_stat_omits_phase_type_for_combined_meter() -> None:
     assert APP_REQUEST_STAT_TYPE not in kwargs["params"]
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_pv_stat_wrapper_delegates_with_system_id() -> None:
     """The PV wrapper forwards device_id and system_id to the shared helper."""
     api = _api()
@@ -135,7 +135,7 @@ async def test_pv_stat_wrapper_delegates_with_system_id() -> None:
     assert delegate.await_args.args[0] == DEVICE_PV_STAT_PATH
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_system_pv_trends_uses_current_app_path() -> None:
     """The current App 2.4.0 system-PV endpoint is the primary request."""
     api = _api()
@@ -152,7 +152,7 @@ async def test_system_pv_trends_uses_current_app_path() -> None:
     assert get_json.await_args.args[0] == PV_TRENDS_PATH
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_system_pv_trends_falls_back_only_for_unknown_current_path() -> None:
     """An older backend may reject the 2.4.0 path with code 10600."""
     api = _api()

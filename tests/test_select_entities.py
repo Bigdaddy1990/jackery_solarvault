@@ -51,7 +51,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # ruff:ignore[any-type]
+def _description(key: str) -> Any:
     return next(desc for desc in SELECT_DESCRIPTIONS if desc.key == key)
 
 
@@ -94,7 +94,7 @@ def test_work_mode_unknown_code_reports_none_and_warns_once() -> None:
     )
 
     assert entity.current_option is None
-    assert 99 in entity._state.warned_unknown_values  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert 99 in entity._state.warned_unknown_values  # ruff: ignore[private-member-access]
 
 
 def test_temp_unit_options_and_current() -> None:
@@ -215,7 +215,7 @@ async def test_portable_power_mode_forwards_via_portable_setter() -> None:
     entity.coordinator.async_portable_set_select.assert_awaited_once()
     _args, kwargs = entity.coordinator.async_portable_set_select.call_args
     assert kwargs["field"] == FIELD_PM
-    assert kwargs["value"] == 2  # ruff: ignore[magic-value-comparison]
+    assert kwargs["value"] == 2
 
 
 @pytest.mark.parametrize(

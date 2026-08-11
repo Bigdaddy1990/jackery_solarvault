@@ -140,7 +140,7 @@ def _hydrated_api(seed_b64: str) -> JackeryApi:
     return api
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_mqtt_credential_alias_is_cache_only() -> None:
     """The compatibility alias never turns a transport read into HTTP login."""
     api = _hydrated_api(base64.b64encode(bytes(range(32))).decode("ascii"))

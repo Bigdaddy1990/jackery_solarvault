@@ -155,7 +155,7 @@ def test_diagnostics_reports_only_live_diagnostic_windows(
     assert payload["active_count"] == 1
     assert _DIAG_KEY in payload["active"]
     assert _ENERGY_KEY not in payload["active"]
-    assert payload["active"][_DIAG_KEY]["code"] == 10422  # ruff: ignore[magic-value-comparison]
+    assert payload["active"][_DIAG_KEY]["code"] == 10422
 
 
 # --- local MQTT liveness ---------------------------------------------------
@@ -266,7 +266,7 @@ def test_dynamic_price_backs_off_on_unsupported_code(
 # cycle.
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,

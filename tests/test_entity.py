@@ -42,11 +42,11 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
 
     Returns:
         JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
-    """  # ruff: ignore[line-too-long]
+    """
     return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
 
 
-def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # ruff: ignore[any-type]
+def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     """Create and initialize an instance of the given sensor class for tests using the provided device payload.
 
     Parameters:
@@ -55,7 +55,7 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # ruff: 
 
     Returns:
         Any: An instance of `cls` initialized with the given payload.
-    """  # ruff: ignore[line-too-long]
+    """
     entity = cls.__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
         entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"

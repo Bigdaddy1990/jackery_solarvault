@@ -32,7 +32,7 @@ def _api(login: AsyncMock) -> MagicMock:
     return api
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_transient_rejection_retries_without_reauth() -> None:
     """One transient rejection is retried and setup succeeds — no reauth."""
     api = _api(AsyncMock(side_effect=[JackeryAuthError("transient"), None]))
@@ -53,7 +53,7 @@ async def test_transient_rejection_retries_without_reauth() -> None:
     assert api.async_login.await_count == _TRANSIENT_THEN_SUCCESS_ATTEMPTS
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_persistent_rejection_triggers_reauth() -> None:
     """A rejection that persists across all attempts still reauths."""
     api = _api(AsyncMock(side_effect=JackeryAuthError("bad-credentials")))

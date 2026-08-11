@@ -176,7 +176,7 @@ class _HandlerCase(SimpleNamespace):
     backend_error: BaseException
 
 
-def _case(  # ruff:ignore[too-many-arguments]
+def _case(
     name: str,
     method: str,
     *,
@@ -645,7 +645,7 @@ async def _call(
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_service_forwards_to_owning_coordinator(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -664,7 +664,7 @@ async def test_service_forwards_to_owning_coordinator(
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_service_rejects_unowned_device(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -692,7 +692,7 @@ async def test_service_rejects_unowned_device(
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_service_maps_backend_error_to_validation_error(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -705,7 +705,7 @@ async def test_service_maps_backend_error_to_validation_error(
 
 
 @pytest.mark.parametrize("case", _AUTH_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_service_maps_auth_error_to_reauth(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -732,7 +732,7 @@ _RERAISE_CASES = tuple(case for case in _CASES if case.name in _RERAISE_NAMES)
 
 
 @pytest.mark.parametrize("case", _RERAISE_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_service_reraises_config_entry_auth_failed(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -745,7 +745,7 @@ async def test_service_reraises_config_entry_auth_failed(
 
 
 @pytest.mark.parametrize("case", _PORTABLE_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_home_family_service_rejects_portable_device(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -759,7 +759,7 @@ async def test_home_family_service_rejects_portable_device(
     getattr(coordinator, case.method).assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_unbind_shelly_device_rejects_unaccepted_request(
     hass: HomeAssistant,
 ) -> None:
@@ -778,7 +778,7 @@ async def test_unbind_shelly_device_rejects_unaccepted_request(
         await _call(hass, case, coordinator)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_unbind_shelly_account_rejects_unaccepted_request(
     hass: HomeAssistant,
 ) -> None:
@@ -790,7 +790,7 @@ async def test_unbind_shelly_account_rejects_unaccepted_request(
         await _call(hass, case, coordinator)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_send_ble_command_rejects_when_no_session(
     hass: HomeAssistant,
 ) -> None:
@@ -843,7 +843,7 @@ async def _call_rename(
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_rename_forwards_to_system_owner(hass: HomeAssistant) -> None:
     """Rename resolves the owning coordinator by system id and forwards the name."""
     coordinator = _rename_coordinator()
@@ -853,7 +853,7 @@ async def test_rename_forwards_to_system_owner(hass: HomeAssistant) -> None:
     coordinator.async_set_system_name.assert_awaited_once_with(_NUM_ID, "New Name")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_rename_rejects_unowned_system(hass: HomeAssistant) -> None:
     """A system id no account owns surfaces a translated validation error."""
     async_setup_services(hass)
@@ -872,7 +872,7 @@ async def test_rename_rejects_unowned_system(hass: HomeAssistant) -> None:
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_rename_maps_backend_error_to_validation_error(
     hass: HomeAssistant,
 ) -> None:
@@ -883,7 +883,7 @@ async def test_rename_maps_backend_error_to_validation_error(
         await _call_rename(hass, coordinator)
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_rename_maps_auth_error_to_reauth(hass: HomeAssistant) -> None:
     """Rejected credentials during rename trigger reauth."""
     coordinator = _rename_coordinator(error=JackeryAuthError("nope"))
@@ -1005,7 +1005,7 @@ def test_render_share_qr_png_data_uri_encodes_png() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_share_qr_code_rejects_unowned_device(
     hass: HomeAssistant,
 ) -> None:
@@ -1031,7 +1031,7 @@ async def test_get_share_qr_code_rejects_unowned_device(
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_share_qr_code_maps_backend_error_to_validation_error(
     hass: HomeAssistant,
 ) -> None:
@@ -1061,7 +1061,7 @@ async def test_get_share_qr_code_maps_backend_error_to_validation_error(
         )
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_get_share_qr_code_maps_auth_error_to_reauth(
     hass: HomeAssistant,
 ) -> None:
