@@ -1,6 +1,7 @@
 """HTTP-only statistic ownership and period coverage contracts."""
 
 import asyncio
+from datetime import date
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
@@ -8,15 +9,41 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.jackery_solarvault.const import (
+    APP_CHART_SERIES_Y,
+    APP_DEVICE_STAT_BATTERY_DISCHARGE,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_INPUT,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_PV_ENERGY,
+    APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_PERIOD_DATE_TYPES,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_META,
+    APP_SECTION_BATTERY_STAT,
+    APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
+    APP_SECTION_HOME_TRENDS,
     APP_SECTION_TODAY_ENERGY,
+    APP_STAT_TODAY_BATTERY_ENERGY,
+    APP_STAT_TODAY_GRID_IMPORT_ENERGY,
     APP_STAT_TODAY_HOME_LOAD_ENERGY,
+    APP_STAT_TODAY_SOLAR_ENERGY,
+    APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_HOME_ENERGY,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
+    APP_STAT_UNIT,
+    APP_TODAY_ENERGY_SOURCE_META,
+    APP_UNIT_KWH,
     DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    FIELD_CT_TOTAL_PHASE_ENERGY,
     PAYLOAD_HOME_TRENDS,
+    PAYLOAD_LOCAL_DAILY_ENERGY,
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
@@ -34,14 +61,22 @@ if TYPE_CHECKING:
 _DEVICE_ID = "device-1"
 
 
-def _native_value(sensor_key: str, payload: dict[str, Any]) -> float | None:
-    """Evaluate a statistic description against an isolated coordinator payload."""
+def _stat_sensor(
+    sensor_key: str,
+    payload: dict[str, Any],
+    *,
+    local_period_kwh: float | None = None,
+) -> JackeryStatSensor:
+    """Build and refresh a statistic sensor against an isolated payload."""
     description = next(desc for desc in STAT_DESCRIPTIONS if desc.key == sensor_key)
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+        local_period_energy_kwh=lambda _device_id, _metric_key, **_kwargs: (
+            local_period_kwh
+        ),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
@@ -53,7 +88,12 @@ def _native_value(sensor_key: str, payload: dict[str, Any]) -> float | None:
 
     context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
-    return cast("float | None", sensor.native_value)
+    return sensor
+
+
+def _native_value(sensor_key: str, payload: dict[str, Any]) -> float | None:
+    """Evaluate a statistic description against an isolated coordinator payload."""
+    return cast("float | None", _stat_sensor(sensor_key, payload).native_value)
 
 
 def test_home_day_energy_uses_exact_app_dto_owners() -> None:
@@ -84,6 +124,208 @@ def test_home_day_description_names_the_system_home_trends_section() -> None:
 
     assert description.section == PAYLOAD_HOME_TRENDS
     assert description.stat_key == APP_STAT_TOTAL_HOME_ENERGY
+
+
+def test_compact_today_energy_uses_only_positive_documented_fallbacks() -> None:
+    """Lagging compact zeros are repaired without manufacturing zero energy."""
+    payload = {
+        APP_SECTION_TODAY_ENERGY: {
+            APP_STAT_TODAY_SOLAR_ENERGY: 0,
+            APP_STAT_TODAY_GRID_IMPORT_ENERGY: 0,
+            APP_STAT_TODAY_HOME_LOAD_ENERGY: 0,
+            APP_STAT_TODAY_BATTERY_ENERGY: 0,
+        },
+        PAYLOAD_LOCAL_DAILY_ENERGY: {
+            APP_DEVICE_STAT_PV_ENERGY: 1817,
+            APP_DEVICE_STAT_ONGRID_INPUT: 5,
+            APP_DEVICE_STAT_BATTERY_DISCHARGE: 124,
+        },
+        PAYLOAD_HOME_TRENDS: {APP_STAT_TOTAL_HOME_ENERGY: "0.75"},
+    }
+
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+        payload,
+        today=date(2026, 8, 11),
+    )
+
+    assert payload[APP_SECTION_TODAY_ENERGY] == {
+        APP_STAT_TODAY_SOLAR_ENERGY: pytest.approx(18.17),
+        APP_STAT_TODAY_GRID_IMPORT_ENERGY: pytest.approx(0.05),
+        APP_STAT_TODAY_HOME_LOAD_ENERGY: pytest.approx(0.75),
+        APP_STAT_TODAY_BATTERY_ENERGY: pytest.approx(1.24),
+        APP_TODAY_ENERGY_SOURCE_META: {
+            APP_STAT_TODAY_SOLAR_ENERGY: {
+                "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                "source_key": APP_DEVICE_STAT_PV_ENERGY,
+                "fallback": "local_lifetime_delta",
+            },
+            APP_STAT_TODAY_GRID_IMPORT_ENERGY: {
+                "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                "source_key": APP_DEVICE_STAT_ONGRID_INPUT,
+                "fallback": "local_lifetime_delta",
+            },
+            APP_STAT_TODAY_BATTERY_ENERGY: {
+                "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                "source_key": APP_DEVICE_STAT_BATTERY_DISCHARGE,
+                "fallback": "local_lifetime_delta",
+            },
+            APP_STAT_TODAY_HOME_LOAD_ENERGY: {
+                "source_section": PAYLOAD_HOME_TRENDS,
+                "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+                "fallback": "documented_http_fallback",
+            },
+        },
+    }
+
+    home_sensor = _stat_sensor("today_home_load_energy", payload)
+    assert home_sensor.extra_state_attributes == {
+        "source_section": PAYLOAD_HOME_TRENDS,
+        "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+        "fallback": "documented_http_fallback",
+    }
+    solar_sensor = _stat_sensor("today_feed_in_energy", payload)
+    assert solar_sensor.extra_state_attributes == {
+        "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+        "source_key": APP_DEVICE_STAT_PV_ENERGY,
+        "fallback": "local_lifetime_delta",
+        "fallback_metric": APP_DEVICE_STAT_PV_ENERGY,
+    }
+
+
+def test_compact_today_energy_uses_current_month_home_bucket() -> None:
+    """Home load uses the documented current-month bucket when day trend is empty."""
+    today = date(2026, 8, 11)
+    home_month_section = f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}"
+    payload = {
+        APP_SECTION_TODAY_ENERGY: {APP_STAT_TODAY_HOME_LOAD_ENERGY: 0},
+        PAYLOAD_HOME_TRENDS: {},
+        home_month_section: {
+            APP_CHART_SERIES_Y: [0.0] * 10 + [0.9],
+            APP_REQUEST_META: {APP_REQUEST_BEGIN_DATE: "2026-08-01"},
+            APP_STAT_UNIT: APP_UNIT_KWH,
+        },
+    }
+
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+        payload,
+        today=today,
+    )
+
+    compact = cast("dict[str, Any]", payload[APP_SECTION_TODAY_ENERGY])
+    assert compact[APP_STAT_TODAY_HOME_LOAD_ENERGY] == pytest.approx(0.9)
+    provenance = cast("dict[str, Any]", compact[APP_TODAY_ENERGY_SOURCE_META])
+    assert provenance[APP_STAT_TODAY_HOME_LOAD_ENERGY] == {
+        "source_section": home_month_section,
+        "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+        "fallback": "current_month_bucket",
+    }
+    home_sensor = _stat_sensor("today_home_load_energy", payload)
+    assert home_sensor.extra_state_attributes == {
+        "source_section": home_month_section,
+        "source_key": APP_STAT_TOTAL_HOME_ENERGY,
+        "fallback": "current_month_bucket",
+        "request": {APP_REQUEST_BEGIN_DATE: "2026-08-01"},
+    }
+
+
+def test_today_battery_flows_use_http_day_as_independent_fallback() -> None:
+    """HTTP day totals supplement local deltas and independently confirm zero."""
+    battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
+    payload = {
+        PAYLOAD_LOCAL_DAILY_ENERGY: {
+            APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0,
+            APP_DEVICE_STAT_PV_TO_BATTERY: 511,
+            APP_DEVICE_STAT_BATTERY_TO_GRID: 123,
+        },
+        battery_day: {
+            APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0.0,
+            APP_DEVICE_STAT_PV_TO_BATTERY: 5.11,
+            APP_DEVICE_STAT_BATTERY_TO_GRID: 1.15,
+        },
+    }
+
+    zero_sensor = _stat_sensor("device_today_ongrid_to_battery", payload)
+    assert zero_sensor.native_value == pytest.approx(0.0)
+    assert zero_sensor.extra_state_attributes == {
+        "source_section": battery_day,
+        "source_key": APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+        "fallback": "documented_http_day_fallback",
+    }
+    assert _native_value("device_today_pv_to_battery", payload) == pytest.approx(5.11)
+    assert _native_value("device_today_battery_to_ongrid", payload) == pytest.approx(
+        1.23
+    )
+
+
+def test_today_battery_flow_http_fallback_keeps_kwh_unit() -> None:
+    """A positive HTTP-only day total is not divided as a local raw counter."""
+    battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
+    payload = {
+        battery_day: {APP_DEVICE_STAT_PV_TO_BATTERY: 5.11},
+    }
+
+    sensor = _stat_sensor("device_today_pv_to_battery", payload)
+
+    assert sensor.native_value == pytest.approx(5.11)
+    assert sensor.extra_state_attributes["fallback"] == (
+        "documented_http_day_fallback"
+    )
+
+
+def test_today_battery_flow_compares_local_and_http_in_kwh() -> None:
+    """A small native local delta cannot mask a larger HTTP kWh day total."""
+    battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
+    payload = {
+        PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_PV_TO_BATTERY: 1},
+        battery_day: {APP_DEVICE_STAT_PV_TO_BATTERY: 5.11},
+    }
+
+    sensor = _stat_sensor("device_today_pv_to_battery", payload)
+
+    assert sensor.native_value == pytest.approx(5.11)
+    assert sensor.extra_state_attributes["fallback"] == (
+        "documented_http_day_fallback"
+    )
+
+
+def test_today_battery_flow_does_not_publish_lone_http_zero() -> None:
+    """An uncorroborated HTTP zero remains unavailable per AGENTS zero rules."""
+    battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
+    payload = {
+        battery_day: {APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0.0},
+    }
+
+    assert _native_value("device_today_ongrid_to_battery", payload) is None
+
+
+def test_today_battery_flow_does_not_publish_lone_local_zero() -> None:
+    """An uncorroborated local zero remains unavailable per AGENTS zero rules."""
+    payload = {
+        PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0},
+    }
+
+    assert _native_value("device_today_ongrid_to_battery", payload) is None
+
+
+def test_ct_week_uses_fully_covered_local_period_when_cloud_is_placeholder() -> None:
+    """A verified local period can replace one unconfirmed cloud zero."""
+    ct_week = f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}"
+    payload = {
+        ct_week: {
+            APP_STAT_TOTAL_CT_INPUT_ENERGY: 0.0,
+            APP_CHART_SERIES_Y: [],
+        },
+    }
+
+    sensor = _stat_sensor("ct_input_week_energy", payload, local_period_kwh=6.5)
+
+    assert sensor.native_value == pytest.approx(6.5)
+    assert sensor.extra_state_attributes["source_section"] == PAYLOAD_LOCAL_DAILY_ENERGY
+    assert sensor.extra_state_attributes["fallback"] == "local_lifetime_delta"
+    assert (
+        sensor.extra_state_attributes["fallback_metric"]
+        == FIELD_CT_TOTAL_PHASE_ENERGY
+    )
 
 
 @pytest.mark.asyncio

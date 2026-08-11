@@ -3,11 +3,8 @@
 import base64
 from typing import TYPE_CHECKING, Any
 
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
 from custom_components.jackery_solarvault.client import api as api_module
 from custom_components.jackery_solarvault.client.api import (
-    _RSA_PUBLIC_KEY,  # noqa: PLC2701, RUF105
     build_login_crypto_fields,
     generate_login_aes_key,
 )
@@ -18,11 +15,6 @@ from custom_components.jackery_solarvault.const import (
 
 if TYPE_CHECKING:
     import pytest
-
-# Derived DER-encoded public key for golden-vector injection (matches bundled PEM)
-_RSA_PUBLIC_KEY_DER_B64 = base64.b64encode(
-    _RSA_PUBLIC_KEY.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
-).decode()
 
 
 def test_login_aes_key_matches_app_random_base64_contract() -> None:

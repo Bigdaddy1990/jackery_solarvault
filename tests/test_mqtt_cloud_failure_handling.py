@@ -83,14 +83,14 @@ def test_handle_connect_error_rc133_pauses_instead_of_backoff() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fix B: teardown logging — silence late aiomqtt callback noise
+# Teardown logging remains visible through Home Assistant's logger hierarchy
 # ---------------------------------------------------------------------------
 
 
-def test_unexpected_message_id_is_suppressed_by_default(
+def test_unexpected_message_id_remains_visible_by_default(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Late-SUBACK teardown noise stays out of the HA log at default level."""
+    """Late-SUBACK teardown errors remain available for diagnostics."""
     logger = logging.getLogger(_AIOMQTT_LOGGER)
     with caplog.at_level(logging.INFO):
         logger.error('Unexpected message ID "%d" in on_subscribe callback', 1)
@@ -102,13 +102,14 @@ def test_unexpected_message_id_is_suppressed_by_default(
         if "Unexpected message ID" in record.getMessage()
         or "Caught exception in on_" in record.getMessage()
     ]
-    assert not noisy
+    assert len(noisy) == 2
+    assert all(record.levelno == logging.ERROR for record in noisy)
 
 
-def test_unexpected_message_id_demoted_to_debug_when_debugging(
+def test_unexpected_message_id_keeps_error_level_when_debugging(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """With the child logger at DEBUG the record is visible, demoted to DEBUG."""
+    """Enabling DEBUG does not rewrite the severity emitted by aiomqtt."""
     logger = logging.getLogger(_AIOMQTT_LOGGER)
     with caplog.at_level(logging.DEBUG, logger=_AIOMQTT_LOGGER):
         logger.error('Unexpected message ID "%d" in on_subscribe callback', 3)
@@ -119,13 +120,13 @@ def test_unexpected_message_id_demoted_to_debug_when_debugging(
         if "Unexpected message ID" in record.getMessage()
     ]
     assert records
-    assert records[0].levelno == logging.DEBUG
+    assert records[0].levelno == logging.ERROR
 
 
-def test_aiomqtt_real_warnings_still_pass_the_filter(
+def test_aiomqtt_real_warnings_remain_visible(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Unrelated aiomqtt warnings must not be swallowed by the noise filter."""
+    """Unrelated aiomqtt warnings remain visible."""
     logger = logging.getLogger(_AIOMQTT_LOGGER)
     with caplog.at_level(logging.INFO):
         logger.warning("failed to receive on socket: unexpected TLS alert")
@@ -256,7 +257,10 @@ def test_cloud_disconnect_preserves_cache_and_peer_transports() -> None:
     end = source.index("\n    @property\n", start)
     handler = source[start:end]
 
-    assert "_async_ensure_mqtt(force=False, wait_connected=False)" in handler
+    assert "async def _reconnect_background()" in handler
+    assert "_async_ensure_mqtt(force=True, wait_connected=True)" in handler
+    assert "_schedule_background_once(" in handler
+    assert '"mqtt_reconnect"' in handler
     assert "async_clear_mqtt_session" not in handler
     assert "async_start_ble" not in handler
     assert "async_start_local_mqtt" not in handler

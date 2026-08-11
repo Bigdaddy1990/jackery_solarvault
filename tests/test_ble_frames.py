@@ -16,6 +16,8 @@ pin that exact outbound contract while retaining explicit trailer injection
 only for malformed/inbound parser fixtures.
 """
 
+from typing import Any
+
 import pytest
 
 from custom_components.jackery_solarvault.client.ble import (
@@ -163,7 +165,7 @@ def test_build_binary_frame_rejects_out_of_range_header_fields(
     field: str, value: int, expected: str
 ) -> None:
     """Every packed uint16 field is range-checked before serialisation."""
-    kwargs: dict[str, int] = {"cmd": _CMD, field: value}
+    kwargs: Any = {"cmd": _CMD, field: value}
 
     with pytest.raises(ValueError, match=expected):
         build_binary_frame(body=_BODY, **kwargs)

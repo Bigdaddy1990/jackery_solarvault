@@ -33,6 +33,9 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     obj._async_save_statistics_backfill_state = AsyncMock()  # ruff: ignore[private-member-access]
     obj._local_today = lambda: _TODAY  # ruff: ignore[private-member-access]
     obj._slow_http_request_semaphore = asyncio.Semaphore(2)  # ruff: ignore[private-member-access]
+    obj.hass = SimpleNamespace(
+        config=SimpleNamespace(time_zone="Europe/Berlin"),
+    )
     obj.api = SimpleNamespace()
     return coordinator
 
@@ -41,8 +44,9 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 async def test_day_backfill_shares_slow_http_concurrency_gate() -> None:
     """A bounded historical day request must wait for the shared HTTP gate."""
     coordinator = _coordinator()
+    raw = cast("Any", coordinator)
     coordinator._slow_http_request_semaphore = asyncio.Semaphore(1)  # ruff: ignore[private-member-access]
-    coordinator._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
+    raw._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: (APP_SECTION_BATTERY_STAT,)
     )
     fetch_started = asyncio.Event()
@@ -54,7 +58,7 @@ async def test_day_backfill_shares_slow_http_concurrency_gate() -> None:
         fetch_started.set()
         return {}
 
-    coordinator.api.async_get_device_battery_stat = _mock_battery_stat
+    raw.api.async_get_device_battery_stat = _mock_battery_stat
     await coordinator._slow_http_request_semaphore.acquire()  # ruff: ignore[private-member-access]
     task = asyncio.create_task(
         coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
@@ -241,8 +245,8 @@ async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_empty_old_day_does_not_block_later_source_days() -> None:
-    """An unavailable old bucket remains pending while newer days still advance."""
+async def test_empty_day_does_not_block_other_source_days() -> None:
+    """An unavailable bucket remains pending while another day still advances."""
     coordinator = _coordinator()
     cast("Any", coordinator)._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
         lambda _device_id, _payload: ("battery",)
@@ -277,7 +281,7 @@ async def test_empty_old_day_does_not_block_later_source_days() -> None:
         force=True,
     )
 
-    assert requested_days[1] > requested_days[0]
+    assert requested_days[1] != requested_days[0]
 
 
 @pytest.mark.asyncio

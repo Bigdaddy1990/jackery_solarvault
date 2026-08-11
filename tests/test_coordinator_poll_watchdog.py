@@ -12,7 +12,7 @@ the stall and force a refresh.
 from datetime import timedelta
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -168,13 +168,15 @@ async def test_background_slow_metrics_wait_for_scheduled_http_poll(
     coordinator.hass = hass
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]
+    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
     coordinator.data = {"device": {"statistic": {"todayGeneration": "1.0"}}}
-    coordinator.async_request_refresh = AsyncMock()
-    coordinator.async_set_updated_data = MagicMock()
+    mutable = cast("Any", coordinator)
+    mutable.async_request_refresh = AsyncMock()
+    mutable.async_set_updated_data = MagicMock()
 
     coordinator._launch_background_slow_refresh(set(), AsyncMock())  # ruff: ignore[private-member-access]
     assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
     await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
 
-    coordinator.async_set_updated_data.assert_not_called()
-    coordinator.async_request_refresh.assert_not_awaited()
+    mutable.async_set_updated_data.assert_not_called()
+    mutable.async_request_refresh.assert_not_awaited()

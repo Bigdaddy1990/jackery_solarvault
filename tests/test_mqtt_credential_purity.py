@@ -226,11 +226,18 @@ async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     )
     mqtt = MagicMock(name="mqtt")
     mqtt.is_connected = True
+    mqtt.session_generation = 1
     mqtt.async_publish_json = AsyncMock()
     mqtt.diagnostics = {}
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._mqtt_session_generation = 0  # ruff: ignore[private-member-access]
+    coordinator._mqtt_session_actions_seen = set()  # ruff: ignore[private-member-access]
+    coordinator._mqtt_birth_snapshot_pending = False  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_failures = {}  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_attempts = {}  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_attempt_sequence = 0  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = api
     cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).data = {
@@ -238,21 +245,22 @@ async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     }
     cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
-    cast("Any", coordinator).device_bluetooth_key = MagicMock(
-        return_value=b"0123456789abcdef",
-    )
-    cast("Any", coordinator).async_send_ble_command = AsyncMock(return_value=False)
-    cast("Any", coordinator)._apply_local_property_patch = MagicMock()  # ruff: ignore[private-member-access]
 
     def _start_mqtt() -> None:
         coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
 
-    cast("Any", coordinator).async_start_mqtt = AsyncMock(side_effect=_start_mqtt)
+    start_mqtt = AsyncMock(side_effect=_start_mqtt)
+    cast("Any", coordinator).async_start_mqtt = start_mqtt
 
-    await coordinator.async_set_eps("dev-1", True)
+    await coordinator._async_publish_command(  # ruff: ignore[private-member-access]
+        "dev-1",
+        message_type="ControlDeviceProperty",
+        action_id=3022,
+        cmd=110,
+        body_fields={"swEps": 1},
+    )
 
-    coordinator.async_send_ble_command.assert_awaited_once()
-    coordinator.async_start_mqtt.assert_awaited_once()
+    start_mqtt.assert_awaited_once()
     mqtt.async_publish_json.assert_awaited_once()
 
 

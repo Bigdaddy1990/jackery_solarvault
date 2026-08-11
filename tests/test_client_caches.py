@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -119,6 +120,7 @@ async def test_cache_mutation_survives_caller_cancellation(
 ) -> None:
     """Offline bootstrap data finishes writing when its caller is cancelled."""
     store = _BlockingStore()
+    module: ModuleType
     if cache_kind == "discovery":
         module = discovery_cache_module
         save_coro = async_save_discovery_cache(

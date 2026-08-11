@@ -118,6 +118,15 @@ def _diagnostics_rig(  # test builder wires every accessor the export touches
     obj._endpoint_backoff = endpoint_backoff or {}  # ruff: ignore[private-member-access]
     obj._ble_listener = None  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_diagnostics = {  # ruff: ignore[private-member-access]
+        "scheduled": 0,
+        "attempts": 0,
+        "target_count": 0,
+        "last_status": "not_started",
+        "last_attempt_at": None,
+        "last_success_at": None,
+        "last_errors": {},
+    }
     obj._statistics_backfill_state = statistics_backfill_state or {}  # ruff: ignore[private-member-access]
     obj._statistics_backfill_state_loaded = statistics_backfill_loaded  # ruff: ignore[private-member-access]
     obj.rejection_metrics = (

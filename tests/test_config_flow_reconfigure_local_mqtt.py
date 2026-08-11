@@ -10,7 +10,7 @@ were discarded. Additionally the broker IP field rendered as ``bool``,
 making a hostname impossible to enter.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -105,7 +105,7 @@ async def _submit_reconfigure_credentials(
             user_input,
         )
         await hass.async_block_till_done()
-    return result
+    return cast("dict[str, Any]", result)
 
 
 async def test_reconfigure_credentials_preserves_local_mqtt_options(

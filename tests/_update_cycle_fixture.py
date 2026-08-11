@@ -274,7 +274,7 @@ async def setup_update_cycle_coordinator(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
+        "custom_components.jackery_solarvault._schedule_layer5_start_if_ready",
             return_value=None,
         ),
     ):

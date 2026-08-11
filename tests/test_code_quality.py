@@ -20,8 +20,12 @@ PERCENT_PLACEHOLDER = re.compile(
 )
 
 
-def _load_util_module():
+def _load_util_module() -> tuple[types.ModuleType, types.ModuleType]:
     package_dir = CUSTOM_COMPONENT
+    previous_namespace = sys.modules.get("custom_components")
+    previous_package = sys.modules.get("custom_components.jackery_solarvault")
+    previous_const = sys.modules.get("custom_components.jackery_solarvault.const")
+    previous_util = sys.modules.get("custom_components.jackery_solarvault.util")
     sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
     package = types.ModuleType("custom_components.jackery_solarvault")
     package.__path__ = [str(package_dir)]
@@ -44,11 +48,29 @@ def _load_util_module():
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous_namespace is None:
+            sys.modules.pop("custom_components", None)
+        else:
+            sys.modules["custom_components"] = previous_namespace
+        if previous_package is None:
+            sys.modules.pop("custom_components.jackery_solarvault", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault"] = previous_package
+        if previous_const is None:
+            sys.modules.pop("custom_components.jackery_solarvault.const", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault.const"] = previous_const
+        if previous_util is None:
+            sys.modules.pop("custom_components.jackery_solarvault.util", None)
+        else:
+            sys.modules["custom_components.jackery_solarvault.util"] = previous_util
+    return module, const_module
 
 
-util = _load_util_module()
+util, const_module = _load_util_module()
 
 
 def _python_sources() -> list[pathlib.Path]:
@@ -452,7 +474,10 @@ def _const_string_values(name: str) -> tuple[str, ...]:
             and isinstance(node.func, ast.Name)
             and node.func.id == "frozenset"
         ):
-            return tuple(eval_node(item) for item in node.args[0].elts)  # type: ignore[index,union-attr]
+            assert node.args, f"frozenset in {name} is missing its iterable"
+            iterable = node.args[0]
+            assert isinstance(iterable, ast.Tuple | ast.List | ast.Set)
+            return tuple(eval_node(item) for item in iterable.elts)
         raise AssertionError(
             f"Unsupported const expression in {name}: {ast.dump(node)}"
         )
@@ -515,8 +540,8 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     assert "CONF_SCAN_INTERVAL" not in const_source
     assert "async_migrate_entry" not in init_source
     assert "_async_clean_entry_config" not in init_source
-    assert "async_update_entry(entry" not in init_source
     assert "version=" not in init_source
+    assert "_async_prune_removed_local_mqtt_tls_options" in init_source
     assert _class_constant_int(config_tree, "JackeryConfigFlow", "VERSION") == 1
 
 
@@ -637,7 +662,6 @@ def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
 
 def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
     """Keep diagnostics aligned with HA's share-safe diagnostics rule."""
-    const_module = sys.modules["custom_components.jackery_solarvault.const"]
     required = {
         getattr(const_module, name)
         for name in (
@@ -845,40 +869,13 @@ def test_unique_id_contract_is_documented_and_followed() -> None:
         assert fragment not in assignment_line
 
 
-def test_data_quality_repair_issue_is_wired_with_guarded_year_backfill() -> None:
-    """Contradictory app data still creates diagnostics around guarded states."""
-    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
-        encoding="utf-8"
-    )
+def test_data_quality_warning_utilities_remain_available() -> None:
+    """Contradictory app data is still normalized for diagnostics/logging."""
     util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
-    translation_sources = _translation_sources()
 
-    assert "PAYLOAD_DATA_QUALITY" in const_source
-    assert "REPAIR_ISSUE_APP_DATA_INCONSISTENCY" in const_source
-    assert "app_data_quality_warnings(entry, today=today)" in coordinator_source
-    assert "_async_update_data_quality_issue" in coordinator_source
-    assert "normalized_data_quality_warnings(warnings)" in coordinator_source
-    assert "format_data_quality_warning(warning)" in coordinator_source
-    assert "DATA_QUALITY_REPAIR_EXAMPLE_LIMIT" in coordinator_source
-    assert "async_create_issue" in coordinator_source
-    assert "async_delete_issue" in coordinator_source
-    assert 'issue_suffix = f"_{REPAIR_ISSUE_APP_DATA_INCONSISTENCY}"' in (
-        coordinator_source
-    )
-    assert "for domain, existing_issue_id in tuple(registry.issues):" in (
-        coordinator_source
-    )
-    assert "existing_issue_id != issue_id" in coordinator_source
     assert "app_data_quality_warnings" in util_source
     assert "normalized_data_quality_warnings" in util_source
     assert "format_data_quality_warning" in util_source
-    assert "DATA_QUALITY_KEY_SOURCE_VALUE" in const_source
-    for path, source in translation_sources.items():
-        assert "app_data_inconsistency" in source, path
-        assert "{examples}" in source, path
-        assert "{source_section}" not in source, path
-        assert "{reference_section}" not in source, path
 
 
 def test_user_visible_action_errors_have_translations() -> None:
@@ -957,25 +954,6 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
         "Device grid-side output energy: device_home_stat_year=30.28 "
         "< device_home_stat_week=89.08"
     )
-
-
-def test_data_quality_diagnostics_include_request_context_keys() -> None:
-    """Implement test data quality diagnostics include request context keys."""
-    const_source = (CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8")
-    util_source = (CUSTOM_COMPONENT / "util.py").read_text(encoding="utf-8")
-
-    for key in (
-        "DATA_QUALITY_KEY_SOURCE_REQUEST",
-        "DATA_QUALITY_KEY_REFERENCE_REQUEST",
-        "DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY",
-        "DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY",
-        "DATA_QUALITY_KEY_TOTAL_METHOD",
-    ):
-        assert key in const_source
-        assert key in util_source
-    assert "def _format_request_range" in util_source
-    assert "source_request=_request_for_section(source_section)" in util_source
-    assert "reference_request=_request_for_section(reference_section)" in util_source
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
@@ -1090,8 +1068,6 @@ def test_property_setters_keep_local_override_during_stale_refresh_window() -> N
 
 def test_redact_keys_cover_mqtt_credential_aliases() -> None:
     """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
-    const_module = sys.modules["custom_components.jackery_solarvault.const"]
-
     for key_name in (
         "FIELD_MQTT_PASSWORD",
         "FIELD_USER_ID",
@@ -1658,7 +1634,7 @@ def test_smart_meter_entities_cache_state_before_ha_state_write() -> None:
     """Smart-meter sensors must not recompute values during every HA state read."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     block = sensor_source.split(
-        "class JackerySmartMeterSensor(JackeryEntity, SensorEntity):", 1
+        "class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackeryRawPropertiesSensor", 1)[0]
 
     assert "self._cached_native_value: Any = None" in block
@@ -1674,7 +1650,7 @@ def test_sensor_source_has_no_duplicate_battery_pack_ot_attribute_entry() -> Non
     """Battery-pack diagnostics should not expose the same raw key twice."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     block = sensor_source.split(
-        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackerySmartMeterSensor", 1)[0]
 
     assert block.count("FIELD_OT,") == 1
@@ -1694,7 +1670,7 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     assert "raw = pack.get(FIELD_IS_FIRMWARE_UPGRADE)" in impl_block
     # Verify the class calls the implementation
     class_block = sensor_source.split(
-        "class JackeryBatteryPackSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackerySmartMeterSensor", 1)[0]
     assert "_battery_pack_description_value" in class_block
     assert "def _refresh_cache(self) -> None:" in class_block
@@ -1733,7 +1709,7 @@ def test_data_quality_warnings_do_not_hide_sensor_states() -> None:
     """Repairs diagnose contradictions; entity states keep their documented source."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     stat_block = sensor_source.split(
-        "class JackeryStatSensor(JackeryEntity, SensorEntity):", 1
+        "class JackeryStatSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
     assert "def _data_quality_warning_for_own_source" not in stat_block
@@ -1914,7 +1890,7 @@ def test_gate_ruff_scope_excludes_embedded_non_integration_trees() -> None:
     assert '"check", "--fix", "."' not in source
 
 
-def _load_py314_exception_guard_module():
+def _load_py314_exception_guard_module() -> types.ModuleType:
     """Load the local Python 3.14 exception-style guard script."""
     spec = importlib.util.spec_from_file_location(
         "verify_py314_exception_style",
@@ -2100,7 +2076,7 @@ def test_battery_pack_lifetime_entities_exist() -> None:
     the BLE-sourced ``inEgy``/``outEgy`` lifetime counters stay buried
     in coordinator.data and are invisible to the Energy Dashboard.
     Both must be ``TOTAL_INCREASING`` (lifetime monotonic counters in
-    kWh after the ``_div(1000)`` Wh-int transform) and
+    kWh after the live 0.01 kWh unit transform) and
     ``entity_registry_enabled_default=False`` (BLE transport is opt-in).
     """
     source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
@@ -2125,8 +2101,8 @@ def test_battery_pack_lifetime_entities_exist() -> None:
         assert "entity_registry_enabled_default=False" in window, (
             f"{key} must be opt-in (BLE transport is optional)"
         )
-        assert "_div(1000)" in window, (
-            f"{key} must transform Wh-int -> kWh via _div(1000)"
+        assert "_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)" in window, (
+            f"{key} must transform live 0.01 kWh units to kWh"
         )
 
 

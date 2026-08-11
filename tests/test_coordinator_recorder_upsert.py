@@ -14,6 +14,8 @@ pre-fix behavior and passes once corrections are re-emitted from the first
 divergent bucket.
 """
 
+import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 import itertools
 import operator
@@ -29,6 +31,7 @@ from custom_components.jackery_solarvault.const import (
     DOMAIN,
     EXTERNAL_STAT_BUCKET_DAY_HOURLY,
 )
+import custom_components.jackery_solarvault.coordinator as coordinator_module
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
@@ -38,6 +41,7 @@ from homeassistant.components.recorder.statistics import (
     adjust_statistics,
     statistics_during_period,
 )
+from homeassistant.components.recorder.tasks import SynchronizeTask
 from homeassistant.const import UnitOfEnergy
 
 if TYPE_CHECKING:
@@ -61,6 +65,8 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     obj = cast("Any", coordinator)
     obj.hass = hass
     obj._stat_import_last_sig = {}  # ruff: ignore[private-member-access]
+    obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._statistics_recorder_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
     return coordinator
 
@@ -102,7 +108,8 @@ async def _read_rows(hass: HomeAssistant) -> list[dict[str, Any]]:
         {"start", "state", "sum"},
     )
     series = rows.get(_STAT_ID, [])
-    return sorted(series, key=operator.itemgetter("start"))
+    generic_rows = cast("list[dict[str, Any]]", series)
+    return sorted(generic_rows, key=operator.itemgetter("start"))
 
 
 def _row_at(rows: list[dict[str, Any]], start: datetime) -> dict[str, Any]:
@@ -128,15 +135,14 @@ def mock_recorder_before_hass(recorder_db_url: str) -> None:
     del recorder_db_url
 
 
-async def test_corrected_bucket_state_and_sum_are_updated_not_dropped(
+async def test_corrected_bucket_sum_is_updated_not_dropped(
     recorder_mock: Recorder,
     hass: HomeAssistant,
 ) -> None:
-    """FINDING 6: a re-imported bucket with a corrected state updates the row.
+    """A corrected interval re-import updates the cumulative sum chain.
 
-    The pre-fix loop skipped an existing bucket whose state differed, so the
-    correction was permanently dropped. The row must instead carry the new
-    state and a rebased sum.
+    External app-chart rows intentionally carry only ``sum``: the chart value
+    is an interval increment, not a second HA sensor-state channel.
     """
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
@@ -157,11 +163,121 @@ async def test_corrected_bucket_state_and_sum_are_updated_not_dropped(
 
     assert ok is True
     rows = await _read_rows(hass)
-    assert _row_at(rows, hour11)["state"] == pytest.approx(5.0)
+    assert _row_at(rows, hour11)["state"] is None
     assert _row_at(rows, hour11)["sum"] == pytest.approx(6.0)
     # The trailing bucket is rebased on the correction, keeping the sum monotonic.
     assert _row_at(rows, hour12)["sum"] == pytest.approx(9.0)
     _assert_monotonic(rows)
+
+
+async def test_import_uses_fifo_recorder_barrier(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verification does not use the racy queue-empty commit-future probe."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    monkeypatch.setattr(
+        recorder_mock,
+        "async_block_till_done",
+        lambda: pytest.fail("racy recorder queue probe was used"),
+    )
+
+    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        name_prefix="Jackery",
+        metric_key="fifo_barrier_energy",
+        label="FIFO barrier energy",
+        bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+        bucket_label="Day (hourly)",
+        points=[_point(datetime(2026, 7, 1, 15, tzinfo=UTC), 1.25)],
+    )
+
+    assert ok is True
+    assert count == 1
+
+
+async def test_import_waits_for_delayed_recorder_visibility(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bounded verifier outlives three stale post-import database reads."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    real_reader = cast(
+        "Callable[..., object]",
+        coordinator_module.statistics_during_period,
+    )
+    read_count = 0
+
+    def delayed_reader(*args: object, **kwargs: object) -> object:
+        nonlocal read_count
+        read_count += 1
+        # Read 1 is the pre-import prefix lookup. Simulate three stale reads on
+        # the separate verification connection before the committed row appears.
+        if 2 <= read_count <= 4:
+            return {}
+        return real_reader(*args, **kwargs)
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "statistics_during_period",
+        delayed_reader,
+    )
+
+    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        name_prefix="Jackery",
+        metric_key="delayed_visibility_energy",
+        label="Delayed visibility energy",
+        bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+        bucket_label="Day (hourly)",
+        points=[_point(datetime(2026, 7, 1, 16, tzinfo=UTC), 2.5)],
+    )
+
+    assert ok is True
+    assert count == 1
+    assert read_count >= 5
+
+
+async def test_import_deadline_bounds_stalled_recorder_barrier(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A recorder that never completes the FIFO barrier cannot hold the lock."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    recorder_any = cast("Any", recorder_mock)
+    real_queue_task = recorder_any.queue_task
+
+    def queue_without_sync(task: object) -> None:
+        if isinstance(task, SynchronizeTask):
+            return
+        real_queue_task(task)
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "_STATISTICS_RECORDER_VERIFICATION_TIMEOUT_SEC",
+        0.01,
+    )
+    monkeypatch.setattr(recorder_mock, "queue_task", queue_without_sync)
+
+    async with asyncio.timeout(0.5):
+        ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+            device_id=_DEVICE_ID,
+            name_prefix="Jackery",
+            metric_key="stalled_barrier_energy",
+            label="Stalled barrier energy",
+            bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+            bucket_label="Day (hourly)",
+            points=[_point(datetime(2026, 7, 1, 17, tzinfo=UTC), 3.5)],
+        )
+
+    assert ok is False
+    assert count == 0
 
 
 async def test_mid_series_insertion_keeps_sum_monotonic(

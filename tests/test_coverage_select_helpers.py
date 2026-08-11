@@ -33,7 +33,7 @@ def test_storm_minutes_value() -> None:
     assert _storm_minutes_value({}, {}, {"wpc": 180}) == 180
 
     # 4. Found in weather_plan list storm items
-    weather_plan_list = {"storm": [{"minsInterval": 240}]}
+    weather_plan_list: dict[str, object] = {"storm": [{"minsInterval": 240}]}
     assert _storm_minutes_value({}, weather_plan_list, {}) == 240
 
     # 5. Invalid / sentinel values (< STORM_MINUTES_MIN_VALID)

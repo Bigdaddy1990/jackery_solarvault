@@ -41,6 +41,7 @@ def restore_payload_debug_logger() -> Iterator[logging.Logger]:
     """Yield the payload logger and restore its and its parent's levels."""
     logger = logging.getLogger(PAYLOAD_DEBUG_LOGGER_NAME)
     parent = logger.parent
+    assert parent is not None
     old_level = logger.level
     old_parent_level = parent.level
     try:
@@ -156,7 +157,9 @@ async def test_inherited_effective_debug_logger_activates_capture(
 ) -> None:
     """An inherited DEBUG level is honored when the child level is NOTSET."""
     restore_payload_debug_logger.setLevel(logging.NOTSET)
-    restore_payload_debug_logger.parent.setLevel(logging.DEBUG)
+    parent = restore_payload_debug_logger.parent
+    assert parent is not None
+    parent.setLevel(logging.DEBUG)
     coordinator = _payload_debug_coordinator()
     writes: list[dict[str, Any]] = []
 

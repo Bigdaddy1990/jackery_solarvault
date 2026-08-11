@@ -64,8 +64,8 @@ def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() ->
     assert rejection_reasons == []
 
 
-def test_unknown_textual_device_type_records_schema_rejection() -> None:
-    """An unresolved textual type remains visible in rejection diagnostics."""
+def test_unknown_textual_device_type_is_not_a_numeric_schema_rejection() -> None:
+    """A future textual product category is not malformed numeric devType."""
     rejection_reasons: list[str] = []
 
     dev_type = subdevice_dev_type(
@@ -74,7 +74,7 @@ def test_unknown_textual_device_type_records_schema_rejection() -> None:
     )
 
     assert dev_type is None
-    assert rejection_reasons == ["subdevice_dev_type_value_error"]
+    assert rejection_reasons == []
 
 
 @pytest.mark.asyncio

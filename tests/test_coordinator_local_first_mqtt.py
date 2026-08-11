@@ -30,7 +30,6 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
-    coordinator._cloud_mqtt_paused_by_local_mqtt_count = 0  # ruff: ignore[private-member-access]
     return coordinator
 
 

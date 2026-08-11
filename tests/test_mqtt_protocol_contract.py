@@ -2,6 +2,9 @@
 
 import ast
 from pathlib import Path
+from typing import Any, cast
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
@@ -147,6 +150,11 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"soc": 40}}}
         self._device_index = {"dev": {}}
         self._property_overrides = {}
+        self._mqtt = None
+        self._mqtt_session_generation = 0
+        self._mqtt_session_actions_seen = set()
+        self._cloud_mqtt_command_failures = {}
+        self._cloud_mqtt_command_attempts = {}
         captured: dict[str, object] = {}
 
         async def _debug_event(_event_or_factory: object) -> None:  # ruff: ignore[unused-async]
@@ -165,9 +173,12 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             """
             captured["data"] = new_data
 
-        self._async_payload_debug_event = _debug_event
-        self._push_partial_update = _push_partial_update
-        self._schedule_battery_pack_ota_enrichment = lambda _device_id: None
+        raw_self = cast("Any", self)
+        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]
+        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]
+        raw_self._schedule_battery_pack_ota_enrichment = (  # ruff: ignore[private-member-access]
+            lambda _device_id: None
+        )
 
         body = {
             FIELD_CMD: MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -194,7 +205,9 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         assert FIELD_THIRD_PARTY_MQTT_IP not in entry[PAYLOAD_PROPERTIES]
         assert FIELD_THIRD_PARTY_MQTT_PORT not in entry[PAYLOAD_PROPERTIES]
         assert FIELD_THIRD_PARTY_MQTT_ENABLE not in entry[PAYLOAD_PROPERTIES]
-        assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == body
+        assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == {
+            key: value for key, value in body.items() if key != FIELD_CMD
+        }
         assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # ruff: ignore[private-member-access]
 
     asyncio.run(_run())
@@ -371,9 +384,12 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
             """
             captured["data"] = new_data
 
-        self._async_payload_debug_event = _debug_event
-        self._push_partial_update = _push_partial_update
-        self._schedule_battery_pack_ota_enrichment = lambda _device_id: None
+        raw_self = cast("Any", self)
+        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]
+        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]
+        raw_self._schedule_battery_pack_ota_enrichment = (  # ruff: ignore[private-member-access]
+            lambda _device_id: None
+        )
 
         await JackerySolarVaultCoordinator._async_handle_mqtt_message(  # ruff: ignore[private-member-access]
             self,
@@ -435,7 +451,9 @@ def test_mqtt_payload_buckets_survive_http_refresh() -> None:
     assert "PAYLOAD_SMART_PLUGS" in preserved
 
 
-def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
+def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Stale HTTP property snapshots must not create SOC spikes."""
     from datetime import timedelta  # ruff: ignore[import-outside-top-level]
     import time  # ruff: ignore[import-outside-top-level]
@@ -445,44 +463,59 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http() -> None:
         FIELD_BAT_SOC,
         FIELD_SOC,
         FIELD_WNAME,
-        PAYLOAD_MQTT_LAST,
-        PAYLOAD_PROPERTIES,
     )
     from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
         JackerySolarVaultCoordinator,
     )
+    from custom_components.jackery_solarvault.ingest import (  # ruff: ignore[import-outside-top-level]
+        TransportSource,
+    )
 
     self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     self._configured_update_interval = timedelta(seconds=15)
-    self._live_property_received_monotonic = {}
-    entry = {
-        PAYLOAD_MQTT_LAST: {
-            "messageType": "UploadCombineData",
-            "received_at_monotonic": time.monotonic(),
-        },
-        PAYLOAD_PROPERTIES: {
+    self._property_overrides = {}
+    self._property_source_state = {}
+    now = time.monotonic()
+    monkeypatch.setattr(time, "monotonic", lambda: now)
+    mqtt_values = self._merge_main_properties_for_device(
+        "dev-1",
+        {},
+        {
             FIELD_SOC: 49,
             FIELD_BAT_SOC: 51,
             FIELD_BAT_OUT_PW: 300,
             FIELD_WNAME: "old-wifi",
         },
-    }
-    http_props = {
-        FIELD_SOC: 78,
-        FIELD_BAT_SOC: 74,
-        FIELD_BAT_OUT_PW: 163,
-        FIELD_WNAME: "new-wifi",
-    }
-
-    guarded = self._http_properties_with_live_overrides(entry, http_props)
+        source=TransportSource.CLOUD_MQTT,
+    )
+    guarded = self._merge_main_properties_for_device(
+        "dev-1",
+        mqtt_values,
+        {
+            FIELD_SOC: 78,
+            FIELD_BAT_SOC: 74,
+            FIELD_BAT_OUT_PW: 163,
+            FIELD_WNAME: "new-wifi",
+        },
+        source=TransportSource.HTTP,
+    )
 
     assert guarded[FIELD_SOC] == 49
     assert guarded[FIELD_BAT_SOC] == 51
     assert guarded[FIELD_BAT_OUT_PW] == 300
     assert guarded[FIELD_WNAME] == "new-wifi"
 
-    entry[PAYLOAD_MQTT_LAST]["received_at_monotonic"] = time.monotonic() - 120
-    unguarded = self._http_properties_with_live_overrides(entry, http_props)
+    monkeypatch.setattr(time, "monotonic", lambda: now + 120.0)
+    unguarded = self._merge_main_properties_for_device(
+        "dev-1",
+        guarded,
+        {
+            FIELD_SOC: 78,
+            FIELD_BAT_SOC: 74,
+            FIELD_BAT_OUT_PW: 163,
+        },
+        source=TransportSource.HTTP,
+    )
 
     assert unguarded[FIELD_SOC] == 78
     assert unguarded[FIELD_BAT_SOC] == 74
@@ -594,5 +627,6 @@ def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
         source = _function_source(api_path, name)
         assert "def _request_headers()" in source
         assert "headers=_request_headers()" in source
-        assert "self._token = None" in source
+        assert "_perform_authenticated_json_request(" in source
+        assert "token_used=token_used" in source
         assert "await self._ensure_token()" in source

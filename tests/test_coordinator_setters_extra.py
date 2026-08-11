@@ -51,12 +51,16 @@ def _coordinator(entry: dict[str, Any] | None = None) -> Any:
 
 def _ble_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last BLE-first command frame."""
-    return coordinator._async_publish_command_ble_first.await_args.kwargs  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
+    assert await_args is not None
+    return cast("dict[str, Any]", await_args.kwargs)
 
 
 def _cmd_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last direct command frame."""
-    return coordinator._async_publish_command.await_args.kwargs  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command.await_args  # ruff: ignore[private-member-access]
+    assert await_args is not None
+    return cast("dict[str, Any]", await_args.kwargs)
 
 
 # --- property-frame setters ------------------------------------------------

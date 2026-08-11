@@ -90,7 +90,7 @@ def mock_jackery_login() -> Generator[None]:
     cloud I/O.
     """
 
-    async def _fake_login(api) -> str:  # ruff: ignore[unused-async]
+    async def _fake_login(api: Any) -> str:  # ruff: ignore[unused-async]
         """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
 
         Parameters:
@@ -103,7 +103,7 @@ def mock_jackery_login() -> Generator[None]:
         api._mqtt_user_id = "test-user"  # ruff: ignore[private-member-access]
         api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="  # ruff: ignore[private-member-access]
         api._mqtt_mac_id = api._resolve_login_mac_id()  # ruff: ignore[private-member-access]
-        return api._token  # ruff: ignore[private-member-access]
+        return "test-token"
 
     with (
         patch(

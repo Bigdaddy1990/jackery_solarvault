@@ -55,7 +55,7 @@ def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:
     per-subclass identity attributes (e.g. ``_pack_index``, ``_sub_device_sn``)
     a given builder reads directly.
     """
-    instance = cls.__new__(cls)
+    instance = cast("Any", cls).__new__(cls)
     mutable = cast("Any", instance)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
@@ -83,8 +83,10 @@ def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     """Blank name fields yield a "Jackery {device_id}" prefix, not "SolarVault"."""
     info = _entity({})._build_smart_plug_device_info(1, {})  # ruff: ignore[private-member-access]
 
-    assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
-    assert "SolarVault" not in info["name"]
+    name = info["name"]
+    assert name is not None
+    assert name.startswith(f"Jackery {_DEVICE_ID}")
+    assert "SolarVault" not in name
 
 
 def test_breaker_switch_falls_back_to_jackery() -> None:

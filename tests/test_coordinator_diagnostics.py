@@ -7,9 +7,8 @@ back to cached discovery. All are pure lookups over in-memory coordinator state
 — no I/O — so they assert real branch behavior directly.
 """
 
-from datetime import date
 from typing import Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -92,18 +91,11 @@ def test_endpoint_backoff_active_count_ignores_energy_keys(
 
 def test_endpoint_backoff_delays_for_key_uses_energy_ladder() -> None:
     """Energy keys use the short capped ladder; others use the long one."""
-    energy = _Coordinator._endpoint_backoff_delays_for_key("pv_stat", 10600)  # ruff: ignore[private-member-access]
-    other = _Coordinator._endpoint_backoff_delays_for_key("device_list", 10600)  # ruff: ignore[private-member-access]
+    energy = _Coordinator._endpoint_backoff_delays_for_key("pv_stat")  # ruff: ignore[private-member-access]
+    other = _Coordinator._endpoint_backoff_delays_for_key("device_list")  # ruff: ignore[private-member-access]
 
     assert energy == co._ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC  # ruff: ignore[private-member-access]
     assert other == co._ENDPOINT_BACKOFF_DELAYS_SEC  # ruff: ignore[private-member-access]
-
-
-def test_endpoint_backoff_delays_for_key_uses_ratelimit_ladder() -> None:
-    """A code=10426 rate-limit failure uses the short transient ladder."""
-    ratelimited = _Coordinator._endpoint_backoff_delays_for_key("device_list", 10426)  # ruff: ignore[private-member-access]
-
-    assert ratelimited == co._ENDPOINT_BACKOFF_RATELIMIT_DELAYS_SEC  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -146,111 +138,21 @@ def test_statistics_backfill_diagnostics_tolerates_missing_devices() -> None:
     }
 
 
-def test_statistics_repair_from_date_returns_none_when_current() -> None:
-    """No repair is needed when state is current and versions match."""
-    coordinator = _bare()
-    today = date(2026, 6, 15)
-    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
-        co._STATISTICS_BACKFILL_STORE_DEVICES: {  # ruff: ignore[private-member-access]
-            "dev-1": {
-                co._STATISTICS_BACKFILL_LAST_SUCCESS: "2026-06-15",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_REPAIR: "2026-06-01",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_FAILED_BUCKETS: 0,  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION: (  # ruff: ignore[private-member-access]
-                    co._EXTERNAL_STATISTICS_REPAIR_VERSION  # ruff: ignore[private-member-access]
-                ),
-                co._STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION: (  # ruff: ignore[private-member-access]
-                    co._ENTITY_STATISTICS_REPAIR_VERSION  # ruff: ignore[private-member-access]
-                ),
-            },
-        },
-    }
-
-    result = coordinator._statistics_repair_from_date("dev-1", today)  # ruff: ignore[private-member-access]
-
-    assert result is None
-
-
-def test_statistics_repair_from_date_reseeds_after_failed_buckets() -> None:
-    """A persisted failed-bucket count re-triggers the current-year recovery."""
-    coordinator = _bare()
-    today = date(2026, 6, 15)
-    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
-        co._STATISTICS_BACKFILL_STORE_DEVICES: {  # ruff: ignore[private-member-access]
-            "dev-1": {
-                co._STATISTICS_BACKFILL_LAST_SUCCESS: "2026-05-20",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_REPAIR: "2026-05-01",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_FAILED_BUCKETS: 3,  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION: (  # ruff: ignore[private-member-access]
-                    co._EXTERNAL_STATISTICS_REPAIR_VERSION  # ruff: ignore[private-member-access]
-                ),
-                co._STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION: (  # ruff: ignore[private-member-access]
-                    co._ENTITY_STATISTICS_REPAIR_VERSION  # ruff: ignore[private-member-access]
-                ),
-            },
-        },
-    }
-
-    result = coordinator._statistics_repair_from_date("dev-1", today)  # ruff: ignore[private-member-access]
-
-    assert result == date(2026, 1, 1)
-
-
-def test_statistics_repair_from_date_reseeds_on_repair_version_mismatch() -> None:
-    """A repair-version bump reseeds the whole current calendar year."""
-    coordinator = _bare()
-    today = date(2026, 6, 15)
-    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
-        co._STATISTICS_BACKFILL_STORE_DEVICES: {  # ruff: ignore[private-member-access]
-            "dev-1": {
-                co._STATISTICS_BACKFILL_LAST_SUCCESS: "2026-05-20",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_REPAIR: "2026-05-01",  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_LAST_FAILED_BUCKETS: 0,  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_EXTERNAL_REPAIR_VERSION: 0,  # ruff: ignore[private-member-access]
-                co._STATISTICS_BACKFILL_ENTITY_REPAIR_VERSION: (  # ruff: ignore[private-member-access]
-                    co._ENTITY_STATISTICS_REPAIR_VERSION  # ruff: ignore[private-member-access]
-                ),
-            },
-        },
-    }
-
-    result = coordinator._statistics_repair_from_date("dev-1", today)  # ruff: ignore[private-member-access]
-
-    assert result == date(2026, 1, 1)
-
-
-def test_statistics_repair_from_date_seeds_january_first_on_first_run() -> None:
-    """The first run seeds history from January 1 of the current year."""
-    coordinator = _bare()
-    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
-        co._STATISTICS_BACKFILL_STORE_DEVICES: {},  # ruff: ignore[private-member-access]
-    }
-
-    assert coordinator._statistics_repair_from_date(  # ruff: ignore[private-member-access]
-        "dev-1",
-        date(2026, 6, 15),
-    ) == date(2026, 1, 1)
-    assert (
-        coordinator._statistics_repair_from_date(  # ruff: ignore[private-member-access]
-            "dev-1",
-            date(2026, 1, 10),
-        )
-        is None
-    )
-
-
 @pytest.mark.asyncio
 async def test_statistics_import_job_awaits_repair_wrapper() -> None:
-    """The background import job drives the import+repair chain."""
+    """The current import job awaits current import and schedules backfill."""
     coordinator = _bare()
     coordinator._statistics_import_task = None  # ruff: ignore[private-member-access]
     repair = AsyncMock()
     coordinator._async_import_and_repair_app_chart_statistics = repair  # ruff: ignore[private-member-access]
+    scheduler = MagicMock()
+    coordinator._schedule_statistics_backfill = scheduler  # ruff: ignore[private-member-access]
 
     snapshot: dict[str, dict[str, Any]] = {"dev-1": {}}
     await coordinator._async_statistics_import_job(snapshot)  # ruff: ignore[private-member-access]
 
     repair.assert_awaited_once_with(snapshot)
+    scheduler.assert_called_once_with(snapshot)
 
 
 def test_statistics_backfill_device_state_creates_nested_state() -> None:

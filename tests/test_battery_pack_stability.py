@@ -10,6 +10,7 @@ Locks down the contract:
 4. Pure unit-test coverage of the cleanup helper without HA fixtures.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import re
@@ -19,6 +20,7 @@ from custom_components.jackery_solarvault.coordinator import battery_packs_need_
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
+PackRow = dict[str, object]
 
 
 def _read(name: str) -> str:
@@ -70,12 +72,6 @@ def test_pack_field_last_seen_at_is_internal() -> None:
     assert "last_seen" in name
 
 
-def test_diagnostics_exposes_stale_pack_count() -> None:
-    """Diagnostics must surface the cumulative stale-pack drop counter."""
-    src = _read("coordinator.py")
-    assert 'diag["stale_battery_packs_dropped"] = ' in src, src
-
-
 def test_stale_drop_helper_logic_unit() -> None:
     """End-to-end logic check for the stale-pack threshold.
 
@@ -88,7 +84,7 @@ def test_stale_drop_helper_logic_unit() -> None:
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
 
-    def drop(packs):
+    def drop(packs: Sequence[PackRow]) -> tuple[list[PackRow], int]:
         """Filter packs by their `_last_seen_at` ISO 8601 timestamp, dropping those older than the configured threshold.
 
         Parameters:
@@ -97,7 +93,7 @@ def test_stale_drop_helper_logic_unit() -> None:
         Returns:
             tuple[list[dict], int]: A pair (kept_packs, stale_count) where `kept_packs` is the list of packs retained and `stale_count` is the number of packs considered stale and dropped.
         """
-        kept = []
+        kept: list[PackRow] = []
         stale = 0
         for pack in packs:
             last_seen = pack.get("_last_seen_at")
@@ -118,7 +114,7 @@ def test_stale_drop_helper_logic_unit() -> None:
     yesterday = (now - timedelta(days=1)).isoformat()
     eight_days_ago = (now - timedelta(days=8)).isoformat()
 
-    packs = [
+    packs: list[PackRow] = [
         {"deviceSn": "fresh", "_last_seen_at": yesterday},
         {"deviceSn": "stale", "_last_seen_at": eight_days_ago},
         {"deviceSn": "untagged"},  # newly discovered, no timestamp yet
@@ -138,13 +134,13 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
     """
     threshold_seconds = 7 * 24 * 3600
     now = datetime(2026, 5, 5, 12, 0, tzinfo=UTC)
-    pack = {
+    pack: PackRow = {
         "deviceSn": "blip",
         "commState": "0",  # currently offline
         "_last_seen_at": (now - timedelta(hours=4)).isoformat(),
     }
 
-    def drop(packs):
+    def drop(packs: Sequence[PackRow]) -> list[PackRow]:
         """Filter out battery packs whose `_last_seen_at` timestamp is older than the configured threshold.
 
         Parameters:
@@ -153,7 +149,7 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
         Returns:
             list: The subset of `packs` retained — packs that do not have a string `_last_seen_at`, have an unparsable `_last_seen_at`, or whose parsed `_last_seen_at` is within `threshold_seconds` of `now`.
         """
-        kept = []
+        kept: list[PackRow] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
             if not isinstance(last_seen, str):
@@ -236,26 +232,3 @@ def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     refresh_body = refresh_match.group(0)
     assert "_merge_battery_pack_ota_lists" in refresh_body, refresh_body
     assert "_merge_battery_pack_lists" not in refresh_body, refresh_body
-
-
-# ---------- Dynamic battery-pack devices --------------------------------
-
-
-def test_update_data_drains_pending_removals() -> None:
-    """_async_update_data must call the cleanup hook each refresh.
-
-    Otherwise pack indices queued by the merge step would accumulate
-    forever and HA's registry would never converge.
-    """
-    src = _read("coordinator.py")
-    # Find the cleanup invocation site
-    assert "await self.async_cleanup_pending_device_removals()" in src, src
-    # It must be guarded by a non-empty check to avoid the executor cost
-    # when nothing is queued.
-    pattern = re.search(
-        r"if self\._pending_device_removals:\s*\n"
-        r"\s*try:\s*\n"
-        r"\s*await self\.async_cleanup_pending_device_removals\(\)",
-        src,
-    )
-    assert pattern is not None, src

@@ -314,5 +314,5 @@ async def test_concurrent_token_expired_requests_relogin_only_once() -> None:
             api.async_get_user_info(),
         )
 
-    assert results == [{"ok": True}, {"ok": True}]
+    assert [*results] == [{"ok": True}, {"ok": True}]
     login.assert_awaited_once()

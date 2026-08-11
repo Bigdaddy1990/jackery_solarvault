@@ -1,3 +1,4 @@
+# mypy: disable-error-code="assignment,dict-item,no-untyped-def"
 """Behavioral tests for the coordinator's system-info enrichment query methods.
 
 These drive `_async_query_system_info_for_missing`, `_async_query_weather_plan_for_missing`,
@@ -13,6 +14,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.jackery_solarvault.const import (
+    ACTION_ID_QUERY_COMBINE_DATA,
+    ACTION_ID_QUERY_DEVICE_PROPERTY,
+    ACTION_ID_QUERY_WEATHER_PLAN,
     PAYLOAD_DEVICE,
     PAYLOAD_PROPERTIES,
 )
@@ -102,6 +106,13 @@ async def coordinator(hass):  # noqa: RUF105
     coord, entry, _api = await setup_update_cycle_coordinator(
         hass, api=api, discover=True
     )
+    # Entry setup legitimately performs its own enrichment pass in background.
+    # Most cases below exercise transport and error behavior, not the scheduler
+    # window, so neutralize that setup throttle.  The dedicated throttle cases
+    # explicitly restore non-zero intervals before asserting the gate.
+    coord._system_info_query_interval_sec = 0  # ruff: ignore[private-member-access]
+    coord._weather_plan_query_interval_sec = 0  # ruff: ignore[private-member-access]
+    coord._subdevice_query_interval_sec = 0  # ruff: ignore[private-member-access]
     yield coord
     await _teardown(hass, entry.entry_id)
 
@@ -166,11 +177,15 @@ async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # no
 
 @pytest.mark.asyncio
 async def test_system_info_query_skips_device_with_complete_data(coordinator) -> None:  # noqa: RUF105
-    """Device that already has all system-info fields is skipped (no force)."""
+    """Complete data is skipped once session getter responses have been seen."""
     mqtt = MagicMock()
     mqtt.is_connected = True
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
+    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+        (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
+        (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
+    })
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
@@ -278,6 +293,10 @@ async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> Non
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload()}
     snapshot = {DEVICE_ID: _device_payload(has_system_info=True)}
+    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+        (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
+        (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
+    })
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
@@ -323,11 +342,14 @@ async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:
 
 @pytest.mark.asyncio
 async def test_weather_plan_query_skips_when_minutes_present(coordinator) -> None:  # noqa: RUF105
-    """Device with existing lead-time fields is skipped (no force)."""
+    """Existing lead-time fields are skipped after the session getter was seen."""
     mqtt = MagicMock()
     mqtt.is_connected = True
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
+    coordinator._mqtt_session_actions_seen.add(  # noqa: RUF105, SLF001
+        (DEVICE_ID, ACTION_ID_QUERY_WEATHER_PLAN)
+    )
     coordinator.async_query_weather_plan = AsyncMock()
 
     await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001

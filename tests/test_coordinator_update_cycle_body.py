@@ -20,7 +20,7 @@ result / diagnostics), never call order:
 
 from datetime import date
 from time import monotonic
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -178,7 +178,7 @@ async def test_cold_device_failure_keeps_other_device_result(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
     second_id = f"{DEVICE_ID}0002"
     coordinator._device_index[second_id] = dict(coordinator._device_index[DEVICE_ID])  # ruff: ignore[private-member-access]
-    coordinator.data = None
+    cast("Any", coordinator).data = None
 
     result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
@@ -257,7 +257,7 @@ async def test_property_10600_without_prior_data_keeps_first_refresh_failed(
     )
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
     # No prior data: this is the first refresh for a fresh system.
-    coordinator.data = None
+    cast("Any", coordinator).data = None
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -333,7 +333,7 @@ async def test_broken_shelly_enrichment_never_breaks_l3(
 async def test_statistics_import_dispatched_then_throttled(
     hass: HomeAssistant,
 ) -> None:
-    """The recorder import is scheduled once, then throttled on the next cycle."""
+    """The recorder import runs again after slow metrics advanced period caches."""
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
     import_job = AsyncMock(return_value=None)
     coordinator._async_import_current_app_chart_statistics_job = import_job  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
@@ -344,9 +344,9 @@ async def test_statistics_import_dispatched_then_throttled(
     await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
 
-    # Dispatched off the critical path exactly once; the second (immediate)
-    # cycle is inside the throttle window and does not re-import.
-    assert import_job.await_count == 1
+    # The background slow-metrics refresh advances periodic caches and resets
+    # the import throttle so the next coordinator cycle consumes fresh buckets.
+    assert import_job.await_count == 2
     await _teardown(hass, entry.entry_id)
 
 

@@ -86,6 +86,11 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     return coordinator
 
 
+def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:
+    """Return the API test double behind the coordinator's typed boundary."""
+    return cast("Any", coordinator.api)
+
+
 def _button(coordinator: Any, key: str) -> JackeryQueryButton:
     """Create a query button against a lightweight coordinator double."""
     coordinator.data = {_DEVICE_ID: {}}
@@ -168,16 +173,18 @@ async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
     }
     coordinator = _bare_coordinator(entry)
     coordinator.last_update_success = True
-    coordinator.api.async_get_sub_shadow.return_value = {
+    api = _mock_api(coordinator)
+    api.async_get_sub_shadow.return_value = {
         FIELD_PLUGS: [{FIELD_DEVICE_SN: plug_sn, "sysSwitch": 0}],
     }
-    coordinator._async_publish_command_ble_first = AsyncMock(  # ruff: ignore[private-member-access]
+    coordinator_mock = cast("Any", coordinator)
+    coordinator_mock._async_publish_command_ble_first = AsyncMock(  # ruff: ignore[private-member-access]
         side_effect=HomeAssistantError("push unavailable"),
     )
-    coordinator._merge_subdevice_data = MagicMock(  # ruff: ignore[private-member-access]
+    coordinator_mock._merge_subdevice_data = MagicMock(  # ruff: ignore[private-member-access]
         return_value=False,
     )
-    coordinator._push_partial_update = MagicMock()  # ruff: ignore[private-member-access]
+    coordinator_mock._push_partial_update = MagicMock()  # ruff: ignore[private-member-access]
     button = JackeryQueryButton(
         coordinator,
         _DEVICE_ID,
@@ -187,7 +194,7 @@ async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
     await button.async_press()
 
     assert coordinator.data[_DEVICE_ID][PAYLOAD_SMART_PLUGS] == [live_plug]
-    coordinator._push_partial_update.assert_not_called()  # ruff: ignore[private-member-access]
+    coordinator_mock._push_partial_update.assert_not_called()  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio
@@ -213,6 +220,7 @@ async def test_device_property_http_read_preserves_fresh_live_value() -> None:
         PAYLOAD_HTTP_PROPERTIES: {"pvPw": 100},
     }
     coordinator = _bare_coordinator(entry)
+    api = _mock_api(coordinator)
     request_started = asyncio.Event()
     release_response = asyncio.Event()
 
@@ -224,7 +232,7 @@ async def test_device_property_http_read_preserves_fresh_live_value() -> None:
             PAYLOAD_PROPERTIES: {"pvPw": _HTTP_PV_POWER},
         }
 
-    coordinator.api.async_get_device_property.side_effect = _delayed_property
+    api.async_get_device_property.side_effect = _delayed_property
     refresh = asyncio.create_task(
         coordinator.async_refresh_documented_http_read(
             _DEVICE_ID,
@@ -264,7 +272,8 @@ async def test_system_shadow_http_read_surfaces_system_info() -> None:
         PAYLOAD_SYSTEM: {FIELD_ID: "SYSTEM-1"},
     }
     coordinator = _bare_coordinator(entry)
-    coordinator.api.async_get_system_shadow.return_value = {
+    api = _mock_api(coordinator)
+    api.async_get_system_shadow.return_value = {
         FIELD_ENERGY_PLAN_PW: _SYSTEM_ENERGY_PLAN_POWER,
     }
 
@@ -273,7 +282,7 @@ async def test_system_shadow_http_read_surfaces_system_info() -> None:
         system_shadow=True,
     )
 
-    coordinator.api.async_get_system_shadow.assert_awaited_once_with(
+    api.async_get_system_shadow.assert_awaited_once_with(
         device_sn=_DEVICE_SN,
         diy_sn="SYSTEM-1",
     )
@@ -299,6 +308,7 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
         ],
     }
     coordinator = _bare_coordinator(entry)
+    api = _mock_api(coordinator)
     coordinator._accessory_source_state = {  # ruff: ignore[private-member-access]
         (_DEVICE_ID, PAYLOAD_BATTERY_PACKS, pack_sn): {
             FIELD_BAT_SOC: FieldProvenance(
@@ -309,14 +319,14 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
             ),
         },
     }
-    coordinator.api.async_get_battery_pack_list.return_value = [
+    api.async_get_battery_pack_list.return_value = [
         {
             FIELD_DEVICE_SN: pack_sn,
             FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BATTERY_PACK,
             FIELD_BAT_SOC: 20,
         },
     ]
-    coordinator.api.async_get_sub_shadow.return_value = {
+    api.async_get_sub_shadow.return_value = {
         FIELD_BATTERY_PACKS: [
             {
                 FIELD_DEVICE_SN: pack_sn,
@@ -331,8 +341,8 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
         battery_packs=True,
     )
 
-    coordinator.api.async_get_battery_pack_list.assert_awaited_once_with(_DEVICE_SN)
-    coordinator.api.async_get_sub_shadow.assert_awaited_once_with(
+    api.async_get_battery_pack_list.assert_awaited_once_with(_DEVICE_SN)
+    api.async_get_sub_shadow.assert_awaited_once_with(
         dev_type=str(SUBDEVICE_DEV_TYPE_BATTERY_PACK),
         device_sn=_DEVICE_SN,
         sub_device_sn=pack_sn,
@@ -398,14 +408,15 @@ async def test_known_subdevice_refresh_uses_documented_sub_shadow(
         },
     }
     coordinator = _bare_coordinator(entry)
-    coordinator.api.async_get_sub_shadow.return_value = body
+    api = _mock_api(coordinator)
+    api.async_get_sub_shadow.return_value = body
 
     assert await coordinator.async_refresh_documented_http_read(
         _DEVICE_ID,
         subdevice_dev_type=dev_type,
     )
 
-    coordinator.api.async_get_sub_shadow.assert_awaited_once_with(
+    api.async_get_sub_shadow.assert_awaited_once_with(
         dev_type=str(dev_type),
         device_sn=_DEVICE_SN,
         sub_device_sn=serial,

@@ -103,7 +103,9 @@ async def test_period_backfill_shares_slow_http_concurrency_gate(
         fetch_started.set()
         return {}
 
-    coordinator.api = SimpleNamespace(async_get_device_pv_stat=_mock_pv_stat)
+    cast("Any", coordinator).api = SimpleNamespace(
+        async_get_device_pv_stat=_mock_pv_stat,
+    )
     await coordinator._slow_http_request_semaphore.acquire()  # ruff: ignore[private-member-access]
     task = asyncio.create_task(
         coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
@@ -136,10 +138,10 @@ def _source(period_start: date) -> dict[str, object]:
 
 
 @pytest.mark.asyncio
-async def test_month_then_year_then_week_priority(
+async def test_closed_months_then_weeks_skip_open_periods(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Months finish before year, and year before the larger weekly queue."""
+    """Closed months lead closed weeks; active month/year stay unqueued."""
     monkeypatch.setattr(
         coordinator_module,
         "APP_CHART_STAT_METRICS",
@@ -166,9 +168,9 @@ async def test_month_then_year_then_week_priority(
         request_budget=8,
     )
 
-    assert [date_type for date_type, _start in requested[:7]] == [DATE_TYPE_MONTH] * 7
-    assert requested[7][0] == DATE_TYPE_YEAR
-    assert DATE_TYPE_WEEK not in {date_type for date_type, _start in requested}
+    assert [date_type for date_type, _start in requested[:6]] == [DATE_TYPE_MONTH] * 6
+    assert [date_type for date_type, _start in requested[6:]] == [DATE_TYPE_WEEK] * 2
+    assert DATE_TYPE_YEAR not in {date_type for date_type, _start in requested}
 
 
 @pytest.mark.asyncio
@@ -181,7 +183,7 @@ async def test_disabled_periods_are_never_queued(
         "APP_CHART_STAT_METRICS",
         _ONE_PV_METRIC,
     )
-    coordinator = _coordinator(
+    coordinator = cast("Any", _coordinator)(
         **{
             CONF_ENABLE_MONTH_STATISTICS: False,
             CONF_ENABLE_YEAR_STATISTICS: False,
@@ -195,7 +197,9 @@ async def test_disabled_periods_are_never_queued(
         request_budget=1,
     )
 
-    assert fetch.await_args.kwargs["date_type"] == DATE_TYPE_WEEK
+    call = fetch.await_args
+    assert call is not None
+    assert call.kwargs["date_type"] == DATE_TYPE_WEEK
 
 
 @pytest.mark.asyncio
@@ -208,7 +212,7 @@ async def test_all_period_opt_outs_make_no_http_request(
         "APP_CHART_STAT_METRICS",
         _ONE_PV_METRIC,
     )
-    coordinator = _coordinator(
+    coordinator = cast("Any", _coordinator)(
         **{
             CONF_ENABLE_MONTH_STATISTICS: False,
             CONF_ENABLE_WEEK_STATISTICS: False,
@@ -268,9 +272,9 @@ async def test_new_calendar_period_is_added_incrementally(
         request_budget=1,
     )
 
-    # January was sampled while still open, so the first February run finalizes
-    # that now-closed bucket before sampling the new active month.
-    assert requested == [date(2026, 1, 1), date(2026, 1, 1)]
+    # January is skipped while open. The first February run fetches it once
+    # after it closes; the new active February bucket stays on the normal poll.
+    assert requested == [date(2026, 1, 1)]
 
 
 @pytest.mark.asyncio
@@ -284,7 +288,7 @@ async def test_period_transport_failure_uses_retry_cooldown(
         _ONE_PV_METRIC,
     )
     coordinator = _coordinator(
-        today=date(2026, 1, 2),
+        today=date(2026, 2, 2),
         **{
             CONF_ENABLE_WEEK_STATISTICS: False,
             CONF_ENABLE_YEAR_STATISTICS: False,
@@ -308,7 +312,8 @@ async def test_period_transport_failure_uses_retry_cooldown(
     ]
     assert bucket_state["status"] == "retryable"
     assert bucket_state["retry_after_epoch"] > 0
-    assert result["pending_sources"] == 0
+    assert result["pending_sources"] == 1
+    assert result["actionable_sources"] == 0
 
     immediate_retry = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},

@@ -7,6 +7,7 @@ triggered) — never call order. The governing invariant: MQTT is a supplemental
 Layer-5 transport that must never gate the HTTP path or open HA reauth.
 """
 
+from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,6 +19,7 @@ from custom_components.jackery_solarvault.const import (
     MQTT_CREDENTIAL_USERNAME,
     MQTT_CREDENTIAL_USER_ID,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
     make_update_cycle_api,
@@ -27,7 +29,7 @@ from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
 _MODULE = "custom_components.jackery_solarvault.coordinator"
 
 
-async def _teardown(hass, entry_id) -> None:  # noqa: RUF105
+async def _teardown(hass: HomeAssistant, entry_id: str) -> None:  # noqa: RUF105
     """Unload the entry and drain background tasks."""
     await hass.config_entries.async_unload(entry_id)
     await hass.async_block_till_done()
@@ -42,6 +44,7 @@ def _fake_mqtt(*, connected: bool = False, last_error: Any = None) -> MagicMock:
     mqtt.async_wait_until_connected = AsyncMock(return_value=None)
     mqtt.diagnostics = {"last_error": last_error} if last_error else {}
     mqtt.consecutive_auth_failures = 0
+    mqtt.session_generation = 1
     return mqtt
 
 
@@ -55,7 +58,7 @@ def _credential_dict() -> dict[str, str]:
 
 
 @pytest.fixture
-async def coordinator(hass) -> Any:  # noqa: RUF105
+async def coordinator(hass: HomeAssistant) -> AsyncGenerator[Any]:  # noqa: RUF105
     """Yield a coordinator with mocked api for MQTT lifecycle tests."""
     api = make_update_cycle_api()
     coord, entry, _api = await setup_update_cycle_coordinator(
@@ -71,7 +74,7 @@ async def coordinator(hass) -> Any:  # noqa: RUF105
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_returns_early_without_runtime(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_returns_early_without_runtime(coordinator: Any) -> None:  # noqa: RUF105
     """Without an MQTT runtime there is nothing to start."""
     coordinator._mqtt = None  # noqa: RUF105, SLF001
     calls_before = coordinator.api.get_cached_mqtt_credentials.call_count
@@ -81,7 +84,7 @@ async def test_ensure_mqtt_returns_early_without_runtime(coordinator) -> None:  
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_defers_without_cached_credentials(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_defers_without_cached_credentials(coordinator: Any) -> None:  # noqa: RUF105
     """No cached credentials: back off and let the HTTP login path acquire them."""
     coordinator._mqtt = _fake_mqtt()  # noqa: RUF105, SLF001
     coordinator.api.get_cached_mqtt_credentials = MagicMock(return_value=None)
@@ -92,7 +95,7 @@ async def test_ensure_mqtt_defers_without_cached_credentials(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_skips_when_manager_says_so(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_skips_when_manager_says_so(coordinator: Any) -> None:  # noqa: RUF105
     """The manager's skip decision is honored (e.g. active pause/backoff)."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -107,7 +110,7 @@ async def test_ensure_mqtt_skips_when_manager_says_so(coordinator) -> None:  # n
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_starts_with_cached_credentials(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_starts_with_cached_credentials(coordinator: Any) -> None:  # noqa: RUF105
     """Cached credentials drive a real async_start with the credential fields."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -127,7 +130,7 @@ async def test_ensure_mqtt_starts_with_cached_credentials(coordinator) -> None: 
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_records_success_when_already_connected(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_records_success_when_already_connected(coordinator: Any) -> None:  # noqa: RUF105
     """A client-verified no-op repairs manager state when already connected."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -144,7 +147,7 @@ async def test_ensure_mqtt_records_success_when_already_connected(coordinator) -
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_wait_connected_success_path(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_wait_connected_success_path(coordinator: Any) -> None:  # noqa: RUF105
     """wait_connected=True waits for CONNACK then records the fingerprint."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -161,7 +164,7 @@ async def test_ensure_mqtt_wait_connected_success_path(coordinator) -> None:  # 
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator: Any) -> None:  # noqa: RUF105
     """A broker credential rejection pauses MQTT and re-raises, never reauth."""
     mqtt = _fake_mqtt(connected=False)
     mqtt.diagnostics = {"last_error": "connect rc=5"}
@@ -182,7 +185,7 @@ async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator) -> No
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_wait_connected_network_error_backs_off(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_wait_connected_network_error_backs_off(coordinator: Any) -> None:  # noqa: RUF105
     """A non-auth connect failure records backoff and re-raises."""
     mqtt = _fake_mqtt(connected=False)
     mqtt.diagnostics = {"last_error": "connection refused"}
@@ -202,7 +205,7 @@ async def test_ensure_mqtt_wait_connected_network_error_backs_off(coordinator) -
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator: Any) -> None:  # noqa: RUF105
     """A concurrent unload/reload replacing the runtime bails out quietly."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -210,7 +213,10 @@ async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator) -> None:  
         return_value=_credential_dict()
     )
 
-    async def _replace_runtime(*args, **kwargs) -> None:  # noqa: RUF029, RUF105
+    async def _replace_runtime(  # noqa: RUF029, RUF105
+        *args: object,
+        **kwargs: object,
+    ) -> None:
         coordinator._mqtt = _fake_mqtt()  # noqa: RUF105, SLF001
 
     mqtt.async_start = AsyncMock(side_effect=_replace_runtime)
@@ -222,7 +228,7 @@ async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator) -> None:  
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator: Any) -> None:  # noqa: RUF105
     """A generated macId source is flagged once, not every connect."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -239,7 +245,7 @@ async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_logs_credential_session_change(coordinator) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_logs_credential_session_change(coordinator: Any) -> None:  # noqa: RUF105
     """A changed credential fingerprint logs a reconnect notice."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -260,7 +266,7 @@ async def test_ensure_mqtt_logs_credential_session_change(coordinator) -> None: 
 
 
 @pytest.mark.asyncio
-async def test_mqtt_connected_returns_early_during_shutdown(coordinator) -> None:  # noqa: RUF105
+async def test_mqtt_connected_returns_early_during_shutdown(coordinator: Any) -> None:  # noqa: RUF105
     """No snapshot work happens once shutdown has begun."""
     coordinator._shutdown_started = True  # noqa: RUF105, SLF001
     coordinator._mqtt = _fake_mqtt(connected=True)  # noqa: RUF105, SLF001
@@ -284,10 +290,11 @@ async def test_mqtt_connected_returns_early_during_shutdown(coordinator) -> None
 
 
 @pytest.mark.asyncio
-async def test_mqtt_connected_records_success_and_queries_missing(coordinator) -> None:  # noqa: RUF105
+async def test_mqtt_connected_records_success_and_queries_missing(coordinator: Any) -> None:  # noqa: RUF105
     """On connect the manager records success and the enrichment queries run."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
+    coordinator.data = {"device-1": {}}
     fingerprint = ("c", "h", "s")
     coordinator.api.mqtt_fingerprint = fingerprint
 
@@ -317,15 +324,22 @@ async def test_mqtt_connected_records_success_and_queries_missing(coordinator) -
 
     assert coordinator._mqtt_mgr.fingerprint == fingerprint  # ruff: ignore[private-member-access]
     schedule_config.assert_called_once()
-    query_system.assert_awaited_once_with(force=True, ensure_mqtt=False)
-    query_weather.assert_awaited_once_with(force=True, ensure_mqtt=False)
-    query_sub.assert_awaited_once_with(force=True, ensure_mqtt=False)
+    query_system.assert_awaited_once_with(
+        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+    )
+    query_weather.assert_awaited_once_with(
+        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+    )
+    query_sub.assert_awaited_once_with(
+        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+    )
 
 
 @pytest.mark.asyncio
-async def test_mqtt_connected_defers_background_auth_failure(coordinator) -> None:  # noqa: RUF105
+async def test_mqtt_connected_defers_background_auth_failure(coordinator: Any) -> None:  # noqa: RUF105
     """A ConfigEntryAuthFailed during enrichment is deferred, not raised."""
     coordinator._mqtt = _fake_mqtt(connected=True)  # ruff: ignore[private-member-access]
+    coordinator.data = {"device-1": {}}
     coordinator.api.mqtt_fingerprint = ("c", "h", "s")
 
     with (

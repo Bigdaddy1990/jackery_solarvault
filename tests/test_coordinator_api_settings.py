@@ -473,6 +473,8 @@ async def test_read_device_schedule_adds_plug_sn_for_socket_task() -> None:
         plug_sn="P9",
     )
 
-    body = send.await_args.kwargs["body"]
+    call = send.await_args
+    assert call is not None
+    body = call.kwargs["body"]
     assert body[coord_mod.FIELD_DEVICE_SN] == "P9"
     assert body[coord_mod.FIELD_TASK_TYPE] == coord_mod.TIMER_TASK_TYPE_SMART_PLUG

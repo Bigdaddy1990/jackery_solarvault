@@ -20,7 +20,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble_transport import JackeryBleListener
+from custom_components.jackery_solarvault.client.ble_transport import (
+    BleFrameObservation,
+    JackeryBleListener,
+)
 from custom_components.jackery_solarvault.const import (
     BLE_CONNECT_BACKOFF_INITIAL_SEC,
     BLE_CONNECT_BACKOFF_MAX_SEC,
@@ -150,9 +153,10 @@ class _StubHass:
 
 
 async def _noop_sink(  # ruff: ignore[unused-async]
-    _device_id: str, _observation: object
-) -> None:  # listener sink must be a coroutine function
-    return None
+    _device_id: str,
+    _observation: BleFrameObservation,
+) -> bool:  # listener sink must be a coroutine function
+    return True
 
 
 def _make_listener(

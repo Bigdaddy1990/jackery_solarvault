@@ -1,10 +1,12 @@
 """Unit tests for shared Jackery entity metadata helpers."""
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 from custom_components.jackery_solarvault.const import (
+    DOMAIN,
     FIELD_CURRENT_VERSION,
+    FIELD_DEVICE_ID,
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEV_MODEL,
@@ -43,7 +45,8 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
     Returns:
         JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
     """
-    return JackeryEntity(SimpleNamespace(data={"dev1": payload}), "dev1", "test")
+    coordinator = cast("Any", SimpleNamespace(data={"dev1": payload}))
+    return JackeryEntity(coordinator, "dev1", "test")
 
 
 def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
@@ -56,9 +59,12 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     Returns:
         Any: An instance of `cls` initialized with the given payload.
     """
-    entity = cls.__new__(cls)
+    entity = cast("Any", cls).__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
-        entity, SimpleNamespace(data={"dev1": payload}), "dev1", "test"
+        entity,
+        cast("Any", SimpleNamespace(data={"dev1": payload})),
+        "dev1",
+        "test",
     )
     return entity
 
@@ -198,3 +204,17 @@ def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
     assert info["name"] == "Main Name Smart Meter"
     assert info["model"] == "Smart Meter"
     assert info["serial_number"] == "Meter MAC"
+    assert info["identifiers"] == {(DOMAIN, "dev1_smart_meter_meter_mac")}
+
+
+def test_smart_meter_device_info_uses_device_id_when_serial_is_absent() -> None:
+    """The accessory device id is a stable registry fallback, not the parent id."""
+    entity = _sensor_entity(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_DEVICE_ID: " CT-Device-42 "}},
+    )
+
+    info = entity.device_info
+
+    assert info["serial_number"] == "CT-Device-42"
+    assert info["identifiers"] == {(DOMAIN, "dev1_smart_meter_ct_device_42")}

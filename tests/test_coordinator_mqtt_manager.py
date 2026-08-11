@@ -10,6 +10,7 @@ they never drive HA reauthentication.
 
 from types import SimpleNamespace
 from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -21,6 +22,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     BleConnectBackoff,
+    JackerySolarVaultCoordinator,
     MqttConnectionManager,
     RejectionMetrics,
     is_mqtt_auth_failure,
@@ -362,7 +364,27 @@ def test_handle_connect_error_auth_path_pauses(
     mgr.handle_connect_error(cast("Any", mqtt), "irrelevant")
 
     assert mgr.app_conflict_pause_cycles == 1
-    assert mgr.auth_failure_message is None
+    assert mgr.backoff_until_monotonic == pytest.approx(0.0)
+    assert mgr.paused_until_monotonic > 500.0
+
+
+def test_mqtt_auth_pause_never_invalidates_http_session() -> None:
+    """A broker rejection must not clear HTTP auth or force an HTTP login."""
+    coordinator = JackerySolarVaultCoordinator.__new__(
+        JackerySolarVaultCoordinator,
+    )
+    api = MagicMock()
+    coordinator.api = cast("Any", api)
+    coordinator.rejection_metrics = RejectionMetrics()
+    coordinator._mqtt_mgr = MqttConnectionManager()  # ruff: ignore[private-member-access]
+
+    coordinator._pause_mqtt_after_auth_failure(  # ruff: ignore[private-member-access]
+        "connect rc=134 (bad user name or password)",
+        streak=1,
+    )
+
+    api.invalidate_mqtt_session_for_http_refresh.assert_not_called()
+    assert coordinator._mqtt_mgr.app_conflict_pause_cycles == 1  # ruff: ignore[private-member-access]
 
 
 def test_handle_connect_error_non_auth_path_backs_off(
@@ -402,7 +424,7 @@ def test_defer_background_auth_failure_ignores_generic_notice() -> None:
     mgr.defer_background_auth_failure(None, "some unrelated warning")
 
     assert mgr.app_conflict_pause_cycles == 0
-    assert mgr.auth_failure_message is None
+    assert mgr.backoff_until_monotonic == pytest.approx(0.0)
 
 
 # ---------------------------------------------------------------------------

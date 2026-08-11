@@ -1,6 +1,6 @@
 """Unit tests for the Jackery HTTP API client."""
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -51,7 +51,7 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    api._put_json = _put_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._put_json = _put_json  # ruff: ignore[private-member-access]
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
@@ -81,7 +81,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    api._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
 
     assert (
         await api.async_set_single_mode(
@@ -167,7 +167,7 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
         """
         raise AssertionError("invalid tariff input must stop before HTTP post")
 
-    api._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
 
     with pytest.raises(JackeryApiError, match="single_price"):
         await api.async_set_single_mode(
@@ -192,7 +192,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
         captured.append((path, payload))
         return {FIELD_DATA: True}
 
-    api._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
 
     assert (
         await api.async_set_dynamic_mode(
@@ -225,7 +225,7 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
         assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._get_json = _get_json  # ruff: ignore[private-member-access]
 
     payload = await api.async_get_device_pv_stat(
         "dev1",
@@ -263,7 +263,7 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
         assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    api._get_json = _get_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._get_json = _get_json  # ruff: ignore[private-member-access]
 
     assert await api.async_get_battery_pack_list("sn1") == []
 

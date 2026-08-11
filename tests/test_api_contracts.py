@@ -351,7 +351,9 @@ async def test_async_bind_accessories_contract() -> None:
         )
 
     assert result == payload
-    assert post_json.await_args.args[0] == ACCESSORIES_BIND_PATH
+    awaited = post_json.await_args
+    assert awaited is not None
+    assert awaited.args[0] == ACCESSORIES_BIND_PATH
 
 
 @pytest.mark.asyncio
@@ -374,7 +376,9 @@ async def test_async_check_scannable_accessories_contract() -> None:
         )
 
     assert result == payload
-    assert post_json.await_args.args[0] == ACCESSORIES_SCANNABLE_PATH
+    awaited = post_json.await_args
+    assert awaited is not None
+    assert awaited.args[0] == ACCESSORIES_SCANNABLE_PATH
 
 
 @pytest.mark.asyncio

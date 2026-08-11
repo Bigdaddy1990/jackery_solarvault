@@ -143,18 +143,11 @@ async def test_direct_client_subscribes_once_to_exact_configured_topic(
     )
 
     assert await client._async_run_session() is True  # ruff: ignore[private-member-access]
-    # The client expands concrete topics to both exact and descendant subscriptions
-    if "+" in configured_topic or "#" in configured_topic:
-        assert subscriptions == [(configured_topic, 0)]
-    else:
-        expected = [
-            (configured_topic, 0),
-            (f"{configured_topic.rstrip("/")}/#", 0),
-        ]
-        assert subscriptions == expected
+    assert subscriptions == [(configured_topic, 0)]
 
 
-def test_broad_filter_still_blocks_home_assistant_noise(
+@pytest.mark.asyncio
+async def test_broad_filter_still_blocks_home_assistant_noise(
     hass: HomeAssistant,
 ) -> None:
     """A broad filter must not feed unrelated HA namespace traffic to the sink."""
@@ -168,7 +161,7 @@ def test_broad_filter_still_blocks_home_assistant_noise(
         topic_filter="#",
     )
 
-    client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(  # ruff: ignore[private-member-access]
         "homeassistant/sensor/foreign/config",
         b'{"batSoc":80}',
     )
@@ -179,11 +172,11 @@ def test_broad_filter_still_blocks_home_assistant_noise(
 
 
 @pytest.mark.asyncio
-async def test_foreign_frames_are_ignored_before_sink(  # noqa: RUF029, RUF105
+async def test_foreign_frames_are_ignored_before_sink(  # noqa: RUF105
     hass: HomeAssistant,
 ) -> None:
     """Foreign broker frames without Jackery markers are ignored and
-    never reach the sink.
+    never reach the sink when the user explicitly selects a global wildcard.
     """  # noqa: D205, RUF105
     sink_calls = 0
 
@@ -203,13 +196,17 @@ async def test_foreign_frames_are_ignored_before_sink(  # noqa: RUF029, RUF105
         password=None,
         client_id="bounded-sink",
         sink=_blocking_sink,
-        topic_filter="homeassistant",
+        topic_filter="#",
     )
 
-    # Binary frames without Jackery markers should be ignored by the
-    # foreign-traffic gate and never reach the sink.
+    # Only an explicitly global wildcard applies the marker/header gate.
+    # A bounded configured device topic intentionally forwards opaque frames
+    # to the shared decoder so future firmware formats remain observable.
     for index in range(_FOREIGN_FRAME_COUNT):
-        client._handle_message("homeassistant", b"\xff" + bytes([index % 256]))  # ruff: ignore[private-member-access]
+        await client._handle_message(  # ruff: ignore[private-member-access]
+            "foreign/device",
+            b"\xff" + bytes([index % 256]),
+        )
 
     assert (
         client.diagnostics_snapshot()["messages_ignored_foreign"]
@@ -244,7 +241,7 @@ def test_transient_initial_broker_refusal_is_debug_not_warning(
 
     assert "connect setup failed" in caplog.text
     assert any(record.levelno == logging.WARNING for record in caplog.records)
-    sum(1 for r in caplog.records if r.levelno == logging.WARNING)
+    assert sum(1 for record in caplog.records if record.levelno == logging.WARNING) == 1
 
     # Second identical failure logs at DEBUG (same error as last_error)
     caplog.clear()

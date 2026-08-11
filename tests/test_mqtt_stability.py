@@ -104,21 +104,14 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     assert 'f"connect rc={rc}' in fail_body, fail_body
 
 
-def test_aiomqtt_passive_reset_log_is_filtered() -> None:
-    """Ensure passive broker socket reset messages are filtered from Home Assistant error logs.
-
-    Asserts that mqtt_push.py defines `_AioMqttPassiveDisconnectFilter`, contains common passive-reset message substrings (e.g. "failed to receive on socket", "Errno 104", "Connection reset by peer", "WinError 10054"), registers the filter with `_AIOMQTT_LOGGER`, and does not register the filter on the general `_LOGGER`.
-    """
+def test_aiomqtt_logger_stays_visible_under_home_assistant_logging() -> None:
+    """The integration must not hide aiomqtt diagnostics from HA logging."""
     src = _read("mqtt_push.py")
 
-    assert "_AioMqttPassiveDisconnectFilter" in src
-    assert '"failed to receive on socket"' in src
-    assert '"Errno 104"' in src
-    assert '"Connection reset by peer"' in src
-    assert '"WinError 10054"' in src
-    assert "_AIOMQTT_LOGGER.addFilter(" in src
-    assert "logger=_AIOMQTT_LOGGER" in src
-    assert "logger=_LOGGER" not in src
+    assert '_AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")' in src
+    assert "_AioMqttPassiveDisconnectFilter" not in src
+    assert "_AIOMQTT_LOGGER.addFilter(" not in src
+    assert "_AIOMQTT_LOGGER.setLevel(" not in src
 
 
 def test_diagnostics_exposes_stale_subscription_signals() -> None:

@@ -4,7 +4,7 @@ import asyncio
 from datetime import timedelta
 import logging
 from types import MethodType, SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.jackery_solarvault import (
@@ -68,7 +68,30 @@ _CT_VOLTAGE_V = 230
 _PLAN_POWER_W = 800
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
     import pytest
+
+
+class _ImmediateBackgroundEntry:
+    """Config-entry test double that schedules HA background tasks immediately."""
+
+    @staticmethod
+    def async_create_background_task(
+        _hass: object,
+        coro: Coroutine[Any, Any, Any],
+        *,
+        name: str,
+        eager_start: bool,
+    ) -> asyncio.Task[Any]:
+        """Schedule the given coroutine like Home Assistant's config entry helper."""
+        del eager_start
+        return asyncio.create_task(coro, name=name)
+
+
+def _set_test_attr(target: object, name: str, value: Any) -> None:
+    """Set private coordinator seams used by narrow regression test doubles."""
+    setattr(target, name, value)
 
 
 async def test_home_and_ct_entities_register_without_current_values() -> None:
@@ -92,7 +115,11 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     )
     added: list[Any] = []
 
-    await sensor_module.async_setup_entry(None, entry, added.extend)
+    await sensor_module.async_setup_entry(
+        cast("Any", None),
+        cast("Any", entry),
+        cast("Any", added.extend),
+    )
 
     unique_ids = {entity.unique_id for entity in added}
     assert "dev-1_energy_plan_power" in unique_ids
@@ -144,7 +171,11 @@ async def test_discovered_accessory_sensors_register_before_live_push() -> None:
     )
     added: list[Any] = []
 
-    await sensor_module.async_setup_entry(None, entry, added.extend)
+    await sensor_module.async_setup_entry(
+        cast("Any", None),
+        cast("Any", entry),
+        cast("Any", added.extend),
+    )
 
     unique_ids = {entity.unique_id for entity in added}
     assert "dev-1_battery_pack_pack_1_soc" in unique_ids
@@ -177,7 +208,11 @@ async def test_home_and_plug_buttons_register_from_http_discovery() -> None:
     )
     added: list[Any] = []
 
-    await button_module.async_setup_entry(None, entry, added.extend)
+    await button_module.async_setup_entry(
+        cast("Any", None),
+        cast("Any", entry),
+        cast("Any", added.extend),
+    )
 
     unique_ids = {entity.unique_id for entity in added}
     assert "dev-1_reboot_device" in unique_ids
@@ -224,9 +259,11 @@ def test_successful_recent_http_fetch_proves_device_reachability(
     """HTTP keeps entities usable when BLE and local MQTT are disabled."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     coordinator._last_http_device_refresh_monotonic = {"dev-1": 100.0}  # ruff: ignore[private-member-access]
     coordinator.data = {"dev-1": {}}
-    coordinator.is_device_locally_reachable = MethodType(
+    coordinator_any = cast("Any", coordinator)
+    coordinator_any.is_device_locally_reachable = MethodType(
         lambda _self, _device_id: False,
         coordinator,
     )
@@ -239,19 +276,42 @@ def _source_priority_coordinator() -> JackerySolarVaultCoordinator:
     """Return a minimal coordinator shell for source-priority merge tests."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     coordinator._property_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._accessory_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
-    coordinator._live_property_received_monotonic = {}  # ruff: ignore[private-member-access]
-    coordinator._live_ct_received_monotonic = {}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_live_property_received_monotonic", {})
+    _set_test_attr(coordinator, "_live_ct_received_monotonic", {})
     coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     return coordinator
 
 
-def test_fresh_local_property_beats_cloud_then_expires(
+def _command_coordinator() -> JackerySolarVaultCoordinator:
+    """Return a minimal coordinator shell for independent command tests."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator_any = cast("Any", coordinator)
+    coordinator_any.hass = SimpleNamespace()
+    coordinator_any.entry = _ImmediateBackgroundEntry()
+    _set_test_attr(coordinator, "_mqtt_session_generation", 0)
+    _set_test_attr(coordinator, "_cloud_mqtt_command_attempt_sequence", 0)
+    _set_test_attr(coordinator, "_bind_cloud_command_attempt", MagicMock())
+    _set_test_attr(
+        coordinator,
+        "_record_successful_command_transports",
+        MagicMock(),
+    )
+    _set_test_attr(
+        coordinator,
+        "_record_independent_cloud_mqtt_result",
+        MagicMock(),
+    )
+    return coordinator
+
+
+def test_layer5_property_arrival_order_beats_same_tier_then_expires(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Local MQTT owns a field until its freshness window expires."""
+    """Layer-5 transports share one tier: later fresh L5 frames win."""
     clock = {"now": 100.0}
     monkeypatch.setattr(
         coordinator_module.time,
@@ -276,8 +336,16 @@ def test_fresh_local_property_beats_cloud_then_expires(
         source=TransportSource.CLOUD_MQTT,
     )
 
-    assert merged[FIELD_PV_PW] == _LIVE_PV_W
+    assert merged[FIELD_PV_PW] == _CLOUD_PV_W
     assert merged[FIELD_CHARGE_PLAN_PW] == _PLAN_POWER_W
+
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        merged,
+        {FIELD_PV_PW: _LIVE_PV_W},
+        source=TransportSource.LOCAL_MQTT,
+    )
+    assert merged[FIELD_PV_PW] == _LIVE_PV_W
 
     clock["now"] = 161.0
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
@@ -314,10 +382,10 @@ def test_fresh_ble_property_beats_http_while_http_fills_missing_fields(
     assert merged[FIELD_PV_PW] == _HTTP_PV_W
 
 
-def test_fresh_local_ct_beats_cloud_while_cloud_fills_missing_fields(
+def test_layer5_ct_arrival_order_while_cloud_fills_missing_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Accessory fields follow the same local-over-cloud precedence."""
+    """Layer-5 accessory telemetry follows arrival order and keeps filled gaps."""
     monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: 100.0)
     coordinator = _source_priority_coordinator()
     updated: dict[str, Any] = {}
@@ -338,8 +406,17 @@ def test_fresh_local_ct_beats_cloud_while_cloud_fills_missing_fields(
         source_transport=TransportSource.CLOUD_MQTT,
     )
 
-    assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _LIVE_CT_POWER_W
+    assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _SHELLY_CT_POWER_W
     assert updated[PAYLOAD_CT_METER][FIELD_CT_VOLT] == _CT_VOLTAGE_V
+
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
+        updated,
+        {FIELD_CT_POWER: _LIVE_CT_POWER_W},
+        device_id="dev-1",
+        source_transport=TransportSource.LOCAL_MQTT,
+    )
+
+    assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _LIVE_CT_POWER_W
 
 
 async def test_cloud_subdevice_frame_is_ingested_once(
@@ -359,13 +436,13 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     )
     coordinator.data = {"dev-1": current}
     coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
-    coordinator._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
-    coordinator._schedule_battery_pack_ota_enrichment = MagicMock()  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
 
     def _capture(new_data: dict[str, dict[str, Any]]) -> None:
         coordinator.data = new_data
 
-    coordinator._push_partial_update = _capture  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_push_partial_update", _capture)
 
     with caplog.at_level(
         logging.DEBUG,
@@ -386,14 +463,20 @@ async def test_cloud_subdevice_frame_is_ingested_once(
         for record in caplog.records
         if "rejected ct_meter/ct fields" in record.getMessage()
     ]
-    assert len(rejections) == 1
+    assert not rejections
+    assert coordinator.data["dev-1"][PAYLOAD_CT_METER][FIELD_CT_POWER] == (
+        _SHELLY_CT_POWER_W
+    )
 
 
 async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
-    """Portable action IDs use their own BLE catalog instead of Home-only gating."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.async_send_ble_command = AsyncMock(return_value=True)
-    coordinator._async_publish_command = AsyncMock()  # ruff: ignore[private-member-access]
+    """Portable action IDs dispatch through every supported app transport."""
+    coordinator = _command_coordinator()
+    ble_mock = AsyncMock(return_value=True)
+    publish_mock = AsyncMock()
+    coordinator_any = cast("Any", coordinator)
+    coordinator_any.async_send_ble_command = ble_mock
+    _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
     await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "dev-1",
@@ -403,17 +486,18 @@ async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
         body_fields={"ac": 1},
     )
 
-    coordinator.async_send_ble_command.assert_awaited_once()
-    coordinator._async_publish_command.assert_not_awaited()  # ruff: ignore[private-member-access]
+    ble_mock.assert_awaited_once()
+    publish_mock.assert_awaited_once()
 
 
 async def test_portable_write_falls_back_to_cloud_mqtt_after_ble_failure() -> None:
     """A portable BLE error cannot swallow the Cloud-MQTT fallback."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.async_send_ble_command = AsyncMock(
-        side_effect=RuntimeError("BLE unavailable"),
-    )
-    coordinator._async_publish_command = AsyncMock()  # ruff: ignore[private-member-access]
+    coordinator = _command_coordinator()
+    ble_mock = AsyncMock(side_effect=RuntimeError("BLE unavailable"))
+    publish_mock = AsyncMock()
+    coordinator_any = cast("Any", coordinator)
+    coordinator_any.async_send_ble_command = ble_mock
+    _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
     await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "dev-1",
@@ -423,7 +507,7 @@ async def test_portable_write_falls_back_to_cloud_mqtt_after_ble_failure() -> No
         body_fields={"ac": 1},
     )
 
-    coordinator._async_publish_command.assert_awaited_once()  # ruff: ignore[private-member-access]
+    publish_mock.assert_awaited_once()
 
 
 async def test_mqtt_frames_for_one_device_keep_callback_order() -> None:
@@ -433,7 +517,7 @@ async def test_mqtt_frames_for_one_device_keep_callback_order() -> None:
 
     class _OrderedHandler:
         def __init__(self) -> None:
-            self.data = {"dev-1": {}}
+            self.data: dict[str, dict[str, Any]] = {"dev-1": {}}
             self._mqtt_message_locks: dict[str, asyncio.Lock] = {}
 
         @staticmethod
@@ -450,9 +534,9 @@ async def test_mqtt_frames_for_one_device_keep_callback_order() -> None:
             return "dev-1"
 
     handler = _OrderedHandler()
-    first = asyncio.create_task(handler.handle("first", {}))
+    first = asyncio.ensure_future(handler.handle("first", {}))
     await asyncio.sleep(0)
-    second = asyncio.create_task(handler.handle("second", {}))
+    second = asyncio.ensure_future(handler.handle("second", {}))
     await asyncio.sleep(0)
 
     assert events == ["start:first"]
@@ -463,11 +547,14 @@ async def test_mqtt_frames_for_one_device_keep_callback_order() -> None:
 
 async def test_ble_proxy_failure_cannot_block_cloud_command_fallback() -> None:
     """A failed optional BLE/ESPHome path must still dispatch through cloud MQTT."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.async_send_ble_command = AsyncMock(
+    coordinator = _command_coordinator()
+    ble_mock = AsyncMock(
         side_effect=HomeAssistantError("ESPHome Bluetooth proxy unavailable"),
     )
-    coordinator._async_publish_command = AsyncMock()  # ruff: ignore[private-member-access]
+    publish_mock = AsyncMock()
+    coordinator_any = cast("Any", coordinator)
+    coordinator_any.async_send_ble_command = ble_mock
+    _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
     await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "device-1",
@@ -477,14 +564,15 @@ async def test_ble_proxy_failure_cannot_block_cloud_command_fallback() -> None:
         body_fields={FIELD_SW_EPS: 1},
     )
 
-    coordinator._async_publish_command.assert_awaited_once_with(  # ruff: ignore[private-member-access]
-        "device-1",
-        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
-        action_id=ACTION_ID_EPS_ENABLED,
-        cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE,
-        body_fields={FIELD_SW_EPS: 1},
-        ensure_mqtt=True,
-    )
+    publish_mock.assert_awaited_once()
+    await_args = publish_mock.await_args
+    assert await_args is not None
+    assert await_args.args == ("device-1",)
+    assert await_args.kwargs["message_type"] == MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE
+    assert await_args.kwargs["action_id"] == ACTION_ID_EPS_ENABLED
+    assert await_args.kwargs["cmd"] == MQTT_CMD_DEVICE_PROPERTY_CHANGE
+    assert await_args.kwargs["body_fields"] == {FIELD_SW_EPS: 1}
+    assert await_args.kwargs["ensure_mqtt"] is True
 
 
 def test_local_metadata_does_not_hide_top_level_live_body() -> None:
@@ -516,19 +604,23 @@ async def test_body_only_local_mqtt_routes_each_live_control_and_pv_field() -> N
         coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
         coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
         coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
-        coordinator._live_property_received_monotonic = {}  # ruff: ignore[private-member-access]
+        _set_test_attr(coordinator, "_live_property_received_monotonic", {})
         coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
         coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
-        captured: dict[str, Any] = {}
+        captured: dict[str, dict[str, Any]] = {}
 
         async def _debug_event(  # ruff: ignore[unused-async]
             _event_or_factory: object,
         ) -> None:
             return
 
-        coordinator._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]
-        coordinator._push_partial_update = captured.update  # ruff: ignore[private-member-access]
-        coordinator._schedule_battery_pack_ota_enrichment = lambda _device_id: None  # ruff: ignore[private-member-access]
+        _set_test_attr(coordinator, "_async_payload_debug_event", _debug_event)
+        _set_test_attr(coordinator, "_push_partial_update", captured.update)
+        _set_test_attr(
+            coordinator,
+            "_schedule_battery_pack_ota_enrichment",
+            lambda _device_id: None,
+        )
 
         await coordinator.async_handle_local_mqtt_message(
             "jackery/live",

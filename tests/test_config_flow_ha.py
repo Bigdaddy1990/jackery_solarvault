@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
 )
@@ -180,7 +181,10 @@ async def test_options_flow_persists_local_mqtt_topic_filter_default(
 
     result = await hass.config_entries.options.async_configure(flow["flow_id"], {})
     assert result["type"] == FlowResultType.CREATE_ENTRY
-    assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == ""
+    assert (
+        entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER)
+        == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+    )
 
 
 async def test_options_flow_accepts_local_mqtt_topic_filter_value(

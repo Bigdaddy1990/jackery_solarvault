@@ -96,7 +96,9 @@ async def test_period_stat_includes_system_id_when_given() -> None:
             end_date=_END,
         )
 
-    params = get_json.await_args.kwargs["params"]
+    awaited = get_json.await_args
+    assert awaited is not None
+    params = awaited.kwargs["params"]
     assert params[FIELD_SYSTEM_ID] == "3"
 
 
@@ -115,7 +117,9 @@ async def test_ct_stat_omits_phase_type_for_combined_meter() -> None:
     with patch.object(api, "_get_json", get_json):
         await api.async_get_device_ct_stat(11, date_type=DATE_TYPE_DAY)
 
-    args, kwargs = get_json.await_args
+    awaited = get_json.await_args
+    assert awaited is not None
+    args, kwargs = awaited
     assert args[0] == DEVICE_CT_STAT_PATH
     assert APP_REQUEST_STAT_TYPE not in kwargs["params"]
 
@@ -129,10 +133,12 @@ async def test_pv_stat_wrapper_delegates_with_system_id() -> None:
     with patch.object(api, "_async_get_device_period_stat", delegate):
         await api.async_get_device_pv_stat(_DEV, _SYS, date_type=DATE_TYPE_DAY)
 
-    kwargs = delegate.await_args.kwargs
+    awaited = delegate.await_args
+    assert awaited is not None
+    kwargs = awaited.kwargs
     assert kwargs["device_id"] == _DEV
     assert kwargs["system_id"] == _SYS
-    assert delegate.await_args.args[0] == DEVICE_PV_STAT_PATH
+    assert awaited.args[0] == DEVICE_PV_STAT_PATH
 
 
 @pytest.mark.asyncio
@@ -149,7 +155,9 @@ async def test_system_pv_trends_uses_current_app_path() -> None:
             end_date=_END,
         )
 
-    assert get_json.await_args.args[0] == PV_TRENDS_PATH
+    awaited = get_json.await_args
+    assert awaited is not None
+    assert awaited.args[0] == PV_TRENDS_PATH
 
 
 @pytest.mark.asyncio

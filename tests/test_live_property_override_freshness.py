@@ -12,20 +12,20 @@ regressions are asserted fixed here:
 """
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
+
+import pytest
 
 from custom_components.jackery_solarvault.const import (
     FIELD_GRID_IN_PW,
+    FIELD_PV1,
     FIELD_PV_PW,
-    PAYLOAD_MQTT_LAST,
-    PAYLOAD_PROPERTIES,
+    FIELD_WNAME,
+    FIELD_WORK_MODEL,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-
-if TYPE_CHECKING:
-    import pytest
+from custom_components.jackery_solarvault.ingest import TransportSource
 
 _NOW = 10_000.0
 _LIVE_PV_W = 100
@@ -39,8 +39,10 @@ def _bare_coordinator(
     """Create a coordinator shell for the live-merge policy without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
+    coordinator._property_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._last_property_push_monotonic = 123.0  # ruff: ignore[private-member-access]
     coordinator.data = {}
     monkeypatch.setattr(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
@@ -54,22 +56,19 @@ def test_fresh_live_frame_overrides_http_for_live_keys(
 ) -> None:
     """A fresh MQTT/BLE pvPw wins over the concurrent HTTP pvPw (live-preferred)."""
     coordinator = _bare_coordinator(monkeypatch)
-    entry = {
-        PAYLOAD_MQTT_LAST: {"received_at_monotonic": _NOW},
-        PAYLOAD_PROPERTIES: {FIELD_PV_PW: _LIVE_PV_W},
-    }
-
-    live_guarded = coordinator._http_properties_with_live_overrides(  # ruff: ignore[private-member-access]
-        entry,
-        {FIELD_PV_PW: _HTTP_PV_W},
+    live = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {},
+        {FIELD_PV_PW: _LIVE_PV_W},
+        source=TransportSource.CLOUD_MQTT,
     )
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
-        entry[PAYLOAD_PROPERTIES],
-        live_guarded,
+        live,
+        {FIELD_PV_PW: _HTTP_PV_W},
+        source=TransportSource.HTTP,
     )
 
-    assert live_guarded[FIELD_PV_PW] == _LIVE_PV_W
     assert merged[FIELD_PV_PW] == _LIVE_PV_W
 
 
@@ -78,14 +77,72 @@ def test_live_delivered_combine_field_survives_a_later_http_poll(
 ) -> None:
     """A live-only combine field is retained across the next HTTP-poll rebuild."""
     coordinator = _bare_coordinator(monkeypatch)
-    prior_props = {FIELD_PV_PW: _HTTP_PV_W, FIELD_GRID_IN_PW: _LIVE_GRID_IN_PW}
-    http_props = {FIELD_PV_PW: _HTTP_PV_W}
-
+    live = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {},
+        {FIELD_PV_PW: _LIVE_PV_W, FIELD_GRID_IN_PW: _LIVE_GRID_IN_PW},
+        source=TransportSource.CLOUD_MQTT,
+    )
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
-        prior_props,
-        http_props,
+        live,
+        {FIELD_PV_PW: _HTTP_PV_W},
+        source=TransportSource.HTTP,
     )
 
     assert merged[FIELD_GRID_IN_PW] == _LIVE_GRID_IN_PW
-    assert merged[FIELD_PV_PW] == _HTTP_PV_W
+    assert merged[FIELD_PV_PW] == _LIVE_PV_W
+
+
+def test_work_model_is_protected_as_live_telemetry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A delayed HTTP snapshot must not overwrite a fresh pushed work mode."""
+    coordinator = _bare_coordinator(monkeypatch)
+    live = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {},
+        {FIELD_WORK_MODEL: 7},
+        source=TransportSource.CLOUD_MQTT,
+    )
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        live,
+        {FIELD_WORK_MODEL: 2},
+        source=TransportSource.HTTP,
+    )
+
+    assert merged[FIELD_WORK_MODEL] == 7
+
+
+def test_config_only_push_does_not_refresh_live_push_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An MQTT config field must not masquerade as fresh live telemetry."""
+    coordinator = _bare_coordinator(monkeypatch)
+
+    coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {FIELD_PV_PW: _HTTP_PV_W},
+        {FIELD_WNAME: "new-wifi"},
+        source=TransportSource.CLOUD_MQTT,
+    )
+
+    assert coordinator._last_property_push_monotonic == pytest.approx(123.0)  # ruff: ignore[private-member-access]
+
+
+def test_sparse_pv_push_refreshes_live_push_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sparse nested PV frame is accepted even when its base has extra keys."""
+    coordinator = _bare_coordinator(monkeypatch)
+
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {FIELD_PV1: {FIELD_PV_PW: 100, "name": "PV1"}},
+        {FIELD_PV1: {FIELD_PV_PW: 200}},
+        source=TransportSource.CLOUD_MQTT,
+    )
+
+    assert merged[FIELD_PV1] == {FIELD_PV_PW: 200, "name": "PV1"}
+    assert coordinator._last_property_push_monotonic == pytest.approx(_NOW)  # ruff: ignore[private-member-access]

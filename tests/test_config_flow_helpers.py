@@ -14,10 +14,6 @@ from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_TLS_CA_CERT,
-    CONF_LOCAL_MQTT_TLS_CLIENT_CERT,
-    CONF_LOCAL_MQTT_TLS_CLIENT_KEY,
-    CONF_LOCAL_MQTT_TLS_INSECURE,
     CONF_LOCAL_MQTT_TOPIC,
     CONF_LOCAL_MQTT_USERNAME,
     CONF_REGION_CODE,
@@ -147,10 +143,6 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "user",
         CONF_LOCAL_MQTT_PASSWORD: " pass ",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "jackery/#",
-        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
-        CONF_LOCAL_MQTT_TLS_INSECURE: False,
     }
 
 
@@ -185,10 +177,6 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "new-user",
         CONF_LOCAL_MQTT_PASSWORD: "new-pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "new/#",
-        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
-        CONF_LOCAL_MQTT_TLS_INSECURE: False,
     }
 
 
@@ -269,10 +257,6 @@ def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
         CONF_LOCAL_MQTT_USERNAME: "user",
         CONF_LOCAL_MQTT_PASSWORD: "pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
-        CONF_LOCAL_MQTT_TLS_CA_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_CERT: "",
-        CONF_LOCAL_MQTT_TLS_CLIENT_KEY: "",
-        CONF_LOCAL_MQTT_TLS_INSECURE: False,
     }
     user_input = {
         CONF_ENABLE_BLE_TRANSPORT: True,

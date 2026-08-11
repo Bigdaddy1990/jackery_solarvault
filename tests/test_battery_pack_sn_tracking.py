@@ -7,14 +7,13 @@ Unknown. The entity now pins its pack's serial on first resolution and matches
 by serial thereafter.
 """
 
-from importlib import import_module
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import PropertyMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.jackery_solarvault import __init__ as _jackery_init
+import custom_components.jackery_solarvault as _init_module
 from custom_components.jackery_solarvault.const import DOMAIN, PAYLOAD_BATTERY_PACKS
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -24,13 +23,6 @@ from custom_components.jackery_solarvault.sensor import JackeryBatteryPackSensor
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
-# Re-resolve through the module spec so unit tests can reach private helpers
-# even when the package-level ``from __init__ import …`` lookup fails.
-_init_module = (
-    _jackery_init
-    if hasattr(_jackery_init, "__spec__")
-    else import_module("custom_components.jackery_solarvault.__init__")
-)
 _async_migrate_battery_pack_identities = (
     _init_module._async_migrate_battery_pack_identities  # noqa: RUF105, SLF001
 )
@@ -359,6 +351,52 @@ def test_registry_migration_entity_collision_has_no_partial_writes(
     assert preserved_entity.unique_id == old_unique_id
     assert entity_registry.async_get(collision.entity_id) is not None
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) is None
+
+
+def test_parent_attached_serialless_packs_keep_distinct_index_devices(
+    hass: HomeAssistant,
+) -> None:
+    """Identical serial-less packs use stable index identities, not metadata hashes."""
+    coordinator = _coordinator([
+        {"modelName": "same", "version": "1.0"},
+        {"modelName": "same", "version": "1.0"},
+    ])
+    entry = _entry(hass, coordinator)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    parent = _parent_device(device_registry, entry)
+    first = _pack_entity(
+        entity_registry,
+        entry,
+        parent,
+        f"{_PARENT_ID}_battery_pack_1_state_of_charge",
+    )
+    second = _pack_entity(
+        entity_registry,
+        entry,
+        parent,
+        f"{_PARENT_ID}_battery_pack_2_state_of_charge",
+    )
+
+    _async_migrate_battery_pack_identities(hass, entry)
+
+    first_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, f"{_PARENT_ID}_battery_pack_1")},
+    )
+    second_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, f"{_PARENT_ID}_battery_pack_2")},
+    )
+    assert first_device is not None
+    assert second_device is not None
+    assert first_device.id != second_device.id
+    assert first_device.serial_number is None
+    assert second_device.serial_number is None
+    migrated_first = entity_registry.async_get(first.entity_id)
+    migrated_second = entity_registry.async_get(second.entity_id)
+    assert migrated_first is not None
+    assert migrated_second is not None
+    assert migrated_first.device_id == first_device.id
+    assert migrated_second.device_id == second_device.id
 
 
 def test_registry_seed_matches_live_pack_before_offline_records(

@@ -37,7 +37,9 @@ def _coordinator(props: dict[str, Any] | None = None) -> Any:
 
 def _sent_body(coordinator: Any) -> dict[str, Any]:
     """Return the body_fields the setter asked the dispatcher to send."""
-    return coordinator._async_publish_command_ble_first.await_args.kwargs["body_fields"]  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
+    assert await_args is not None
+    return cast("dict[str, Any]", await_args.kwargs["body_fields"])
 
 
 @pytest.mark.asyncio

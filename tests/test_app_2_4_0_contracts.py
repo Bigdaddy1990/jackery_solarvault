@@ -145,7 +145,7 @@ async def test_mqtt_credential_alias_is_cache_only() -> None:
     """The compatibility alias never turns a transport read into HTTP login."""
     api = _hydrated_api(base64.b64encode(bytes(range(32))).decode("ascii"))
     login = AsyncMock(side_effect=AssertionError("credential read must not log in"))
-    api.async_login = login
+    cast("Any", api).async_login = login
 
     assert await api.async_get_mqtt_credentials() == api.get_cached_mqtt_credentials()
     login.assert_not_awaited()

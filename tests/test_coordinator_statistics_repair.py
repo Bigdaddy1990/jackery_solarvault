@@ -15,8 +15,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
 
-import pytest
-
 from custom_components.jackery_solarvault import coordinator as co
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_HOME_STAT,
@@ -108,7 +106,7 @@ async def test_period_backfill_queue_budget_caps_requests_per_cycle() -> None:
 async def test_statistics_import_wrapper_uses_only_bounded_backfill_job() -> None:
     """The compatibility wrapper must not revive the unbounded legacy repair."""
     coordinator = _coordinator()
-    snapshot = {_DEV: {}}
+    snapshot: dict[str, dict[str, Any]] = {_DEV: {}}
     bounded_job = AsyncMock(return_value={_DEV})
     legacy_repair = AsyncMock(return_value=(0, 0))
     coordinator._async_import_current_app_chart_statistics_job = bounded_job  # ruff: ignore[private-member-access]
@@ -179,100 +177,58 @@ def test_metric_candidates_home_energy_adds_grid_source_when_enabled() -> None:
     assert candidates[-1] == (APP_SECTION_HOME_STAT, APP_STAT_TOTAL_OUT_GRID_ENERGY)
 
 
-# --- _gate_snapshot_period_hierarchy -------------------------------------
-
-
-def test_gate_hierarchy_passes_clean_snapshot_through() -> None:
-    """A snapshot with no period contradictions is returned per device."""
-    snapshot = {_DEV: {"device_pv_stat_day": {"totalSolarEnergy": 1}}}
-
-    gated = JackerySolarVaultCoordinator._gate_snapshot_period_hierarchy(  # ruff: ignore[private-member-access]
-        snapshot,
-        today=date(2026, 7, 9),
-    )
-
-    assert set(gated) == {_DEV}
-    assert isinstance(gated[_DEV], dict)
-
-
-def test_gate_hierarchy_empty_snapshot_is_empty() -> None:
-    """An empty snapshot gates to an empty mapping."""
-    assert (
-        JackerySolarVaultCoordinator._gate_snapshot_period_hierarchy(  # ruff: ignore[private-member-access]
-            {},
-            today=date(2026, 7, 9),
-        )
-        == {}
-    )
-
-
-async def test_current_import_job_gates_snapshot_before_every_import() -> None:
-    """The active bounded job must not pass hierarchy violations to Recorder."""
+async def test_current_import_job_imports_without_advancing_history() -> None:
+    """Current verified imports stay independent of historical HTTP queues."""
     coordinator = _coordinator()
     coordinator._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
     coordinator._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
-    period_backfill = AsyncMock(return_value={"pending_sources": 0})
-    backfill = AsyncMock(return_value={"pending_sources": 0})
-    day_import = AsyncMock(return_value=set())
-    period_import = AsyncMock(return_value=set())
-    coordinator._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
-    coordinator._async_http_backfill_recent_day_statistics = backfill  # ruff: ignore[private-member-access]
+    day_import = AsyncMock(return_value={"day-device"})
+    period_import = AsyncMock(return_value={"period-device"})
     coordinator._async_import_day_chart_statistics = day_import  # ruff: ignore[private-member-access]
     coordinator._async_import_app_chart_statistics = period_import  # ruff: ignore[private-member-access]
-    # Both periods are closed (before today) and the month window lies fully
-    # inside the year window, so the year_less_than_month contradiction is
-    # real and must be withheld.
     snapshot = {
         _DEV: {
-            "device_pv_stat_year": {
-                "y": [1.0, 2.0],
-                "_request": {
-                    "beginDate": "2025-01-01",
-                    "endDate": "2025-12-31",
-                },
-            },
-            "device_pv_stat_month": {
-                "y": [50.0],
-                "_request": {
-                    "beginDate": "2025-04-01",
-                    "endDate": "2025-04-30",
-                },
-            },
+            "device_pv_stat_day": {"totalSolarEnergy": 1.0},
             "properties": {"batSoc": 50},
         },
     }
 
-    await coordinator._async_import_current_app_chart_statistics_job(snapshot)  # ruff: ignore[private-member-access]
+    result = await coordinator._async_import_current_app_chart_statistics_job(  # ruff: ignore[private-member-access]
+        snapshot,
+    )
 
-    gated = backfill.await_args.args[0]
-    assert period_backfill.await_args.args[0] == gated
-    assert "device_pv_stat_month" not in gated[_DEV]
-    assert gated[_DEV]["device_pv_stat_year"]["y"] == [1.0, 2.0]
-    assert day_import.await_args.args[0] == gated
-    assert period_import.await_args.args[0] == gated
+    day_import.assert_awaited_once_with(snapshot)
+    period_import.assert_awaited_once_with(snapshot)
+    assert result == {"day-device", "period-device"}
+    assert coordinator._statistics_import_diagnostics[  # ruff: ignore[private-member-access]
+        "last_external_successful_device_count"
+    ] == 2
 
 
 async def test_startup_sync_stays_pending_without_backfill_progress() -> None:
-    """Empty/time-out backfill runs do not falsely complete startup recovery."""
+    """Actionable historical queues keep startup recovery pending."""
     coordinator = _coordinator()
     coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
     coordinator._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
-    coordinator._async_http_backfill_period_statistics = AsyncMock(  # ruff: ignore[private-member-access]
-        return_value={"pending_sources": 1},
-    )
-    coordinator._async_http_backfill_recent_day_statistics = AsyncMock(  # ruff: ignore[private-member-access]
-        return_value={"pending_sources": 1},
-    )
-    coordinator._async_import_day_chart_statistics = AsyncMock(return_value=set())  # ruff: ignore[private-member-access]
-    coordinator._async_import_app_chart_statistics = AsyncMock(return_value=set())  # ruff: ignore[private-member-access]
+    period_backfill = AsyncMock(return_value={"actionable_sources": 1})
+    day_backfill = AsyncMock(return_value={"actionable_sources": 1})
+    coordinator._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
+    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
+    snapshot = {_DEV: {"device_pv_stat_day": {"totalSolarEnergy": 1}}}
 
-    await coordinator._async_import_current_app_chart_statistics_job(  # ruff: ignore[private-member-access]
-        {_DEV: {"device_pv_stat_day": {"totalSolarEnergy": 1}}},
+    await coordinator._async_advance_statistics_backfill(  # ruff: ignore[private-member-access]
+        snapshot,
     )
 
     assert coordinator._statistics_startup_sync_pending is True  # ruff: ignore[private-member-access]
+    day_backfill.assert_awaited_once_with(
+        snapshot,
+        force=True,
+        window_days=co._STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS,  # ruff: ignore[private-member-access]
+        include_current_year=True,
+        request_budget=co._STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET,  # ruff: ignore[private-member-access]
+    )
+    period_backfill.assert_awaited_once_with(snapshot)
 
 
 async def test_startup_sync_completes_only_after_both_queues_are_terminal() -> None:
@@ -280,21 +236,20 @@ async def test_startup_sync_completes_only_after_both_queues_are_terminal() -> N
     coordinator = _coordinator()
     coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
     coordinator._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
-    coordinator._async_http_backfill_period_statistics = AsyncMock(  # ruff: ignore[private-member-access]
-        return_value={"pending_sources": 0},
-    )
-    day_backfill = AsyncMock(return_value={"pending_sources": 0})
+    period_backfill = AsyncMock(return_value={"actionable_sources": 0})
+    day_backfill = AsyncMock(return_value={"actionable_sources": 0})
+    coordinator._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
     coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
-    coordinator._async_import_day_chart_statistics = AsyncMock(return_value=set())  # ruff: ignore[private-member-access]
-    coordinator._async_import_app_chart_statistics = AsyncMock(return_value=set())  # ruff: ignore[private-member-access]
+    snapshot = {_DEV: {"device_pv_stat_day": {"totalSolarEnergy": 1}}}
 
-    await coordinator._async_import_current_app_chart_statistics_job(  # ruff: ignore[private-member-access]
-        {_DEV: {"device_pv_stat_day": {"totalSolarEnergy": 1}}},
+    await coordinator._async_advance_statistics_backfill(  # ruff: ignore[private-member-access]
+        snapshot,
     )
 
     assert coordinator._statistics_startup_sync_pending is False  # ruff: ignore[private-member-access]
+    assert day_backfill.await_args is not None
     assert day_backfill.await_args.kwargs["include_current_year"] is True
+    period_backfill.assert_awaited_once_with(snapshot)
 
 
 # --- app-chart period / name lookups -------------------------------------
@@ -332,37 +287,6 @@ def test_needs_year_month_backfill_missing_section_is_false() -> None:
         )
         is False
     )
-
-
-# --- _statistics_repair_from_date ----------------------------------------
-
-
-@pytest.mark.parametrize("failed_bucket_count", [0, 3])
-def test_first_year_repair_runs_at_most_once_per_local_day(
-    failed_bucket_count: int,
-) -> None:
-    """A first-run repair must not refetch the full year on every HTTP poll."""
-    coordinator = _coordinator()
-    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
-        "devices": {
-            _DEV: {
-                "last_repair_date": "2026-07-09",
-                "last_failed_bucket_count": failed_bucket_count,
-            },
-        },
-    }
-
-    assert (
-        coordinator._statistics_repair_from_date(  # ruff: ignore[private-member-access]
-            _DEV,
-            date(2026, 7, 9),
-        )
-        is None
-    )
-    assert coordinator._statistics_repair_from_date(  # ruff: ignore[private-member-access]
-        _DEV,
-        date(2026, 7, 10),
-    ) == date(2026, 1, 1)
 
 
 # --- _day_chart_points_for_metric ----------------------------------------
@@ -472,84 +396,6 @@ async def test_import_app_chart_statistics_single_toggle_skips_only_that_period(
     }
 
 
-# --- _async_repair_missing_app_chart_statistics (period opt-out) ---------
-
-
-async def test_repair_missing_statistics_default_options_plans_all_periods() -> None:
-    """With no opt-outs, the historical repair plan covers week/month/year."""
-    coordinator = _coordinator()
-    coordinator._device_index = {}  # ruff: ignore[private-member-access]
-    collect = AsyncMock(return_value=({}, {}, 0))
-    coordinator._collect_repair_buckets = collect  # ruff: ignore[private-member-access]
-
-    await coordinator._async_repair_missing_app_chart_statistics(  # ruff: ignore[private-member-access]
-        _DEV,
-        {},
-        date(2026, 7, 1),
-        date(2026, 7, 9),
-    )
-
-    planned_types = {
-        date_type
-        for call in collect.await_args_list
-        for date_type, _starts in call.kwargs["period_plan"]
-    }
-    assert planned_types == {DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR}
-    assert {
-        date_type
-        for date_type, _starts in collect.await_args_list[0].kwargs["period_plan"]
-    } == {DATE_TYPE_MONTH, DATE_TYPE_YEAR}
-    assert {
-        date_type
-        for date_type, _starts in collect.await_args_list[1].kwargs["period_plan"]
-    } == {DATE_TYPE_WEEK}
-
-
-async def test_repair_missing_statistics_all_toggles_false_plans_nothing() -> None:
-    """Disabling week/month/year leaves the historical repair plan empty."""
-    coordinator = _coordinator(
-        _entry(**{
-            CONF_ENABLE_WEEK_STATISTICS: False,
-            CONF_ENABLE_MONTH_STATISTICS: False,
-            CONF_ENABLE_YEAR_STATISTICS: False,
-        }),
-    )
-    coordinator._device_index = {}  # ruff: ignore[private-member-access]
-    collect = AsyncMock(return_value=({}, {}, 0))
-    coordinator._collect_repair_buckets = collect  # ruff: ignore[private-member-access]
-
-    await coordinator._async_repair_missing_app_chart_statistics(  # ruff: ignore[private-member-access]
-        _DEV,
-        {},
-        date(2026, 7, 1),
-        date(2026, 7, 9),
-    )
-
-    collect.assert_not_awaited()
-
-
-async def test_repair_missing_statistics_single_toggle_skips_only_that_period() -> None:
-    """Disabling only the month toggle leaves week/year in the repair plan."""
-    coordinator = _coordinator(_entry(**{CONF_ENABLE_MONTH_STATISTICS: False}))
-    coordinator._device_index = {}  # ruff: ignore[private-member-access]
-    collect = AsyncMock(return_value=({}, {}, 0))
-    coordinator._collect_repair_buckets = collect  # ruff: ignore[private-member-access]
-
-    await coordinator._async_repair_missing_app_chart_statistics(  # ruff: ignore[private-member-access]
-        _DEV,
-        {},
-        date(2026, 7, 1),
-        date(2026, 7, 9),
-    )
-
-    planned_types = {
-        date_type
-        for call in collect.await_args_list
-        for date_type, _starts in call.kwargs["period_plan"]
-    }
-    assert planned_types == {DATE_TYPE_WEEK, DATE_TYPE_YEAR}
-
-
 async def test_historical_day_idempotent_recorder_match_is_imported() -> None:
     """A matching existing Recorder series is a terminal success, not write_error."""
     coordinator = _coordinator()
@@ -600,7 +446,6 @@ async def test_repair_counts_idempotently_verified_month_points() -> None:
         name_prefix="SolarVault",
         collected={(APP_SECTION_PV_STAT, DATE_TYPE_MONTH, period_start): source},
         period_meta_by_type={DATE_TYPE_MONTH: ("month_daily", "daily")},
-        withheld=set(),
         to_date=date(2026, 7, 9),
     )
 

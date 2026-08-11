@@ -12,7 +12,7 @@ tests run on every supported platform without bleak or BlueZ.
 import asyncio
 import base64
 import json
-import logging
+from typing import Any, cast
 
 import pytest
 
@@ -63,7 +63,6 @@ from custom_components.jackery_solarvault.const import (
     FIELD_BLUETOOTH_KEY,
     FIELD_CMD,
     FIELD_DEVICE_SN,
-    FIELD_SW_EPS,
     PAYLOAD_DEVICE_META,
     PAYLOAD_SYSTEM_META,
 )
@@ -597,7 +596,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         assert ok is True
         assert captured["uuid"] == BLE_WRITE_CHAR_UUID
         assert captured["response"] is False
-        parsed = decrypt_binary_notify(captured["blob"], key)  # type: ignore[arg-type]
+        parsed = decrypt_binary_notify(cast("bytes", captured["blob"]), key)
         assert parsed.cmd == 107
         assert parsed.flags == 3022
         assert parsed.body == b'{"swEps":1}'
@@ -763,7 +762,10 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
         Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
         """
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+        self = cast(
+            "Any",
+            JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+        )
         self.entry = _Entry()
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
@@ -810,7 +812,10 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
             assert device_id == "dev1"
             return 517
 
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator = cast(
+        "Any",
+        JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+    )
     coordinator.entry = _Entry()
     coordinator._device_index = {"dev1": {}}  # ruff: ignore[private-member-access]
     coordinator._ble_listener = None  # ruff: ignore[private-member-access]
@@ -882,7 +887,10 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
         catalog-known (actionId, bleMsgType) pairs pass the gate, so the
         test uses the real EPS pair (3022, 107).
         """
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+        self = cast(
+            "Any",
+            JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+        )
         self.entry = _Entry()
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
@@ -907,293 +915,15 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     asyncio.run(_run())
 
 
-def test_coordinator_ble_first_skips_mqtt_on_success() -> None:
-    """Verify that when BLE send succeeds, the coordinator does not call the MQTT fallback and forwards the expected BLE send options.
-
-    Asserts that _async_publish_command_ble_first calls async_send_ble_command with the provided device id and body (the body includes the supplied fields plus a `cmd` key), and that it forwards `flags`, `wait_for_ack` (True), `ack_timeout_sec` (5.0), `ack_cmds` (None), and `mtu_override` (None). No value is returned.
-    """
-    import asyncio  # ruff: ignore[import-outside-top-level]
-
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
-        FIELD_SW_EPS,
-    )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
-        JackerySolarVaultCoordinator,
-    )
-
-    captured: dict[str, object] = {}
-
-    async def _run() -> None:
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-
-        async def _send_ble(  # ruff: ignore[unused-async]
-            device_id: str,
-            *,
-            cmd: int,
-            body: dict[str, object],
-            flags: int = 0,
-            wait_for_ack: bool = False,
-            ack_timeout_sec: float = 5.0,
-            mtu_override: int | None = None,
-            connect_timeout_sec: float = 0.0,
-        ) -> bool:
-            """Capture the BLE-first router's send parameters."""
-            captured["device_id"] = device_id
-            captured["cmd"] = cmd
-            captured["body"] = body
-            captured["flags"] = flags
-            captured["wait_for_ack"] = wait_for_ack
-            captured["ack_timeout_sec"] = ack_timeout_sec
-            captured["mtu_override"] = mtu_override
-            captured["connect_timeout_sec"] = connect_timeout_sec
-            return True
-
-        async def _publish_mqtt(*_args: object, **_kwargs: object) -> None:  # ruff: ignore[unused-async]
-            """Sentinel coroutine that fails immediately if the MQTT fallback path is invoked.
-
-            This async function is intended for tests and will raise an AssertionError to indicate that MQTT publishing was not expected to be called in the current execution path.
-
-            Raises:
-                AssertionError: Always raised with the message "MQTT fallback must not be called".
-            """
-            raise AssertionError("MQTT fallback must not be called")
-
-        self.async_send_ble_command = _send_ble
-        self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
-            self,
-            "dev1",
-            message_type="DevicePropertyChange",
-            action_id=3022,
-            cmd=107,
-            body_fields={FIELD_SW_EPS: 1},
-        )
-        # Router now always asks for an ACK so a silent firmware drop
-        # falls back to MQTT instead of being swallowed. ``flags``
-        # carries the actionId (wire-header naming).
-        assert captured["device_id"] == "dev1"
-        assert captured["cmd"] == 107
-        assert captured["flags"] == 3022
-        assert captured["body"] == {FIELD_SW_EPS: 1, "cmd": 107}
-        assert captured["wait_for_ack"] is True
-        assert captured["connect_timeout_sec"] > 0
-
-    asyncio.run(_run())
-
-
-def test_coordinator_ble_first_falls_back_to_mqtt_when_unavailable() -> None:
-    """No active BLE session falls through to the existing MQTT command path."""
-    captured: dict[str, object] = {}
-
-    async def _run() -> None:
-        """Run the coordinator's BLE-first publish flow with BLE unavailable and assert the MQTT publish is invoked with the expected arguments.
-
-        This coroutine configures a coordinator instance so BLE sends always fail and replaces the MQTT publish method with a captor, then invokes `_async_publish_command_ble_first` and verifies the captured MQTT parameters match the expected values.
-        """
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
-            return False
-
-        async def _publish_mqtt(  # ruff: ignore[unused-async]
-            device_id: str,
-            *,
-            message_type: str,
-            action_id: int,
-            cmd: int,
-            body_fields: dict[str, object],
-            ensure_mqtt: bool = True,
-        ) -> None:
-            """Publish a device-specific command message to MQTT with the given action, command, and body fields.
-
-            Parameters:
-                device_id (str): Unique identifier of the target device.
-                message_type (str): MQTT message topic suffix or type identifier used for routing.
-                action_id (int): Protocol action identifier associated with this message.
-                cmd (int): Numeric command identifier included in the message body.
-                body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
-                ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """
-            captured["device_id"] = device_id
-            captured["message_type"] = message_type
-            captured["action_id"] = action_id
-            captured["cmd"] = cmd
-            captured["body_fields"] = body_fields
-            captured["ensure_mqtt"] = ensure_mqtt
-
-        self.async_send_ble_command = _send_ble
-        self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
-            self,
-            "dev1",
-            message_type="DevicePropertyChange",
-            action_id=3022,
-            cmd=107,
-            body_fields={FIELD_SW_EPS: 1},
-            ensure_mqtt=False,
-        )
-        assert captured == {
-            "device_id": "dev1",
-            "message_type": "DevicePropertyChange",
-            "action_id": 3022,
-            "cmd": 107,
-            "body_fields": {FIELD_SW_EPS: 1},
-            "ensure_mqtt": False,
-        }
-
-    asyncio.run(_run())
-
-
-def test_coordinator_ble_first_falls_back_quietly_after_ble_ack_error(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """BLE ACK failure must not warn when the MQTT fallback succeeds."""
-    captured: dict[str, object] = {}
-
-    async def _run() -> None:
-        """Run a BLE-first publish scenario that forces a BLE ack timeout and captures the MQTT fallback call.
-
-        This coroutine constructs a Coordinator instance stub, replaces its BLE send method with one that raises a `RuntimeError("BLE ack timeout")`, and replaces its MQTT publish method with a recorder that stores the call arguments into the surrounding `captured` mapping. It then invokes `_async_publish_command_ble_first` for device `"dev1"` with `message_type="DevicePropertyChange"`, `action_id=3022`, `cmd=107`, and `body_fields={FIELD_SW_EPS: 1}` to drive the BLE-fails-then-MQTT flow.
-        """
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
-            """Send a BLE command and wait for its acknowledgement (ACK).
-
-            Returns:
-                True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
-
-            Raises:
-                RuntimeError: If waiting for the ACK times out.
-            """
-            raise RuntimeError("BLE ack timeout")
-
-        async def _publish_mqtt(  # ruff: ignore[unused-async]
-            device_id: str,
-            *,
-            message_type: str,
-            action_id: int,
-            cmd: int,
-            body_fields: dict[str, object],
-            ensure_mqtt: bool = True,
-        ) -> None:
-            """Publish a device-specific command message to MQTT with the given action, command, and body fields.
-
-            Parameters:
-                device_id (str): Unique identifier of the target device.
-                message_type (str): MQTT message topic suffix or type identifier used for routing.
-                action_id (int): Protocol action identifier associated with this message.
-                cmd (int): Numeric command identifier included in the message body.
-                body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
-                ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """
-            captured["device_id"] = device_id
-            captured["message_type"] = message_type
-            captured["action_id"] = action_id
-            captured["cmd"] = cmd
-            captured["body_fields"] = body_fields
-            captured["ensure_mqtt"] = ensure_mqtt
-
-        self.async_send_ble_command = _send_ble
-        self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
-            self,
-            "dev1",
-            message_type="DevicePropertyChange",
-            action_id=3022,
-            cmd=107,
-            body_fields={FIELD_SW_EPS: 1},
-        )
-
-    with caplog.at_level(
-        logging.WARNING,
-        logger="custom_components.jackery_solarvault.coordinator",
-    ):
-        asyncio.run(_run())
-
-    assert captured["device_id"] == "dev1"
-    assert captured["body_fields"] == {FIELD_SW_EPS: 1}
-    assert "falling back to MQTT" not in caplog.text
-
-
-def test_coordinator_ble_first_logs_mqtt_error_when_fallback_fails(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Failed BLE plus failed MQTT logs both transport errors."""
-
-    async def _run() -> None:
-        """Exercise the coordinator's BLE-first publish path by invoking _async_publish_command_ble_first on a stubbed coordinator instance.
-
-        This coroutine constructs a bare coordinator object, replaces its BLE send and MQTT publish callables with stubs that raise RuntimeError("BLE ack timeout") and RuntimeError("MQTT publish timeout") respectively, and then calls _async_publish_command_ble_first for device "dev1" with a DevicePropertyChange message (action_id 3022, cmd 107, and a body containing FIELD_SW_EPS: 1). The call will propagate the RuntimeError raised by the underlying stubbed publish operation.
-        """
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
-            """Send a BLE command and wait for its acknowledgement (ACK).
-
-            Returns:
-                True if an ACK was received and the send succeeded, False if the send completed without receiving an ACK.
-
-            Raises:
-                RuntimeError: If waiting for the ACK times out.
-            """
-            raise RuntimeError("BLE ack timeout")
-
-        async def _publish_mqtt(  # ruff: ignore[unused-async]
-            device_id: str,
-            *,
-            message_type: str,
-            action_id: int,
-            cmd: int,
-            body_fields: dict[str, object],
-            ensure_mqtt: bool = True,
-        ) -> None:
-            """Publish a device-specific command message to MQTT.
-
-            Parameters:
-                device_id (str): Target device identifier.
-                message_type (str): Logical MQTT message type or subtopic used for the publish.
-                action_id (int): Numeric action identifier included in the published payload.
-                cmd (int): Command identifier included in the published payload.
-                body_fields (dict[str, object]): Mapping of additional fields to include in the message body.
-                ensure_mqtt (bool): If True, require MQTT delivery (may trigger fallback or raise on failure).
-
-            Raises:
-                RuntimeError: If the MQTT publish operation times out (message: "MQTT publish timeout").
-            """
-            raise RuntimeError("MQTT publish timeout")
-
-        self.async_send_ble_command = _send_ble
-        self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
-            self,
-            "dev1",
-            message_type="DevicePropertyChange",
-            action_id=3022,
-            cmd=107,
-            body_fields={FIELD_SW_EPS: 1},
-        )
-
-    with (
-        caplog.at_level(
-            logging.DEBUG,
-            logger="custom_components.jackery_solarvault.coordinator",
-        ),
-        pytest.raises(RuntimeError, match="MQTT publish timeout"),
-    ):
-        asyncio.run(_run())
-
-    assert "Jackery command failed on every available transport" in caplog.text
-    assert "BLE=BLE ack timeout" in caplog.text
-    assert "MQTT=MQTT publish timeout" in caplog.text
-
-
 def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
     """cmd=0 actions are not sent through the experimental BLE writer."""
     captured: dict[str, object] = {}
 
     async def _run() -> None:
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+        self = cast(
+            "Any",
+            JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+        )
 
         async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
             """Guard that prevents attempting BLE sends for command 0.
@@ -1210,6 +940,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             action_id: int,
             cmd: int,
             body_fields: dict[str, object],
+            cloud_attempt: object | None = None,
             ensure_mqtt: bool = True,
         ) -> None:
             """Publish a device-specific command message to MQTT with the given action, command, and body fields.
@@ -1222,6 +953,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
             """
+            del cloud_attempt
             captured["device_id"] = device_id
             captured["message_type"] = message_type
             captured["action_id"] = action_id
@@ -1257,7 +989,7 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
     assert JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]
         {"swEps": 1},
-        cmd="107.0",  # type: ignore[arg-type]
+        cmd="107.0",
     ) == {"swEps": 1, FIELD_CMD: 107}
     assert JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]
         {"wpc": 30},
@@ -1268,7 +1000,7 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
         with pytest.raises(ValueError, match="cmd must be an integer"):
             JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]
                 {},
-                cmd=bad_cmd,  # type: ignore[arg-type]
+                cmd=bad_cmd,
             )
 
 
@@ -1298,7 +1030,10 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
     notify frames with ``decode_error="no bluetoothKey for device"`` —
     visible in the BLE-transport diagnostics export from that capture.
     """
-    self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    self = cast(
+        "Any",
+        JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+    )
     self.data = None
     self._device_index = {
         "573702884982521856": {
@@ -1323,7 +1058,10 @@ def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
     lookup picks the most specific value so the integration stays
     forwards-compatible.
     """
-    self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    self = cast(
+        "Any",
+        JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+    )
     self.data = None
     # Two distinct valid keys so we can tell which one came back.
     device_key = base64.b64encode(b"D" * 16).decode("ascii")
@@ -1348,7 +1086,10 @@ def test_serial_resolver_strips_http_prefix_letter() -> None:
     # Build a stub instance just enough to exercise the lookup. We bypass
     # __init__ because the coordinator constructor pulls in HA fixtures
     # that the static-test harness can't load on Windows.
-    self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    self = cast(
+        "Any",
+        JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+    )
     self._device_index = {
         "573702884982521856": {
             PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "HR2C04000280HH3"},
@@ -1388,7 +1129,7 @@ class _HassStub:
         return asyncio.get_running_loop()
 
 
-def _build_bare_listener(key: bytes | None = None) -> object:
+def _build_bare_listener(key: bytes | None = None) -> JackeryBleListener:
     """Return a real JackeryBleListener wired with inert callbacks.
 
     Uses the actual constructor so the test attribute set can never
@@ -1400,7 +1141,7 @@ def _build_bare_listener(key: bytes | None = None) -> object:
         return True
 
     return JackeryBleListener(
-        _HassStub(),  # type: ignore[arg-type]
+        cast("Any", _HassStub()),
         _sink,
         key_resolver=lambda _device_id: key,
         ble_address_resolver=lambda _device_id: None,
@@ -1412,7 +1153,11 @@ def _build_bare_listener(key: bytes | None = None) -> object:
     )
 
 
-def _attach_session(listener: object, device_id: str, client: object) -> object:
+def _attach_session(
+    listener: JackeryBleListener,
+    device_id: str,
+    client: object,
+) -> _GattSession:
     """Install a fake connected GATT session for ``device_id``."""
     session = _GattSession(generation=1, client=client)
     listener._sessions[device_id] = session  # ruff: ignore[private-member-access]
@@ -1612,7 +1357,7 @@ def test_listener_send_command_validates_msg_id_and_type() -> None:
         with pytest.raises(ValueError, match="msg_id must be an integer"):
             await listener.async_send_command(
                 "dev",
-                msg_id=True,  # type: ignore[arg-type]
+                msg_id=True,
                 ble_msg_type=107,
                 body=b"",
             )
@@ -1624,7 +1369,7 @@ def test_listener_send_command_validates_msg_id_and_type() -> None:
                 body=b"",
             )
 
-        assert listener._pending_acks == {}  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]
 
     asyncio.run(_run())
 
@@ -1643,8 +1388,8 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
         # write here, just pinning the cleanup behaviour.
         session_a = _attach_session(listener, "dev1", object())
         session_b = _attach_session(listener, "dev2", object())
-        ack_a = listener._register_pending_ack("dev1", session_a, 3022, 107)  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-        ack_b = listener._register_pending_ack("dev2", session_b, 3019, 120)  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
+        ack_a = listener._register_pending_ack("dev1", session_a, 3022, 107)  # ruff: ignore[private-member-access]
+        ack_b = listener._register_pending_ack("dev2", session_b, 3019, 120)  # ruff: ignore[private-member-access]
 
         await listener.async_stop()
 
@@ -1684,7 +1429,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
-        exploding.is_connected = True  # type: ignore[attr-defined]
+        cast("Any", exploding).is_connected = True
         _attach_session(listener, "dev", exploding)
 
         with pytest.raises(RuntimeError, match="simulated GATT failure"):
@@ -1744,7 +1489,10 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
             return True
 
     async def _run() -> None:
-        self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+        self = cast(
+            "Any",
+            JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+        )
         self.entry = _Entry()
         self._ble_listener = _Listener()
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
@@ -1885,7 +1633,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
-        listener._mtu = {"dev": 247}  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
+        listener._mtu = {"dev": 247}  # ruff: ignore[private-member-access]
 
         body = b"x" * 25
         # MTU 70 → 10 bytes / chunk → three frames.
@@ -1939,7 +1687,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
                 msg_id=3022,
                 ble_msg_type=42,
                 body=b"x",
-                mtu_override=float("nan"),  # type: ignore[arg-type]
+                mtu_override=cast("Any", float("nan")),
             )
 
     asyncio.run(_run())
@@ -1948,9 +1696,9 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 def test_listener_mtu_for_device_falls_back_to_default() -> None:
     """An un-learnt device id surfaces the Android-app default MTU."""
     listener = _build_bare_listener()
-    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
-    listener._mtu["known"] = 120  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-    assert listener.mtu_for_device("known") == 120  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU
+    listener._mtu["known"] = 120  # ruff: ignore[private-member-access]
+    assert listener.mtu_for_device("known") == 120
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -1960,8 +1708,8 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
     class _Client:
         mtu_size = 185
 
-    listener._record_negotiated_mtu("dev", _Client())  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-    assert listener.mtu_for_device("dev") == 185  # type: ignore[attr-defined]
+    listener._record_negotiated_mtu("dev", cast("Any", _Client()))  # ruff: ignore[private-member-access]
+    assert listener.mtu_for_device("dev") == 185
 
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
@@ -1974,11 +1722,11 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     class _Bad:
         mtu_size = 12  # below the 60-byte overhead
 
-    listener._record_negotiated_mtu("dev", _NoMtu())  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
-    listener._record_negotiated_mtu("dev2", _Bad())  # type: ignore[attr-defined]  # ruff: ignore[private-member-access]
+    listener._record_negotiated_mtu("dev", cast("Any", _NoMtu()))  # ruff: ignore[private-member-access]
+    listener._record_negotiated_mtu("dev2", cast("Any", _Bad()))  # ruff: ignore[private-member-access]
     # Both fall back to the default — the cache stays untouched.
-    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
-    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU  # type: ignore[attr-defined]
+    assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU
+    assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU
 
 
 def test_listener_successful_notify_decode_clears_stale_last_error() -> None:

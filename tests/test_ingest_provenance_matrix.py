@@ -56,7 +56,7 @@ def _ingest(
         observation,
         current=current or {},
         provenance=provenance or {},
-        freshness_window=60.0,
+        freshness_window_seconds=60.0,
         received_at_monotonic=received_at_monotonic,
     )
 
@@ -92,12 +92,12 @@ def test_older_http_poll_cannot_overwrite_newer_ble_value() -> None:
     )
 
     assert older.payload[_FIELD] == _NEW_VALUE
-    assert older.rejected_fields == {_FIELD: "older_observation"}
+    assert older.accepted_fields == frozenset()
     assert older.provenance[_FIELD].source is DataSource.BLE
 
 
-def test_newer_http_poll_replaces_older_ble_value() -> None:
-    """Timestamp order wins once both observations carry trustworthy times."""
+def test_newer_http_poll_cannot_replace_fresh_ble_value() -> None:
+    """HTTP remains a fallback while a Layer-5 value is still fresh."""
     older = _ingest(_observation(DataSource.BLE, 90, observed_at=_BASE_TIME))
 
     newer = _ingest(
@@ -109,6 +109,26 @@ def test_newer_http_poll_replaces_older_ble_value() -> None:
         current=older.payload,
         provenance=older.provenance,
         received_at_monotonic=101.0,
+    )
+
+    assert newer.payload[_FIELD] == 90
+    assert newer.accepted_fields == frozenset()
+    assert newer.provenance[_FIELD].source is DataSource.BLE
+
+
+def test_http_poll_replaces_expired_ble_value() -> None:
+    """HTTP fallback may refresh a stale Layer-5 value after the freshness window."""
+    older = _ingest(_observation(DataSource.BLE, 90, observed_at=_BASE_TIME))
+
+    newer = _ingest(
+        _observation(
+            DataSource.HTTP,
+            _NEW_VALUE,
+            observed_at=_BASE_TIME + timedelta(seconds=5),
+        ),
+        current=older.payload,
+        provenance=older.provenance,
+        received_at_monotonic=161.0,
     )
 
     assert newer.payload[_FIELD] == _NEW_VALUE
@@ -134,7 +154,41 @@ def test_equal_timestamp_uses_explicit_live_source_priority() -> None:
 
     assert local.payload[_FIELD] == _NEW_VALUE
     assert stale_http.payload[_FIELD] == _NEW_VALUE
-    assert stale_http.rejected_fields == {_FIELD: "lower_priority_tie"}
+    assert stale_http.accepted_fields == frozenset()
+
+
+@pytest.mark.parametrize(
+    ["first_source", "second_source"],
+    [
+        [DataSource.CLOUD_MQTT, DataSource.BLE],
+        [DataSource.BLE, DataSource.CLOUD_MQTT],
+        [DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT],
+        [DataSource.LOCAL_MQTT, DataSource.CLOUD_MQTT],
+        [DataSource.BLE, DataSource.LOCAL_MQTT],
+        [DataSource.LOCAL_MQTT, DataSource.BLE],
+    ],
+)
+def test_layer5_peers_update_in_arrival_order(
+    first_source: DataSource,
+    second_source: DataSource,
+) -> None:
+    """No Layer-5 connection may freshness-block another Layer-5 peer."""
+    first = _ingest(_observation(first_source, 90, observed_at=_BASE_TIME))
+
+    second = _ingest(
+        _observation(
+            second_source,
+            _NEW_VALUE,
+            observed_at=_BASE_TIME + timedelta(seconds=1),
+        ),
+        current=first.payload,
+        provenance=first.provenance,
+        received_at_monotonic=101.0,
+    )
+
+    assert second.payload[_FIELD] == _NEW_VALUE
+    assert second.accepted_fields == frozenset({_FIELD})
+    assert second.provenance[_FIELD].source is second_source
 
 
 def test_same_field_name_in_different_sections_has_independent_provenance() -> None:
@@ -189,10 +243,10 @@ def test_app_proven_layer5_status_fields_are_live_properties(
     "source",
     [DataSource.CLOUD_MQTT, DataSource.BLE, DataSource.LOCAL_MQTT],
 )
-def test_rest_periodic_section_is_rejected_on_layer5_with_reason(
+def test_rest_periodic_section_is_accepted_for_later_routing_on_layer5(
     source: DataSource,
 ) -> None:
-    """REST trends are HTTP-owned; similarly named Layer-5 status fields differ."""
+    """Decoded periodic sections are kept for coordinator/recorder routing."""
     result = _ingest(
         _observation(
             source,
@@ -202,11 +256,9 @@ def test_rest_periodic_section_is_rejected_on_layer5_with_reason(
         ),
     )
 
-    assert not result.accepted
-    assert result.payload == {}
-    assert result.rejection_reason == (
-        f"unsupported_source_section:{source.value}:{APP_SECTION_PV_STAT}_day"
-    )
+    assert result.accepted
+    assert result.payload == {_FIELD: 10}
+    assert result.provenance[_FIELD].source is source
 
 
 def test_http_periodic_section_remains_available_without_layer5() -> None:
@@ -265,21 +317,19 @@ def test_coordinator_has_one_lifetime_and_repair_implementation() -> None:
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     ]
 
-    assert method_names.count("_merge_lifetime_counter_data") == 1
-    assert method_names.count("_statistics_repair_from_date") == 1
+    assert method_names.count("_merge_battery_pack_lifetime_from_ble") == 1
 
 
-def test_lifetime_counter_merge_isolated_and_non_mutating() -> None:
-    """The retained lifetime merge owns its bucket and leaves input untouched."""
+def test_battery_pack_lifetime_merge_isolated_and_non_mutating() -> None:
+    """The retained battery-pack lifetime merge leaves input frame untouched."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    source = {"totalPvEnergy": 12.5}
-    updated: dict[str, Any] = {"lifetime_counters": {"totalLoadEnergy": 8.0}}
+    source = {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}
+    updated: dict[str, Any] = {"batteryPacks": [{"deviceSn": "PACK-1"}]}
 
-    touched = coordinator._merge_lifetime_counter_data(updated, source)  # ruff: ignore[private-member-access]
+    touched = coordinator._merge_battery_pack_lifetime_from_ble(updated, source)  # ruff: ignore[private-member-access]
 
     assert touched
-    assert updated["lifetime_counters"] == {
-        "totalLoadEnergy": 8.0,
-        "totalPvEnergy": 12.5,
-    }
-    assert source == {"totalPvEnergy": 12.5}
+    assert updated["batteryPacks"] == [
+        {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}
+    ]
+    assert source == {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}

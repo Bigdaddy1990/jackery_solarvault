@@ -210,7 +210,9 @@ async def _discovered_name(method_name: str, discovery_info: SimpleNamespace) ->
     ) as router:
         await getattr(flow, method_name)(discovery_info)
 
-    return cast("str", router.await_args.args[0])
+    await_args = router.await_args
+    assert await_args is not None
+    return cast("str", await_args.args[0])
 
 
 @pytest.mark.asyncio

@@ -65,7 +65,7 @@ async def test_http_sub_shadow_auth_failure_is_not_downgraded_to_empty() -> None
     with pytest.raises(JackeryAuthError, match="token rejected"):
         await coordinator._async_fetch_sub_shadow_body(  # ruff: ignore[private-member-access]
             "device-1",
-            dev_type="4",
+            dev_type=4,
             parent_sn="SN-1",
             sub_device_sn="SUB-1",
         )

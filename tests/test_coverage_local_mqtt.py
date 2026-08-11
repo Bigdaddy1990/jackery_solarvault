@@ -1,27 +1,17 @@
 """Tests for local MQTT client helpers, markers, topic matching, and message handling."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
     _local_mqtt_client,  # ruff: ignore[import-private-name]
-    payload_has_jackery_marker,
 )
 from custom_components.jackery_solarvault.const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
-
-
-def test_payload_has_jackery_marker() -> None:
-    """Test payload marker detection across strings, bytes, and bytearrays."""
-    assert payload_has_jackery_marker('{"batSoc": 80}') is True
-    assert payload_has_jackery_marker(b'{"deviceSn": "12345"}') is True
-    assert payload_has_jackery_marker(bytearray(b'{"gridInPw": 500}')) is True
-    assert payload_has_jackery_marker('{"otherKey": "unrelated"}') is False
-    assert payload_has_jackery_marker(b"raw non-json binary data") is False
 
 
 @pytest.mark.asyncio
@@ -75,11 +65,16 @@ def test_local_mqtt_topic_matching(hass: HomeAssistant) -> None:
 
 @pytest.mark.asyncio
 async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
-    """Test message parsing, marker checks, and dropping logic."""
-    forwarded = []
+    """A bounded device topic forwards known and future payload fields."""
+    forwarded: list[tuple[str, dict[str, Any] | None, bytes]] = []
 
-    async def mock_sink(topic: str, data: dict | None, raw: bytes) -> None:  # ruff: ignore[unused-async]
+    async def mock_sink(  # ruff: ignore[unused-async]
+        topic: str,
+        data: dict[str, Any] | None,
+        raw: bytes,
+    ) -> bool | None:
         forwarded.append((topic, data, raw))
+        return None
 
     client = JackeryLocalMqttClient(
         hass,
@@ -92,24 +87,36 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
         topic_filter="jackery/#",
     )
 
-    # 1. Foreign message without marker -> ignored
-    client._handle_message("jackery/device1", b'{"temperature": 25}')  # ruff: ignore[private-member-access]
+    # A bounded, explicitly configured device topic is the routing boundary.
+    # Unknown fields must reach the shared decoder so new firmware payloads are
+    # not silently lost merely because their keys are not in a static marker set.
+    await client._handle_message(  # ruff: ignore[private-member-access]
+        "jackery/device1",
+        b'{"temperature": 25}',
+    )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_ignored_foreign"] == 1
-    assert len(forwarded) == 0
-
-    # 2. Message with Jackery marker -> forwarded
-    valid_payload = b'{"devSn": "12345", "batSoc": 95}'
-    client._handle_message("jackery/device1", valid_payload)  # ruff: ignore[private-member-access]
-    await hass.async_block_till_done()
-    diag = client.diagnostics_snapshot()
+    assert diag["messages_ignored_foreign"] == 0
     assert diag["messages_forwarded"] == 1
     assert len(forwarded) == 1
-    assert forwarded[0][1] == {"devSn": "12345", "batSoc": 95}
+    assert forwarded[0][1] == {"temperature": 25}
 
-    # 3. Payload too large -> dropped
+    # Known Jackery fields follow the same independent async path.
+    valid_payload = b'{"devSn": "12345", "batSoc": 95}'
+    await client._handle_message(  # ruff: ignore[private-member-access]
+        "jackery/device1",
+        valid_payload,
+    )
+    diag = client.diagnostics_snapshot()
+    assert diag["messages_forwarded"] == 2
+    assert len(forwarded) == 2
+    assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
+
+    # Oversized payloads remain bounded before decoding.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
-    client._handle_message("jackery/device1", large_payload)  # ruff: ignore[private-member-access]
+    await client._handle_message(  # ruff: ignore[private-member-access]
+        "jackery/device1",
+        large_payload,
+    )
     diag = client.diagnostics_snapshot()
     assert diag["messages_dropped"] > 0
 

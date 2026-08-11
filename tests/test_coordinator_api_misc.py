@@ -183,7 +183,7 @@ async def test_set_push_config_maps_argument_name() -> None:
     coordinator = _coordinator()
     _api(coordinator).async_set_push_config = AsyncMock(return_value=_SENTINEL)
 
-    result = await coordinator.async_set_push_config("all")
+    result = await coordinator.async_set_push_config(cast("Any", "all"))
 
     assert result is _SENTINEL
     _api(coordinator).async_set_push_config.assert_awaited_once_with(set="all")
@@ -254,7 +254,7 @@ async def test_list_banners_passthrough() -> None:
     coordinator = _coordinator()
     _api(coordinator).async_get_banner_list = AsyncMock(return_value=[1, 2])
 
-    assert await coordinator.async_list_banners() == [1, 2]
+    assert cast("list[int]", await coordinator.async_list_banners()) == [1, 2]
 
 
 @pytest.mark.asyncio
@@ -439,7 +439,7 @@ async def test_accessory_sync_backs_off_after_persistent_10600() -> None:
     )
     api.async_get_accessories_list = AsyncMock(return_value=[])
     obj._overlay_http_accessories = MagicMock()  # ruff: ignore[private-member-access]
-    index = {_DEVICE: {PAYLOAD_SYSTEM: {}}}
+    index: dict[str, dict[str, Any]] = {_DEVICE: {PAYLOAD_SYSTEM: {}}}
 
     await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
     await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
