@@ -48,8 +48,7 @@ from typing import TYPE_CHECKING, Any
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-from jackery_solarvault.const import DEFAULT_BLE_ACK_TIMEOUT_SEC
-
+from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC  # ruff: ignore[relative-imports]
 from . import ble
 
 if TYPE_CHECKING:

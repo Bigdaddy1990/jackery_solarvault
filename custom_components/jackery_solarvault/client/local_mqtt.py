@@ -5,12 +5,14 @@ This client connects to the user's LAN broker — see PROTOCOL.md §5 /
 docs/Markdown/APP_POLLING_MQTT.md — to capture telemetry that the
 SolarVault publishes when the device-side third-party bridge is enabled.
 
-Topics published by the firmware are not fully documented across all
-SKUs, so users must configure the subscription filter explicitly in the
-options flow. Decoded payloads are pushed to an optional sink callback;
-the transport client does not reach into the coordinator directly. The
-integration wiring sends both decoded and opaque frames through the shared,
-transport-neutral coordinator decoder and ingest path.
+Topics published by the firmware are not documented across all SKUs. An
+empty configured filter therefore starts one guarded broker-wide discovery
+subscription. After the shared decoder accepts a Jackery frame, the client
+subscribes to that exact topic and removes the wildcard without reconnecting.
+Decoded payloads are pushed to an optional sink callback; the transport client
+does not reach into the coordinator directly. The integration wiring sends
+both decoded and opaque frames through the shared, transport-neutral
+coordinator decoder and ingest path.
 """
 
 import asyncio
@@ -25,7 +27,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ..const import (  # ruff: ignore[relative-imports]
     DOMAIN,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_MAX_TOPIC_NAMES,
@@ -59,12 +61,14 @@ _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 # The logger name is namespaced under the integration so HA's logging
 # configuration naturally targets it.
 
-# Strict by default: no implicit wildcard subscription.
-LOCAL_MQTT_DEFAULT_TOPIC: str = ""
+# The device publishes to one exact topic. Empty caller input is normalised to
+# this value in ``__init__`` and never becomes a broker-wide subscription.
+LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
 
 _HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
 _LOCAL_MQTT_RECONNECT_INITIAL_SEC: float = 5.0
 _LOCAL_MQTT_RECONNECT_MAX_SEC: float = 60.0
+_LOCAL_MQTT_MAX_QUEUED_MESSAGES: int = 128
 
 _LOCAL_MQTT_JACKERY_MARKER_KEYS = {
     "actionId",
@@ -84,6 +88,56 @@ _LOCAL_MQTT_JACKERY_MARKER_KEYS = {
     "sn",
     "soc",
 }
+_LOCAL_MQTT_JACKERY_IDENTITY_KEYS = frozenset(
+    {"devId", "devSn", "deviceId", "deviceSn", "sn"}
+)
+_LOCAL_MQTT_JACKERY_PROTOCOL_KEYS = frozenset(
+    {"actionId", "messageType"}
+)
+_LOCAL_MQTT_JACKERY_LIVE_KEYS = frozenset(
+    {
+        "aPhasePw",
+        "batInPw",
+        "batNum",
+        "batOutPw",
+        "batSoc",
+        "bnPhasePw",
+        "cPhasePw",
+        "chargePlanPw",
+        "commState",
+        "defaultPw",
+        "energyPlanPw",
+        "gridInPw",
+        "gridOutPw",
+        "inGridSidePw",
+        "maxFeedGrid",
+        "maxSysInPw",
+        "maxSysOutPw",
+        "ongridStat",
+        "otherLoadPw",
+        "outGridSidePw",
+        "pv1",
+        "pv2",
+        "pv3",
+        "pv4",
+        "pvPw",
+        "subType",
+        "swEps",
+        "swEpsState",
+        "tPhasePw",
+        "tnPhasePw",
+        "workModel",
+    }
+)
+_LOCAL_MQTT_JACKERY_IDENTITY_MARKERS = tuple(
+    f'"{key}"'.encode() for key in _LOCAL_MQTT_JACKERY_IDENTITY_KEYS
+)
+_LOCAL_MQTT_JACKERY_PROTOCOL_MARKERS = tuple(
+    f'"{key}"'.encode() for key in _LOCAL_MQTT_JACKERY_PROTOCOL_KEYS
+)
+_LOCAL_MQTT_JACKERY_LIVE_MARKERS = tuple(
+    f'"{key}"'.encode() for key in _LOCAL_MQTT_JACKERY_LIVE_KEYS
+)
 # Sink signature kept loose so the wiring layer can pass any async callable
 # that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. A concrete
 # user-configured topic is already the routing boundary: every bounded payload
@@ -134,7 +188,7 @@ class JackeryLocalMqttClient:
         self._password = password or None
         self._client_id = client_id
         self._sink = sink
-        self._topic_filter = topic_filter
+        self._topic_filter = topic_filter.strip() or LOCAL_MQTT_DEFAULT_TOPIC
         self._lock = asyncio.Lock()
         self._client: MQTTClient | None = None
         self._runner_task: asyncio.Task[None] | None = None
@@ -158,7 +212,6 @@ class JackeryLocalMqttClient:
         self._blocked_by_filter_count = 0
         self._payload_too_large_count = 0
         self._home_assistant_event_count = 0
-
         # Store configuration for comparison
         self._configuration: LocalMqttConfiguration = (
             host,
@@ -166,7 +219,7 @@ class JackeryLocalMqttClient:
             username or None,
             password or None,
             client_id,
-            topic_filter,
+            self._topic_filter,
         )
 
     def matches_configuration(self, other: LocalMqttConfiguration) -> bool:
@@ -194,10 +247,10 @@ class JackeryLocalMqttClient:
             self._subscribed = False
             self._last_error = None
             _LOGGER.info(
-                "Jackery local MQTT: connecting to %s:%s (topic=%r)",
+                "Jackery local MQTT: connecting to %s:%s (%s topic mode)",
                 self._host,
                 self._port,
-                self._topic_filter,
+                "exact",
             )
             self._runner_task = self._hass.async_create_background_task(
                 self._async_run_forever(),
@@ -275,6 +328,7 @@ class JackeryLocalMqttClient:
                 password=self._password,
                 keepalive=MQTT_KEEPALIVE_SEC,
                 clean_session=True,
+                max_queued_incoming_messages=_LOCAL_MQTT_MAX_QUEUED_MESSAGES,
                 logger=_AIOMQTT_LOGGER,
             ) as client:
                 self._client = client
@@ -283,13 +337,13 @@ class JackeryLocalMqttClient:
                 self._last_connect_at = self._utc_now_iso()
                 self._last_error = None
                 _LOGGER.info(
-                    "Jackery local MQTT connected to %s:%s; subscribing to %r",
+                    "Jackery local MQTT connected to %s:%s; subscribing in %s mode",
                     self._host,
                     self._port,
-                    self._topic_filter,
+                    "exact",
                 )
                 try:
-                    await client.subscribe(self._topic_filter, qos=0)
+                    await client.subscribe(self._subscription_filter, qos=0)
                 except MqttError as err:
                     error = f"subscribe failed: {err}"
                     log = (
@@ -298,7 +352,7 @@ class JackeryLocalMqttClient:
                     self._last_error = error
                     log(
                         "Jackery local MQTT subscribe failed for %r: %s",
-                        self._topic_filter,
+                        self._subscription_filter,
                         err,
                     )
                     self._connected_event.set()
@@ -425,13 +479,16 @@ class JackeryLocalMqttClient:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
                 self._topics_seen.append(topic)
-                _LOGGER.debug("Jackery local MQTT: first message on topic %r", topic)
+                _LOGGER.debug(
+                    "Jackery local MQTT: first message observed on broker topic %s",
+                    len(self._topics_seen),
+                )
             else:
                 self._topics_seen_truncated = True
         self._messages_received += 1
         self._last_topic = topic
         self._last_message_at = self._utc_now_iso()
-        if not self._topic_matches(self._topic_filter, topic):
+        if not self._topic_matches(self._subscription_filter, topic):
             self._blocked_by_filter_count += 1
             return
         if self._should_drop_broad_noise_topic(topic):
@@ -460,6 +517,9 @@ class JackeryLocalMqttClient:
             return
 
         broad_filter = self._is_broad_topic_filter()
+        if broad_filter and not self._is_jackery_discovery_raw_candidate(raw_bytes):
+            self._messages_ignored_foreign += 1
+            return
 
         if decoded_text_hint is not None:
             text = decoded_text_hint
@@ -485,9 +545,7 @@ class JackeryLocalMqttClient:
                     self._home_assistant_event_count += 1
                     self._messages_dropped += 1
                     return
-                if broad_filter and not _LOCAL_MQTT_JACKERY_MARKER_KEYS.intersection(
-                    data
-                ):
+                if broad_filter and not self._is_jackery_discovery_json_payload(data):
                     self._messages_ignored_foreign += 1
                     return
             elif parsed is not None:
@@ -608,9 +666,53 @@ class JackeryLocalMqttClient:
             and payload[2:4] == _BINARY_FRAME_VERSION_BE
         )
 
+    @staticmethod
+    def _is_jackery_discovery_json_payload(payload: dict[str, Any]) -> bool:
+        """Require an app envelope or multiple Jackery-specific live fields.
+
+        Generic keys such as ``data``, ``body``, ``cmd`` or ``soc`` occur in
+        unrelated MQTT integrations and are not a safe broker-wide routing
+        boundary. The documented Jackery app envelope carries a device identity
+        together with an action or message discriminator. The local decoder
+        also supports partial app envelopes and single-field LAN telemetry, so
+        one field from the narrow Jackery-specific live set is sufficient.
+        """
+        keys = payload.keys()
+        app_envelope = bool(
+            _LOCAL_MQTT_JACKERY_PROTOCOL_KEYS.intersection(keys)
+        ) and (
+            "body" in keys
+            or bool(_LOCAL_MQTT_JACKERY_IDENTITY_KEYS.intersection(keys))
+        )
+        return app_envelope or bool(_LOCAL_MQTT_JACKERY_LIVE_KEYS.intersection(keys))
+
+    @staticmethod
+    def _is_jackery_discovery_raw_candidate(payload: bytes) -> bool:
+        """Cheaply reject unrelated broker traffic before UTF-8/JSON parsing."""
+        if JackeryLocalMqttClient._is_jackery_binary_frame(payload):
+            return True
+        if not payload.lstrip().startswith(b"{"):
+            return False
+        app_envelope = any(
+            marker in payload for marker in _LOCAL_MQTT_JACKERY_PROTOCOL_MARKERS
+        ) and (
+            b'"body"' in payload
+            or any(
+                marker in payload for marker in _LOCAL_MQTT_JACKERY_IDENTITY_MARKERS
+            )
+        )
+        return app_envelope or any(
+            marker in payload for marker in _LOCAL_MQTT_JACKERY_LIVE_MARKERS
+        )
+
     def _is_broad_topic_filter(self) -> bool:
         """Return True when the current topic filter is globally broad."""
-        return self._topic_filter in {"#", "+/#"}
+        return self._subscription_filter in {"#", "+/#"}
+
+    @property
+    def _subscription_filter(self) -> str:
+        """The one filter currently installed at the broker."""
+        return self._topic_filter
 
     @staticmethod
     def _topic_matches(topic_filter: str, topic: str) -> bool:
@@ -696,7 +798,10 @@ class JackeryLocalMqttClient:
             "subscribed": self._subscribed,
             "started": self.is_started,
             "topic_filter": topic_filter,
-            "subscription_filter_count": int(bool(self._topic_filter)),
+            "subscription_filter_count": 1,
+            "topic_auto_discovery": False,
+            "topic_auto_discovered_at": None,
+            "topic_auto_narrow_failures": 0,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,

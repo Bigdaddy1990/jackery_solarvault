@@ -1,3 +1,4 @@
+# ruff: disable[unsorted-imports, relative-imports]
 """Persistent discovery cache for local offline startup."""
 
 import asyncio
@@ -5,8 +6,8 @@ import copy
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
-
 from ..const import DOMAIN
+# ruff: enable[unsorted-imports, relative-imports]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -91,14 +92,24 @@ async def async_save_discovery_cache(
         and isinstance(value, dict)
         and bool(value)
     }
-    async with _store_lock(hass):
-        store = _store(hass)
-        loaded = await store.async_load()
-        data = dict(loaded) if isinstance(loaded, dict) else {}
-        raw_entries = data.get(_KEY_ENTRIES)
-        entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
-        entries[entry_id] = {
-            _KEY_DEVICE_INDEX: detached_device_index,
-        }
-        data[_KEY_ENTRIES] = entries
-        await store.async_save(data)
+
+    async def _async_persist() -> None:
+        """Finish the serialized Store transaction even if setup is cancelled."""
+        async with _store_lock(hass):
+            store = _store(hass)
+            loaded = await store.async_load()
+            data = dict(loaded) if isinstance(loaded, dict) else {}
+            raw_entries = data.get(_KEY_ENTRIES)
+            entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
+            entries[entry_id] = {
+                _KEY_DEVICE_INDEX: detached_device_index,
+            }
+            data[_KEY_ENTRIES] = entries
+            await store.async_save(data)
+
+    persist_task = hass.async_create_task(
+        _async_persist(),
+        name=f"{DOMAIN}_save_discovery_cache_{entry_id}",
+        eager_start=False,
+    )
+    await asyncio.shield(persist_task)

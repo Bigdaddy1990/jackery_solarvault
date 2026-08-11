@@ -38,7 +38,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from jackery_solarvault.const import (
+from ..const import (  # ruff: ignore[relative-imports]
     ACCESSORIES_BIND_PATH,
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
@@ -253,7 +253,7 @@ from jackery_solarvault.const import (
     VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
 )
-from jackery_solarvault.util import (
+from ..util import (  # ruff: ignore[relative-imports]
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
@@ -322,8 +322,6 @@ _DAY_CHART_SERIES_KEYS: Final[tuple[str, ...]] = (
 
 def _data_field_accepted(data: dict[str, Any]) -> bool:
     """Return whether the response data field contains a usable payload."""
-    if not isinstance(data, dict):
-        return False
     code = data.get(FIELD_CODE)
     return code == CODE_OK or code is None
 
@@ -386,7 +384,7 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str | None = None) -> byt
 def _generate_udid(seed: str) -> str:
     md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
-    return MQTT_MAC_ID_PREFIX + str(u).replace("-", "")
+    return f"{MQTT_MAC_ID_PREFIX}{u.hex}"
 
 
 type RandomBytesSource = Callable[[int], bytes]
@@ -882,7 +880,8 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         """
         if not isinstance(data, dict):
             return None
-        return first_nonblank_int(data.get(FIELD_CODE))
+        value = first_nonblank_int(data.get(FIELD_CODE))
+        return int(value) if value is not None else None
 
     def _is_token_expired_response(
         self,
@@ -963,7 +962,9 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         last = self._last_auto_relogin_monotonic
         if last is None:
             return True
-        return (time.monotonic() - last) >= AUTH_AUTO_RELOGIN_COOLDOWN_SEC
+        return bool(
+            (time.monotonic() - last) >= AUTH_AUTO_RELOGIN_COOLDOWN_SEC
+        )
 
     def _note_auto_relogin(self) -> None:
         """Record an automatic re-login for cooldown tracking and diagnostics."""
@@ -2338,8 +2339,8 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             parameter.
 
         Returns:
-            dict: Parsed JSON response containing KPI fields such as `de` (feed-in),
-            `dg` (grid import), `dh` (home load), and `ds` (battery energy).
+            dict: Parsed JSON response containing KPI fields `de` (battery),
+            `dg` (grid import), `dh` (home load), and `ds` (solar energy).
         """
         data = await self._get_json(
             DEVICE_TODAY_ENERGY_PATH,

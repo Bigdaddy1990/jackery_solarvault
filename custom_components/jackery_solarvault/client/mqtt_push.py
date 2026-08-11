@@ -14,7 +14,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from jackery_solarvault.const import (
+from ..const import (  # ruff: ignore[relative-imports]
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_RCS,
@@ -941,7 +941,9 @@ class JackeryMqttPushClient:
                             err,
                         )
                     return
-                _LOGGER.error("Jackery MQTT birth snapshot handler failed: %s", err)
+                _LOGGER.error(
+                    "Jackery MQTT birth snapshot handler failed: %s", err
+                )
 
         self._schedule_lifecycle_callback(
             _publish,
@@ -1187,8 +1189,8 @@ class JackeryMqttPushClient:
             except ValueError:
                 return False
             now: datetime = datetime.now(tz=then.tzinfo)
-            return (now - then).total_seconds() > MQTT_SILENT_THRESHOLD_SEC
-        return elapsed > MQTT_SILENT_THRESHOLD_SEC
+            return bool((now - then).total_seconds() > MQTT_SILENT_THRESHOLD_SEC)
+        return bool(elapsed > MQTT_SILENT_THRESHOLD_SEC)
 
     @property
     def is_started(self) -> bool:

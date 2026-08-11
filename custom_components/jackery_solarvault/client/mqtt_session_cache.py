@@ -1,3 +1,4 @@
+# ruff: disable[unsorted-imports, relative-imports]
 """Persistent MQTT session cache for Cloud-Outage tolerance.
 
 The Jackery cloud login returns three fields that fully determine the MQTT
@@ -23,7 +24,6 @@ import time
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
-
 from ..const import (
     DOMAIN,
     MQTT_SESSION_MAC_ID,
@@ -31,6 +31,7 @@ from ..const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
+# ruff: enable[unsorted-imports, relative-imports]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -45,7 +46,7 @@ _CACHE_CLOCK_SKEW_SEC: Final = 300.0
 _MQTT_SEED_LEN: Final = 32
 
 
-def normalize_mqtt_session_snapshot(  # ruff: ignore[too-many-branches, too-many-return-statements]
+def normalize_mqtt_session_snapshot(
     raw: object,
     *,
     now: float | None = None,
@@ -138,7 +139,7 @@ async def async_load_mqtt_session(
     return normalize_mqtt_session_snapshot(row)
 
 
-async def async_save_mqtt_session(  # ruff: ignore[too-many-arguments]
+async def async_save_mqtt_session(
     hass: HomeAssistant,
     entry_id: str,
     *,
@@ -187,25 +188,35 @@ async def async_save_mqtt_session(  # ruff: ignore[too-many-arguments]
     ):
         msg = "MQTT session expires_at must be a finite UNIX timestamp"
         raise ValueError(msg)
-    async with _store_lock(hass):
-        store = _store(hass)
-        loaded = await store.async_load()
-        data = dict(loaded) if isinstance(loaded, dict) else {}
-        raw_entries = data.get(_KEY_ENTRIES)
-        entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
-        row: dict[str, Any] = {
-            MQTT_SESSION_USER_ID: user_id,
-            MQTT_SESSION_SEED_B64: seed_b64,
-            MQTT_SESSION_MAC_ID: mac_id,
-        }
-        if mac_id_source:
-            row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
-        row[_KEY_CACHED_AT] = effective_cached_at
-        if expires_at is not None:
-            row[_KEY_EXPIRES_AT] = expires_at
-        entries[entry_id] = row
-        data[_KEY_ENTRIES] = entries
-        await store.async_save(data)
+
+    async def _async_persist() -> None:
+        """Finish the serialized Store transaction even if setup is cancelled."""
+        async with _store_lock(hass):
+            store = _store(hass)
+            loaded = await store.async_load()
+            data = dict(loaded) if isinstance(loaded, dict) else {}
+            raw_entries = data.get(_KEY_ENTRIES)
+            entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
+            row: dict[str, Any] = {
+                MQTT_SESSION_USER_ID: user_id,
+                MQTT_SESSION_SEED_B64: seed_b64,
+                MQTT_SESSION_MAC_ID: mac_id,
+            }
+            if mac_id_source:
+                row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
+            row[_KEY_CACHED_AT] = effective_cached_at
+            if expires_at is not None:
+                row[_KEY_EXPIRES_AT] = expires_at
+            entries[entry_id] = row
+            data[_KEY_ENTRIES] = entries
+            await store.async_save(data)
+
+    persist_task = hass.async_create_task(
+        _async_persist(),
+        name=f"{DOMAIN}_save_mqtt_session_cache_{entry_id}",
+        eager_start=False,
+    )
+    await asyncio.shield(persist_task)
 
 
 async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
@@ -213,16 +224,25 @@ async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
 
     Performs no action if the storage layout or the entry's row does not exist.
     """
-    async with _store_lock(hass):
-        store = _store(hass)
-        loaded = await store.async_load()
-        if not isinstance(loaded, dict):
-            return
-        data = dict(loaded)
-        raw_entries = data.get(_KEY_ENTRIES)
-        if not isinstance(raw_entries, dict) or entry_id not in raw_entries:
-            return
-        entries = dict(raw_entries)
-        entries.pop(entry_id, None)
-        data[_KEY_ENTRIES] = entries
-        await store.async_save(data)
+    async def _async_persist() -> None:
+        """Finish the serialized Store transaction even if cleanup is cancelled."""
+        async with _store_lock(hass):
+            store = _store(hass)
+            loaded = await store.async_load()
+            if not isinstance(loaded, dict):
+                return
+            data = dict(loaded)
+            raw_entries = data.get(_KEY_ENTRIES)
+            if not isinstance(raw_entries, dict) or entry_id not in raw_entries:
+                return
+            entries = dict(raw_entries)
+            entries.pop(entry_id, None)
+            data[_KEY_ENTRIES] = entries
+            await store.async_save(data)
+
+    persist_task = hass.async_create_task(
+        _async_persist(),
+        name=f"{DOMAIN}_clear_mqtt_session_cache_{entry_id}",
+        eager_start=False,
+    )
+    await asyncio.shield(persist_task)
