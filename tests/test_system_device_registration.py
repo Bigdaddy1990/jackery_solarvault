@@ -1,20 +1,13 @@
-"""Regression tests for SolarVault parent-system registry ordering."""
+"""Regression tests for the single SolarVault main-device registry model."""
 
 import asyncio
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components import jackery_solarvault as integration
-from custom_components.jackery_solarvault.const import (
-    DOMAIN,
-    FIELD_ID,
-    FIELD_SYSTEM_NAME,
-    FIELD_SYSTEM_SN,
-    PAYLOAD_SYSTEM,
-)
+from custom_components.jackery_solarvault.const import DOMAIN, FIELD_ID, PAYLOAD_SYSTEM
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers import device_registry as dr
 
@@ -23,45 +16,45 @@ if TYPE_CHECKING:
 
 _DEVICE_ID = "573702884982521856"
 _SYSTEM_ID = "595364183558991872"
-_SYSTEM_SN = "SYSTEM-SN"
 
 
-def test_system_parent_is_registered_before_platform_setup(
+def test_obsolete_system_parent_is_removed_and_head_is_detached(
     hass: HomeAssistant,
 ) -> None:
-    """Central setup creates the exact parent later referenced by via_device."""
+    """Setup migrates the temporary two-main-device layout back to one head."""
     entry = MockConfigEntry(domain=DOMAIN, data={})
     entry.add_to_hass(hass)
-    coordinator = SimpleNamespace(
-        data={
-            _DEVICE_ID: {
-                PAYLOAD_SYSTEM: {
-                    FIELD_ID: _SYSTEM_ID,
-                    FIELD_SYSTEM_NAME: "SolarVault",
-                    FIELD_SYSTEM_SN: _SYSTEM_SN,
-                }
-            }
-        }
+    registry = dr.async_get(hass)
+    parent_identifier = (DOMAIN, f"system_{_SYSTEM_ID}")
+    parent = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={parent_identifier},
+        name="obsolete system parent",
     )
+    head = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, _DEVICE_ID)},
+        name="SolarVault 3 Pro Max",
+        via_device=parent_identifier,
+    )
+    assert head.via_device_id == parent.id
 
-    integration._async_register_system_devices(  # ruff: ignore[private-member-access]
+    integration._async_remove_legacy_system_parent_devices(  # ruff: ignore[private-member-access]
         hass,
         entry,
-        cast("Any", coordinator),
     )
 
-    parent_identifier = (DOMAIN, f"system_{_SYSTEM_ID}")
-    parent = dr.async_get(hass).async_get_device(identifiers={parent_identifier})
-    assert parent is not None
-    assert parent.config_entries == {entry.entry_id}
-    assert parent.serial_number == _SYSTEM_SN
-    assert parent_identifier in parent.identifiers
+    migrated_head = registry.async_get(head.id)
+    assert migrated_head is not None
+    assert migrated_head.via_device_id is None
+    obsolete_parent = registry.async_get_device(identifiers={parent_identifier})
+    assert obsolete_parent is None or entry.entry_id not in obsolete_parent.config_entries
 
 
 async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     hass: HomeAssistant,
 ) -> None:
-    """Optional transports cannot change parent ids during entity creation."""
+    """Optional transports start after platforms without creating a system parent."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_USERNAME: "tester@example.com", CONF_PASSWORD: "secret"},
@@ -123,21 +116,15 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     assert events == ["platforms", "layer5"]
     coordinator = entry.runtime_data
     runtime_system_id = "runtime-system-1"
-    listener_saw_parent = False
-
-    def _listener() -> None:
-        nonlocal listener_saw_parent
-        parent = dr.async_get(hass).async_get_device(
-            identifiers={(DOMAIN, f"system_{runtime_system_id}")}
-        )
-        listener_saw_parent = parent is not None
-
-    unsubscribe = coordinator.async_add_listener(_listener)
     coordinator._push_partial_update({  # ruff: ignore[private-member-access]
         _DEVICE_ID: {PAYLOAD_SYSTEM: {FIELD_ID: runtime_system_id}}
     })
-    unsubscribe()
-    assert listener_saw_parent
+    assert (
+        dr.async_get(hass).async_get_device(
+            identifiers={(DOMAIN, f"system_{runtime_system_id}")}
+        )
+        is None
+    )
 
     http_system_id = "http-system-2"
     with patch.object(
@@ -155,7 +142,7 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         dr.async_get(hass).async_get_device(
             identifiers={(DOMAIN, f"system_{http_system_id}")}
         )
-        is not None
+        is None
     )
 
     await coordinator.async_shutdown()
