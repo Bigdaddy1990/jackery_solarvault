@@ -112,7 +112,6 @@ from .coordinator import (
     battery_pack_serial,
     sorted_battery_pack_payloads,
 )
-from .entity import system_device_info_from_payload
 from .services import async_setup_services
 from .util import (
     config_entry_bool_option,
@@ -126,7 +125,7 @@ from .util import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable
 
     from homeassistant.core import HomeAssistant
 
@@ -295,33 +294,36 @@ def _async_clean_legacy_entities(  # noqa: RUF067, RUF105
     )
 
 
-def _async_register_system_devices(  # noqa: RUF067, RUF105
+def _async_remove_legacy_system_parent_devices(  # noqa: RUF067, RUF105
     hass: HomeAssistant,
     entry: ConfigEntry,
-    coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """Create parent system records before platforms register child devices."""
-    _async_register_system_devices_from_data(
-        hass,
-        entry,
-        coordinator.data or {},
-    )
-
-
-def _async_register_system_devices_from_data(  # noqa: RUF067, RUF105
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    data: Mapping[str, dict[str, Any]],
-) -> None:
-    """Create parent system records before listeners consume one data snapshot."""
+    """Undo the obsolete split between one SolarVault and its system record."""
     registry = dr.async_get(hass)
-    for device_id, payload in data.items():
-        device_info = system_device_info_from_payload(payload, device_id)
-        if device_info is None:
-            continue
-        registry.async_get_or_create(
-            config_entry_id=entry.entry_id,
-            **device_info,
+    entry_devices = tuple(dr.async_entries_for_config_entry(registry, entry.entry_id))
+    obsolete_device_ids = {
+        device.id
+        for device in entry_devices
+        if any(
+            domain == DOMAIN
+            and identifier.startswith(("system_", "system_sn_"))
+            for domain, identifier in device.identifiers
+        )
+    }
+    if not obsolete_device_ids:
+        return
+
+    for device in entry_devices:
+        if (
+            device.id not in obsolete_device_ids
+            and device.via_device_id in obsolete_device_ids
+        ):
+            registry.async_update_device(device.id, via_device_id=None)
+
+    for device_id in obsolete_device_ids:
+        registry.async_update_device(
+            device_id,
+            remove_config_entry_id=entry.entry_id,
         )
 
 
@@ -1457,13 +1459,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             )
 
     coordinator.set_local_mqtt_config_observer(_adopt_device_local_mqtt_config)
-    coordinator.set_device_registry_observer(
-        lambda snapshot: _async_register_system_devices_from_data(
-            hass,
-            entry,
-            snapshot,
-        )
-    )
     entry.runtime_data = coordinator
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
@@ -1507,7 +1502,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             raise ConfigEntryNotReady(msg)
 
         _async_clean_legacy_entities(hass, entry)
-        _async_register_system_devices(hass, entry, coordinator)
+        _async_remove_legacy_system_parent_devices(hass, entry)
         platforms_started = True
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -1515,9 +1510,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         # the freshly persisted HTTP login session or, after a failed HTTP
         # attempt, the validated session cache loaded above. Start the three
         # independent transports only after all platforms have consumed the
-        # same registry-stable startup snapshot. Otherwise a Layer-5 system
-        # frame can add a parent id between system-device pre-registration and
-        # entity creation, producing an invalid ``via_device`` reference.
+        # same registry-stable startup snapshot.
         _schedule_layer5_start_if_ready(hass, entry, coordinator)
 
         # Entities now exist from either a live HTTP refresh or validated cached

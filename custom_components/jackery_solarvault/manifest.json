@@ -7,7 +7,6 @@
     "dhcp",
     "http",
     "mdns",
-    "mqtt",
     "recorder",
     "zeroconf"
   ],
@@ -22,7 +21,9 @@
     "@Bigdaddy1990"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "mqtt"
+  ],
   "dhcp": [
     {
       "hostname": "solarvault*",
@@ -48,6 +49,9 @@
     "custom_components.jackery_solarvault.client.third_party_mqtt_codec",
     "aiohttp",
     "aiomqtt"
+  ],
+  "mqtt": [
+    "homeassistant"
   ],
   "quality_scale": "custom",
   "requirements": [

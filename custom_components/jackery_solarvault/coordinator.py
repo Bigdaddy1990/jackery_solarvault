@@ -15729,7 +15729,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         )
         return time.monotonic() - received_at <= freshness_window
 
-    def _local_mqtt_device_token(self, device_id: str) -> str:
+    def _local_mqtt_device_token(
+        self,
+        device_id: str,
+        *,
+        readback_token: object = None,
+    ) -> str:
         """Return the persisted, read-back, or App-generated bridge token."""
         configured_token = config_entry_str_option(
             self.entry,
@@ -15742,15 +15747,74 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if isinstance(device_data, dict)
             else None
         )
-        readback_token = (
+        cached_token = (
             current_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
             if isinstance(current_config, dict)
             else None
         )
         token, _use_generated = self._stable_third_party_mqtt_token(
-            configured_token or readback_token,
+            configured_token or readback_token or cached_token,
         )
         return token
+
+    async def _async_local_mqtt_device_token(self, device_id: str) -> str:
+        """Resolve the bridge token in the same order as App 2.4.0.
+
+        ``MqttMsgActivity`` reads command 3047 before saving command 3046 and
+        reuses the decoded device token. Only a missing config body causes the
+        App to generate its nine-digit fallback. A hidden token already stored
+        in the config entry remains authoritative across Home Assistant
+        restarts and therefore needs no device query.
+        """
+        configured_token = config_entry_str_option(
+            self.entry,
+            CONF_THIRD_PARTY_MQTT_TOKEN,
+            DEFAULT_THIRD_PARTY_MQTT_TOKEN,
+        ).strip()
+        if configured_token:
+            return self._local_mqtt_device_token(device_id)
+
+        device_data = (self.data or {}).get(device_id)
+        current_config = (
+            device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
+            if isinstance(device_data, dict)
+            else None
+        )
+        cached_token = (
+            current_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+            if isinstance(current_config, dict)
+            else None
+        )
+        if cached_token:
+            return self._local_mqtt_device_token(device_id)
+
+        readback: dict[str, Any] | None = None
+        try:
+            readback = await self._async_query_third_party_mqtt_config_readback(
+                device_id,
+            )
+        except BACKGROUND_TASK_ERRORS as err:
+            _LOGGER.debug(
+                "Jackery local MQTT bridge: initial 3047 token readback failed "
+                "for %s; using the App fallback for this attempt: %s",
+                device_id,
+                exception_debug_message(err),
+            )
+        readback_token = (
+            readback.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+            if isinstance(readback, dict)
+            else None
+        )
+        if readback_token:
+            _LOGGER.debug(
+                "Jackery local MQTT bridge: reusing device token from initial "
+                "3047 readback for %s",
+                device_id,
+            )
+        return self._local_mqtt_device_token(
+            device_id,
+            readback_token=readback_token,
+        )
 
     async def async_apply_local_mqtt_config_to_devices(
         self,
@@ -15835,14 +15899,14 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             CONF_LOCAL_MQTT_PASSWORD,
             "",
         ) or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
-        # Prefer the hidden persisted token, then a valid decoded 3047 token for
-        # that device. If neither exists, mirror App 2.4.0's nine-digit fallback
-        # generator and persist it before sending 3046. HomeDeviceController.D0
-        # rejects an otherwise complete config when the decoded token is empty.
-        per_device_tokens = {
-            str(device_id): self._local_mqtt_device_token(device_id)
-            for device_id in self._device_index
-        }
+        # App 2.4.0 reads 3047 before 3046 and reuses the decoded token. Resolve
+        # each device independently in that order; only a genuinely missing
+        # config body receives the persisted nine-digit App fallback.
+        per_device_tokens: dict[str, str] = {}
+        for device_id in self._device_index:
+            per_device_tokens[str(device_id)] = (
+                await self._async_local_mqtt_device_token(str(device_id))
+            )
         signature = (
             host,
             port,

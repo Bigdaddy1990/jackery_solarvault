@@ -1919,6 +1919,7 @@ def _day_power_curve_total(
     stat_key: str,
     *,
     today: date,
+    now: datetime,
 ) -> float | None:
     """Return the integrated kWh total from an App 2.4.x day power curve.
 
@@ -1934,6 +1935,7 @@ def _day_power_curve_total(
         section,
         stat_key,
         today=today,
+        now=now,
     )
     if not points:
         return None
@@ -5948,6 +5950,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     section,
                     stat_key,
                     today=context.local_today,
+                    now=context.local_now,
                 )
                 # SENSOR_SOURCE_PATHS.md is explicit: dateType=day watt curves
                 # are integrated by duration, never summed as watts.  Positive
@@ -6202,6 +6205,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 fb_section,
                 fb_stat_key,
                 today=context.local_today,
+                now=context.local_now,
             )
             fb_numeric = safe_float(fb_raw)
             if fb_curve_total is not None and (
