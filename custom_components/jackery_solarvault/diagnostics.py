@@ -1,26 +1,24 @@
 """Diagnostics support for Jackery SolarVault."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
 
 from . import _local_mqtt_client
 from .const import (
-    BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
     CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_TOPIC,
     CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DIAGNOSTICS_SCHEMA_VERSION,
     REDACTED_VALUE,
 )
@@ -39,8 +37,6 @@ if TYPE_CHECKING:
 
     from . import JackeryConfigEntry
     from .coordinator import JackerySolarVaultCoordinator
-
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
 
 
 def _redacted_payload_map(
@@ -61,7 +57,7 @@ def _redacted_payload_map(
 
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     redacted: dict[str, Any] = {}
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
@@ -73,7 +69,7 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(  # ruff:ignore[unused-async]  # HA awaits this entry point
+async def async_get_config_entry_diagnostics(  # HA awaits this entry point
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
@@ -243,7 +239,7 @@ def _local_mqtt_diagnostics(
     Returns:
         dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
         MQTT client is available, otherwise the client's diagnostics snapshot.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     enabled = config_entry_bool_option(
         entry,
         CONF_LOCAL_MQTT_ENABLE,
@@ -269,16 +265,6 @@ def _local_mqtt_diagnostics(
         config_entry_str_option(entry, CONF_LOCAL_MQTT_PASSWORD, "")
         or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
     ).strip()
-    raw_topic_filter = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
-        or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
-    ).strip()
-    configured_topic_filter = raw_topic_filter
-    effective_topic_filter: str | None = (
-        configured_topic_filter or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
-    )
-    if effective_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
-        effective_topic_filter = None
     diagnostic_host = REDACTED_VALUE if host else ""
     diagnostic_port = REDACTED_VALUE if port else ""
 
@@ -288,8 +274,6 @@ def _local_mqtt_diagnostics(
             reason = "bridge_disabled"
         elif not host:
             reason = "missing_broker_host"
-        elif raw_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS:
-            reason = "broad_topic_filter_blocked"
         else:
             reason = "client_not_started"
         return {

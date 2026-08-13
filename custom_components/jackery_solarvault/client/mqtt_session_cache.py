@@ -1,4 +1,3 @@
-# ruff: disable[unsorted-imports, relative-imports]
 """Persistent MQTT session cache for Cloud-Outage tolerance.
 
 The Jackery cloud login returns three fields that fully determine the MQTT
@@ -16,6 +15,8 @@ or right after a Home Assistant restart, before the first login round-trip
 has succeeded.
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import binascii
@@ -31,7 +32,6 @@ from ..const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
-# ruff: enable[unsorted-imports, relative-imports]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -82,7 +82,7 @@ def normalize_mqtt_session_snapshot(
         return None
     try:
         seed = base64.b64decode(seed_b64, validate=True)
-    except binascii.Error, ValueError:
+    except (binascii.Error, ValueError):
         return None
     if len(seed) != _MQTT_SEED_LEN:
         return None

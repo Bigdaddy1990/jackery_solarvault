@@ -16,6 +16,8 @@ Rules:
   - Never merge HTTP and MQTT command body formats.
 """
 
+from __future__ import annotations
+
 import re
 from typing import Final
 
@@ -32,12 +34,18 @@ DEFAULT_DEVICE_MODEL_FALLBACK: Final = "SolarVault / HomePower"
 BASE_URL: Final = "https://iot.jackeryapp.com"
 LOGIN_PATH: Final = "/v1/auth/login"
 
-# API timeouts. Login carries the hybrid AES+RSA handshake plus chained
-# credential fetches; the polling GET /v1/device/* reads are served from a
-# cache on Jackery's side. Owner-set value 2026-07-22 (previously 60).
-LOGIN_TIMEOUT_SEC: Final = 30
+
 # Automatic HTTP re-login is independent of MQTT/BLE reconnect state.
 AUTH_AUTO_RELOGIN_COOLDOWN_SEC: Final[int] = 60
+
+# API timeouts. Login uses a longer budget than the polling requests because
+# hybrid AES+RSA-login plus chained credential fetches takes noticeably longer
+# than GET /v1/device/* reads (which are served from a cache on Jackery's side).
+LOGIN_TIMEOUT_SEC: Final = 60
+_HTTP_RETRY_ATTEMPTS = 3
+_HTTP_RETRY_BACKOFF_SEC = (0.5, 2.0, 5.0)
+HTTP_RETRY_ATTEMPTS: Final = _HTTP_RETRY_ATTEMPTS
+HTTP_RETRY_BACKOFF_SEC: Final = _HTTP_RETRY_BACKOFF_SEC
 
 # Diagnostics export schema version (bump on breaking diagnostics-shape changes).
 DIAGNOSTICS_SCHEMA_VERSION: Final = 2
@@ -46,7 +54,7 @@ LOGIN_AES_KEY_LEN: Final = 24
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
 MQTT_PORT: Final = 8883
-MQTT_KEEPALIVE_SEC: Final = 60
+MQTT_KEEPALIVE_SEC: Final = 15
 # Track topic names with a sensible upper bound so a misconfigured broker
 # (foreign neighbours publishing on the same LAN) cannot explode memory.
 LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
@@ -55,11 +63,29 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
+# The subscription filter is the user's decision — it is entered in the
+# options flow and used verbatim. An empty field falls back to this default.
+LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
+_HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
+_LOCAL_MQTT_JACKERY_MARKER_KEYS = {
+    "actionId",
+    "batSoc",
+    "body",
+    "cmd",
+    "data",
+    "devId",
+    "devSn",
+    "deviceId",
+    "deviceSn",
+    "gridInPw",
+    "gridOutPw",
+    "messageType",
+    "payload",
+    "pvPw",
+    "sn",
+    "soc",
+}
 
-# Wildcard local-MQTT topic filters that are rejected (subscribing to "#"
-# would capture unrelated LAN traffic). Single source for __init__.py +
-# diagnostics.py.
-BLOCKED_LOCAL_MQTT_TOPIC_FILTERS: Final = frozenset({"#", "+/#"})
 
 # How long the integration tolerates silence on the MQTT subscription
 # before flagging it as stale in diagnostics. Real Jackery devices send
@@ -107,7 +133,7 @@ MQTT_CONNECT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (300, 900, 1800)
 # staleness diagnostics. HTTP polling is NEVER skipped based on this — HTTP is
 # the always-on, authoritative data path and is never gated by MQTT/BLE state
 # (owner invariant 2026-07-05).
-MQTT_LIVE_THRESHOLD_SEC: Final = 30
+MQTT_LIVE_THRESHOLD_SEC: Final = 15
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
 # the official Jackery app can rotate broker sessions while HTTP credentials
@@ -295,15 +321,15 @@ BLE_MANUFACTURER_ID: int = 0x4802  # 18434 decimal — confirmed via live scan
 # ---------------------------------------------------------------------------
 # Observed binary frame layout (device → app notify on char 0xEE02)
 # ---------------------------------------------------------------------------
-#
+
 # Live capture 2026-05-16 against a SolarVault 3 Pro Max (via an ESPHome BLE
 # proxy) gave the *real* wire format. The earlier smali reconstruction stored
 # header fields as ASCII hex; what actually goes over the air is the same
 # logical fields but **packed as big-endian binary** inside the encrypted
 # payload. The 16-byte IV is plaintext-prefixed to every frame.
-#
+
 # Wire structure (after :func:`aes_decrypt`):
-#
+
 #   bytes 0..1   magic  = 0xDFED
 #   bytes 2..3   0x0064 (constant in every observed frame — possibly
 #                       a protocol-version / framing-version marker)
@@ -594,7 +620,14 @@ FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH: Final = "reconfigure_account_mismatch"
 FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL: Final = "accept_shared_successful"
 FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED: Final = "accept_shared_reauth_required"
 
-DEFAULT_SCAN_INTERVAL_SEC: Final = 15
+# Live-property polling cadence. 30 s is the Home Assistant `appropriate-polling`
+# guidance for a ``cloud_polling`` integration; cloud MQTT and BLE deliver the
+# fast-moving values by push, so the HTTP poll is a floor, not the live path.
+# Users who want the previous 15 s cadence can set it in the options flow.
+CONF_SCAN_INTERVAL: Final = "scan_interval"
+DEFAULT_SCAN_INTERVAL_SEC: Final = 30
+MIN_SCAN_INTERVAL_SEC: Final = 15
+MAX_SCAN_INTERVAL_SEC: Final = 600
 DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS: Final = True
 DEFAULT_CREATE_CALCULATED_POWER_SENSORS: Final = False
 DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
@@ -2752,17 +2785,11 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "messages_received",
     "messages_dropped",
     "messages_forwarded",
-    "messages_rejected_by_sink",
-    "messages_ignored_foreign",
     "last_connect_at",
     "last_disconnect_at",
     "last_message_at",
     "last_error",
     "connect_attempts",
-    "blocked_by_filter_count",
-    "payload_too_large_count",
-    "home_assistant_event_count",
-    "routing_warning",
     "local_mqtt_active",
     "library",
 })
@@ -2882,4 +2909,7 @@ _ENTITY_CREATING_OPTION_KEYS: frozenset[str] = frozenset({
 
 _RECONFIGURE_IN_PLACE_OPTION_KEYS: frozenset[str] = (
     frozenset(_OPTION_DEFAULTS) - _ENTITY_CREATING_OPTION_KEYS
-) | {CONF_ENABLE_PAYLOAD_DEBUG_LOG}
+) | {CONF_ENABLE_PAYLOAD_DEBUG_LOG, CONF_SCAN_INTERVAL}
+
+# NOTE: PACK_FIELD_LAST_SEEN_AT is declared once near the top of this module.
+# A duplicate ``Final`` re-declaration stood here and is invalid typing.

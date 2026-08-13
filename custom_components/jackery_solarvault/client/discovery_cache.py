@@ -1,5 +1,6 @@
-# ruff: disable[unsorted-imports, relative-imports]
 """Persistent discovery cache for local offline startup."""
+
+from __future__ import annotations
 
 import asyncio
 import copy
@@ -7,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
 from ..const import DOMAIN
-# ruff: enable[unsorted-imports, relative-imports]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant

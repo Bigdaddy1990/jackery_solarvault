@@ -10,7 +10,9 @@ Button command flow:
   coordinator-owned and never gate the HTTP polling path.
 """
 
-import asyncio  # ruff:ignore[unsorted-imports]
+from __future__ import annotations
+
+import asyncio
 import base64
 import binascii
 from collections import deque
@@ -565,13 +567,13 @@ if TYPE_CHECKING:
     from .client.api import JackeryApi, MqttSessionSnapshot
     from .client.ble_transport import BleFrameObservation
     from .client.mqtt_push import JackeryMqttPushClient
-    from .types import FieldProvenance
+    from .models import FieldProvenance
 
 from itertools import starmap
 import operator
 
 from .ingest import TransportSource, ingest_observation, is_periodic_section
-from .types import Observation
+from .models import Observation
 from .util import (
     WHOLE_INT_TEXT_RE,
     app_chart_name_prefix,
@@ -778,7 +780,7 @@ def _slow_fetch_failure_log_level(
     return logging.WARNING
 
 
-def control_int(value: Any, field_name: str) -> int:  # noqa: RUF105
+def control_int(value: Any, field_name: str) -> int:
     """Return a finite integer control value or raise a coordinator error."""
     parsed = None if isinstance(value, bool) else safe_int(value)
     if parsed is None:
@@ -787,7 +789,7 @@ def control_int(value: Any, field_name: str) -> int:  # noqa: RUF105
     return parsed
 
 
-def transport_cmd(value: Any) -> int:  # noqa: RUF105
+def transport_cmd(value: Any) -> int:
     """Return a command integer for MQTT/BLE transport routing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
@@ -882,6 +884,17 @@ def _normalize_backfill_status(
 _SYSTEM_BUSY_API_CODE = 10426
 _ENDPOINT_BACKOFF_CODES = frozenset({10422, 10432, 10600})
 _ENDPOINT_BACKOFF_DELAYS_SEC: tuple[int, ...] = (300, 900, 3600, 21600)
+# 10600 is a *verdict*, not a failure: the cloud is telling us this device or
+# contract does not serve the endpoint at all. Walking the escalating ladder
+# (300 -> 900 -> 3600 -> 21600) means four probes before the rate settles, and
+# because ``_endpoint_backoff`` lives only in memory that walk restarts on every
+# Home Assistant restart / entry reload. Saturate immediately instead: one probe
+# per long window from the very first 10600, so a restart costs a single
+# request per unsupported endpoint rather than four. Still not permanent — a
+# firmware update or a new contract can start serving the endpoint, and the
+# next window picks that up.
+_ENDPOINT_UNSUPPORTED_API_CODE = 10600
+_ENDPOINT_BACKOFF_UNSUPPORTED_DELAYS_SEC: tuple[int, ...] = (21600,)
 
 
 def _is_system_busy_error(err: BaseException) -> bool:
@@ -2584,7 +2597,7 @@ def sanitize_main_properties(props: dict[str, Any]) -> dict[str, Any]:
 
 
 def merge_battery_pack_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while.
@@ -2638,7 +2651,7 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
@@ -2692,7 +2705,7 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Merge Shelly Cloud accessory data by stable identity values and return an.
@@ -2732,7 +2745,7 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental smart-plug telemetry entries using device serial numbers to.
@@ -2754,7 +2767,7 @@ def merge_smart_plug_lists(
 
 
 def merge_circuits(
-    current: Any,  # noqa: RUF105
+    current: Any,
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental circuit breaker telemetry using idx to align updates."""
@@ -2762,7 +2775,7 @@ def merge_circuits(
 
 
 def merge_sub_devices(
-    current: Any,  # noqa: RUF105
+    current: Any,
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge generic sub-device telemetry using serial numbers to align updates."""
@@ -2770,9 +2783,9 @@ def merge_sub_devices(
 
 
 def _merge_subdevice_lists_by_fn(
-    current: Any,  # noqa: RUF105
+    current: Any,
     updates: list[dict[str, Any]],
-    serial_fn: Any,  # noqa: RUF105
+    serial_fn: Any,
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
 
@@ -2873,7 +2886,7 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge OTA metadata into a battery-pack list by matching serial numbers.
@@ -2933,7 +2946,7 @@ def merge_battery_pack_ota_lists(
 # ---------------------------------------------------------------------------
 
 
-def merge_battery_pack_lifetime_from_ble(  # noqa: RUF105
+def merge_battery_pack_lifetime_from_ble(
     updated: dict[str, Any],
     body: dict[str, Any],
 ) -> bool:
@@ -3283,7 +3296,7 @@ _shelly_cloud_device_matches_entry_fn = shelly_cloud_device_matches_entry
 
 _METRIC_SOURCE_FALLBACKS: dict[str, tuple[tuple[str, str], ...]] = {
     # Intentionally empty today.
-    #
+
     # Home-energy period/day curves are only equivalent when sourced from
     # home_trends (totalHomeEgy + y-series). device_home_stat represents a
     # different metric family (grid-side in/out) and must not be substituted
@@ -3299,9 +3312,24 @@ _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS = 2
 _STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS = 3
 _STATISTICS_HTTP_TRANSIENT_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 # A genuinely empty historical response is not permanent: the app/cloud can
-# publish older buckets later. Reuse the longest existing HTTP endpoint backoff
-# so empty high-priority periods cannot starve independent year/week/day queues.
-_STATISTICS_HTTP_EMPTY_RETRY_SEC = _ENDPOINT_BACKOFF_DELAYS_SEC[-1]
+# publish older buckets later. So an empty day is never written off — but it
+# must not be re-probed at a fixed rate forever either.
+#
+# Observed 2026-08-12: ``/v1/device/stat/ct`` answers ``code=0 SUCCESS`` with
+# ``y1=[] y2=[]`` and no ``x`` axis for every dateType, on every call. With a
+# flat 6 h retry that is 153 days x 2 sources re-requested every 6 h, forever,
+# for series the cloud does not have. Escalate instead: 6 h, then 24 h, then
+# weekly. A day that stays empty decays to a background probe; a day that
+# starts delivering is picked up on the next window and imports normally.
+_STATISTICS_HTTP_EMPTY_RETRY_LADDER_SEC: tuple[int, ...] = (
+    _ENDPOINT_BACKOFF_DELAYS_SEC[-1],  # 6 h
+    86400,  # 1 day
+    604800,  # 1 week
+)
+_STATISTICS_HTTP_EMPTY_RETRY_SEC = _STATISTICS_HTTP_EMPTY_RETRY_LADDER_SEC[0]
+# Counts how often a day has already been deferred as empty, so the ladder above
+# can be indexed. Distinct from ``attempts``, which also counts transport errors.
+_STATISTICS_HTTP_EMPTY_DEFERRALS = "empty_deferrals"
 _STATISTICS_HTTP_RETRY_AFTER_EPOCH = "retry_after_epoch"
 _STATISTICS_HTTP_VERIFIED_TOTALS = "verified_totals"
 _STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY = "sum_chain_version"
@@ -3380,7 +3408,7 @@ def _serialize_mqtt_messages_by_device(
         self: JackerySolarVaultCoordinator,
         topic: str,
         payload: dict[str, Any],
-        **kwargs: Any,  # noqa: RUF105
+        **kwargs: Any,
     ) -> str | None:
         device_id = self._resolve_device_id_from_mqtt(payload)
         lock_key = device_id or "__unresolved__"
@@ -3424,7 +3452,7 @@ class _CloudCommandAttempt:
     session_generation: int
 
 
-class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):  # ruff:ignore[too-many-public-methods]
+class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Polls all known Jackery devices."""
 
     @staticmethod
@@ -3754,7 +3782,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         }
         self._statistics_startup_sync_pending = True
         self._polling_diagnostics: dict[str, Any] = {
+            # Slow-endpoint TTL cache effectiveness. ``cache_hits`` used to be
+            # declared here but never incremented, so it always read 0 and
+            # looked like the cache never worked. Both counters are maintained
+            # in ``_get_with_ttl_for``.
             "cache_hits": 0,
+            "cache_stale_returns": 0,
             "fetches": 0,
             "empty_fetches": 0,
             "failures": 0,
@@ -3980,7 +4013,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._pending_discovery_parent_removals = next_confirmations
         return reconciled, first_omissions, confirmed_removals
 
-    async def async_discover(self) -> bool:  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    async def async_discover(self) -> bool:  # noqa: C901
         """Populate _device_index from config or /v1/device/system/list."""
         new_index: dict[str, dict[str, Any]] = {}
         discovered_at = datetime.now(UTC).isoformat()
@@ -4556,7 +4589,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def record_http_auth_rejection(self, status: int, data: object) -> None:
         """Record HTTP/API authentication rejection metrics."""
         reason = f"http_{status}"
-        if self.api._is_token_expired_response(status, data):  # noqa: RUF105, SLF001
+        if self.api._is_token_expired_response(status, data):  # noqa: SLF001
             self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
             return
         self.rejection_metrics.increment("http_auth_rejections", reason)
@@ -4821,8 +4854,25 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def configured_update_interval(self) -> timedelta:
-        """Return the integration's coordinator polling interval."""  # noqa: D421, RUF105
+        """Return the integration's coordinator polling interval."""
         return self._configured_update_interval
+
+    def async_set_scan_interval(self, update_interval: timedelta) -> None:
+        """Apply a new live-poll interval without reloading the config entry.
+
+        The options flow can change the cadence at runtime. Both the configured
+        baseline (used for cycle budgets and TTL derivations) and the
+        coordinator's own scheduling interval have to move together, otherwise
+        the overrun accounting keeps measuring against the old cadence.
+        """
+        self._configured_update_interval = update_interval
+        self._slow_metrics_interval_sec = max(
+            SLOW_METRICS_INTERVAL_SEC,
+            int(update_interval.total_seconds()),
+        )
+        # See ``_reschedule_after_cycle``: the stubs split the property/setter
+        # pair, so mypy misses the HA-public ``update_interval`` setter.
+        self.update_interval = update_interval  # type: ignore[misc]
 
     def _poll_cycle_timeout_seconds(self) -> float:
         """Return a cycle ceiling that preserves the configured poll cadence."""
@@ -4891,7 +4941,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return
             except ConfigEntryAuthFailed as err:
                 self._defer_background_auth_failure(err)
-            except Exception as err:  # background boundary  # noqa: BLE001, RUF105
+            except Exception as err:  # background boundary  # noqa: BLE001
                 _LOGGER.debug("Jackery background task %s failed: %s", key, err)
 
         task.add_done_callback(_task_done)
@@ -4954,7 +5004,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def has_pending_supplemental_transport_cleanup(self) -> bool:
-        """Return whether a Layer-5 transport still needs independent cleanup."""  # noqa: D421, RUF105
+        """Return whether a Layer-5 transport still needs independent cleanup."""
         return (
             self._mqtt is not None
             or self._ble_listener is not None
@@ -5425,22 +5475,18 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "device_traffic_observed": bool(snap.get("device_traffic_observed", False))
             or bool(getattr(self, "_local_mqtt_device_traffic_observed", False)),
             "messages_received": snap.get("messages_received", 0),
+            # ``messages_dropped`` now only counts messages that arrived with no
+            # sink wired. The client applies no content filtering, so the other
+            # drop counters (blocked_by_filter / payload_too_large /
+            # home_assistant_event / rejected_by_sink / ignored_foreign) no
+            # longer exist.
             "messages_dropped": snap.get("messages_dropped", 0),
             "messages_forwarded": snap.get("messages_forwarded", 0),
-            "messages_rejected_by_sink": snap.get(
-                "messages_rejected_by_sink",
-                0,
-            ),
-            "messages_ignored_foreign": snap.get("messages_ignored_foreign", 0),
             "last_connect_at": snap.get("last_connect_at"),
             "last_disconnect_at": snap.get("last_disconnect_at"),
             "last_message_at": snap.get("last_message_at"),
             "last_error": snap.get("last_error"),
             "connect_attempts": snap.get("connect_attempts", 0),
-            "blocked_by_filter_count": snap.get("blocked_by_filter_count", 0),
-            "payload_too_large_count": snap.get("payload_too_large_count", 0),
-            "home_assistant_event_count": snap.get("home_assistant_event_count", 0),
-            "routing_warning": snap.get("routing_warning"),
             "local_mqtt_active": self._local_mqtt_is_active(),
             "library": snap.get("library"),
         }
@@ -5491,7 +5537,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Clear BLE connect backoff after a successful device session."""
         self._ble_backoff_for_device(device_id).record_success()
 
-    async def _async_ingest_ble_observation(  # ruff:ignore[too-many-locals]  # One guarded decoder keeps App frame validation and routing atomic.  # noqa: C901, RUF105
+    async def _async_ingest_ble_observation(  # One guarded decoder keeps App frame validation and routing atomic.  # noqa: C901
         self,
         device_id: str,
         observation: BleFrameObservation,
@@ -5822,7 +5868,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     _BACKGROUND_TASK_STOP_TIMEOUT_SEC,
                 )
                 return
-            except Exception as err:  # noqa: BLE001, RUF105
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.warning(
                     "Jackery BLE option reconfiguration failed; HTTP remains "
                     "active: %s",
@@ -5984,7 +6030,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         self._mqtt_mgr.record_connect_success(mqtt, fingerprint)
 
     @_serialize_mqtt_messages_by_device
-    async def _async_handle_mqtt_message(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    async def _async_handle_mqtt_message(  # noqa: C901
         self,
         topic: str,
         payload: dict[str, Any],
@@ -6212,7 +6258,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         # /v1/device/property HTTP endpoint. The app requests them with
         # READ_DEVICE_INFO (QueryDeviceProperty, actionId=3011, cmd=106).
         if (
-            not is_subdevice  # ruff:ignore[too-many-boolean-expressions]
+            not is_subdevice
             and not (
                 is_wifi_config
                 or is_wifi_list
@@ -6418,7 +6464,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 key = self.device_bluetooth_key(dev_id)
                 if not key:
                     continue
-                try:  # ruff:ignore[too-many-statements-in-try-clause]
+                try:
                     frame = decrypt_binary_notify(raw_bytes, key)
                     if frame.body:
                         decoded = json.loads(frame.body)
@@ -6714,7 +6760,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         source_state[device_id] = result.provenance
         return result.payload
 
-    def _accessory_updates_for_source(  # noqa: RUF105
+    def _accessory_updates_for_source(
         self,
         device_id: str | None,
         bucket: str,
@@ -6908,7 +6954,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             rejection_callback=self.record_schema_rejection,
         )
 
-    def _merge_subdevice_data(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    def _merge_subdevice_data(  # noqa: C901
         self,
         updated: dict[str, Any],
         source: dict[str, Any],
@@ -7119,7 +7165,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         """Merge partial accessory telemetry without deleting other sources."""
         updated[bucket] = merge_fn(updated.get(bucket), update_dicts)
 
-    def _normalize_live_property_payload(  # ruff:ignore[no-self-use]
+    def _normalize_live_property_payload(
         self, source: dict[str, Any]
     ) -> dict[str, Any]:
         """Normalize live properties before merging into coordinator data."""
@@ -7128,7 +7174,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields.
@@ -7144,7 +7190,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -7153,7 +7199,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``.
@@ -7391,7 +7437,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     async def _async_refresh_battery_pack_ota(self, device_id: str) -> None:
         """Fetch per-pack OTA metadata and push a partial coordinator update."""
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             payload = (self.data or {}).get(device_id) or {}
             packs = payload.get(PAYLOAD_BATTERY_PACKS)
             if not isinstance(packs, list) or not packs:
@@ -7431,7 +7477,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # noqa: RUF105
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -7947,14 +7993,21 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         return any(part in key for part in _ENDPOINT_BACKOFF_ENERGY_KEY_PARTS)
 
     @staticmethod
-    def _endpoint_backoff_delays_for_key(key: str) -> tuple[int, ...]:
+    def _endpoint_backoff_delays_for_key(
+        key: str,
+        code: int | None = None,
+    ) -> tuple[int, ...]:
         """Return the retry ladder for an endpoint-backoff key.
 
         Energy/stat keys use a short ladder capped at two minutes so they retry
-        regularly; every other key keeps the long escalating diagnostic ladder.
+        regularly. A ``code=10600`` verdict ("device does not serve this
+        endpoint") saturates at the long window immediately instead of walking
+        the escalating diagnostic ladder. Everything else keeps that ladder.
         """
         if JackerySolarVaultCoordinator._endpoint_backoff_is_energy_key(key):
             return _ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC
+        if code == _ENDPOINT_UNSUPPORTED_API_CODE:
+            return _ENDPOINT_BACKOFF_UNSUPPORTED_DELAYS_SEC
         return _ENDPOINT_BACKOFF_DELAYS_SEC
 
     @staticmethod
@@ -8000,23 +8053,31 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         else:
             previous_code = 0
-        delays = self._endpoint_backoff_delays_for_key(key)
+        delays = self._endpoint_backoff_delays_for_key(key, failure_code)
         if previous_code == failure_code and previous_level >= 0:
             level = min(previous_level + 1, len(delays) - 1)
         else:
             level = 0
         delay_sec = delays[level]
+        unsupported = failure_code == _ENDPOINT_UNSUPPORTED_API_CODE
         self._endpoint_backoff[key] = {
             "code": failure_code,
             "level": level,
             "until": now_monotonic + delay_sec,
+            # Surfaced in diagnostics so an operator can tell "the cloud says
+            # this device never serves that endpoint" apart from "this endpoint
+            # is currently failing".
+            "unsupported": unsupported,
         }
         if previous is None:
             _LOGGER.debug(
-                "Jackery endpoint backoff entered for %s (code=%d, delay=%ss)",
+                "Jackery endpoint backoff entered for %s (code=%d, delay=%ss%s)",
                 key,
                 failure_code,
                 delay_sec,
+                ", endpoint reported unsupported for this device"
+                if unsupported
+                else "",
             )
         return True
 
@@ -8068,7 +8129,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     def endpoint_backoff_diagnostics(self) -> dict[str, Any]:
         """Return active endpoint-backoff windows for diagnostics."""
         now_monotonic = time.monotonic()
-        active: dict[str, dict[str, int]] = {}
+        active: dict[str, dict[str, Any]] = {}
+        unsupported_keys: list[str] = []
         for key, state in self._endpoint_backoff.items():
             if self._endpoint_backoff_is_energy_key(key):
                 continue
@@ -8077,15 +8139,26 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             if remaining_raw <= 0:
                 continue
             remaining = int(remaining_raw)
+            is_unsupported = bool(state.get("unsupported"))
+            if is_unsupported:
+                unsupported_keys.append(key)
             active[key] = {
                 "code": int(safe_float(state.get("code")) or 0),
                 "level": int(safe_float(state.get("level")) or 0),
                 "remaining_seconds": remaining,
+                "unsupported": is_unsupported,
             }
         return {
             "active_count": len(active),
             "active": active,
             "delay_seconds": list(_ENDPOINT_BACKOFF_DELAYS_SEC),
+            # Endpoints the cloud reported as not served by this device
+            # (code=10600). These are expected to stay listed; they are not a
+            # fault and do not escalate.
+            "unsupported_count": len(unsupported_keys),
+            "unsupported_delay_seconds": list(
+                _ENDPOINT_BACKOFF_UNSUPPORTED_DELAYS_SEC
+            ),
         }
 
     def _merge_partial_device_update(
@@ -8373,15 +8446,17 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 )
 
     @staticmethod
-    def _coerce_transport_cmd(cmd: Any) -> int:  # noqa: RUF105
+    def _coerce_transport_cmd(cmd: Any) -> int:
         """Coerce transport cmd input to an integer.
 
         Accepts plain ints plus integral numeric strings (e.g. ``"107"``,
         ``"107.0"``). Rejects booleans, NaN/inf and non-integral values.
         """
         if isinstance(cmd, bool):
+            # ValueError (not TypeError) on purpose: the callers at the
+            # transport boundary catch ValueError for every coercion failure.
             msg = "cmd must be an integer"
-            raise ValueError(msg)  # ruff:ignore[type-check-without-type-error]
+            raise ValueError(msg)  # noqa: TRY004
         if isinstance(cmd, int):
             return cmd
         if isinstance(cmd, float):
@@ -8587,7 +8662,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             failures,
         )
 
-    async def _async_publish_command_ble_first(  # ruff:ignore[too-many-locals]
+    async def _async_publish_command_ble_first(
         self,
         device_id: str,
         *,
@@ -8702,7 +8777,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         succeeded: list[str] = []
         failures: list[str] = []
         first_error: Exception | None = None
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             while pending:
                 done, pending = await asyncio.wait(
                     pending,
@@ -8843,7 +8918,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         action_id = safe_int(payload.get(FIELD_ACTION_ID))
         last_err: Exception | None = None
         for attempt in range(2):
-            try:  # ruff:ignore[too-many-statements-in-try-clause]
+            try:
                 mqtt = self._mqtt
                 if mqtt is not None and not mqtt.is_connected:
                     await self._async_ensure_mqtt(
@@ -8853,7 +8928,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     mqtt = self._mqtt
                 if mqtt is None or not mqtt.is_connected:
                     msg = "MQTT client is not connected"
-                    raise RuntimeError(msg)  # ruff:ignore[raise-within-try]
+                    raise RuntimeError(msg)
                 if cloud_attempt is not None:
                     self._bind_cloud_command_attempt(cloud_attempt)
                 await mqtt.async_publish_json(topic, payload, qos=0, retain=False)
@@ -9957,7 +10032,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             recognized = isinstance(sub_devices, list) and bool(sub_devices)
         return recognized
 
-    async def async_refresh_documented_http_read(  # noqa: C901, RUF105
+    async def async_refresh_documented_http_read(  # noqa: C901
         self,
         device_id: str,
         *,
@@ -10431,13 +10506,13 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
     # (cmd=113 ``ThirdPartMQTTConfig``) and ``GET_THIRD_PARTY_MQTT_CONFIG``
     # (cmd=114 ``QueryThirdPartMQTTConfig``). Body schema from
     # ``ThirdPartyMqttBody.smali``:
-    #
+
     #     {"enable":0|1, "ip":<str>, "port":<int>,
     #      "userName":<str>, "password":<str>, "token":<str>}
-    #
+
     # These methods bypass the REST relay and publish the same app command
     # body to the device over the available write transport.
-    #
+
     # App 2.4.0 ``MqttMsgActivity.initData$lambda$10`` reuses a decoded token
     # when present and otherwise generates nine decimal digits with
     # ``Random.nextInt(10)``. ``HomeDeviceController.t1`` then sends
@@ -11863,7 +11938,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def statistics_backfill_diagnostics(self) -> dict[str, Any]:
-        """Return redaction-safe statistics repair diagnostics."""  # noqa: D421, RUF105
+        """Return redaction-safe statistics repair diagnostics."""
         devices = self._statistics_backfill_state.get(
             _STATISTICS_BACKFILL_STORE_DEVICES,
         )
@@ -12024,7 +12099,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 points=points,
             )
 
-    async def _async_add_app_chart_statistics_locked(  # ruff:ignore[too-many-locals]  # noqa: RUF105
+    async def _async_add_app_chart_statistics_locked(
         self,
         *,
         device_id: str,
@@ -12094,7 +12169,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         existing_sums: dict[float, float] = {}
         earliest = dt_util.as_utc(min(starts))
         latest = dt_util.as_utc(max(starts))
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             recorder = get_instance(self.hass)
             existing = await recorder.async_add_executor_job(
                 statistics_during_period,
@@ -12156,7 +12231,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
         }
         verified_sums: dict[float, float] = {}
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             recorder = get_instance(self.hass)
             async_add_external_statistics(
                 self.hass,
@@ -12356,7 +12431,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         successful_devices.add(device_id)
         return successful_devices
 
-    async def _async_fetch_historical_app_chart_source(  # noqa: RUF105
+    async def _async_fetch_historical_app_chart_source(
         self,
         *,
         device_id: str,
@@ -12594,7 +12669,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 self._device_registry_observer(merged)
             return merged
 
-    async def _async_update_data_guarded(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    async def _async_update_data_guarded(  # noqa: C901
         self,
         _retry_discovery_once: bool = True,
     ) -> dict[str, dict[str, Any]]:
@@ -12777,11 +12852,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: RUF105
+            default: Any,  # generic TTL cache over arbitrary payloads
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: RUF105
+        ) -> Any:  # generic TTL cache over arbitrary payloads
             """Generic TTL cache helper operating on any dict."""
             now = time.monotonic()
             entry = cache.get(cache_key)
@@ -12796,16 +12871,22 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # first TTL window after HA/WSL boot, when monotonic time is
                 # still smaller than ``ttl_sec``.
                 if last_ts > 0.0 and now - last_ts < ttl_sec:
+                    self._polling_diagnostics["cache_hits"] = (
+                        int(self._polling_diagnostics.get("cache_hits", 0)) + 1
+                    )
                     return last_value
                 # TTL expired — return stale data when caller allows it.
                 if stale_ok:
+                    self._polling_diagnostics["cache_stale_returns"] = (
+                        int(self._polling_diagnostics.get("cache_stale_returns", 0)) + 1
+                    )
                     return last_value
             elif stale_ok:
                 seeded_default = copy.deepcopy(default)
                 cache[cache_key] = (0.0, seeded_default)
                 return seeded_default
 
-            async def _fetch_uncached() -> Any:  # noqa: RUF105
+            async def _fetch_uncached() -> Any:
                 """Run one cache miss under the shared slow-HTTP limit."""
                 semaphore = getattr(self, "_slow_http_request_semaphore", None)
                 if not stale_ok and semaphore is not None:
@@ -12878,11 +12959,11 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # noqa: RUF105
+            default: Any,  # generic TTL cache over arbitrary payloads
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # noqa: RUF105
+        ) -> Any:  # generic TTL cache over arbitrary payloads
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -12923,7 +13004,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 return []
             return [item for item in devices if isinstance(item, dict)]
 
-        async def _fetch_system(  # ruff:ignore[too-many-locals]
+        async def _fetch_system(
             sys_id: str,
             *,
             stale_ok: bool = False,
@@ -13245,7 +13326,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         cache_key: str,
                         request_kwargs: dict[str, str],
                     ) -> Callable[[], Awaitable[Any]]:
-                        async def _refresh() -> Any:  # noqa: RUF105
+                        async def _refresh() -> Any:
                             # Use the non-semaphore primitive here. The
                             # background pass already bounds every device
                             # refresher with the shared slow-HTTP semaphore in
@@ -13271,7 +13352,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:  # forwards arbitrary cached payload  # noqa: RUF105
+                    ) -> Any:  # forwards arbitrary cached payload
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         cache_key = (
                             f"{section_prefix}_{DATE_TYPE_MONTH}_"
@@ -13328,7 +13409,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             system_cache[sys_id] = bundle
             return bundle
 
-        async def _fetch_device_extras(  # ruff:ignore[too-many-locals]
+        async def _fetch_device_extras(
             dev_id: str,
             dev_sn: str | None,
             sys_id: str | None,
@@ -13416,8 +13497,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                             stale_ok=stale_ok,
                         ),
                     )
-                task_names.append(battery_key)  # noqa: FURB113, RUF105
-                tasks.append(  # noqa: FURB113, RUF105
+                task_names.append(battery_key)  # noqa: FURB113
+                tasks.append(  # noqa: FURB113
                     _get_with_ttl_for(
                         per_dev,
                         battery_key,
@@ -13538,8 +13619,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # REST pack/list is slow and often returns null for SolarVault.
                 # Live pack values are refreshed via MQTT subdevice queries.
                 pack_interval_sec = self._slow_metrics_interval_sec
-                task_names.append(PAYLOAD_OTA)  # noqa: FURB113, RUF105
-                tasks.append(  # noqa: FURB113, RUF105
+                task_names.append(PAYLOAD_OTA)  # noqa: FURB113
+                tasks.append(  # noqa: FURB113
                     _get_with_ttl_for(
                         per_dev,
                         PAYLOAD_OTA,
@@ -14347,7 +14428,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             # (all buttons included) report unavailable and HA then refuses
             # button.press. The primary property/system/discovery fetches above
             # remain the sole auth authority that triggers reauth.
-            #
+
             # These are L5-class endpoints (Shelly realtime in particular is
             # slow and, on timeout, fails the single request with no retry — a
             # received-but-rejected response triggers at most one rate-limited
@@ -14517,7 +14598,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             def _make_device_refresher(
                 descriptor: tuple[str, str | None, str | None, str | None],
             ) -> Callable[[], Awaitable[Any]]:
-                async def _refresh() -> Any:  # forwards device extras  # noqa: RUF105
+                async def _refresh() -> Any:  # forwards device extras
                     return await _fetch_device_extras(
                         descriptor[0],
                         descriptor[1],
@@ -14537,7 +14618,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 # buckets back into ``self.data`` and push a partial update.
                 # Auth / transient failures stay isolated so they never flip
                 # ``last_update_success``.
-                async def _refresh() -> Any:  # noqa: RUF105
+                async def _refresh() -> Any:
                     if not self.data or enrich_dev_id not in self.data:
                         return None
                     enrich_entry = dict(self.data[enrich_dev_id])
@@ -14588,7 +14669,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             device_refreshers.extend(historical_month_refreshers)
             if shelly_cache_stale:
 
-                async def _refresh_shelly() -> Any:  # noqa: RUF105
+                async def _refresh_shelly() -> Any:
                     return await _fetch_shelly_cloud_devices(stale_ok=False)
 
                 device_refreshers.append(_refresh_shelly)
@@ -14743,7 +14824,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
             async def _refresh_device(
                 refresh_device: Callable[[], Awaitable[Any]],
-            ) -> Any:  # noqa: RUF105
+            ) -> Any:
                 return await refresh_device()
 
             async def _refresh_devices() -> None:
@@ -14758,7 +14839,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             async def _fetch_system_refresh(sid: str) -> None:
                 """Fetch all slow metrics for a single system under the
                 semaphore.
-                """  # noqa: D205, RUF105
+                """  # noqa: D205
                 # Run all system-level slow metric fetches concurrently,
                 # bounded by the shared semaphore.
                 await asyncio.gather(
@@ -14955,7 +15036,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     return_exceptions=True,
                 )
 
-            try:  # ruff:ignore[too-many-statements-in-try-clause]
+            try:
                 # Each HTTP request already has its own bounded client timeout.
                 # A second timeout around the complete queue aborted valid
                 # period/backfill work solely because many independent bounded
@@ -15017,7 +15098,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def mqtt_diagnostics(self) -> dict[str, Any]:
-        """Return the MQTT client diagnostics block for the diagnostics export."""  # noqa: D421, RUF105
+        """Return the MQTT client diagnostics block for the diagnostics export."""
         return self.mqtt_diagnostics_snapshot()
 
     def mqtt_diagnostics_snapshot(self) -> dict[str, Any]:
@@ -15079,7 +15160,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         ]
         return diag
 
-    def app_chart_import_diagnostics(self) -> dict[str, Any]:  # ruff:ignore[too-many-locals]
+    def app_chart_import_diagnostics(self) -> dict[str, Any]:
         """Return current app-chart import coverage for diagnostics.
 
         This makes the day-to-hourly backfill routing explicit: every metric in
@@ -16578,7 +16659,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             prefixes.extend((APP_SECTION_PV_STAT, APP_SECTION_HOME_TRENDS))
         return tuple(prefixes)
 
-    async def _async_fetch_historical_day_chart_source(  # noqa: RUF105
+    async def _async_fetch_historical_day_chart_source(
         self,
         *,
         device_id: str,
@@ -16669,7 +16750,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             error_status = (
                 "rate_limited" if _is_system_busy_error(err) else "transport_error"
             )
-        except Exception as err:  # noqa: BLE001, RUF105
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug(
                 "Jackery historical %s fetch for %s on %s failed: %s",
                 section_prefix,
@@ -16916,6 +16997,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         day_state.pop("imported_rows", None)
         day_state.pop("last_attempt_at", None)
         day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+        day_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
         day_state.pop(_STATISTICS_HTTP_VERIFIED_TOTALS, None)
         return False, True, False
 
@@ -16947,6 +17029,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             existing_state.pop("imported_rows", None)
             existing_state.pop("last_attempt_at", None)
             existing_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            existing_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
         source_state[_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY] = (
             _STATISTICS_HTTP_SUM_CHAIN_VERSION
         )
@@ -16982,6 +17065,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             later_state.pop("imported_rows", None)
             later_state.pop("last_attempt_at", None)
             later_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            later_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
             reopened += 1
         return reopened
 
@@ -17012,6 +17096,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             existing_state.pop("imported_rows", None)
             existing_state.pop("last_attempt_at", None)
             existing_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            existing_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
         type_state[_STATISTICS_HTTP_SUM_CHAIN_VERSION_KEY] = (
             _STATISTICS_HTTP_SUM_CHAIN_VERSION
         )
@@ -17040,8 +17125,29 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             later_state.pop("imported_rows", None)
             later_state.pop("last_attempt_at", None)
             later_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+            later_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
             reopened += 1
         return reopened
+
+    @staticmethod
+    def _defer_empty_backfill_bucket(bucket_state: dict[str, Any]) -> int:
+        """Schedule the next probe for a bucket the cloud answered as empty.
+
+        Each successive empty answer moves one rung up
+        ``_STATISTICS_HTTP_EMPTY_RETRY_LADDER_SEC`` (6 h -> 1 d -> 1 week) and
+        saturates at the top. The bucket is never written off, so a cloud that
+        starts publishing the series later is still picked up.
+
+        Returns:
+            int: The delay in seconds that was scheduled.
+        """
+        previous = bucket_state.get(_STATISTICS_HTTP_EMPTY_DEFERRALS)
+        deferrals = previous + 1 if isinstance(previous, int) and previous >= 0 else 1
+        bucket_state[_STATISTICS_HTTP_EMPTY_DEFERRALS] = deferrals
+        ladder = _STATISTICS_HTTP_EMPTY_RETRY_LADDER_SEC
+        delay = ladder[min(deferrals - 1, len(ladder) - 1)]
+        bucket_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = time.time() + delay
+        return delay
 
     @staticmethod
     def _apply_unfetched_day_backfill_status(
@@ -17065,9 +17171,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             status == "empty_ambiguous"
             and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
         ):
-            day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
-            )
+            JackerySolarVaultCoordinator._defer_empty_backfill_bucket(day_state)
             day_state.pop("completed_at", None)
         elif (
             status in {"auth_error", "transport_error"}
@@ -17080,7 +17184,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
         return False
 
-    async def _async_http_backfill_recent_day_statistics(  # ruff:ignore[too-many-locals]
+    async def _async_http_backfill_recent_day_statistics(
         self,
         snapshot: dict[str, dict[str, Any]],
         *,
@@ -17296,6 +17400,10 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
             )
             day_state["last_attempt_at"] = utc_now().isoformat()
             day_state["status"] = BackfillStatus.RETRYABLE.value
+            # NOTE: the empty-deferral counter is deliberately NOT cleared here.
+            # This runs at the START of every attempt; clearing it would flatten
+            # the escalating ladder back to 6 h forever. It is cleared only on a
+            # successful import or an explicit reopen.
             day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
             state_changed = True
 
@@ -17333,6 +17441,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     day_state["attempts"] = 0
                     day_state.pop("last_attempt_at", None)
                     day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+                    day_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
                 else:
                     self._apply_unfetched_day_backfill_status(
                         day_state,
@@ -17363,22 +17472,23 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 day_state["status"] = BackfillStatus.IMPORTED.value
                 day_state["imported_rows"] = imported
                 day_state["completed_at"] = utc_now().isoformat()
+                # The source delivered: a future empty answer starts the
+                # escalating cooldown from the bottom again.
+                day_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
                 successful_devices.add(device_id)
                 terminal_transitions += 1
                 pending_sources_total -= 1
                 actionable_sources_total -= 1
             else:
                 # A non-empty HTTP envelope can still contain no usable series
-                # for this metric/day. Keep it retryable after a long cooldown;
-                # an empty app bucket must never become permanent data loss.
+                # for this metric/day. Keep it retryable on an escalating
+                # cooldown; an empty app bucket must never become permanent
+                # data loss, but it must not be re-probed at a fixed rate
+                # forever either.
+                day_state["status"] = BackfillStatus.RETRYABLE.value
                 if day_state["attempts"] >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS:
-                    day_state["status"] = BackfillStatus.RETRYABLE.value
-                    day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
-                    )
+                    self._defer_empty_backfill_bucket(day_state)
                     day_state.pop("completed_at", None)
-                else:
-                    day_state["status"] = BackfillStatus.RETRYABLE.value
                 day_state.pop("imported_rows", None)
                 actionable_sources_total -= int(
                     day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH) is not None
@@ -17452,7 +17562,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
         })
         return result
 
-    async def _async_http_backfill_period_statistics(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    async def _async_http_backfill_period_statistics(  # noqa: C901
         self,
         snapshot: dict[str, dict[str, Any]],
         *,
@@ -17717,7 +17827,7 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                     period_start.isoformat(),
                     exception_debug_message(err),
                 )
-            except Exception as err:  # noqa: BLE001, RUF105
+            except Exception as err:  # noqa: BLE001
                 status = "transport_error"
                 _LOGGER.debug(
                     "Jackery period backfill failed for %s %s %s: %s",
@@ -17741,6 +17851,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 "status": BackfillStatus.RETRYABLE.value,
                 "period_open": False,
             })
+            # See the day loop: the empty-deferral counter must survive the
+            # start of an attempt, or the escalating ladder never escalates.
             bucket_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
             state_changed = True
 
@@ -17765,6 +17877,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                         "status": BackfillStatus.IMPORTED.value,
                         "completed_at": utc_now().isoformat(),
                     })
+                    # The source delivered: reset the escalating empty cooldown.
+                    bucket_state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
                     reopened = self._reopen_later_imported_period_states(
                         type_state,
                         target_period=period_start,
@@ -17795,12 +17909,8 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
                 status == "empty_ambiguous"
                 and attempts_now >= _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS
             ):
-                bucket_state.update({
-                    "status": BackfillStatus.RETRYABLE.value,
-                    _STATISTICS_HTTP_RETRY_AFTER_EPOCH: (
-                        time.time() + _STATISTICS_HTTP_EMPTY_RETRY_SEC
-                    ),
-                })
+                bucket_state["status"] = BackfillStatus.RETRYABLE.value
+                self._defer_empty_backfill_bucket(bucket_state)
                 bucket_state.pop("completed_at", None)
                 actionable_sources_total -= 1
             elif (
@@ -17845,12 +17955,12 @@ class JackerySolarVaultCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any
 
     @property
     def polling_diagnostics(self) -> dict[str, Any]:
-        """Return the latest HTTP polling/cache diagnostics."""  # noqa: D421, RUF105
+        """Return the latest HTTP polling/cache diagnostics."""
         return dict(self._polling_diagnostics)
 
     @property
     def statistics_import_diagnostics(self) -> dict[str, Any]:
-        """Return the latest Recorder import diagnostics."""  # noqa: D421, RUF105
+        """Return the latest Recorder import diagnostics."""
         return dict(self._statistics_import_diagnostics)
 
     def _metric_source_candidates(

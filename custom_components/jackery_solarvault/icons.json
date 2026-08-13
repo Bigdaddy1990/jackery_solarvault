@@ -255,11 +255,23 @@
       "ability_bits": {
         "default": "mdi:chip"
       },
+      "ac1_name": {
+        "default": "mdi:tag-text-outline"
+      },
+      "ac2_name": {
+        "default": "mdi:tag-text-outline"
+      },
+      "ac_output_mode": {
+        "default": "mdi:power-socket-de"
+      },
       "alarm_count": {
         "default": "mdi:alert-circle-outline"
       },
       "auto_standby": {
         "default": "mdi:power-sleep"
+      },
+      "auto_standby_timer": {
+        "default": "mdi:timer-cog-outline"
       },
       "battery_charge_month_energy": {
         "default": "mdi:battery-arrow-up"
@@ -288,6 +300,9 @@
       "battery_discharge_year_energy": {
         "default": "mdi:battery-arrow-down"
       },
+      "battery_low_state": {
+        "default": "mdi:battery-alert-variant-outline"
+      },
       "battery_net_power": {
         "default": "mdi:battery-sync"
       },
@@ -299,6 +314,9 @@
       },
       "battery_pack_communication_state": {
         "default": "mdi:access-point-network"
+      },
+      "battery_pack_count": {
+        "default": "mdi:battery-sync-outline"
       },
       "battery_pack_discharge_power": {
         "default": "mdi:battery-arrow-down"
@@ -329,6 +347,24 @@
       },
       "ble_transport": {
         "default": "mdi:bluetooth"
+      },
+      "box_mode": {
+        "default": "mdi:tune-variant"
+      },
+      "breaker_sph": {
+        "default": "mdi:electric-switch"
+      },
+      "charge_status": {
+        "default": "mdi:battery-charging"
+      },
+      "charge_status_code": {
+        "default": "mdi:battery-charging-outline"
+      },
+      "charge_status_limit": {
+        "default": "mdi:battery-charging-high"
+      },
+      "charge_status_type": {
+        "default": "mdi:battery-charging-medium"
       },
       "charging_input_power": {
         "default": "mdi:car-battery"
@@ -365,6 +401,21 @@
       },
       "ct_state": {
         "default": "mdi:counter"
+      },
+      "dc_output_config": {
+        "default": "mdi:current-dc"
+      },
+      "dc_output_type": {
+        "default": "mdi:current-dc"
+      },
+      "dc_type": {
+        "default": "mdi:current-dc"
+      },
+      "dc_usb_connected": {
+        "default": "mdi:usb-port"
+      },
+      "dc_usb_type": {
+        "default": "mdi:usb"
       },
       "device_activation": {
         "default": "mdi:key-variant"
@@ -435,6 +486,9 @@
       "device_pv4_year_energy": {
         "default": "mdi:solar-panel"
       },
+      "dhg_recall": {
+        "default": "mdi:backup-restore"
+      },
       "dynamic_price_contract_auth": {
         "default": "mdi:file-certificate"
       },
@@ -480,6 +534,9 @@
       "eps_switch_state": {
         "default": "mdi:power-plug-outline"
       },
+      "error_code": {
+        "default": "mdi:alert-circle-outline"
+      },
       "eth_port": {
         "default": "mdi:ethernet"
       },
@@ -491,6 +548,9 @@
       },
       "ethernet_port": {
         "default": "mdi:ethernet"
+      },
+      "external_pack_connected": {
+        "default": "mdi:battery-plus-outline"
       },
       "firmware_version": {
         "default": "mdi:chip"
@@ -540,6 +600,12 @@
       "latitude": {
         "default": "mdi:latitude"
       },
+      "light_sensor": {
+        "default": "mdi:brightness-6"
+      },
+      "load_mode": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
       "local_mqtt": {
         "default": "mdi:lan"
       },
@@ -585,8 +651,23 @@
       "ongrid_state": {
         "default": "mdi:transmission-tower"
       },
+      "power_count": {
+        "default": "mdi:counter"
+      },
+      "power_mode": {
+        "default": "mdi:power-settings"
+      },
+      "power_mode_battery": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "power_mode_portable": {
+        "default": "mdi:power-plug-outline"
+      },
       "power_price": {
         "default": "mdi:currency-eur"
+      },
+      "power_source_selector": {
+        "default": "mdi:transmission-tower-import"
       },
       "pv1_power": {
         "default": "mdi:solar-panel"
@@ -647,6 +728,12 @@
       },
       "savings_pv_residual_year_energy": {
         "default": "mdi:solar-power-variant-outline"
+      },
+      "sleep_mode_flag": {
+        "default": "mdi:sleep"
+      },
+      "sltb_value": {
+        "default": "mdi:numeric"
       },
       "smart_meter_apparent_power": {
         "default": "mdi:flash-outline"
@@ -777,6 +864,12 @@
       "smart_meter_voltage": {
         "default": "mdi:sine-wave"
       },
+      "smart_mode_active": {
+        "default": "mdi:brain"
+      },
+      "smart_mode_time_difference": {
+        "default": "mdi:clock-alert-outline"
+      },
       "smart_plug_communication_mode": {
         "default": "mdi:transit-connection-variant"
       },
@@ -849,6 +942,9 @@
       "system_state": {
         "default": "mdi:state-machine"
       },
+      "system_status_switch": {
+        "default": "mdi:toggle-switch-outline"
+      },
       "task_plan": {
         "default": "mdi:calendar-clock"
       },
@@ -873,6 +969,15 @@
       "total_revenue": {
         "default": "mdi:currency-eur"
       },
+      "total_time": {
+        "default": "mdi:timer-outline"
+      },
+      "tou_plan_tasks": {
+        "default": "mdi:calendar-clock"
+      },
+      "ups_mode": {
+        "default": "mdi:shield-flash-outline"
+      },
       "weather_plan": {
         "default": "mdi:weather-lightning-rainy"
       },
@@ -881,6 +986,12 @@
       },
       "wifi_name": {
         "default": "mdi:wifi"
+      },
+      "wifi_ssid": {
+        "default": "mdi:wifi"
+      },
+      "wifi_switch_status": {
+        "default": "mdi:wifi-cog"
       },
       "work_mode": {
         "default": "mdi:tune-variant"

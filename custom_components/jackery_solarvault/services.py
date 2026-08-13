@@ -19,6 +19,8 @@ The actions follow the same routing contract:
    ``translation_domain`` so HA can render a localized error to the user.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable, Coroutine
 import json
 import logging
@@ -204,7 +206,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _coerce_service_int(raw: Any) -> int:  # noqa: RUF105
+def _coerce_service_int(raw: Any) -> int:
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
         msg = "expected integer"
@@ -233,7 +235,7 @@ def _coerce_service_int(raw: Any) -> int:  # noqa: RUF105
     raise vol.Invalid(msg)
 
 
-def _coerce_service_float(raw: Any) -> float:  # noqa: RUF105
+def _coerce_service_float(raw: Any) -> float:
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
         msg = "expected finite number"
@@ -1051,7 +1053,7 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g.,
         "12345"), otherwise the original input.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
@@ -1067,7 +1069,7 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
     Returns:
         parent_id (str): The parent Jackery numeric device id with any documented
         subdevice suffix removed.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
     if device is not None:
@@ -1221,7 +1223,7 @@ def _service_validation_error(
         ServiceValidationError: Error with `translation_domain` set to DOMAIN,
         `translation_key` set to `translation_key`, and `translation_placeholders`
         containing `device_id` and `error`.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     placeholders = {
         "device_id": device_id,
         "error": str(error),
@@ -1237,7 +1239,7 @@ def _service_validation_error(
 
 def _device_id_from_service(
     hass: HomeAssistant,
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     translation_key: str,
     extra_placeholders: dict[str, str] | None = None,
@@ -1259,7 +1261,7 @@ def _device_id_from_service(
     )
 
 
-def _rename_system_id_from_service(raw: Any) -> str:  # noqa: RUF105
+def _rename_system_id_from_service(raw: Any) -> str:
     """Return a validated system id from a direct rename service call."""
     system_id = ""
     if isinstance(raw, str):
@@ -1282,7 +1284,7 @@ def _rename_system_id_from_service(raw: Any) -> str:  # noqa: RUF105
     )
 
 
-def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: RUF105
+def _rename_name_from_service(raw: Any, system_id: str) -> str:
     """Return a validated system name from a direct rename service call."""
     if not isinstance(raw, str):
         raise ServiceValidationError(
@@ -1315,7 +1317,7 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:  # noqa: RUF105
     return parsed
 
 
-def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # noqa: RUF105
+def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:
     """Return a validated storm-alert id from a direct service call."""
     alert_id = ""
     if isinstance(raw, str):
@@ -1342,7 +1344,7 @@ def _reject_json_constant(constant: str) -> object:
     raise ValueError(msg)
 
 
-def _json_native_value(value: Any) -> Any:  # noqa: RUF105
+def _json_native_value(value: Any) -> Any:
     """Return a JSON-native value or raise ValueError."""
     if value is None or isinstance(value, str | bool | int):
         return value
@@ -1357,8 +1359,10 @@ def _json_native_value(value: Any) -> Any:  # noqa: RUF105
         normalized: dict[str, Any] = {}
         for key, item in value.items():
             if not isinstance(key, str):
+                # ValueError (not TypeError) on purpose: the caller wraps this
+                # helper in ``except ValueError`` to build the service error.
                 msg = "body object keys must be strings"
-                raise ValueError(msg)  # ruff:ignore[type-check-without-type-error]
+                raise ValueError(msg)  # noqa: TRY004
             normalized[key] = _json_native_value(item)
         return normalized
     msg = "body must contain only JSON-compatible values"
@@ -1386,7 +1390,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     return normalized
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # noqa: RUF105
+def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
     """Parse a BLE command `body` value from a service call into a dict.
 
     Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.
@@ -1435,7 +1439,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
     )
 
 
-def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:  # noqa: RUF105
+def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:
     """Return a TOU tasks list from a service object or JSON string."""
     parsed: Any = raw_body
     if isinstance(raw_body, str):
@@ -1474,7 +1478,7 @@ def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any
 
 
 def _service_bool(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1492,7 +1496,7 @@ def _service_bool(
 
 
 def _service_required_text(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1523,7 +1527,7 @@ def _service_required_text(
 
 
 def _service_optional_text(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1550,7 +1554,7 @@ def _service_optional_text(
 
 
 def _service_int(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1577,7 +1581,7 @@ def _service_int(
 
 
 def _service_float(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1872,7 +1876,7 @@ async def _async_handle_set_third_party_mqtt_config(
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or
         if applying the configuration fails. The error includes translation placeholders
         `device_id` and `error`.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2433,10 +2437,10 @@ def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
     segno is imported lazily so the module import stays cheap for the common
     path that never renders a QR.
     """
-    import base64  # ruff:ignore[import-outside-top-level]
-    import io  # ruff:ignore[import-outside-top-level]
+    import base64
+    import io
 
-    import segno  # ruff:ignore[import-outside-top-level]
+    import segno
 
     buffer = io.BytesIO()
     segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
@@ -2461,7 +2465,7 @@ def _notify_share_qr_code(
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
     try:
-        # ruff:ignore[import-outside-top-level]  # deliberate: the import stays inside
+  # deliberate: the import stays inside
         # the best-effort try so a missing/broken persistent_notification component
         # cannot fail the service, which must still return its response envelope.
         from homeassistant.components import persistent_notification
@@ -3632,7 +3636,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     storm alert, set/query third-party MQTT config, send BLE command, and send device
     schedule. Each service is registered with this module's corresponding voluptuous
     schema and forwards validated ServiceCall objects to the integration handlers.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
 
     def _make_handler(
         handler: _ServiceHandler,
@@ -3673,7 +3677,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
         `body` is invalid, or if sending the schedule fails.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

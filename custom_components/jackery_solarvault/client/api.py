@@ -17,6 +17,8 @@ Trends:   /v1/device/stat/sys/pv/trends       (?systemId&beginDate&endDate&dateT
 Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import binascii
@@ -38,7 +40,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     ACCESSORIES_BIND_PATH,
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
@@ -253,7 +255,7 @@ from ..const import (  # ruff: ignore[relative-imports]
     VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
 )
-from ..util import (  # ruff: ignore[relative-imports]
+from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
@@ -450,7 +452,7 @@ class MqttSessionSnapshot(TypedDict):
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:  # ruff:ignore[too-many-public-methods]
+class JackeryApi:
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(  # constructor takes distinct client-config values; a params object adds no clarity
@@ -596,7 +598,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
         Returns:
             str: The resolved MAC ID string.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -620,7 +622,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         url: str,
         form_body: dict[str, str],
         headers: dict[str, str],
-    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors  # noqa: RUF105
+    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors
         """POST the encrypted login form and return the decoded JSON response.
 
         Parameters:
@@ -653,7 +655,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
     @staticmethod
     async def _decode_login_response(
         resp: aiohttp.ClientResponse,
-    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors  # noqa: RUF105
+    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors
         """Validate the login HTTP response and return its decoded JSON body.
 
         Parameters:
@@ -806,7 +808,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):
             return None
 
         if len(seed) != _MQTT_SEED_LEN:
@@ -1135,7 +1137,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             result = callback(status, data)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001, RUF105
+        except Exception as err:  # noqa: BLE001
             _LOGGER.debug("Jackery auth rejection callback failed: %s", err)
 
     async def _emit_payload_debug(
@@ -1157,7 +1159,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # ruff:ignore[blind-except]  # best-effort debug logging must never break the API path
+        except Exception as err:  # best-effort debug logging must never break the API path
             _LOGGER.debug("Jackery payload debug logging failed: %s", err)
 
     @staticmethod
@@ -1471,7 +1473,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
     async def async_get_alarm(
         self, system_id: str | int
-    ) -> Any:  # parsed JSON response, indexed by callers  # noqa: RUF105
+    ) -> Any:  # parsed JSON response, indexed by callers
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -1738,7 +1740,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         Returns:
             list[dict]: Battery pack dictionaries extracted from the response; empty
             list if no packs are found or the response shape is unrecognized.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         params = {FIELD_DEVICE_SN: str(device_sn)}
         data = await self._get_json(BATTERY_PACK_PATH, params=params)
         if isinstance(data, dict):
@@ -2160,7 +2162,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
         )
         return self._payload_dict(data, DEVICE_BLUETOOTH_KEY_PATH)
 
-    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:  # noqa: RUF105
+    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:
         """Create or configure a system using backend-provided parameters.
 
         Parameters:
@@ -2322,7 +2324,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             dict: Payload containing aggregated totals (e.g., `totalInEpsEnergy`,
             `totalOutEpsEnergy`), chart series arrays (`x`, `y`, `y1`, `y2`), and, when
             present, an `APP_REQUEST_META` dict with the request parameters used.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
             device_id=device_id,
@@ -3991,7 +3993,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
             the response `code` indicates an error.
             JackeryAuthError: When the response indicates an authentication or
             authorization failure.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         token_used = await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -4094,7 +4096,7 @@ class JackeryApi:  # ruff:ignore[too-many-public-methods]
 
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if not isinstance(max_power, int) or max_power < 0:
             msg = "max_power must be a non-negative integer"
             raise JackeryApiError(msg)

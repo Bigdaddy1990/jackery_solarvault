@@ -54,6 +54,8 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 import os
@@ -167,7 +169,7 @@ def hex_encode(data: bytes) -> str:
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     return data.hex().upper()
 
 
@@ -179,7 +181,7 @@ def hex_decode(text: str) -> bytes:
 # ---------------------------------------------------------------------------
 # CRC-16 (mirrors ``sb.b.b`` in the app)
 # ---------------------------------------------------------------------------
-#
+
 # The smali implementation in ``sb/b.b([B) String`` is a textbook Modbus
 # CRC-16 (polynomial 0xA001, reflected): for each input byte XOR into the
 # low byte of the accumulator, then shift right 8 times, XORing with
@@ -264,16 +266,16 @@ def random_iv() -> bytes:
 # ---------------------------------------------------------------------------
 # Observed binary frame layout (device → app notify on char 0xEE02)
 # ---------------------------------------------------------------------------
-#
+
 # Live capture 2026-05-16 against a SolarVault 3 Pro Max (via an ESPHome BLE
 # proxy) gave the *real* wire format. The smali-reconstructed layout in
 # ``build_plaintext_frame`` / ``parse_plaintext_frame`` above stores all
 # header fields as ASCII hex; what actually goes over the air is the same
 # logical fields but **packed as big-endian binary** inside the encrypted
 # payload. The 16-byte IV is plaintext-prefixed to every frame.
-#
+
 # Wire structure (after :func:`aes_decrypt`):
-#
+
 #   bytes 0..1   magic  = 0xDFED
 #   bytes 2..3   0x0064 (constant in every observed frame — possibly
 #                       a protocol-version / framing-version marker)
@@ -332,11 +334,11 @@ class BleBinaryFrame:
 # ---------------------------------------------------------------------------
 # Outbound frame builder (Phase 3b, write to char 0xEE01)
 # ---------------------------------------------------------------------------
-#
+
 # Mirror image of :func:`decrypt_binary_notify`: serialise the same binary
 # layout, PKCS7-pad and AES-CBC-encrypt, then prefix the IV so the device
 # can recover the original plaintext with its own key.
-#
+
 # Open questions captured in :class:`BleBinaryFrame` apply: the trailer
 # algorithm is unknown, so this builder accepts an explicit ``trailer``
 # parameter that defaults to four NUL bytes. The right path forward is
@@ -658,7 +660,7 @@ def decrypt_frame(blob: bytes, key: bytes) -> BleFrame:
 # ---------------------------------------------------------------------------
 # Chunking helper (encode side, for Phase 3b setters)
 # ---------------------------------------------------------------------------
-#
+
 # The app sizes each chunk at ``(MTU - 60) * 2`` *hex characters*, i.e. the
 # raw payload-byte budget per frame is ``MTU - 60``. The default BLE 5.0
 # MTU is 23 (= 3 bytes/chunk after the 60-byte overhead), but the app

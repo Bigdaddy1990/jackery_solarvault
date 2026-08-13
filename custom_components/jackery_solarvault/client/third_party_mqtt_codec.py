@@ -1,11 +1,13 @@
 """App-compatible codec for ThirdPartMQTTConfig credential fields."""
 
+from __future__ import annotations
+
 import base64
 import logging
 import secrets
 from typing import Any
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
@@ -32,7 +34,7 @@ from ..const import (  # ruff: ignore[relative-imports]
     FIELD_THIRD_PARTY_MQTT_USERNAME,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
 )
-from ..util import safe_bool  # ruff: ignore[relative-imports]
+from ..util import safe_bool
 from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
 
 _LOGGER = logging.getLogger(__name__)

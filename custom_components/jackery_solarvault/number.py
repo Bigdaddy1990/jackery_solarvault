@@ -6,6 +6,8 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -160,7 +162,7 @@ def _is_portable_payload(
 # ---------------------------------------------------------------------------
 
 
-def _rounded_int(value: Any) -> int:  # noqa: RUF105
+def _rounded_int(value: Any) -> int:
     """Round a value accepted by Home Assistant as a number to the nearest integer.
 
     Parameters:
@@ -241,7 +243,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 # ---------------------------------------------------------------------------
 
 
-def _wire_int(value: Any) -> int:  # noqa: RUF105
+def _wire_int(value: Any) -> int:
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
@@ -262,7 +264,7 @@ def _wire_int(value: Any) -> int:  # noqa: RUF105
     return parsed
 
 
-def _wire_float(value: Any) -> float:  # noqa: RUF105
+def _wire_float(value: Any) -> float:
     """Parse an arbitrary input into a float suitable for coordinator setter calls.
 
     Parameters:
@@ -953,7 +955,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity's current value."""  # noqa: D421, RUF105
+        """Return the entity's current value."""
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -966,7 +968,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
-        """Return the highest value the user can write."""  # noqa: D421, RUF105
+        """Return the highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -982,7 +984,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         Returns:
             The unit of measurement string, or None if no unit is configured.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -991,7 +993,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def suggested_display_precision(self) -> int | None:
-        """Return the suggested number of decimal places for display."""  # noqa: D421, RUF105
+        """Return the suggested number of decimal places for display."""
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
@@ -1035,7 +1037,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when
             `raise_on_setter_error` is True and the setter fails.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         parsed_value = safe_float(value)
         if parsed_value is None:
             self._raise_action_error(
@@ -1098,7 +1100,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]
+async def async_setup_entry(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -1188,7 +1190,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home
             Assistant.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)

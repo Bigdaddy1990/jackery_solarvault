@@ -1,5 +1,7 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
 from datetime import UTC, datetime
@@ -14,7 +16,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_RCS,
@@ -80,7 +82,7 @@ class JackeryMqttPushClient:
             disconnect_callback (Callable[[], Awaitable[None]] | None): Optional async
             callback invoked after a prior successful connection when the client
             disconnects.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         self._hass = hass
         self._message_callback = message_callback
         self._connect_callback = connect_callback
@@ -306,7 +308,7 @@ class JackeryMqttPushClient:
         Raises:
             RuntimeError: If the MQTT client runner is not started, or if the client
             fails to connect within `timeout_sec`.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if not self.is_started:
             msg = "MQTT client is not running"
             raise RuntimeError(msg)
@@ -325,7 +327,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -447,11 +449,11 @@ class JackeryMqttPushClient:
         connected and schedules the disconnect callback when a previously established
         session ends. On errors, updates internal error state and sets or clears the
         connected event to reflect whether the termination was a connect failure.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         runner_task = asyncio.current_task()
         broker_connected = False
         subscription_error: str | None = None
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             raw_client = aiomqtt.Client(
                 hostname=MQTT_HOST,
                 port=MQTT_PORT,
@@ -528,7 +530,7 @@ class JackeryMqttPushClient:
                 )
         except asyncio.CancelledError:
             raise
-        except Exception as err:  # noqa: BLE001, RUF105
+        except Exception as err:  # noqa: BLE001
             if self._session_is_current(generation, runner_task):
                 self._last_error = f"connect failed: {err}"
                 self._connected_event.set()
@@ -572,7 +574,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the connect failure reason.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         message = f"connect rc={rc} ({reason})"
@@ -619,7 +621,7 @@ class JackeryMqttPushClient:
                 error (str): The error message to record.
                 was_connected (bool): If True, record the error as a disconnect; if
                 False, record it as a connect failure.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if self._is_connect_failure_error(self._last_error):
             return
         if was_connected:
@@ -659,7 +661,7 @@ class JackeryMqttPushClient:
         Returns:
             True if `rc` is one of 4, 5, 134, or 135 (authentication failure codes),
             False otherwise.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         return rc in MQTT_AUTH_FAILURE_RCS
 
     @staticmethod
@@ -690,7 +692,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and
             `verify_mode = ssl.CERT_REQUIRED`.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -758,7 +760,7 @@ class JackeryMqttPushClient:
                 `_messages_seen`, records `_last_message_at` (UTC ISO), clears
                 `_last_message_error`, and schedules the configured message callback
                 with `(topic, data)`.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if generation is not None and not self._session_is_current(
             generation, runner_task
         ):
@@ -849,8 +851,8 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:  # noqa: BLE001, RUF105
-                _LOGGER.error("Jackery MQTT %s handler failed: %s", label, err)
+            except Exception:
+                _LOGGER.exception("Jackery MQTT %s handler failed", label)
 
         task.add_done_callback(_log_task_result)
 
@@ -885,8 +887,8 @@ class JackeryMqttPushClient:
                 done.result()
             except asyncio.CancelledError:
                 return
-            except Exception as err:
-                _LOGGER.exception("Jackery MQTT %s handler failed: %s", label, err)  # ruff:ignore[verbose-log-message]
+            except Exception:
+                _LOGGER.exception("Jackery MQTT %s handler failed", label)
 
         task.add_done_callback(_track_lifecycle_result)
 
@@ -929,7 +931,7 @@ class JackeryMqttPushClient:
         async def _publish() -> None:
             try:
                 await publish()
-            except Exception as err:  # noqa: BLE001, RUF105
+            except Exception as err:  # noqa: BLE001
                 if not self._session_is_current(callback_generation):
                     return
                 self._birth_publish_failed += 1
@@ -941,9 +943,7 @@ class JackeryMqttPushClient:
                             err,
                         )
                     return
-                _LOGGER.error(
-                    "Jackery MQTT birth snapshot handler failed: %s", err
-                )
+                _LOGGER.exception("Jackery MQTT birth snapshot handler failed")
 
         self._schedule_lifecycle_callback(
             _publish,
@@ -973,7 +973,7 @@ class JackeryMqttPushClient:
 
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if topic is None:
             return None
         parts = topic.split("/")
@@ -1136,7 +1136,7 @@ class JackeryMqttPushClient:
         Returns:
             float | None: Non-negative seconds since the last message, or `None` if
             unavailable or invalid.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if self._last_message_at is None:
             return None
         try:
@@ -1177,7 +1177,7 @@ class JackeryMqttPushClient:
         Returns:
             `True` if the elapsed time since the chosen timestamp exceeds
             MQTT_SILENT_THRESHOLD_SEC, `False` otherwise.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if not self._connected:
             return False
         elapsed = self._seconds_since_last_message()

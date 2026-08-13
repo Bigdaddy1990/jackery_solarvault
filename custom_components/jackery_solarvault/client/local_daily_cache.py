@@ -1,4 +1,3 @@
-# ruff: disable[unsorted-imports, relative-imports]
 """Per-device midnight snapshots of lifetime energy counters.
 
 The SolarVault firmware exposes monotonic 0.01 kWh counters in every BLE/MQTT
@@ -22,6 +21,8 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
+from __future__ import annotations
+
 import asyncio
 from datetime import date, timedelta
 import json
@@ -36,7 +37,6 @@ from ..const import (
     DATE_TYPE_YEAR,
     DOMAIN,
 )
-# ruff: enable[unsorted-imports, relative-imports]
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -354,7 +354,7 @@ def daily_delta(
         return None
     try:
         current = int(current_lifetime_value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if not isinstance(snapshot, dict):
         return None
@@ -369,7 +369,7 @@ def daily_delta(
         return None
     try:
         anchor_int = int(anchor)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
     if current < anchor_int:
         return None
@@ -428,7 +428,7 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
         refreshed: dict[str, Any] = {
             _KEY_DAY: today_iso,
@@ -446,7 +446,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
     for metric, value in current_values.items():
         if metric in merged:
@@ -455,7 +455,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             continue
     refreshed = {_KEY_DAY: today_iso, _KEY_VALUES: merged}
     if completed_days:

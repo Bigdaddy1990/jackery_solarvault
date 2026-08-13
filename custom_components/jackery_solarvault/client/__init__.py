@@ -5,6 +5,8 @@ constants live one level up in ``..util`` and ``..const`` so the integration
 maintains a single source of truth — there is no separate, standalone copy.
 """
 
+from __future__ import annotations
+
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
@@ -24,7 +26,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export  # noqa: RUF105
+def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export
     """Lazily resolve ``JackeryMqttPushClient`` on module attribute access.
 
     Parameters:

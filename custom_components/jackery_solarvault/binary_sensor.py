@@ -1,5 +1,7 @@
 """Binary sensor platform for Jackery SolarVault."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -160,7 +162,7 @@ SUBDEVICE_ALARM_DEVICE_CLASSES: dict[int, BinarySensorDeviceClass] = {
 }
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
+async def async_setup_entry(  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -172,7 +174,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     coordinator data, de-duplicates entities across rebuilds, and calls the provided
     `async_add_entities` callback to register newly discovered entities when the
     coordinator's entity signature changes.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -188,7 +190,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             unique ID is new.
             entity (BinarySensorEntity): Binary sensor entity whose unique ID will be
             checked and recorded.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -284,7 +286,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Compute the coordinator entity signature and, if it differs from the previously
         recorded signature, collect entities and register them via `async_add_entities`;
         update the stored signature. No action is taken when the signature is unchanged.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:
@@ -386,7 +388,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: The matching smart-plug dictionary from the current payload,
             or an empty dict if no match is found.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         payload = self._payload
         if payload:
             for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
@@ -419,7 +421,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to values; always contains
             `plug_index`.
-        """  # noqa: D205, D421, RUF105
+        """  # noqa: D205
         plug = self._plug
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
@@ -473,7 +475,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the alert count is positive."""  # noqa: D421, RUF105
+        """Return true if the alert count is positive."""
         raw = self._sub_device.get(self.entity_description.field)
         val = safe_int(raw)
         return val > 0 if val is not None else None
@@ -485,7 +487,7 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
         Overrides the description's fixed `safety` class so a smoke or
         water-leak accessory reports its own `smoke`/`moisture` class instead
         of the generic one every subdevice alarm otherwise shares.
-        """  # noqa: D421, RUF105
+        """
         dev_type = safe_int(self._sub_device.get(FIELD_DEV_TYPE))
         if dev_type is None:
             return self.entity_description.device_class

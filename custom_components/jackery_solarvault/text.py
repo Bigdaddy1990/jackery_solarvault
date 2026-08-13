@@ -1,5 +1,7 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -153,7 +155,7 @@ _THIRD_PARTY_MQTT_TEXT_FIELDS: tuple[
 )
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
+async def async_setup_entry(  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -287,7 +289,7 @@ class JackeryDeviceNameText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the device name exposed by the HTTP property/discovery payload."""  # noqa: D421, RUF105
+        """Return the device name exposed by the HTTP property/discovery payload."""
         for section in (self._device_meta, self._discovery, self._system):
             value = section.get(FIELD_DEVICE_NAME)
             if isinstance(value, str) and value:
@@ -368,7 +370,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Returns:
             The editable system name, the device product name, or None.
-        """  # noqa: D421, RUF105
+        """
         sys_data = self._system
         # systemName is the editable label; deviceName is the app product label.
         return sys_data.get(FIELD_SYSTEM_NAME) or sys_data.get(FIELD_DEVICE_NAME)
@@ -640,7 +642,7 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
 
     @property
     def native_value(self) -> str | None:
-        """Return the current plaintext value used for writes."""  # noqa: D421, RUF105
+        """Return the current plaintext value used for writes."""
         value = self.coordinator.third_party_mqtt_config_plaintext(self._device_id).get(
             self._field,
         )

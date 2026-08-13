@@ -1,5 +1,7 @@
 """Button platform for Jackery SolarVault."""
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -263,7 +265,7 @@ async def _query_wifi_list(
 
     Parameters:
         device_id (str): Identifier of the target device to query.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """
     await coordinator.async_query_wifi_list(device_id)
 
 
@@ -941,7 +943,7 @@ def _smart_plug_device_sn(plug: object) -> str | None:
     return str(raw)
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
+async def async_setup_entry(  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,

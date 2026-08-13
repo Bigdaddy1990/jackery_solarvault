@@ -1,6 +1,8 @@
 """Jackery SolarVault integration."""
 
-import asyncio  # ruff:ignore[unsorted-imports]
+from __future__ import annotations
+
+import asyncio
 import contextlib
 from datetime import timedelta
 import hashlib
@@ -40,7 +42,6 @@ from .client.mqtt_session_cache import (
     normalize_mqtt_session_snapshot,
 )
 from .const import (
-    BLOCKED_LOCAL_MQTT_TOPIC_FILTERS,
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -54,6 +55,7 @@ from .const import (
     CONF_LOCAL_MQTT_USERNAME,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
+    CONF_SCAN_INTERVAL,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -71,7 +73,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_ENABLE as DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD as DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
-    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER as DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME as DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
     DUPLICATE_BINARY_SENSOR_SUFFIXES,
@@ -86,7 +88,10 @@ from .const import (
     FIELD_MODEL_NAME as FIELD_MODEL_NAME,
     FIELD_SCAN_NAME as FIELD_SCAN_NAME,
     FIELD_SUB_TYPE as FIELD_SUB_TYPE,
+    LOCAL_MQTT_DEFAULT_TOPIC,
     LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,
+    MAX_SCAN_INTERVAL_SEC,
+    MIN_SCAN_INTERVAL_SEC,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
@@ -149,12 +154,11 @@ if TYPE_CHECKING:
 else:
     JackeryConfigEntry = ConfigEntry
 
-_LOGGER = logging.getLogger(__name__)  # noqa: RUF067, RUF105
-_BLOCKED_LOCAL_MQTT_TOPIC_FILTERS = BLOCKED_LOCAL_MQTT_TOPIC_FILTERS  # noqa: RUF067, RUF105
-_JACKERY_ENV_PREFIX = "JACKERY_"  # noqa: RUF067, RUF105
+_LOGGER = logging.getLogger(__name__)
+_JACKERY_ENV_PREFIX = "JACKERY_"
 
 
-def _read_env_file_sync(env_file: Path) -> str | None:  # noqa: RUF067, RUF105
+def _read_env_file_sync(env_file: Path) -> str | None:
     """Read the .env file content if present.
 
     This blocking read is deliberately a module-level synchronous helper so it
@@ -174,7 +178,7 @@ def _read_env_file_sync(env_file: Path) -> str | None:  # noqa: RUF067, RUF105
         return None
 
 
-async def _load_dotenv_if_present(hass_config_path: Path) -> None:  # noqa: RUF067, RUF105
+async def _load_dotenv_if_present(hass_config_path: Path) -> None:
     """Load JACKERY_* variables from a .env file into os.environ.
 
     HA OS does not process .env files for custom integrations.  This
@@ -209,17 +213,17 @@ async def _load_dotenv_if_present(hass_config_path: Path) -> None:  # noqa: RUF0
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
 # accident.
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)  # noqa: RUF067, RUF105
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:  # noqa: RUF067, RUF105
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up global Jackery SolarVault services."""
     await _load_dotenv_if_present(Path(hass.config.config_dir))
     async_setup_services(hass)
     return True
 
 
-def _async_clean_legacy_entities(  # noqa: RUF067, RUF105
+def _async_clean_legacy_entities(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> None:
@@ -294,7 +298,7 @@ def _async_clean_legacy_entities(  # noqa: RUF067, RUF105
     )
 
 
-def _async_remove_legacy_system_parent_devices(  # noqa: RUF067, RUF105
+def _async_remove_legacy_system_parent_devices(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> None:
@@ -327,7 +331,7 @@ def _async_remove_legacy_system_parent_devices(  # noqa: RUF067, RUF105
         )
 
 
-def _local_mqtt_client(  # noqa: RUF067, RUF105
+def _local_mqtt_client(
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """Return the per-entry local MQTT client stored in hass.data.
@@ -343,14 +347,14 @@ def _local_mqtt_client(  # noqa: RUF067, RUF105
     return client if isinstance(client, JackeryLocalMqttClient) else None
 
 
-_PRIMARY_SETUP_TIMEOUT_SEC = 90.0  # noqa: RUF067, RUF105
-_ENTRY_TASK_CANCEL_TIMEOUT_SEC = 5.0  # noqa: RUF067, RUF105
-_LAYER5_TASK_RUNTIME_KEY = "layer5_start_task"  # noqa: RUF067, RUF105
-_OPTIONS_RECONCILE_TASK_RUNTIME_KEY = "options_reconcile_task"  # noqa: RUF067, RUF105
-_OPTIONS_RECONCILE_PENDING_RUNTIME_KEY = "options_reconcile_pending"  # noqa: RUF067, RUF105
-_OPTIONS_SNAPSHOT_RUNTIME_KEY = "options_snapshot"  # noqa: RUF067, RUF105
-_ENTRY_DATA_SNAPSHOT_RUNTIME_KEY = "entry_data_snapshot"  # noqa: RUF067, RUF105
-_LOCAL_MQTT_OPTION_KEYS = frozenset({  # noqa: RUF067, RUF105
+_PRIMARY_SETUP_TIMEOUT_SEC = 90.0
+_ENTRY_TASK_CANCEL_TIMEOUT_SEC = 5.0
+_LAYER5_TASK_RUNTIME_KEY = "layer5_start_task"
+_OPTIONS_RECONCILE_TASK_RUNTIME_KEY = "options_reconcile_task"
+_OPTIONS_RECONCILE_PENDING_RUNTIME_KEY = "options_reconcile_pending"
+_OPTIONS_SNAPSHOT_RUNTIME_KEY = "options_snapshot"
+_ENTRY_DATA_SNAPSHOT_RUNTIME_KEY = "entry_data_snapshot"
+_LOCAL_MQTT_OPTION_KEYS = frozenset({
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
     CONF_LOCAL_MQTT_PASSWORD,
@@ -365,24 +369,24 @@ _LOCAL_MQTT_OPTION_KEYS = frozenset({  # noqa: RUF067, RUF105
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
 })
-_DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS = frozenset(  # noqa: RUF067, RUF105
+_DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS = frozenset(
     _LOCAL_MQTT_OPTION_KEYS - {CONF_THIRD_PARTY_MQTT_TOKEN},
 )
-_SUPPLEMENTAL_OPTION_KEYS = frozenset({  # noqa: RUF067, RUF105
+_SUPPLEMENTAL_OPTION_KEYS = frozenset({
     CONF_ENABLE_BLE_TRANSPORT,
     *_LOCAL_MQTT_OPTION_KEYS,
 })
-_UNLOADING_COORDINATOR_RUNTIME_KEY = "unloading_coordinator"  # noqa: RUF067, RUF105
-_PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY = "primary_setup_coordinator"  # noqa: RUF067, RUF105
-_SUPPLEMENTAL_TRANSPORT_COORDINATORS_RUNTIME_KEY = "supplemental_transport_coordinators"  # noqa: RUF067, RUF105
-_SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY = "supplemental_local_mqtt_clients"  # noqa: RUF067, RUF105
-_SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY = "supplemental_layer5_tasks"  # noqa: RUF067, RUF105
-_SUPPLEMENTAL_CLEANUP_TASK_RUNTIME_KEY = "supplemental_cleanup_task"  # noqa: RUF067, RUF105
-_SUPPLEMENTAL_CLEANUP_RETRY_SEC = 5.0  # noqa: RUF067, RUF105
+_UNLOADING_COORDINATOR_RUNTIME_KEY = "unloading_coordinator"
+_PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY = "primary_setup_coordinator"
+_SUPPLEMENTAL_TRANSPORT_COORDINATORS_RUNTIME_KEY = "supplemental_transport_coordinators"
+_SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY = "supplemental_local_mqtt_clients"
+_SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY = "supplemental_layer5_tasks"
+_SUPPLEMENTAL_CLEANUP_TASK_RUNTIME_KEY = "supplemental_cleanup_task"
+_SUPPLEMENTAL_CLEANUP_RETRY_SEC = 5.0
 
 
-@callback  # ruff: ignore[non-empty-init-module]
-def _async_prune_removed_local_mqtt_tls_options(  # noqa: RUF105
+@callback
+def _async_prune_removed_local_mqtt_tls_options(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -400,7 +404,7 @@ def _async_prune_removed_local_mqtt_tls_options(  # noqa: RUF105
     )
 
 
-def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:  # noqa: RUF067, RUF105
+def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:
     """Validate and extract the config entry's bootstrap MQTT session.
 
     Parameters:
@@ -418,7 +422,7 @@ def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None: 
     )
 
 
-def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:  # noqa: RUF067, RUF105
+def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Get or create the config entry's mutable ``hass.data`` bucket.
 
     Parameters:
@@ -437,7 +441,7 @@ def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, 
     return bucket
 
 
-def _entry_runtime_task(  # noqa: RUF067, RUF105
+def _entry_runtime_task(
     hass: HomeAssistant,
     entry: ConfigEntry,
     key: str,
@@ -454,7 +458,26 @@ def _entry_runtime_task(  # noqa: RUF067, RUF105
     return task if isinstance(task, asyncio.Task) else None
 
 
-def _entry_owns_coordinator(  # noqa: RUF067, RUF105
+def _configured_scan_interval_sec(entry: ConfigEntry) -> int:
+    """Return the user's live-poll interval, clamped to the supported range.
+
+    Clamping happens here as well as in the options schema so a value written
+    by an older release, a YAML import, or a hand-edited ``.storage`` entry can
+    never drive the coordinator below the rate limit the Jackery cloud tolerates.
+
+    Returns:
+        int: Poll interval in seconds within
+        [``MIN_SCAN_INTERVAL_SEC``, ``MAX_SCAN_INTERVAL_SEC``].
+    """
+    configured = config_entry_int_option(
+        entry,
+        CONF_SCAN_INTERVAL,
+        DEFAULT_SCAN_INTERVAL_SEC,
+    )
+    return min(max(configured, MIN_SCAN_INTERVAL_SEC), MAX_SCAN_INTERVAL_SEC)
+
+
+def _entry_owns_coordinator(
     hass: HomeAssistant,
     entry: ConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -469,7 +492,7 @@ def _entry_owns_coordinator(  # noqa: RUF067, RUF105
     return entry.runtime_data is coordinator and unloading is not coordinator
 
 
-def _store_entry_runtime_task(  # noqa: RUF067, RUF105
+def _store_entry_runtime_task(
     hass: HomeAssistant,
     entry: ConfigEntry,
     key: str,
@@ -487,7 +510,7 @@ def _store_entry_runtime_task(  # noqa: RUF067, RUF105
             done.result()
         except asyncio.CancelledError:
             return
-        except Exception as err:  # noqa: BLE001, RUF105
+        except Exception as err:  # noqa: BLE001
             _LOGGER.warning(
                 "Jackery background task %s for entry %s failed: %s",
                 task.get_name(),
@@ -498,7 +521,7 @@ def _store_entry_runtime_task(  # noqa: RUF067, RUF105
     task.add_done_callback(_task_done)
 
 
-def _append_supplemental_runtime_object(  # noqa: RUF067, RUF105
+def _append_supplemental_runtime_object(
     hass: HomeAssistant,
     entry: ConfigEntry,
     key: str,
@@ -514,7 +537,7 @@ def _append_supplemental_runtime_object(  # noqa: RUF067, RUF105
         values.append(value)
 
 
-def _supplemental_runtime_items(  # noqa: RUF067, RUF105
+def _supplemental_runtime_items(
     bucket: dict[str, Any],
     key: str,
 ) -> list[object]:
@@ -523,7 +546,7 @@ def _supplemental_runtime_items(  # noqa: RUF067, RUF105
     return list(values) if isinstance(values, list) else []
 
 
-def _set_supplemental_runtime_items(  # noqa: RUF067, RUF105
+def _set_supplemental_runtime_items(
     bucket: dict[str, Any],
     key: str,
     values: list[object],
@@ -535,7 +558,7 @@ def _set_supplemental_runtime_items(  # noqa: RUF067, RUF105
         bucket.pop(key, None)
 
 
-def _supplemental_cleanup_pending(  # noqa: RUF067, RUF105
+def _supplemental_cleanup_pending(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> bool:
@@ -553,7 +576,7 @@ def _supplemental_cleanup_pending(  # noqa: RUF067, RUF105
     )
 
 
-def _defer_layer5_start_task(  # noqa: RUF067, RUF105
+def _defer_layer5_start_task(
     hass: HomeAssistant,
     entry: ConfigEntry,
 ) -> None:
@@ -575,7 +598,7 @@ def _defer_layer5_start_task(  # noqa: RUF067, RUF105
         )
 
 
-def _defer_supplemental_local_mqtt(  # noqa: RUF067, RUF105
+def _defer_supplemental_local_mqtt(
     hass: HomeAssistant,
     entry: ConfigEntry,
     client: JackeryLocalMqttClient,
@@ -592,7 +615,7 @@ def _defer_supplemental_local_mqtt(  # noqa: RUF067, RUF105
     )
 
 
-def _defer_supplemental_transports(  # noqa: RUF067, RUF105
+def _defer_supplemental_transports(
     hass: HomeAssistant,
     entry: ConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -607,7 +630,7 @@ def _defer_supplemental_transports(  # noqa: RUF067, RUF105
         )
 
 
-async def _async_cleanup_stale_supplemental(  # noqa: RUF067, RUF105
+async def _async_cleanup_stale_supplemental(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -651,7 +674,7 @@ async def _async_cleanup_stale_supplemental(  # noqa: RUF067, RUF105
             try:
                 async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                     await item.async_stop()
-            except Exception:  # noqa: BLE001, RUF105
+            except Exception:  # noqa: BLE001
                 pending_local_mqtt.append(item)
         _set_supplemental_runtime_items(
             bucket,
@@ -669,7 +692,7 @@ async def _async_cleanup_stale_supplemental(  # noqa: RUF067, RUF105
             try:
                 async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                     await item.async_stop_supplemental_transports()
-            except Exception:  # noqa: BLE001, RUF105
+            except Exception:  # noqa: BLE001
                 pending_transport_coordinators.append(item)
                 continue
             if item.has_pending_supplemental_transport_cleanup:
@@ -684,7 +707,7 @@ async def _async_cleanup_stale_supplemental(  # noqa: RUF067, RUF105
             await asyncio.sleep(_SUPPLEMENTAL_CLEANUP_RETRY_SEC)
 
 
-def _schedule_supplemental_cleanup(  # noqa: RUF067, RUF105
+def _schedule_supplemental_cleanup(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -711,7 +734,7 @@ def _schedule_supplemental_cleanup(  # noqa: RUF067, RUF105
     )
 
 
-async def _async_release_fenced_coordinator(  # noqa: RUF067, RUF105
+async def _async_release_fenced_coordinator(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> bool:
@@ -745,7 +768,7 @@ async def _async_release_fenced_coordinator(  # noqa: RUF067, RUF105
     return True
 
 
-async def _async_prime_entry_bootstrap_mqtt_session(  # noqa: RUF029, RUF067, RUF105
+async def _async_prime_entry_bootstrap_mqtt_session(  # noqa: RUF029
     _hass: HomeAssistant,
     entry: ConfigEntry,
     api: JackeryApi,
@@ -763,7 +786,7 @@ async def _async_prime_entry_bootstrap_mqtt_session(  # noqa: RUF029, RUF067, RU
     return snapshot
 
 
-async def _async_load_entry_caches(  # noqa: RUF067, RUF105
+async def _async_load_entry_caches(
     hass: HomeAssistant,
     entry: ConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -806,7 +829,7 @@ async def _async_load_entry_caches(  # noqa: RUF067, RUF105
     return False
 
 
-async def _async_authenticate_api_layer(  # noqa: RUF067, RUF105
+async def _async_authenticate_api_layer(
     hass: HomeAssistant,
     entry: ConfigEntry,
     api: JackeryApi,
@@ -866,13 +889,13 @@ async def _async_authenticate_api_layer(  # noqa: RUF067, RUF105
             break
 
 
-async def _async_prepare_primary_http(  # noqa: RUF067, RUF105
+async def _async_prepare_primary_http(
     hass: HomeAssistant,
     entry: ConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
     """Authenticate, discover, and complete HA's mandatory first HTTP refresh."""
-    try:  # ruff:ignore[too-many-statements-in-try-clause]
+    try:
         await _async_authenticate_api_layer(hass, entry, coordinator.api)
         await coordinator.async_persist_http_mqtt_session()
         await coordinator.async_discover()
@@ -882,8 +905,8 @@ async def _async_prepare_primary_http(  # noqa: RUF067, RUF105
                 "Jackery HTTP discovery returned no devices; "
                 "Home Assistant will retry setup"
             )
-            raise ConfigEntryNotReady(msg)  # ruff:ignore[raise-within-try]
-    except ConfigEntryAuthFailed, ConfigEntryNotReady:
+            raise ConfigEntryNotReady(msg)
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
         raise
     except JackeryAuthError as err:
         msg = f"Jackery credentials were rejected by the HTTP API: {err}"
@@ -893,7 +916,7 @@ async def _async_prepare_primary_http(  # noqa: RUF067, RUF105
         raise ConfigEntryNotReady(msg) from err
 
 
-def _handle_optional_startup_result(  # noqa: RUF067, RUF105
+def _handle_optional_startup_result(
     coordinator: JackerySolarVaultCoordinator,
     result: BaseException | object,
     *,
@@ -909,12 +932,12 @@ def _handle_optional_startup_result(  # noqa: RUF067, RUF105
         label (str): Short label identifying the startup layer (used in logs).
     """
     if isinstance(result, ConfigEntryAuthFailed):
-        coordinator._defer_background_auth_failure(result)  # noqa: RUF105, SLF001
+        coordinator._defer_background_auth_failure(result)  # noqa: SLF001
     elif isinstance(result, BaseException):
         _LOGGER.warning("Jackery %s could not start: %s", label, result)
 
 
-async def _async_start_layer5_transports(  # noqa: RUF067, RUF105
+async def _async_start_layer5_transports(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -950,7 +973,7 @@ async def _async_start_layer5_transports(  # noqa: RUF067, RUF105
     coordinator.async_schedule_local_mqtt_device_config()
 
 
-def _schedule_layer5_start_if_ready(  # noqa: RUF067, RUF105
+def _schedule_layer5_start_if_ready(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -980,7 +1003,7 @@ def _schedule_layer5_start_if_ready(  # noqa: RUF067, RUF105
     entry.async_on_unload(_cancel_layer5_task)
 
 
-async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
+async def _async_start_local_mqtt(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -1012,23 +1035,10 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
     # An empty value falls back to the central receiver default because the UI
     # tells users they may leave it empty.
     raw_topic_filter = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
-        or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
-        or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
+        or LOCAL_MQTT_DEFAULT_TOPIC
     ).strip()
     configured_topic_filter = raw_topic_filter
-    topic_filter_blocked = (
-        enabled
-        and bool(host)
-        and raw_topic_filter in _BLOCKED_LOCAL_MQTT_TOPIC_FILTERS
-    )
-    if topic_filter_blocked:
-        _LOGGER.warning(
-            "Jackery local MQTT listener not started: broad topic filter %r is"
-            " blocked for CPU safety; configure a scoped filter or leave empty"
-            " to use the configured default topic",
-            raw_topic_filter,
-        )
     port = config_entry_int_option(
         entry,
         CONF_LOCAL_MQTT_PORT,
@@ -1059,7 +1069,9 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
         f"ha-jackery-{entry.entry_id[:8]}",
         configured_topic_filter,
     )
-    should_run = enabled and bool(host) and not topic_filter_blocked
+    # The subscription filter is the user's decision and is used verbatim; the
+    # listener only needs the opt-in and a broker host to start.
+    should_run = enabled and bool(host)
     existing_client = _local_mqtt_client(hass, entry)
     if (
         should_run
@@ -1077,7 +1089,7 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
         try:
             async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                 await existing_client.async_stop()
-        except Exception as err:  # never overlap an old broker session  # noqa: BLE001, RUF105
+        except Exception as err:  # never overlap an old broker session  # noqa: BLE001
             _LOGGER.warning(
                 "Jackery local MQTT client is still stopping; deferring its "
                 "cleanup before a replacement: %s",
@@ -1109,8 +1121,8 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
             data (dict[str, Any] | None): Validated plaintext JSON, or ``None`` for a
                 raw frame that the coordinator must decrypt before shared ingest.
         """
-        if not _entry_owns_coordinator(hass, entry, coordinator):
-            return False
+        # Forward all messages to the coordinator without filtering
+        # per integration rules: messages must not be dropped
         return await coordinator.async_handle_local_mqtt_message(
             topic,
             data,
@@ -1152,7 +1164,7 @@ async def _async_start_local_mqtt(  # noqa: RUF067, RUF105
     coordinator.async_schedule_local_mqtt_device_config()
 
 
-async def _async_shutdown_coordinator_bounded(  # noqa: RUF067, RUF105
+async def _async_shutdown_coordinator_bounded(
     coordinator: JackerySolarVaultCoordinator,
     *,
     context: str,
@@ -1168,13 +1180,13 @@ async def _async_shutdown_coordinator_bounded(  # noqa: RUF067, RUF105
             context,
         )
         return False
-    except Exception as err:  # noqa: BLE001, RUF105
+    except Exception as err:  # noqa: BLE001
         _LOGGER.debug("Jackery coordinator shutdown failed during %s: %s", context, err)
         return False
     return True
 
 
-async def _async_reconcile_entry_options(  # noqa: RUF067, RUF105
+async def _async_reconcile_entry_options(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -1214,7 +1226,7 @@ async def _async_reconcile_entry_options(  # noqa: RUF067, RUF105
             coordinator.async_schedule_local_mqtt_device_config()
 
 
-def _schedule_options_reconcile(  # noqa: RUF067, RUF105
+def _schedule_options_reconcile(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -1248,7 +1260,7 @@ def _schedule_options_reconcile(  # noqa: RUF067, RUF105
     )
 
 
-async def _async_entry_updated(  # noqa: RUF067, RUF105
+async def _async_entry_updated(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -1273,6 +1285,16 @@ async def _async_entry_updated(  # noqa: RUF067, RUF105
     }
     if not changed_keys:
         return
+    if CONF_SCAN_INTERVAL in changed_keys:
+        # Applied in place: the coordinator schedules each next cycle from its
+        # own ``update_interval``, so no reload is needed and every running
+        # transport keeps its session.
+        interval_sec = _configured_scan_interval_sec(entry)
+        coordinator.async_set_scan_interval(timedelta(seconds=interval_sec))
+        _LOGGER.info(
+            "Jackery: coordinator polling interval changed to %ss",
+            interval_sec,
+        )
     if changed_keys & _ENTITY_CREATING_OPTION_KEYS:
         _async_clean_legacy_entities(hass, entry)
         coordinator.async_update_listeners()
@@ -1280,7 +1302,7 @@ async def _async_entry_updated(  # noqa: RUF067, RUF105
         _schedule_options_reconcile(hass, entry, coordinator, changed_keys)
 
 
-async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
+async def _async_rollback_entry_setup(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
@@ -1293,7 +1315,7 @@ async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
     platforms_rolled_back = not platforms_started
     shutdown_ok = False
     rollback_ok = True
-    try:  # ruff:ignore[too-many-statements-in-try-clause]
+    try:
         _defer_layer5_start_task(hass, entry)
         local_mqtt = _local_mqtt_client(hass, entry)
         if local_mqtt is not None:
@@ -1314,7 +1336,7 @@ async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
                     COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
                 )
                 platforms_rolled_back = False
-            except Exception as err:  # noqa: BLE001, RUF105
+            except Exception as err:  # noqa: BLE001
                 _LOGGER.warning("Jackery partial platform rollback failed: %s", err)
                 platforms_rolled_back = False
         if not platforms_rolled_back:
@@ -1331,7 +1353,7 @@ async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
             return False
         _defer_supplemental_transports(hass, entry, coordinator)
         _schedule_supplemental_cleanup(hass, entry)
-    except Exception as err:  # noqa: BLE001, RUF105
+    except Exception as err:  # noqa: BLE001
         rollback_ok = False
         _LOGGER.warning("Jackery setup rollback cleanup failed: %s", err)
     finally:
@@ -1354,7 +1376,7 @@ async def _async_rollback_entry_setup(  # noqa: RUF067, RUF105
     return rollback_ok and platforms_rolled_back and shutdown_ok
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF105
+async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up the Jackery SolarVault config entry and optional transports.
 
     Performs authentication, constructs the coordinator, runs discovery and the initial
@@ -1396,7 +1418,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         ),
     )
 
-    interval_sec = DEFAULT_SCAN_INTERVAL_SEC
+    interval_sec = _configured_scan_interval_sec(entry)
     coordinator = JackerySolarVaultCoordinator(
         hass,
         entry,
@@ -1467,7 +1489,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     try:
         cache_ready = await _async_load_entry_caches(hass, entry, coordinator)
         http_ready = False
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             async with asyncio.timeout(_PRIMARY_SETUP_TIMEOUT_SEC):
                 try:
                     await _async_prepare_primary_http(hass, entry, coordinator)
@@ -1546,7 +1568,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 # -----------------------------------------------------------------------------
 
 
-def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RUF067, RUF105
+def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     """Remove stale Energy helper entities created without a measurement unit.
 
     Scans the entity registry for entities whose entity_id starts with the configured
@@ -1584,15 +1606,15 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:  # noqa: RU
         registry.async_remove(entity_id)
 
 
-_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")  # noqa: RUF067, RUF105
-_PORTABLE_SCREEN_UID_SUFFIX = "_portable_screen"  # noqa: RUF067, RUF105
-_PORTABLE_SCREEN_TRANSLATION_KEY = "portable_screen"  # noqa: RUF067, RUF105
-_GRID_STANDARD_UID_SUFFIX = "_grid_standard"  # noqa: RUF067, RUF105
-_GRID_STANDARD_TRANSLATION_KEY = "grid_standard"  # noqa: RUF067, RUF105
-_BATTERY_PACK_INDEX_MAX = 5  # noqa: RUF067, RUF105
+_LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
+_PORTABLE_SCREEN_UID_SUFFIX = "_portable_screen"
+_PORTABLE_SCREEN_TRANSLATION_KEY = "portable_screen"
+_GRID_STANDARD_UID_SUFFIX = "_grid_standard"
+_GRID_STANDARD_TRANSLATION_KEY = "grid_standard"
+_BATTERY_PACK_INDEX_MAX = 5
 
 
-def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067, RUF105
+def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     """Check whether a legacy device head is followed by ``key_suffix``.
 
     A legacy device head has the form `<digits>` or `<digits>_battery_pack_<digits>`.
@@ -1611,7 +1633,7 @@ def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:  # noqa: RUF067, 
     return _LEGACY_UID_HEAD_RE.fullmatch(head) is not None
 
 
-def _async_migrate_portable_screen_entity(  # noqa: RUF067, RUF105
+def _async_migrate_portable_screen_entity(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -1665,7 +1687,7 @@ def _async_migrate_portable_screen_entity(  # noqa: RUF067, RUF105
         )
         registry.async_update_entity(
             target_entry.entity_id,
-            aliases=list(old_entry.aliases),
+            aliases=set(old_entry.aliases),
             area_id=old_entry.area_id,
             categories=dict(old_entry.categories),
             disabled_by=old_entry.disabled_by,
@@ -1682,7 +1704,7 @@ def _async_migrate_portable_screen_entity(  # noqa: RUF067, RUF105
         )
 
 
-def _async_migrate_grid_standard_entity(  # noqa: RUF067, RUF105
+def _async_migrate_grid_standard_entity(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -1732,7 +1754,7 @@ def _async_migrate_grid_standard_entity(  # noqa: RUF067, RUF105
         )
         registry.async_update_entity(
             target_entry.entity_id,
-            aliases=list(old_entry.aliases),
+            aliases=set(old_entry.aliases),
             area_id=old_entry.area_id,
             categories=dict(old_entry.categories),
             disabled_by=old_entry.disabled_by,
@@ -1749,7 +1771,7 @@ def _async_migrate_grid_standard_entity(  # noqa: RUF067, RUF105
         )
 
 
-def _device_stable_identity(device: dr.DeviceEntry) -> str:  # noqa: RUF067, RUF105
+def _device_stable_identity(device: dr.DeviceEntry) -> str:
     """Generate a stable identity hash from device info when serial is unavailable.
 
     Uses a combination of model, firmware, hardware, scan_name, and type_name
@@ -1774,7 +1796,7 @@ def _device_stable_identity(device: dr.DeviceEntry) -> str:  # noqa: RUF067, RUF
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-def _battery_pack_registry_identity(  # noqa: RUF067, RUF105
+def _battery_pack_registry_identity(
     registry: dr.DeviceRegistry,
     device: dr.DeviceEntry,
 ) -> tuple[str, str, str] | None:
@@ -1802,7 +1824,7 @@ def _battery_pack_registry_identity(  # noqa: RUF067, RUF105
     return None
 
 
-def _async_migrate_smart_meter_identity(  # noqa: RUF067, RUF105
+def _async_migrate_smart_meter_identity(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -1862,7 +1884,7 @@ def _async_migrate_smart_meter_identity(  # noqa: RUF067, RUF105
             )
 
 
-def _seed_battery_pack_registry_identities(  # noqa: RUF067, RUF105
+def _seed_battery_pack_registry_identities(
     coordinator: JackerySolarVaultCoordinator,
     serial_records: dict[str, list[tuple[str, int | None]]],
     remaining_old_indices: dict[str, set[int]],
@@ -1967,7 +1989,7 @@ def _seed_battery_pack_registry_identities(  # noqa: RUF067, RUF105
             )
 
 
-def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # noqa: RUF067, RUF105
+def _async_migrate_battery_pack_identities(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -1981,7 +2003,7 @@ def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # n
     remaining_old_indices: dict[str, set[int]] = {}
     target_owners: dict[tuple[str, str], set[str]] = {}
 
-    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):  # noqa: RUF105
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
         identity = _battery_pack_registry_identity(device_registry, device)
         if identity is None:
             continue
@@ -2152,7 +2174,7 @@ def _async_migrate_battery_pack_identities(  # ruff:ignore[too-many-locals]  # n
     )
 
 
-def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF067, RUF105
+def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     serial_records: dict[str, list[tuple[str, int | None]]],
@@ -2259,7 +2281,7 @@ def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914, RUF0
                 )
 
 
-def _async_remove_phantom_battery_pack_devices(  # noqa: RUF067, RUF105
+def _async_remove_phantom_battery_pack_devices(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -2315,7 +2337,7 @@ def _async_remove_phantom_battery_pack_devices(  # noqa: RUF067, RUF105
         )
 
 
-def _async_remove_entities_with_suffixes(  # noqa: RUF067, RUF105
+def _async_remove_entities_with_suffixes(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     *,
@@ -2353,7 +2375,7 @@ def _async_remove_entities_with_suffixes(  # noqa: RUF067, RUF105
             registry.async_remove(ent.entity_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:  # noqa: RUF067, RUF105
+async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Unload the config entry and tear down its runtime resources.
 
     If platform unload succeeds, shuts down the coordinator (if present) and clears the
@@ -2431,7 +2453,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
                 entry.runtime_data = cast("Any", None)
 
 
-async def async_remove_config_entry_device(  # noqa: RUF029, RUF067, RUF105
+async def async_remove_config_entry_device(  # noqa: RUF029
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     device_entry: dr.DeviceEntry,

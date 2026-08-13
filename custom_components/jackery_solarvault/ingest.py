@@ -25,6 +25,8 @@ by an immediate cloud fallback snapshot; it never stops independent transports
 from continuing to publish.
 """
 
+from __future__ import annotations
+
 import time
 from typing import TYPE_CHECKING, Any, Final
 
@@ -42,12 +44,12 @@ from .const import (
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_STATISTIC,
 )
-from .types import DataSource, FieldProvenance, IngestResult
+from .models import DataSource, FieldProvenance, IngestResult
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from .types import Observation
+    from .models import Observation
 
 # Compatibility name retained for existing transport decoders. New code should
 # use ``DataSource`` so the source type is shared with Observation/IngestResult.

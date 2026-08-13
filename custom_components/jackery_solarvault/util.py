@@ -1,5 +1,7 @@
 """Shared helpers for Jackery SolarVault entities."""
 
+from __future__ import annotations
+
 import calendar
 import contextlib
 from dataclasses import dataclass
@@ -166,7 +168,7 @@ def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
     Returns:
         bool: The resolved boolean value (`true` or `false`), or `default` if the value
         is missing or not parseable.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -192,7 +194,7 @@ def config_entry_str_option(entry: object, key: str, default: str) -> str:
 
     Returns:
         str: The resolved option value coerced to `str`, or `default` when unset.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -216,7 +218,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
 
     Returns:
         int: The resolved integer option or `default` if not present or not convertible.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
     value = options.get(key)
@@ -226,7 +228,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -317,7 +319,7 @@ def parse_utc_datetime(
     return parsed.astimezone(UTC)
 
 
-def coordinator_entity_signature(  # ruff:ignore[too-many-locals]
+def coordinator_entity_signature(
     coordinator_data: dict[str, Any] | None,
 ) -> tuple[tuple[Any, ...], ...]:
     """Produce a deterministic, lightweight "shape" signature for coordinator payloads used during entity setup.
@@ -469,7 +471,7 @@ def append_unique_entity[EntityT](
     Returns:
         `True` if the entity was appended, `False` if it was skipped due to a duplicate
         `unique_id`.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     uid = getattr(entity, "unique_id", None)
     if uid and uid in seen_unique_ids:
         return False
@@ -499,7 +501,7 @@ def app_period_range(date_type: str, *, today: date | None = None) -> tuple[date
 
     Returns:
         tuple[date, date]: (begin_date, end_date) for the requested period, inclusive.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     date_type = validate_app_period_date_type(date_type)
     if today is None:
         today = datetime.now(UTC).astimezone().date()
@@ -561,7 +563,7 @@ def app_period_date_bounds(
     Raises:
         ValueError: If inputs are invalid for a date bound or if the resolved begin date
         is after the resolved end date.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     default_begin, default_end = app_period_range(date_type, today=today)
     begin = _app_period_bound_to_date(
         default_begin if begin_date is None else begin_date,
@@ -845,7 +847,7 @@ def safe_float(
     Returns:
         float_value (float | None): The parsed float on success, or `None` if `value` is
         `None` or cannot be converted.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if value is None:
         return None
     if isinstance(value, bool):
@@ -854,7 +856,7 @@ def safe_float(
         return _parse_float_string(value)
     try:
         parsed = float(value)
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):
         return None
     return parsed if math.isfinite(parsed) else None
 
@@ -1139,7 +1141,7 @@ def safe_bool(value: bool | float | str | None) -> bool | None:  # boolean paylo
             return False
     try:
         return int(value) != 0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -1407,7 +1409,7 @@ def _trend_date_type(section: str, source: dict[str, Any]) -> str | None:
     Returns:
         str | None: One of the `DATE_TYPE_*` suffix values when found, `None` if no date
         type can be determined.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     request = source.get(APP_REQUEST_META)
     if isinstance(request, dict):
         date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
@@ -1543,7 +1545,7 @@ def expanded_year_series_values(
               the documented total within a small tolerance; otherwise returns the raw
               series values.
             - If the series key is missing or the series is not a list, returns `None`.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return None
@@ -1652,7 +1654,7 @@ def effective_trend_series_values(
         list[float | None] | None: Normalized numeric values/placeholders, or
         ``None`` if the chart series key is not applicable or the series value
         is not a list.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     # dateType=day arrays are W power curves (served through
     # day_power_series_key), never energy chart buckets — their energy
     # totals live in the scalar fields.
@@ -1687,7 +1689,7 @@ def effective_period_total_value(
     Returns:
         float: The period total rounded to 2 decimals when available, `None` if no value
         can be determined.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
@@ -1737,7 +1739,7 @@ def year_payload_appears_current_month_only(
     Returns:
         bool: `True` if any inspected series has non-zero values only for
         `current_month`, `False` otherwise.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
+    """  # noqa: D205
     if current_month <= 1:
         return False
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
@@ -1856,7 +1858,7 @@ def _matches_pv_revenue_shape(
     return False
 
 
-def _calculated_savings_from_year(  # ruff:ignore[too-many-locals]  # cohesive savings estimation; intermediate totals kept named for clarity
+def _calculated_savings_from_year(  # cohesive savings estimation; intermediate totals kept named for clarity
     payload: dict[str, Any],
     *,
     year_generation: float | None,
@@ -1883,7 +1885,7 @@ def _calculated_savings_from_year(  # ruff:ignore[too-many-locals]  # cohesive s
             - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
         None: If required inputs are missing (no usable device/home/CT totals or no
         configured/derivable price).
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     device_output = _period_total_from_payload(
         payload,
         APP_SECTION_HOME_STAT,
@@ -2067,7 +2069,7 @@ def _backfill_pv_revenue(
     Side effects:
         - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
+    """  # noqa: D205
     revenue_values = [0.0 for _ in range(12)]
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
@@ -2130,7 +2132,7 @@ def backfill_year_payload_from_months(  # per-month aggregation dispatch; branch
         A dictionary payload: either the unchanged `year_source` or a modified copy with
         corrected series/stat fields and `APP_YEAR_BACKFILL_META` when corrections were
         applied.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if not isinstance(year_source, dict) or not month_sources:
         return year_source
 
@@ -2220,7 +2222,7 @@ def apply_year_month_backfill(
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section
         prefix to a mapping of 1-based month index -> month payload dict used to
         reconstruct year-series values.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     section_metrics: tuple[tuple[str, tuple[str, ...]], ...] = (
         (
             APP_SECTION_PV_STAT,
@@ -2305,7 +2307,7 @@ def attach_calculated_savings_metadata(payload: dict[str, Any]) -> None:
     }
 
 
-def guard_statistic_totals_from_year(  # ruff:ignore[too-many-locals]
+def guard_statistic_totals_from_year(
     payload: dict[str, Any],
     *,
     previous_statistic: dict[str, Any] | None = None,
@@ -2560,7 +2562,7 @@ def _parse_day_chart_minute(value: object) -> int | None:
         int: Minutes after local midnight for a valid label (0–1439).
         None: If the input is not a valid H:MM label or represents the disallowed
         `24:00` end marker.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]
+    """
     if not isinstance(value, str):
         return None
     match = _DAY_CHART_MINUTE_RE.fullmatch(value)
@@ -2590,7 +2592,7 @@ def _day_power_sample_minute(
         minute_of_day (int | None): Minutes after local midnight (0–1439) for the
         sample, or `None` if the computed minute is outside the day range or no valid
         label/index mapping exists.
-    """  # ruff:ignore[ambiguous-unicode-character-docstring]  # noqa: D205, RUF105
+    """  # noqa: D205
     if labels is not None and index < len(labels):
         minute = _parse_day_chart_minute(labels[index])
         if minute is not None:
@@ -2705,11 +2707,14 @@ def _resolve_day_request_window(
     if begin > today:
         return None
     if now is None:
-        now = datetime.now()
+        # Local wall clock, but timezone-aware: ``now.date()`` must match the
+        # local ``today`` computed above, and callers compare it against the
+        # app's local ``beginDate``.
+        now = datetime.now(UTC).astimezone()
     return begin, now
 
 
-def day_power_energy_points(  # ruff:ignore[too-many-locals]  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
+def day_power_energy_points(  # cohesive day-curve → kWh bucketing pipeline; validation/scaling prelude already extracted
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2835,9 +2840,13 @@ def day_power_energy_points(  # ruff:ignore[too-many-locals]  # cohesive day-cur
             reconciled_total,
         )
 
+    # Intentionally naive: these are LOCAL wall-clock bucket starts from the
+    # app's day curve. ``JackerySolarVaultCoordinator._local_statistic_start``
+    # attaches Home Assistant's configured timezone. Adding tzinfo here would
+    # shift every bucket by the UTC offset and corrupt long-term statistics.
     return [
         TrendStatisticPoint(
-            datetime(begin.year, begin.month, begin.day, minute // 60, minute % 60),
+            datetime(begin.year, begin.month, begin.day, minute // 60, minute % 60),  # noqa: DTZ001
             bucket_value,
         )
         for (minute, _value), bucket_value in zip(
@@ -3124,7 +3133,7 @@ def directional_power_value(
     Returns:
         float | None: The net power (sum of positive keys minus sum of negative keys) if
         at least one numeric value is present, `None` otherwise.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     positive = 0.0
     negative = 0.0
     found = False
@@ -3158,7 +3167,7 @@ def signed_phase_power_values(ct: dict[str, Any]) -> list[float] | None:
         list[float] | None: A list of signed per-phase power values in the same order as
         CT_PHASE_POWER_PAIRS, or `None` if any phase value is missing or cannot be
         computed.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     values: list[float] = []
     for pos_key, neg_key in CT_PHASE_POWER_PAIRS:
         value = directional_power_value(ct, (pos_key,), (neg_key,))
@@ -3204,7 +3213,7 @@ def calculated_smart_meter_power(  # flat guard chain over CT calculation varian
     Returns:
         float | None: Calculated power in the same units as the input values, or `None`
         when required inputs are missing or the calculation mode is unrecognized.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
@@ -3246,7 +3255,7 @@ def first_power_value(source: dict[str, Any], *keys: str) -> float | None:
     Returns:
         float | None: The first value successfully coerced to a number, or `None` if no
         numeric value is found.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     for key in keys:
         if key in source and source.get(key) is not None:
             value = safe_float(source.get(key))
@@ -3418,7 +3427,7 @@ def jackery_corrected_home_consumption_power(
             source=FIELD_OTHER_LOAD_PW,
         )
 
-    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # ruff:ignore[float-equality-comparison]  # parsed device powers (or 0.0 default); exact-zero means absent/zero
+    if meter_net is None or (jackery_input == 0.0 and jackery_output == 0.0):  # parsed device powers (or 0.0 default); exact-zero means absent/zero
         return None
 
     calculated = meter_net - jackery_input + jackery_output
@@ -3545,7 +3554,7 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
 
     Returns:
         str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a period payload or no mapping exists.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if not section.endswith((
         f"_{DATE_TYPE_DAY}",
         f"_{DATE_TYPE_WEEK}",
@@ -3567,7 +3576,7 @@ def day_power_series_key(
     Returns:
         The chart-series key string for the given `section`/`stat_key` when `source` is
         a day-period payload, `None` otherwise.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if not is_day_period_payload(source, section):
         return None
     if (
@@ -3634,7 +3643,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0  # ruff:ignore[float-equality-comparison]  # parsed/round(,2) period total; exact-zero is intentional
+            and server_total == 0.0  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
@@ -3675,7 +3684,7 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
     Returns:
         `true` if a numeric value can be derived from the payload for the section and
         stat_key, `false` otherwise.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if is_day_period_payload(source, section):
         return safe_float(source.get(stat_key)) is not None
 
@@ -3692,7 +3701,7 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
         server_total = effective_period_total_value(source, section, stat_key)
         if (
             section.startswith(APP_SECTION_HOME_STAT)
-            and server_total == 0.0  # ruff:ignore[float-equality-comparison]  # parsed/round(,2) period total; exact-zero is intentional
+            and server_total == 0.0  # parsed/round(,2) period total; exact-zero is intentional
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
@@ -3728,7 +3737,7 @@ def task_plan_value(
     Returns:
         Any: The first non-`None` value found for the provided keys, or `None` if none
         are present.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     for key in keys:
         if key in task_plan and task_plan.get(key) is not None:
             return task_plan.get(key)
@@ -3762,13 +3771,13 @@ def trend_payload_has_value(
 
     Returns:
         True if a usable period value exists, False otherwise.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:  # noqa: RUF105
+def first_nonblank(*values: Any) -> str | None:
     """Return the first value that still has content after stripping."""
     for value in values:
         if value is None:
@@ -3779,7 +3788,7 @@ def first_nonblank(*values: Any) -> str | None:  # noqa: RUF105
     return None
 
 
-def first_nonblank_int(*values: Any) -> int | None:  # noqa: RUF105
+def first_nonblank_int(*values: Any) -> int | None:
     """Return the first nonblank value parsed as an integer."""
     for value in values:
         if value is None:
@@ -3829,6 +3838,6 @@ def normalize_account(value: str) -> str:
     return value.strip()
 
 
-def entry_bool_option(entry: Any, key: str, default: bool) -> bool:  # noqa: RUF105
+def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
     """Return a config-entry boolean option with safe legacy value parsing."""
     return config_entry_bool_option(entry, key, default)

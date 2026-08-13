@@ -7,6 +7,8 @@ section, an optional task-plan fallback and the coordinator setter that pushes
 the new state to the cloud / MQTT command path.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -183,7 +185,7 @@ def _is_portable_payload(
 
 
 def _standby_is_on(
-    raw: Any,  # noqa: RUF105
+    raw: Any,
 ) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
@@ -648,7 +650,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Returns:
             `True` if the switch is on, `False` if the switch is off, `None` if the
             state cannot be determined.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         description = self.entity_description
         section = self._payload_section_for_sources(
             description.source_section,
@@ -676,7 +678,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return None
         return description.is_on_transform(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn this switch on.
 
         If the entity is writable, requests the configured setter to apply the on state
@@ -707,7 +709,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the described switch off for the device.
 
         If the description has no setter this is a no-op.
@@ -798,7 +800,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         Returns:
             dict[str, Any]: The payload dictionary for the matching smart plug, or an
             empty dict if no matching plug is found.
-        """  # noqa: D421, RUF105
+        """
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -912,14 +914,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the bound smart plug on.
 
         Set the smart plug's switch to the requested state through the coordinator.
         """
         await self._async_set_state(True)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the smart plug off."""
         await self._async_set_state(False)
 
@@ -933,7 +935,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of extra state attributes for the entity.
-        """  # noqa: D421, RUF105
+        """
         attrs: dict[str, Any] = {"plug_index": self._plug_index}
         for key in (
             FIELD_DEVICE_NAME,
@@ -998,16 +1000,16 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the breaker relay is closed."""  # noqa: D421, RUF105
+        """Return true if the breaker relay is closed."""
         return safe_bool(self._breaker.get(FIELD_SW))
 
-    async def async_turn_on(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_on(self, **kwargs: Any) -> None:
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, True
         )
 
-    async def async_turn_off(self, **kwargs: Any) -> None:  # noqa: RUF105
+    async def async_turn_off(self, **kwargs: Any) -> None:
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, False
@@ -1041,7 +1043,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
-        """  # noqa: D421, RUF105
+        """
         attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
         for key in (
             FIELD_NM,
@@ -1176,7 +1178,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entry point
+async def async_setup_entry(  # HA awaits this entry point
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -1189,7 +1191,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
     certain description-driven switches by observed device properties or
     advanced-capability support. Register a listener that re-evaluates the coordinator
     data signature and adds newly discovered entities only when the signature changes.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
@@ -1202,7 +1204,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
             appended when unique.
             entity (SwitchEntity): Entity to add if its unique id has not already been
             recorded.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -1242,7 +1244,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         Returns:
             list[SwitchEntity]: Switch entity instances to add for the current
             coordinator dataset.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)
@@ -1340,7 +1342,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA awaits this entr
         If the coordinator's current entity signature differs from the last recorded
         signature, update the stored signature, collect entities via
         _collect_entities(), and call async_add_entities() with any discovered entities.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

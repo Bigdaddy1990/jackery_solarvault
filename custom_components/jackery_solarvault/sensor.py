@@ -71,6 +71,8 @@ The ``key`` attribute of each ``JackerySensorDescription`` is the
 must never affect ``unique_id``.
 """
 
+from __future__ import annotations
+
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass
@@ -712,14 +714,14 @@ def _div(divisor: float) -> Callable[[Any], float | None]:
         Callable[[Any], float | None]: A function that accepts any value, returns the
         quotient rounded to 2 decimals when the value can be converted to float, or
         `None` when conversion fails.
-    """  # noqa: D205, RUF105
+    """  # noqa: D205
 
     def _f(
-        value: Any,  # noqa: RUF105
+        value: Any,
     ) -> float | None:  # arbitrary payload value, coerced via float() at runtime
         try:
             return round(float(value) / divisor, 2)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
 
     return _f
@@ -890,7 +892,7 @@ def _no_property_value(_props: dict[str, Any]) -> None:
 def _payload_section_field(section: str, key: str) -> Callable[[dict[str, Any]], Any]:
     """Return a fallback getter for a top-level coordinator payload bucket."""
 
-    def _f(payload: dict[str, Any]) -> Any:  # cloud payload value  # noqa: RUF105
+    def _f(payload: dict[str, Any]) -> Any:  # cloud payload value
         source = payload.get(section)
         if isinstance(source, dict):
             return source.get(key)
@@ -1736,7 +1738,7 @@ def _sensor_description_has_value(
 def _battery_pack_description_value(
     pack: dict[str, Any],
     description: JackeryBatteryPackSensorDescription,
-) -> Any:  # HA sensor values may be numeric or textual  # noqa: RUF105
+) -> Any:  # HA sensor values may be numeric or textual
     """Return one app-backed battery-pack value from the current pack payload."""
     field = description.field
     raw = pack.get(field)
@@ -1778,7 +1780,7 @@ def _battery_pack_description_value(
 def _smart_meter_description_value(
     ct: dict[str, Any],
     description: JackerySmartMeterSensorDescription,
-) -> Any:  # HA sensor values may be numeric or textual  # noqa: RUF105
+) -> Any:  # HA sensor values may be numeric or textual
     """Return one calculable Smart-Meter value from the current CT payload."""
     raw = None
     if description.calculation:
@@ -2181,7 +2183,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # surface the same period total the cloud reports for the energy charts,
     # but valued in the device's own currency (PvStatApi$Bean.currency, read
     # at runtime by JackeryStatSensor.native_unit_of_measurement — see there).
-    #
+
     # state_class=TOTAL (NOT TOTAL_INCREASING): like the period-energy
     # sensors these are per-period totals (week = Mon-Sun, month/year =
     # calendar) that reset at the app boundary, not a lifetime cumulative
@@ -4390,7 +4392,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
     # source-of-truth/jackery_entity_field_candidates_v2.html). Per-phase
     # voltage / current / power-factor / apparent / reactive plus their
     # totals. Active power is already covered above.
-    #
+
     # ALL of these are ``entity_registry_enabled_default=False``: the
     # SolarVault firmware only emits ``volt``/``curr``/``freq``/``fact``/
     # ``ap``/``rep`` when an external AccCT-class accessory is bound
@@ -4661,7 +4663,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self._reset_period is None:
             return None
         return _period_start(self._reset_period, self._local_timezone())
@@ -4678,7 +4680,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | int | str | None:
-        """Return the selected calculated value."""  # noqa: D421, RUF105
+        """Return the selected calculated value."""
         raw: object = self._calculation
         for key in self.entity_description.path:
             if not isinstance(raw, dict):
@@ -4693,7 +4695,7 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return calculation context for diagnostics."""  # noqa: D421, RUF105
+        """Return calculation context for diagnostics."""
         calculation = self._calculation
         return {
             "source_section": PAYLOAD_STATISTIC,
@@ -4820,7 +4822,7 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; entity-build logic lives in the nested _collect_entities closure over coordinator/options  # noqa: C901, RUF105
+async def async_setup_entry(  # HA entry point; entity-build logic lives in the nested _collect_entities closure over coordinator/options  # noqa: C901
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -4913,7 +4915,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
                 eligible.add((dev_id, "derived", "home_consumption_power"))
         return eligible
 
-    def _collect_entities(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    def _collect_entities(  # noqa: C901
         option_signature: tuple[bool, bool, bool],
     ) -> list[SensorEntity]:
         """Collect and instantiate all sensor entities for each device payload present
@@ -4932,7 +4934,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
         Returns:
             list[SensorEntity]: A list of instantiated sensor entities ready for
             registration.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         (
             create_smart_meter_derived,
             create_calculated_power,
@@ -4948,7 +4950,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
             # Cloud MQTT, local MQTT and BLE; gating registration on the first
             # payload left existing registry entities restored-only after a
             # restart whenever one supplemental transport was disabled.
-            #
+
             # The 30.05 implementation already registered the complete home
             # family eagerly.  Keep value gating only when a portable payload is
             # being inspected so portable stations do not inherit SolarVault
@@ -5283,7 +5285,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
             # Create them when discovery confirms a meter accessory, or when a
             # CT payload was already received before entity setup.
             has_smart_meter = bool(
-                coordinator._has_smart_meter_accessory(  # noqa: RUF105, SLF001
+                coordinator._has_smart_meter_accessory(  # noqa: SLF001
                     payload
                 )  # same-package discovery helper
                 or payload.get(PAYLOAD_CT_METER)
@@ -5295,8 +5297,8 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
                     # Create entity if discovery confirms smart meter,
                     # even without current values. Entities with no current
                     # value will show as unavailable.
-                    if not _smart_meter_description_has_value(payload, ct_desc):  # noqa: RUF105
-                        if not coordinator._has_smart_meter_accessory(payload):  # noqa: RUF105, SLF001
+                    if not _smart_meter_description_has_value(payload, ct_desc):
+                        if not coordinator._has_smart_meter_accessory(payload):  # noqa: SLF001
                             continue
                     _append_unique(
                         entities,
@@ -5333,7 +5335,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]  # HA entry point; ent
         Compares the current coordinator entity signature with the previously stored
         signature; when different, updates the stored signature, collects entities to
         create, and calls the platform's entity adder for any discovered entities.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         nonlocal last_option_signature, last_signature
         sig = coordinator_entity_signature(coordinator.data)
         option_signature = _entity_option_signature()
@@ -5396,7 +5398,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
         """The entity's current value."""
         source_payload = self._payload_for_sources(self.entity_description.data_sources)
         props = source_payload.get(PAYLOAD_PROPERTIES) or {}
@@ -5417,7 +5419,7 @@ class JackerySensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self.entity_description.reset_period is None:
             return None
         return _period_start(
@@ -5581,7 +5583,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             and device registry linkage.
             description (JackeryStatSensorDescription): Sensor description that
             supplies stat key, source section, transforms, and optional reset_period.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         super().__init__(coordinator, device_id, description.key)
         self.entity_description = description
         self._attr_entity_registry_enabled_default = (
@@ -5636,7 +5638,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self._reset_period is None:
             return None
         return self._compute_period_start(self._reset_period)
@@ -5674,7 +5676,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
 
         Returns:
             date: Local date in the configured Home Assistant timezone.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         return dt_util.now(self._local_timezone()).date()
 
     def _period_begin_from_meta(
@@ -5718,7 +5720,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         Returns:
                 dict[str, Any]: The dict storing data for the requested section, or an
                 empty dict if no usable source is available.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if payload is not None:
             source = payload.get(section) or {}
             return source if isinstance(source, dict) else {}
@@ -5756,7 +5758,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             corresponding source payload dictionary; `None` when the function is not
             applicable or no
             suitable week/month bucket contains today's value.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         if self._reset_period != DATE_TYPE_DAY:
             return None
         prefix = _day_section_prefix(section)
@@ -5918,7 +5920,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         period_cache[cache_key] = resolution
         return resolution
 
-    def _refresh_cache(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    def _refresh_cache(  # noqa: C901
         self,
         context: _StatRefreshContext,
         period_cache: _PeriodResolutionCache,
@@ -6543,7 +6545,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         self._cache_refresh_active = True
         try:
             await super().async_added_to_hass()
-        except Exception, asyncio.CancelledError:
+        except (Exception, asyncio.CancelledError):
             batch.discard(self)
             raise
         if (
@@ -6565,7 +6567,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         await super().async_will_remove_from_hass()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
         """The entity's current value."""
         return self._cached_native_value
 
@@ -6666,11 +6668,11 @@ def _build_stat_refreshes(
     payload_errors: dict[str, Exception] = {}
     results: list[_StatRefreshResult] = []
     for request in requests:
-        device_id = request.entity._device_id  # noqa: RUF105, SLF001
+        device_id = request.entity._device_id  # noqa: SLF001
         if device_id not in payloads and device_id not in payload_errors:
             try:
                 payloads[device_id] = deepcopy(request.context.payload)
-            except Exception as err:  # isolate one device snapshot from peers  # noqa: BLE001, RUF105
+            except Exception as err:  # isolate one device snapshot from peers  # noqa: BLE001
                 payload_errors[device_id] = err
         if (error := payload_errors.get(device_id)) is not None:
             results.append(_StatRefreshResult(request=request, error=error))
@@ -6683,8 +6685,8 @@ def _build_stat_refreshes(
                 local_daily_raw=request.context.local_daily_raw,
                 local_period_raw=request.context.local_period_raw,
             )
-            snapshot = request.entity._refresh_cache(context, period_cache)  # noqa: RUF105, SLF001
-        except Exception as err:  # isolate one entity from the shared executor batch  # noqa: BLE001, RUF105
+            snapshot = request.entity._refresh_cache(context, period_cache)  # noqa: SLF001
+        except Exception as err:  # isolate one entity from the shared executor batch  # noqa: BLE001
             results.append(_StatRefreshResult(request=request, error=err))
         else:
             results.append(_StatRefreshResult(request=request, snapshot=snapshot))
@@ -6707,7 +6709,7 @@ class _StatRefreshBatch:
     @callback
     def _is_current(entity: JackeryStatSensor, generation: int) -> bool:
         """Return whether a result may still affect this live entity."""
-        return entity._cache_refresh_active and entity._cache_generation == generation  # noqa: RUF105, SLF001
+        return entity._cache_refresh_active and entity._cache_generation == generation  # noqa: SLF001
 
     @staticmethod
     @callback
@@ -6720,7 +6722,7 @@ class _StatRefreshBatch:
         and prevents a continuously updating transport from starving the entity
         at ``unknown`` forever.
         """
-        return entity._cache_refresh_active and generation <= entity._cache_generation  # noqa: RUF105, SLF001
+        return entity._cache_refresh_active and generation <= entity._cache_generation  # noqa: SLF001
 
     @callback
     def _ensure_task(self, entity: JackeryStatSensor) -> None:
@@ -6734,7 +6736,7 @@ class _StatRefreshBatch:
                 refresh_coro,
                 "Jackery statistic sensor cache refresh",
             )
-        except Exception as err:  # task creation failure must be visible per entity  # noqa: BLE001, RUF105
+        except Exception as err:  # task creation failure must be visible per entity  # noqa: BLE001
             refresh_coro.close()
             pending = self._pending
             self._pending = {}
@@ -6743,12 +6745,12 @@ class _StatRefreshBatch:
     @callback
     def request(self, entity: JackeryStatSensor, *, write_state: bool) -> None:
         """Queue the latest entity generation and start one shared task."""
-        if not entity._cache_refresh_active:  # noqa: RUF105, SLF001
+        if not entity._cache_refresh_active:  # noqa: SLF001
             return
-        entity._cache_generation += 1  # noqa: RUF105, SLF001
+        entity._cache_generation += 1  # noqa: SLF001
         pending = self._pending.get(entity)
         self._pending[entity] = (
-            entity._cache_generation,  # noqa: RUF105, SLF001
+            entity._cache_generation,  # noqa: SLF001
             write_state or (pending is not None and pending[1]),
         )
         self._ensure_task(entity)
@@ -6756,8 +6758,8 @@ class _StatRefreshBatch:
     @callback
     def discard(self, entity: JackeryStatSensor) -> None:
         """Discard all work for an entity and invalidate in-flight results."""
-        entity._cache_refresh_active = False  # noqa: RUF105, SLF001
-        entity._cache_generation += 1  # noqa: RUF105, SLF001
+        entity._cache_refresh_active = False  # noqa: SLF001
+        entity._cache_generation += 1  # noqa: SLF001
         self._pending.pop(entity, None)
         self._failure_signatures.pop(entity, None)
 
@@ -6815,12 +6817,12 @@ class _StatRefreshBatch:
         for entity, (generation, write_state) in pending.items():
             if not self._is_current(entity, generation):
                 continue
-            device_id = entity._device_id  # noqa: RUF105, SLF001
+            device_id = entity._device_id  # noqa: SLF001
             if device_id not in payloads and device_id not in payload_errors:
                 try:
-                    payloads[device_id] = dict(entity._payload)  # noqa: RUF105, SLF001
+                    payloads[device_id] = dict(entity._payload)  # noqa: SLF001
                 except (
-                    Exception  # noqa: BLE001, RUF105
+                    Exception  # noqa: BLE001
                 ) as err:  # one failed device snapshot must not strand peers
                     payload_errors[device_id] = err
             if (error := payload_errors.get(device_id)) is not None:
@@ -6832,8 +6834,8 @@ class _StatRefreshBatch:
                 )
                 continue
             try:
-                context = entity._capture_refresh_context(payloads[device_id])  # noqa: RUF105, SLF001
-            except Exception as err:  # isolate per-entity event-loop capture  # noqa: BLE001, RUF105
+                context = entity._capture_refresh_context(payloads[device_id])  # noqa: SLF001
+            except Exception as err:  # isolate per-entity event-loop capture  # noqa: BLE001
                 self._fail_entity(
                     entity,
                     generation,
@@ -6876,8 +6878,8 @@ class _StatRefreshBatch:
             )
             return
         try:
-            entity._apply_cache_snapshot(snapshot)  # noqa: RUF105, SLF001
-        except Exception as err:  # apply failures are entity-local  # noqa: BLE001, RUF105
+            entity._apply_cache_snapshot(snapshot)  # noqa: SLF001
+        except Exception as err:  # apply failures are entity-local  # noqa: BLE001
             self._fail_entity(
                 entity,
                 request.generation,
@@ -6887,8 +6889,8 @@ class _StatRefreshBatch:
             return
         if request.write_state:
             try:
-                entity._write_cached_state()  # noqa: RUF105, SLF001
-            except Exception as err:  # state writes must not abort peer entities  # noqa: BLE001, RUF105
+                entity._write_cached_state()  # noqa: SLF001
+            except Exception as err:  # state writes must not abort peer entities  # noqa: BLE001
                 self._fail_entity(
                     entity,
                     request.generation,
@@ -6911,14 +6913,14 @@ class _StatRefreshBatch:
     async def _async_run(self, hass: HomeAssistant) -> None:
         """Drain coalesced generations through HA's managed executor."""
         in_flight: dict[JackeryStatSensor, tuple[int, bool]] = {}
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             await asyncio.sleep(0)
             while self._pending:
                 in_flight = self._pending
                 self._pending = {}
                 try:
                     requests = self._capture_requests(in_flight)
-                except Exception as err:  # batch capture failure must be entity-scoped  # noqa: BLE001, RUF105
+                except Exception as err:  # batch capture failure must be entity-scoped  # noqa: BLE001
                     self._fail_pending(
                         in_flight,
                         err,
@@ -6938,13 +6940,13 @@ class _StatRefreshBatch:
                         result.request is not request
                         for result, request in zip(results, requests, strict=True)
                     ):
-                        raise RuntimeError(  # ruff:ignore[raise-within-try]
+                        raise RuntimeError(
                             "Statistic refresh executor returned an incomplete batch"
                         )
                 except asyncio.CancelledError:
                     raise
                 except (
-                    Exception  # noqa: BLE001, RUF105
+                    Exception  # noqa: BLE001
                 ) as err:  # executor failure affects the whole drained batch
                     for request in requests:
                         self._fail_entity(
@@ -6958,7 +6960,7 @@ class _StatRefreshBatch:
                 for result in results:
                     try:
                         self._apply_result(result)
-                    except Exception as err:  # isolate unexpected per-result failures  # noqa: BLE001, RUF105
+                    except Exception as err:  # isolate unexpected per-result failures  # noqa: BLE001
                         self._fail_entity(
                             result.request.entity,
                             result.request.generation,
@@ -6969,7 +6971,7 @@ class _StatRefreshBatch:
         except asyncio.CancelledError:
             self._cancel_all(in_flight)
             raise
-        except Exception as err:  # report every affected entity on batch failure  # noqa: BLE001, RUF105
+        except Exception as err:  # report every affected entity on batch failure  # noqa: BLE001
             affected = dict(in_flight)
             affected.update(self._pending)
             self._pending = {}
@@ -7029,7 +7031,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
             pack field to expose and how to transform it.
             enabled_default (bool): Whether the entity should be enabled by default in
             the entity registry.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         super().__init__(
             coordinator,
             device_id,
@@ -7053,7 +7055,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self._reset_period is None:
             return None
         return _period_start(self._reset_period, self._local_timezone())
@@ -7074,7 +7076,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
 
         Returns:
             dict: The battery pack dictionary when available, otherwise an empty dict.
-        """  # noqa: D421, RUF105
+        """
         packs = self._payload.get(PAYLOAD_BATTERY_PACKS) or []
         # Sort by serial before any positional lookup: the cloud/MQTT list
         # order is not guaranteed, and indexing the raw list would let index N
@@ -7122,7 +7124,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
 
     def _value_from_pack(
         self, pack: dict[str, Any]
-    ) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    ) -> Any:  # dynamically computed HA sensor state value
         """Return this description's app-backed value from one pack payload."""
         return _battery_pack_description_value(pack, self.entity_description)
 
@@ -7172,7 +7174,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
 
         This updates self._cached_native_value and self._cached_attrs using the current
         pack snapshot; intended to be run once per coordinator update.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         pack = self._pack
         live_value = self._value_from_pack(pack)
         attrs = self._attrs_from_pack(pack)
@@ -7218,7 +7220,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
             self._refresh_cache()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
         """The entity's last cached native value.
 
         Returns:
@@ -7315,7 +7317,7 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
         Notes:
             Builds and caches the per-plug `device_info` at construction time from the
             current plug payload.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         super().__init__(
             coordinator,
             device_id,
@@ -7355,7 +7357,7 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
         Returns:
             dict: The matching plug payload dictionary, or an empty dict if no match is
             found.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
             if smart_plug_serial(plug) == self._plug_sn:
                 return plug
@@ -7455,7 +7457,7 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
             self._refresh_cache()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
         """The cached native value from the latest coordinator update."""
         return self._cached_native_value
 
@@ -7570,7 +7572,7 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
-        """  # noqa: D421, RUF105
+        """
         attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
         for key in (
             FIELD_NM,
@@ -7715,7 +7717,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self._reset_period is None:
             return None
         return _period_start(self._reset_period, self._local_timezone())
@@ -7733,7 +7735,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
             dict: The meter-head dictionary from payload's `PAYLOAD_METER_HEADS` at
             `self._meter_head_index` (1-based) when present and valid; otherwise an
             empty dict.
-        """  # noqa: D421, RUF105
+        """
         expected_sn = getattr(self, "_meter_head_sn", None)
         meter_heads = sorted_meter_heads(self._payload.get(PAYLOAD_METER_HEADS))
         for meter_head in meter_heads:
@@ -7745,7 +7747,7 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
         return {}
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
         """Provide the current value for this meter-head sensor.
 
         Returns:
@@ -7884,7 +7886,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Return the last reset time for periodic sensors."""  # noqa: D421, RUF105
+        """Return the last reset time for periodic sensors."""
         if self._reset_period is None:
             return None
         return _period_start(self._reset_period, self._local_timezone())
@@ -7920,7 +7922,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
 
     def _value_from_ct(
         self, ct: dict[str, Any]
-    ) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
+    ) -> Any:  # dynamically computed HA sensor state value
         """Calculate the current value from a CT payload."""
         return _smart_meter_description_value(ct, self.entity_description)
 
@@ -7939,7 +7941,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         Returns:
             dict[str, Any]: Mapping of diagnostic attribute names to their values (may
             be empty if no diagnostics are available).
-        """  # ruff:ignore[ambiguous-unicode-character-docstring]
+        """
         if self.entity_description.calculation:
             return {
                 "calculation": self.entity_description.calculation,
@@ -8055,8 +8057,8 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
             self._refresh_cache()
 
     @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value  # noqa: RUF105
-        """Return the entity's current value."""  # noqa: D421, RUF105
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
+        """Return the entity's current value."""
         return self._cached_native_value
 
     @property
@@ -8339,11 +8341,12 @@ class JackeryLocalMqttSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int:
-        """Jackery messages forwarded to the router since HA setup.
+        """Messages handed to the router since HA setup.
 
-        Foreign broker traffic swept up by a shared topic filter is counted
-        in the ``messages_received`` / ``messages_ignored_foreign`` attributes
-        but must not inflate the layer's headline counter.
+        The client forwards everything the broker delivers for the user's
+        subscription filter — it applies no content filtering. The attribute
+        ``messages_received`` is the broker-side total; the difference to this
+        counter is what arrived with no sink wired.
         """
         return int(self._observation().get("messages_forwarded", 0))
 
@@ -8380,7 +8383,7 @@ class JackeryDeviceActivationSensor(JackeryEntity, SensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the cloud-activation state (0 = not activated, 1 = active)."""  # noqa: D421, RUF105
+        """Return the cloud-activation state (0 = not activated, 1 = active)."""
         device = (
             (self.coordinator.data or {})
             .get(self._device_id, {})
@@ -8470,7 +8473,7 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
 
 # ---------------------------------------------------------------------------
 # Derived live-power sensors.
-#
+
 # These values are calculated from multiple live fields and may change sign. They
 # intentionally keep device_class/unit for normal graphs but do not set
 # state_class so Home Assistant does not build long-term statistics metadata for
@@ -8715,7 +8718,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             ct = {}
 
         result = self._home_consumption_power(ct, props)
-        meter_net = JackerySmartMeterSensor._net_power(  # noqa: RUF105, SLF001
+        meter_net = JackerySmartMeterSensor._net_power(  # noqa: SLF001
             ct
         )  # reuse of sibling sensor's classmethod net-power helper (same module)
         input_available = self._grid_side_input_power(props) is not None
@@ -8747,7 +8750,7 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
                 result.jackery_output_power, 2
             )
 
-        phases = JackerySmartMeterSensor._signed_phase_values(  # noqa: RUF105, SLF001
+        phases = JackerySmartMeterSensor._signed_phase_values(  # noqa: SLF001
             ct
         )  # reuse of sibling sensor's classmethod phase helper (same module)
         if phases is not None:
@@ -8857,13 +8860,13 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
         Returns:
             datetime: Timezone-aware UTC datetime parsed from the milliseconds value, or
             `None` if the value is missing or cannot be parsed.
-        """  # noqa: D205, RUF105
+        """  # noqa: D205
         ts_ms = self._device_meta.get(self._source_key)
         if not ts_ms:
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):
             return None
 
 

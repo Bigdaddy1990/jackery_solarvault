@@ -33,13 +33,15 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 import json
 import logging
 import sys
@@ -48,7 +50,7 @@ from typing import TYPE_CHECKING, Any
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC  # ruff: ignore[relative-imports]
+from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
 
 if TYPE_CHECKING:
@@ -79,7 +81,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
-    except UnicodeDecodeError, json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):
         return False
 
 
@@ -228,7 +230,7 @@ class _GattSession:
 
 FrameSink = Callable[[str, BleFrameObservation], Awaitable[bool]]
 # Async sink called for every observed frame.
-#
+
 # ``device_id`` is the Jackery numeric device id (matches coordinator state).
 # ``observation`` carries the decoded or raw frame.
 
@@ -373,7 +375,7 @@ class JackeryBleListener:
     def _install_session(
         self,
         device_id: str,
-        client: Any,  # noqa: RUF105
+        client: Any,
         generation: int,
     ) -> _GattSession:
         """Invalidate the prior session and install a new owned GATT session."""
@@ -546,7 +548,7 @@ class JackeryBleListener:
             return
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
-            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: RUF105, SLF001
+            if isinstance(value, int) and value > ble._BLE_FRAME_OVERHEAD:  # noqa: SLF001
                 self._mtu[device_id] = value
                 if session is not None:
                     self._mtu_owners[device_id] = session
@@ -647,14 +649,14 @@ class JackeryBleListener:
         """
         if self._keep_alive_msg_id is None or self._keep_alive_ble_msg_type is None:
             return
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             while not self._stop_event.is_set():
                 try:
                     await asyncio.wait_for(
                         self._stop_event.wait(),
                         timeout=_KEEPALIVE_INTERVAL_SEC,
                     )
-                    return  # stop_event fired  # ruff:ignore[try-consider-else]
+                    return  # stop_event fired
                 except TimeoutError:
                     pass
                 if session is not None:
@@ -675,7 +677,7 @@ class JackeryBleListener:
                         wait_for_ack=False,
                     )
                     if not sent:
-                        raise RuntimeError("no current connected GATT session")  # ruff:ignore[raise-within-try]
+                        raise RuntimeError("no current connected GATT session")
                 except (RuntimeError, ValueError) as err:
                     error = f"keep-alive write failed: {err}"
                     if stats.last_keep_alive_error is None:
@@ -694,7 +696,9 @@ class JackeryBleListener:
                             "Jackery BLE %s: keep-alive writes recovered",
                             device_id,
                         )
-        except asyncio.CancelledError:  # ruff:ignore[useless-try-except]
+        # Kept deliberately: makes the cancellation contract documented in the
+        # docstring visible at the code level. Semantically a no-op.
+        except asyncio.CancelledError:  # noqa: TRY203
             raise
 
     async def async_send_command(
@@ -793,11 +797,11 @@ class JackeryBleListener:
                 pending = self._register_pending_ack(
                     device_id, session, msg_id, ble_msg_type
                 )
-            try:  # ruff:ignore[too-many-statements-in-try-clause]
+            try:
                 for idx, chunk in enumerate(chunks, start=1):
                     if not self._session_is_current(device_id, session):
                         msg = f"BLE session for {device_id} changed during write"
-                        raise RuntimeError(msg)  # ruff:ignore[raise-within-try]
+                        raise RuntimeError(msg)
                     plain = ble.build_binary_frame(
                         cmd=ble_msg_type,
                         body=chunk,
@@ -887,7 +891,7 @@ class JackeryBleListener:
                 raise RuntimeError(failure_reason) from err
             raise
         stats.acks_received += 1
-        stats.last_ack_at = datetime.now()
+        stats.last_ack_at = datetime.now(UTC)
 
     # ------------------------------------------------------------------
     # ACK registry (internal)
@@ -1162,7 +1166,7 @@ class JackeryBleListener:
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
-            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001, RUF105
+            except Exception as err:  # pragma: no cover — HA callback contract is sync  # noqa: BLE001
                 _LOGGER.debug("Jackery BLE: callback unregister failed: %s", err)
         self._unregister_callbacks.clear()
         # Inactive sessions cannot resolve writes. Cancel ACK waiters before the
@@ -1329,7 +1333,7 @@ class JackeryBleListener:
         """
         stats = self.stats_for(device_id)
         runner_task = asyncio.current_task()
-        try:  # ruff:ignore[too-many-statements-in-try-clause]
+        try:
             while not self._stop_event.is_set():
                 remaining = self._connect_backoff_remaining(
                     device_id,
@@ -1381,17 +1385,17 @@ class JackeryBleListener:
                             self._stop_event.wait(),
                             timeout=delay,
                         )
-                        return  # stop_event fired during the wait  # ruff:ignore[try-consider-else]
+                        return  # stop_event fired during the wait
                     except TimeoutError:
                         continue
                 stats.connect_attempts += 1
                 generation = self._next_session_generation(device_id)
 
-                def _disconnected_callback(disconnected_client: Any) -> None:  # noqa: RUF105
+                def _disconnected_callback(disconnected_client: Any) -> None:
                     """Record a disconnect for this session generation."""
                     self._on_disconnect(
                         device_id,
-                        generation=generation,  # noqa: B023, RUF105
+                        generation=generation,  # noqa: B023
                         client=disconnected_client,
                     )
 
@@ -1426,7 +1430,7 @@ class JackeryBleListener:
                             self._stop_event.wait(),
                             timeout=delay,
                         )
-                        return  # stop_event fired during the wait  # ruff:ignore[try-consider-else]
+                        return  # stop_event fired during the wait
                     except TimeoutError:
                         continue
 
@@ -1438,7 +1442,7 @@ class JackeryBleListener:
                     return
 
                 session = self._install_session(device_id, client, generation)
-                stats.last_connect_at = datetime.now()
+                stats.last_connect_at = datetime.now(UTC)
                 _LOGGER.info(
                     "Jackery BLE %s: connected; subscribing to notify %s",
                     device_id,
@@ -1447,12 +1451,12 @@ class JackeryBleListener:
 
                 def _notify_callback(_characteristic: object, data: bytearray) -> None:
                     """Copy a Bleak notification into the ordered session queue."""
-                    self._schedule_notification(device_id, session, bytes(data))  # noqa: B023, RUF105
+                    self._schedule_notification(device_id, session, bytes(data))  # noqa: B023
 
                 keep_alive_task: asyncio.Task[None] | None = None
                 stable_session_started_at: float | None = None
                 backoff_reset = False
-                try:  # ruff:ignore[too-many-statements-in-try-clause]
+                try:
                     await client.start_notify(
                         ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
                     )
@@ -1509,7 +1513,7 @@ class JackeryBleListener:
                         with contextlib.suppress(asyncio.CancelledError, Exception):
                             await keep_alive_task
                     await self._teardown_session(device_id, session)
-                    stats.last_disconnect_at = datetime.now()
+                    stats.last_disconnect_at = datetime.now(UTC)
 
                 if self._stop_event.is_set():
                     return
@@ -1568,7 +1572,7 @@ class JackeryBleListener:
         device_id: str,
         *,
         generation: int | None = None,
-        client: Any | None = None,  # noqa: RUF105
+        client: Any | None = None,
     ) -> None:
         """Handle a peripheral disconnect for the given device.
 
@@ -1592,7 +1596,7 @@ class JackeryBleListener:
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
         stats = self.stats_for(device_id)
-        stats.last_disconnect_at = datetime.now()
+        stats.last_disconnect_at = datetime.now(UTC)
         if generation is None and client is None:
             dropped = self._clear_frame_assemblies(device_id)
             if dropped:
@@ -1607,7 +1611,7 @@ class JackeryBleListener:
     # Notification handler
     # ------------------------------------------------------------------
 
-    def _reassemble_frame(  # ruff:ignore[too-many-locals]  # noqa: C901, RUF105
+    def _reassemble_frame(  # noqa: C901
         self,
         device_id: str,
         frame: ble.BleBinaryFrame,
@@ -1839,7 +1843,7 @@ class JackeryBleListener:
                     )
                 if assembled is None:
                     observation = BleFrameObservation(
-                        received_at=datetime.now(),
+                        received_at=datetime.now(UTC),
                         raw_bytes=raw,
                         base64_encoded=b64,
                         parsed=parsed,
@@ -1859,7 +1863,7 @@ class JackeryBleListener:
                 parsed = assembled
 
         observation = BleFrameObservation(
-            received_at=datetime.now(),
+            received_at=datetime.now(UTC),
             raw_bytes=raw,
             base64_encoded=b64,
             parsed=parsed,
@@ -1901,7 +1905,7 @@ class JackeryBleListener:
             return
         try:
             sink_processed = await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001, RUF105
+        except Exception as err:  # pragma: no cover — sink misbehaviour  # noqa: BLE001
             error = f"sink failed: {err}"
             if stats.last_sink_error is None:
                 _LOGGER.warning("Jackery BLE %s: %s", device_id, error)
