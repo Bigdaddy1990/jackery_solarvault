@@ -250,6 +250,10 @@ line-length = 88
 src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
 show-fixes = true
+# `ruff check` MUSS ein reiner Report sein. Mit `fix = true` schrieb jeder simple
+# `ruff check`-Aufruf still Dateien um (2026-08-13: 31 Auto-Fixes ungefragt, davor
+# der TID252-Importschaden, Integration nicht mehr ladbar). Fixen nur noch explizit
+# per `ruff check --fix`; unsichere Fixes nur per `--unsafe-fixes`.
 fix = true
 unsafe-fixes = true
 force-exclude = true
@@ -453,12 +457,21 @@ ignore = [
   # Disabled to implement in follow up PRs after ruff 0.16 bump
   "implicit-string-concatenation-in-collection-literal",
   "log-exception-outside-except-handler",
+  # TID252: In einer Custom-Integration sind paketrelative Importe
+  # (`from ..const import X`) der vorgeschriebene und einzige tragfaehige Stil —
+  # der Autofix schrieb sie in absolute Pfade um und machte die Integration fuer
+  # den HA-Loader unauffindbar (2026-08-13). Die Regel stammt aus HA-Core, wo
+  # ausschliesslich absolut importiert wird, und passt hier nicht.
+  "relative-imports",
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "line-too-long"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
-unfixable = []
+# TID252 (relative-imports) darf NIE automatisch gefixt werden: der Autofix schreibt
+# `from .const import X` in einen absoluten Pfad um und macht die Custom-Integration
+# fuer den HA-Loader unauffindbar (Vorfall 2026-08-13, Integration nicht mehr ladbar).
+unfixable = ["TID252"]
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
@@ -529,6 +542,11 @@ parametrize-values-type = "list"
 [tool.ruff.lint.flake8-tidy-imports]
 # Require lazy imports by default, except for modules with import-time side effects.
 require-lazy = { include = "all", exclude = ["sitecustomize"] }
+# Diese Datei stammt urspruenglich aus HA-Core, wo alle Imports absolut sind. Hier liegt
+# aber eine CUSTOM-Integration: paketinterne relative Imports (`from .const import ...`)
+# sind der vorgeschriebene Stil und duerfen nicht als TID252 gemeldet/umgeschrieben
+# werden. "parents" verbietet weiterhin `from ..x import y` ueber Paketgrenzen hinweg.
+ban-relative-imports = "parents"
 
 [tool.ruff.lint.flake8-unused-arguments]
 ignore-variadic-names = true
