@@ -389,7 +389,6 @@ SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endp
 ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
 SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
 PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"
-PV_TRENDS_LEGACY_PATH: Final = "/v1/device/stat/sys/pv/statics"
 # ?systemId=<id>&beginDate&endDate&dateType
 POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
 PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
@@ -950,6 +949,7 @@ FIELD_MAX_FEED_GRID: Final = "maxFeedGrid"
 FIELD_MAX_GRID_STD_PW: Final = "maxGridStdPw"
 FIELD_DEFAULT_PW: Final = "defaultPw"
 FIELD_SOC_CHG_LIMIT: Final = "socChgLimit"
+FIELD_SOC_FORCE_CHG: Final = "socForceChg"
 FIELD_SOC_CHARGE_LIMIT: Final = "socChargeLimit"
 FIELD_SOC_DISCHG_LIMIT: Final = "socDischgLimit"
 FIELD_SOC_DISCHARGE_LIMIT: Final = "socDischargeLimit"
@@ -2274,9 +2274,9 @@ MQTT_CMD_UNBIND_SMART_PART: Final = 109
 # frame. The integration must not send a separate frame for the charge limit
 # alone — verified against the official app via Frida capture (2026-05-14).
 # Verified against the Jackery app smali ``HomeCmdAction.smali``: a single
-# actionId ``SET_CHARGE_DISCHARGE_LINE = 3028`` carries both SOC limits in
-# one DevicePropertyChange frame (body has ``socChgLimit`` and
-# ``socDischgLimit`` together). An earlier doc capture
+# actionId ``SET_CHARGE_DISCHARGE_LINE = 3028`` carries both SOC limits and
+# the optional ``socForceChg`` checkbox in one DevicePropertyChange frame.
+# An earlier doc capture
 # (docs/MQTT_PROTOCOL.md PCAPNG) split this into 3022/3028, but 3022 is
 # actually ``CONTROL_AC_OFF_GRID_SWITCH`` (EPS) — sending a charge limit
 # under 3022 would hit the EPS action instead.

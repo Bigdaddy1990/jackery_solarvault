@@ -67,7 +67,7 @@ from .const import (
     DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
-    DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_LOCAL_MQTT_ENABLE as DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE as DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD as DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
@@ -121,6 +121,7 @@ from .util import (
     config_entry_bool_option,
     config_entry_int_option,
     config_entry_str_option,
+    local_mqtt_opt_in,
     nonblank_text,
     safe_bool,
     safe_int,
@@ -1041,14 +1042,15 @@ async def _async_start_local_mqtt(
     """Start an entry-owned receiver on Home Assistant's MQTT transport."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
-    # The receiver is an explicit opt-in. The app-synchronised legacy
-    # third_party_mqtt_enable field describes device state and must never start
-    # a Home Assistant MQTT subscription by itself.
-    enabled = config_entry_bool_option(
-        entry,
-        CONF_LOCAL_MQTT_ENABLE,
-        DEFAULT_LOCAL_MQTT_ENABLE,
-    )
+    # Der Opt-in kommt aus ``local_mqtt_opt_in``: explizites
+    # ``local_mqtt_enable`` gewinnt, sonst gilt das app-synchronisierte
+    # ``third_party_mqtt_enable`` als Fallback. Genau diese Reihenfolge nutzt
+    # auch ``config_flow._current_local_mqtt_options`` fuer die Formularvorgabe.
+    # Vorher las diese Stelle nur ``local_mqtt_enable`` (Default False), sodass
+    # Eintraege mit ausschliesslich Third-Party-Schluesseln als deaktiviert
+    # galten: der Receiver startete nie und sein Zaehler blieb auf 0, obwohl die
+    # Optionen im UI als aktiviert angezeigt wurden.
+    enabled = local_mqtt_opt_in(entry)
     # The receiver filter is used verbatim for exactly one HA MQTT
     # subscription. App 2.4.0 command 3046 does not carry a topic field, so
     # this is intentionally independent of the device-side bridge settings.

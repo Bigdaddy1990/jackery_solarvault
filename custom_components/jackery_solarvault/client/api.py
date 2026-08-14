@@ -211,7 +211,6 @@ from ..const import (
     PUSH_CONFIG_GET_PATH,
     PUSH_CONFIG_SET_PATH,
     PV_NAME_PATH,
-    PV_TRENDS_LEGACY_PATH,
     PV_TRENDS_PATH,
     QUERY_TOU_PLAN_PATH,
     REDACTED_VALUE,
@@ -1529,15 +1528,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             APP_REQUEST_BEGIN_DATE: str(begin_date),
             APP_REQUEST_END_DATE: str(end_date),
         }
-        path = PV_TRENDS_PATH
-        try:
-            data = await self._get_json(path, params=params)
-        except JackeryApiError as err:
-            if "code=10600" not in str(err):
-                raise
-            path = PV_TRENDS_LEGACY_PATH
-            data = await self._get_json(path, params=params)
-        payload = self._payload_dict(data, path)
+        data = await self._get_json(PV_TRENDS_PATH, params=params)
+        payload = self._payload_dict(data, PV_TRENDS_PATH)
         if payload:
             payload.setdefault(
                 APP_REQUEST_META,
@@ -1727,13 +1719,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """GET /v1/device/stat/ct — app CT/smart-meter statistics.
 
-        Always sends ``type=CT_STAT_TYPE_L1`` (0), the value the app's chart
-        screen defaults to (``CtStatChartActivity.getInt("type", 0)``). The
-        parameter is mandatory: without it the cloud answers ``code=0`` with an
-        empty shell (no ``x``, zero-length series), which the zero-payload guard
-        drops — the reason CT statistics stayed permanently unknown. Kept out of
-        the signature on purpose so the generic ``**period_kwargs`` call sites
-        cannot pass a string here.
+        App 2.4.x ``CtStatChartVM.loadData`` passes its selected ``Integer``
+        through ``CtStatApi.type``. The integration currently requests the
+        app's first CT chart type (``0``), matching that request contract.
         """
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,

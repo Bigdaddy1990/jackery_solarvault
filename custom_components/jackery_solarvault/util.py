@@ -65,12 +65,16 @@ from .const import (
     APP_UNIT_KWH,
     APP_UNIT_WH,
     APP_YEAR_BACKFILL_META,
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
+    DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     FIELD_ACCESSORIES,
     FIELD_CURRENT_VERSION,
     FIELD_DEVICE_ID,
@@ -151,6 +155,34 @@ _DAY_POWER_SAMPLE_MINUTES: Final = 5
 _MINUTES_PER_HOUR: Final = 60
 _WATTS_PER_KILOWATT: Final = 1000
 WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
+
+
+def local_mqtt_opt_in(entry: object) -> bool:
+    """Return whether the local MQTT receiver is opted in for this config entry.
+
+    Single source for the opt-in so the options flow and the runtime start path
+    cannot disagree. ``config_flow._current_local_mqtt_options`` documents the
+    same precedence: an explicit ``local_mqtt_enable`` wins, otherwise the
+    app-synchronised ``third_party_mqtt_enable`` acts as the fallback opt-in.
+    Reading only ``local_mqtt_enable`` at runtime made entries that carry just
+    the third-party keys look disabled, so the receiver never started and its
+    message counter stayed at zero.
+    """
+    # Kein ``isinstance(..., Mapping)``: ``Mapping`` ist hier nur ein
+    # TYPE_CHECKING-Import. ``in`` funktioniert fuer jedes Mapping, auch fuer
+    # das ``MappingProxyType`` von ``ConfigEntry.options``.
+    for source in (getattr(entry, "options", None), getattr(entry, "data", None)):
+        if source and CONF_LOCAL_MQTT_ENABLE in source:
+            return config_entry_bool_option(
+                entry,
+                CONF_LOCAL_MQTT_ENABLE,
+                DEFAULT_LOCAL_MQTT_ENABLE,
+            )
+    return config_entry_bool_option(
+        entry,
+        CONF_THIRD_PARTY_MQTT_ENABLE,
+        DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+    )
 
 
 def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
@@ -3525,12 +3557,12 @@ def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mappin
             return APP_CHART_SERIES_Y2
 
     if section.startswith(APP_SECTION_EPS_STAT):
-        # ``EpsStatApi.Bean`` (App 2.4.1) fuehrt DREI Serien: ``y``, ``y1`` und
-        # ``y2`` — im Gegensatz zu ``CtStatApi.Bean``, das nur ``y1``/``y2`` hat.
-        # ``y`` bleibt bewusst unzugeordnet: es gibt weder ein passendes
-        # Skalar-Total (nur ``totalInEpsEnergy``/``totalOutEpsEnergy``) noch eine
-        # EPS-Chart-Klasse in der App, aus der sich die Bedeutung ableiten
-        # liesse. Erst zuordnen, wenn ein Live-Payload sie belegt — nicht raten.
+        # App 2.4.x renders the EPS day view as one unlabeled AREA_SPLINE from
+        # ``x/y``. It does not identify that single curve as input or output,
+        # so it cannot safely back either directional energy total. The
+        # mirrored period chart and captured totals prove y1=input/y2=output.
+        if section.endswith(f"_{DATE_TYPE_DAY}"):
+            return None
         if stat_key == APP_STAT_TOTAL_IN_EPS_ENERGY:
             return APP_CHART_SERIES_Y1
         if stat_key == APP_STAT_TOTAL_OUT_EPS_ENERGY:

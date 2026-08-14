@@ -339,6 +339,7 @@ from .const import (
     FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SOC_FORCE_CHG,
     FIELD_STACK_IN_PW,
     FIELD_STACK_OUT_PW,
     FIELD_STORM,
@@ -9744,15 +9745,22 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if chg is None or dis is None:
             msg = "Invalid SOC limit"
             raise UpdateFailed(msg)
+        body_fields = {
+            FIELD_SOC_DISCHG_LIMIT: dis,
+            FIELD_SOC_CHG_LIMIT: chg,
+        }
+        force_charge = safe_int(current.get(FIELD_SOC_FORCE_CHG))
+        if force_charge in {0, 1}:
+            # App ``ChargeDischargeLimitActivity`` always forwards its current
+            # force-charge checkbox in the same 3028 frame. Preserve that
+            # independently observed value when either SOC limit changes.
+            body_fields[FIELD_SOC_FORCE_CHG] = force_charge
         await self._async_publish_command_ble_first(
             device_id,
             message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
             action_id=ACTION_ID_SOC_LIMITS,
             cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE,
-            body_fields={
-                FIELD_SOC_DISCHG_LIMIT: dis,
-                FIELD_SOC_CHG_LIMIT: chg,
-            },
+            body_fields=body_fields,
         )
         self._apply_local_property_patch(
             device_id,
@@ -16239,7 +16247,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self.entry,
             CONF_THIRD_PARTY_MQTT_TOKEN,
             DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-        ).strip()
+        )
         device_data = (self.data or {}).get(device_id)
         current_config = (
             device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
@@ -16269,7 +16277,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self.entry,
             CONF_THIRD_PARTY_MQTT_TOKEN,
             DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-        ).strip()
+        )
         if configured_token:
             return self._local_mqtt_device_token(device_id)
 

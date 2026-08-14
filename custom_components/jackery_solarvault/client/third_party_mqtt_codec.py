@@ -47,15 +47,6 @@ def generate_third_party_mqtt_token() -> str:
     )
 
 
-def _is_app_third_party_mqtt_token(value: str) -> bool:
-    """Return whether ``value`` matches the App's nine ASCII digit token."""
-    return (
-        len(value) == _THIRD_PARTY_MQTT_TOKEN_LEN
-        and value.isascii()
-        and value.isdecimal()
-    )
-
-
 def stable_third_party_mqtt_token(
     token: object,
     prior_generated: object,
@@ -70,27 +61,22 @@ def stable_third_party_mqtt_token(
       state, ``False`` if it came from options.
     - ``new``: the newly generated App-compatible fallback, otherwise ``None``.
 
-    The token must be exactly nine decimal digits. Empty/whitespace-only input
-    falls back to ``prior_generated`` if valid; otherwise a token is generated
-    exactly like App 2.4.0 ``MqttMsgActivity`` (nine ``Random.nextInt(10)``
-    digits). The caller persists ``new`` so reconnects reuse the same token.
+    App 2.4.x does not validate or trim an existing decoded token: every
+    non-empty value is reused verbatim. An empty input falls back to a prior
+    decoded value; only when both are absent is a token generated exactly like
+    ``MqttMsgActivity`` (nine ``Random.nextInt(10)`` digits). The caller
+    persists ``new`` so reconnects reuse the same token.
     """
-    raw_token = "" if token is None else str(token).strip()
+    raw_token = "" if token is None else str(token)
 
     if raw_token:
-        if not _is_app_third_party_mqtt_token(raw_token):
-            msg = (
-                "third-party MQTT token must be a "
-                f"{_THIRD_PARTY_MQTT_TOKEN_LEN}-digit decimal string"
-            )
-            raise ValueError(msg)
-        prior = "" if prior_generated is None else str(prior_generated).strip()
+        prior = "" if prior_generated is None else str(prior_generated)
         if prior and prior == raw_token:
             return (raw_token, True, None)
         return (raw_token, False, None)
 
-    prior = "" if prior_generated is None else str(prior_generated).strip()
-    if prior and _is_app_third_party_mqtt_token(prior):
+    prior = "" if prior_generated is None else str(prior_generated)
+    if prior:
         return (prior, True, None)
 
     new_token = generate_third_party_mqtt_token()
