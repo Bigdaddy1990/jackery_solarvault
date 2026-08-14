@@ -1,12 +1,10 @@
 """Diagnostics support for Jackery SolarVault."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
 
-from . import _local_mqtt_client
+# _local_mqtt_client moved to coordinator property
 from .const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_LOCAL_MQTT_HOST,
@@ -20,8 +18,11 @@ from .const import (
     DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DIAGNOSTICS_SCHEMA_VERSION,
+    DOMAIN,
+    LOCAL_MQTT_RUNTIME_KEY,
     REDACTED_VALUE,
 )
+from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
     config_entry_bool_option,
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from . import JackeryConfigEntry
-    from .coordinator import JackerySolarVaultCoordinator
+    from .client.local_mqtt import JackeryLocalMqttClient
 
 
 def _redacted_payload_map(
@@ -44,8 +45,9 @@ def _redacted_payload_map(
     prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Return a deterministic, labeled mapping of redacted payloads where original
-    mapping keys are replaced with stable generated labels.
+    """Build a deterministic labeled mapping of redacted payloads.
+
+    Replace original mapping keys with stable generated labels.
 
     Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
 
@@ -57,7 +59,7 @@ def _redacted_payload_map(
 
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
-    """  # noqa: D205
+    """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
@@ -69,7 +71,7 @@ def _redacted_payload_map(
     return redacted
 
 
-async def async_get_config_entry_diagnostics(  # HA awaits this entry point
+async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # HA requires async.
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
@@ -233,13 +235,14 @@ def _local_mqtt_diagnostics(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> dict[str, Any]:
-    """Build a diagnostics block for the integration's local MQTT client or indicate
-    that local MQTT is unavailable.
+    """Build diagnostics for the integration's local MQTT client.
+
+    Indicate explicitly when local MQTT is unavailable.
 
     Returns:
         dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
         MQTT client is available, otherwise the client's diagnostics snapshot.
-    """  # noqa: D205
+    """
     enabled = config_entry_bool_option(
         entry,
         CONF_LOCAL_MQTT_ENABLE,
@@ -268,7 +271,39 @@ def _local_mqtt_diagnostics(
     diagnostic_host = REDACTED_VALUE if host else ""
     diagnostic_port = REDACTED_VALUE if port else ""
 
-    client = _local_mqtt_client(hass, entry)
+    # Bewusst als ``object`` gehalten: der Typ von ``runtime_data`` verspricht den
+    # Coordinator, zur Laufzeit kann er beim fehlgeschlagenen Setup oder waehrend
+    # des Teardowns aber fehlen. Ohne die Annotation haelt mypy den Guard fuer
+    # unerreichbar und der Diagnose-Pfad "coordinator_not_ready" faellt weg.
+    coordinator: object = entry.runtime_data
+    if not isinstance(coordinator, JackerySolarVaultCoordinator):
+        reason = "coordinator_not_ready"
+        return {
+            "enabled": False,
+            "disabled_reason": reason,
+            "configured_local_mqtt": {
+                "host": diagnostic_host,
+                "port": diagnostic_port,
+                "username_set": bool(username),
+                "password_set": bool(password),
+                "topic_filter": REDACTED_VALUE,
+                "effective_topic_filter": REDACTED_VALUE,
+            },
+        }
+
+    try:
+        client = coordinator.local_mqtt_client
+    except AttributeError:
+        # Diagnostics must remain exportable while a coordinator is only
+        # partially initialised (for example during failed startup handling).
+        client = None
+    if client is None:
+        runtime_bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+        if isinstance(runtime_bucket, dict):
+            client = cast(
+                "JackeryLocalMqttClient | None",
+                runtime_bucket.get(LOCAL_MQTT_RUNTIME_KEY),
+            )
     if client is None:
         if not enabled:
             reason = "bridge_disabled"

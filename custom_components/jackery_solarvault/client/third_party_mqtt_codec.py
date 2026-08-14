@@ -1,7 +1,5 @@
 """App-compatible codec for ThirdPartMQTTConfig credential fields."""
 
-from __future__ import annotations
-
 import base64
 import logging
 import secrets
@@ -44,7 +42,9 @@ _THIRD_PARTY_MQTT_TOKEN_LEN = 9
 
 def generate_third_party_mqtt_token() -> str:
     """Generate the App's nine-digit Third-Party MQTT fallback token."""
-    return "".join(str(secrets.randbelow(10)) for _ in range(_THIRD_PARTY_MQTT_TOKEN_LEN))
+    return "".join(
+        str(secrets.randbelow(10)) for _ in range(_THIRD_PARTY_MQTT_TOKEN_LEN)
+    )
 
 
 def _is_app_third_party_mqtt_token(value: str) -> bool:

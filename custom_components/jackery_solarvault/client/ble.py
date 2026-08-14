@@ -54,8 +54,6 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 import os
@@ -164,12 +162,13 @@ def parse_hex16(text: str) -> int:
 
 
 def hex_encode(data: bytes) -> str:
-    """Produce an uppercase hexadecimal string of the given bytes with no separators or
-    "0x" prefix.
+    """Produce an uppercase hexadecimal string.
+
+    The representation has no separators or ``0x`` prefix.
 
     Returns:
         str: Uppercase hexadecimal representation of `data`.
-    """  # noqa: D205
+    """
     return data.hex().upper()
 
 

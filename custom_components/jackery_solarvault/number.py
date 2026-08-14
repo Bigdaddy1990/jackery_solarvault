@@ -6,8 +6,6 @@ single-tariff dynamic currency, max-power error handling) live as
 optional callables on the description.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -955,7 +953,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the entity's current value."""
+        """The entity's current value."""
         section = self._section()
         for key in self.entity_description.source_keys:
             val = section.get(key)
@@ -968,7 +966,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_max_value(self) -> float:
-        """Return the highest value the user can write."""
+        """The highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -979,12 +977,13 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """The entity's unit of measurement, using a dynamic unit computed from the
-        current payload when available.
+        """The entity's unit of measurement.
+
+        Use a dynamic unit computed from the current payload when available.
 
         Returns:
             The unit of measurement string, or None if no unit is configured.
-        """  # noqa: D205
+        """
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(
                 self._payload_for_sources(self.entity_description.data_sources)
@@ -993,7 +992,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
     @property
     def suggested_display_precision(self) -> int | None:
-        """Return the suggested number of decimal places for display."""
+        """The suggested number of decimal places for display."""
         return self.entity_description.display_precision
 
     def _allowed_values(self) -> tuple[float, ...]:
@@ -1017,8 +1016,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         return tuple(allowed)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Write the given native numeric value to the device, enforcing
-        description-driven validation and invoking the configured setter.
+        """Write a validated native numeric value to the device.
+
+        Enforce description-driven validation and invoke the configured setter.
 
         Validates the value against the description's min/max when `validate_range` is
         True and against discrete `allowed_values` when present. If a setter is
@@ -1037,7 +1037,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             ConfigEntryAuthFailed: If the setter reports an authentication failure.
             HomeAssistantError: For invalid range or allowed-value violations, or when
             `raise_on_setter_error` is True and the setter fails.
-        """  # noqa: D205
+        """
         parsed_value = safe_float(value)
         if parsed_value is None:
             self._raise_action_error(
@@ -1100,7 +1100,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an async platform hook.
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -1180,8 +1180,9 @@ async def async_setup_entry(
     }
 
     def _collect_entities() -> list[NumberEntity]:
-        """Collect JackeryNumber entities for devices whose payloads satisfy their
-        gating predicates.
+        """Collect number entities for devices that satisfy their predicates.
+
+        Use the description-specific gating predicates for each device payload.
 
         Iterates coordinator data and instantiates a JackeryNumber for each entry in
         NUMBER_DESCRIPTIONS when the description has no predicate or its predicate
@@ -1190,7 +1191,7 @@ async def async_setup_entry(
         Returns:
             list[NumberEntity]: Instantiated number entities ready to be added to Home
             Assistant.
-        """  # noqa: D205
+        """
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)

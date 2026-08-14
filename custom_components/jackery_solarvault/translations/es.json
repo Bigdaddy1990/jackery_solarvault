@@ -304,9 +304,6 @@
       "portable_energy_storage_charge_limit": {
         "name": "Límite de carga del almacenamiento de energía"
       },
-      "portable_output_priority": {
-        "name": "Modo de prioridad de salida"
-      },
       "single_tariff_price_set": {
         "name": "Precio de tarifa única"
       },
@@ -1898,6 +1895,7 @@
           "enable_payload_debug_log": "Enable redacted payload debug log",
           "enable_week_statistics": "Importar estadísticas semanales",
           "enable_year_statistics": "Importar estadísticas anuales",
+          "scan_interval": "Intervalo de sondeo en directo (segundos)",
           "third_party_mqtt_enable": "Activar puente MQTT de terceros",
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
           "third_party_mqtt_password": "Contraseña MQTT de terceros",
@@ -1916,6 +1914,7 @@
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "scan_interval": "Con qué frecuencia se consulta la nube de Jackery para obtener valores en directo. El MQTT en la nube y el Bluetooth entregan actualizaciones más rápidas de forma independiente; 30 s sigue la recomendación de Home Assistant para integraciones de sondeo en la nube. Mínimo 15 s.",
           "third_party_mqtt_enable": "Pide a la SolarVault que publique telemetría en tu propio broker MQTT (PROTOCOL.md §5 / §15). Experimental: el relé REST en la nube para este comando está bloqueado en el servidor, por lo que la integración publica el frame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) primero directamente por BLE y luego por MQTT en la nube. El usuario, la contraseña y el token se codifican con el códec ThirdPartMQTTConfig compatible con la app antes de enviarse.",
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",
           "third_party_mqtt_password": "Contraseña opcional del broker MQTT.",

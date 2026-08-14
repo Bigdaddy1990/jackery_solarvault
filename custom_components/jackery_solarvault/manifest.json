@@ -2,17 +2,20 @@
   "domain": "jackery_solarvault",
   "name": "Jackery SolarVault",
   "after_dependencies": [
-    "aiousbwatcher",
     "bluetooth",
     "dhcp",
     "http",
+    "mqtt",
     "recorder",
     "zeroconf"
   ],
   "bluetooth": [
     {
       "connectable": true,
-      "manufacturer_id": 18434,
+      "manufacturer_id": 18434
+    },
+    {
+      "connectable": true,
       "service_uuid": "0000bdee-0000-1000-8000-00805f9b34fb"
     }
   ],
@@ -20,6 +23,7 @@
     "@Bigdaddy1990"
   ],
   "config_flow": true,
+  "dependencies": [],
   "dhcp": [
     {
       "hostname": "solarvault*",

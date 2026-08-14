@@ -1,9 +1,7 @@
 """Repair flows for Jackery SolarVault."""
 
-from __future__ import annotations
-
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import voluptuous as vol
 
@@ -14,9 +12,6 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 
 from .const import DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ACTIVATED
 from .coordinator import BACKGROUND_TASK_ERRORS, JackerySolarVaultCoordinator
-
-if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +81,7 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
         return None
 
 
-async def async_create_fix_flow(  # HA awaits this entry point
+async def async_create_fix_flow(  # ruff: ignore[unused-async]  # HA requires an async fix hook.
     hass: HomeAssistant,
     issue_id: str,
     data: dict[str, Any] | None,

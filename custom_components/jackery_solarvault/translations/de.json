@@ -304,9 +304,6 @@
       "portable_energy_storage_charge_limit": {
         "name": "Energiespeicher-Ladelimit"
       },
-      "portable_output_priority": {
-        "name": "Ausgangsprioritätsmodus"
-      },
       "single_tariff_price_set": {
         "name": "Einheitstarif Strompreis"
       },
@@ -1898,6 +1895,7 @@
           "enable_payload_debug_log": "Enable redacted payload debug log",
           "enable_week_statistics": "Wochenstatistiken importieren",
           "enable_year_statistics": "Jahresstatistiken importieren",
+          "scan_interval": "Abfrageintervall Live-Werte (Sekunden)",
           "third_party_mqtt_enable": "Third-Party-MQTT-Bridge aktivieren",
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",
           "third_party_mqtt_password": "Third-Party-MQTT-Passwort",
@@ -1916,6 +1914,7 @@
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
           "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
+          "scan_interval": "Wie oft die Jackery-Cloud nach Live-Werten abgefragt wird. Cloud-MQTT und Bluetooth liefern unabhängig davon schnellere Aktualisierungen; 30 s entspricht der Home-Assistant-Vorgabe für Cloud-Polling-Integrationen. Minimum 15 s.",
           "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md §5 / §15). Experimentell: Der Cloud-REST-Relay fuer diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",

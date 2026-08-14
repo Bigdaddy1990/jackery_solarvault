@@ -2,6 +2,40 @@
 # Source: https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/
 # Status values are intentionally conservative: this custom integration targets
 # Platinum behavior, but only rules with local code/test evidence are marked done.
+#
+# VERIFICATION PROVENANCE — a status here is a claim, so record how it was
+# checked. Audit of 2026-08-13 (28 modules, 62.9k LOC):
+#
+#   appropriate-polling  measured, not asserted. Live poll respects its 120 s
+#                        TTL (2-3 calls per endpoint in a 5.2 min capture); the
+#                        remaining volume is historical backfill. Scan interval
+#                        is user-configurable, default 30 s, floor 15 s.
+#   parallel-updates     verified: set in all 7 platform modules.
+#   entity-unique-id     verified: f"{device_id}_{key_suffix}", no names or
+#                        translation keys in the id.
+#   has-entity-name      verified on the shared entity base class.
+#   entity-translations  verified by key-parity check between strings.json and
+#                        en.json, plus a per-platform placement check.
+#   icon-translations    verified: every entity without a device_class has an
+#                        explicit icons.json entry. Entities WITH a device_class
+#                        deliberately have none — Home Assistant supplies it.
+#   runtime-data         verified. The coordinator is in entry.runtime_data. The
+#                        hass.data bucket alongside it is NOT a second copy; it
+#                        carries cross-setup teardown/fence state that
+#                        runtime_data cannot hold. See _entry_runtime_bucket.
+#   strict-typing        mypy --strict completes across all 28 modules. Re-run in
+#                        the project venv with homeassistant-stubs for the
+#                        authoritative count; a stubs-less environment reports
+#                        version artifacts (unused type: ignore, redundant cast)
+#                        that are not defects.
+#
+# Unverified here, and knowingly so: every docs-* rule points at README sections
+# that this audit did not read.
+#
+# OPEN DECISION: the target level is stated three different ways —
+# manifest.json says quality_scale "custom", the project instructions say
+# Platinum, docs/CLAUDE.md says Gold. Pick one; test-coverage and
+# config-flow-test-coverage below block Silver and above either way.
 rules:
   action-setup:
     status: done

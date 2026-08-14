@@ -14,7 +14,6 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, NotRequired, TypedDict
 
-
 # =============================================================================
 # Shared transport ingest
 # =============================================================================
@@ -59,12 +58,15 @@ class FieldProvenance:
     request_id: str | None = None
 
 
+type ProvenanceKey = str | tuple[str, ...]
+
+
 @dataclass(frozen=True, slots=True)
 class IngestResult:
     """Result of applying one observation to a single payload section."""
 
     payload: dict[str, Any]
-    provenance: dict[str, FieldProvenance]
+    provenance: dict[ProvenanceKey, FieldProvenance]
     accepted_fields: frozenset[str]
 
     @property
@@ -1047,3 +1049,36 @@ class PowerReportRequestData(TypedDict):
 
     deviceSn: str
     properties: dict[str, str]
+
+
+# =============================================================================
+# BLE Box — Fault (from source-of-truth hbxn_model_fields.csv)
+# =============================================================================
+
+
+class FaultData(TypedDict):
+    """com.hbxn.control.device.bean.box.Fault — box fault/error information."""
+
+    bs1: int  # battery status 1
+    bs2: int  # battery status 2
+    ec1: int  # error code 1
+    ec2: int  # error code 2
+    es: int  # error status
+    gs: int  # grid status
+    loc: str  # location
+    moc: int  # module code
+    ntc: int  # NTC temperature
+    ol: int  # overload
+    ta1: int  # temperature alarm 1
+    ta2: int  # temperature alarm 2
+
+
+# =============================================================================
+# Device Share / Bind — topicList (from source-of-truth jackery_http_model_fields_v2.csv)
+# =============================================================================
+
+
+class DeviceShareBindData(TypedDict):
+    """device/bind/share — shared device bind info with topicList."""
+
+    topicList: list[str]  # valid MQTT topics from cloud

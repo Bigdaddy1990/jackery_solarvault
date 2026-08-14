@@ -19,17 +19,19 @@ The actions follow the same routing contract:
    ``translation_domain`` so HA can render a localized error to the user.
 """
 
-from __future__ import annotations
-
+import base64
 from collections.abc import Callable, Coroutine
+import io
 import json
 import logging
 import math
 import re
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
 
+import segno
 import voluptuous as vol
 
+from homeassistant.components import persistent_notification
 from homeassistant.core import SupportsResponse, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -1043,8 +1045,9 @@ _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 
 
 def _strip_jackery_subdevice_suffix(device_id: str) -> str:
-    """Return the parent numeric Jackery device identifier by removing a recognized
-    subdevice suffix.
+    """Return the parent numeric Jackery device identifier.
+
+    Remove a recognized subdevice suffix before returning the identifier.
 
     Parameters:
         device_id (str): Device identifier that may include a trailing `_suffix`
@@ -1053,14 +1056,15 @@ def _strip_jackery_subdevice_suffix(device_id: str) -> str:
     Returns:
         str: The leading numeric device identifier if a suffix is present (e.g.,
         "12345"), otherwise the original input.
-    """  # noqa: D205
+    """
     match = _JACKERY_MAIN_DEVICE_RE.match(device_id)
     return match.group(1) if match else device_id
 
 
 def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
-    """Resolve a Home Assistant device-registry id or Jackery compound id to the parent
-    Jackery numeric device id.
+    """Resolve an identifier to the parent Jackery numeric device id.
+
+    Accept a Home Assistant device-registry id or Jackery compound id.
 
     Parameters:
         raw (str): A device-registry id or a Jackery device identifier that may include
@@ -1069,7 +1073,7 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
     Returns:
         parent_id (str): The parent Jackery numeric device id with any documented
         subdevice suffix removed.
-    """  # noqa: D205
+    """
     registry = dr.async_get(hass)
     device = registry.async_get(raw)
     if device is not None:
@@ -1210,8 +1214,9 @@ def _service_validation_error(
     error: object,
     extra_placeholders: dict[str, str] | None = None,
 ) -> ServiceValidationError:
-    """Constructs a ServiceValidationError with the integration DOMAIN and populated
-    translation placeholders for a device and an error.
+    """Construct a translated ``ServiceValidationError``.
+
+    Populate the integration domain and placeholders for a device and an error.
 
     Parameters:
         translation_key (str): Translation key to identify the localized error message.
@@ -1223,7 +1228,7 @@ def _service_validation_error(
         ServiceValidationError: Error with `translation_domain` set to DOMAIN,
         `translation_key` set to `translation_key`, and `translation_placeholders`
         containing `device_id` and `error`.
-    """  # noqa: D205
+    """
     placeholders = {
         "device_id": device_id,
         "error": str(error),
@@ -1359,10 +1364,8 @@ def _json_native_value(value: Any) -> Any:
         normalized: dict[str, Any] = {}
         for key, item in value.items():
             if not isinstance(key, str):
-                # ValueError (not TypeError) on purpose: the caller wraps this
-                # helper in ``except ValueError`` to build the service error.
                 msg = "body object keys must be strings"
-                raise ValueError(msg)  # noqa: TRY004
+                raise TypeError(msg)
             normalized[key] = _json_native_value(item)
         return normalized
     msg = "body must contain only JSON-compatible values"
@@ -1373,7 +1376,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     """Return a JSON-native object body or raise a translated service error."""
     try:
         normalized = _json_native_value(body)
-    except ValueError as err:
+    except (TypeError, ValueError) as err:
         msg = "send_ble_command_failed"
         raise _service_validation_error(
             msg,
@@ -1858,8 +1861,9 @@ async def _async_handle_set_third_party_mqtt_config(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> None:
-    """Send a third-party MQTT configuration to the coordinator that owns the resolved
-    Jackery device.
+    """Send a third-party MQTT configuration to the owning coordinator.
+
+    Resolve the Jackery device before forwarding the configuration.
 
     Parameters:
         hass (HomeAssistant): Home Assistant instance.
@@ -1876,7 +1880,7 @@ async def _async_handle_set_third_party_mqtt_config(
         ServiceValidationError: If no loaded coordinator owns the resolved device id, or
         if applying the configuration fails. The error includes translation placeholders
         `device_id` and `error`.
-    """  # noqa: D205
+    """
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2434,14 +2438,7 @@ def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
     part of the scanned payload. This exact scan format is reverse-engineered,
     not vendor-documented, so the rendering is best-effort.
 
-    segno is imported lazily so the module import stays cheap for the common
-    path that never renders a QR.
     """
-    import base64
-    import io
-
-    import segno
-
     buffer = io.BytesIO()
     segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
@@ -2465,11 +2462,6 @@ def _notify_share_qr_code(
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
     try:
-  # deliberate: the import stays inside
-        # the best-effort try so a missing/broken persistent_notification component
-        # cannot fail the service, which must still return its response envelope.
-        from homeassistant.components import persistent_notification
-
         data_uri = _render_share_qr_png_data_uri(qr_code_id)
         message = (
             f"![Share QR code]({data_uri})\n\n"
@@ -3628,15 +3620,16 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
 
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
-    """Register the integration's domain-scoped Home Assistant services and their
-    handlers.
+    """Register the integration's domain-scoped Home Assistant services.
+
+    Bind each service to its handler.
 
     Registers the following services (if not already present) and wires each to the
     integration's internal async handler: rename system, refresh weather plan, delete
     storm alert, set/query third-party MQTT config, send BLE command, and send device
     schedule. Each service is registered with this module's corresponding voluptuous
     schema and forwards validated ServiceCall objects to the integration handlers.
-    """  # noqa: D205
+    """
 
     def _make_handler(
         handler: _ServiceHandler,
@@ -3661,8 +3654,9 @@ async def _async_handle_send_device_schedule(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> None:
-    """Send a device schedule frame (TIMER_TASK_ADD/DELETE/UPDATE/READ) to a Jackery
-    device.
+    """Send a device schedule frame to a Jackery device.
+
+    Support TIMER_TASK_ADD, TIMER_TASK_DELETE, TIMER_TASK_UPDATE, and TIMER_TASK_READ.
 
     Resolves the provided device identifier to the owning Jackery device, parses the
     schedule `body` (accepts a mapping or a JSON object string), and forwards the action
@@ -3677,7 +3671,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
         `body` is invalid, or if sending the schedule fails.
-    """  # noqa: D205
+    """
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

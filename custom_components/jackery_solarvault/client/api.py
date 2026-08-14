@@ -17,8 +17,6 @@ Trends:   /v1/device/stat/sys/pv/trends       (?systemId&beginDate&endDate&dateT
 Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import binascii
@@ -323,9 +321,19 @@ _DAY_CHART_SERIES_KEYS: Final[tuple[str, ...]] = (
 
 
 def _data_field_accepted(data: dict[str, Any]) -> bool:
-    """Return whether the response data field contains a usable payload."""
-    code = data.get(FIELD_CODE)
-    return code == CODE_OK or code is None
+    """Return whether a Shelly write response signals acceptance.
+
+    Current Shelly control responses use ``data.accepted``. The scalar
+    ``data`` form is retained for older backend variants.
+    """
+    val = data.get(FIELD_DATA)
+    if isinstance(val, dict):
+        val = val.get("accepted")
+    if val is True:
+        return True
+    if isinstance(val, (str, int)):
+        return str(val).lower() in {"true", "1", "ok"}
+    return False
 
 
 class JackeryError(Exception):
@@ -384,7 +392,8 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str | None = None) -> byt
 
 
 def _generate_udid(seed: str) -> str:
-    md5_digest = hashlib.md5(seed.encode("utf-8")).digest()
+    # MD5 is required only for protocol-compatible UUIDv3 derivation.
+    md5_digest = hashlib.md5(seed.encode("utf-8"), usedforsecurity=False).digest()
     u = uuid.UUID(bytes=md5_digest, version=3)
     return f"{MQTT_MAC_ID_PREFIX}{u.hex}"
 
@@ -452,7 +461,7 @@ class MqttSessionSnapshot(TypedDict):
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
-class JackeryApi:
+class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented facade mirrors the app API
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(  # constructor takes distinct client-config values; a params object adds no clarity
@@ -586,8 +595,7 @@ class JackeryApi:
         return mac_id
 
     def _resolve_login_mac_id(self) -> str:
-        """Resolve and return the MAC identifier used for login and MQTT username
-        derivation.
+        """Resolve the MAC identifier used for login and MQTT username derivation.
 
         If a configured MQTT MAC ID is present and valid, that value is returned and
         `self._mqtt_mac_id_source` is set to `"configured"`. If the configured value is
@@ -598,7 +606,7 @@ class JackeryApi:
 
         Returns:
             str: The resolved MAC ID string.
-        """  # noqa: D205
+        """
         configured = self._mqtt_mac_id_configured
         if configured:
             try:
@@ -808,7 +816,7 @@ class JackeryApi:
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except (binascii.Error, ValueError):
+        except binascii.Error, ValueError:
             return None
 
         if len(seed) != _MQTT_SEED_LEN:
@@ -964,9 +972,7 @@ class JackeryApi:
         last = self._last_auto_relogin_monotonic
         if last is None:
             return True
-        return bool(
-            (time.monotonic() - last) >= AUTH_AUTO_RELOGIN_COOLDOWN_SEC
-        )
+        return bool((time.monotonic() - last) >= AUTH_AUTO_RELOGIN_COOLDOWN_SEC)
 
     def _note_auto_relogin(self) -> None:
         """Record an automatic re-login for cooldown tracking and diagnostics."""
@@ -1137,8 +1143,10 @@ class JackeryApi:
             result = callback(status, data)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("Jackery auth rejection callback failed: %s", err)
+        except Exception as err:
+            _LOGGER.debug(
+                "Jackery auth rejection callback failed: %s", err, exc_info=True
+            )
 
     async def _emit_payload_debug(
         self,
@@ -1159,8 +1167,12 @@ class JackeryApi:
             result = callback(event_or_factory)
             if inspect.isawaitable(result):
                 await result
-        except Exception as err:  # best-effort debug logging must never break the API path
-            _LOGGER.debug("Jackery payload debug logging failed: %s", err)
+        except (
+            Exception
+        ) as err:  # best-effort debug logging must never break the API path
+            _LOGGER.debug(
+                "Jackery payload debug logging failed: %s", err, exc_info=True
+            )
 
     @staticmethod
     def _coalesced_day_stat_copy(
@@ -1727,8 +1739,7 @@ class JackeryApi:
         return self._payload_dict(data, DEVICE_METER_STAT_PATH)
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
-        """Get a normalized list of battery pack dictionaries for the given device
-        serial number.
+        """Get normalized battery-pack dictionaries for a device serial number.
 
         The raw parsed API response is saved to
         self.last_battery_pack_responses[device_sn]. Handles multiple backend response
@@ -1740,7 +1751,7 @@ class JackeryApi:
         Returns:
             list[dict]: Battery pack dictionaries extracted from the response; empty
             list if no packs are found or the response shape is unrecognized.
-        """  # noqa: D205
+        """
         params = {FIELD_DEVICE_SN: str(device_sn)}
         data = await self._get_json(BATTERY_PACK_PATH, params=params)
         if isinstance(data, dict):
@@ -2317,14 +2328,13 @@ class JackeryApi:
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """Retrieve EPS (off-grid) energy input/output statistics for a device for a
-        specified period.
+        """Retrieve device EPS input/output energy for a specified period.
 
         Returns:
             dict: Payload containing aggregated totals (e.g., `totalInEpsEnergy`,
             `totalOutEpsEnergy`), chart series arrays (`x`, `y`, `y1`, `y2`), and, when
             present, an `APP_REQUEST_META` dict with the request parameters used.
-        """  # noqa: D205
+        """
         return await self._async_get_device_period_stat(
             DEVICE_EPS_STAT_PATH,
             device_id=device_id,
@@ -3973,8 +3983,7 @@ class JackeryApi:
         multipart: bool = False,
         multipart_files: Sequence[_MultipartFile] = (),
     ) -> dict[str, Any]:
-        """Send a form-urlencoded POST to the Jackery API, retrying once after automatic
-        re-login if the token is expired.
+        """Send a form POST, retrying once after automatic expired-token login.
 
         Parameters:
             path (str): API endpoint path appended to the base URL.
@@ -3993,7 +4002,7 @@ class JackeryApi:
             the response `code` indicates an error.
             JackeryAuthError: When the response indicates an authentication or
             authorization failure.
-        """  # noqa: D205
+        """
         token_used = await self._ensure_token()
         url = f"{BASE_URL}{path}"
 
@@ -4078,8 +4087,7 @@ class JackeryApi:
         return data
 
     async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
-        """Set the device's maximum allowed power using the experimental max-power
-        endpoint.
+        """Set device maximum power through the experimental endpoint.
 
         Validates that `max_power` is an integer greater than or equal to 0 before
         sending the request.
@@ -4096,7 +4104,7 @@ class JackeryApi:
 
         Raises:
             JackeryApiError: If `max_power` is invalid or the API call fails.
-        """  # noqa: D205
+        """
         if not isinstance(max_power, int) or max_power < 0:
             msg = "max_power must be a non-negative integer"
             raise JackeryApiError(msg)

@@ -1,6 +1,9 @@
 """Jackery SolarVault integration."""
 
-from __future__ import annotations
+# Home Assistant requires each integration's setup/unload entry points in this
+# package module; moving them solely to satisfy the generic package-init rule
+# would break HA's loader contract.
+# ruff: file-ignore[non-empty-init-module]
 
 import asyncio
 import contextlib
@@ -14,29 +17,25 @@ import re
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_PASSWORD,
-    CONF_USERNAME,
-    EntityCategory,
-)
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EntityCategory
 from homeassistant.core import callback
-from homeassistant.exceptions import (
-    ConfigEntryAuthFailed,
-    ConfigEntryNotReady,
-)
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.helpers.storage import Store as Store
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from .client import JackeryApi, JackeryAuthError, JackeryError
-from .client.local_mqtt import (
-    JackeryLocalMqttClient,
+from .client import (
+    JackeryApi,
+    JackeryApiError as JackeryApiError,
+    JackeryAuthError,
+    JackeryError,
 )
+from .client.local_mqtt import JackeryLocalMqttClient
 from .client.mqtt_session_cache import (
     async_load_mqtt_session,
     normalize_mqtt_session_snapshot,
@@ -60,8 +59,8 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
-    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
     CT_PERIOD_SENSOR_SUFFIXES,
@@ -72,7 +71,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE as DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD as DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
-    DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_PORT as DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER as DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME as DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
@@ -100,20 +99,20 @@ from .const import (
     PAYLOAD_CT_METER,
     PAYLOAD_PROPERTIES,
     PLATFORMS,
-    REMOVED_SENSOR_SUFFIXES,
     REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
+    REMOVED_SENSOR_SUFFIXES,
     SAVINGS_DETAIL_SENSOR_SUFFIXES,
     SETUP_LOGIN_MAX_ATTEMPTS,
     SETUP_LOGIN_RETRY_DELAY_SEC,
     SMART_METER_DERIVED_SENSOR_SUFFIXES,
     STALE_ENERGY_HELPER_PREFIX,
     STALE_HELPER_VENDOR_TOKENS,
-    _ENTITY_CREATING_OPTION_KEYS,
     STALE_NET_POWER_SUFFIX,
+    _ENTITY_CREATING_OPTION_KEYS,
 )
 from .coordinator import (
-    JackerySolarVaultCoordinator,
     STORAGE_ERRORS,
+    JackerySolarVaultCoordinator,
     battery_pack_serial,
     sorted_battery_pack_payloads,
 )
@@ -309,8 +308,7 @@ def _async_remove_legacy_system_parent_devices(
         device.id
         for device in entry_devices
         if any(
-            domain == DOMAIN
-            and identifier.startswith(("system_", "system_sn_"))
+            domain == DOMAIN and identifier.startswith(("system_", "system_sn_"))
             for domain, identifier in device.identifiers
         )
     }
@@ -394,9 +392,7 @@ def _async_prune_removed_local_mqtt_tls_options(
     removed = REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS.intersection(entry.options)
     if not removed:
         return
-    options = {
-        key: value for key, value in entry.options.items() if key not in removed
-    }
+    options = {key: value for key, value in entry.options.items() if key not in removed}
     hass.config_entries.async_update_entry(entry, options=options)
     _LOGGER.info(
         "Removed obsolete Jackery local MQTT TLS options: %s",
@@ -424,6 +420,29 @@ def _entry_bootstrap_mqtt_session(entry: ConfigEntry) -> dict[str, str] | None:
 
 def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Get or create the config entry's mutable ``hass.data`` bucket.
+
+    NOT a second copy of ``entry.runtime_data`` — do not "consolidate" the two.
+    The coordinator lives in ``entry.runtime_data`` and that remains the single
+    store for the integration's runtime state. This bucket holds only
+    LIFECYCLE-TRANSITION state, which needs a lifetime that ``runtime_data``
+    structurally cannot provide:
+
+    * Home Assistant resets ``entry.runtime_data`` per setup, and this module
+      additionally clears it to ``None`` during teardown (see
+      ``_async_release_fenced_coordinator``). Anything stored there is gone
+      exactly when the teardown path still needs it.
+    * ``_async_release_fenced_coordinator`` runs as the FIRST statement of
+      ``async_setup_entry`` and reads ``_UNLOADING_COORDINATOR_RUNTIME_KEY``
+      from a *previous* setup that has not finished unwinding. That fence is
+      what prevents two overlapping HTTP runtimes; it has to survive the
+      boundary between two setups.
+    * Deferred reaping (``_SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY``,
+      ``_LAYER5_TASK_RUNTIME_KEY``, ``_SUPPLEMENTAL_CLEANUP_TASK_RUNTIME_KEY``)
+      deliberately outlives the coordinator that created it.
+
+    Moving these onto the coordinator or into ``runtime_data`` would drop the
+    fence and allow a new coordinator to start while the previous one is still
+    holding an HTTP session open.
 
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
@@ -510,7 +529,7 @@ def _store_entry_runtime_task(
             done.result()
         except asyncio.CancelledError:
             return
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:  # ruff: ignore[blind-except]
             _LOGGER.warning(
                 "Jackery background task %s for entry %s failed: %s",
                 task.get_name(),
@@ -674,7 +693,7 @@ async def _async_cleanup_stale_supplemental(
             try:
                 async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                     await item.async_stop()
-            except Exception:  # noqa: BLE001
+            except Exception:  # ruff: ignore[blind-except]
                 pending_local_mqtt.append(item)
         _set_supplemental_runtime_items(
             bucket,
@@ -692,7 +711,7 @@ async def _async_cleanup_stale_supplemental(
             try:
                 async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                     await item.async_stop_supplemental_transports()
-            except Exception:  # noqa: BLE001
+            except Exception:  # ruff: ignore[blind-except]
                 pending_transport_coordinators.append(item)
                 continue
             if item.has_pending_supplemental_transport_cleanup:
@@ -768,7 +787,7 @@ async def _async_release_fenced_coordinator(
     return True
 
 
-async def _async_prime_entry_bootstrap_mqtt_session(  # noqa: RUF029
+async def _async_prime_entry_bootstrap_mqtt_session(  # ruff: ignore[unused-async]
     _hass: HomeAssistant,
     entry: ConfigEntry,
     api: JackeryApi,
@@ -889,6 +908,24 @@ async def _async_authenticate_api_layer(
             break
 
 
+async def _async_run_primary_http_startup(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Run the ordered HTTP authentication and discovery sequence."""
+    await _async_authenticate_api_layer(hass, entry, coordinator.api)
+    await coordinator.async_persist_http_mqtt_session()
+    await coordinator.async_discover()
+    await coordinator.async_config_entry_first_refresh()
+    if not coordinator.data:
+        msg = (
+            "Jackery HTTP discovery returned no devices; "
+            "Home Assistant will retry setup"
+        )
+        raise ConfigEntryNotReady(msg)
+
+
 async def _async_prepare_primary_http(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -896,17 +933,8 @@ async def _async_prepare_primary_http(
 ) -> None:
     """Authenticate, discover, and complete HA's mandatory first HTTP refresh."""
     try:
-        await _async_authenticate_api_layer(hass, entry, coordinator.api)
-        await coordinator.async_persist_http_mqtt_session()
-        await coordinator.async_discover()
-        await coordinator.async_config_entry_first_refresh()
-        if not coordinator.data:
-            msg = (
-                "Jackery HTTP discovery returned no devices; "
-                "Home Assistant will retry setup"
-            )
-            raise ConfigEntryNotReady(msg)
-    except (ConfigEntryAuthFailed, ConfigEntryNotReady):
+        await _async_run_primary_http_startup(hass, entry, coordinator)
+    except ConfigEntryAuthFailed, ConfigEntryNotReady:
         raise
     except JackeryAuthError as err:
         msg = f"Jackery credentials were rejected by the HTTP API: {err}"
@@ -932,7 +960,9 @@ def _handle_optional_startup_result(
         label (str): Short label identifying the startup layer (used in logs).
     """
     if isinstance(result, ConfigEntryAuthFailed):
-        coordinator._defer_background_auth_failure(result)  # noqa: SLF001
+        coordinator._defer_background_auth_failure(  # ruff: ignore[private-member-access]
+            result
+        )
     elif isinstance(result, BaseException):
         _LOGGER.warning("Jackery %s could not start: %s", label, result)
 
@@ -1008,88 +1038,53 @@ async def _async_start_local_mqtt(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """Start a per-entry local MQTT client when the entry is explicitly scoped.
-
-    The listener only starts when local MQTT is explicitly enabled and the
-    host is set. An empty option uses the single app-compatible exact topic;
-    the listener never falls back to a broker-wide wildcard.
-    """
+    """Start an entry-owned receiver on Home Assistant's MQTT transport."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
-    # The direct listener is an explicit opt-in. The app-synchronised legacy
+    # The receiver is an explicit opt-in. The app-synchronised legacy
     # third_party_mqtt_enable field describes device state and must never start
-    # a Home Assistant broker client by itself.
+    # a Home Assistant MQTT subscription by itself.
     enabled = config_entry_bool_option(
         entry,
         CONF_LOCAL_MQTT_ENABLE,
         DEFAULT_LOCAL_MQTT_ENABLE,
     )
-    host = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "")
-        or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "")
-    ).strip()
-
-    # The receiver filter is used verbatim for exactly one direct-broker
+    # The receiver filter is used verbatim for exactly one HA MQTT
     # subscription. App 2.4.0 command 3046 does not carry a topic field, so
     # this is intentionally independent of the device-side bridge settings.
     # An empty value falls back to the central receiver default because the UI
     # tells users they may leave it empty.
     raw_topic_filter = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
+        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
+        or config_entry_str_option(entry, CONF_LOCAL_MQTT_TOPIC, "")
         or LOCAL_MQTT_DEFAULT_TOPIC
     ).strip()
     configured_topic_filter = raw_topic_filter
-    port = config_entry_int_option(
-        entry,
-        CONF_LOCAL_MQTT_PORT,
-        0,
-    ) or config_entry_int_option(
-        entry,
-        CONF_THIRD_PARTY_MQTT_PORT,
-        DEFAULT_THIRD_PARTY_MQTT_PORT,
-    )
-    username = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_USERNAME, "")
-        or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_USERNAME, "")
-    ).strip()
-    password = config_entry_str_option(
-        entry,
-        CONF_LOCAL_MQTT_PASSWORD,
-        "",
-    ) or config_entry_str_option(
-        entry,
-        CONF_THIRD_PARTY_MQTT_PASSWORD,
-        "",
-    )
-    configuration: LocalMqttConfiguration = (
-        host,
-        port,
-        username or None,
-        password or None,
-        f"ha-jackery-{entry.entry_id[:8]}",
-        configured_topic_filter,
-    )
+    configuration: LocalMqttConfiguration = (configured_topic_filter,)
     # The subscription filter is the user's decision and is used verbatim; the
-    # listener only needs the opt-in and a broker host to start.
-    should_run = enabled and bool(host)
+    # listener only needs the opt-in. Device-side broker configuration is a
+    # separate 3046/3047 lifecycle and must not gate the HA receiver.
+    should_run = enabled
     existing_client = _local_mqtt_client(hass, entry)
     if (
         should_run
         and existing_client is not None
         and existing_client.matches_configuration(configuration)
     ):
-        # The client owns its reconnect loop. Reusing an unchanged instance
-        # preserves counters and avoids a broker disconnect on every options
-        # reconcile; ``async_start`` only revives a runner that actually ended.
+        # Home Assistant owns the broker reconnect loop. Reusing an unchanged
+        # receiver preserves counters and avoids subscription churn.
+        coordinator.set_local_mqtt_client(existing_client)
         await existing_client.async_start()
         coordinator.async_schedule_local_mqtt_device_config()
         return
 
     if existing_client is not None:
+        if coordinator.local_mqtt_client is existing_client:
+            coordinator.set_local_mqtt_client(None)
         try:
             async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
                 await existing_client.async_stop()
-        except Exception as err:  # never overlap an old broker session  # noqa: BLE001
+        except Exception as err:  # ruff: ignore[blind-except]
             _LOGGER.warning(
                 "Jackery local MQTT client is still stopping; deferring its "
                 "cleanup before a replacement: %s",
@@ -1107,6 +1102,7 @@ async def _async_start_local_mqtt(
         if not _entry_owns_coordinator(hass, entry, coordinator):
             return
     if not should_run:
+        coordinator.set_local_mqtt_client(None)
         return
 
     async def _handle_local_mqtt_data(
@@ -1114,15 +1110,16 @@ async def _async_start_local_mqtt(
         data: dict[str, Any] | None,
         raw_bytes: bytes,
     ) -> bool:
-        """Dispatch a decoded or encrypted local MQTT candidate to the coordinator.
+        """Dispatch a decoded local MQTT candidate to the coordinator.
+
+        The device bridge may publish plaintext JSON or an app-framed binary
+        payload. The transport preserves both; the coordinator owns decoding.
 
         Parameters:
             topic (str): MQTT topic the message was received on.
-            data (dict[str, Any] | None): Validated plaintext JSON, or ``None`` for a
-                raw frame that the coordinator must decrypt before shared ingest.
+            data (dict[str, Any] | None): Parsed JSON object when available.
         """
-        # Forward all messages to the coordinator without filtering
-        # per integration rules: messages must not be dropped
+        # Forward all messages to the coordinator without transport filtering.
         return await coordinator.async_handle_local_mqtt_message(
             topic,
             data,
@@ -1131,11 +1128,6 @@ async def _async_start_local_mqtt(
 
     client = JackeryLocalMqttClient(
         hass,
-        host=host,
-        port=port,
-        username=username or None,
-        password=password or None,
-        client_id=configuration[4],
         sink=_handle_local_mqtt_data,
         topic_filter=configured_topic_filter,
     )
@@ -1143,24 +1135,30 @@ async def _async_start_local_mqtt(
         return
     bucket = hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
     bucket[_LOCAL_MQTT_RUNTIME_KEY] = client
+    coordinator.set_local_mqtt_client(client)
 
     try:
         await client.async_start()
     except asyncio.CancelledError:
+        if coordinator.local_mqtt_client is client:
+            coordinator.set_local_mqtt_client(None)
         _defer_supplemental_local_mqtt(hass, entry, client)
         _schedule_supplemental_cleanup(hass, entry)
         raise
     except Exception:
+        if coordinator.local_mqtt_client is client:
+            coordinator.set_local_mqtt_client(None)
         _defer_supplemental_local_mqtt(hass, entry, client)
         _schedule_supplemental_cleanup(hass, entry)
         raise
     if not _entry_owns_coordinator(hass, entry, coordinator):
+        if coordinator.local_mqtt_client is client:
+            coordinator.set_local_mqtt_client(None)
         _defer_supplemental_local_mqtt(hass, entry, client)
         _schedule_supplemental_cleanup(hass, entry)
         return
-    # Device-side publishing is configured with the App-proven 3046/BLE-113
-    # command router. Trigger it from the direct local transport lifecycle as
-    # well as Cloud-MQTT reconnects so BLE alone can enable Local MQTT.
+    # Device-side publishing is configured separately with the App-proven
+    # 3046/BLE-113 command router. The HA MQTT receiver never publishes it.
     coordinator.async_schedule_local_mqtt_device_config()
 
 
@@ -1180,7 +1178,7 @@ async def _async_shutdown_coordinator_bounded(
             context,
         )
         return False
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:  # ruff: ignore[blind-except]
         _LOGGER.debug("Jackery coordinator shutdown failed during %s: %s", context, err)
         return False
     return True
@@ -1315,7 +1313,7 @@ async def _async_rollback_entry_setup(
     platforms_rolled_back = not platforms_started
     shutdown_ok = False
     rollback_ok = True
-    try:
+    try:  # ruff: ignore[too-many-statements-in-try-clause]
         _defer_layer5_start_task(hass, entry)
         local_mqtt = _local_mqtt_client(hass, entry)
         if local_mqtt is not None:
@@ -1336,7 +1334,7 @@ async def _async_rollback_entry_setup(
                     COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
                 )
                 platforms_rolled_back = False
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:  # ruff: ignore[blind-except]
                 _LOGGER.warning("Jackery partial platform rollback failed: %s", err)
                 platforms_rolled_back = False
         if not platforms_rolled_back:
@@ -1353,7 +1351,7 @@ async def _async_rollback_entry_setup(
             return False
         _defer_supplemental_transports(hass, entry, coordinator)
         _schedule_supplemental_cleanup(hass, entry)
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:  # ruff: ignore[blind-except]
         rollback_ok = False
         _LOGGER.warning("Jackery setup rollback cleanup failed: %s", err)
     finally:
@@ -1489,7 +1487,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     try:
         cache_ready = await _async_load_entry_caches(hass, entry, coordinator)
         http_ready = False
-        try:
+        try:  # ruff: ignore[too-many-statements-in-try-clause]
             async with asyncio.timeout(_PRIMARY_SETUP_TIMEOUT_SEC):
                 try:
                     await _async_prepare_primary_http(hass, entry, coordinator)
@@ -1687,7 +1685,10 @@ def _async_migrate_portable_screen_entity(
         )
         registry.async_update_entity(
             target_entry.entity_id,
-            aliases=set(old_entry.aliases),
+            # ``async_update_entity`` erwartet fuer aliases eine Liste (labels
+            # dagegen ein Set) — ein Set fuehrt zu einem Typfehler in der
+            # Entity-Registry-API.
+            aliases=list(old_entry.aliases),
             area_id=old_entry.area_id,
             categories=dict(old_entry.categories),
             disabled_by=old_entry.disabled_by,
@@ -1754,7 +1755,10 @@ def _async_migrate_grid_standard_entity(
         )
         registry.async_update_entity(
             target_entry.entity_id,
-            aliases=set(old_entry.aliases),
+            # ``async_update_entity`` erwartet fuer aliases eine Liste (labels
+            # dagegen ein Set) — ein Set fuehrt zu einem Typfehler in der
+            # Entity-Registry-API.
+            aliases=list(old_entry.aliases),
             area_id=old_entry.area_id,
             categories=dict(old_entry.categories),
             disabled_by=old_entry.disabled_by,
@@ -1818,8 +1822,10 @@ def _battery_pack_registry_identity(
         ]
         if len(pack_identifiers) == 1:
             pack_identifier = pack_identifiers[0]
-            return parent_device_id, pack_identifier, pack_identifier.removeprefix(
-                prefix
+            return (
+                parent_device_id,
+                pack_identifier,
+                pack_identifier.removeprefix(prefix),
             )
     return None
 
@@ -1835,8 +1841,6 @@ def _async_migrate_smart_meter_identity(
 
     device_registry = dr.async_get(hass)
     for parent_device_id, payload in coordinator.data.items():
-        if not isinstance(payload, dict):
-            continue
         smart_meter = payload.get(PAYLOAD_CT_METER)
         if not isinstance(smart_meter, dict) or not smart_meter:
             continue
@@ -1989,7 +1993,7 @@ def _seed_battery_pack_registry_identities(
             )
 
 
-def _async_migrate_battery_pack_identities(
+def _async_migrate_battery_pack_identities(  # ruff: ignore[too-many-locals]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -2174,7 +2178,7 @@ def _async_migrate_battery_pack_identities(
     )
 
 
-def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914
+def _async_migrate_parent_attached_battery_pack_entities(  # ruff: ignore[too-many-locals]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     serial_records: dict[str, list[tuple[str, int | None]]],
@@ -2281,7 +2285,7 @@ def _async_migrate_parent_attached_battery_pack_entities(  # noqa: PLR0914
                 )
 
 
-def _async_remove_phantom_battery_pack_devices(
+def _async_remove_phantom_battery_pack_devices(  # ruff: ignore[too-many-locals]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
@@ -2296,6 +2300,28 @@ def _async_remove_phantom_battery_pack_devices(
         if identity is None:
             continue
         parent_device_id, current_identifier, suffix = identity
+        parent = (
+            device_registry.devices.get(device.via_device_id)
+            if device.via_device_id is not None
+            else None
+        )
+        parent_serial = (
+            nonblank_text(parent.serial_number) if parent is not None else None
+        )
+        child_serial = nonblank_text(device.serial_number)
+        if parent_serial is not None and (parent_serial in {child_serial, suffix}):
+            # A head-unit serial can appear in action 3014 as devType=1. It is
+            # never an add-on pack, so this identity is definitively stale and
+            # does not need the two-signal topology heuristic below.
+            device_registry.async_update_device(
+                device.id,
+                remove_config_entry_id=entry.entry_id,
+            )
+            _LOGGER.info(
+                "Removed head-unit duplicate battery-pack registry device %s",
+                current_identifier,
+            )
+            continue
         payload = (coordinator.data or {}).get(parent_device_id)
         if not isinstance(payload, dict):
             continue
@@ -2453,7 +2479,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
                 entry.runtime_data = cast("Any", None)
 
 
-async def async_remove_config_entry_device(  # noqa: RUF029
+async def async_remove_config_entry_device(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     device_entry: dr.DeviceEntry,

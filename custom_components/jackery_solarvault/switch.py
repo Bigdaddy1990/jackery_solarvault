@@ -7,8 +7,6 @@ section, an optional task-plan fallback and the coordinator setter that pushes
 the new state to the cloud / MQTT command path.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -639,8 +637,9 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Determine the switch's current on/off state from the entity description and
-        available payload data.
+        """Determine the switch's current on/off state.
+
+        Use the entity description and available payload data.
 
         Checks in order: the description's `source_section` for the first non-`None`
         `source_keys` value, the optional `fallback_section`, and the task-plan fallback
@@ -650,7 +649,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         Returns:
             `True` if the switch is on, `False` if the switch is off, `None` if the
             state cannot be determined.
-        """  # noqa: D205
+        """
         description = self.entity_description
         section = self._payload_section_for_sources(
             description.source_section,
@@ -795,7 +794,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     def _plug(self) -> dict[str, Any]:
         # Look up by captured serial; cloud-side re-ordering of the plug
         # array must not switch this entity to a different physical plug.
-        """Get the smart-plug payload that matches this entity's captured serial.
+        """Smart-plug payload matching this entity's captured serial.
 
         Returns:
             dict[str, Any]: The payload dictionary for the matching smart plug, or an
@@ -927,7 +926,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic state attributes for the smart-plug switch.
+        """Diagnostic state attributes for the smart-plug switch.
 
         Always includes `plug_index`. Additionally includes any of these plug-specific
         fields if present: `deviceName`, `scanName`, `commState`, `commMode`,
@@ -1000,7 +999,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return true if the breaker relay is closed."""
+        """Whether the breaker relay is closed."""
         return safe_bool(self._breaker.get(FIELD_SW))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -1039,7 +1038,7 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return diagnostic state attributes for the breaker.
+        """Diagnostic state attributes for the breaker.
 
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
@@ -1178,33 +1177,35 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 # ---------------------------------------------------------------------------
 
 
-async def async_setup_entry(  # HA awaits this entry point
+async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an async platform hook.
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Create and register switch entities for devices and smart plugs based on
-    coordinator data.
+    """Create and register switch entities from coordinator data.
+
+    Include device controls and smart-plug controls.
 
     Discover description-driven device switches and per-smart-plug switches (including
     priority switches when present), avoid duplicate unique IDs, and gate creation of
     certain description-driven switches by observed device properties or
     advanced-capability support. Register a listener that re-evaluates the coordinator
     data signature and adds newly discovered entities only when the signature changes.
-    """  # noqa: D205
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[SwitchEntity], entity: SwitchEntity) -> None:
-        """Append `entity` to `entities` if its unique id has not been seen for the
-        switch platform.
+        """Append an entity whose unique ID has not been seen.
+
+        Track uniqueness across the switch platform.
 
         Parameters:
             entities (list[SwitchEntity]): Mutable list to which the entity will be
             appended when unique.
             entity (SwitchEntity): Entity to add if its unique id has not already been
             recorded.
-        """  # noqa: D205
+        """
         append_unique_entity(
             entities,
             seen_unique_ids,
@@ -1231,8 +1232,9 @@ async def async_setup_entry(  # HA awaits this entry point
     }
 
     def _collect_entities() -> list[SwitchEntity]:
-        """Build a list of switch entities to register for every device present in the
-        coordinator data.
+        """Build switch entities for all coordinator devices.
+
+        Include the available per-device and per-smart-plug controls.
 
         The list includes description-driven JackeryDescriptionSwitch entities and
         per-smart-plug entities:
@@ -1244,7 +1246,7 @@ async def async_setup_entry(  # HA awaits this entry point
         Returns:
             list[SwitchEntity]: Switch entity instances to add for the current
             coordinator dataset.
-        """  # noqa: D205
+        """
         entities: list[SwitchEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)
@@ -1336,13 +1338,14 @@ async def async_setup_entry(  # HA awaits this entry point
 
     @callback
     def _add_new_entities() -> None:
-        """Add newly discovered switch entities when the coordinator's entity signature
-        changes.
+        """Add switches discovered after an entity-signature change.
+
+        Rebuild the eligible entity list from current coordinator data.
 
         If the coordinator's current entity signature differs from the last recorded
         signature, update the stored signature, collect entities via
         _collect_entities(), and call async_add_entities() with any discovered entities.
-        """  # noqa: D205
+        """
         nonlocal last_signature
         sig = coordinator_entity_signature(coordinator.data)
         if sig == last_signature:

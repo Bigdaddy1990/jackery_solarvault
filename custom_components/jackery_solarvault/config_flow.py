@@ -1,7 +1,6 @@
 """Config flow for Jackery SolarVault."""
 
-from __future__ import annotations
-
+import json
 import logging
 from typing import TYPE_CHECKING, Any, Self, cast, override
 
@@ -60,8 +59,6 @@ from .const import (
     ENTRY_BOOTSTRAP_MQTT_SESSION,
     FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED,
     FLOW_ABORT_ACCEPT_SHARED_SUCCESSFUL,
-    MAX_SCAN_INTERVAL_SEC,
-    MIN_SCAN_INTERVAL_SEC,
     FLOW_ABORT_REAUTH_ENTRY_MISSING,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
     FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH,
@@ -78,6 +75,9 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_RECONFIGURE_CREDENTIALS,
     FLOW_STEP_USER,
+    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
+    MAX_SCAN_INTERVAL_SEC,
+    MIN_SCAN_INTERVAL_SEC,
     REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
@@ -95,6 +95,7 @@ if TYPE_CHECKING:
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
     from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+    from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
     from .coordinator import JackerySolarVaultCoordinator
@@ -179,9 +180,10 @@ def _flow_options(
     current_options: dict[str, Any] | None = None,
     option_keys: frozenset[str] | None = None,
 ) -> dict[str, Any]:
-    """Produce a complete options dictionary by taking values from `user_input` when
-    present, otherwise preserving `current_options`, and finally falling back to the
-    integration's typed defaults.
+    """Produce a complete options dictionary.
+
+    Take values from `user_input` when present, otherwise preserve
+    `current_options`, and finally fall back to the integration's typed defaults.
 
     Parameters:
         user_input (dict[str, Any]): Option values provided by the user; may omit keys.
@@ -191,7 +193,7 @@ def _flow_options(
     Returns:
         dict[str, Any]: A merged options dictionary containing every known option key
         with its resolved value.
-    """  # noqa: D205
+    """
     current = current_options or {}
     keys = option_keys or frozenset(_ALL_OPTION_DEFAULTS)
     return {
@@ -512,8 +514,7 @@ class JackeryOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Present the options form for the integration or create an options entry from
-        submitted values.
+        """Present or submit the integration options form.
 
         When `user_input` is provided, merge the submitted values with the current
         stored options and create an options entry. When `user_input` is None, show the
@@ -527,7 +528,7 @@ class JackeryOptionsFlow(OptionsFlow):
         Returns:
             ConfigFlowResult: The created options entry result, or a form result to
             display to the user.
-        """  # noqa: D205
+        """
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
         if user_input is not None:
@@ -710,12 +711,49 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         discovered_name = discovery_info.hostname or discovery_info.ip
         return await self._async_route_discovery_to_user(discovered_name)
 
-    # NOTE: no ``async_step_mqtt``. The integration does not use Home
-    # Assistant's MQTT integration: cloud topics are derived automatically as
-    # ``hb/app/<userId>/<suffix>`` and the optional local-broker filter is
-    # entered by the user in the options flow. Claiming an MQTT discovery
-    # topic in manifest.json would subscribe to Home Assistant's reserved
-    # ``homeassistant/#`` discovery prefix, so the key was removed.
+    async def async_step_mqtt(
+        self,
+        discovery_info: MqttServiceInfo,
+    ) -> ConfigFlowResult:
+        """Route a local Jackery MQTT discovery frame to HTTP account setup.
+
+        Home Assistant invokes this method for the exact topic declared in
+        ``manifest.json``. MQTT is only a discovery signal: authentication and
+        entry creation still run exclusively through the HTTP client in the
+        shared user step.
+
+        Returns:
+            ConfigFlowResult: An abort result for duplicate discovery, otherwise
+            the HTTP-account user form.
+        """
+        raw_payload = discovery_info.payload
+        payload_size = (
+            len(raw_payload.encode("utf-8", errors="replace"))
+            if isinstance(raw_payload, str)
+            else len(raw_payload)
+        )
+        if payload_size > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
+            return self.async_abort(reason="invalid_discovery_info")
+        try:
+            payload = json.loads(raw_payload)
+        except (
+            json.JSONDecodeError,
+            RecursionError,
+            TypeError,
+            UnicodeDecodeError,
+        ):
+            return self.async_abort(reason="invalid_discovery_info")
+        if not isinstance(payload, dict) or not any(
+            (isinstance(value := payload.get(key), str) and bool(value.strip()))
+            or (isinstance(value, int) and not isinstance(value, bool))
+            for key in ("devSn", "deviceSn", "deviceId")
+        ):
+            return self.async_abort(reason="invalid_discovery_info")
+        topic_suffix = discovery_info.topic.rsplit("/", maxsplit=1)[-1].strip()
+        discovered_name = (
+            f"Jackery MQTT ({topic_suffix})" if topic_suffix else "Jackery MQTT"
+        )
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_zeroconf(
         self,
@@ -740,8 +778,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self,
         user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
-        """Handle the initial user-driven configuration step and authenticate the
-        provided Jackery account.
+        """Authenticate the account during initial user setup.
 
         Validates and normalizes the submitted username, prevents creating a duplicate
         entry for the same account, attempts to authenticate with the Jackery service
@@ -758,7 +795,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: A flow result that either shows the user form with errors
             or creates the new configuration entry on successful authentication.
-        """  # noqa: D205
+        """
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -806,8 +843,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Reconfigure an existing config entry by validating provided account
-        credentials and updating stored username, password, and options.
+        """Reconfigure an existing config entry.
 
         Validates that the submitted username matches the entry being reconfigured,
         verifies credentials with the Jackery service, and on success updates and
@@ -819,10 +855,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             A ConfigFlowResult that shows the reconfigure form with any errors, aborts
             with a specific reason, or updates and reloads the entry on successful
             reconfiguration.
-        """  # noqa: D205
+        """
         try:
             self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
         return self.async_show_menu(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -861,7 +897,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -992,7 +1028,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1045,8 +1081,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for the account's current password and validate it against Jackery to
-        complete reauthentication.
+        """Validate the current password for reauthentication.
 
         Parameters:
             user_input (dict[str, Any] | None): Form data containing `CONF_PASSWORD`
@@ -1055,10 +1090,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: The next flow result (shows the password form on error or
             missing input, aborts and updates the entry on successful reauthentication).
-        """  # noqa: D205
+        """
         try:
             entry = self._get_reauth_entry()
-        except (UnknownEntry, ValueError):
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)

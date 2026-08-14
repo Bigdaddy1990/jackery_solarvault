@@ -25,8 +25,6 @@ by an immediate cloud fallback snapshot; it never stops independent transports
 from continuing to publish.
 """
 
-from __future__ import annotations
-
 import time
 from typing import TYPE_CHECKING, Any, Final
 
@@ -44,7 +42,7 @@ from .const import (
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_STATISTIC,
 )
-from .models import DataSource, FieldProvenance, IngestResult
+from .models import DataSource, FieldProvenance, IngestResult, ProvenanceKey
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -84,6 +82,31 @@ PERIODIC_SECTION_PREFIXES: frozenset[str] = frozenset({
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_BATTERY_TRENDS,
 })
+
+_PERIOD_TOTAL_TOLERANCE_KWH: Final = 0.00001
+
+
+def local_period_total_supersedes_cloud(
+    cloud_total: float | None,
+    local_total: float | None,
+    *,
+    tolerance: float = _PERIOD_TOTAL_TOLERANCE_KWH,
+) -> bool:
+    """Return whether a verified local period delta exposes a lagging cloud total.
+
+    Jackery's current-period HTTP/App statistics can remain on an earlier partial
+    snapshot while the device lifetime counters already contain the complete
+    same-period energy. A positive local delta may therefore replace a missing,
+    zero or strictly smaller cloud total. It never lowers a cloud value and it
+    never turns an unconfirmed local zero into observed energy.
+
+    Both values must already use the same unit (kWh at every current caller).
+    """
+    if local_total is None or local_total <= 0:
+        return False
+    if cloud_total is None:
+        return True
+    return local_total > cloud_total + max(0.0, tolerance)
 
 
 def is_periodic_section(section_key: str) -> bool:
@@ -144,11 +167,116 @@ def merge_live_properties(
     return merged
 
 
+def _provenance_keeps_current(
+    current_value: object,
+    current_provenance: FieldProvenance | None,
+    incoming: FieldProvenance,
+    *,
+    received_at: float,
+    freshness_window_seconds: float,
+) -> bool:
+    """Return whether provenance protects one populated live value."""
+    if current_provenance is None or _is_blankable(current_value):
+        return False
+    current_tier = _LIVE_SOURCE_TIER[current_provenance.source]
+    incoming_tier = _LIVE_SOURCE_TIER[incoming.source]
+    current_age = max(
+        0.0,
+        received_at - current_provenance.received_at_monotonic,
+    )
+    incoming_is_older = (
+        incoming.observed_at is not None
+        and current_provenance.observed_at is not None
+        and incoming.observed_at < current_provenance.observed_at
+    )
+    return (
+        incoming_tier < current_tier and current_age < freshness_window_seconds
+    ) or incoming_is_older
+
+
+def _merge_nested_with_provenance(
+    current: dict[str, Any],
+    update: dict[str, Any],
+    *,
+    path: tuple[str, ...],
+    fallback_provenance: FieldProvenance | None,
+    provenance: dict[ProvenanceKey, FieldProvenance],
+    incoming: FieldProvenance,
+    received_at: float,
+    freshness_window_seconds: float,
+) -> tuple[dict[str, Any], bool]:
+    """Merge a nested live mapping while retaining ownership per field path."""
+    merged = dict(current)
+    accepted = False
+    for key, value in update.items():
+        field_path = (*path, key)
+        current_value = merged.get(key)
+        field_provenance = provenance.get(field_path, fallback_provenance)
+        if isinstance(current_value, dict) and isinstance(value, dict):
+            nested, nested_accepted = _merge_nested_with_provenance(
+                current_value,
+                value,
+                path=field_path,
+                fallback_provenance=field_provenance,
+                provenance=provenance,
+                incoming=incoming,
+                received_at=received_at,
+                freshness_window_seconds=freshness_window_seconds,
+            )
+            if nested_accepted:
+                merged[key] = nested
+                accepted = True
+            continue
+        if _is_blankable(value) and not _is_blankable(current_value):
+            continue
+        if _provenance_keeps_current(
+            current_value,
+            field_provenance,
+            incoming,
+            received_at=received_at,
+            freshness_window_seconds=freshness_window_seconds,
+        ):
+            continue
+        if isinstance(value, dict):
+            _drop_descendant_provenance(provenance, field_path)
+            nested, _ = _merge_nested_with_provenance(
+                {},
+                value,
+                path=field_path,
+                fallback_provenance=None,
+                provenance=provenance,
+                incoming=incoming,
+                received_at=received_at,
+                freshness_window_seconds=freshness_window_seconds,
+            )
+            merged[key] = nested
+            provenance[field_path] = incoming
+            accepted = True
+            continue
+        if isinstance(current_value, dict):
+            _drop_descendant_provenance(provenance, field_path)
+        merged[key] = value
+        provenance[field_path] = incoming
+        accepted = True
+    return merged, accepted
+
+
+def _drop_descendant_provenance(
+    provenance: dict[ProvenanceKey, FieldProvenance],
+    field: ProvenanceKey,
+) -> None:
+    """Remove nested ownership after a payload shape change."""
+    prefix = field if isinstance(field, tuple) else (field,)
+    for key in tuple(provenance):
+        if isinstance(key, tuple) and key[: len(prefix)] == prefix:
+            provenance.pop(key, None)
+
+
 def ingest_observation(
     observation: Observation,
     *,
     current: Mapping[str, Any],
-    provenance: Mapping[str, FieldProvenance],
+    provenance: Mapping[ProvenanceKey, FieldProvenance],
     received_at_monotonic: float | None = None,
     freshness_window_seconds: float = 0.0,
 ) -> IngestResult:
@@ -159,9 +287,12 @@ def ingest_observation(
     mapping, so Home Assistant entities never expose ingest bookkeeping.
     Neither input mapping is mutated. Layer-5 live fields remain authoritative
     over the HTTP fallback for ``freshness_window_seconds``. Equal-tier
-    transports still update in arrival order, so BLE, cloud MQTT and local MQTT
-    remain independent peers. Sparse lower-tier dictionaries may fill missing
-    nested fields but cannot reverse a fresh live value.
+    transports update in arrival order when no protocol timestamp is available,
+    so BLE, cloud MQTT and local MQTT remain independent peers. When both
+    observations carry trustworthy timestamps, an older frame can never reverse
+    a newer live value, regardless of which independent transport delivered it.
+    Sparse lower-tier dictionaries may fill missing nested fields but cannot
+    reverse a fresh live value.
     """
     received_at = received_at_monotonic
     if received_at is None:
@@ -183,37 +314,63 @@ def ingest_observation(
         )
         current_value = merged.get(field)
         current_provenance = updated_provenance.get(field)
-        keep_current = False
-        if current_provenance is not None and not _is_blankable(current_value):
-            current_tier = _LIVE_SOURCE_TIER[current_provenance.source]
-            incoming_tier = _LIVE_SOURCE_TIER[incoming.source]
-            current_age = max(
-                0.0,
-                received_at - current_provenance.received_at_monotonic,
-            )
-            keep_current = (
-                incoming_tier < current_tier
-                and current_age < freshness_window_seconds
-            ) or (
-                incoming.source is current_provenance.source
-                and incoming.observed_at is not None
-                and current_provenance.observed_at is not None
-                and incoming.observed_at < current_provenance.observed_at
-            )
+        keep_current = _provenance_keeps_current(
+            current_value,
+            current_provenance,
+            incoming,
+            received_at=received_at,
+            freshness_window_seconds=freshness_window_seconds,
+        )
 
         if keep_current:
             if isinstance(current_value, dict) and isinstance(value, dict):
+                assert current_provenance is not None
                 # HTTP remains a complete independent fallback: while a fresh
                 # L5 dictionary owns overlapping live keys, HTTP may still fill
                 # fields that the sparse L5 frame did not contain.
-                supplemented = merge_live_properties(value, current_value)
-                if supplemented != current_value:
+                supplemented, supplemented_fields = _merge_nested_with_provenance(
+                    current_value,
+                    value,
+                    path=(field,),
+                    fallback_provenance=current_provenance,
+                    provenance=updated_provenance,
+                    incoming=incoming,
+                    received_at=received_at,
+                    freshness_window_seconds=freshness_window_seconds,
+                )
+                if supplemented_fields:
                     merged[field] = supplemented
                     accepted_fields.add(field)
             continue
         if isinstance(current_value, dict) and isinstance(value, dict):
-            merged[field] = merge_live_properties(current_value, value)
+            merged_value, nested_accepted = _merge_nested_with_provenance(
+                current_value,
+                value,
+                path=(field,),
+                fallback_provenance=current_provenance,
+                provenance=updated_provenance,
+                incoming=incoming,
+                received_at=received_at,
+                freshness_window_seconds=freshness_window_seconds,
+            )
+            if not nested_accepted:
+                continue
+            merged[field] = merged_value
+        elif isinstance(value, dict):
+            _drop_descendant_provenance(updated_provenance, field)
+            merged_value, _ = _merge_nested_with_provenance(
+                {},
+                value,
+                path=(field,),
+                fallback_provenance=None,
+                provenance=updated_provenance,
+                incoming=incoming,
+                received_at=received_at,
+                freshness_window_seconds=freshness_window_seconds,
+            )
+            merged[field] = merged_value
         else:
+            _drop_descendant_provenance(updated_provenance, field)
             merged[field] = value
         updated_provenance[field] = incoming
         accepted_fields.add(field)

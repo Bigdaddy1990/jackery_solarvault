@@ -16,8 +16,6 @@ Rules:
   - Never merge HTTP and MQTT command body formats.
 """
 
-from __future__ import annotations
-
 import re
 from typing import Final
 
@@ -66,6 +64,12 @@ LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
 # The subscription filter is the user's decision — it is entered in the
 # options flow and used verbatim. An empty field falls back to this default.
 LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
+# Reconnect-Backoff des lokalen MQTT-Subscribers. Ohne diese Schleife beendete
+# ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
+# blieb bis zum naechsten Integrations-Reload tot (RX-Zaehler dauerhaft 0).
+LOCAL_MQTT_RECONNECT_INITIAL_SEC: Final = 5.0
+LOCAL_MQTT_RECONNECT_MAX_SEC: Final = 300.0
+LOCAL_MQTT_RECONNECT_FACTOR: Final = 2.0
 _HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
 _LOCAL_MQTT_JACKERY_MARKER_KEYS = {
     "actionId",

@@ -1,7 +1,5 @@
 """Shared entity base class."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any
 
@@ -198,7 +196,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _pv_trends(self) -> dict[str, Any]:
-        """Fetch the photovoltaic (PV) trends section from the device payload.
+        """Photovoltaic trends section from the device payload.
 
         Returns:
             dict[str, Any]: PV trends data from the device payload, or an empty dict if
@@ -208,7 +206,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @property
     def _alarm(self) -> object:
-        """Return the alarm payload for the device.
+        """Alarm payload for the device.
 
         Returns:
             The alarm payload object from the device payload, or None if no alarm data
