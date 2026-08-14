@@ -1,8 +1,7 @@
 """Config flow for Jackery SolarVault."""
 
-import json
 import logging
-from typing import TYPE_CHECKING, Any, Self, cast, override
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
@@ -75,7 +74,6 @@ from .const import (
     FLOW_STEP_RECONFIGURE,
     FLOW_STEP_RECONFIGURE_CREDENTIALS,
     FLOW_STEP_USER,
-    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     MAX_SCAN_INTERVAL_SEC,
     MIN_SCAN_INTERVAL_SEC,
     REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
@@ -95,7 +93,6 @@ if TYPE_CHECKING:
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
     from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
-    from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
     from .coordinator import JackerySolarVaultCoordinator
@@ -641,16 +638,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    @override
-    def is_matching(self, other_flow: Self) -> bool:
-        """Match discovery flows for the single account-backed Jackery hub."""
-        # Bluetooth/DHCP/Zeroconf cannot reveal the Jackery cloud account that
-        # owns a device.  The integration intentionally creates one account
-        # hub entry, so concurrent signals from any of its discovery sources
-        # represent the same pending setup.  Home Assistant requires this
-        # matcher when discovery has no stable unique id.
-        return True
-
     @callback
     def _async_abort_duplicate_discovery(self) -> ConfigFlowResult | None:
         """Abort discovery when this account integration is already represented."""
@@ -666,7 +653,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Abort duplicate discovery, otherwise route to the HTTP-account setup form.
 
-        Every discovery transport (Bluetooth, DHCP, MQTT, Zeroconf) is a
+        Every discovery transport (Bluetooth, DHCP, Zeroconf) is a
         supplemental signal that must not start account login/setup on its
         own; it only de-duplicates and pre-fills a display name before
         handing off to the user step.
@@ -709,50 +696,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             result of proceeding to the user step.
         """
         discovered_name = discovery_info.hostname or discovery_info.ip
-        return await self._async_route_discovery_to_user(discovered_name)
-
-    async def async_step_mqtt(
-        self,
-        discovery_info: MqttServiceInfo,
-    ) -> ConfigFlowResult:
-        """Route a local Jackery MQTT discovery frame to HTTP account setup.
-
-        Home Assistant invokes this method for the exact topic declared in
-        ``manifest.json``. MQTT is only a discovery signal: authentication and
-        entry creation still run exclusively through the HTTP client in the
-        shared user step.
-
-        Returns:
-            ConfigFlowResult: An abort result for duplicate discovery, otherwise
-            the HTTP-account user form.
-        """
-        raw_payload = discovery_info.payload
-        payload_size = (
-            len(raw_payload.encode("utf-8", errors="replace"))
-            if isinstance(raw_payload, str)
-            else len(raw_payload)
-        )
-        if payload_size > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
-            return self.async_abort(reason="invalid_discovery_info")
-        try:
-            payload = json.loads(raw_payload)
-        except (
-            json.JSONDecodeError,
-            RecursionError,
-            TypeError,
-            UnicodeDecodeError,
-        ):
-            return self.async_abort(reason="invalid_discovery_info")
-        if not isinstance(payload, dict) or not any(
-            (isinstance(value := payload.get(key), str) and bool(value.strip()))
-            or (isinstance(value, int) and not isinstance(value, bool))
-            for key in ("devSn", "deviceSn", "deviceId")
-        ):
-            return self.async_abort(reason="invalid_discovery_info")
-        topic_suffix = discovery_info.topic.rsplit("/", maxsplit=1)[-1].strip()
-        discovered_name = (
-            f"Jackery MQTT ({topic_suffix})" if topic_suffix else "Jackery MQTT"
-        )
         return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_zeroconf(

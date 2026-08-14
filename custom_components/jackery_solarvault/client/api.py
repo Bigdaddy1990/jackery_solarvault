@@ -63,6 +63,7 @@ from ..const import (
     APP_REQUEST_DATE_TYPE,
     APP_REQUEST_END_DATE,
     APP_REQUEST_META,
+    APP_REQUEST_STAT_TYPE,
     APP_VERSION,
     APP_VERSION_CODE,
     APP_VERSION_PATH,
@@ -83,6 +84,7 @@ from ..const import (
     CODE_OK,
     CODE_TOKEN_EXPIRED,
     CONTRACT_LIST_PATH,
+    CT_STAT_TYPE_L1,
     CURRENCY_LIST_PATH,
     CUTOFF_STAT_PATH,
     DATE_TYPE_DAY,
@@ -1614,12 +1616,16 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         begin_date: str | None = None,
         end_date: str | None = None,
         system_id: str | int | None = None,
+        stat_type: int | None = None,
     ) -> dict[str, Any]:
         """GET a device-level app chart endpoint.
 
         The Android app uses these device endpoints for the PV/battery/home/CT
         statistic pages, while the older ``sys/*/trends`` endpoints are system
         summaries. Keep request metadata on the payload for diagnostics.
+
+        ``stat_type`` is only sent when the endpoint expects it (currently
+        ``/stat/ct``); see the note next to the params dict below.
         """
         # APP_POLLING_MQTT.md: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
@@ -1634,6 +1640,13 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         }
         if system_id is not None:
             params[FIELD_SYSTEM_ID] = str(system_id)
+        # ``type`` ist fuer /stat/ct ein Pflichtparameter der App-API. Fehlt er,
+        # antwortet die Cloud mit ``code=0, msg=SUCCESS`` und einer leeren Huelle
+        # (kein ``x``, Serien der Laenge 0) — siehe const.py:1416-1425, gegen die
+        # App-Smali verifiziert. Der Zero-Guard verwirft die Huelle danach zu
+        # Recht, weshalb CT-Statistiken dauerhaft leer blieben.
+        if stat_type is not None:
+            params[APP_REQUEST_STAT_TYPE] = str(stat_type)
         data = await self._get_json(path, params=params)
         # Preserve request metadata in the stored response for diagnostics
         request_meta_stored = {
@@ -1712,13 +1725,23 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         begin_date: str | None = None,
         end_date: str | None = None,
     ) -> dict[str, Any]:
-        """GET /v1/device/stat/ct — app CT/smart-meter statistics."""
+        """GET /v1/device/stat/ct — app CT/smart-meter statistics.
+
+        Always sends ``type=CT_STAT_TYPE_L1`` (0), the value the app's chart
+        screen defaults to (``CtStatChartActivity.getInt("type", 0)``). The
+        parameter is mandatory: without it the cloud answers ``code=0`` with an
+        empty shell (no ``x``, zero-length series), which the zero-payload guard
+        drops — the reason CT statistics stayed permanently unknown. Kept out of
+        the signature on purpose so the generic ``**period_kwargs`` call sites
+        cannot pass a string here.
+        """
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
             device_id=device_id,
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
+            stat_type=CT_STAT_TYPE_L1,
         )
 
     async def async_get_device_meter_stat(

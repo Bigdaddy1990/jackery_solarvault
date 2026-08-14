@@ -499,7 +499,11 @@ CANCEL_CONTRACT_PATH: Final = "/v1/device/dynamic/cancelContractAuth"
 # App 2.4.0 moved this endpoint to v2 (ElePriceDynamicApi.smali:
 # "device/dynamic/v2/dynamicPrice"); request (systemId) and response bean
 # are unchanged from 2.1.1, only the path gained the v2 segment.
-DYNAMIC_PRICE_PATH: Final = "/v1/device/dynamic/dynamicPrice"
+# App 2.4.1 hat den Pfad auf /v2/ gehoben: ``ElePriceDynamicApi`` liefert dort
+# ``device/dynamic/v2/dynamicPrice``; der alte ``device/dynamic/dynamicPrice``
+# existiert in 2.4.1 nicht mehr (jadx-Diff, docs/source-of-truth/jadx-2.4.1/
+# diff_240_to_241.md) und beantwortet Anfragen mit code=10600.
+DYNAMIC_PRICE_PATH: Final = "/v1/device/dynamic/v2/dynamicPrice"
 SAVE_LOCATION_ID_PATH: Final = "/v1/device/dynamic/saveLocationId"
 SAVE_TOU_PLAN_PATH: Final = "/v1/device/tou/saveTouPlan"
 QUERY_TOU_PLAN_PATH: Final = "/v1/device/tou/queryTouPlan"
@@ -1429,6 +1433,11 @@ APP_REQUEST_END_DATE: Final = "endDate"
 APP_REQUEST_END_DATE_ALT: Final = "end_date"
 APP_STAT_UNIT: Final = "unit"
 APP_UNIT_KWH: Final = "kwh"
+# Die Stat-Bodys (CtStatApi.Bean, EpsStatApi.Bean u. a.) fuehren ``unit`` als
+# eigenes Feld mit Default "kWh". Wh ist ebenso zulaessig; frueher wurde jede
+# Nicht-kWh-Antwort verworfen, wodurch eine Wh-Antwort still zu fehlenden Werten
+# fuehrte (bzw. bei ungeprueftem Durchreichen zum Faktor-1000-Fehler).
+APP_UNIT_WH: Final = "wh"
 APP_CHART_LABELS: Final = "x"
 APP_CHART_SERIES_Y: Final = "y"
 APP_CHART_SERIES_Y1: Final = "y1"

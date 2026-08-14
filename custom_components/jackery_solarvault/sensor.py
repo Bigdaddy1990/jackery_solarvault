@@ -158,9 +158,7 @@ from .const import (
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
     APP_STAT_TOTAL_SOLAR_REVENUE,
-    APP_STAT_UNIT,
     APP_TODAY_ENERGY_SOURCE_META,
-    APP_UNIT_KWH,
     APP_YEAR_BACKFILL_META,
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -479,6 +477,7 @@ from .entity import (
 )
 from .ingest import local_period_total_supersedes_cloud
 from .util import (
+    app_energy_unit_scale,
     append_unique_entity,
     calculated_smart_meter_power,
     circuit_id,
@@ -1850,8 +1849,8 @@ def _chart_value_for_day(
     today: date,
 ) -> float | None:
     """Return today's value from a week/month/year app chart payload."""
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    unit_scale = app_energy_unit_scale(source)
+    if unit_scale is None:
         return None
     begin = _request_date(source, APP_REQUEST_BEGIN_DATE, APP_REQUEST_BEGIN_DATE_ALT)
     if begin is None:
@@ -1865,7 +1864,8 @@ def _chart_value_for_day(
     index = (today - begin).days
     if index < 0 or index >= len(values):
         return None
-    return safe_float(values[index])
+    value = safe_float(values[index])
+    return None if value is None else value * unit_scale
 
 
 def _chart_sum_for_date_range(
@@ -1879,8 +1879,8 @@ def _chart_sum_for_date_range(
     """Sum explicit kWh chart buckets for one fully covered date range."""
     if end < start:
         return None
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    unit_scale = app_energy_unit_scale(source)
+    if unit_scale is None:
         return None
     request_begin = _request_date(
         source,
@@ -1911,7 +1911,7 @@ def _chart_sum_for_date_range(
         value = safe_float(raw_value)
         if value is None or value < 0:
             return None
-        values.append(value)
+        values.append(value * unit_scale)
     return round(sum(values), 5)
 
 

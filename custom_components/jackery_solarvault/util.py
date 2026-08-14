@@ -63,6 +63,7 @@ from .const import (
     APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
     APP_STAT_UNIT,
     APP_UNIT_KWH,
+    APP_UNIT_WH,
     APP_YEAR_BACKFILL_META,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
@@ -150,6 +151,26 @@ _DAY_POWER_SAMPLE_MINUTES: Final = 5
 _MINUTES_PER_HOUR: Final = 60
 _WATTS_PER_KILOWATT: Final = 1000
 WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
+
+
+def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
+    """Return the factor that converts a stat payload's values into kWh.
+
+    The app stat bodies carry their own ``unit`` field (default ``"kWh"``, see
+    ``CtStatApi.Bean``/``EpsStatApi.Bean``). Treating every non-kWh answer as
+    unusable silently dropped valid Wh payloads, while passing them through
+    unscaled would inflate them by 1000.
+
+    Returns:
+        float | None: ``1.0`` for kWh (or a missing unit), ``0.001`` for Wh and
+        ``None`` when the unit is present but not a supported energy unit.
+    """
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if not unit or unit == APP_UNIT_KWH:
+        return 1.0
+    if unit == APP_UNIT_WH:
+        return 1 / _WATTS_PER_KILOWATT
+    return None
 
 
 def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
@@ -1759,8 +1780,7 @@ def year_payload_appears_current_month_only(
     """
     if current_month <= 1:
         return False
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    if app_energy_unit_scale(source) is None:
         return False
     for stat_key in stat_keys:
         values = effective_trend_series_values(source, section, stat_key)
@@ -2158,8 +2178,7 @@ def backfill_year_payload_from_months(  # per-month aggregation dispatch; branch
 
     year_section = _period_section(section_prefix, DATE_TYPE_YEAR)
     month_section = _period_section(section_prefix, DATE_TYPE_MONTH)
-    unit = str(year_source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    if app_energy_unit_scale(year_source) is None:
         return year_source
 
     out = dict(year_source)
@@ -2515,8 +2534,8 @@ def trend_series_points(  # trend-series parsing dispatches over unit/label/seri
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return []
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    unit_scale = app_energy_unit_scale(source)
+    if unit_scale is None:
         return []
     series = effective_trend_series_values(source, section, stat_key)
     if not isinstance(series, list) or not series:
@@ -2568,7 +2587,9 @@ def trend_series_points(  # trend-series parsing dispatches over unit/label/seri
         value_float = safe_float(value)
         if value_float is None:
             continue
-        points.append(TrendStatisticPoint(bucket_start, round(value_float, 5)))
+        points.append(
+            TrendStatisticPoint(bucket_start, round(value_float * unit_scale, 5))
+        )
     return points
 
 
@@ -3504,6 +3525,12 @@ def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mappin
             return APP_CHART_SERIES_Y2
 
     if section.startswith(APP_SECTION_EPS_STAT):
+        # ``EpsStatApi.Bean`` (App 2.4.1) fuehrt DREI Serien: ``y``, ``y1`` und
+        # ``y2`` — im Gegensatz zu ``CtStatApi.Bean``, das nur ``y1``/``y2`` hat.
+        # ``y`` bleibt bewusst unzugeordnet: es gibt weder ein passendes
+        # Skalar-Total (nur ``totalInEpsEnergy``/``totalOutEpsEnergy``) noch eine
+        # EPS-Chart-Klasse in der App, aus der sich die Bedeutung ableiten
+        # liesse. Erst zuordnen, wenn ein Live-Payload sie belegt — nicht raten.
         if stat_key == APP_STAT_TOTAL_IN_EPS_ENERGY:
             return APP_CHART_SERIES_Y1
         if stat_key == APP_STAT_TOTAL_OUT_EPS_ENERGY:
@@ -3655,8 +3682,8 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     if not series_key:
         return None
 
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    unit_scale = app_energy_unit_scale(source)
+    if unit_scale is None:
         return None
 
     series = source.get(series_key)
@@ -3673,7 +3700,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
             section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
             and server_total is not None
         ):
-            return round(server_total, 2)
+            return round(server_total * unit_scale, 2)
         return None
 
     values = effective_trend_series_values(source, section, stat_key) or []
@@ -3685,10 +3712,10 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
             section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
             and server_total is not None
         ):
-            return round(server_total, 2)
+            return round(server_total * unit_scale, 2)
         return None
 
-    return round(sum(valid_values), 2)
+    return round(sum(valid_values) * unit_scale, 2)
 
 
 def trend_series_has_value(  # flat guard chain over series/value shapes; clearest as-is
@@ -3715,8 +3742,7 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
     if not series_key:
         return False
 
-    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    if unit and unit != APP_UNIT_KWH:
+    if app_energy_unit_scale(source) is None:
         return False
 
     series = source.get(series_key)
