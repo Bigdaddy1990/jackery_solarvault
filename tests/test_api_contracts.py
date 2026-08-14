@@ -50,6 +50,34 @@ def _make_api() -> JackeryApi:
 
 
 @pytest.mark.asyncio
+async def test_shelly_control_rejects_false_accepted_payload() -> None:
+    """A successful HTTP envelope must not hide a rejected Shelly write."""
+    api = _make_api()
+    post_json = AsyncMock(return_value={FIELD_DATA: {"accepted": False}})
+
+    with patch.object(api, "_post_json", post_json):
+        accepted = await api.async_control_shelly_device(
+            "shelly-1",
+            action="switch",
+            function="on",
+        )
+
+    assert accepted is False
+
+
+@pytest.mark.asyncio
+async def test_shelly_unbind_accepts_legacy_scalar_payload() -> None:
+    """The older scalar acceptance response remains supported."""
+    api = _make_api()
+    post_form = AsyncMock(return_value={FIELD_DATA: "ok"})
+
+    with patch.object(api, "_post_form", post_form):
+        accepted = await api.async_unbind_shelly_device("binding-1", "shelly-1")
+
+    assert accepted is True
+
+
+@pytest.mark.asyncio
 async def test_async_get_box_stat_contract_includes_explicit_period() -> None:
     """The catalog-only box-stat endpoint keeps the app request shape stable."""
     api = _make_api()

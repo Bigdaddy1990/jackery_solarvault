@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
 _EXPECTED_CONFIG_PUSH_COUNT = 2
+_BOUNDED_CONFIG_APPLY_COUNT = 4
 _LOCAL_MQTT_PORT = 1883
 
 
@@ -144,6 +145,69 @@ async def test_failed_config_push_retries_without_cloud_reconnect() -> None:
 
 
 @pytest.mark.asyncio
+async def test_confirmed_config_retries_until_device_traffic_is_observed() -> None:
+    """A successful 3046 without a device PUBLISH is not terminal health."""
+    coordinator = JackerySolarVaultCoordinator.__new__(
+        JackerySolarVaultCoordinator,
+    )
+    obj = cast("Any", coordinator)
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._background_tasks = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_retry_pending = False  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj.hass = _TaskHass()
+    retry_sleep = AsyncMock()
+    obj._async_local_mqtt_config_retry_sleep = retry_sleep  # ruff: ignore[private-member-access]
+
+    async def _apply() -> bool:
+        await asyncio.sleep(0)
+        attempts = retry_sleep.await_count
+        obj._local_mqtt_config_diagnostics[  # ruff: ignore[private-member-access]
+            "last_status"
+        ] = "config_confirmed_awaiting_device_traffic" if attempts == 0 else "success"
+        return True
+
+    obj.async_apply_local_mqtt_config_to_devices = _apply
+
+    task = coordinator.async_schedule_local_mqtt_device_config()
+    assert task is not None
+    await task
+
+    retry_sleep.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_confirmed_config_without_traffic_stops_after_bounded_retries() -> None:
+    """A silent device cannot trigger an infinite 3046 command loop."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    obj = cast("Any", coordinator)
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._background_tasks = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_retry_pending = False  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj.hass = _TaskHass()
+    retry_sleep = AsyncMock()
+    obj._async_local_mqtt_config_retry_sleep = retry_sleep  # ruff: ignore[private-member-access]
+
+    def _apply() -> bool:
+        obj._local_mqtt_config_diagnostics[  # ruff: ignore[private-member-access]
+            "last_status"
+        ] = "config_confirmed_awaiting_device_traffic"
+        return True
+
+    apply = AsyncMock(side_effect=_apply)
+    obj.async_apply_local_mqtt_config_to_devices = apply
+
+    task = coordinator.async_schedule_local_mqtt_device_config()
+    assert task is not None
+    await task
+
+    assert apply.await_count == _BOUNDED_CONFIG_APPLY_COUNT
+    assert retry_sleep.await_count == _BOUNDED_CONFIG_APPLY_COUNT - 1
+    assert "last_retry_exhausted_at" in obj._local_mqtt_config_diagnostics  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio
 async def test_automatic_bridge_preserves_stable_app_token() -> None:
     """The automatic bridge reuses its hidden persisted App-style token."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -187,7 +251,58 @@ async def test_automatic_bridge_preserves_stable_app_token() -> None:
         password="mqtt_password",
         token="123456789",
     )
-    assert obj._local_mqtt_config_diagnostics["last_status"] == "success"  # ruff: ignore[private-member-access]
+    assert obj._local_mqtt_config_diagnostics["last_status"] == (  # ruff: ignore[private-member-access]
+        "config_confirmed_awaiting_device_traffic"
+    )
+
+
+@pytest.mark.asyncio
+async def test_one_devices_traffic_does_not_confirm_every_device() -> None:
+    """Each configured device must publish before the shared config is healthy."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    obj = cast("Any", coordinator)
+    options = {
+        CONF_LOCAL_MQTT_ENABLE: True,
+        CONF_LOCAL_MQTT_HOST: "192.168.2.212",
+        CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
+        CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
+        CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+        CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
+    }
+    obj.entry = SimpleNamespace(data={}, options=options)
+    obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_no_host_warned = False  # ruff: ignore[private-member-access]
+    obj._generated_third_party_mqtt_token = None  # ruff: ignore[private-member-access]
+    obj._device_index = {"device-1": {}, "device-2": {}}  # ruff: ignore[private-member-access]
+    obj.data = {
+        device_id: {
+            PAYLOAD_THIRD_PARTY_MQTT_CONFIG: {
+                FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
+            },
+        }
+        for device_id in obj._device_index  # ruff: ignore[private-member-access]
+    }
+    obj._local_mqtt_config_applied_signature = (  # ruff: ignore[private-member-access]
+        "192.168.2.212",
+        _LOCAL_MQTT_PORT,
+        "mqtt_user",
+        "mqtt_password",
+        (("device-1", "123456789"), ("device-2", "123456789")),
+        ("device-1", "device-2"),
+    )
+    obj._local_mqtt_device_traffic_observed = True  # ruff: ignore[private-member-access]
+    obj._local_mqtt_device_traffic_observed_ids = {  # ruff: ignore[private-member-access]
+        "device-1"
+    }
+    setter = AsyncMock(return_value=None)
+    obj.async_set_third_party_mqtt_config = setter
+
+    assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
+
+    assert setter.await_count == 2
+    assert obj._local_mqtt_config_diagnostics["last_status"] == (  # ruff: ignore[private-member-access]
+        "config_confirmed_awaiting_device_traffic"
+    )
 
 
 def test_blank_setter_token_reuses_persisted_token_after_restart() -> None:

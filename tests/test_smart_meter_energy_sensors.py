@@ -19,9 +19,7 @@ from homeassistant.const import UnitOfEnergy
 
 
 def _by_key(key: str) -> Any:
-    return cast(
-        "Any", next(d for d in SMART_METER_SENSOR_DESCRIPTIONS if d.key == key)
-    )
+    return cast("Any", next(d for d in SMART_METER_SENSOR_DESCRIPTIONS if d.key == key))
 
 
 def test_grid_import_energy_reads_total_phase_energy() -> None:

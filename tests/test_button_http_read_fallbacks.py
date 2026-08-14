@@ -43,7 +43,7 @@ from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
-from custom_components.jackery_solarvault.types import FieldProvenance
+from custom_components.jackery_solarvault.models import FieldProvenance
 from homeassistant.exceptions import HomeAssistantError
 
 _DEVICE_ID = "dev-1"
@@ -83,6 +83,7 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     shell._system_info_cache_monotonic = {}  # ruff: ignore[private-member-access]
     shell._pending_device_removals = []  # ruff: ignore[private-member-access]
     shell._device_index = {}  # ruff: ignore[private-member-access]
+    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
     return coordinator
 
 

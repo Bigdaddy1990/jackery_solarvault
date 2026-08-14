@@ -1073,6 +1073,26 @@ def test_effective_period_total_value_year_section() -> None:
     assert total == expected
 
 
+def test_effective_period_total_value_year_zero_series_uses_positive_scalar() -> None:
+    """App 2.4.x year payloads may carry a valid scalar with zero placeholders."""
+    section = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}"
+    source = {
+        APP_CHART_SERIES_Y: [0.0] * 12,
+        APP_STAT_TOTAL_SOLAR_ENERGY: "954.98",
+        APP_REQUEST_META: {
+            APP_REQUEST_DATE_TYPE_ALT: DATE_TYPE_YEAR,
+            APP_REQUEST_BEGIN_DATE_ALT: "2026-01-01",
+            APP_REQUEST_END_DATE_ALT: "2026-12-31",
+        },
+    }
+
+    total = util.effective_period_total_value(
+        source, section, APP_STAT_TOTAL_SOLAR_ENERGY
+    )
+
+    assert total == pytest.approx(954.98)
+
+
 def test_year_payload_appears_current_month_only() -> None:
     """Only-current-month year payloads are flagged as the app month-only bug."""
     current_month = 5

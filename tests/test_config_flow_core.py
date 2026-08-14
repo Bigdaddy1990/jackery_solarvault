@@ -74,7 +74,10 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
             hostname="jackery.local",
             ip="192.0.2.10",
         ),
-        "async_step_mqtt": SimpleNamespace(topic="jackery/discovery/device-1"),
+        "async_step_mqtt": SimpleNamespace(
+            topic="jackery/discovery/device-1",
+            payload=b'{"devSn":"HR2C04000280HH3"}',
+        ),
         "async_step_zeroconf": SimpleNamespace(
             name="Jackery SolarVault",
             hostname="jackery.local",
@@ -103,7 +106,10 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
             hostname="jackery.local",
             ip="192.0.2.10",
         ),
-        "async_step_mqtt": SimpleNamespace(topic="jackery/discovery/device-1"),
+        "async_step_mqtt": SimpleNamespace(
+            topic="jackery/discovery/device-1",
+            payload=b'{"devSn":"HR2C04000280HH3"}',
+        ),
         "async_step_zeroconf": SimpleNamespace(
             name="Jackery SolarVault",
             hostname="jackery.local",
@@ -257,7 +263,10 @@ async def test_mqtt_discovery_formats_or_falls_back_from_topic_suffix(
     suffix after ``strip()``, which must fall back to the bare ``"Jackery
     MQTT"`` label rather than the malformed ``"Jackery MQTT ()"``.
     """
-    discovery_info = SimpleNamespace(topic=topic)
+    discovery_info = SimpleNamespace(
+        topic=topic,
+        payload=b'{"devSn":"HR2C04000280HH3"}',
+    )
     assert await _discovered_name("async_step_mqtt", discovery_info) == expected_name
 
 

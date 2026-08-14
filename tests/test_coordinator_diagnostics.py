@@ -69,6 +69,7 @@ def test_endpoint_backoff_diagnostics_reports_only_active_non_energy(
         "code": 500,
         "level": 2,
         "remaining_seconds": 30,
+        "unsupported": False,
     }
     assert "pv_stat" not in diagnostics["active"]
     assert "expired" not in diagnostics["active"]

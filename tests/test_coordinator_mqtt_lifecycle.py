@@ -130,7 +130,9 @@ async def test_ensure_mqtt_starts_with_cached_credentials(coordinator: Any) -> N
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_records_success_when_already_connected(coordinator: Any) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_records_success_when_already_connected(
+    coordinator: Any,
+) -> None:  # noqa: RUF105
     """A client-verified no-op repairs manager state when already connected."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
@@ -185,7 +187,9 @@ async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator: Any) 
 
 
 @pytest.mark.asyncio
-async def test_ensure_mqtt_wait_connected_network_error_backs_off(coordinator: Any) -> None:  # noqa: RUF105
+async def test_ensure_mqtt_wait_connected_network_error_backs_off(
+    coordinator: Any,
+) -> None:  # noqa: RUF105
     """A non-auth connect failure records backoff and re-raises."""
     mqtt = _fake_mqtt(connected=False)
     mqtt.diagnostics = {"last_error": "connection refused"}
@@ -290,7 +294,9 @@ async def test_mqtt_connected_returns_early_during_shutdown(coordinator: Any) ->
 
 
 @pytest.mark.asyncio
-async def test_mqtt_connected_records_success_and_queries_missing(coordinator: Any) -> None:  # noqa: RUF105
+async def test_mqtt_connected_records_success_and_queries_missing(
+    coordinator: Any,
+) -> None:  # noqa: RUF105
     """On connect the manager records success and the enrichment queries run."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]

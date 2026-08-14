@@ -340,9 +340,7 @@ def test_day_power_energy_points_skips_unverified_null_gaps() -> None:
         now=util.datetime(2026, 7, 29, 12),
     )
 
-    assert points == [
-        util.TrendStatisticPoint(util.datetime(2026, 7, 28, 9), 0.05)
-    ]
+    assert points == [util.TrendStatisticPoint(util.datetime(2026, 7, 28, 9), 0.05)]
 
 
 def test_day_power_energy_points_ignores_stale_zero_total_with_live_curve() -> None:
@@ -371,10 +369,8 @@ def test_day_power_energy_points_ignores_stale_zero_total_with_live_curve() -> N
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 0.1)]
 
 
-def test_day_power_energy_points_never_scales_live_curve_down_to_lagging_scalar() -> (
-    None
-):
-    """A lagging current-day scalar must not shrink the integrated power curve."""
+def test_day_power_energy_points_scales_current_day_curve_to_positive_scalar() -> None:
+    """A positive current-day scalar reconciles inflated raw power integration."""
     source = {
         util.APP_REQUEST_META: {
             util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
@@ -396,7 +392,7 @@ def test_day_power_energy_points_never_scales_live_curve_down_to_lagging_scalar(
         now=util.datetime(2026, 5, 23, 10, 10),
     )
 
-    assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 1.0)]
+    assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 0.1)]
 
 
 def test_blank_unit_day_curve_is_rejected_without_unit_evidence() -> None:

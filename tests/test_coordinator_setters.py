@@ -31,6 +31,7 @@ def _coordinator(props: dict[str, Any] | None = None) -> Any:
     shell._property_overrides = {}  # ruff: ignore[private-member-access]
     shell._live_property_key_monotonic = {}  # ruff: ignore[private-member-access]
     shell._listeners = {}  # ruff: ignore[private-member-access]
+    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
     shell._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]
     return shell
 

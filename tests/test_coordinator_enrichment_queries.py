@@ -118,6 +118,44 @@ async def coordinator(hass):  # noqa: RUF105
 
 
 # ---------------------------------------------------------------------------
+# Independent background dispatch
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> None:  # noqa: RUF105
+    """A BLE-only enrichment pass dispatches without Cloud-MQTT startup."""
+    coordinator._ble_listener = MagicMock()  # noqa: RUF105, SLF001
+    coordinator._mqtt = None  # noqa: RUF105, SLF001
+    coordinator._mqtt_session_generation = 1  # noqa: RUF105, SLF001
+    coordinator._mqtt_birth_snapshot_pending = False  # noqa: RUF105, SLF001
+    coordinator._async_query_subdevices_for_missing = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_query_system_info_for_missing = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_query_weather_plan_for_missing = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator.async_start_mqtt = AsyncMock()
+    snapshot = {DEVICE_ID: _device_payload()}
+
+    await coordinator._async_mqtt_poll_queries(snapshot)  # noqa: RUF105, SLF001
+
+    coordinator._async_query_subdevices_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
+        force=False,
+        snapshot=snapshot,
+        ensure_mqtt=False,
+    )
+    coordinator._async_query_system_info_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
+        force=False,
+        snapshot=snapshot,
+        ensure_mqtt=False,
+    )
+    coordinator._async_query_weather_plan_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
+        force=False,
+        snapshot=snapshot,
+        ensure_mqtt=False,
+    )
+    coordinator.async_start_mqtt.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
 # _async_query_system_info_for_missing
 # ---------------------------------------------------------------------------
 
@@ -176,12 +214,44 @@ async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # no
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_skips_device_with_complete_data(coordinator) -> None:  # noqa: RUF105
-    """Complete data is skipped once session getter responses have been seen."""
+async def test_system_info_query_refreshes_complete_data_when_periodic_due(
+    coordinator,  # noqa: RUF105
+) -> None:
+    """Complete data is refreshed after the periodic getter interval."""
     mqtt = MagicMock()
     mqtt.is_connected = True
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
+    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 61  # noqa: RUF105, SLF001
+    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+        (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
+        (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
+    })
+    coordinator.async_query_device_info = AsyncMock()
+    coordinator.async_query_system_info = AsyncMock()
+
+    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+
+    coordinator.async_query_device_info.assert_awaited_once_with(
+        DEVICE_ID, ensure_mqtt=True
+    )
+    coordinator.async_query_system_info.assert_awaited_once_with(
+        DEVICE_ID, ensure_mqtt=True
+    )
+
+
+@pytest.mark.asyncio
+async def test_system_info_query_skips_complete_data_before_periodic_due(
+    coordinator,  # noqa: RUF105
+) -> None:
+    """Complete data remains throttled until the periodic interval expires."""
+    mqtt = MagicMock()
+    mqtt.is_connected = True
+    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
+    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
     coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
         (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
         (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
@@ -293,6 +363,8 @@ async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> Non
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload()}
     snapshot = {DEVICE_ID: _device_payload(has_system_info=True)}
+    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
     coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
         (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
         (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
@@ -341,12 +413,39 @@ async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_skips_when_minutes_present(coordinator) -> None:  # noqa: RUF105
-    """Existing lead-time fields are skipped after the session getter was seen."""
+async def test_weather_plan_query_refreshes_minutes_when_periodic_due(
+    coordinator,  # noqa: RUF105
+) -> None:
+    """Existing lead-time fields are refreshed after the periodic interval."""
     mqtt = MagicMock()
     mqtt.is_connected = True
     coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
+    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 301  # noqa: RUF105, SLF001
+    coordinator._mqtt_session_actions_seen.add(  # noqa: RUF105, SLF001
+        (DEVICE_ID, ACTION_ID_QUERY_WEATHER_PLAN)
+    )
+    coordinator.async_query_weather_plan = AsyncMock()
+
+    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+
+    coordinator.async_query_weather_plan.assert_awaited_once_with(
+        DEVICE_ID, ensure_mqtt=True
+    )
+
+
+@pytest.mark.asyncio
+async def test_weather_plan_query_skips_minutes_before_periodic_due(
+    coordinator,  # noqa: RUF105
+) -> None:
+    """Existing lead-time fields remain throttled before the interval expires."""
+    mqtt = MagicMock()
+    mqtt.is_connected = True
+    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
+    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
     coordinator._mqtt_session_actions_seen.add(  # noqa: RUF105, SLF001
         (DEVICE_ID, ACTION_ID_QUERY_WEATHER_PLAN)
     )

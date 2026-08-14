@@ -111,6 +111,61 @@ def test_week_period_rejects_one_payloads_placeholder_zero() -> None:
     assert sensor.extra_state_attributes["period_values"] == [0.0, None, None]
 
 
+def test_week_period_keeps_populated_app_week_over_verified_day_rebuild() -> None:
+    """A populated App week payload is authoritative over reconstructed days."""
+    description = next(
+        desc for desc in STAT_DESCRIPTIONS if desc.key == "device_pv1_week_energy"
+    )
+    sensor = JackeryStatSensor.__new__(JackeryStatSensor)
+    mutable = cast("Any", sensor)
+    today = datetime(2026, 8, 13, tzinfo=UTC).date()
+    week_start = today - timedelta(days=today.weekday())
+    request = {
+        APP_REQUEST_DATE_TYPE: DATE_TYPE_WEEK,
+        APP_REQUEST_BEGIN_DATE: week_start.isoformat(),
+        APP_REQUEST_END_DATE: (week_start + timedelta(days=6)).isoformat(),
+    }
+    month_section = description.section.replace("_week", "_month")
+    payload = {
+        description.section: {
+            description.stat_key: 4.85,
+            APP_CHART_SERIES_Y1: [0.0, 4.7, 0.0, 0.15, 0.0, 0.0, 0.0],
+            APP_STAT_UNIT: APP_UNIT_KWH,
+            APP_REQUEST_META: request,
+        },
+        month_section: {
+            description.stat_key: 5.28,
+            APP_CHART_SERIES_Y1: [0.23, 4.7, 0.2, 0.15],
+            APP_STAT_UNIT: APP_UNIT_KWH,
+        },
+        "verified_day_statistics": {
+            "2026-08-10": {"device_pv_stat": {description.stat_key: 0.23}},
+            "2026-08-11": {"device_pv_stat": {description.stat_key: 4.7}},
+            "2026-08-12": {"device_pv_stat": {description.stat_key: 0.2}},
+        },
+    }
+    mutable.coordinator = SimpleNamespace(
+        data={_DEVICE_ID: payload},
+        local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+    )
+    mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable.entity_description = description
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
+    mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
+
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(4.85)
+    assert sensor.extra_state_attributes["source_section"] == description.section
+    assert "fallback" not in sensor.extra_state_attributes
+
+
 def test_day_period_accepts_zero_only_after_distinct_source_confirmation() -> None:
     """Two different HTTP buckets may confirm a genuine scalar period zero."""
     description = next(
@@ -148,9 +203,7 @@ def test_day_period_accepts_zero_only_after_distinct_source_confirmation() -> No
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
     assert sensor.native_value is None
 
-    mutable.coordinator.local_daily_energy_kwh = (
-        lambda _device_id, _metric_key: 0.0
-    )
+    mutable.coordinator.local_daily_energy_kwh = lambda _device_id, _metric_key: 0.0
     context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
     snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
@@ -283,9 +336,7 @@ def _today_battery_value(
         desc for desc in STAT_DESCRIPTIONS if desc.key == "today_battery_energy"
     )
     fallback_section, fallback_key = description.fallback_sources[0]
-    primary_source = (
-        {description.stat_key: primary} if primary is not None else {}
-    )
+    primary_source = {description.stat_key: primary} if primary is not None else {}
     fallback_source = {fallback_key: fallback} if fallback is not None else {}
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)

@@ -134,9 +134,7 @@ def test_smart_meter_lifetime_restore_is_replaced_by_real_transport_value() -> N
     """A CT lifetime total survives a gap and yields to the next real frame."""
     sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
     mutable = cast("Any", sensor)
-    mutable.coordinator = SimpleNamespace(
-        data={_DEVICE_ID: {PAYLOAD_CT_METER: {}}}
-    )
+    mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: {PAYLOAD_CT_METER: {}}})
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = next(
         item
@@ -163,17 +161,13 @@ def test_smart_plug_lifetime_restore_is_replaced_by_real_transport_value() -> No
     """A plug total survives a gap and yields to the next real PlugSub frame."""
     sensor = JackerySmartPlugSensor.__new__(JackerySmartPlugSensor)
     mutable = cast("Any", sensor)
-    mutable.coordinator = SimpleNamespace(
-        data={_DEVICE_ID: {PAYLOAD_SMART_PLUGS: []}}
-    )
+    mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: {PAYLOAD_SMART_PLUGS: []}})
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable._plug_index = 1  # ruff: ignore[private-member-access]
     mutable._plug_sn = "PLUG-1"  # ruff: ignore[private-member-access]
     mutable._plug_key = "smart_plug_plug_1"  # ruff: ignore[private-member-access]
     mutable.entity_description = next(
-        item
-        for item in SMART_PLUG_SENSOR_DESCRIPTIONS
-        if item.key == "total_energy"
+        item for item in SMART_PLUG_SENSOR_DESCRIPTIONS if item.key == "total_energy"
     )
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]

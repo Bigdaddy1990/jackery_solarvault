@@ -1,11 +1,12 @@
 """Behavioral tests for the coordinator live-property merge machinery.
 
-These exercise the HTTP-first / supplemental-fill invariant: HTTP live
-properties are authoritative, and MQTT/BLE supplemental pushes may only fill
-keys HTTP has left empty. Recent local setter writes (property overrides) beat
+HTTP remains the complete fallback, while cloud MQTT, local MQTT and BLE are
+equal live-data peers. A fresh Layer-5 observation must not be reversed by an
+immediate HTTP snapshot. Recent local setter writes (property overrides) beat
 stale snapshots until their TTL lapses.
 """
 
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 from custom_components.jackery_solarvault.const import (
@@ -28,6 +29,7 @@ from custom_components.jackery_solarvault.coordinator import (
     merge_sub_devices,
     merge_subdevice_lists_by_sn,
 )
+from custom_components.jackery_solarvault.ingest import TransportSource
 
 if TYPE_CHECKING:
     import pytest
@@ -48,6 +50,7 @@ def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:
     shell._listeners = {}  # ruff: ignore[private-member-access]
     shell._device_index = {}  # ruff: ignore[private-member-access]
     shell._ble_pending_updates = {}  # ruff: ignore[private-member-access]
+    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
     return shell
 
 
@@ -116,6 +119,57 @@ def test_concurrent_live_push_is_reapplied_without_reverting_fresh_http() -> Non
     assert merged["dev-1"][PAYLOAD_HTTP_PROPERTIES]["pvPw"] == fresh_http_pv_power
     assert merged["dev-1"][PAYLOAD_HTTP_PROPERTIES]["soc"] == live_soc
     assert merged["dev-1"]["stat"] == {"day": 2}
+
+
+def test_concurrent_reapply_preserves_each_layer5_field_timestamp() -> None:
+    """Mixed BLE/MQTT deltas retain per-field ordering across an HTTP await."""
+    coordinator = _coordinator()
+    mqtt_time = datetime.now(UTC) - timedelta(seconds=2)
+    ble_time = mqtt_time + timedelta(seconds=1)
+    properties = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {},
+        {"soc": 76},
+        source=TransportSource.CLOUD_MQTT,
+        observed_at=mqtt_time,
+    )
+    properties = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+        "dev-1",
+        properties,
+        {"pvPw": 20_620},
+        source=TransportSource.BLE,
+        observed_at=ble_time,
+    )
+    coordinator.data = {"dev-1": {PAYLOAD_PROPERTIES: properties}}
+    baseline = {"dev-1": {PAYLOAD_PROPERTIES: {"soc": 75, "pvPw": 600}}}
+    http_result = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {"soc": 75, "pvPw": 650},
+            PAYLOAD_HTTP_PROPERTIES: {"soc": 75, "pvPw": 650},
+        },
+    }
+
+    merged = coordinator._merge_concurrent_coordinator_updates(  # ruff: ignore[private-member-access]
+        baseline,
+        http_result,
+    )
+
+    assert merged["dev-1"][PAYLOAD_PROPERTIES]["soc"] == 76
+    assert merged["dev-1"][PAYLOAD_PROPERTIES]["pvPw"] == 20_620
+    provenance = coordinator._property_source_state["dev-1"]  # ruff: ignore[private-member-access]
+    assert provenance["soc"].source is TransportSource.CLOUD_MQTT
+    assert provenance["soc"].observed_at == mqtt_time
+    assert provenance["pvPw"].source is TransportSource.BLE
+    assert provenance["pvPw"].observed_at == ble_time
+
+    stale = coordinator._merge_partial_device_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        merged["dev-1"],
+        {PAYLOAD_PROPERTIES: {"pvPw": 500}},
+        source=TransportSource.LOCAL_MQTT,
+        observed_at=mqtt_time - timedelta(hours=5),
+    )
+    assert stale[PAYLOAD_PROPERTIES]["pvPw"] == 20_620
 
 
 def test_http_rebuild_preserves_circuit_and_generic_subdevice_buckets() -> None:
@@ -233,6 +287,80 @@ def test_merge_partial_update_live_push_wins() -> None:
     assert props["pvPw"] == _STALE_POWER
     assert props["extra"] == _FILL_VALUE
     assert props["keepme"] == 1
+
+
+def test_background_http_partial_cannot_reverse_fresh_layer5_live_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A slow HTTP payload cannot reset PV/SOC immediately after a BLE frame."""
+    coordinator = _coordinator()
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.coordinator.time.monotonic",
+        lambda: 1_000.0,
+    )
+    layer5_values = {"pvPw": 20_620, "soc": 76}
+    current = {
+        PAYLOAD_PROPERTIES: coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+            "dev-1",
+            {},
+            layer5_values,
+            source=TransportSource.BLE,
+        ),
+        PAYLOAD_HTTP_PROPERTIES: {"pvPw": 650, "soc": 70},
+    }
+
+    merged = coordinator._merge_partial_device_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        current,
+        {
+            PAYLOAD_PROPERTIES: {"pvPw": 650, "soc": 70},
+            PAYLOAD_HTTP_PROPERTIES: {"pvPw": 650, "soc": 70},
+        },
+        source=TransportSource.HTTP,
+    )
+
+    assert merged[PAYLOAD_PROPERTIES]["pvPw"] == layer5_values["pvPw"]
+    assert merged[PAYLOAD_PROPERTIES]["soc"] == layer5_values["soc"]
+    assert merged[PAYLOAD_HTTP_PROPERTIES]["pvPw"] == 650
+    assert merged[PAYLOAD_HTTP_PROPERTIES]["soc"] == 70
+
+
+def test_unchanged_http_partial_does_not_relabel_layer5_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stats-only HTTP refresh leaves unchanged Layer-5 ownership intact."""
+    coordinator = _coordinator()
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.coordinator.time.monotonic",
+        lambda: 1_000.0,
+    )
+    live_values = {"pvPw": 20_620, "soc": 76}
+    current = {
+        PAYLOAD_PROPERTIES: coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
+            "dev-1",
+            {},
+            live_values,
+            source=TransportSource.LOCAL_MQTT,
+        ),
+    }
+
+    merged = coordinator._merge_partial_device_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        current,
+        {
+            PAYLOAD_PROPERTIES: dict(live_values),
+            PAYLOAD_HTTP_PROPERTIES: dict(live_values),
+            "device_pv_stat_day": {"totalSolarEnergy": 0.65},
+        },
+        source=TransportSource.HTTP,
+    )
+
+    assert merged[PAYLOAD_PROPERTIES]["pvPw"] == live_values["pvPw"]
+    assert merged[PAYLOAD_PROPERTIES]["soc"] == live_values["soc"]
+    assert (
+        coordinator._property_source_state["dev-1"]["pvPw"].source  # ruff: ignore[private-member-access]
+        is TransportSource.LOCAL_MQTT
+    )
 
 
 def test_merge_main_properties_for_device_live_updates_win() -> None:

@@ -41,6 +41,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     obj._last_http_cycle_started_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     obj._polling_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
+    obj._device_registry_observer = None  # ruff: ignore[private-member-access]
     return coordinator
 
 

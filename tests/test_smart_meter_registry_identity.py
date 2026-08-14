@@ -100,9 +100,7 @@ def test_smart_meter_registry_migration_preserves_device_and_entity(
     assert migrated_device.id == legacy_device.id
     assert migrated_device.serial_number == _METER_SN
     assert (
-        device_registry.async_get_device(
-            identifiers={(DOMAIN, legacy_identifier)}
-        )
+        device_registry.async_get_device(identifiers={(DOMAIN, legacy_identifier)})
         is None
     )
     migrated_entity = entity_registry.async_get(entity.entity_id)

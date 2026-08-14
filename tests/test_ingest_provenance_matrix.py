@@ -1,6 +1,7 @@
 """Provenance and source/section contract tests for shared transport ingest."""
 
 import ast
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,10 +16,14 @@ from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import ingest_observation
-from custom_components.jackery_solarvault.types import DataSource, Observation
+from custom_components.jackery_solarvault.models import DataSource, Observation
 
 if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.types import FieldProvenance, IngestResult
+    from custom_components.jackery_solarvault.models import (
+        FieldProvenance,
+        IngestResult,
+        ProvenanceKey,
+    )
 
 _DEVICE_ID = "device-1"
 _SECTION = PAYLOAD_PROPERTIES
@@ -48,7 +53,7 @@ def _ingest(
     observation: Observation,
     *,
     current: dict[str, Any] | None = None,
-    provenance: dict[str, FieldProvenance] | None = None,
+    provenance: Mapping[ProvenanceKey, FieldProvenance] | None = None,
     received_at_monotonic: float = 100.0,
 ) -> IngestResult:
     """Ingest one observation with deterministic receive time."""
@@ -189,6 +194,58 @@ def test_layer5_peers_update_in_arrival_order(
     assert second.payload[_FIELD] == _NEW_VALUE
     assert second.accepted_fields == frozenset({_FIELD})
     assert second.provenance[_FIELD].source is second_source
+
+
+@pytest.mark.parametrize(
+    ["newer_source", "replayed_source"],
+    [
+        [DataSource.CLOUD_MQTT, DataSource.BLE],
+        [DataSource.BLE, DataSource.CLOUD_MQTT],
+        [DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT],
+        [DataSource.LOCAL_MQTT, DataSource.CLOUD_MQTT],
+        [DataSource.BLE, DataSource.LOCAL_MQTT],
+        [DataSource.LOCAL_MQTT, DataSource.BLE],
+    ],
+)
+def test_timestamped_layer5_replay_cannot_reverse_newer_peer(
+    newer_source: DataSource,
+    replayed_source: DataSource,
+) -> None:
+    """A retained old Layer-5 frame cannot reverse newer PV or SOC state."""
+    newer = _ingest(
+        _observation(
+            newer_source,
+            _NEW_VALUE,
+            observed_at=_BASE_TIME + timedelta(hours=6),
+        ),
+    )
+
+    replayed = _ingest(
+        _observation(replayed_source, 90, observed_at=_BASE_TIME),
+        current=newer.payload,
+        provenance=newer.provenance,
+        received_at_monotonic=101.0,
+    )
+
+    assert replayed.payload[_FIELD] == _NEW_VALUE
+    assert replayed.accepted_fields == frozenset()
+    assert replayed.provenance[_FIELD].source is newer_source
+
+
+def test_stale_first_mqtt_live_snapshot_does_not_replace_cached_state() -> None:
+    """A six-hour-old retained snapshot is not initial live telemetry."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    current = {"pvPw": _NEW_VALUE, "soc": 75}
+
+    result = coordinator._property_updates_for_source(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        {"pvPw": 900, "soc": 20},
+        DataSource.CLOUD_MQTT,
+        base=current,
+        observed_at=datetime.now(UTC) - timedelta(hours=6),
+    )
+
+    assert result == current
 
 
 def test_same_field_name_in_different_sections_has_independent_provenance() -> None:

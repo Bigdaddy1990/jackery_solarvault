@@ -165,7 +165,9 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             """
             return
 
-        def _push_partial_update(new_data: dict[str, object]) -> None:
+        def _push_partial_update(
+            new_data: dict[str, object], **_kwargs: object
+        ) -> None:
             """Store a partial update payload into the test capture dictionary.
 
             Parameters:
@@ -202,9 +204,11 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         assert isinstance(data, dict)
         entry = data["dev"]
         assert isinstance(entry, dict)
-        assert FIELD_THIRD_PARTY_MQTT_IP not in entry[PAYLOAD_PROPERTIES]
-        assert FIELD_THIRD_PARTY_MQTT_PORT not in entry[PAYLOAD_PROPERTIES]
-        assert FIELD_THIRD_PARTY_MQTT_ENABLE not in entry[PAYLOAD_PROPERTIES]
+        properties = entry.get(PAYLOAD_PROPERTIES, {})
+        assert isinstance(properties, dict)
+        assert FIELD_THIRD_PARTY_MQTT_IP not in properties
+        assert FIELD_THIRD_PARTY_MQTT_PORT not in properties
+        assert FIELD_THIRD_PARTY_MQTT_ENABLE not in properties
         assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == {
             key: value for key, value in body.items() if key != FIELD_CMD
         }
@@ -376,7 +380,9 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
             """
             return
 
-        def _push_partial_update(new_data: dict[str, object]) -> None:
+        def _push_partial_update(
+            new_data: dict[str, object], **_kwargs: object
+        ) -> None:
             """Store a partial update payload into the test capture dictionary.
 
             Parameters:

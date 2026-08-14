@@ -51,6 +51,7 @@ async def test_empty_filter_uses_exact_default_topic(
         == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
     )
     client.async_start.assert_awaited_once()
+    coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
 
@@ -82,6 +83,7 @@ async def test_homeassistant_topic_is_preserved_verbatim(
 
     client_cls.assert_called_once()
     assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant"
+    coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
 
@@ -113,4 +115,5 @@ async def test_explicit_scoped_local_topic_is_used_verbatim(
 
     client_cls.assert_called_once()
     assert client_cls.call_args.kwargs["topic_filter"] == "jackery/device/telemetry"
+    coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()

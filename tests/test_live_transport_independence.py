@@ -439,7 +439,7 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
 
-    def _capture(new_data: dict[str, dict[str, Any]]) -> None:
+    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
         coordinator.data = new_data
 
     _set_test_attr(coordinator, "_push_partial_update", _capture)

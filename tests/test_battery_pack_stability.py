@@ -218,10 +218,11 @@ def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     )
     assert handler_match is not None
     handler_body = handler_match.group(0)
-    assert "self._push_partial_update(new_data)" in handler_body, handler_body
-    assert "_schedule_battery_pack_ota_enrichment(device_id)" in handler_body, (
-        handler_body
-    )
+    push_call = "self._push_partial_update("
+    schedule_call = "_schedule_battery_pack_ota_enrichment(device_id)"
+    assert push_call in handler_body, handler_body
+    assert schedule_call in handler_body, handler_body
+    assert handler_body.index(push_call) < handler_body.index(schedule_call)
 
     refresh_match = re.search(
         r"async def _async_refresh_battery_pack_ota\(.*?(?=\n    @staticmethod)",

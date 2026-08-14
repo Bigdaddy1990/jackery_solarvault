@@ -200,9 +200,12 @@ async def test_current_import_job_imports_without_advancing_history() -> None:
     day_import.assert_awaited_once_with(snapshot)
     period_import.assert_awaited_once_with(snapshot)
     assert result == {"day-device", "period-device"}
-    assert coordinator._statistics_import_diagnostics[  # ruff: ignore[private-member-access]
-        "last_external_successful_device_count"
-    ] == 2
+    assert (
+        coordinator._statistics_import_diagnostics[  # ruff: ignore[private-member-access]
+            "last_external_successful_device_count"
+        ]
+        == 2
+    )
 
 
 async def test_startup_sync_stays_pending_without_backfill_progress() -> None:
@@ -298,6 +301,7 @@ def test_day_chart_points_absent_sources_returns_empty() -> None:
 
     assert (
         coordinator._day_chart_points_for_metric(  # ruff: ignore[private-member-access]
+            _DEV,
             {},
             "device_pv_stat",
             "totalSolarEnergy",
@@ -404,12 +408,31 @@ async def test_historical_day_idempotent_recorder_match_is_imported() -> None:
     coordinator._async_add_app_chart_statistics = add_stat  # ruff: ignore[private-member-access]
     source = {
         "unit": "kWh",
+        "x": ["00:00"],
         "y": [1.25],
         "_request": {
             "beginDate": "2026-07-08",
             "endDate": "2026-07-08",
         },
     }
+    historical_payload = coordinator._historical_day_payload_from_sources(  # ruff: ignore[private-member-access]
+        {APP_SECTION_PV_STAT: source},
+    )
+    assert coordinator._day_chart_source_candidates(  # ruff: ignore[private-member-access]
+        APP_SECTION_PV_STAT,
+        "totalSolarEnergy",
+        "pv_energy",
+    )[-1] == ("device_pv_stat_day", "totalSolarEnergy")
+    assert coordinator._day_chart_points_for_metric(  # ruff: ignore[private-member-access]
+        _DEV,
+        historical_payload,
+        APP_SECTION_PV_STAT,
+        "totalSolarEnergy",
+        "pv_energy",
+        bucket_minutes=60,
+        now=datetime(2026, 7, 9, 12, tzinfo=UTC),
+        use_local_day_guard=False,
+    )
 
     (
         ok,

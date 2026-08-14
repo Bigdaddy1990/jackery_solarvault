@@ -10,15 +10,109 @@ from custom_components.jackery_solarvault.const import (
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
+    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
 )
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_mqtt_discovery_loads_handler_and_routes_to_http_login(
+    hass: HomeAssistant,
+) -> None:
+    """The manifest MQTT topic must resolve to a valid HTTP-account flow."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="homeassistant",
+            payload=b'{"devSn":"HR2C04000280HH3"}',
+            qos=0,
+            retain=False,
+            subscribed_topic="homeassistant",
+            timestamp=0.0,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+
+async def test_mqtt_discovery_rejects_foreign_payload(
+    hass: HomeAssistant,
+) -> None:
+    """A retained non-Jackery message must not create a login flow."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="homeassistant",
+            payload=b'{"state":"online"}',
+            qos=0,
+            retain=True,
+            subscribed_topic="homeassistant",
+            timestamp=0.0,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "invalid_discovery_info"
+
+
+async def test_mqtt_discovery_rejects_action_id_without_device_identity(
+    hass: HomeAssistant,
+) -> None:
+    """A command-shaped retained message is not a stable Jackery identity."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="homeassistant",
+            payload=b'{"actionId":3011}',
+            qos=0,
+            retain=True,
+            subscribed_topic="homeassistant",
+            timestamp=0.0,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "invalid_discovery_info"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"devSn":[]}',
+        b'{"devSn":"' + b"x" * LOCAL_MQTT_MAX_PAYLOAD_BYTES + b'"}',
+    ],
+)
+async def test_mqtt_discovery_rejects_invalid_marker_payloads(
+    hass: HomeAssistant,
+    payload: bytes,
+) -> None:
+    """Malformed or oversized discovery frames must abort without exceptions."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="homeassistant",
+            payload=payload,
+            qos=0,
+            retain=True,
+            subscribed_topic="homeassistant",
+            timestamp=0.0,
+        ),
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "invalid_discovery_info"
 
 
 async def test_user_flow_happy_path(

@@ -537,7 +537,6 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     assert "CONFIG_ENTRY_VERSION" not in const_source
     assert "CONF_DEVICE_ID" not in const_source
     assert "CONF_SYSTEM_ID" not in const_source
-    assert "CONF_SCAN_INTERVAL" not in const_source
     assert "async_migrate_entry" not in init_source
     assert "_async_clean_entry_config" not in init_source
     assert "version=" not in init_source
@@ -978,14 +977,12 @@ def test_system_discovery_does_not_keep_unpublished_manual_id_paths() -> None:
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
-    init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
 
     assert "manual deviceId" not in coordinator_source
     assert "Configured device_id=" not in coordinator_source
     assert "self.entry.data.get(CONF_DEVICE_ID)" not in coordinator_source
     assert "CONF_SYSTEM_ID" not in coordinator_source
     assert "CONF_DEVICE_ID" not in coordinator_source
-    assert "CONF_SCAN_INTERVAL" not in init_source
 
 
 def test_optional_number_setter_failures_are_logged_before_suppression() -> None:

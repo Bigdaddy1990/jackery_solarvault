@@ -228,11 +228,45 @@ async def test_day_period_sensor_prefers_scalar_total_over_power_curve_sum(
     assert state.state == "3.58"
 
 
-async def test_day_period_sensor_uses_fresher_integrated_curve_over_lagging_scalar(
+async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_is_higher(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """A current-day W curve outranks a smaller, delayed scalar counter."""
+    """A lagging cloud day scalar cannot override a validated local day delta."""
+    entry = night_setup
+    coordinator = entry.runtime_data
+    payload = _night_payload(hass)
+    today = _local_today(hass)
+    payload[_DEVICE_ID][_DAY_SECTION] = {
+        APP_CHART_SERIES_Y: [0.0],
+        "totalSolarEnergy": 0.65,
+        "unit": "kWh",
+        APP_REQUEST_META: {
+            APP_REQUEST_BEGIN_DATE: today.isoformat(),
+            APP_REQUEST_END_DATE: today.isoformat(),
+        },
+    }
+    payload[_DEVICE_ID][PAYLOAD_LOCAL_DAILY_ENERGY] = {
+        APP_DEVICE_STAT_PV_ENERGY: 2062,
+    }
+    coordinator.async_set_updated_data(payload)
+    await hass.async_block_till_done()
+
+    entity_id = _entity_id_for(hass, "device_today_pv_energy")
+    state = hass.states.get(entity_id)
+
+    assert state is not None
+    assert state.state == "20.62"
+    assert state.attributes["source_section"] == PAYLOAD_LOCAL_DAILY_ENERGY
+    assert state.attributes["source_key"] == APP_DEVICE_STAT_PV_ENERGY
+    assert state.attributes["fallback"] == "local_lifetime_delta"
+
+
+async def test_day_period_sensor_never_integrates_day_power_curve_over_scalar(
+    hass: HomeAssistant,
+    night_setup: MockConfigEntry,
+) -> None:
+    """The dateType=day watt curve never replaces the dated scalar."""
     entry = night_setup
     coordinator = entry.runtime_data
     payload = _night_payload(hass)
@@ -253,8 +287,9 @@ async def test_day_period_sensor_uses_fresher_integrated_curve_over_lagging_scal
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "1.0"
-    assert state.attributes["day_power_curve_has_activity"] is True
+    assert state.state == "0.1"
+    assert state.attributes["source_section"] == _DAY_SECTION
+    assert "day_power_curve_has_activity" not in state.attributes
 
 
 async def test_day_period_sensor_stays_unknown_without_todays_bucket(

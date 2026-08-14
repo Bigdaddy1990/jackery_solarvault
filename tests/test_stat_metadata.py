@@ -722,7 +722,9 @@ def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
 
     # The active bounded job must never call the old unbounded repair state.
     combined_current_backfill = import_source + backfill_source
-    assert "_async_repair_missing_app_chart_statistics(" not in combined_current_backfill
+    assert (
+        "_async_repair_missing_app_chart_statistics(" not in combined_current_backfill
+    )
     assert "_statistics_repair_from_date(" not in combined_current_backfill
     assert "_statistics_rolling_backfill_from_date(" not in combined_current_backfill
     for legacy_state in (
@@ -902,9 +904,9 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
     )[1].split(
         "\n    # ------------------------------------------------------------------", 1
     )[0]
-    backfill_job = src.split(
-        "async def _async_advance_statistics_backfill", 1
-    )[1].split(
+    backfill_job = src.split("async def _async_advance_statistics_backfill", 1)[
+        1
+    ].split(
         "\n    # ------------------------------------------------------------------", 1
     )[0]
     assert "_statistics_repair_from_date(device_id, today)" not in import_job

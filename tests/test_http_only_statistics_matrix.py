@@ -24,7 +24,9 @@ from custom_components.jackery_solarvault.const import (
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_TODAY_ENERGY,
+    APP_STAT_TODAY_BATTERY_DISCHARGE,
     APP_STAT_TODAY_BATTERY_ENERGY,
+    APP_STAT_TODAY_GENERATION,
     APP_STAT_TODAY_GRID_IMPORT_ENERGY,
     APP_STAT_TODAY_HOME_LOAD_ENERGY,
     APP_STAT_TODAY_SOLAR_ENERGY,
@@ -41,6 +43,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_PHASE_ENERGY,
     PAYLOAD_HOME_TRENDS,
     PAYLOAD_LOCAL_DAILY_ENERGY,
+    PAYLOAD_STATISTIC,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -65,6 +68,7 @@ def _stat_sensor(
     sensor_key: str,
     payload: dict[str, Any],
     *,
+    local_daily_kwh: dict[str, float] | None = None,
     local_period_kwh: float | None = None,
 ) -> JackeryStatSensor:
     """Build and refresh a statistic sensor against an isolated payload."""
@@ -73,7 +77,9 @@ def _stat_sensor(
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
-        local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+        local_daily_energy_kwh=lambda _device_id, metric_key: (
+            None if local_daily_kwh is None else local_daily_kwh.get(metric_key)
+        ),
         local_period_energy_kwh=lambda _device_id, _metric_key, **_kwargs: (
             local_period_kwh
         ),
@@ -192,6 +198,79 @@ def test_compact_today_energy_uses_only_positive_documented_fallbacks() -> None:
     }
 
 
+def test_compact_today_local_delta_can_beat_lagging_positive_http_value() -> None:
+    """Current-day local deltas may replace lagging positive HTTP/App totals."""
+    payload = {
+        APP_SECTION_TODAY_ENERGY: {
+            APP_STAT_TODAY_SOLAR_ENERGY: 20.62,
+            APP_STAT_TODAY_BATTERY_ENERGY: 3.98,
+            APP_TODAY_ENERGY_SOURCE_META: {
+                APP_STAT_TODAY_SOLAR_ENERGY: {
+                    "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                    "source_key": APP_DEVICE_STAT_PV_ENERGY,
+                    "fallback": "local_lifetime_delta",
+                },
+                APP_STAT_TODAY_BATTERY_ENERGY: {
+                    "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                    "source_key": APP_DEVICE_STAT_BATTERY_DISCHARGE,
+                    "fallback": "local_lifetime_delta",
+                },
+            },
+        },
+        PAYLOAD_STATISTIC: {
+            APP_STAT_TODAY_GENERATION: 0.65,
+            APP_STAT_TODAY_BATTERY_DISCHARGE: 0.63,
+        },
+        PAYLOAD_LOCAL_DAILY_ENERGY: {
+            APP_DEVICE_STAT_PV_ENERGY: 2062,
+            APP_DEVICE_STAT_BATTERY_DISCHARGE: 398,
+        },
+    }
+
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+        payload,
+        today=date(2026, 8, 13),
+    )
+
+    compact = cast("dict[str, Any]", payload[APP_SECTION_TODAY_ENERGY])
+    assert compact[APP_STAT_TODAY_SOLAR_ENERGY] == pytest.approx(20.62)
+    assert compact[APP_STAT_TODAY_BATTERY_ENERGY] == pytest.approx(3.98)
+    provenance = cast("dict[str, Any]", compact[APP_TODAY_ENERGY_SOURCE_META])
+    assert provenance[APP_STAT_TODAY_SOLAR_ENERGY] == {
+        "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+        "source_key": APP_DEVICE_STAT_PV_ENERGY,
+        "fallback": "local_lifetime_delta",
+    }
+    assert provenance[APP_STAT_TODAY_BATTERY_ENERGY] == {
+        "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+        "source_key": APP_DEVICE_STAT_BATTERY_DISCHARGE,
+        "fallback": "local_lifetime_delta",
+    }
+
+    local_daily_kwh = {
+        APP_DEVICE_STAT_PV_ENERGY: 20.62,
+        APP_DEVICE_STAT_BATTERY_DISCHARGE: 3.98,
+    }
+    solar_sensor = _stat_sensor(
+        "today_feed_in_energy",
+        payload,
+        local_daily_kwh=local_daily_kwh,
+    )
+    battery_sensor = _stat_sensor(
+        "today_battery_energy",
+        payload,
+        local_daily_kwh=local_daily_kwh,
+    )
+    assert solar_sensor.native_value == pytest.approx(20.62)
+    assert battery_sensor.native_value == pytest.approx(3.98)
+    assert solar_sensor.extra_state_attributes["source_section"] == (
+        PAYLOAD_LOCAL_DAILY_ENERGY
+    )
+    assert battery_sensor.extra_state_attributes["source_section"] == (
+        PAYLOAD_LOCAL_DAILY_ENERGY
+    )
+
+
 def test_compact_today_energy_uses_current_month_home_bucket() -> None:
     """Home load uses the documented current-month bucket when day trend is empty."""
     today = date(2026, 8, 11)
@@ -267,9 +346,7 @@ def test_today_battery_flow_http_fallback_keeps_kwh_unit() -> None:
     sensor = _stat_sensor("device_today_pv_to_battery", payload)
 
     assert sensor.native_value == pytest.approx(5.11)
-    assert sensor.extra_state_attributes["fallback"] == (
-        "documented_http_day_fallback"
-    )
+    assert sensor.extra_state_attributes["fallback"] == ("documented_http_day_fallback")
 
 
 def test_today_battery_flow_compares_local_and_http_in_kwh() -> None:
@@ -283,9 +360,7 @@ def test_today_battery_flow_compares_local_and_http_in_kwh() -> None:
     sensor = _stat_sensor("device_today_pv_to_battery", payload)
 
     assert sensor.native_value == pytest.approx(5.11)
-    assert sensor.extra_state_attributes["fallback"] == (
-        "documented_http_day_fallback"
-    )
+    assert sensor.extra_state_attributes["fallback"] == ("documented_http_day_fallback")
 
 
 def test_today_battery_flow_does_not_publish_lone_http_zero() -> None:
@@ -323,8 +398,7 @@ def test_ct_week_uses_fully_covered_local_period_when_cloud_is_placeholder() -> 
     assert sensor.extra_state_attributes["source_section"] == PAYLOAD_LOCAL_DAILY_ENERGY
     assert sensor.extra_state_attributes["fallback"] == "local_lifetime_delta"
     assert (
-        sensor.extra_state_attributes["fallback_metric"]
-        == FIELD_CT_TOTAL_PHASE_ENERGY
+        sensor.extra_state_attributes["fallback_metric"] == FIELD_CT_TOTAL_PHASE_ENERGY
     )
 
 

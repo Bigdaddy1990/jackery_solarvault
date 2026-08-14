@@ -48,7 +48,9 @@ def test_obsolete_system_parent_is_removed_and_head_is_detached(
     assert migrated_head is not None
     assert migrated_head.via_device_id is None
     obsolete_parent = registry.async_get_device(identifiers={parent_identifier})
-    assert obsolete_parent is None or entry.entry_id not in obsolete_parent.config_entries
+    assert (
+        obsolete_parent is None or entry.entry_id not in obsolete_parent.config_entries
+    )
 
 
 async def test_layer5_start_is_scheduled_after_platform_registry_setup(
@@ -131,9 +133,7 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         coordinator,
         "_async_update_data_guarded",
         AsyncMock(
-            return_value={
-                "http-device-2": {PAYLOAD_SYSTEM: {FIELD_ID: http_system_id}}
-            }
+            return_value={"http-device-2": {PAYLOAD_SYSTEM: {FIELD_ID: http_system_id}}}
         ),
     ):
         result = await coordinator._async_update_data_with_timeout()  # ruff: ignore[private-member-access]

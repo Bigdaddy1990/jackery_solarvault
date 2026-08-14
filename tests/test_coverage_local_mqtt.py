@@ -1,6 +1,7 @@
 """Tests for local MQTT client helpers, markers, topic matching, and message handling."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,7 +9,6 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
     _local_mqtt_client,  # ruff: ignore[import-private-name]
 )
-from custom_components.jackery_solarvault.const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -21,11 +21,6 @@ async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore
     """Test client initialization, properties, and diagnostic dictionary output."""
     client = JackeryLocalMqttClient(
         hass,
-        host="192.168.1.100",
-        port=1883,
-        username="admin",
-        password="secret_password",
-        client_id="jackery_local_test",
         topic_filter="jackery/#",
     )
 
@@ -33,34 +28,25 @@ async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore
     assert client.is_started is False
 
     diagnostics = client.diagnostics_snapshot()
-    assert diagnostics["configured_target"]["host"] == "**REDACTED**"
-    assert diagnostics["configured_target"]["port"] == "**REDACTED**"
+    assert diagnostics["transport"] == "homeassistant.components.mqtt"
+    assert diagnostics["library"] == "homeassistant.components.mqtt"
     assert diagnostics["topic_filter"] == "**REDACTED**"
+    assert diagnostics["mqtt_integration_available"] is False
+    assert diagnostics["subscribed"] is False
     assert diagnostics["connected"] is False
     rendered = repr(diagnostics)
-    assert "192.168.1.100" not in rendered
-    assert "secret_password" not in rendered
     assert "jackery/#" not in rendered
 
 
-def test_local_mqtt_topic_matching(hass: HomeAssistant) -> None:
-    """Test topic matching rules (wildcards +, #, exact matches)."""
+def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:
+    """The broker-selected topic is the receiver's complete configuration."""
     client = JackeryLocalMqttClient(
         hass,
-        host="localhost",
-        port=1883,
-        username=None,
-        password=None,
-        client_id="test",
         topic_filter="jackery/+/telemetry",
     )
 
-    assert (
-        client._topic_matches("jackery/+/telemetry", "jackery/e2000/telemetry") is True  # ruff: ignore[private-member-access]
-    )
-    assert client._topic_matches("jackery/+/telemetry", "jackery/e2000/status") is False  # ruff: ignore[private-member-access]
-    assert client._topic_matches("jackery/#", "jackery/sub/topic") is True  # ruff: ignore[private-member-access]
-    assert client._topic_matches("jackery/#", "other/topic") is False  # ruff: ignore[private-member-access]
+    assert client.matches_configuration(("jackery/+/telemetry",))
+    assert not client.matches_configuration(("jackery/#",))
 
 
 @pytest.mark.asyncio
@@ -78,11 +64,6 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
 
     client = JackeryLocalMqttClient(
         hass,
-        host="localhost",
-        port=1883,
-        username=None,
-        password=None,
-        client_id="test",
         sink=mock_sink,
         topic_filter="jackery/#",
     )
@@ -95,7 +76,6 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
         b'{"temperature": 25}',
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_ignored_foreign"] == 0
     assert diag["messages_forwarded"] == 1
     assert len(forwarded) == 1
     assert forwarded[0][1] == {"temperature": 25}
@@ -111,30 +91,63 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert len(forwarded) == 2
     assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
 
-    # Oversized payloads remain bounded before decoding.
+    # Oversized frames are counted for diagnostics but never filtered from the
+    # broker-selected stream; semantic validation belongs to shared ingest.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
     await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         large_payload,
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_dropped"] > 0
+    assert diag["messages_dropped"] == 0
+    assert diag["messages_oversized"] == 1
+    assert diag["messages_forwarded"] == 3
+    assert forwarded[2][2] == large_payload
 
 
 @pytest.mark.asyncio
 async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
-    """Test start and stop lifecycle without real connection."""
+    """Start and stop own only HA MQTT subscriptions, never a broker client."""
     client = JackeryLocalMqttClient(
         hass,
-        host="127.0.0.1",
-        port=18883,
-        username=None,
-        password=None,
-        client_id="test_start_stop",
+        topic_filter="jackery/device/#",
     )
+    unsubscribe = MagicMock()
+    unsubscribe_status = MagicMock()
 
-    # Stop when not started is safe
+    with (
+        patch(
+            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_wait_for_mqtt_client",
+            new=AsyncMock(return_value=True),
+        ),
+        patch(
+            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe",
+            new=AsyncMock(return_value=unsubscribe),
+        ) as async_subscribe,
+        patch(
+            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe_connection_status",
+            return_value=unsubscribe_status,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.is_connected",
+            return_value=True,
+        ),
+    ):
+        await client.async_start()
+
+    async_subscribe.assert_awaited_once()
+    subscribe_call = async_subscribe.await_args
+    assert subscribe_call is not None
+    assert subscribe_call.args[1] == "jackery/device/#"
+    assert subscribe_call.kwargs == {"qos": 0, "encoding": None}
+    assert client.is_started is True
+    assert client.is_connected is True
+
     await client.async_stop()
+
+    unsubscribe.assert_called_once_with()
+    unsubscribe_status.assert_called_once_with()
+    assert client.is_started is False
     assert client.is_connected is False
 
 
@@ -143,17 +156,22 @@ def test_local_mqtt_client_lookup_helper(hass: HomeAssistant) -> None:
 
     class DummyEntry:
         entry_id = "test_entry_id"
+        runtime_data: object | None = None
 
     entry = DummyEntry()
-    assert _local_mqtt_client(hass, entry) is None
+    assert _local_mqtt_client(hass, cast("Any", entry)) is None
 
     client = JackeryLocalMqttClient(
         hass,
-        host="127.0.0.1",
-        port=1883,
-        username=None,
-        password=None,
-        client_id="test_lookup",
+        topic_filter="jackery/#",
     )
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"local_mqtt_client": client}
-    assert _local_mqtt_client(hass, entry) is client
+
+    class DummyCoordinator:
+        local_mqtt_client = client
+
+    entry.runtime_data = DummyCoordinator()
+    with patch(
+        "custom_components.jackery_solarvault.coordinator.JackerySolarVaultCoordinator",
+        DummyCoordinator,
+    ):
+        assert _local_mqtt_client(hass, cast("Any", entry)) is client

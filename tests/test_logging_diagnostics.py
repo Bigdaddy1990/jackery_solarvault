@@ -9,13 +9,13 @@ Two logging rules are covered:
    Home Assistant log, not swallowed at DEBUG.
 """
 
+import asyncio
 from collections import deque
 import logging
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from aiomqtt import MqttError
 import pytest
 
 from custom_components.jackery_solarvault.client import local_mqtt as local_mqtt_module
@@ -203,51 +203,39 @@ async def test_payload_debug_capture_off_without_dev_mode_or_debug_logger(
     assert not writes, "capture must stay off without dev mode or a DEBUG logger"
 
 
-class _FailingAioMqttClient:
-    """Stand-in aiomqtt client whose connect always refuses."""
-
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        """Accept and ignore the real client's constructor signature."""
-
-    async def __aenter__(self) -> Self:
-        """Fail the connection the way an unreachable broker would."""
-        msg = "Could not connect to broker"
-        raise MqttError(msg)
-
-    async def __aexit__(self, *_exc: object) -> bool:
-        """Never suppress the raised connection error."""
-        return False
-
-
 @pytest.mark.asyncio
-async def test_local_mqtt_connect_failure_logs_warning(
+async def test_local_mqtt_unavailable_ha_client_logs_warning(
     caplog: pytest.LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unreachable local broker must log a WARNING carrying the host:port."""
-    monkeypatch.setattr(
-        local_mqtt_module.aiomqtt,
-        "Client",
-        _FailingAioMqttClient,
+    """An unavailable shared HA MQTT client must produce a visible warning."""
+    hass = MagicMock()
+    hass.async_create_background_task.side_effect = lambda coroutine, **_kwargs: (
+        asyncio.create_task(coroutine)
     )
     client = JackeryLocalMqttClient(
-        MagicMock(),
-        host="192.0.2.10",
-        port=1883,
-        username=None,
-        password=None,
-        client_id="test-client",
+        hass,
         sink=None,
         topic_filter="hb/app/#",
     )
 
-    with caplog.at_level(logging.WARNING, logger=_LOCAL_MQTT_LOGGER):
-        await client._async_run_session()  # ruff: ignore[private-member-access]
+    with (
+        patch.object(
+            local_mqtt_module.mqtt,
+            "async_wait_for_mqtt_client",
+            new=AsyncMock(return_value=False),
+        ),
+        caplog.at_level(logging.WARNING, logger=_LOCAL_MQTT_LOGGER),
+    ):
+        await client.async_start()
+        await client.async_stop()
 
     warnings = [
         record
         for record in caplog.records
         if record.levelno >= logging.WARNING and record.name == _LOCAL_MQTT_LOGGER
     ]
-    assert warnings, "a failed local MQTT connection must log at WARNING"
-    assert any("192.0.2.10:1883" in record.getMessage() for record in warnings)
+    assert warnings, "an unavailable HA MQTT integration must log at WARNING"
+    assert any("hb/app/#" in record.getMessage() for record in warnings)
+    assert any(
+        "Home Assistant MQTT integration" in record.getMessage() for record in warnings
+    )

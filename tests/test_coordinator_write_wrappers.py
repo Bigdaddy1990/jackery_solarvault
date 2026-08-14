@@ -53,6 +53,7 @@ def _coordinator(
     obj._device_index = device_index or {}  # ruff: ignore[private-member-access]
     obj._property_overrides = {}  # ruff: ignore[private-member-access]
     obj._listeners = {}  # ruff: ignore[private-member-access]
+    obj._device_registry_observer = None  # ruff: ignore[private-member-access]
     obj._shutdown_started = False  # ruff: ignore[private-member-access]
     obj.last_update_success = True
     obj.last_update_exception = None

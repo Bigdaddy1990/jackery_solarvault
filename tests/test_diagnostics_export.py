@@ -390,8 +390,8 @@ async def test_local_mqtt_diagnostics_missing_broker_host() -> None:
 
 
 @pytest.mark.asyncio
-async def test_local_mqtt_diagnostics_broad_topic_filter_blocked() -> None:
-    """A broker-wide `#` topic filter is blocked even with host/port set."""
+async def test_local_mqtt_diagnostics_redacts_broker_wide_topic() -> None:
+    """A user-selected broker-wide topic remains private in diagnostics."""
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
@@ -403,7 +403,7 @@ async def test_local_mqtt_diagnostics_broad_topic_filter_blocked() -> None:
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     local_mqtt = result["raw_api"]["local_mqtt"]
-    assert local_mqtt["disabled_reason"] == "broad_topic_filter_blocked"
+    assert local_mqtt["disabled_reason"] == "client_not_started"
     assert (
         local_mqtt["configured_local_mqtt"]["effective_topic_filter"] == REDACTED_VALUE
     )
