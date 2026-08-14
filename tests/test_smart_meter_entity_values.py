@@ -1,0 +1,143 @@
+"""Regression tests for Smart-Meter entity value passthrough."""
+
+from types import SimpleNamespace
+from typing import Any, cast
+
+import pytest
+
+from custom_components.jackery_solarvault.const import (
+    FIELD_CT_TOTAL_PHASE_ENERGY,
+    FIELD_DEVICE_SN,
+    PAYLOAD_CT_METER,
+)
+from custom_components.jackery_solarvault.sensor import (
+    SMART_METER_SENSOR_DESCRIPTIONS,
+    JackerySmartMeterSensor,
+)
+
+_DEVICE_ID = "dev-1"
+_HIGH_WATT_HOURS = 10_000
+_LOWER_WATT_HOURS = 9_000
+_HIGH_KWH = 10.0
+_LOWER_KWH = 9.0
+
+
+def _lifetime_import_sensor() -> JackerySmartMeterSensor:
+    sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
+    mutable = cast("Any", sensor)
+    mutable.coordinator = SimpleNamespace(data={})
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable.entity_description = next(
+        desc
+        for desc in SMART_METER_SENSOR_DESCRIPTIONS
+        if desc.key == "lifetime_import_energy"
+    )
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    return sensor
+
+
+def _set_ct_total(sensor: JackerySmartMeterSensor, watt_hours: int) -> None:
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {
+                FIELD_CT_TOTAL_PHASE_ENERGY: watt_hours,
+            },
+        },
+    }
+
+
+def test_smart_meter_total_increasing_reports_current_coordinator_value() -> None:
+    """Entity cache must not clamp lower raw CT totals at the entity layer."""
+    sensor = _lifetime_import_sensor()
+
+    _set_ct_total(sensor, _HIGH_WATT_HOURS)
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(_HIGH_KWH)
+
+    _set_ct_total(sensor, _LOWER_WATT_HOURS)
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(_LOWER_KWH)
+
+
+def _sensor_by_key(key: str) -> JackerySmartMeterSensor:
+    sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
+    mutable = cast("Any", sensor)
+    mutable.coordinator = SimpleNamespace(data={})
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable.entity_description = next(
+        desc for desc in SMART_METER_SENSOR_DESCRIPTIONS if desc.key == key
+    )
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    return sensor
+
+
+def test_import_energy_falls_back_to_per_phase_sum_when_total_absent() -> None:
+    """A meter reporting only per-phase import energy still yields a total kWh."""
+    sensor = _sensor_by_key("lifetime_import_energy")
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {
+                "aPhaseEgy": 1_000,
+                "bPhaseEgy": 2_000,
+                "cPhaseEgy": 3_000,
+            },
+        },
+    }
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(6.0)
+
+
+def test_import_energy_prefers_reported_total_over_phase_sum() -> None:
+    """When ``tPhaseEgy`` is present it wins over the per-phase sum."""
+    sensor = _sensor_by_key("lifetime_import_energy")
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {
+                FIELD_CT_TOTAL_PHASE_ENERGY: 62_598,
+                "aPhaseEgy": 1_000,
+            },
+        },
+    }
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    # 62_598 Wh -> 62.598 kWh, rounded to two decimals at the entity layer.
+    assert sensor.native_value == pytest.approx(62.6)
+
+
+def test_export_energy_falls_back_to_per_phase_negative_sum() -> None:
+    """A meter reporting only per-phase export energy still yields a total kWh."""
+    sensor = _sensor_by_key("lifetime_export_energy")
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {
+                "anPhaseEgy": 500,
+                "bnPhaseEgy": 500,
+                "cnPhaseEgy": 1_000,
+            },
+        },
+    }
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(2.0)
+
+
+def test_mac_address_falls_back_to_device_sn_when_mac_absent() -> None:
+    """A CT meter without ``mac`` resolves its id from ``deviceSn``."""
+    sensor = _sensor_by_key("mac_address")
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {FIELD_DEVICE_SN: "5c013b048e3c"},
+        },
+    }
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == "5c013b048e3c"
