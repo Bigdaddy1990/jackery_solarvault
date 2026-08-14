@@ -4,13 +4,14 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryApi, JackeryApiError
+from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_DATE_TYPE,
     APP_REQUEST_END_DATE,
     APP_REQUEST_META,
     APP_REQUEST_STAT_TYPE,
+    CT_STAT_TYPE_L1,
     DATE_TYPE_DAY,
     DEVICE_CT_STAT_PATH,
     DEVICE_PV_STAT_PATH,
@@ -18,7 +19,6 @@ from custom_components.jackery_solarvault.const import (
     FIELD_DATA,
     FIELD_DEVICE_ID,
     FIELD_SYSTEM_ID,
-    PV_TRENDS_LEGACY_PATH,
     PV_TRENDS_PATH,
 )
 
@@ -103,14 +103,8 @@ async def test_period_stat_includes_system_id_when_given() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ct_stat_omits_phase_type_for_combined_meter() -> None:
-    """The CT-stat request must not pin ``type=0`` (phase L1).
-
-    A combined-phase meter (``ct_phase=combined_phases``, e.g. a Shelly Pro
-    3EM) returns an empty series when ``type=0`` is forced, starving the CT
-    energy sensors. The request must omit the ``type`` phase filter so the
-    cloud returns the combined series.
-    """
+async def test_ct_stat_uses_app_first_chart_type() -> None:
+    """The CT-stat request mirrors App 2.4.x ``CtStatApi.type`` selection."""
     api = _api()
     get_json = AsyncMock(return_value={FIELD_DATA: {"totalInCtEnergy": "1.5"}})
 
@@ -121,7 +115,7 @@ async def test_ct_stat_omits_phase_type_for_combined_meter() -> None:
     assert awaited is not None
     args, kwargs = awaited
     assert args[0] == DEVICE_CT_STAT_PATH
-    assert APP_REQUEST_STAT_TYPE not in kwargs["params"]
+    assert kwargs["params"][APP_REQUEST_STAT_TYPE] == str(CT_STAT_TYPE_L1)
 
 
 @pytest.mark.asyncio
@@ -158,28 +152,3 @@ async def test_system_pv_trends_uses_current_app_path() -> None:
     awaited = get_json.await_args
     assert awaited is not None
     assert awaited.args[0] == PV_TRENDS_PATH
-
-
-@pytest.mark.asyncio
-async def test_system_pv_trends_falls_back_only_for_unknown_current_path() -> None:
-    """An older backend may reject the 2.4.0 path with code 10600."""
-    api = _api()
-    get_json = AsyncMock(
-        side_effect=[
-            JackeryApiError(f"GET {PV_TRENDS_PATH} code=10600"),
-            {FIELD_DATA: {"x": [], "y": []}},
-        ]
-    )
-
-    with patch.object(api, "_get_json", get_json):
-        await api.async_get_pv_trends(
-            _SYS,
-            date_type=DATE_TYPE_DAY,
-            begin_date=_BEGIN,
-            end_date=_END,
-        )
-
-    assert [call.args[0] for call in get_json.await_args_list] == [
-        PV_TRENDS_PATH,
-        PV_TRENDS_LEGACY_PATH,
-    ]

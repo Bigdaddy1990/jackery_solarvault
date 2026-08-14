@@ -90,7 +90,10 @@ async def test_set_soc_limits_fills_missing_side_from_state() -> None:
     coordinator = _coordinator()
     cast("Any", coordinator).data = {
         _DEVICE: {
-            coord_mod.PAYLOAD_PROPERTIES: {coord_mod.FIELD_SOC_DISCHG_LIMIT: 20},
+            coord_mod.PAYLOAD_PROPERTIES: {
+                coord_mod.FIELD_SOC_DISCHG_LIMIT: 20,
+                coord_mod.FIELD_SOC_FORCE_CHG: 1,
+            },
         },
     }
 
@@ -99,6 +102,7 @@ async def test_set_soc_limits_fills_missing_side_from_state() -> None:
     body = _ble_call(coordinator).kwargs["body_fields"]
     assert body[coord_mod.FIELD_SOC_CHG_LIMIT] == 90
     assert body[coord_mod.FIELD_SOC_DISCHG_LIMIT] == 20
+    assert body[coord_mod.FIELD_SOC_FORCE_CHG] == 1
 
 
 @pytest.mark.asyncio

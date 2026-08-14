@@ -1017,6 +1017,18 @@ def test_chart_series_key_for_stat_all_sections() -> None:
     )
     assert (
         util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
+            f"{APP_SECTION_EPS_STAT}_day", APP_STAT_TOTAL_OUT_EPS_ENERGY
+        )
+        is None
+    )
+    assert (
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
+            f"{APP_SECTION_EPS_STAT}_day", APP_STAT_TOTAL_IN_EPS_ENERGY
+        )
+        is None
+    )
+    assert (
+        util._chart_series_key_for_stat(  # ruff: ignore[private-member-access]
             APP_SECTION_BATTERY_TRENDS, APP_STAT_TOTAL_TREND_CHARGE_ENERGY
         )
         == APP_CHART_SERIES_Y1

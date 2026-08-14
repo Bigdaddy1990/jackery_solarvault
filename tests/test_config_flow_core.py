@@ -74,10 +74,6 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
             hostname="jackery.local",
             ip="192.0.2.10",
         ),
-        "async_step_mqtt": SimpleNamespace(
-            topic="jackery/discovery/device-1",
-            payload=b'{"devSn":"HR2C04000280HH3"}',
-        ),
         "async_step_zeroconf": SimpleNamespace(
             name="Jackery SolarVault",
             hostname="jackery.local",
@@ -105,10 +101,6 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
         "async_step_dhcp": SimpleNamespace(
             hostname="jackery.local",
             ip="192.0.2.10",
-        ),
-        "async_step_mqtt": SimpleNamespace(
-            topic="jackery/discovery/device-1",
-            payload=b'{"devSn":"HR2C04000280HH3"}',
         ),
         "async_step_zeroconf": SimpleNamespace(
             name="Jackery SolarVault",
@@ -142,7 +134,7 @@ async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
     """The shared router pre-fills the display name and hands off to the user step.
 
     ``_async_route_discovery_to_user`` backs every discovery transport
-    (Bluetooth/DHCP/MQTT/Zeroconf); this pins its own contract directly so a
+    (Bluetooth/DHCP/Zeroconf); this pins its own contract directly so a
     regression here is caught even if a transport's fallback-name test still
     mocks the router itself away.
     """
@@ -241,33 +233,6 @@ async def test_dhcp_discovery_falls_back_to_ip_without_hostname() -> None:
 
     unnamed = SimpleNamespace(hostname="", ip="192.0.2.10")
     assert await _discovered_name("async_step_dhcp", unnamed) == "192.0.2.10"
-
-
-@pytest.mark.parametrize(
-    ["topic", "expected_name"],
-    [
-        ["jackery/discovery/device-1", "Jackery MQTT (device-1)"],
-        ["device-1", "Jackery MQTT (device-1)"],
-        ["jackery/discovery/", "Jackery MQTT"],
-        ["jackery/discovery/  ", "Jackery MQTT"],
-    ],
-)
-@pytest.mark.asyncio
-async def test_mqtt_discovery_formats_or_falls_back_from_topic_suffix(
-    topic: str,
-    expected_name: str,
-) -> None:
-    """MQTT discovery names itself after the topic suffix, or a bare fallback.
-
-    A topic ending in a separator (or whitespace-only suffix) yields an empty
-    suffix after ``strip()``, which must fall back to the bare ``"Jackery
-    MQTT"`` label rather than the malformed ``"Jackery MQTT ()"``.
-    """
-    discovery_info = SimpleNamespace(
-        topic=topic,
-        payload=b'{"devSn":"HR2C04000280HH3"}',
-    )
-    assert await _discovered_name("async_step_mqtt", discovery_info) == expected_name
 
 
 @pytest.mark.asyncio
