@@ -21,7 +21,6 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
-from __future__ import annotations
 
 import asyncio
 from datetime import date, timedelta
