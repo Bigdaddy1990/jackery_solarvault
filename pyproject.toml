@@ -318,7 +318,7 @@ skip-magic-trailing-comma = false
 # Use the configured quote style for nested strings (Python 3.12+ only).
 nested-string-quote-style = "preferred"
 
-  
+
 [tool.ruff.lint]
 preview = true
 select = [
