@@ -12,7 +12,14 @@ from aiomqtt import MqttError
 import pytest
 
 from custom_components.jackery_solarvault.client import mqtt_push
-from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
+from custom_components.jackery_solarvault.client.mqtt_push import (
+    JACKERY_MQTT_SUPPORTS_LWT,
+    JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE,
+    MQTT_MESSAGE_SPECS,
+    JackeryMqttPushClient,
+    JackeryMqttTransportError,
+    MqttSessionState,
+)
 from custom_components.jackery_solarvault.const import (
     FIELD_BODY,
     MQTT_KEEPALIVE_SEC,
@@ -306,6 +313,75 @@ async def test_response_timeout_expires_and_removes_waiter(
 
     assert client.responses_expired == 1
     assert client._pending_responses == {}  # ruff: ignore[private-member-access]
+
+
+async def test_rpc_disconnect_fails_waiter_with_transport_error(
+    hass: HomeAssistant,
+) -> None:
+    """Disconnect completes every open RPC rather than leaking its future."""
+    client = _client(hass)
+    waiter = asyncio.create_task(client._wait_for_response(8))  # ruff: ignore[private-member-access]
+    await asyncio.sleep(0)
+
+    client._fail_pending_responses("connection lost")  # ruff: ignore[private-member-access]
+
+    with pytest.raises(JackeryMqttTransportError, match="connection lost"):
+        await waiter
+    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
+
+
+async def test_late_or_wrong_kind_response_cannot_cross_session(
+    hass: HomeAssistant,
+) -> None:
+    """RPC matching includes generation, request ID and response kind."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(9, expected_response_type=3031)  # ruff: ignore[private-member-access]
+    )
+    await asyncio.sleep(0)
+
+    client._resolve_pending_response(  # ruff: ignore[private-member-access]
+        {"request_id": 9, "actionId": 3032}
+    )
+    assert not waiter.done()
+    client._session_generation += 1  # ruff: ignore[private-member-access]
+    client._resolve_pending_response(  # ruff: ignore[private-member-access]
+        {"request_id": 9, "actionId": 3031}
+    )
+    assert not waiter.done()
+    client._fail_pending_responses("new session")  # ruff: ignore[private-member-access]
+    with pytest.raises(JackeryMqttTransportError):
+        await waiter
+
+
+def test_protocol_delivery_contract_disables_presence_features() -> None:
+    """Jackery explicitly uses QoS 0 without retained presence or an LWT."""
+    assert JACKERY_MQTT_SUPPORTS_LWT is False
+    assert JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE is False
+    assert all(spec.qos == 0 for spec in MQTT_MESSAGE_SPECS.values())
+    assert all(spec.retain is False for spec in MQTT_MESSAGE_SPECS.values())
+
+
+async def test_birth_once_per_generation_and_rebirth_next_generation(
+    hass: HomeAssistant,
+) -> None:
+    """Birth succeeds once in each fully subscribed broker generation."""
+    birth = AsyncMock()
+    client = _client(hass)
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._session_state = MqttSessionState.SUBSCRIBED  # ruff: ignore[private-member-access]
+
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    await hass.async_block_till_done()
+    assert birth.await_count == 1
+    assert client.diagnostics_snapshot()["birth_publishes"] == 1
+
+    client._session_generation = 1  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=1)  # ruff: ignore[private-member-access]
+    await hass.async_block_till_done()
+    assert birth.await_count == 2
+    assert client.diagnostics_snapshot()["session_state"] == "online"
 
 
 async def test_stop_cancels_owned_callbacks_and_clears_cloud_state(
