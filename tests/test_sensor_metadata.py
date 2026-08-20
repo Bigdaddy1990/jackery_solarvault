@@ -100,7 +100,7 @@ async def _setup_grid_standard_entities(
     }
     coordinator.last_update_success = True
     coordinator.async_add_listener.return_value = lambda: None
-    coordinator._has_smart_meter_accessory.return_value = False  # ruff: ignore[private-member-access]
+    coordinator.has_smart_meter_accessory.return_value = False
     entry = SimpleNamespace(
         data={},
         options={},

@@ -32,7 +32,7 @@ async def test_message_burst_past_old_cap_dispatches_every_frame(
     # the tracking set once they run, so a synchronous burst accumulates all of
     # them at once — exactly the condition the old cap dropped frames under.
     for index in range(_BURST):
-        client._handle_message("device/property", json.dumps({"body": {"seq": index}}))  # ruff: ignore[private-member-access]
+        client._handle_message("device/property", json.dumps({"body": {"seq": index}}))
 
     snapshot = client.diagnostics_snapshot()
     assert snapshot["messages_seen"] == _BURST

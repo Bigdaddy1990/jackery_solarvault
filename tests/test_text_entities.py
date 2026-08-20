@@ -86,7 +86,7 @@ def _system_name(data: dict[str, Any]) -> JackerySystemNameText:
     entity = JackerySystemNameText.__new__(JackerySystemNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -95,7 +95,7 @@ def _device_name(data: dict[str, Any]) -> JackeryDeviceNameText:
     entity = JackeryDeviceNameText.__new__(JackeryDeviceNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -217,9 +217,9 @@ def _third_party(field: str, data: dict[str, Any]) -> JackeryThirdPartyMqttText:
     entity = JackeryThirdPartyMqttText.__new__(JackeryThirdPartyMqttText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable._field = field  # ruff: ignore[private-member-access]
-    mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
+    mutable._field = field
+    mutable._attr_translation_key = "third_party_mqtt_ip"
     return entity
 
 
@@ -291,10 +291,10 @@ def _pv_name(data: dict[str, Any], index: int) -> JackeryPvNameText:
     entity = JackeryPvNameText.__new__(JackeryPvNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable._index = index  # ruff: ignore[private-member-access]
-    mutable._field = _PV_FIELDS[index]  # ruff: ignore[private-member-access]
-    mutable._attr_translation_key = f"pv{index + 1}_name"  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
+    mutable._index = index
+    mutable._field = _PV_FIELDS[index]
+    mutable._attr_translation_key = f"pv{index + 1}_name"
     mutable.async_write_ha_state = MagicMock()
     return entity
 

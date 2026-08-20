@@ -37,6 +37,7 @@ from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, r
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
+import voluptuous as vol
 
 from ..const import (
     ACCESSORIES_BIND_PATH,
@@ -255,6 +256,12 @@ from ..const import (
     USER_INFO_PATH,
     VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
+)
+from ..credentials import (
+    MAX_TOKEN_LENGTH,
+    credential_fingerprint,
+    credential_text,
+    redacted_error,
 )
 from ..util import (
     app_period_date_bounds,
@@ -660,7 +667,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            msg = f"Login request failed: {type(err).__name__}: {err or "(no message)"}"
+            msg = f"Login request failed: {redacted_error(err)}"
             raise JackeryApiError(msg) from err
 
     @staticmethod
@@ -693,8 +700,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             UnicodeDecodeError,
             ValueError,
         ) as err:
-            raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-            msg = f"Login returned invalid JSON: {raw!r}"
+            await resp.text()
+            msg = "Login returned invalid JSON (response redacted)"
             raise JackeryApiError(msg) from err
 
     async def async_login(self) -> str:
@@ -753,6 +760,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         if not isinstance(token, str) or not token:
             msg = "Login succeeded but no token returned"
             raise JackeryAuthError(msg)
+        try:
+            token = credential_text(token, field="token", max_length=MAX_TOKEN_LENGTH)
+        except vol.Invalid as err:
+            raise JackeryAuthError("Login returned an invalid token") from err
 
         raw_payload = data.get(FIELD_DATA)
         if raw_payload is not None and not isinstance(raw_payload, dict):
@@ -843,9 +854,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         }
 
     @property
-    def mqtt_fingerprint(self) -> tuple[str | None, str | None, str | None]:
-        """Tuple that changes whenever a new login session rotates MQTT seed."""
-        return (self._mqtt_user_id, self._mqtt_mac_id, self._mqtt_seed_b64)
+    def mqtt_fingerprint(self) -> str | None:
+        """Opaque digest that changes whenever the MQTT session rotates."""
+        if not self._mqtt_user_id or not self._mqtt_mac_id or not self._mqtt_seed_b64:
+            return None
+        return credential_fingerprint({
+            "user_id": self._mqtt_user_id,
+            "mac_id": self._mqtt_mac_id,
+            "seed": self._mqtt_seed_b64,
+        })
 
     def invalidate_mqtt_session_for_http_refresh(self) -> None:
         """Drop stale MQTT seed material so the HTTP owner refreshes it.
@@ -896,7 +913,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         value = first_nonblank_int(data.get(FIELD_CODE))
         return int(value) if value is not None else None
 
-    def _is_token_expired_response(
+    def is_token_expired_response(
         self,
         status: int,
         data: dict[str, Any] | Any,
@@ -951,7 +968,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in {401, 403}:
             return True
-        if self._is_token_expired_response(status, data):
+        if self.is_token_expired_response(status, data):
             return True
         if status != HTTPStatus.OK:
             return self._response_has_auth_failure_text(data)

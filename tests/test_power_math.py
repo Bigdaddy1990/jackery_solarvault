@@ -21,7 +21,7 @@ def _load_util_module() -> types.ModuleType:
 
     Returns:
         module: The loaded `custom_components.jackery_solarvault.util` module object.
-    """  # noqa: RUF105
+    """
     package_dir = (
         Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
     )
@@ -513,7 +513,7 @@ def test_smart_meter_net_and_gross_values_from_signed_phases() -> None:
     - phase values are converted to signed-phase list with the B-phase sign inverted,
     - net power equals the sum of signed phases,
     - calculated smart-meter powers for `net_import`, `net_export`, `gross_import`, `gross_export`, and `gross_flow` match expected numeric results.
-    """  # noqa: RUF105
+    """
     ct = {
         "aPhasePw": 2.9,
         "bPhasePw": 0,
@@ -644,7 +644,7 @@ def test_jackery_reported_home_load_does_not_require_ct_payload() -> None:
 
 
 def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -> None:
-    """Implement test jackery corrected home consumption requires ct for fallback formula."""  # noqa: RUF105
+    """Implement test jackery corrected home consumption requires ct for fallback formula."""
     assert (
         util.jackery_corrected_home_consumption_power({}, {"outGridSidePw": 70}) is None
     )
@@ -652,7 +652,7 @@ def test_jackery_corrected_home_consumption_requires_ct_for_fallback_formula() -
 
 
 def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -> None:
-    """Implement test period trend totals use same chart series logic for week month year."""  # noqa: RUF105
+    """Implement test period trend totals use same chart series logic for week month year."""
     week = {"totalHomeEgy": "999", "y": [12.54, 15.3, 15.57, 15.36, 15.53, 0.42, 0.0]}
     month = {"totalHomeEgy": "999", "y": [15.53, 0.42] + [0.0] * 29}
     year = {"totalHomeEgy": "999", "y": [0.0, 0.0, 0.0, 0.0, 15.95] + [0.0] * 7}
@@ -665,7 +665,7 @@ def test_period_trend_totals_use_same_chart_series_logic_for_week_month_year() -
 def test_period_trend_entities_can_be_created_from_series_without_server_total() -> (
     None
 ):
-    """Implement test period trend entities can be created from series without server total."""  # noqa: RUF105
+    """Implement test period trend entities can be created from series without server total."""
     source = {"y": [0.0, 1.25, None, 2.75]}
 
     assert util.trend_series_has_value(source, "home_trends_month", "totalHomeEgy")
@@ -771,7 +771,7 @@ def test_empty_ct_period_zero_shell_is_not_energy_data() -> None:
     The key distinction: when unit is kWh (valid energy unit) and total is explicitly
     provided as zero, this IS valid data - the device reported 0 energy for that period.
     This test ensures the OLD behavior for truly unconfirmed data (invalid unit).
-    """  # noqa: RUF105
+    """
     # Invalid unit (W instead of kWh) with zero - this IS an unconfirmed shell
     source_invalid_unit = {
         "unit": "W",  # Invalid energy unit
@@ -1201,7 +1201,7 @@ def test_trend_series_points_build_year_monthly_buckets_and_skip_future() -> Non
     """Verify monthly bucket points are produced for a year-series payload, that compact-encoded year buckets are expanded when anchored by a documented total, and that months after `today` are omitted.
 
     The test uses a `kWh` year payload where `y2` contains a compact value (`7.84`) that should expand into April=7.0 and May=84.0 when `totalOutGridEnergy` anchors the interpretation; with `today` set to 2026-05-03 the function must return points for January through May (month-start dates) and skip later months.
-    """  # noqa: RUF105
+    """
     source = {
         "unit": "kWh",
         # Documented year total anchors compact expansion: 7.84 -> April=7, May=84
@@ -1466,7 +1466,7 @@ def test_safe_float_parses_decimal_comma_without_deleting_it() -> None:
 
             Raises:
                 OverflowError: Always raised to signal an overflow on float conversion.
-            """  # noqa: RUF105
+            """
             raise OverflowError
 
     assert util.safe_float("40,96") == 40.96  # ruff: ignore[float-equality-comparison]
@@ -1485,8 +1485,8 @@ def test_device_year_compact_bucket_rejects_overflowing_parts() -> None:
     """Malformed compact year buckets must not raise on oversized digit runs."""
     huge_digits = "9" * 400
 
-    assert util._compact_year_parts(f"{huge_digits}.1") is None  # ruff: ignore[private-member-access]
-    assert util._compact_year_parts(f"1.{huge_digits}") is None  # ruff: ignore[private-member-access]
+    assert util._compact_year_parts(f"{huge_digits}.1") is None
+    assert util._compact_year_parts(f"1.{huge_digits}") is None
 
 
 def test_device_year_series_decimal_comma_items_use_compact_bucket_semantics() -> None:
@@ -1660,8 +1660,8 @@ def test_config_entry_bool_option_parses_legacy_string_values() -> None:
     """Boolean options must not treat legacy string 'false' as truthy."""
 
     class Entry:
-        options = {"enabled": "false"}  # noqa: RUF105
-        data = {"enabled": True, "fallback": "yes"}  # noqa: RUF105
+        options = {"enabled": "false"}
+        data = {"enabled": True, "fallback": "yes"}
 
     assert util.config_entry_bool_option(Entry(), "enabled", True) is False
     assert util.config_entry_bool_option(Entry(), "fallback", False) is True

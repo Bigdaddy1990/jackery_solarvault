@@ -115,6 +115,7 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             ),
             "coordinator_polling": True,
             "redactions_enforced": True,
+            "credential_contract": "v1",
         },
         "login_response": async_redact_data(
             coordinator.api.last_login_response or {}, redact_keys

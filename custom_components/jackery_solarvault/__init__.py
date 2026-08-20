@@ -53,6 +53,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -65,6 +66,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_ENABLE as DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD as DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT as DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER as DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME as DEFAULT_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
@@ -350,6 +352,7 @@ _LOCAL_MQTT_OPTION_KEYS = frozenset({
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
 })
@@ -1014,9 +1017,7 @@ def _handle_optional_startup_result(
         label (str): Short label identifying the startup layer (used in logs).
     """
     if isinstance(result, ConfigEntryAuthFailed):
-        coordinator._defer_background_auth_failure(  # ruff: ignore[private-member-access]
-            result
-        )
+        coordinator.defer_background_auth_failure(result)
     elif isinstance(result, BaseException):
         _LOGGER.warning("Jackery %s could not start: %s", label, result)
 
@@ -1199,10 +1200,14 @@ async def _async_start_local_mqtt(
             raw_bytes,
         )
 
+    configured_qos = config_entry_int_option(
+        entry, CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS
+    )
     client = JackeryLocalMqttClient(
         hass,
         sink=_handle_local_mqtt_data,
         topic_filter=configured_topic_filter,
+        qos=configured_qos,
     )
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
@@ -1516,7 +1521,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
         for (label, _), result in zip(startup_tasks, results, strict=True):
             if isinstance(result, ConfigEntryAuthFailed):
-                coordinator._defer_background_auth_failure(result)  # ruff: ignore[private-member-access]
+                coordinator.defer_background_auth_failure(result)
             elif isinstance(result, BaseException):
                 _LOGGER.warning(
                     "Jackery %s failed during background startup: %s", label, result

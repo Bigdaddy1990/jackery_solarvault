@@ -34,7 +34,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.select import (
     SELECT_DESCRIPTIONS,
     JackerySelect,
-    _SelectState,  # ruff: ignore[import-private-name]
+    _SelectState,
     async_setup_entry,
 )
 from homeassistant.exceptions import HomeAssistantError
@@ -54,7 +54,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     """Return one production select description by stable key."""
     return next(
         description for description in SELECT_DESCRIPTIONS if description.key == key
@@ -78,9 +78,9 @@ def _select(key: str, payload: dict[str, Any]) -> JackerySelect:
     entity = JackerySelect.__new__(JackerySelect)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator({_DEVICE_ID: payload})
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = _description(key)
-    mutable._state = _SelectState()  # ruff: ignore[private-member-access]
+    mutable._state = _SelectState()
     return entity
 
 
@@ -306,11 +306,11 @@ async def test_portable_select_families_map_current_and_wire_values(
 
 
 async def test_setup_listener_adds_new_home_selects_once_after_discovery() -> None:
-    """A later payload discovers selects once and unchanged callbacks add no duplicates."""  # noqa: RUF105
+    """A later payload discovers selects once and unchanged callbacks add no duplicates."""
     coordinator = _coordinator({})
     listeners: list[Any] = []
 
-    def _capture_listener(listener: Any) -> Any:  # noqa: RUF105
+    def _capture_listener(listener: Any) -> Any:
         listeners.append(listener)
         return lambda: None
 

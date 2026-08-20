@@ -34,32 +34,32 @@ _DEFAULT_W = 1200
 _STORM_MIN = 45
 
 
-def _coordinator(entry: dict[str, Any] | None = None) -> Any:  # noqa: RUF105
+def _coordinator(entry: dict[str, Any] | None = None) -> Any:
     """Bare coordinator with both command-dispatch seams mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
     shell.data = {_DEVICE: entry if entry is not None else {PAYLOAD_PROPERTIES: {}}}
-    shell._shutdown_started = False  # ruff: ignore[private-member-access]
-    shell._property_overrides = {}  # ruff: ignore[private-member-access]
-    shell._price_overrides = {}  # ruff: ignore[private-member-access]
-    shell._live_property_key_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._listeners = {}  # ruff: ignore[private-member-access]
-    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
-    shell._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]
-    shell._async_publish_command = AsyncMock()  # ruff: ignore[private-member-access]
+    shell._shutdown_started = False
+    shell._property_overrides = {}
+    shell._price_overrides = {}
+    shell._live_property_key_monotonic = {}
+    shell._listeners = {}
+    shell._device_registry_observer = None
+    shell._async_publish_command_ble_first = AsyncMock()
+    shell._async_publish_command = AsyncMock()
     return shell
 
 
-def _ble_frame(coordinator: Any) -> dict[str, Any]:  # noqa: RUF105
+def _ble_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last BLE-first command frame."""
-    await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command_ble_first.await_args
     assert await_args is not None
     return cast("dict[str, Any]", await_args.kwargs)
 
 
-def _cmd_frame(coordinator: Any) -> dict[str, Any]:  # noqa: RUF105
+def _cmd_frame(coordinator: Any) -> dict[str, Any]:
     """Return the kwargs of the last direct command frame."""
-    await_args = coordinator._async_publish_command.await_args  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command.await_args
     assert await_args is not None
     return cast("dict[str, Any]", await_args.kwargs)
 
@@ -154,7 +154,7 @@ async def test_set_storm_warning_uses_direct_command_seam() -> None:
     frame = _cmd_frame(coordinator)
     assert frame["body_fields"] == {coord_mod.FIELD_WPS: 1}
     assert frame["action_id"] == coord_mod.ACTION_ID_STORM_WARNING
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -177,7 +177,7 @@ async def test_reboot_device_sends_reboot_flag() -> None:
     await coordinator.async_reboot_device(_DEVICE)
 
     assert _ble_frame(coordinator)["body_fields"] == {coord_mod.FIELD_REBOOT: 1}
-    coordinator._async_publish_command.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command.assert_not_awaited()
 
 
 # --- sub-device switches ---------------------------------------------------
@@ -249,7 +249,7 @@ async def test_set_ct_phase_rejects_out_of_range_phase() -> None:
     with pytest.raises(HomeAssistantError):
         await coordinator.async_set_ct_phase(_DEVICE, "CT-1", 9)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -260,7 +260,7 @@ async def test_set_ct_phase_missing_sn_raises() -> None:
     with pytest.raises(HomeAssistantError):
         await coordinator.async_set_ct_phase(_DEVICE, "", 1)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio

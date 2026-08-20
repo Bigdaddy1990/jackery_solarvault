@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    _local_mqtt_client,  # ruff: ignore[import-private-name]
+    _local_mqtt_client,
 )
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     # A bounded, explicitly configured device topic is the routing boundary.
     # Unknown fields must reach the shared decoder so new firmware payloads are
     # not silently lost merely because their keys are not in a static marker set.
-    await client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(
         "jackery/device1",
         b'{"temperature": 25}',
     )
@@ -82,7 +82,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
 
     # Known Jackery fields follow the same independent async path.
     valid_payload = b'{"devSn": "12345", "batSoc": 95}'
-    await client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(
         "jackery/device1",
         valid_payload,
     )
@@ -94,7 +94,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     # Oversized frames are counted for diagnostics but never filtered from the
     # broker-selected stream; semantic validation belongs to shared ingest.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
-    await client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(
         "jackery/device1",
         large_payload,
     )

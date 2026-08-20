@@ -3,7 +3,7 @@
 Task 13: Restore safe payload logging and mandatory diagnostics redaction.
 """
 
-import math  # ruff: ignore[unsorted-imports]
+import math
 from unittest.mock import Mock
 
 import pytest
@@ -15,24 +15,24 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_DEBUG_LOGGER_NAME,
     REDACTED_VALUE,
 )
-from custom_components.jackery_solarvault.util import _payload_debug_redacted  # noqa: PLC2701, RUF105
+from custom_components.jackery_solarvault.util import _payload_debug_redacted
 
 
 class TestPayloadDebugLogger:
     """Test the dedicated payload debug logger."""
 
-    def test_payload_debug_logger_exists(self) -> None:  # noqa: PLR6301, RUF105
+    def test_payload_debug_logger_exists(self) -> None:  # noqa: PLR6301
         """PAYLOAD_DEBUG_LOGGER_NAME constant should be defined."""
         assert (
             PAYLOAD_DEBUG_LOGGER_NAME
             == "custom_components.jackery_solarvault.payload_debug"
         )  # noqa: E501, RUF100
 
-    def test_payload_debug_option_constant_exists(self) -> None:  # noqa: PLR6301, RUF105
+    def test_payload_debug_option_constant_exists(self) -> None:  # noqa: PLR6301
         """CONF_ENABLE_PAYLOAD_DEBUG_LOG constant should be defined."""
         assert CONF_ENABLE_PAYLOAD_DEBUG_LOG == "enable_payload_debug_log"
 
-    def test_redacted_value_constant(self) -> None:  # noqa: PLR6301, RUF105
+    def test_redacted_value_constant(self) -> None:  # noqa: PLR6301
         """REDACTED_VALUE should be a recognizable placeholder."""
         assert REDACTED_VALUE == "**REDACTED**"
 
@@ -41,10 +41,10 @@ class TestPayloadRedaction:
     """Test mandatory recursive redaction of sensitive data."""
 
     @pytest.fixture
-    def api(self) -> JackeryApi:  # noqa: D102, PLR6301, RUF105
+    def api(self) -> JackeryApi:  # noqa: D102, PLR6301
         return JackeryApi(Mock(), "tester@example.com", "secret")
 
-    def test_redaction_removes_tokens(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_removes_tokens(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Access tokens, refresh tokens must be redacted."""
         payload = {
             "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -59,7 +59,7 @@ class TestPayloadRedaction:
         assert redacted["token"] == "**REDACTED**"
         assert redacted["data"]["nested_token"] == "**REDACTED**"
 
-    def test_redaction_removes_credentials(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_removes_credentials(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Passwords, API keys, secrets must be redacted."""
         payload = {
             "password": "my_secret_password",
@@ -78,7 +78,7 @@ class TestPayloadRedaction:
         # username is also redacted (REDACT_KEYS contains username-related keys)
         assert redacted["credentials"]["username"] == "**REDACTED**"
 
-    def test_redaction_removes_keys_and_coordinates(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_removes_keys_and_coordinates(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Encryption keys, MAC IDs, coordinates must be redacted."""
         payload = {
             "aes_key": "base64encodedkey==",
@@ -98,7 +98,7 @@ class TestPayloadRedaction:
         # gps is a redacted key, so the entire dict is replaced
         assert redacted["gps"] == "**REDACTED**"
 
-    def test_redaction_removes_account_ids(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_removes_account_ids(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """User IDs, account IDs, device IDs must be redacted."""
         payload = {
             "user_id": 123456789,
@@ -115,7 +115,7 @@ class TestPayloadRedaction:
         assert redacted["device_sn"] == "**REDACTED**"
         assert redacted["bind_user_id"] == "**REDACTED**"
 
-    def test_redaction_preserves_non_sensitive_data(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_preserves_non_sensitive_data(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Non-sensitive fields (measurements, states, config) must be preserved."""
         payload = {
             "soc": 73,
@@ -134,12 +134,12 @@ class TestPayloadRedaction:
         assert redacted["batState"] == 1
         assert redacted["pvPw"] == 1200
         assert redacted["gridPw"] == -500
-        assert redacted["temperature"] == 25.5  # noqa: RUF069, RUF105
+        assert redacted["temperature"] == 25.5  # noqa: RUF069
         assert redacted["firmware"] == "v1.2.3"
         assert redacted["model"] == "SolarVault 3 Pro Max"
         assert redacted["onlineState"] == 1
 
-    def test_redaction_handles_lists(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_handles_lists(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Redaction must recurse into lists."""
         payload = {
             "devices": [
@@ -157,7 +157,7 @@ class TestPayloadRedaction:
         # Chart data preserved (not sensitive)
         assert redacted["chart_data"] == [1.0, 2.0, 3.0]
 
-    def test_redaction_handles_none_and_primitives(self, api: JackeryApi) -> None:  # noqa: PLR6301, RUF105
+    def test_redaction_handles_none_and_primitives(self, api: JackeryApi) -> None:  # noqa: PLR6301
         """Redaction must handle None, bool, int, float, str safely."""
         payload = {
             "none_val": None,
@@ -188,7 +188,7 @@ class TestPayloadDebugOption:
         # The payload logger should check isEnabledFor(logging.DEBUG)
         # rather than just its own level
 
-    def test_payload_debug_defaults_to_true(self) -> None:  # noqa: PLR6301, RUF105
+    def test_payload_debug_defaults_to_true(self) -> None:  # noqa: PLR6301
         """Payload debug default value."""
         assert DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG is True
 
@@ -196,14 +196,14 @@ class TestPayloadDebugOption:
 class TestMandatoryRedaction:
     """Test that redaction cannot be disabled."""
 
-    def test_no_redaction_disable_path(self) -> None:  # noqa: PLR6301, RUF105
+    def test_no_redaction_disable_path(self) -> None:  # noqa: PLR6301
         """No option, env var, or function argument can disable redaction."""
         # The redaction must be mandatory at export boundary
         # Verify there's no "redact=False" or similar parameter
         # The function should not accept a disable parameter
-        import inspect  # noqa: PLC0415, RUF105
+        import inspect
 
-        from homeassistant.components.diagnostics import (  # noqa: PLC0415, RUF105
+        from homeassistant.components.diagnostics import (
             async_redact_data as _recursive_redact,
         )
 
@@ -220,10 +220,10 @@ class TestMandatoryRedaction:
 class TestManifestLoggers:
     """Test manifest.json logger declarations."""
 
-    def test_manifest_logger_declarations_minimal(self) -> None:  # noqa: PLR6301, RUF105
+    def test_manifest_logger_declarations_minimal(self) -> None:  # noqa: PLR6301
         """manifest.json should only declare applicable external library loggers."""
-        import json  # noqa: PLC0415, RUF105
-        from pathlib import Path  # noqa: PLC0415, RUF105
+        import json
+        from pathlib import Path
 
         manifest_path = (
             Path(__file__).parents[1]
@@ -242,11 +242,11 @@ class TestManifestLoggers:
 class TestQualityScaleSchema:
     """Test quality_scale.yaml current schema and tested rules."""
 
-    def test_quality_scale_yaml_has_rules_schema(self) -> None:  # noqa: PLR6301, RUF105
+    def test_quality_scale_yaml_has_rules_schema(self) -> None:  # noqa: PLR6301
         """quality_scale.yaml must have top-level rules: schema."""
-        from pathlib import Path  # noqa: PLC0415, RUF105
+        from pathlib import Path
 
-        import yaml  # noqa: PLC0415, RUF105
+        import yaml
 
         qs_path = (
             Path(__file__).parents[1]

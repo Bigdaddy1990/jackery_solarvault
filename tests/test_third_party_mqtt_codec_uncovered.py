@@ -14,14 +14,14 @@ from custom_components.jackery_solarvault.client.third_party_mqtt_codec import (
 )
 
 
-class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
+class TestThirdPartyMqttCodec:  # noqa: PLR0904
     """Test third_party_mqtt_codec module."""
 
-    def _create_bluetooth_key(self) -> bytes:  # noqa: PLR6301, RUF105
+    def _create_bluetooth_key(self) -> bytes:  # noqa: PLR6301
         """Create a valid 16-byte bluetooth key."""
         return b"0123456789abcdef"
 
-    def test_ble_aes_iv_len_constant(self) -> None:  # noqa: PLR6301, RUF105
+    def test_ble_aes_iv_len_constant(self) -> None:  # noqa: PLR6301
         """Test BLE_AES_IV_LEN constant value."""
         assert BLE_AES_IV_LEN == 16
 
@@ -72,14 +72,14 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         decoded = decode_third_party_mqtt_field(encoded, bluetooth_key)
         assert decoded == value
 
-    def test_generate_token_format(self) -> None:  # noqa: PLR6301, RUF105
+    def test_generate_token_format(self) -> None:  # noqa: PLR6301
         """Test token generation format."""
         for _ in range(100):
             token = generate_third_party_mqtt_token()
             assert len(token) == 9
             assert token.isdigit()
 
-    def test_generate_token_uniqueness(self) -> None:  # noqa: PLR6301, RUF105
+    def test_generate_token_uniqueness(self) -> None:  # noqa: PLR6301
         """Test that generated tokens are unique."""
         tokens = set()
         for _ in range(1000):
@@ -88,7 +88,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         # Should have very high uniqueness
         assert len(tokens) > 950
 
-    def test_stable_token_user_provided_valid(self) -> None:  # noqa: PLR6301, RUF105
+    def test_stable_token_user_provided_valid(self) -> None:  # noqa: PLR6301
         """Test stable_third_party_mqtt_token with user token."""
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             "123456789", "987654321"
@@ -97,7 +97,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert use_generated is False
         assert new_generated is None
 
-    def test_stable_token_user_matches_generated(self) -> None:  # noqa: PLR6301, RUF105
+    def test_stable_token_user_matches_generated(self) -> None:  # noqa: PLR6301
         """Test stable_third_party_mqtt_token when user token matches generated."""
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             "123456789", "123456789"
@@ -106,7 +106,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert use_generated is True
         assert new_generated is None
 
-    def test_stable_token_no_user_no_generated(self) -> None:  # noqa: PLR6301, RUF105
+    def test_stable_token_no_user_no_generated(self) -> None:  # noqa: PLR6301
         """Test stable_third_party_mqtt_token with no tokens."""
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             None, None
@@ -116,7 +116,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert use_generated is True
         assert new_generated == result_token
 
-    def test_stable_token_no_user_has_generated(self) -> None:  # noqa: PLR6301, RUF105
+    def test_stable_token_no_user_has_generated(self) -> None:  # noqa: PLR6301
         """Test stable_third_party_mqtt_token with generated but no user."""
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             None, "987654321"
@@ -125,7 +125,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert use_generated is True
         assert new_generated is None
 
-    def test_config_from_options_all_defaults(self) -> None:  # noqa: PLR6301, RUF105
+    def test_config_from_options_all_defaults(self) -> None:  # noqa: PLR6301
         """Test config from options with all defaults."""
         options = {}
         generated_token = "123456789"
@@ -137,7 +137,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert config["password"] == ""
         assert config["token"] == "123456789"
 
-    def test_config_from_options_custom_values(self) -> None:  # noqa: PLR6301, RUF105
+    def test_config_from_options_custom_values(self) -> None:  # noqa: PLR6301
         """Test config from options with custom values."""
         options = {
             "third_party_mqtt_enable": True,
@@ -156,7 +156,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert config["password"] == "pass"
         assert config["token"] == "123456789"
 
-    def test_config_plaintext_without_device_data(self) -> None:  # noqa: PLR6301, RUF105
+    def test_config_plaintext_without_device_data(self) -> None:  # noqa: PLR6301
         """Test config plaintext without device data."""
         options = {
             "third_party_mqtt_enable": True,
@@ -176,7 +176,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert result["password"] == "pass"
         assert result["token"] == "123456789"
 
-    def test_config_plaintext_with_device_data(self) -> None:  # noqa: PLR6301, RUF105
+    def test_config_plaintext_with_device_data(self) -> None:  # noqa: PLR6301
         """Test config plaintext with device data (device overwrites)."""
         options = {
             "third_party_mqtt_enable": True,
@@ -199,7 +199,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
         assert result["ip"] == "10.0.0.1"  # Device overwrites
         assert result["port"] == 8883
 
-    def test_decode_config_body_missing_bluetooth_key(self) -> None:  # noqa: PLR6301, RUF105
+    def test_decode_config_body_missing_bluetooth_key(self) -> None:  # noqa: PLR6301
         """Test decode_config_body with missing bluetooth key."""
         body = {"userName": "dGVzdA==", "password": "cGFzcw=="}
         result = decode_third_party_mqtt_config_body(body, None)
@@ -217,7 +217,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
     def test_decode_config_body_valid(self) -> None:
         """Test decode_config_body with valid fields."""
         bluetooth_key = self._create_bluetooth_key()
-        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806, RUF105
+        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806
         password = encode_third_party_mqtt_field("pass", bluetooth_key)
         body = {"userName": userName, "password": password}
         result = decode_third_party_mqtt_config_body(body, bluetooth_key)
@@ -228,7 +228,7 @@ class TestThirdPartyMqttCodec:  # noqa: PLR0904, RUF105
     def test_decode_config_body_invalid_field(self) -> None:
         """Test decode_config_body with invalid field."""
         bluetooth_key = self._create_bluetooth_key()
-        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806, RUF105
+        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806
         body = {"userName": userName, "password": "invalid_base64"}
         result = decode_third_party_mqtt_config_body(body, bluetooth_key)
         assert result["userName"] == "user"

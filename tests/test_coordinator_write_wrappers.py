@@ -50,11 +50,11 @@ def _coordinator(
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.data = data
-    obj._device_index = device_index or {}  # ruff: ignore[private-member-access]
-    obj._property_overrides = {}  # ruff: ignore[private-member-access]
-    obj._listeners = {}  # ruff: ignore[private-member-access]
-    obj._device_registry_observer = None  # ruff: ignore[private-member-access]
-    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._device_index = device_index or {}
+    obj._property_overrides = {}
+    obj._listeners = {}
+    obj._device_registry_observer = None
+    obj._shutdown_started = False
     obj.last_update_success = True
     obj.last_update_exception = None
     obj.api = MagicMock()
@@ -62,7 +62,7 @@ def _coordinator(
     return coordinator
 
 
-def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
+def _api(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator).api
 
 

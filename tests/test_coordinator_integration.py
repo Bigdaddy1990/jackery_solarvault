@@ -75,7 +75,7 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
         coordinator = JackerySolarVaultCoordinator(hass, entry, api)
         # Manually initialize since we're not going through HA setup
         coordinator.data = _TEST_HTTP_DATA
-        coordinator._device_registry_synced = True  # noqa: RUF105, SLF001
+        coordinator._device_registry_synced = True
 
     return coordinator
 
@@ -84,7 +84,7 @@ class TestCoordinatorIntegration:
     """Test coordinator integration logic."""
 
     @pytest.mark.asyncio
-    async def test_coordinator_initialization(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_initialization(self) -> None:  # noqa: PLR6301
         """Coordinator initializes with correct defaults."""
         coordinator = _make_coordinator()
 
@@ -93,26 +93,26 @@ class TestCoordinatorIntegration:
         assert coordinator.update_interval == timedelta(
             seconds=DEFAULT_SCAN_INTERVAL_SEC
         )  # noqa: E501, RUF100
-        assert coordinator._device_registry_synced is True  # noqa: RUF105, SLF001
+        assert coordinator._device_registry_synced is True
 
     @pytest.mark.asyncio
-    async def test_coordinator_async_update_data_returns_data(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_async_update_data_returns_data(self) -> None:  # noqa: PLR6301
         """_async_update_data returns device data correctly."""
         coordinator = _make_coordinator()
 
-        data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+        data = await coordinator._async_update_data()
         assert data == _TEST_HTTP_DATA
 
     @pytest.mark.asyncio
-    async def test_coordinator_device_registry_sync(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_device_registry_sync(self) -> None:  # noqa: PLR6301
         """Coordinator syncs device registry on first poll."""
         coordinator = _make_coordinator()
 
         # Should have device registry sync flag set
-        assert coordinator._device_registry_synced is True  # noqa: RUF105, SLF001
+        assert coordinator._device_registry_synced is True
 
     @pytest.mark.asyncio
-    async def test_coordinator_handles_multiple_devices(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_handles_multiple_devices(self) -> None:  # noqa: PLR6301
         """Coordinator handles multiple device data."""
         multi_device_data = {
             "device-1": {
@@ -177,7 +177,7 @@ class TestCoordinatorIntegration:
             assert "device-2" in coordinator.data
 
     @pytest.mark.asyncio
-    async def test_coordinator_data_structure(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_data_structure(self) -> None:  # noqa: PLR6301
         """Coordinator data has expected structure."""
         coordinator = _make_coordinator()
 
@@ -194,7 +194,7 @@ class TestCoordinatorUpdateCycle:
     """Test coordinator update cycle behavior."""
 
     @pytest.mark.asyncio
-    async def test_update_interval(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_update_interval(self) -> None:  # noqa: PLR6301
         """Coordinator uses correct update interval."""
         coordinator = _make_coordinator()
         assert coordinator.update_interval == timedelta(
@@ -202,12 +202,12 @@ class TestCoordinatorUpdateCycle:
         )  # noqa: E501, RUF100
 
     @pytest.mark.asyncio
-    async def test_multiple_updates(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_multiple_updates(self) -> None:  # noqa: PLR6301
         """Multiple updates work correctly."""
         coordinator = _make_coordinator()
 
         for _ in range(3):
-            data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+            data = await coordinator._async_update_data()
             assert data == _TEST_HTTP_DATA
 
 
@@ -215,7 +215,7 @@ class TestCoordinatorErrorHandling:
     """Test coordinator error handling."""
 
     @pytest.mark.asyncio
-    async def test_coordinator_handles_api_error(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_coordinator_handles_api_error(self) -> None:  # noqa: PLR6301
         """Coordinator handles API errors gracefully."""
         with (
             patch(
@@ -260,10 +260,10 @@ class TestCoordinatorErrorHandling:
             coordinator = JackerySolarVaultCoordinator(hass, entry, api)
 
             # Should raise UpdateFailed
-            from homeassistant.helpers.update_coordinator import UpdateFailed  # noqa: I001, PLC0415, RUF105
+            from homeassistant.helpers.update_coordinator import UpdateFailed  # noqa: I001
 
             with pytest.raises(UpdateFailed):
-                await coordinator._async_update_data()  # noqa: RUF105, SLF001
+                await coordinator._async_update_data()
 
 
 if __name__ == "__main__":

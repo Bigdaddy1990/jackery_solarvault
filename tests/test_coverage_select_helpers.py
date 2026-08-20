@@ -1,10 +1,10 @@
 """Tests for helper functions and mappings in select.py."""
 
 from custom_components.jackery_solarvault.select import (
-    _CT_PHASE_TO_OPTION,  # ruff: ignore[import-private-name]
-    _HOURS_TO_AUTO_OFF_OPTION,  # ruff: ignore[import-private-name]
-    _OPTION_TO_CT_PHASE,  # ruff: ignore[import-private-name]
-    _storm_minutes_value,  # ruff: ignore[import-private-name]
+    _CT_PHASE_TO_OPTION,
+    _HOURS_TO_AUTO_OFF_OPTION,
+    _OPTION_TO_CT_PHASE,
+    _storm_minutes_value,
 )
 
 
