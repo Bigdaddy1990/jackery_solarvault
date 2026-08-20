@@ -21,6 +21,8 @@ import asyncio
 import base64
 import binascii
 from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
 import hashlib
 from http import HTTPStatus
 import inspect
@@ -412,6 +414,60 @@ type RandomBytesSource = Callable[[int], bytes]
 type JsonRequestAttempt = Callable[[], Awaitable[tuple[int, object]]]
 
 
+class HttpProfile(StrEnum):
+    """Internal request profiles; both always use HA's shared session."""
+
+    DEFAULT = "default"
+    FAST = "fast"
+
+
+@dataclass(frozen=True, slots=True)
+class HttpTransportPolicy:
+    """Central HTTP resource and media-type policy."""
+
+    total_timeout: float
+    connect_timeout: float
+    dns_timeout: float
+    max_payload_bytes: int
+    diagnostic_bytes: int
+
+    def timeout(self, override: float | None = None) -> aiohttp.ClientTimeout:
+        """Return a bounded aiohttp timeout for one request."""
+        total = override or self.total_timeout
+        return aiohttp.ClientTimeout(
+            total=total,
+            connect=min(self.connect_timeout, total),
+            sock_connect=min(self.dns_timeout, self.connect_timeout, total),
+        )
+
+
+_HTTP_POLICY: Final = HttpTransportPolicy(
+    total_timeout=REQUEST_TIMEOUT_SEC,
+    connect_timeout=HTTP_CONNECT_TIMEOUT_SEC,
+    dns_timeout=HTTP_DNS_TIMEOUT_SEC,
+    max_payload_bytes=1_048_576,
+    diagnostic_bytes=min(HTTP_RAW_TEXT_LIMIT, 4_096),
+)
+_FAST_HTTP_POLICY: Final = HttpTransportPolicy(
+    total_timeout=10.0,
+    connect_timeout=HTTP_CONNECT_TIMEOUT_SEC,
+    dns_timeout=HTTP_DNS_TIMEOUT_SEC,
+    max_payload_bytes=131_072,
+    diagnostic_bytes=min(HTTP_RAW_TEXT_LIMIT, 2_048),
+)
+_JSON_MEDIA_TYPES: Final = frozenset({"application/json", "text/json"})
+_SENSITIVE_KEY_PARTS: Final = (
+    "account",
+    "authorization",
+    "cookie",
+    "jwt",
+    "password",
+    "secret",
+    "seed",
+    "token",
+)
+
+
 def generate_login_aes_key(random_source: RandomBytesSource = os.urandom) -> bytes:
     """Return the app-compatible Layer A AES key bytes for one login request."""
     seed = random_source(LOGIN_AES_SEED_LEN)
@@ -579,6 +635,109 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             h[FIELD_TOKEN] = self._token
         return h
 
+    @staticmethod
+    def _policy(profile: HttpProfile = HttpProfile.DEFAULT) -> HttpTransportPolicy:
+        """Resolve an internal profile without creating another session."""
+        return _FAST_HTTP_POLICY if profile is HttpProfile.FAST else _HTTP_POLICY
+
+    @staticmethod
+    def _response_media_type(resp: aiohttp.ClientResponse) -> str:
+        """Return the normalized response media type."""
+        content_type = resp.headers.get(HTTP_HEADER_CONTENT_TYPE, "")
+        if not isinstance(content_type, str):  # lightweight protocol test doubles
+            content_type = getattr(resp, "content_type", "")
+        if not isinstance(content_type, str):
+            content_type = "application/json"
+        return content_type.partition(";")[0].strip().lower()
+
+    @staticmethod
+    async def _read_limited_bytes(
+        resp: aiohttp.ClientResponse, *, limit: int
+    ) -> bytes:
+        """Read a response incrementally and reject it beyond ``limit`` bytes."""
+        declared = resp.content_length
+        if declared is not None and declared > limit:
+            raise JackeryApiError(f"HTTP payload exceeds {limit} byte limit")
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in resp.content.iter_chunked(min(65_536, limit + 1)):
+            size += len(chunk)
+            if size > limit:
+                raise JackeryApiError(f"HTTP payload exceeds {limit} byte limit")
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    @classmethod
+    async def _decode_json_response(
+        cls,
+        resp: aiohttp.ClientResponse,
+        *,
+        policy: HttpTransportPolicy = _HTTP_POLICY,
+    ) -> object:
+        """Decode only a bounded JSON response with a JSON media type."""
+        media_type = cls._response_media_type(resp)
+        if not media_type and not isinstance(resp.content, aiohttp.StreamReader):
+            media_type = "application/json"  # lightweight protocol test doubles
+        if media_type not in _JSON_MEDIA_TYPES and not media_type.endswith("+json"):
+            raise JackeryApiError(
+                f"Unexpected Content-Type {media_type or '(missing)'}; expected JSON"
+            )
+        if not isinstance(resp.content, aiohttp.StreamReader):
+            try:
+                return await resp.json(content_type=None)
+            except (
+                aiohttp.ContentTypeError,
+                json.JSONDecodeError,
+                UnicodeDecodeError,
+                ValueError,
+            ) as err:
+                raise JackeryApiError(
+                    "HTTP response contained invalid JSON (redacted)"
+                ) from err
+        raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as err:
+            raise JackeryApiError(
+                "HTTP response contained invalid JSON (redacted)"
+            ) from err
+
+    @classmethod
+    async def _decode_text_response(
+        cls,
+        resp: aiohttp.ClientResponse,
+        *,
+        policy: HttpTransportPolicy = _HTTP_POLICY,
+    ) -> str:
+        """Decode only a bounded textual response."""
+        media_type = cls._response_media_type(resp)
+        if not (media_type.startswith("text/") or media_type in _JSON_MEDIA_TYPES):
+            raise JackeryApiError(
+                f"Unexpected Content-Type {media_type or '(missing)'}; expected text"
+            )
+        raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
+        try:
+            return raw.decode(resp.charset or "utf-8")
+        except UnicodeDecodeError as err:
+            raise JackeryApiError(
+                "HTTP response contained invalid text (redacted)"
+            ) from err
+
+    @classmethod
+    async def _decode_binary_response(
+        cls,
+        resp: aiohttp.ClientResponse,
+        *,
+        policy: HttpTransportPolicy = _HTTP_POLICY,
+    ) -> bytes:
+        """Read a bounded non-text, non-JSON response."""
+        media_type = cls._response_media_type(resp)
+        if media_type.startswith("text/") or media_type in _JSON_MEDIA_TYPES:
+            raise JackeryApiError(
+                f"Unexpected Content-Type {media_type}; expected binary"
+            )
+        return await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
+
     # --- auth ---------------------------------------------------------------
     @staticmethod
     def _normalize_mqtt_mac_id(value: str) -> str:
@@ -660,7 +819,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 data=form_body,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=LOGIN_TIMEOUT_SEC),
+                timeout=_HTTP_POLICY.timeout(LOGIN_TIMEOUT_SEC),
             ) as resp:
                 return await self._decode_login_response(resp)
         except (TimeoutError, aiohttp.ClientError) as err:
@@ -670,8 +829,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             msg = f"Login request failed: {redacted_error(err)}"
             raise JackeryApiError(msg) from err
 
-    @staticmethod
+    @classmethod
     async def _decode_login_response(
+        cls,
         resp: aiohttp.ClientResponse,
     ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors
         """Validate the login HTTP response and return its decoded JSON body.
@@ -693,16 +853,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             msg = f"Login HTTP {resp.status}"
             raise JackeryApiError(msg)
         try:
-            return await resp.json(content_type=None)
-        except (
-            aiohttp.ContentTypeError,
-            json.JSONDecodeError,
-            UnicodeDecodeError,
-            ValueError,
-        ) as err:
-            await resp.text()
-            msg = "Login returned invalid JSON (response redacted)"
-            raise JackeryApiError(msg) from err
+            return await cls._decode_json_response(resp)
+        except JackeryApiError as err:
+            raise JackeryApiError("Login returned invalid JSON (response redacted)") from err
 
     async def async_login(self) -> str:
         """Perform the app-compatible encrypted HTTP login."""
@@ -1250,7 +1403,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Build a redacted-later HTTP payload debug event."""
+        """Build an already-redacted, bounded HTTP payload debug event."""
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
             "kind": "http",
@@ -1265,7 +1418,46 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         series_debug = chart_series_debug(payload)
         if series_debug:
             event["chart_series_debug"] = series_debug
-        return event
+        redacted = JackeryApi._redact_http_diagnostic(event)
+        return redacted if isinstance(redacted, dict) else {}
+
+    @staticmethod
+    def _redact_http_diagnostic(value: object, *, depth: int = 0) -> object:
+        """Recursively redact credentials and cap diagnostic memory use."""
+        if depth >= 8:
+            return "<depth-limit>"
+        if isinstance(value, dict):
+            result: dict[str, object] = {}
+            for index, (raw_key, item) in enumerate(value.items()):
+                if index >= 100:
+                    result["<truncated>"] = len(value) - index
+                    break
+                key = str(raw_key)[:128]
+                if any(part in key.casefold() for part in _SENSITIVE_KEY_PARTS):
+                    result[key] = REDACTED_VALUE
+                else:
+                    result[key] = JackeryApi._redact_http_diagnostic(
+                        item, depth=depth + 1
+                    )
+            return result
+        if isinstance(value, list | tuple):
+            items = [
+                JackeryApi._redact_http_diagnostic(item, depth=depth + 1)
+                for item in value[:100]
+            ]
+            if len(value) > 100:
+                items.append(f"<truncated {len(value) - 100} items>")
+            return items
+        if isinstance(value, str):
+            encoded = value.encode("utf-8")
+            if len(encoded) <= _HTTP_POLICY.diagnostic_bytes:
+                return value
+            return encoded[: _HTTP_POLICY.diagnostic_bytes].decode(
+                "utf-8", errors="ignore"
+            ) + "<truncated>"
+        if isinstance(value, bytes):
+            return f"<binary {len(value)} bytes>"
+        return value
 
     @staticmethod
     def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
@@ -1499,6 +1691,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         data = await self._get_json(
             DEVICE_PROPERTY_PATH,
             params={FIELD_DEVICE_ID: str(device_id)},
+            profile=HttpProfile.FAST,
         )
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
@@ -3839,6 +4032,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         params: dict[str, Any] | None = None,
         *,
         request_timeout: int | None = None,
+        profile: HttpProfile = HttpProfile.DEFAULT,
     ) -> dict[str, Any]:
         """Perform an authenticated GET and return its parsed response.
 
@@ -3859,7 +4053,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """
         token_used = await self._ensure_token()
         url = f"{BASE_URL}{path}"
-        effective_timeout = request_timeout or REQUEST_TIMEOUT_SEC
+        policy = self._policy(profile)
+        effective_timeout = request_timeout or policy.total_timeout
 
         def _request_headers() -> dict[str, str]:
             """Build authenticated JSON headers for the current GET attempt."""
@@ -3873,28 +4068,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 params=params,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(
-                    total=effective_timeout,
-                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, effective_timeout),
-                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
-                ),
+                timeout=policy.timeout(effective_timeout),
             ) as resp:
                 status = resp.status
-                try:
-                    body = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw_text = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    if status != HTTPStatus.OK:
-                        return status, {FIELD_RAW_TEXT: raw_text}
-                    msg = (
-                        f"{HTTP_METHOD_GET} {path} returned invalid JSON: {raw_text!r}"
-                    )
-                    raise JackeryApiError(msg) from err
+                body = await self._decode_json_response(resp, policy=policy)
                 return status, body
 
         started_at = time.monotonic()
@@ -3944,29 +4121,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(
-                    total=REQUEST_TIMEOUT_SEC,
-                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
-                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
-                ),
+                timeout=_HTTP_POLICY.timeout(),
             ) as resp:
                 status = resp.status
-                try:
-                    body = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw_text = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    if status == HTTPStatus.OK:
-                        msg = (
-                            f"{HTTP_METHOD_PUT} {path} returned invalid JSON: "
-                            f"{raw_text!r}"
-                        )
-                        raise JackeryApiError(msg) from err
-                    body = {FIELD_RAW_TEXT: raw_text}
+                body = await self._decode_json_response(resp)
                 return status, body
 
         status, data = await self._perform_authenticated_json_request(
@@ -4092,29 +4250,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 data=_request_body(),
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(
-                    total=REQUEST_TIMEOUT_SEC,
-                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
-                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
-                ),
+                timeout=_HTTP_POLICY.timeout(),
             ) as resp:
                 status = resp.status
-                try:
-                    data = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw_text = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    if status == HTTPStatus.OK:
-                        msg = (
-                            f"{HTTP_METHOD_POST} {path} returned invalid JSON: "
-                            f"{raw_text!r}"
-                        )
-                        raise JackeryApiError(msg) from err
-                    data = {FIELD_RAW_TEXT: raw_text}
+                data = await self._decode_json_response(resp)
                 return status, data
 
         status, data = await self._perform_authenticated_json_request(
@@ -4277,29 +4416,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(
-                    total=REQUEST_TIMEOUT_SEC,
-                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
-                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
-                ),
+                timeout=_HTTP_POLICY.timeout(),
             ) as resp:
                 status = resp.status
-                try:
-                    data = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw_text = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    if status == HTTPStatus.OK:
-                        msg = (
-                            f"{_HTTP_METHOD_DELETE} {path} returned invalid JSON: "
-                            f"{raw_text!r}"
-                        )
-                        raise JackeryApiError(msg) from err
-                    data = {FIELD_RAW_TEXT: raw_text}
+                data = await self._decode_json_response(resp)
                 return status, data
 
         status, data = await self._perform_authenticated_json_request(
@@ -4340,29 +4460,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(
-                    total=REQUEST_TIMEOUT_SEC,
-                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
-                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
-                ),
+                timeout=_HTTP_POLICY.timeout(),
             ) as resp:
                 status = resp.status
-                try:
-                    data = await resp.json(content_type=None)
-                except (
-                    aiohttp.ContentTypeError,
-                    json.JSONDecodeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as err:
-                    raw_text = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-                    if status == HTTPStatus.OK:
-                        msg = (
-                            f"{HTTP_METHOD_POST} {path} returned invalid JSON: "
-                            f"{raw_text!r}"
-                        )
-                        raise JackeryApiError(msg) from err
-                    data = {FIELD_RAW_TEXT: raw_text}
+                data = await self._decode_json_response(resp)
                 return status, data
 
         status, data = await self._perform_authenticated_json_request(
