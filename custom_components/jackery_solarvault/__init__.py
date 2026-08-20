@@ -1511,12 +1511,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     platforms_started = False
     try:
         cache_ready = await _async_load_entry_caches(hass, entry, coordinator)
-        http_ready = False
-        refresh_err: BaseException | None = None
         try:
             async with asyncio.timeout(_PRIMARY_SETUP_TIMEOUT_SEC):
                 await _async_prepare_primary_http(hass, entry, coordinator)
-                http_ready = True
         except ConfigEntryNotReady as err:
             if not cache_ready:
                 raise
@@ -1525,8 +1522,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             if not cache_ready:
                 raise ConfigEntryNotReady("Jackery HTTP setup timeout") from err
             _LOGGER.warning("Jackery HTTP setup timeout; continuing from cache")
-        except BaseException as err:  # noqa: BLE001
-            refresh_err = err
+        except BaseException as err:  # ruff: ignore[blind-except]
             _LOGGER.warning("Jackery HTTP refresh failed: %s", err)
 
         _async_clean_legacy_entities(hass, entry)

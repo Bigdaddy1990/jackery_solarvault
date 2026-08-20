@@ -1,6 +1,6 @@
 """Tests for uncovered paths in button.py to increase coverage."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -8,16 +8,10 @@ from custom_components.jackery_solarvault.button import (
     JackeryDeleteStormAlertButton,
     JackeryQueryButton,
     JackeryQueryButtonDescription,
+    JackeryReadScheduleButton,
     JackeryRebootButton,
     JackeryRefreshWeatherPlanButton,
-    JackeryReadScheduleButton,
     async_setup_entry,
-)
-from custom_components.jackery_solarvault.const import (
-    PAYLOAD_WEATHER_PLAN,
-    PAYLOAD_SMART_PLUGS,
-    PAYLOAD_PROPERTIES,
-    FIELD_REBOOT,
 )
 
 

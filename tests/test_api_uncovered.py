@@ -1,63 +1,53 @@
 """Tests for uncovered paths in api.py to increase coverage."""
 
 import asyncio
+import base64
 import json
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
-import base64
 import pytest
 
 from custom_components.jackery_solarvault.client.api import (
+    _DAY_CHART_SERIES_KEYS,
     JackeryApi,
     JackeryApiError,
-    _aes_ecb_encrypt,
     _aes_cbc_encrypt,
-    _rsa_pkcs1v15_encrypt,
-    _generate_udid,
-    generate_login_aes_key,
-    build_login_crypto_fields,
+    _aes_ecb_encrypt,
     _data_field_accepted,
-    _log_value_shape,
+    _generate_udid,
     _log_body,
-    _DAY_CHART_SERIES_KEYS,
+    _log_value_shape,
+    _rsa_pkcs1v15_encrypt,
+    build_login_crypto_fields,
+    generate_login_aes_key,
 )
 from custom_components.jackery_solarvault.const import (
-    FIELD_DATA,
-    FIELD_TOKEN,
-    FIELD_MQTT_PASSWORD,
-    FIELD_USER_ID,
-    FIELD_CODE,
+    ACCESSORIES_BIND_PATH,
+    ACCESSORIES_UNBIND_PATH,
+    ALARM_PATH,
+    APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_DATE_TYPE,
+    APP_REQUEST_END_DATE,
+    APP_REQUEST_META,
+    APP_REQUEST_STAT_TYPE,
+    BATTERY_PACK_PATH,
     DATE_TYPE_DAY,
-    CODE_OK,
-    REDACTED_VALUE,
-    MQTT_USERNAME_SEPARATOR,
-    MQTT_CLIENT_ID_SUFFIX,
-    MQTT_CREDENTIAL_CLIENT_ID,
-    MQTT_CREDENTIAL_USERNAME,
-    MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
-    MQTT_MAC_ID_PREFIX,
-    FIELD_SYSTEM_ID,
+    DEVICE_PROPERTY_PATH,
+    DEVICE_SHARED_LIST_PATH,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_SN_LIST,
-    ACCESSORIES_BIND_PATH,
-    ACCESSORIES_UNBIND_PATH,
-    DEVICE_SHARED_LIST_PATH,
-    BATTERY_PACK_PATH,
+    FIELD_SYSTEM_ID,
+    MQTT_CREDENTIAL_CLIENT_ID,
+    MQTT_CREDENTIAL_PASSWORD,
+    MQTT_CREDENTIAL_USERNAME,
+    MQTT_CREDENTIAL_USER_ID,
+    MQTT_MAC_ID_PREFIX,
     OTA_LIST_PATH,
-    ALARM_PATH,
     POWER_PRICE_PATH,
     PRICE_SOURCE_LIST_PATH,
-    APP_REQUEST_STAT_TYPE,
-    CT_STAT_TYPE_L1,
-    APP_REQUEST_DATE_TYPE,
-    APP_REQUEST_BEGIN_DATE,
-    APP_REQUEST_END_DATE,
-    APP_REQUEST_META,
-    DEVICE_PROPERTY_PATH,
     SYSTEM_STATISTIC_PATH,
 )
 
@@ -174,8 +164,8 @@ class TestCryptoFunctions:
     def test_rsa_pkcs1v15_encrypt(self) -> None:
         """Test _rsa_pkcs1v15_encrypt with bundled key."""
         # Generate a test RSA key pair
-        from cryptography.hazmat.primitives.asymmetric import rsa as crypto_rsa
         from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa as crypto_rsa
 
         private_key = crypto_rsa.generate_private_key(
             public_exponent=65537,
@@ -241,7 +231,7 @@ class TestCryptoFunctions:
         aes_key = b"too_short"
         try:
             build_login_crypto_fields(login_bean, aes_key=aes_key)
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError:
             pass  # Expected
 
@@ -590,7 +580,7 @@ class TestRequestMethods:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
 
@@ -602,7 +592,7 @@ class TestRequestMethods:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
 
@@ -1051,7 +1041,7 @@ class TestAuthFailurePaths:
                 status=401,
                 data={"code": 10402, "msg": "token expired"},
             )
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in type(e).__name__
 
@@ -1071,7 +1061,7 @@ class TestAuthFailurePaths:
                 request=failing_request,
                 token_used="test_token",
             )
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "connection failed" in str(e)
@@ -1092,7 +1082,7 @@ class TestAuthFailurePaths:
                 request=timeout_request,
                 token_used="test_token",
             )
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "timed out" in str(e)
@@ -1122,7 +1112,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1137,7 +1127,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1156,7 +1146,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
 
@@ -1176,7 +1166,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
 
@@ -1191,7 +1181,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._post_json("/test/path", {"key": "value"})
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1206,7 +1196,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._put_json("/test/path", {"key": "value"})
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1221,7 +1211,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._delete_json("/test/path", {"key": "value"})
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1236,7 +1226,7 @@ class TestHttpErrorPaths:
 
         try:
             await client._post_form("/test/path", {"key": "value"})
-            assert False, "Should have raised JackeryAuthError"
+            raise AssertionError("Should have raised JackeryAuthError")
         except Exception as e:
             assert "JackeryAuthError" in str(e)
 
@@ -1279,7 +1269,7 @@ class TestHttpErrorPaths:
                 device_sn="sn1",
                 images=[b"1", b"2", b"3", b"4"],  # 4 images exceeds limit
             )
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "three feedback images" in str(e)
@@ -1480,7 +1470,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_set_single_mode(system_id="system123", single_price=-0.1, currency="EUR")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "single_price must be >= 0" in str(e)
@@ -1492,7 +1482,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_set_single_mode(system_id="system123", single_price=0.15, currency="")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "currency must be a non-empty string" in str(e)
@@ -1515,7 +1505,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_set_dynamic_mode(system_id="system123", platform_company_id=123, system_region="")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "system_region must be a non-empty string" in str(e)
@@ -1673,7 +1663,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_control_shelly_device("device123", action="turn_on", function="switch", control_allowed=False)
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "not allowed" in str(e)
@@ -2148,7 +2138,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_set_system_name(system_id="system123", system_name="")
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "system_name must be a non-empty string" in str(e)
@@ -2170,7 +2160,7 @@ class TestAdditionalEndpoints:
 
         try:
             await client.async_set_max_power(device_id="device123", max_power=-100)
-            assert False, "Should have raised JackeryApiError"
+            raise AssertionError("Should have raised JackeryApiError")
         except Exception as e:
             assert "JackeryApiError" in type(e).__name__
             assert "non-negative integer" in str(e)

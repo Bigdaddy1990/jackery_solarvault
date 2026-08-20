@@ -3,19 +3,17 @@
 Task 13: Restore safe payload logging and mandatory diagnostics redaction.
 """
 
-from types import MappingProxyType
-from typing import Any, Callable, cast
-from unittest.mock import Mock, patch
+import math
+from unittest.mock import Mock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
-    PAYLOAD_DEBUG_LOGGER_NAME,
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
+    PAYLOAD_DEBUG_LOGGER_NAME,
     REDACTED_VALUE,
-    REDACT_KEYS,
 )
 from custom_components.jackery_solarvault.util import _payload_debug_redacted
 
@@ -45,7 +43,6 @@ class TestPayloadRedaction:
 
     def test_redaction_removes_tokens(self, api: JackeryApi) -> None:
         """Access tokens, refresh tokens must be redacted."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -62,7 +59,6 @@ class TestPayloadRedaction:
 
     def test_redaction_removes_credentials(self, api: JackeryApi) -> None:
         """Passwords, API keys, secrets must be redacted."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "password": "my_secret_password",
@@ -83,7 +79,6 @@ class TestPayloadRedaction:
 
     def test_redaction_removes_keys_and_coordinates(self, api: JackeryApi) -> None:
         """Encryption keys, MAC IDs, coordinates must be redacted."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "aes_key": "base64encodedkey==",
@@ -105,7 +100,6 @@ class TestPayloadRedaction:
 
     def test_redaction_removes_account_ids(self, api: JackeryApi) -> None:
         """User IDs, account IDs, device IDs must be redacted."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "user_id": 123456789,
@@ -124,7 +118,6 @@ class TestPayloadRedaction:
 
     def test_redaction_preserves_non_sensitive_data(self, api: JackeryApi) -> None:
         """Non-sensitive fields (measurements, states, config) must be preserved."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "soc": 73,
@@ -150,7 +143,6 @@ class TestPayloadRedaction:
 
     def test_redaction_handles_lists(self, api: JackeryApi) -> None:
         """Redaction must recurse into lists."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "devices": [
@@ -170,13 +162,12 @@ class TestPayloadRedaction:
 
     def test_redaction_handles_none_and_primitives(self, api: JackeryApi) -> None:
         """Redaction must handle None, bool, int, float, str safely."""
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
 
         payload = {
             "none_val": None,
             "bool_val": True,
             "int_val": 42,
-            "float_val": 3.14,
+            "float_val": math.pi,
             "str_val": "hello",
         }
         redacted = _payload_debug_redacted(payload)
@@ -184,7 +175,7 @@ class TestPayloadRedaction:
         assert redacted["none_val"] is None
         assert redacted["bool_val"] is True
         assert redacted["int_val"] == 42
-        assert redacted["float_val"] == 3.14
+        assert redacted["float_val"] == math.pi
         assert redacted["str_val"] == "hello"
 
 
@@ -195,17 +186,14 @@ class TestPayloadDebugOption:
         """When payload_debug option is True, payload logger should be active."""
         # The option should enable the dedicated payload_debug logger
         # This is tested via the config flow and coordinator integration
-        pass
 
     def test_inherited_debug_level_honored(self) -> None:
         """If root logger is DEBUG, payload logger should also log."""
         # The payload logger should check isEnabledFor(logging.DEBUG)
         # rather than just its own level
-        pass
 
     def test_payload_debug_defaults_to_true(self) -> None:
         """Payload debug default value."""
-        from custom_components.jackery_solarvault.const import DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG
         assert DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG is True
 
 
@@ -216,10 +204,12 @@ class TestMandatoryRedaction:
         """No option, env var, or function argument can disable redaction."""
         # The redaction must be mandatory at export boundary
         # Verify there's no "redact=False" or similar parameter
-        from homeassistant.components.diagnostics import async_redact_data as _recursive_redact
-
         # The function should not accept a disable parameter
         import inspect
+
+        from homeassistant.components.diagnostics import (
+            async_redact_data as _recursive_redact,
+        )
         sig = inspect.signature(_recursive_redact)
         params = list(sig.parameters.keys())
         assert "redact" not in params
@@ -228,7 +218,6 @@ class TestMandatoryRedaction:
     def test_export_boundary_redaction(self) -> None:
         """Final export (diagnostics, logs) must pass through redaction."""
         # This tests that all payload outputs go through _recursive_redact
-        pass
 
 
 class TestManifestLoggers:
@@ -241,12 +230,11 @@ class TestManifestLoggers:
 
         manifest_path = Path(__file__).parents[1] / "custom_components" / "jackery_solarvault" / "manifest.json"
         if manifest_path.exists():
-            with open(manifest_path, encoding="utf-8") as f:
-                manifest = json.load(f)
+            with Path(manifest_path).open(encoding="utf-8") as f:
+                json.load(f)
 
             # Should not declare internal integration loggers
             # Only external: aiohttp, aiomqtt, bleak, cryptography, etc.
-            pass
 
 
 class TestQualityScaleSchema:
@@ -254,12 +242,13 @@ class TestQualityScaleSchema:
 
     def test_quality_scale_yaml_has_rules_schema(self) -> None:
         """quality_scale.yaml must have top-level rules: schema."""
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         qs_path = Path(__file__).parents[1] / "custom_components" / "jackery_solarvault" / "quality_scale.yaml"
         if qs_path.exists():
-            with open(qs_path, encoding="utf-8") as f:
+            with Path(qs_path).open(encoding="utf-8") as f:
                 qs = yaml.safe_load(f)
 
             assert "rules" in qs, "quality_scale.yaml missing top-level rules:"
@@ -269,7 +258,6 @@ class TestQualityScaleSchema:
     def test_quality_scale_only_claims_tested_rules(self) -> None:
         """Only rules actually satisfied should be claimed."""
         # This validates the quality_scale.yaml against actual test coverage
-        pass
 
 
 if __name__ == "__main__":

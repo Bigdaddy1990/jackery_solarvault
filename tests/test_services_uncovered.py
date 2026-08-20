@@ -1,35 +1,27 @@
 """Tests for uncovered paths in services.py to increase coverage."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import cast
+from unittest.mock import AsyncMock, Mock
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
-    SERVICE_REPORT_DEVICE_TIMEZONE,
-    SERVICE_SET_AC_NICKNAME,
-    SERVICE_UNBIND_ACCESSORIES,
-    SERVICE_FIELD_DEVICE_ID,
-    SERVICE_FIELD_BIND_IDS,
-    SERVICE_FIELD_NICKNAME,
     SERVICE_FIELD_AC_PORT,
+    SERVICE_FIELD_BIND_IDS,
+    SERVICE_FIELD_DEVICE_ID,
+    SERVICE_FIELD_NICKNAME,
     SERVICE_FIELD_TIMEZONE_OFFSET,
     SERVICE_FIELD_ZONE_ID,
 )
 from custom_components.jackery_solarvault.services import (
-    _async_handle_unbind_accessories,
-    _async_handle_set_ac_nickname,
     _async_handle_report_device_timezone,
+    _async_handle_set_ac_nickname,
+    _async_handle_unbind_accessories,
 )
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ServiceValidationError, ConfigEntryAuthFailed
-
-
-if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 
 
 @dataclass(slots=True)

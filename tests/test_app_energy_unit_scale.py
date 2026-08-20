@@ -1,13 +1,7 @@
 """Unit tests for app_energy_unit_scale function."""
 
-import pytest
-from unittest.mock import MagicMock
 
-from custom_components.jackery_solarvault.const import (
-    APP_STAT_UNIT,
-    APP_UNIT_KWH,
-    APP_UNIT_WH,
-)
+from custom_components.jackery_solarvault.const import APP_STAT_UNIT
 from custom_components.jackery_solarvault.util import app_energy_unit_scale
 
 
@@ -30,7 +24,7 @@ def test_app_energy_unit_scale_kwh() -> None:
 
 
 def test_app_energy_unit_scale_kwh_case_insensitive() -> None:
-    """kWh should be case-insensitive."""
+    """KWh should be case-insensitive."""
     source = {APP_STAT_UNIT: "KWH"}
     assert app_energy_unit_scale(source) == 1.0
 

@@ -4,7 +4,6 @@ These tests verify that zero values are accepted for CT/EPS stat sections
 where the device legitimately reports zero energy for a period.
 """
 
-import pytest
 
 from custom_components.jackery_solarvault import util
 from custom_components.jackery_solarvault.const import (
@@ -13,7 +12,6 @@ from custom_components.jackery_solarvault.const import (
     APP_SECTION_CT_STAT,
     APP_SECTION_EPS_STAT,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
-    APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
     APP_STAT_TOTAL_IN_EPS_ENERGY,
     APP_STAT_TOTAL_OUT_EPS_ENERGY,
     APP_STAT_UNIT,

@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.jackery_solarvault.const import PAYLOAD_PRICE
+from custom_components.jackery_solarvault.entity import HTTP_COMMAND_SOURCES
 from custom_components.jackery_solarvault.number import (
     JackeryNumber,
     JackeryNumberDescription,
@@ -18,8 +20,6 @@ from custom_components.jackery_solarvault.number import (
 from homeassistant.components.number import NumberDeviceClass, NumberMode
 from homeassistant.const import PERCENTAGE, UnitOfPower
 from homeassistant.helpers.entity import EntityCategory
-from custom_components.jackery_solarvault.const import PAYLOAD_PRICE
-from custom_components.jackery_solarvault.entity import HTTP_COMMAND_SOURCES
 
 
 class TestRoundedInt:

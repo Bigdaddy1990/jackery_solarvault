@@ -13,18 +13,16 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
-    PV_TRENDS_PATH,
-    DYNAMIC_PRICE_PATH,
-    DEVICE_PORTABLE_CT_STAT_PATH,
-    APP_REQUEST_STAT_TYPE,
-    CT_STAT_TYPE_L1,
-    FIELD_DATA,
-    FIELD_SYSTEM_ID,
-    FIELD_DEVICE_ID,
-    APP_REQUEST_DATE_TYPE,
     APP_REQUEST_BEGIN_DATE,
+    APP_REQUEST_DATE_TYPE,
     APP_REQUEST_END_DATE,
     APP_REQUEST_META,
+    APP_REQUEST_STAT_TYPE,
+    CT_STAT_TYPE_L1,
+    DYNAMIC_PRICE_PATH,
+    FIELD_DATA,
+    FIELD_SYSTEM_ID,
+    PV_TRENDS_PATH,
 )
 
 
@@ -104,7 +102,6 @@ class TestApp241Endpoints:
 
         # Verify the AIEMS path is NOT in the API client's endpoint constants
         # by checking the const.py catalog (it's only a comment there)
-        from custom_components.jackery_solarvault import const
 
         # The AIEMS path exists only as a comment in const.py, not as an endpoint
         # This test ensures no method in JackeryApi calls this unproven endpoint
@@ -155,7 +152,7 @@ class TestApp241Endpoints:
         get_json = AsyncMock(return_value={FIELD_DATA: {"priceConfig": {}}})
 
         with patch.object(api, "_get_json", get_json):
-            result = await api.async_get_dynamic_price(system_id=12345)
+            await api.async_get_dynamic_price(system_id=12345)
 
         # Dynamic price doesn't currently add APP_REQUEST_META - this is a known gap
         # The test documents the expected behavior; implementation may need update

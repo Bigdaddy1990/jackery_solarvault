@@ -3,13 +3,18 @@
 Task 5: Replace terminal backfill shortcuts with an explicit
 open/closed-period state machine (BackfillStatus enum).
 """
-
 from datetime import date, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
+from custom_components.jackery_solarvault.const import (
+    DATE_TYPE_DAY,
+    DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
+)
 from custom_components.jackery_solarvault.coordinator import (
     BackfillStatus,
     JackerySolarVaultCoordinator,
@@ -62,7 +67,7 @@ class TestBackfillOpenPeriodState:
         """An open period receiving two empty responses stays RETRYABLE, never IMPORTED."""
         today = date.today()
         # Open period (yesterday's day)
-        yesterday = today - timedelta(days=1)
+        today - timedelta(days=1)
 
         # Normalize first empty response
         status1 = _normalize_backfill_status("empty_ambiguous", closed=False)
@@ -96,7 +101,7 @@ class TestBackfillOpenPeriodState:
         # This tests the integration between recorder upsert and coordinator state
         # The coordinator's async_add_external_statistics should also update its internal cache
         # This is an integration contract - the state machine must ensure consistency
-        pass  # Implementation detail - tested in coordinator_statistics tests
+        # Implementation detail - tested in coordinator_statistics tests
 
     def test_closed_periods_retry_bounded_times_before_unavailable(self) -> None:
         """Closed periods retry a bounded number of times before becoming permanently unavailable."""
@@ -196,7 +201,7 @@ class TestBackfillPeriodClosure:
         """Week period ends on Sunday (Monday-Sunday)."""
         # Monday 2026-07-13 to Sunday 2026-07-19
         monday = date(2026, 7, 13)
-        sunday = date(2026, 7, 19)
+        date(2026, 7, 19)
         next_monday = date(2026, 7, 20)
 
         # During the week (Wednesday), week is not closed
@@ -228,12 +233,6 @@ class TestBackfillPeriodClosure:
 
 
 # Import constants for the tests
-from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_YEAR,
-)
 
 
 if __name__ == "__main__":
