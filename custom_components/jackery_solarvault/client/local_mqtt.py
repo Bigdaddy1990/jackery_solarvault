@@ -52,7 +52,7 @@ class JackeryLocalMqttClient:
         self._hass = hass
         self._sink = sink
         self._topic_filter = topic_filter
-        if qos not in (0, 1, 2):
+        if qos not in {0, 1, 2}:
             raise ValueError("MQTT QoS must be 0, 1, or 2")
         self._qos = qos
         self._lifecycle_lock = asyncio.Lock()
@@ -112,9 +112,7 @@ class JackeryLocalMqttClient:
             self._unsubscribe_status()
             self._unsubscribe_status = None
         current_task = asyncio.current_task()
-        tasks = tuple(
-            task for task in self._message_tasks if task is not current_task
-        )
+        tasks = tuple(task for task in self._message_tasks if task is not current_task)
         for task in tasks:
             task.cancel()
         if tasks:

@@ -234,6 +234,7 @@ def test_connection_status_is_observational_only(hass: HomeAssistant) -> None:
     assert not client.is_connected
     assert client.diagnostics_snapshot()["last_disconnect_at"] is not None
 
+
 @pytest.mark.asyncio
 async def test_qos_wildcard_and_retained_semantics(
     hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
