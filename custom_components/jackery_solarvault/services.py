@@ -199,6 +199,13 @@ from .const import (
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .credentials import (
+    MAX_PASSWORD_LENGTH,
+    MAX_TOKEN_LENGTH,
+    MAX_USERNAME_LENGTH,
+    credential_text,
+    redacted_error,
+)
 from .util import safe_bool
 
 if TYPE_CHECKING:
@@ -328,16 +335,19 @@ SET_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
         vol.Range(min=1, max=65535),
     ),
     vol.Optional(SERVICE_FIELD_USERNAME, default=""): vol.All(
-        cv.string,
-        vol.Length(max=128),
+        lambda value: credential_text(
+            value, field="username", max_length=MAX_USERNAME_LENGTH
+        ),
     ),
     vol.Optional(SERVICE_FIELD_PASSWORD, default=""): vol.All(
-        cv.string,
-        vol.Length(max=128),
+        lambda value: credential_text(
+            value, field="password", max_length=MAX_PASSWORD_LENGTH
+        ),
     ),
     vol.Optional(SERVICE_FIELD_TOKEN, default=""): vol.All(
-        cv.string,
-        vol.Length(max=512),
+        lambda value: credential_text(
+            value, field="token", max_length=MAX_TOKEN_LENGTH
+        ),
     ),
 })
 QUERY_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
@@ -1231,7 +1241,7 @@ def _service_validation_error(
     """
     placeholders = {
         "device_id": device_id,
-        "error": str(error),
+        "error": redacted_error(error),
     }
     if extra_placeholders is not None:
         placeholders.update(extra_placeholders)
@@ -1645,7 +1655,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
             translation_key="rename_system_failed",
             translation_placeholders={
                 "system_id": system_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 
@@ -1692,7 +1702,7 @@ async def _async_handle_refresh_weather_plan(
             translation_key="refresh_weather_plan_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 
@@ -1745,7 +1755,7 @@ async def _async_handle_refresh_subdevices(
             translation_key="refresh_subdevices_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 
@@ -1805,7 +1815,7 @@ async def _async_handle_delete_storm_alert(
             translation_placeholders={
                 "device_id": device_id,
                 "alert_id": alert_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 
@@ -1970,7 +1980,7 @@ async def _async_handle_set_third_party_mqtt_config(
             translation_key="set_third_party_mqtt_config_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 
@@ -2036,7 +2046,7 @@ async def _async_handle_query_third_party_mqtt_config(
             translation_key="query_third_party_mqtt_config_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": str(err),
+                "error": redacted_error(err),
             },
         ) from err
 

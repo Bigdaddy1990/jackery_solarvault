@@ -28,11 +28,11 @@ from custom_components.jackery_solarvault.const import (
 
 def test_extract_code_uses_shared_integer_parser() -> None:
     """API code parsing rejects bool/non-finite malformed response values."""
-    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200  # ruff: ignore[private-member-access]
-    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200  # ruff: ignore[private-member-access]
-    assert JackeryApi._extract_code({FIELD_CODE: True}) is None  # ruff: ignore[private-member-access]
-    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None  # ruff: ignore[private-member-access]
-    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None  # ruff: ignore[private-member-access]
+    assert JackeryApi._extract_code({FIELD_CODE: 200}) == 200
+    assert JackeryApi._extract_code({FIELD_CODE: "200.0"}) == 200
+    assert JackeryApi._extract_code({FIELD_CODE: True}) is None
+    assert JackeryApi._extract_code({FIELD_CODE: float("nan")}) is None
+    assert JackeryApi._extract_code({FIELD_CODE: "200.5"}) is None
 
 
 async def test_set_system_name_accepts_only_boolean_true_response() -> None:
@@ -51,7 +51,7 @@ async def test_set_system_name_accepts_only_boolean_true_response() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    cast("Any", api)._put_json = _put_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._put_json = _put_json
 
     assert await api.async_set_system_name("123", " SolarVault ") is True
     assert await api.async_set_system_name("123", "SolarVault") is False
@@ -81,7 +81,7 @@ async def test_tariff_writers_reject_only_explicit_false_markers() -> None:
         captured.append((path, payload))
         return next(responses)
 
-    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form
 
     assert (
         await api.async_set_single_mode(
@@ -164,10 +164,10 @@ async def test_tariff_writers_validate_numeric_inputs_before_post() -> None:
 
         Raises:
             AssertionError: Always raised with message "invalid tariff input must stop before HTTP post".
-        """  # noqa: RUF105
+        """
         raise AssertionError("invalid tariff input must stop before HTTP post")
 
-    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form
 
     with pytest.raises(JackeryApiError, match="single_price"):
         await api.async_set_single_mode(
@@ -192,7 +192,7 @@ async def test_dynamic_tariff_writer_accepts_integral_company_id_text() -> None:
         captured.append((path, payload))
         return {FIELD_DATA: True}
 
-    cast("Any", api)._post_form = _post_form  # ruff: ignore[private-member-access]
+    cast("Any", api)._post_form = _post_form
 
     assert (
         await api.async_set_dynamic_mode(
@@ -225,7 +225,7 @@ async def test_device_period_diagnostics_keep_request_context_for_null_payload()
         assert path == DEVICE_PV_STAT_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    cast("Any", api)._get_json = _get_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._get_json = _get_json
 
     payload = await api.async_get_device_pv_stat(
         "dev1",
@@ -263,7 +263,7 @@ async def test_battery_pack_diagnostics_keep_request_context_for_null_payload() 
         assert path == BATTERY_PACK_PATH
         return {FIELD_CODE: 0, FIELD_DATA: None}
 
-    cast("Any", api)._get_json = _get_json  # ruff: ignore[private-member-access]
+    cast("Any", api)._get_json = _get_json
 
     assert await api.async_get_battery_pack_list("sn1") == []
 

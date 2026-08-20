@@ -5,21 +5,8 @@ updates:
     directory: "/"
     target-branch: "main"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "05:00"
-      timezone: "Etc/UTC"
-    cooldown:
-      default-days: 7
-      semver-major-days: 30
-      semver-minor-days: 7
-      semver-patch-days: 3
-      exclude:
-        # Do not delay fixes for the supported Home Assistant release line.
-        - "homeassistant"
-        - "pytest-homeassistant-custom-component"
+      interval: "daily"
     rebase-strategy: "auto"
-    open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "python"
@@ -65,28 +52,14 @@ updates:
           - "ruff"
           - "types-*"
           - "typing-extensions"
-    ignore:
-      # This integration supports the HA 2026.8 release line. Revisit monthly.
-      - dependency-name: "homeassistant"
-        versions:
-          - ">=2026.9.0"
 
   # The repository root includes workflows and any local or nested actions.
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "main"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "05:00"
-      timezone: "Etc/UTC"
-    cooldown:
-      default-days: 7
-      semver-major-days: 30
-      semver-minor-days: 7
-      semver-patch-days: 3
+      interval: "daily"
     rebase-strategy: "auto"
-    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "github-actions"
@@ -108,17 +81,8 @@ updates:
     directory: "/"
     target-branch: "main"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "05:00"
-      timezone: "Etc/UTC"
-    cooldown:
-      default-days: 7
-      semver-major-days: 30
-      semver-minor-days: 7
-      semver-patch-days: 3
+      interval: "daily"
     rebase-strategy: "auto"
-    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "python"

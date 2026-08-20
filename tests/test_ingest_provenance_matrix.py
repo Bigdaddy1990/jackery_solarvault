@@ -237,7 +237,7 @@ def test_stale_first_mqtt_live_snapshot_does_not_replace_cached_state() -> None:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     current = {"pvPw": _NEW_VALUE, "soc": 75}
 
-    result = coordinator._property_updates_for_source(  # ruff: ignore[private-member-access]
+    result = coordinator._property_updates_for_source(
         _DEVICE_ID,
         {"pvPw": 900, "soc": 20},
         DataSource.CLOUD_MQTT,
@@ -383,7 +383,7 @@ def test_battery_pack_lifetime_merge_isolated_and_non_mutating() -> None:
     source = {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}
     updated: dict[str, Any] = {"batteryPacks": [{"deviceSn": "PACK-1"}]}
 
-    touched = coordinator._merge_battery_pack_lifetime_from_ble(updated, source)  # ruff: ignore[private-member-access]
+    touched = coordinator._merge_battery_pack_lifetime_from_ble(updated, source)
 
     assert touched
     assert updated["batteryPacks"] == [

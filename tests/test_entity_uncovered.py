@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import EntityDescription
 class TestJackeryEntity:
     """Test JackeryEntity class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -22,7 +22,7 @@ class TestJackeryEntity:
         coordinator.is_entity_source_available = MagicMock(return_value=True)
         return coordinator
 
-    def _create_entity(self, coordinator, key_suffix="test_key"):  # noqa: PLR6301, RUF105
+    def _create_entity(self, coordinator, key_suffix="test_key"):  # noqa: PLR6301
         """Create an entity instance for testing."""
         # Use a simple EntityDescription for testing
         description = EntityDescription(key=key_suffix, name="Test Entity")
@@ -37,7 +37,7 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator()
         entity = self._create_entity(coordinator)
         assert entity is not None
-        assert entity._device_id == "test_device"  # noqa: RUF105, SLF001
+        assert entity._device_id == "test_device"
 
     def test_unique_id(self) -> None:
         """Test unique_id property."""
@@ -81,7 +81,7 @@ class TestJackeryEntity:
             "test_device": {"properties": {"test": "value"}}
         })
         entity = self._create_entity(coordinator)
-        payload = entity._payload  # noqa: RUF105, SLF001
+        payload = entity._payload
         assert payload == {"properties": {"test": "value"}}
 
     def test_properties_property(self) -> None:
@@ -90,7 +90,7 @@ class TestJackeryEntity:
             "test_device": {"properties": {"test": "value"}}
         })
         entity = self._create_entity(coordinator)
-        props = entity._properties  # noqa: RUF105, SLF001
+        props = entity._properties
         assert props == {"test": "value"}
 
     def test_device_meta_property(self) -> None:
@@ -99,7 +99,7 @@ class TestJackeryEntity:
             "test_device": {"device": {"model": "Test Model"}}
         })
         entity = self._create_entity(coordinator)
-        meta = entity._device_meta  # noqa: RUF105, SLF001
+        meta = entity._device_meta
         assert meta == {"model": "Test Model"}
 
     def test_discovery_property(self) -> None:
@@ -108,7 +108,7 @@ class TestJackeryEntity:
             "test_device": {"discovery": {"name": "Test"}}
         })
         entity = self._create_entity(coordinator)
-        disc = entity._discovery  # noqa: RUF105, SLF001
+        disc = entity._discovery
         assert disc == {"name": "Test"}
 
     def test_system_property(self) -> None:
@@ -117,7 +117,7 @@ class TestJackeryEntity:
             "test_device": {"system": {"online": True}}
         })
         entity = self._create_entity(coordinator)
-        sys = entity._system  # noqa: RUF105, SLF001
+        sys = entity._system
         assert sys == {"online": True}
 
     def test_online_marker_available(self) -> None:
@@ -126,7 +126,7 @@ class TestJackeryEntity:
             "test_device": {"device": {"onlineStatus": 1}}
         })
         entity = self._create_entity(coordinator)
-        result = entity._online_marker_available(False)  # noqa: RUF105, SLF001
+        result = entity._online_marker_available(False)
         assert result is True
 
     def test_source_capability_contract(self) -> None:
@@ -134,7 +134,7 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator({"test_device": {}})
         entity = self._create_entity(coordinator)
         supported, data_sources, command_sources, _fields, _supervisor_only = (
-            entity._source_capability_contract()  # noqa: RUF105, SLF001
+            entity._source_capability_contract()
         )
         assert supported is True
         assert isinstance(data_sources, tuple)

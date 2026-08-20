@@ -66,9 +66,9 @@ LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
 # The subscription topic is the user's decision and is used verbatim. Command
 # 3046 has no topic field, so the receiver must never silently widen an exact
 # configured topic to a broker-wide wildcard.
-# Deliberate convenience default so the topic does not have to be re-entered
-# on every setup. Not a fault source -- broad wildcards stay blocked below.
-LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
+# Device telemetry is published below Home Assistant's topic prefix; subscribe to
+# that complete subtree while leaving broker-wide ``#`` opt-in.
+LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant/#"
 
 # Local MQTT (HA-MQTT listener) config — enabled by default to match 123/ baseline
 CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
@@ -221,7 +221,9 @@ CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
 # surface it to the user.
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
+CONF_THIRD_PARTY_MQTT_QOS: Final = "third_party_mqtt_qos"
 DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = LOCAL_MQTT_DEFAULT_TOPIC
+DEFAULT_THIRD_PARTY_MQTT_QOS: Final = 0
 
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 # BLE-first command writes ensure a connection for the command's own device_id

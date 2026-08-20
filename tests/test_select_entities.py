@@ -31,7 +31,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.select import (
     SELECT_DESCRIPTIONS,
     JackerySelect,
-    _SelectState,  # ruff: ignore[import-private-name]
+    _SelectState,
     async_setup_entry,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -51,7 +51,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     return next(desc for desc in SELECT_DESCRIPTIONS if desc.key == key)
 
 
@@ -70,9 +70,9 @@ def _select(key: str, data: dict[str, Any]) -> JackerySelect:
     entity = JackerySelect.__new__(JackerySelect)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = _description(key)
-    mutable._state = _SelectState()  # ruff: ignore[private-member-access]
+    mutable._state = _SelectState()
     return entity
 
 
@@ -94,7 +94,7 @@ def test_work_mode_unknown_code_reports_none_and_warns_once() -> None:
     )
 
     assert entity.current_option is None
-    assert 99 in entity._state.warned_unknown_values  # ruff: ignore[private-member-access]
+    assert 99 in entity._state.warned_unknown_values
 
 
 def test_temp_unit_options_and_current() -> None:

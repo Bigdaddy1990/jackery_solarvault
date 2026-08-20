@@ -4,8 +4,8 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from custom_components.jackery_solarvault.__init__ import (
-    _async_prime_entry_bootstrap_mqtt_session,  # noqa: PLC2701, RUF105
-    _entry_bootstrap_mqtt_session,  # noqa: PLC2701, RUF105
+    _async_prime_entry_bootstrap_mqtt_session,
+    _entry_bootstrap_mqtt_session,
 )
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.client.mqtt_session_cache import (
@@ -22,7 +22,7 @@ from custom_components.jackery_solarvault.const import (
 class MockHass:
     """Mock Home Assistant instance."""
 
-    def __init__(self) -> None:  # noqa: D107, RUF105
+    def __init__(self) -> None:  # noqa: D107
         self.data = {}
         self.config = MagicMock()
         self.config.config_dir = "/mock/config"
@@ -45,7 +45,7 @@ class MockConfigEntry:
 class MockCoordinator:
     """Mock Coordinator with API."""
 
-    def __init__(self, api: JackeryApi, entry: MockConfigEntry, hass: MockHass) -> None:  # noqa: D107, RUF105
+    def __init__(self, api: JackeryApi, entry: MockConfigEntry, hass: MockHass) -> None:  # noqa: D107
         self.api = api
         self.entry = entry
         self.hass = hass
@@ -54,24 +54,24 @@ class MockCoordinator:
         self._persisted_mqtt_session = None
         self._shutdown_started = False
 
-    def cached_discovery_snapshot(self) -> dict | None:  # noqa: D102, PLR6301, RUF105
+    def cached_discovery_snapshot(self) -> dict | None:  # noqa: D102, PLR6301
         return None
 
-    async def async_load_cached_discovery(self, _label: str) -> bool:  # noqa: D102, PLR6301, RUF105
+    async def async_load_cached_discovery(self, _label: str) -> bool:  # noqa: D102, PLR6301
         return False
 
-    async def async_load_local_daily_snapshots(self) -> None:  # noqa: D102, RUF105
+    async def async_load_local_daily_snapshots(self) -> None:  # noqa: D102
         pass
 
-    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # noqa: D102, RUF105
+    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # noqa: D102
         self._persisted_mqtt_session = persisted
         self._mqtt_session_cache_loaded = True
         return True
 
 
-async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  # noqa: RUF029, RUF105
+async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  # noqa: RUF029
     """_entry_bootstrap_mqtt_session extracts valid snapshot from entry.data."""
-    # Valid bootstrap session - 32 zero bytes base64 encoded = 43 'A' + '=' padding = 44 chars  # noqa: RUF105
+    # Valid bootstrap session - 32 zero bytes base64 encoded = 43 'A' + '=' padding = 44 chars
     seed = "A" * 43 + "="
     entry = MockConfigEntry(
         data={
@@ -88,14 +88,14 @@ async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  
     assert snapshot[MQTT_SESSION_MAC_ID] == "mac456"
 
 
-async def test_entry_bootstrap_mqtt_session_returns_none_for_missing() -> None:  # noqa: RUF029, RUF105
+async def test_entry_bootstrap_mqtt_session_returns_none_for_missing() -> None:  # noqa: RUF029
     """_entry_bootstrap_mqtt_session returns None when key missing."""
     entry = MockConfigEntry(data={})
     snapshot = _entry_bootstrap_mqtt_session(entry)
     assert snapshot is None
 
 
-async def test_entry_bootstrap_mqtt_session_returns_none_for_invalid() -> None:  # noqa: RUF029, RUF105
+async def test_entry_bootstrap_mqtt_session_returns_none_for_invalid() -> None:  # noqa: RUF029
     """_entry_bootstrap_mqtt_session returns None for invalid snapshot."""
     entry = MockConfigEntry(
         data={
@@ -124,15 +124,15 @@ async def test_async_prime_entry_bootstrap_mqtt_session_hydrates_api() -> None:
         }
     )
     api = JackeryApi.__new__(JackeryApi)
-    api._mqtt_user_id = None  # noqa: RUF105, SLF001
-    api._mqtt_seed_b64 = None  # noqa: RUF105, SLF001
-    api._mqtt_mac_id = None  # noqa: RUF105, SLF001
+    api._mqtt_user_id = None
+    api._mqtt_seed_b64 = None
+    api._mqtt_mac_id = None
 
     result = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
     assert result is not None
-    assert api._mqtt_user_id == "user123"  # noqa: RUF105, SLF001
-    assert api._mqtt_mac_id == "mac456"  # noqa: RUF105, SLF001
-    assert api._mqtt_seed_b64 == seed  # noqa: RUF105, SLF001
+    assert api._mqtt_user_id == "user123"
+    assert api._mqtt_mac_id == "mac456"
+    assert api._mqtt_seed_b64 == seed
 
 
 async def test_async_prime_entry_bootstrap_mqtt_session_noop_when_missing() -> None:
@@ -140,16 +140,16 @@ async def test_async_prime_entry_bootstrap_mqtt_session_noop_when_missing() -> N
     hass = MockHass()
     entry = MockConfigEntry(data={})
     api = JackeryApi.__new__(JackeryApi)
-    api._mqtt_user_id = None  # noqa: RUF105, SLF001
+    api._mqtt_user_id = None
 
     result = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
     assert result is None
-    assert api._mqtt_user_id is None  # noqa: RUF105, SLF001
+    assert api._mqtt_user_id is None
 
 
-async def test_normalize_mqtt_session_snapshot_validates_expiry() -> None:  # noqa: RUF029, RUF105
+async def test_normalize_mqtt_session_snapshot_validates_expiry() -> None:  # noqa: RUF029
     """normalize_mqtt_session_snapshot rejects expired sessions."""
-    import time  # noqa: PLC0415, RUF105
+    import time
 
     expired = time.time() - 3600
     seed = "A" * 44
@@ -163,9 +163,9 @@ async def test_normalize_mqtt_session_snapshot_validates_expiry() -> None:  # no
     assert snapshot is None
 
 
-async def test_normalize_mqtt_session_snapshot_accepts_valid() -> None:  # noqa: RUF029, RUF105
+async def test_normalize_mqtt_session_snapshot_accepts_valid() -> None:  # noqa: RUF029
     """normalize_mqtt_session_snapshot accepts valid non-expired sessions."""
-    import time  # noqa: PLC0415, RUF105
+    import time
 
     future = time.time() + 3600
     seed = "A" * 43 + "="  # 32 bytes base64 encoded = 43 chars + "=" padding
@@ -180,7 +180,7 @@ async def test_normalize_mqtt_session_snapshot_accepts_valid() -> None:  # noqa:
     assert snapshot[MQTT_SESSION_USER_ID] == "user123"
 
 
-async def test_mqtt_session_cache_load_save_roundtrip() -> None:  # noqa: RUF029, RUF105
+async def test_mqtt_session_cache_load_save_roundtrip() -> None:  # noqa: RUF029
     """MQTT session cache can be saved and loaded back."""
     # This tests the normalize function logic used by both load/save
     seed = "A" * 43 + "="  # 32 bytes base64
@@ -200,7 +200,7 @@ async def test_mqtt_session_cache_load_save_roundtrip() -> None:  # noqa: RUF029
     assert normalized[MQTT_SESSION_SEED_B64] == seed
 
 
-async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # noqa: RUF029, RUF105
+async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # noqa: RUF029
     """Verify API is hydrated with MQTT session before Layer-5 transports start."""
     # This test verifies the sequence in _async_load_entry_caches:
     # 1. Persistent MQTT session is loaded
@@ -211,10 +211,10 @@ async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # noqa: 
     # The actual integration test would require HA runtime, but we verify
     # the logic components work correctly.
     api = JackeryApi.__new__(JackeryApi)
-    api._mqtt_user_id = None  # noqa: RUF105, SLF001
-    api._mqtt_seed_b64 = None  # noqa: RUF105, SLF001
-    api._mqtt_mac_id = None  # noqa: RUF105, SLF001
-    api._mqtt_mac_id_source = "generated"  # noqa: RUF105, SLF001
+    api._mqtt_user_id = None
+    api._mqtt_seed_b64 = None
+    api._mqtt_mac_id = None
+    api._mqtt_mac_id_source = "generated"
 
     seed = "A" * 43 + "="
     persisted = {
@@ -246,7 +246,7 @@ async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # noqa: 
     assert creds["username"] == "user123@mac456"
 
 
-async def test_api_derives_credentials_after_hydration() -> None:  # noqa: RUF029, RUF105
+async def test_api_derives_credentials_after_hydration() -> None:  # noqa: RUF029
     """API can derive MQTT credentials after session hydration."""
     api = JackeryApi.__new__(JackeryApi)
     seed = "A" * 43 + "="
@@ -266,18 +266,18 @@ async def test_api_derives_credentials_after_hydration() -> None:  # noqa: RUF02
     assert creds["user_id"] == "user123"
 
 
-async def test_api_returns_none_credentials_without_session() -> None:  # noqa: RUF029, RUF105
+async def test_api_returns_none_credentials_without_session() -> None:  # noqa: RUF029
     """API returns None for credentials when no session hydrated."""
     api = JackeryApi.__new__(JackeryApi)
-    api._mqtt_user_id = None  # noqa: RUF105, SLF001
-    api._mqtt_seed_b64 = None  # noqa: RUF105, SLF001
-    api._mqtt_mac_id = None  # noqa: RUF105, SLF001
+    api._mqtt_user_id = None
+    api._mqtt_seed_b64 = None
+    api._mqtt_mac_id = None
 
     creds = api.get_cached_mqtt_credentials()
     assert creds is None
 
 
-async def test_mqtt_fingerprint_changes_after_new_login() -> None:  # noqa: RUF029, RUF105
+async def test_mqtt_fingerprint_changes_after_new_login() -> None:  # noqa: RUF029
     """MQTT fingerprint changes when new session is hydrated."""
     api = JackeryApi.__new__(JackeryApi)
     seed1 = "A" * 43 + "="

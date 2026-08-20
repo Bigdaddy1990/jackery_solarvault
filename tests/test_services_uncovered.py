@@ -16,9 +16,9 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_ZONE_ID,
 )
 from custom_components.jackery_solarvault.services import (
-    _async_handle_report_device_timezone,  # noqa: PLC2701, RUF105
-    _async_handle_set_ac_nickname,  # noqa: PLC2701, RUF105
-    _async_handle_unbind_accessories,  # noqa: PLC2701, RUF105
+    _async_handle_report_device_timezone,
+    _async_handle_set_ac_nickname,
+    _async_handle_unbind_accessories,
 )
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
@@ -37,7 +37,7 @@ class _Registry:
     def async_get(self, device_id: str) -> _Device | None:
         return self._devices.get(device_id)
 
-    def async_get_or_create(self, **kwargs) -> Mock:  # noqa: PLR6301, RUF105
+    def async_get_or_create(self, **kwargs) -> Mock:  # noqa: PLR6301
         return Mock()
 
 
@@ -237,7 +237,7 @@ class TestServices:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_set_ac_nickname with auth error."""
-        from custom_components.jackery_solarvault.client import JackeryAuthError  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.client import JackeryAuthError  # noqa: I001
 
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -259,7 +259,7 @@ class TestServices:
             lambda h, d: coordinator,
         )
 
-        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)  # noqa: RUF105
+        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)
         call = _service_call({
             SERVICE_FIELD_DEVICE_ID: "test_device",
             SERVICE_FIELD_NICKNAME: "My AC",

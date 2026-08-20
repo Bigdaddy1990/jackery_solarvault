@@ -64,10 +64,10 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.hass = hass
-    obj._stat_import_last_sig = {}  # ruff: ignore[private-member-access]
-    obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    obj._statistics_recorder_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
-    obj._device_index = {}  # ruff: ignore[private-member-access]
+    obj._stat_import_last_sig = {}
+    obj._statistics_import_diagnostics = {}
+    obj._statistics_recorder_lock = asyncio.Lock()
+    obj._device_index = {}
     return coordinator
 
 
@@ -82,7 +82,7 @@ async def _import(
     points: list[SimpleNamespace],
 ) -> tuple[bool, int]:
     """Import a day-hourly series and block until the recorder has committed."""
-    result = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+    result = await coordinator._async_add_app_chart_statistics(
         device_id=_DEVICE_ID,
         name_prefix="Jackery",
         metric_key=_METRIC_KEY,
@@ -184,7 +184,7 @@ async def test_import_uses_fifo_recorder_barrier(
         lambda: pytest.fail("racy recorder queue probe was used"),
     )
 
-    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+    ok, count = await coordinator._async_add_app_chart_statistics(
         device_id=_DEVICE_ID,
         name_prefix="Jackery",
         metric_key="fifo_barrier_energy",
@@ -227,7 +227,7 @@ async def test_import_waits_for_delayed_recorder_visibility(
         delayed_reader,
     )
 
-    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+    ok, count = await coordinator._async_add_app_chart_statistics(
         device_id=_DEVICE_ID,
         name_prefix="Jackery",
         metric_key="delayed_visibility_energy",
@@ -266,7 +266,7 @@ async def test_import_deadline_bounds_stalled_recorder_barrier(
     monkeypatch.setattr(recorder_mock, "queue_task", queue_without_sync)
 
     async with asyncio.timeout(0.5):
-        ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
+        ok, count = await coordinator._async_add_app_chart_statistics(
             device_id=_DEVICE_ID,
             name_prefix="Jackery",
             metric_key="stalled_barrier_energy",

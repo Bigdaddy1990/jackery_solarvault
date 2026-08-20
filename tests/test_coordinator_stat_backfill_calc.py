@@ -25,7 +25,7 @@ def _coordinator(*, time_zone: str = "UTC") -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.hass = SimpleNamespace(config=SimpleNamespace(time_zone=time_zone))
-    obj._device_index = {}  # ruff: ignore[private-member-access]
+    obj._device_index = {}
     return coordinator
 
 
@@ -36,7 +36,7 @@ def test_backfill_dates_rolling_window_excludes_today() -> None:
     """The default rolling window covers window_days completed days, not today."""
     today = date(2026, 7, 9)
 
-    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(  # ruff: ignore[private-member-access]
+    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(
         today,
         window_days=3,
     )
@@ -49,7 +49,7 @@ def test_backfill_dates_include_current_year_starts_january() -> None:
     """Year mode covers every completed day from Jan 1 through yesterday."""
     today = date(2026, 1, 4)
 
-    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(  # ruff: ignore[private-member-access]
+    days = JackerySolarVaultCoordinator._statistics_http_backfill_dates(
         today,
         include_current_year=True,
     )
@@ -60,7 +60,7 @@ def test_backfill_dates_include_current_year_starts_january() -> None:
 def test_backfill_dates_non_positive_window_is_empty() -> None:
     """A window of zero (or less) yields no completed days."""
     assert (
-        JackerySolarVaultCoordinator._statistics_http_backfill_dates(  # ruff: ignore[private-member-access]
+        JackerySolarVaultCoordinator._statistics_http_backfill_dates(
             date(2026, 7, 9),
             window_days=0,
         )
@@ -73,7 +73,7 @@ def test_backfill_dates_non_positive_window_is_empty() -> None:
 
 def test_iter_calendar_months_crosses_year_boundary() -> None:
     """Month starts include every first-of-month across a year boundary."""
-    months = JackerySolarVaultCoordinator._iter_calendar_months(  # ruff: ignore[private-member-access]
+    months = JackerySolarVaultCoordinator._iter_calendar_months(
         date(2025, 11, 20),
         date(2026, 2, 3),
     )
@@ -88,7 +88,7 @@ def test_iter_calendar_months_crosses_year_boundary() -> None:
 
 def test_iter_calendar_weeks_returns_monday_starts() -> None:
     """Week iteration yields Monday-aligned starts spanning the range."""
-    weeks = JackerySolarVaultCoordinator._iter_calendar_weeks(  # ruff: ignore[private-member-access]
+    weeks = JackerySolarVaultCoordinator._iter_calendar_weeks(
         date(2026, 7, 8),
         date(2026, 7, 20),
     )
@@ -99,7 +99,7 @@ def test_iter_calendar_weeks_returns_monday_starts() -> None:
 
 def test_iter_calendar_years_is_inclusive_range() -> None:
     """Year iteration returns every calendar year inclusive of both ends."""
-    assert JackerySolarVaultCoordinator._iter_calendar_years(  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._iter_calendar_years(
         date(2024, 6, 1),
         date(2026, 2, 1),
     ) == [2024, 2025, 2026]
@@ -110,7 +110,7 @@ def test_iter_calendar_years_is_inclusive_range() -> None:
 
 def test_historical_day_payload_remaps_prefixes_and_skips_empty() -> None:
     """Section prefixes remap to ``{prefix}_day`` keys and empties drop out."""
-    payload = JackerySolarVaultCoordinator._historical_day_payload_from_sources(  # ruff: ignore[private-member-access]
+    payload = JackerySolarVaultCoordinator._historical_day_payload_from_sources(
         {
             "device_battery_stat": {"unit": 1},
             "device_pv_stat": {},

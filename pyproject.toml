@@ -299,12 +299,10 @@ exclude = [
 detect-string-imports = true
 direction = "dependencies"
 string-imports-min-dots = 2
-preview= true
 # Exclude type-checking-only imports from the graph
 type-checking-imports = true
 
 [tool.ruff.format]
-preview = true
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
@@ -315,7 +313,6 @@ skip-magic-trailing-comma = false
 nested-string-quote-style = "preferred"
 
 [tool.ruff.lint]
-preview = true
 select = [
   "builtin-variable-shadowing",   # Variable {name} is shadowing a Python builtin
   "ASYNC",  # flake8-async
@@ -489,13 +486,15 @@ dev = [
 max-complexity = 25
 
 [tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["module-import-not-at-top-of-file", "undefined-local-with-import-star"]
-"tests/test_coordinator_helpers.py" = [
-    "import-private-name",
-    "import-outside-top-level",
-    "unsorted-imports",
+# Tests intentionally exercise private implementation details and use local imports
+# to isolate Home Assistant modules. Production code receives the full rule set.
+"tests/**" = [
+  "private-member-access",
+  "import-private-name",
+  "noqa-comments",
+  "import-outside-top-level",
+  "undocumented-public-module",
 ]
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -622,35 +621,6 @@ voluptuous = "vol"
 "homeassistant.util.ulid" = "ulid_util"
 "homeassistant.util.uuid" = "uuid_util"
 "homeassistant.util.yaml" = "yaml_util"
-
-[tool.mypy]
-python_version = "3.14"
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-enable_error_code = "deprecated"
-explicit_package_bases = true
-ignore_missing_imports = true
-no_implicit_optional = true
-local_partial_types = true
-strict_equality = true
-warn_redundant_casts = true
-warn_return_any = true
-warn_unused_configs = true
-warn_unused_ignores = true
-sqlite_cache = false
-disable_error_code = "import-untyped"
-
-[[tool.mypy.overrides]]
-module = ["custom_components.jackery_solarvault.*"]
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-no_implicit_optional = true
-# Strict typing is still in progress; keep these exceptions explicit until
-# they can be removed under the final Home Assistant typing profile.
-warn_return_any = true
 
 [tool.coverage.run]
 branch = true

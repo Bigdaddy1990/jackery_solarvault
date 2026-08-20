@@ -81,7 +81,7 @@ def _diagnostics_rig(  # test builder wires every accessor the export touches
     rejection_metrics: RejectionMetrics | None = None,
     hass_data: dict[str, Any] | None = None,
 ) -> tuple[Any, Any]:
-    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""  # noqa: RUF105
+    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     entry = SimpleNamespace(
@@ -113,13 +113,13 @@ def _diagnostics_rig(  # test builder wires every accessor the export touches
     }
     api_defaults.update(api_overrides or {})
     obj.api = SimpleNamespace(**api_defaults)
-    obj._configured_update_interval = timedelta(seconds=30)  # ruff: ignore[private-member-access]
-    obj._polling_diagnostics = {}  # ruff: ignore[private-member-access]
-    obj._mqtt = None  # ruff: ignore[private-member-access]
-    obj._endpoint_backoff = endpoint_backoff or {}  # ruff: ignore[private-member-access]
-    obj._ble_listener = None  # ruff: ignore[private-member-access]
-    obj._device_index = {}  # ruff: ignore[private-member-access]
-    obj._local_mqtt_config_diagnostics = {  # ruff: ignore[private-member-access]
+    obj._configured_update_interval = timedelta(seconds=30)
+    obj._polling_diagnostics = {}
+    obj._mqtt = None
+    obj._endpoint_backoff = endpoint_backoff or {}
+    obj._ble_listener = None
+    obj._device_index = {}
+    obj._local_mqtt_config_diagnostics = {
         "scheduled": 0,
         "attempts": 0,
         "target_count": 0,
@@ -128,8 +128,8 @@ def _diagnostics_rig(  # test builder wires every accessor the export touches
         "last_success_at": None,
         "last_errors": {},
     }
-    obj._statistics_backfill_state = statistics_backfill_state or {}  # ruff: ignore[private-member-access]
-    obj._statistics_backfill_state_loaded = statistics_backfill_loaded  # ruff: ignore[private-member-access]
+    obj._statistics_backfill_state = statistics_backfill_state or {}
+    obj._statistics_backfill_state_loaded = statistics_backfill_loaded
     obj.rejection_metrics = (
         rejection_metrics if rejection_metrics is not None else RejectionMetrics()
     )
@@ -448,7 +448,7 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
 
 @pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> None:
-    """A fully valid config with no registered client falls back to client_not_started."""  # noqa: RUF105
+    """A fully valid config with no registered client falls back to client_not_started."""
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
@@ -570,7 +570,7 @@ async def test_sensitive_option_value_is_scrubbed_from_error_text() -> None:
     coordinator, entry = _diagnostics_rig(
         options={CONF_THIRD_PARTY_MQTT_PASSWORD: broker_secret},
     )
-    coordinator._polling_diagnostics = {  # ruff: ignore[private-member-access]
+    coordinator._polling_diagnostics = {
         "last_error": f"Authentication rejected for password {broker_secret}",
     }
 

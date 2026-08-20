@@ -31,6 +31,7 @@ from ..const import (
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
+from ..credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -287,12 +288,11 @@ class JackeryMqttPushClient:
         Returns:
             str: Hexadecimal SHA-256 digest of the provided credentials.
         """
-        hasher = hashlib.sha256()
-        for value in (client_id, username, password):
-            encoded = value.encode()
-            hasher.update(len(encoded).to_bytes(4, "big"))
-            hasher.update(encoded)
-        return hasher.hexdigest()
+        return credential_fingerprint({
+            "client_id": client_id,
+            "username": username,
+            "password": password,
+        })
 
     async def async_stop(self) -> None:
         """Stop the MQTT runner and disconnect the client.
@@ -456,6 +456,10 @@ class JackeryMqttPushClient:
         # Wake callers already blocked on a connection attempt. They observe the
         # invalidated generation and fail immediately; a new start clears the event.
         self._connected_event.set()
+        for future in self._pending_responses.values():
+            if not future.done():
+                future.cancel()
+        self._pending_responses.clear()
         for pending in owned_tasks:
             # aiomqtt 2.5.1 does not unwind a cancelled ``__aenter__`` cleanly.
             # Let an in-progress connect finish or time out; once the context
@@ -557,10 +561,14 @@ class JackeryMqttPushClient:
                     except MqttError as err:
                         if not self._session_is_current(generation, runner_task):
                             return
-                        subscription_error = f"subscribe failed for {topic}: {err}"
+                        subscription_error = (
+                            f"subscribe failed for {topic}: {redacted_error(err)}"
+                        )
                         self._last_error = subscription_error
                         _LOGGER.warning(
-                            "Jackery MQTT subscribe failed for %s: %s", topic, err
+                            "Jackery MQTT subscribe failed for %s: %s",
+                            topic,
+                            redacted_error(err),
                         )
                         raise
                     if not self._session_is_current(generation, runner_task):
@@ -601,16 +609,16 @@ class JackeryMqttPushClient:
         except MqttError as err:
             if self._session_is_current(generation, runner_task):
                 self._handle_disconnect_error(
-                    subscription_error or str(err), broker_connected
+                    subscription_error or redacted_error(err), broker_connected
                 )
         except asyncio.CancelledError:
             raise
-        except Exception as err:
+        except Exception as err:  # ruff: ignore[blind-except]
             if self._session_is_current(generation, runner_task):
-                self._last_error = f"connect failed: {err}"
+                self._last_error = f"connect failed: {redacted_error(err)}"
                 self._connected_event.set()
                 _LOGGER.debug(
-                    "Jackery MQTT connect setup failed: %s", err, exc_info=True
+                    "Jackery MQTT connect setup failed: %s", redacted_error(err)
                 )
         finally:
             was_connected = broker_connected
@@ -787,7 +795,9 @@ class JackeryMqttPushClient:
                 ctx.load_verify_locations(cafile=str(ca_path))
             except (OSError, ssl.SSLError) as err:
                 _LOGGER.warning(
-                    "Jackery MQTT CA file %s could not be loaded: %s", ca_path, err
+                    "Jackery MQTT CA file %s could not be loaded: %s",
+                    ca_path,
+                    redacted_error(err),
                 )
             else:
                 self._tls_custom_ca_loaded = True

@@ -11,14 +11,14 @@ from custom_components.jackery_solarvault.util import local_mqtt_opt_in
 class MockConfigEntry:
     """Mock ConfigEntry with options and data dicts."""
 
-    def __init__(self, options: dict | None = None, data: dict | None = None) -> None:  # noqa: D107, RUF105
+    def __init__(self, options: dict | None = None, data: dict | None = None) -> None:  # noqa: D107
         self.options = options or {}
         self.data = data or {}
 
-    def __contains__(self, key) -> bool:  # noqa: D105, RUF105
+    def __contains__(self, key) -> bool:  # noqa: D105
         return key in self.options or key in self.data
 
-    def get(self, key, default=None):  # noqa: D102, RUF105
+    def get(self, key, default=None):  # noqa: D102
         return self.options.get(key, self.data.get(key, default))
 
 
@@ -29,7 +29,7 @@ def test_local_mqtt_opt_in_legacy_true() -> None:
 
 
 def test_local_mqtt_opt_in_explicit_false_respected() -> None:
-    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""  # noqa: RUF105
+    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""
     entry = MockConfigEntry(
         options={"local_mqtt_enable": False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
     )
@@ -45,18 +45,18 @@ def test_local_mqtt_opt_in_legacy_false_third_party_false() -> None:
     assert local_mqtt_opt_in(entry) is False
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:  # noqa: D103, RUF105
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:  # noqa: D103
     entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True})
     assert local_mqtt_opt_in(entry) is True
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  # noqa: D103, RUF105
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  # noqa: D103
     entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: False})
     assert local_mqtt_opt_in(entry) is False
 
 
 def test_local_mqtt_opt_in_defaults_match_123_baseline() -> None:
-    """Default constants: local_mqtt enabled by default, third_party_mqtt opt-in (disabled)."""  # noqa: RUF105
+    """Default constants: local_mqtt enabled by default, third_party_mqtt opt-in (disabled)."""
     assert DEFAULT_LOCAL_MQTT_ENABLE is True
     assert DEFAULT_THIRD_PARTY_MQTT_ENABLE is False
 

@@ -73,7 +73,7 @@ async def test_cancelled_subscribe_removes_status_callback(
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
 
     with pytest.raises(asyncio.CancelledError):
-        await client._async_subscribe_once()  # ruff: ignore[private-member-access]
+        await client._async_subscribe_once()
 
     unsubscribe_status.assert_called_once_with()
 
@@ -124,13 +124,13 @@ async def test_retry_supervisor_backs_off_and_clears_its_own_task(
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_RECONNECT_MAX_SEC", 3.0)
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
     monkeypatch.setattr(client, "_async_retry_subscription_once", retry_once)
-    task = asyncio.create_task(client._async_retry_subscription())  # ruff: ignore[private-member-access]
-    client._retry_task = task  # ruff: ignore[private-member-access]
+    task = asyncio.create_task(client._async_retry_subscription())
+    client._retry_task = task
 
     await task
 
     assert [call.args[0] for call in sleeps.await_args_list] == [1.0, 2.0, 3.0]
-    assert client._retry_task is None  # ruff: ignore[private-member-access]
+    assert client._retry_task is None
 
 
 @pytest.mark.asyncio
@@ -139,11 +139,11 @@ async def test_stopped_retry_supervisor_exits_without_attempt(
 ) -> None:
     """A supervisor started during teardown exits through its finalizer."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-    client._stopping = True  # ruff: ignore[private-member-access]
+    client._stopping = True
 
-    await client._async_retry_subscription()  # ruff: ignore[private-member-access]
+    await client._async_retry_subscription()
 
-    assert client._retry_task is None  # ruff: ignore[private-member-access]
+    assert client._retry_task is None
 
 
 @pytest.mark.asyncio
@@ -159,7 +159,7 @@ async def test_start_ignores_an_active_subscription_retry(
         await asyncio.Event().wait()
 
     blocker = asyncio.create_task(_wait_forever())
-    client._retry_task = blocker  # ruff: ignore[private-member-access]
+    client._retry_task = blocker
     monkeypatch.setattr(client, "_async_subscribe_once", subscribe_once)
 
     await client.async_start()
@@ -175,19 +175,19 @@ async def test_retry_once_stops_when_client_is_stopping_or_subscribed(
 ) -> None:
     """A late retry never creates a ghost subscription after stop/success."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-    client._stopping = True  # ruff: ignore[private-member-access]
-    assert await client._async_retry_subscription_once()  # ruff: ignore[private-member-access]
+    client._stopping = True
+    assert await client._async_retry_subscription_once()
 
-    client._stopping = False  # ruff: ignore[private-member-access]
-    client._unsubscribe = MagicMock()  # ruff: ignore[private-member-access]
-    assert await client._async_retry_subscription_once()  # ruff: ignore[private-member-access]
+    client._stopping = False
+    client._unsubscribe = MagicMock()
+    assert await client._async_retry_subscription_once()
 
 
 def test_duplicate_connection_status_is_a_noop(hass: HomeAssistant) -> None:
     """Repeated broker status callbacks do not rewrite timestamps."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
 
-    client._async_connection_status_changed(False)  # ruff: ignore[private-member-access]
+    client._async_connection_status_changed(False)
 
     assert client.diagnostics_snapshot()["last_disconnect_at"] is None
 
@@ -209,10 +209,10 @@ async def test_message_wrapper_handles_text_and_bytearray_payloads(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="jackery/#")
-    await client._async_message_received(  # ruff: ignore[private-member-access]
+    await client._async_message_received(
         MagicMock(topic="jackery/device", payload='{"soc":80}'),
     )
-    await client._async_message_received(  # ruff: ignore[private-member-access]
+    await client._async_message_received(
         MagicMock(topic="jackery/device", payload=bytearray(b"not-json")),
     )
 
@@ -226,12 +226,12 @@ async def test_stopping_message_wrapper_and_handler_are_noops(
     """Unload barriers prevent queued callbacks from mutating diagnostics."""
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
-    client._stopping = True  # ruff: ignore[private-member-access]
+    client._stopping = True
 
-    await client._async_message_received(  # ruff: ignore[private-member-access]
+    await client._async_message_received(
         MagicMock(topic="jackery/device", payload=b"{}"),
     )
-    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", b"{}")
 
     sink.assert_not_awaited()
     assert client.diagnostics_snapshot()["messages_received"] == 0
@@ -244,7 +244,7 @@ async def test_payload_without_sink_is_counted_as_dropped(
     """Observation-only construction exposes an explicit dropped-frame count."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
 
-    await client._handle_message("jackery/device", "[]")  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", "[]")
 
     snapshot = client.diagnostics_snapshot(redact=False)
     assert snapshot["messages_received"] == 1
@@ -265,7 +265,7 @@ async def test_rejected_or_failed_sink_is_diagnosed(
         sink = AsyncMock(return_value=sink_result)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
 
-    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", b"{}")
 
     snapshot = client.diagnostics_snapshot()
     assert snapshot["messages_dropped"] == 1
@@ -283,7 +283,7 @@ async def test_sink_cancellation_propagates(hass: HomeAssistant) -> None:
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
 
     with pytest.raises(asyncio.CancelledError):
-        await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
+        await client._handle_message("jackery/device", b"{}")
 
     assert client.diagnostics_snapshot()["messages_dropped"] == 0
 
@@ -298,7 +298,7 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_TOPIC_NAMES", 0)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
-    await client._handle_message("future/device", b"{}")  # ruff: ignore[private-member-access]
+    await client._handle_message("future/device", b"{}")
 
     snapshot = client.diagnostics_snapshot(redact=False)
     assert snapshot["topics_seen_truncated"] is True
@@ -315,7 +315,7 @@ async def test_oversized_payload_is_rejected_before_decode(
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_PAYLOAD_BYTES", 2)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
-    await client._handle_message("jackery/device", b"{} ")  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", b"{} ")
 
     sink.assert_not_awaited()
     snapshot = client.diagnostics_snapshot(redact=False)
