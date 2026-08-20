@@ -1,73 +1,136 @@
 version: 2
 updates:
-  # Python dependencies
+  # Python packages declared in requirements*.txt and pyproject.toml.
   - package-ecosystem: "pip"
     directory: "/"
+    target-branch: "main"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+      exclude:
+        # Do not delay fixes for the supported Home Assistant release line.
+        - "homeassistant"
+        - "pytest-homeassistant-custom-component"
+    rebase-strategy: "auto"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "python"
     commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
-    ignore:
-      # Ignore major version updates for stable dependencies
-      - dependency-name: "homeassistant"
-        update-types: ["version-update:semver-major"]
-
-    # Group updates
+      prefix: "deps"
+      prefix-development: "deps"
+      include: "scope"
     groups:
-      testing:
-        patterns:
-          - "pytest*"
-          - "hypothesis"
-          - "coverage"
-          - "codecov"
-          - "codefactor"
-          - "mypy"
-          - "pre-commit"
-          - "ruff"
       security:
+        applies-to: "security-updates"
         patterns:
-          - "bandit"
-          - "safety"
-      linting:
+          - "*"
+      production:
+        applies-to: "version-updates"
         patterns:
-          - "ruff"
+          - "aiohttp"
+          - "aiomqtt"
+          - "bleak-retry-connector"
+          - "cryptography"
+          - "segno"
+          - "voluptuous"
+      home-assistant:
+        applies-to: "version-updates"
+        patterns:
+          - "homeassistant"
+          - "pytest-homeassistant-custom-component"
+      testing:
+        applies-to: "version-updates"
+        patterns:
+          - "coverage"
+          - "hypothesis"
+          - "pytest*"
+      tooling:
+        applies-to: "version-updates"
+        patterns:
+          - "annotatedyaml"
+          - "jinja2"
           - "mypy"
-          - "pre-commit"
-          - "typing*"
+          - "packaging"
+          - "pip"
+          - "pylint"
+          - "pyyaml"
+          - "ruff"
+          - "types-*"
+          - "typing-extensions"
+    ignore:
+      # This integration supports the HA 2026.8 release line. Revisit monthly.
+      - dependency-name: "homeassistant"
+        versions:
+          - ">=2026.9.0"
 
-  # GitHub Actions
+  # The repository root includes workflows and any local or nested actions.
   - package-ecosystem: "github-actions"
-    directory: ".github/workflows/"
+    directory: "/"
+    target-branch: "main"
     schedule:
-      interval: "daily"
-    open-pull-requests-limit: 10
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
-      prefix: "⬆️ [actions]"
-  - package-ecosystem: "pre-commit" # See documentation for possible values
-    directory: "/" # Location of package manifests
+      prefix: "deps"
+      include: "scope"
+    groups:
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      actions:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+
+  # Hooks declared in .pre-commit-config.yaml.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    target-branch: "main"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
+    rebase-strategy: "auto"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "python"
     commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
-  - package-ecosystem: "uv" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "daily"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
+      prefix: "deps"
+      include: "scope"
+    groups:
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      tooling:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
