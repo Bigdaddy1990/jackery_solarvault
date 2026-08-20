@@ -1,27 +1,11 @@
 """Tests for uncovered paths in mqtt_push.py to increase coverage."""
 
-from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
-from custom_components.jackery_solarvault.const import (
-    MQTT_AUTH_FAILURE_RCS,
-    MQTT_AUTH_FAILURE_TOLERANCE,
-    FIELD_BODY,
-    FIELD_DATA,
-    MQTT_CLIENT_LIBRARY,
-    MQTT_CONNACK_REASONS,
-    MQTT_HOST,
-    MQTT_PORT,
-    MQTT_SILENT_THRESHOLD_SEC,
-    MQTT_TOPIC_PREFIX,
-    REDACTED_VALUE,
-)
-from aiomqtt import MqttError
-from aiomqtt.exceptions import MqttCodeError
-import asyncio
+from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX, REDACTED_VALUE
 
 
 class TestJackeryMqttPushClient:
@@ -139,6 +123,7 @@ class TestJackeryMqttPushClient:
 
             mock_client.subscribe = AsyncMock()
             # messages needs to be an async iterator
+
             async def mock_messages():
                 return
                 yield  # pragma: no cover
@@ -283,7 +268,6 @@ class TestJackeryMqttPushClient:
 
     def test_extract_mqtt_code(self) -> None:
         """Test _extract_mqtt_code static method."""
-        from aiomqtt.exceptions import MqttCodeError
 
         # Create mock error with rc attribute
         class MockError:
@@ -330,10 +314,6 @@ class TestJackeryMqttPushClient:
 
     def test_redact_topic(self) -> None:
         """Test _redact_topic static method."""
-        from custom_components.jackery_solarvault.const import (
-            MQTT_TOPIC_PREFIX,
-            REDACTED_VALUE,
-        )
 
         topic = f"{MQTT_TOPIC_PREFIX}/user123/status"
         redacted = JackeryMqttPushClient._redact_topic(topic)

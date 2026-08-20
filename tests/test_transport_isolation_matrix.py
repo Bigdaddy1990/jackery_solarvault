@@ -9,24 +9,24 @@ This test matrix verifies that each transport operates independently:
 - Command routing is transport-specific
 - Provenance is preserved per transport
 """
-
 import asyncio
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
-from custom_components.jackery_solarvault.models import DataSource
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 from custom_components.jackery_solarvault.ingest import ingest_observation
-from custom_components.jackery_solarvault.models import Observation
+from custom_components.jackery_solarvault.models import DataSource, Observation
 from custom_components.jackery_solarvault.transport_supervisor import (
-    SupervisorState,
-    TransportSupervisor,
-    TransportSupervisorManager,
     SupervisorConfig,
+    SupervisorState,
+    TransportSupervisorManager,
 )
 
 
@@ -72,9 +72,9 @@ class TestTransportIsolationMatrix:
     # | all paths | none | concurrent updates, provenance, reconnect, unload |
 
     @pytest.mark.parametrize(
-        "enabled_path,disabled_paths,required_proofs",
+        ["enabled_path", "disabled_paths", "required_proofs"],
         [
-            (
+            [
                 "http",
                 ["ble", "cloud_mqtt", "local_mqtt"],
                 [
@@ -84,22 +84,22 @@ class TestTransportIsolationMatrix:
                     "backfill",
                     "REST_setters",
                 ],
-            ),
-            (
+            ],
+            [
                 "ble",
                 ["cloud_mqtt", "local_mqtt"],
                 ["connect", "ingest", "BLE_getters", "BLE_setters"],
-            ),
-            (
+            ],
+            [
                 "cloud_mqtt",
                 ["ble", "local_mqtt"],
                 ["connect", "ingest", "encrypted_getters_setters"],
-            ),
-            (
+            ],
+            [
                 "local_mqtt",
                 ["ble", "cloud_mqtt"],
                 ["connect", "subscribe", "binary_plain_ingest"],
-            ),
+            ],
         ],
     )
     @pytest.mark.asyncio
@@ -146,7 +146,7 @@ class TestTransportIsolationMatrix:
         for proof in required_proofs:
             # Verify the proof capability exists in the codebase
             # This is a placeholder - real tests are in specific test files
-            assert proof in [
+            assert proof in {
                 "discovery",
                 "properties",
                 "all_REST_periods",
@@ -159,7 +159,7 @@ class TestTransportIsolationMatrix:
                 "encrypted_getters_setters",
                 "subscribe",
                 "binary_plain_ingest",
-            ]
+            }
 
     @pytest.mark.asyncio
     async def test_all_paths_concurrent_updates_provenance_reconnect_unload(
@@ -229,16 +229,16 @@ class TestProvenanceIsolation:
         self, source: DataSource
     ) -> None:
         """Every supported transport can independently populate live properties."""
-        _BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
-        _DEVICE_ID = "device-1"
-        _FIELD = "pvPw"
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
+        DEVICE_ID = "device-1"
+        FIELD = "pvPw"
 
         observation = Observation(
             source=source,
-            device_id=_DEVICE_ID,
+            device_id=DEVICE_ID,
             section=PAYLOAD_PROPERTIES,
-            payload={_FIELD: 10},
-            observed_at=_BASE_TIME,
+            payload={FIELD: 10},
+            observed_at=BASE_TIME,
         )
 
         result = ingest_observation(
@@ -250,9 +250,9 @@ class TestProvenanceIsolation:
         )
 
         assert result.accepted
-        assert result.payload == {_FIELD: 10}
-        assert result.accepted_fields == frozenset({_FIELD})
-        assert result.provenance[_FIELD].source is source
+        assert result.payload == {FIELD: 10}
+        assert result.accepted_fields == frozenset({FIELD})
+        assert result.provenance[FIELD].source is source
 
     def test_provenance_metadata_never_leaks_into_entity_payload(self) -> None:
         """Source timestamps stay outside coordinator/entity-visible state."""
@@ -281,9 +281,9 @@ class TestProvenanceIsolation:
 
     def test_same_field_different_sections_independent_provenance(self) -> None:
         """One section's timestamp must never block another section."""
-        from datetime import UTC, datetime, timedelta
+        from datetime import UTC, datetime
 
-        _BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
 
         properties = ingest_observation(
             Observation(
@@ -291,7 +291,7 @@ class TestProvenanceIsolation:
                 device_id="device-1",
                 section=PAYLOAD_PROPERTIES,
                 payload={"pvPw": 1},
-                observed_at=_BASE_TIME + timedelta(minutes=1),
+                observed_at=BASE_TIME + timedelta(minutes=1),
             ),
             current={},
             provenance={},
@@ -305,7 +305,7 @@ class TestProvenanceIsolation:
                 device_id="device-1",
                 section="alarm",
                 payload={"pvPw": 2},
-                observed_at=_BASE_TIME,
+                observed_at=BASE_TIME,
             ),
             current={},
             provenance=properties.provenance,
@@ -371,17 +371,17 @@ class TestCommandRoutingIsolation:
     """Test that commands route only through their proven transport."""
 
     @pytest.mark.parametrize(
-        "command,expected_transport",
+        ["command", "expected_transport"],
         [
             # Home Wi-Fi config - HTTP only
-            ("write_wifi_info_home", "http"),
+            ["write_wifi_info_home", "http"],
             # Third-party MQTT config - BLE or Cloud MQTT
-            ("set_third_party_mqtt", "ble"),  # BLE 113
-            ("query_third_party_mqtt", "ble"),  # BLE 114
+            ["set_third_party_mqtt", "ble"],  # BLE 113
+            ["query_third_party_mqtt", "ble"],  # BLE 114
             # Portable commands - BLE
-            ("write_wifi_info_portable", "ble"),
-            ("setting_energy_saving", "ble"),
-            ("set_peaks_troughs", "ble"),
+            ["write_wifi_info_portable", "ble"],
+            ["setting_energy_saving", "ble"],
+            ["set_peaks_troughs", "ble"],
         ],
     )
     def test_command_transport_mapping(
@@ -396,14 +396,13 @@ class TestCommandRoutingIsolation:
 
         if command == "write_wifi_info_home":
             assert HOME_COMMANDS["write_wifi_info"].ble_message_type == 2
-        elif command in ("set_third_party_mqtt", "query_third_party_mqtt"):
-            assert HOME_COMMANDS[command].ble_message_type in (113, 114)
-        elif command in ("write_wifi_info", "setting_energy_saving", "set_peaks_troughs"):
-            assert PORTABLE_COMMANDS[command].ble_message_type in (2, 4, 130)
+        elif command in {"set_third_party_mqtt", "query_third_party_mqtt"}:
+            assert HOME_COMMANDS[command].ble_message_type in {113, 114}
+        elif command in {"write_wifi_info", "setting_energy_saving", "set_peaks_troughs"}:
+            assert PORTABLE_COMMANDS[command].ble_message_type in {2, 4, 130}
 
 
 # Import missing constants
-from datetime import UTC, datetime, timedelta
 
 
 if __name__ == "__main__":

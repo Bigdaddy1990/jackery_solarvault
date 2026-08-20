@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components import jackery_solarvault as integration
-from custom_components.jackery_solarvault.const import DOMAIN, FIELD_ID, PAYLOAD_SYSTEM
+from custom_components.jackery_solarvault.const import DOMAIN
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers import device_registry as dr
 
@@ -84,7 +84,6 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     # Mock Layer-5 startup tasks to track execution order
     async def mock_start_mqtt():
         events.append("layer5")
-        return None
 
     async def mock_start_local_mqtt_listener():
         return None

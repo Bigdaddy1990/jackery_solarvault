@@ -89,7 +89,7 @@ except ImportError:
     @pytest.fixture(autouse=True)
     def auto_enable_custom_integrations() -> None:
         """No-op when HA test plugin is not available."""
-        yield
+        return
 
 
 @pytest.fixture

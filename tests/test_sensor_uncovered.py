@@ -1,6 +1,6 @@
 """Tests for uncovered paths in sensor.py to increase coverage."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,11 +14,11 @@ from custom_components.jackery_solarvault.sensor import (
     JackeryLocalMqttSensor,
     JackeryRawPropertiesSensor,
     JackerySavingsDetailSensor,
+    JackerySavingsDetailSensorDescription,
     JackerySensor,
     JackerySensorDescription,
     JackeryStatSensor,
     JackeryStatSensorDescription,
-    JackerySavingsDetailSensorDescription,
     async_setup_entry,
 )
 

@@ -3,19 +3,12 @@
 Task 12: Make entity source capabilities and App field coverage truthful.
 """
 
-from types import MappingProxyType
-from typing import Any, cast
-from unittest.mock import Mock
 
 import pytest
 
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
 from custom_components.jackery_solarvault.entity import ALL_LIVE_DATA_SOURCES
-from custom_components.jackery_solarvault.entity import JackeryEntity
-from tests.fixtures.jackery_app_2_4_0_contracts import (
-    APP_FIELD_EXPOSURE_CONTRACTS,
-    AppFieldExposureContract,
-)
+from tests.fixtures.jackery_app_2_4_0_contracts import APP_FIELD_EXPOSURE_CONTRACTS
 
 
 class TestEntitySourceCapabilities:
@@ -26,7 +19,7 @@ class TestEntitySourceCapabilities:
         for contract in APP_FIELD_EXPOSURE_CONTRACTS:
             assert contract.model, "Contract missing model"
             assert contract.field, "Contract missing field"
-            assert contract.classification in ("entity", "internal"), (
+            assert contract.classification in {"entity", "internal"}, (
                 f"Invalid classification for {contract.model}.{contract.field}"
             )
             if contract.classification == "entity":
@@ -53,13 +46,13 @@ class TestEntitySourceCapabilities:
                 # For entity contracts, verify the source_path exists in coordinator data
                 # This is a structural check - actual transport capability validation
                 # happens in integration tests
-                assert contract.source_path in (
+                assert contract.source_path in {
                     PAYLOAD_PROPERTIES,
                     "ct_meter",
                     "alarm",
                     "subdevices",
                     "batteryPacks",
-                ), f"Unknown source_path {contract.source_path}"
+                }, f"Unknown source_path {contract.source_path}"
 
     def test_internal_fields_have_rationale(self) -> None:
         """Internal (non-entity) fields must have documented rationale."""
@@ -72,7 +65,7 @@ class TestEntitySourceCapabilities:
                 assert contract.entity_key is None, "Internal fields should not have entity_key"
 
     def test_max_grid_standard_power_in_contracts(self) -> None:
-        """maxGridStdPw (max_grid_standard_power) must be exposed as entity."""
+        """MaxGridStdPw (max_grid_standard_power) must be exposed as entity."""
         # This is a specific field mentioned in the plan
         matches = [
             c for c in APP_FIELD_EXPOSURE_CONTRACTS
@@ -91,7 +84,6 @@ class TestEntitySourceDeclarations:
         """JackeryBaseEntity should have source capability tracking."""
         # This will be implemented when entity.py is updated
         # For now, verify the contract structure supports it
-        pass
 
     def test_entities_declare_capability_subset(self) -> None:
         """Each entity should declare only sources that can produce its field."""
@@ -108,10 +100,9 @@ class TestAppFieldExposureDocumentation:
 
     def test_docs_app_field_exposure_exists(self) -> None:
         """docs/APP_FIELD_EXPOSURE.md should exist and document all fields."""
-        import os
         from pathlib import Path
 
-        doc_path = Path(__file__).parents[1] / "docs" / "APP_FIELD_EXPOSURE.md"
+        Path(__file__).parents[1] / "docs" / "APP_FIELD_EXPOSURE.md"
         # The file should exist after generation
         # assert doc_path.exists(), "docs/APP_FIELD_EXPOSURE.md not found"
 
@@ -137,7 +128,7 @@ class TestTranslationSync:
 
         strings_path = Path(__file__).parents[1] / "custom_components" / "jackery_solarvault" / "translations" / "en.json"
         if strings_path.exists():
-            with open(strings_path, encoding="utf-8") as f:
+            with Path(strings_path).open(encoding="utf-8") as f:
                 strings = json.load(f)
             # Check nested key exists: entity.sensor.max_grid_standard_power
             assert "entity" in strings, "entity section missing from translations/en.json"

@@ -471,7 +471,7 @@ fixable = ["ALL"]
 # TID252 (relative-imports) darf NIE automatisch gefixt werden: der Autofix schreibt
 # `from .const import X` in einen absoluten Pfad um und macht die Custom-Integration
 # fuer den HA-Loader unauffindbar (Vorfall 2026-08-13, Integration nicht mehr ladbar).
-unfixable = ["TID252"]
+unfixable = ["relative-imports"]
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]

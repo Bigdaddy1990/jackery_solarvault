@@ -6,23 +6,16 @@ independent lifecycle, reconnect logic, and credential management.
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
-from datetime import timedelta
+import contextlib
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Optional
 import logging
+from typing import Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
-from .const import (
-    CONF_ENABLE_BLE_TRANSPORT,
-    CONF_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_ENABLE_BLE_TRANSPORT,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,8 +37,8 @@ class SupervisorConfig:
     enabled_check: Callable[[ConfigEntry], bool]
     start_fn: Callable[[], Awaitable[Any]]
     stop_fn: Callable[[], Awaitable[Any]]
-    update_credentials_fn: Optional[Callable[[], Awaitable[Any]]] = None
-    health_check_fn: Optional[Callable[[], bool]] = None
+    update_credentials_fn: Callable[[], Awaitable[Any]] | None = None
+    health_check_fn: Callable[[], bool] | None = None
     reconnect_delay_sec: float = 5.0
     max_reconnect_delay_sec: float = 300.0
 
@@ -65,10 +58,10 @@ class TransportSupervisor:
         self.coordinator = coordinator
         self.config = config
         self._state = SupervisorState.STOPPED
-        self._task: Optional[asyncio.Task[Any]] = None
-        self._reconnect_task: Optional[asyncio.Task[Any]] = None
+        self._task: asyncio.Task[Any] | None = None
+        self._reconnect_task: asyncio.Task[Any] | None = None
         self._shutdown = False
-        self._last_error: Optional[Exception] = None
+        self._last_error: Exception | None = None
 
     @property
     def state(self) -> SupervisorState:
@@ -83,7 +76,7 @@ class TransportSupervisor:
         return self._state == SupervisorState.STARTING
 
     @property
-    def last_error(self) -> Optional[Exception]:
+    def last_error(self) -> Exception | None:
         return self._last_error
 
     async def async_start(self) -> None:
@@ -95,7 +88,7 @@ class TransportSupervisor:
             )
             return
 
-        if self._state in (SupervisorState.STARTING, SupervisorState.RUNNING):
+        if self._state in {SupervisorState.STARTING, SupervisorState.RUNNING}:
             return
 
         self._state = SupervisorState.STARTING
@@ -207,18 +200,14 @@ class TransportSupervisor:
         # Cancel health monitor
         if self._task and not self._task.done():
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
 
         # Cancel reconnect
         if self._reconnect_task and not self._reconnect_task.done():
             self._reconnect_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._reconnect_task
-            except asyncio.CancelledError:
-                pass
 
         # Stop the transport
         try:
@@ -258,7 +247,7 @@ class TransportSupervisorManager:
         self._supervisors[name] = supervisor
         return supervisor
 
-    def get(self, name: str) -> Optional[TransportSupervisor]:
+    def get(self, name: str) -> TransportSupervisor | None:
         """Get a supervisor by name."""
         return self._supervisors.get(name)
 
@@ -271,7 +260,7 @@ class TransportSupervisorManager:
 
         if start_tasks:
             results = await asyncio.gather(*start_tasks, return_exceptions=True)
-            for (name, _), result in zip(self._supervisors.items(), results):
+            for (name, _), result in zip(self._supervisors.items(), results, strict=False):
                 if isinstance(result, ConfigEntryAuthFailed):
                     _LOGGER.warning(
                         "Transport %s auth failure - HTTP remains auth authority",

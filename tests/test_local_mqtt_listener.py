@@ -7,12 +7,12 @@ import pytest
 
 from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_ENABLE,
-    DEFAULT_LOCAL_MQTT_ENABLE,
-    DOMAIN,
     MQTT_TOPIC_PREFIX,
     MQTT_TOPIC_SUFFIXES,
 )
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
@@ -74,7 +74,7 @@ def test_local_mqtt_listener_subscribes_to_expected_topics(monkeypatch: pytest.M
     expected_topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
     assert mock_ha_mqtt.async_subscribe.call_count == len(expected_topics)
 
-    for call, expected_topic in zip(mock_ha_mqtt.async_subscribe.call_args_list, expected_topics):
+    for call, expected_topic in zip(mock_ha_mqtt.async_subscribe.call_args_list, expected_topics, strict=False):
         args, kwargs = call
         assert args[1] == expected_topic  # topic is second positional arg
         assert kwargs.get("qos") == 0
@@ -133,7 +133,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(monkeypatch:
 
     # Get the callback that was passed to async_subscribe
     subscribe_call = mock_ha_mqtt.async_subscribe.call_args_list[0]
-    callback = subscribe_call.kwargs.get("callback") or subscribe_call.args[2]  # 3rd positional
+    subscribe_call.kwargs.get("callback") or subscribe_call.args[2]  # 3rd positional
 
     # Simulate a message - callback is _queue_local_mqtt_message which schedules a background task
     # We directly call the internal handler _handle_local_mqtt_message to test the logic
@@ -144,6 +144,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(monkeypatch:
     # Find the _handle_local_mqtt_message function from the coordinator
     # It's created inside async_start_local_mqtt_listener, so we test the logic directly
     import asyncio
+
     from custom_components.jackery_solarvault.coordinator import json
 
     # Simulate what _handle_local_mqtt_message does
@@ -185,8 +186,9 @@ def test_local_mqtt_listener_ignores_non_json(monkeypatch: pytest.MonkeyPatch) -
 
     # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message
     # We test _handle_local_mqtt_message directly (the logic that filters non-JSON)
-    from custom_components.jackery_solarvault.coordinator import json
     import asyncio
+
+    from custom_components.jackery_solarvault.coordinator import json
 
     # Simulate non-JSON payload - _handle_local_mqtt_message catches JSONDecodeError
     mock_message = MagicMock()
@@ -224,8 +226,9 @@ def test_local_mqtt_listener_ignores_non_dict_payload(monkeypatch: pytest.Monkey
 
     # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message
     # We test _handle_local_mqtt_message logic directly (the logic that filters non-dict JSON)
-    from custom_components.jackery_solarvault.coordinator import json
     import asyncio
+
+    from custom_components.jackery_solarvault.coordinator import json
 
     # Simulate JSON array payload - _handle_local_mqtt_message checks isinstance(payload, dict)
     mock_message = MagicMock()

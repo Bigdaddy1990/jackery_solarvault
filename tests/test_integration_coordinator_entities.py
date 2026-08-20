@@ -6,22 +6,20 @@ state transitions without requiring the full Home Assistant test infrastructure.
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
 from custom_components.jackery_solarvault.const import (
     DEFAULT_SCAN_INTERVAL_SEC,
     FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
     FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
     FIELD_MODEL_CODE,
 )
-
-if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 _TEST_HTTP_DATA = {
     "test-device": {
@@ -174,9 +172,12 @@ class TestCoordinatorEntityManagement:
     @pytest.mark.asyncio
     async def test_coordinator_async_update_data_returns_data(self) -> None:
         """_async_update_data returns device data correctly."""
-        from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
+
+        from custom_components.jackery_solarvault.coordinator import (
+            JackerySolarVaultCoordinator,
+        )
 
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = coordinator
@@ -252,9 +253,12 @@ class TestCoordinatorUpdateCycle:
     @pytest.mark.asyncio
     async def test_multiple_updates(self) -> None:
         """Multiple updates work correctly."""
-        from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
+
+        from custom_components.jackery_solarvault.coordinator import (
+            JackerySolarVaultCoordinator,
+        )
 
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = coordinator
@@ -292,9 +296,12 @@ class TestCoordinatorErrorHandling:
     @pytest.mark.asyncio
     async def test_coordinator_handles_api_error(self) -> None:
         """Coordinator handles API errors gracefully."""
-        from custom_components.jackery_solarvault.helpers import UpdateFailed
-        from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
         from types import SimpleNamespace
+
+        from custom_components.jackery_solarvault.coordinator import (
+            JackerySolarVaultCoordinator,
+        )
+        from custom_components.jackery_solarvault.helpers import UpdateFailed
 
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = coordinator
@@ -345,9 +352,12 @@ class TestCoordinatorDeviceDataIntegrity:
     @pytest.mark.asyncio
     async def test_coordinator_preserves_device_identity(self) -> None:
         """Coordinator preserves device identity across updates."""
-        from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
+
+        from custom_components.jackery_solarvault.coordinator import (
+            JackerySolarVaultCoordinator,
+        )
 
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = coordinator

@@ -5,14 +5,14 @@ These tests verify that:
 2. Shadow queries don't block or replace primary HTTP data path
 3. Fresh HTTP data takes precedence over shadow/background data in merges
 """
-
-import pytest
 from datetime import datetime
-from typing import Any, Mapping
-from unittest.mock import AsyncMock, MagicMock, patch
+import time
+from unittest.mock import AsyncMock, MagicMock
 
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 from custom_components.jackery_solarvault.models import DataSource as TransportSource
 
 
@@ -54,7 +54,6 @@ async def test_poll_watchdog_stall_threshold() -> None:
     coordinator._configured_update_interval.total_seconds.return_value = 15.0
 
     # Threshold = max(4 * 15, 60) = 60 seconds
-    import time
     coordinator._last_http_cycle_completed_monotonic = time.monotonic() - 100.0
     coordinator._last_poll_watchdog_request_monotonic = 0.0
 
@@ -68,7 +67,6 @@ async def test_poll_watchdog_stall_threshold() -> None:
 async def test_poll_watchdog_stays_silent_when_healthy() -> None:
     """Poll watchdog doesn't trigger when polling is healthy."""
     coordinator = _make_coordinator_stub()
-    import time
     coordinator._last_http_cycle_completed_monotonic = time.monotonic() - 10.0  # 10s ago
     coordinator._last_poll_watchdog_request_monotonic = 0.0
 
@@ -123,7 +121,9 @@ async def test_merge_concurrent_updates_prioritizes_http_properties() -> None:
 
 async def test_merge_concurrent_updates_preserves_layer5_deltas() -> None:
     """Merge logic preserves Layer-5 deltas for non-property fields."""
-    from custom_components.jackery_solarvault.coordinator import merge_present_dict_values
+    from custom_components.jackery_solarvault.coordinator import (
+        merge_present_dict_values,
+    )
 
     coordinator = _make_coordinator_stub()
 
@@ -158,7 +158,8 @@ async def test_merge_concurrent_updates_preserves_layer5_deltas() -> None:
 
 async def test_shadow_queries_do_not_block_primary_http() -> None:
     """Shadow queries run as background tasks, not blocking primary HTTP.
-    This test verifies the shadow query scheduling logic without full HA setup."""
+    This test verifies the shadow query scheduling logic without full HA setup.
+    """
     # Test that _schedule_background_once is called for shadow queries
     # by mocking the relevant internal methods
     from types import SimpleNamespace
@@ -189,6 +190,7 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:
 
     # Mock _schedule_background_once to verify it's called for shadow queries
     scheduled_tasks = []
+
     def mock_schedule_background_once(key, coro, name):
         scheduled_tasks.append((key, coro, name))
     coordinator._schedule_background_once = mock_schedule_background_once
@@ -266,7 +268,9 @@ async def test_merge_handles_missing_property_source_state() -> None:
 
 async def test_merge_preserves_non_property_deltas_from_layer5() -> None:
     """Merge preserves Layer-5 deltas for non-property fields (e.g., stats)."""
-    from custom_components.jackery_solarvault.coordinator import merge_present_dict_values
+    from custom_components.jackery_solarvault.coordinator import (
+        merge_present_dict_values,
+    )
 
     coordinator = _make_coordinator_stub()
 
@@ -285,5 +289,3 @@ async def test_merge_preserves_non_property_deltas_from_layer5() -> None:
 
 
 # Need to import MagicMock
-from unittest.mock import MagicMock
-import time
