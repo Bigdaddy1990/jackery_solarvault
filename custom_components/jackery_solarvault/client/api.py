@@ -651,9 +651,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         return content_type.partition(";")[0].strip().lower()
 
     @staticmethod
-    async def _read_limited_bytes(
-        resp: aiohttp.ClientResponse, *, limit: int
-    ) -> bytes:
+    async def _read_limited_bytes(resp: aiohttp.ClientResponse, *, limit: int) -> bytes:
         """Read a response incrementally and reject it beyond ``limit`` bytes."""
         declared = resp.content_length
         if declared is not None and declared > limit:
@@ -680,7 +678,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             media_type = "application/json"  # lightweight protocol test doubles
         if media_type not in _JSON_MEDIA_TYPES and not media_type.endswith("+json"):
             raise JackeryApiError(
-                f"Unexpected Content-Type {media_type or '(missing)'}; expected JSON"
+                f"Unexpected Content-Type {media_type or "(missing)"}; expected JSON"
             )
         if not isinstance(resp.content, aiohttp.StreamReader):
             try:
@@ -713,7 +711,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         media_type = cls._response_media_type(resp)
         if not (media_type.startswith("text/") or media_type in _JSON_MEDIA_TYPES):
             raise JackeryApiError(
-                f"Unexpected Content-Type {media_type or '(missing)'}; expected text"
+                f"Unexpected Content-Type {media_type or "(missing)"}; expected text"
             )
         raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
         try:
@@ -855,7 +853,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         try:
             return await cls._decode_json_response(resp)
         except JackeryApiError as err:
-            raise JackeryApiError("Login returned invalid JSON (response redacted)") from err
+            raise JackeryApiError(
+                "Login returned invalid JSON (response redacted)"
+            ) from err
 
     async def async_login(self) -> str:
         """Perform the app-compatible encrypted HTTP login."""
@@ -1452,9 +1452,12 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             encoded = value.encode("utf-8")
             if len(encoded) <= _HTTP_POLICY.diagnostic_bytes:
                 return value
-            return encoded[: _HTTP_POLICY.diagnostic_bytes].decode(
-                "utf-8", errors="ignore"
-            ) + "<truncated>"
+            return (
+                encoded[: _HTTP_POLICY.diagnostic_bytes].decode(
+                    "utf-8", errors="ignore"
+                )
+                + "<truncated>"
+            )
         if isinstance(value, bytes):
             return f"<binary {len(value)} bytes>"
         return value

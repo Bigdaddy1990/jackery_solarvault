@@ -44,7 +44,9 @@ async def test_limited_reader_rejects_declared_and_streamed_oversize() -> None:
     with pytest.raises(JackeryApiError, match="exceeds"):
         await JackeryApi._read_limited_bytes(declared, limit=10)
 
-    streamed = SimpleNamespace(content_length=None, content=_Chunks(b"12345", b"678901"))
+    streamed = SimpleNamespace(
+        content_length=None, content=_Chunks(b"12345", b"678901")
+    )
     with pytest.raises(JackeryApiError, match="exceeds"):
         await JackeryApi._read_limited_bytes(streamed, limit=10)
 
@@ -71,4 +73,7 @@ def test_http_diagnostic_redacts_credentials_and_bounds_values() -> None:
 
 
 def test_fast_profile_is_policy_only() -> None:
-    assert JackeryApi._policy(HttpProfile.FAST).max_payload_bytes < JackeryApi._policy().max_payload_bytes
+    assert (
+        JackeryApi._policy(HttpProfile.FAST).max_payload_bytes
+        < JackeryApi._policy().max_payload_bytes
+    )
