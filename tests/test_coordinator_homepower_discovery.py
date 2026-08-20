@@ -60,7 +60,7 @@ from custom_components.jackery_solarvault.entity import payload_properties_for_s
 from custom_components.jackery_solarvault.sensor import (
     SMART_MODE_SENSOR_DESCRIPTIONS,
     JackerySensor,
-    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
+    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]  # noqa: E501, RUF105
     _is_portable_payload,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
 )
 

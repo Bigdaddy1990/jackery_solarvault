@@ -78,7 +78,7 @@ def _number(
     return entity
 
 
-def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:
+def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:  # noqa: ANN401, RUF105
     """Build a real text entity with a mocked transport boundary."""
     entity = object.__new__(entity_type)
     mutable = cast("Any", entity)
@@ -177,7 +177,7 @@ def test_number_description_resolves_smali_and_explicit_capabilities() -> None:
 
 
 @pytest.mark.parametrize("parser", [_wire_int, _wire_float])
-def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:
+def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:  # noqa: ANN401, RUF105
     """Wire values fail closed instead of silently coercing invalid input."""
     with pytest.raises(HomeAssistantError, match="invalid number value"):
         parser("not-a-number")

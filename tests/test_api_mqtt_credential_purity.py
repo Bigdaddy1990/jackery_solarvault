@@ -25,7 +25,7 @@ class TestMqttCredentialCanonical:
     """Test canonical MQTT credential implementation."""
 
     @pytest.mark.asyncio
-    async def test_async_get_mqtt_credentials_is_canonical(self) -> None:
+    async def test_async_get_mqtt_credentials_is_canonical(self) -> None:  # noqa: PLR6301, RUF105
         """async_get_mqtt_credentials is the single canonical implementation."""
         api = _make_api()
         # Both public methods should delegate to the same private implementation
@@ -35,13 +35,13 @@ class TestMqttCredentialCanonical:
         assert result_async == result_cached is None
 
     @pytest.mark.asyncio
-    async def test_get_cached_delegates_to_canonical(self) -> None:
+    async def test_get_cached_delegates_to_canonical(self) -> None:  # noqa: PLR6301, RUF105
         """get_cached_mqtt_credentials delegates to async_get_mqtt_credentials."""
         api = _make_api()
         # When there's a session, both should return the same derived credentials
-        api._mqtt_user_id = "user123"
-        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")
-        api._mqtt_mac_id = "2" + "a" * 32  # valid 33-char MAC ID
+        api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
+        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")  # noqa: RUF105, SLF001
+        api._mqtt_mac_id = "2" + "a" * 32  # valid 33-char MAC ID  # noqa: RUF105, SLF001
 
         result_async = await api.async_get_mqtt_credentials()
         result_cached = api.get_cached_mqtt_credentials()
@@ -55,12 +55,12 @@ class TestMqttCredentialCanonical:
         assert result_async["password"] == result_cached["password"]
 
     @pytest.mark.asyncio
-    async def test_base64_decode_error_raises_typed_error_not_nameerror(self) -> None:
-        """Base64 decoding failures return None, not NameError or unhandled exception."""
+    async def test_base64_decode_error_raises_typed_error_not_nameerror(self) -> None:  # noqa: PLR6301, RUF105
+        """Base64 decoding failures return None, not NameError or unhandled exception."""  # noqa: E501, RUF105
         api = _make_api()
-        api._mqtt_user_id = "user123"
-        api._mqtt_seed_b64 = "not-valid-base64!!!"
-        api._mqtt_mac_id = "2" + "a" * 32
+        api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
+        api._mqtt_seed_b64 = "not-valid-base64!!!"  # noqa: RUF105, SLF001
+        api._mqtt_mac_id = "2" + "a" * 32  # noqa: RUF105, SLF001
 
         # Should return None gracefully, not raise NameError or binascii.Error
         result = await api.async_get_mqtt_credentials()
@@ -71,27 +71,29 @@ class TestMqttCredentialCanonical:
         )
 
     @pytest.mark.asyncio
-    async def test_base64_decode_wrong_length_returns_none(self) -> None:
+    async def test_base64_decode_wrong_length_returns_none(self) -> None:  # noqa: PLR6301, RUF105
         """Base64 seed of wrong length (not 32 bytes) returns None."""
         api = _make_api()
-        api._mqtt_user_id = "user123"
-        api._mqtt_seed_b64 = base64.b64encode(b"short").decode("ascii")  # 5 bytes, not 32
-        api._mqtt_mac_id = "2" + "a" * 32
+        api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
+        api._mqtt_seed_b64 = base64.b64encode(b"short").decode(  # ruff: ignore[private-member-access]
+            "ascii"
+        )  # 5 bytes, not 32  # noqa: E501, RUF100, SLF001
+        api._mqtt_mac_id = "2" + "a" * 32  # noqa: RUF105, SLF001
 
         result = await api.async_get_mqtt_credentials()
         assert result is None, "Seed of wrong length must return None"
 
     @pytest.mark.asyncio
-    async def test_no_plaintext_token_in_logs(self) -> None:
+    async def test_no_plaintext_token_in_logs(self) -> None:  # noqa: PLR6301, RUF105
         """Credential derivation never logs plaintext tokens/secrets."""
         api = _make_api()
-        api._mqtt_user_id = "user123"
-        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")
-        api._mqtt_mac_id = "2" + "a" * 32
+        api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
+        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")  # noqa: RUF105, SLF001
+        api._mqtt_mac_id = "2" + "a" * 32  # noqa: RUF105, SLF001
 
         # Capture log output
-        from io import StringIO
-        import logging
+        from io import StringIO  # noqa: PLC0415, RUF105
+        import logging  # noqa: PLC0415, RUF105
 
         log_stream = StringIO()
         handler = logging.StreamHandler(log_stream)
@@ -105,35 +107,36 @@ class TestMqttCredentialCanonical:
 
             # Verify no sensitive data in logs
             assert "user123" not in log_output, "User ID must not appear in logs"
-            assert api._mqtt_seed_b64 not in log_output, "Seed must not appear in logs"
-            assert api._mqtt_mac_id not in log_output, "MAC ID must not appear in logs"
+            assert api._mqtt_seed_b64 not in log_output, "Seed must not appear in logs"  # noqa: RUF105, SLF001
+            assert api._mqtt_mac_id not in log_output, "MAC ID must not appear in logs"  # noqa: RUF105, SLF001
         finally:
             logger.removeHandler(handler)
 
     @pytest.mark.asyncio
-    async def test_no_direct_decoding_duplication_in_rsa_encrypt(self) -> None:
+    async def test_no_direct_decoding_duplication_in_rsa_encrypt(self) -> None:  # noqa: PLR6301, RUF105
         """RSA encrypt uses base64.b64decode but handles exact exception."""
-        from custom_components.jackery_solarvault.client.api import (
-            _rsa_pkcs1v15_encrypt,
+        from custom_components.jackery_solarvault.client.api import (  # noqa: PLC0415, RUF105
+            _rsa_pkcs1v15_encrypt,  # noqa: PLC2701, RUF105
         )
 
         # Invalid base64 should raise binascii.Error (the exact exception)
         with pytest.raises(binascii.Error):
             _rsa_pkcs1v15_encrypt(b"test", "not-valid-base64!!!")
 
-        # Valid base64 but invalid DER should raise ValueError (from load_der_public_key)
-        import base64
+        # Valid base64 but invalid DER should raise ValueError (from load_der_public_key)  # noqa: E501, RUF105
+        import base64  # noqa: PLC0415, RUF105
+
         valid_b64_but_not_der = base64.b64encode(b"not a der key").decode("ascii")
         with pytest.raises(ValueError, match="Could not deserialize key data"):
             _rsa_pkcs1v15_encrypt(b"test", valid_b64_but_not_der)
 
     @pytest.mark.asyncio
-    async def test_mqtt_credential_structure_is_complete(self) -> None:
+    async def test_mqtt_credential_structure_is_complete(self) -> None:  # noqa: PLR6301, RUF105
         """Derived credentials have all four required fields."""
         api = _make_api()
-        api._mqtt_user_id = "user123"
-        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")
-        api._mqtt_mac_id = "2" + "a" * 32
+        api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
+        api._mqtt_seed_b64 = base64.b64encode(b"x" * 32).decode("ascii")  # noqa: RUF105, SLF001
+        api._mqtt_mac_id = "2" + "a" * 32  # noqa: RUF105, SLF001
 
         result = await api.async_get_mqtt_credentials()
 

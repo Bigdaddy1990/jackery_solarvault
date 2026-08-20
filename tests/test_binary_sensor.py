@@ -18,12 +18,12 @@ from custom_components.jackery_solarvault.const import SOLAR_VAULT_HEAD_UNIT_MOD
 class TestBinarySensor:
     """Test binary sensor classes."""
 
-    def _bare_hass(self) -> Any:
+    def _bare_hass(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
         hass = SimpleNamespace()
         hass.data = {}
         return hass
 
-    def _bare_entry(self) -> Any:
+    def _bare_entry(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -31,7 +31,7 @@ class TestBinarySensor:
         entry.async_on_unload = MagicMock()
         return entry
 
-    def _bare_coordinator(self, entry: Any) -> Any:
+    def _bare_coordinator(self, entry: Any) -> Any:  # noqa: ANN401, PLR6301, RUF105
         """Create a bare coordinator with the given entry."""
         coordinator = SimpleNamespace()
         coordinator.entry = entry
@@ -75,7 +75,7 @@ class TestBinarySensor:
         """Test JackeryBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (
+        from custom_components.jackery_solarvault.binary_sensor import (  # noqa: PLC0415, RUF105
             JackeryBinaryDescription,
         )
 
@@ -108,7 +108,7 @@ class TestBinarySensor:
         """Test JackerySubdeviceAlarmBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (
+        from custom_components.jackery_solarvault.binary_sensor import (  # noqa: PLC0415, RUF105
             JackerySubdeviceAlarmBinarySensorDescription,
         )
 

@@ -54,7 +54,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:
+def _description(key: str) -> Any:  # noqa: ANN401, RUF105
     """Return one production select description by stable key."""
     return next(
         description for description in SELECT_DESCRIPTIONS if description.key == key
@@ -306,11 +306,11 @@ async def test_portable_select_families_map_current_and_wire_values(
 
 
 async def test_setup_listener_adds_new_home_selects_once_after_discovery() -> None:
-    """A later payload discovers selects once and unchanged callbacks add no duplicates."""
+    """A later payload discovers selects once and unchanged callbacks add no duplicates."""  # noqa: E501, RUF105
     coordinator = _coordinator({})
     listeners: list[Any] = []
 
-    def _capture_listener(listener: Any) -> Any:
+    def _capture_listener(listener: Any) -> Any:  # noqa: ANN401, RUF105
         listeners.append(listener)
         return lambda: None
 

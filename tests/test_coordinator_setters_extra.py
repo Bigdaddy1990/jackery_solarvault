@@ -34,7 +34,7 @@ _DEFAULT_W = 1200
 _STORM_MIN = 45
 
 
-def _coordinator(entry: dict[str, Any] | None = None) -> Any:
+def _coordinator(entry: dict[str, Any] | None = None) -> Any:  # noqa: ANN401, RUF105
     """Bare coordinator with both command-dispatch seams mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
@@ -50,14 +50,14 @@ def _coordinator(entry: dict[str, Any] | None = None) -> Any:
     return shell
 
 
-def _ble_frame(coordinator: Any) -> dict[str, Any]:
+def _ble_frame(coordinator: Any) -> dict[str, Any]:  # noqa: ANN401, RUF105
     """Return the kwargs of the last BLE-first command frame."""
     await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
     assert await_args is not None
     return cast("dict[str, Any]", await_args.kwargs)
 
 
-def _cmd_frame(coordinator: Any) -> dict[str, Any]:
+def _cmd_frame(coordinator: Any) -> dict[str, Any]:  # noqa: ANN401, RUF105
     """Return the kwargs of the last direct command frame."""
     await_args = coordinator._async_publish_command.await_args  # ruff: ignore[private-member-access]
     assert await_args is not None

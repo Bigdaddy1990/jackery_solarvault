@@ -147,7 +147,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
 
 
 def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
-    """Submitted form keys (third_party_mqtt_*) are used with current values as fallback."""
+    """Submitted form keys (third_party_mqtt_*) are used with current values as fallback."""  # noqa: E501, RUF105
     current: dict[str, Any] = {
         CONF_LOCAL_MQTT_ENABLE: False,
         CONF_LOCAL_MQTT_HOST: "old.local",
@@ -157,7 +157,7 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
     }
 
-    # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)
+    # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)  # noqa: E501, RUF105
     result = config_flow._merge_local_mqtt_options(  # ruff: ignore[private-member-access]
         {
             CONF_THIRD_PARTY_MQTT_ENABLE: True,
@@ -244,8 +244,8 @@ def test_flow_options_preserves_third_party_mqtt_token() -> None:
 
 def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
     """Token from current_options flows through merge_local_mqtt_options correctly."""
-    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # noqa: RUF105
-    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # noqa: RUF105
+    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # noqa: E501, RUF105
+    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # noqa: E501, RUF105
     current_options = {
         CONF_ENABLE_BLE_TRANSPORT: False,
         CONF_THIRD_PARTY_MQTT_TOKEN: "token-from-options",

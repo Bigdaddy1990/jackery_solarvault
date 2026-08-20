@@ -42,7 +42,7 @@ def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def _api(coordinator: JackerySolarVaultCoordinator) -> Any:
+def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: ANN401, RUF105
     return cast("Any", coordinator).api
 
 

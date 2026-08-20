@@ -90,7 +90,7 @@ def _healthy_property(dev_id: str) -> dict[str, Any]:
     return {PAYLOAD_DEVICE: {"deviceId": dev_id, "activated": 1, "online": 1}}
 
 
-def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str) -> Any:
+def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str) -> Any:  # noqa: ANN401, RUF105
     """Return a background-task stub that captures one coroutine, closes the rest.
 
     Mirrors ``_consume_background_task`` in ``test_coordinator_update_cycle.py``
@@ -102,7 +102,7 @@ def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str)
     """
 
     def _stub(
-        coro: Any,
+        coro: Any,  # noqa: ANN401, RUF105
         name: str,
         *,
         eager_start: bool = True,
@@ -120,7 +120,7 @@ def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str)
 # --- F-SW2-6: symmetry endpoint backoff must be per-device -----------------
 
 
-def _symmetry_side_effect(*, device_sn: str, **_kwargs: Any) -> dict[str, Any]:
+def _symmetry_side_effect(*, device_sn: str, **_kwargs: Any) -> dict[str, Any]:  # noqa: ANN401, RUF105
     """Fail every call attributed to device A, succeed for device B."""
     if device_sn == _DEVICE_A_ID:
         raise _UNSUPPORTED_ERROR

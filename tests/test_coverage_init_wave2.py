@@ -67,7 +67,7 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     forward = AsyncMock(return_value=None)
 
     # Configure coordinator async methods to return proper awaitables
-    async def noop() -> None:
+    async def noop() -> None:  # noqa: RUF029, RUF105
         return None
 
     coordinator.async_start_mqtt = AsyncMock(side_effect=noop)
@@ -154,7 +154,7 @@ async def test_setup_ignores_incomplete_enabled_device_mqtt_config(
     coordinator.data = {}
 
     # Configure coordinator async methods to return proper awaitables
-    async def noop() -> None:
+    async def noop() -> None:  # noqa: RUF029, RUF105
         return None
 
     coordinator.async_start_mqtt = AsyncMock(side_effect=noop)

@@ -336,7 +336,7 @@ def test_fresh_layer5_nested_value_rejects_redundant_http_snapshot() -> None:
     assert result.accepted_fields == frozenset()
 
 
-def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:
+def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:  # noqa: ANN401, RUF105
     """Return the minimal config-entry surface used by diagnostics."""
     return SimpleNamespace(
         data={},

@@ -45,7 +45,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 _DEVICE_ID = "device-1"
 
 
-def _description(key: str) -> Any:
+def _description(key: str) -> Any:  # noqa: ANN401, RUF105
     """Return the query-button description with the requested key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -193,7 +193,7 @@ def test_query_descriptions_declare_http_and_layer5_sources_independently() -> N
 
 @pytest.mark.asyncio
 async def test_setup_home_device_discovers_queries_and_accessory_buttons() -> None:
-    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""
+    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""  # noqa: E501, RUF105
     payload = {
         PAYLOAD_PROPERTIES: {"batSoc": 50, FIELD_REBOOT: 0},
         PAYLOAD_SMART_PLUGS: [{FIELD_DEVICE_SN: "PLUG-1"}],

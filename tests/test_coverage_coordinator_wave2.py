@@ -19,7 +19,7 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
 
-# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)
+# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)  # noqa: E501, RUF105
 CONF_LOCAL_MQTT_ENABLE = CONF_THIRD_PARTY_MQTT_ENABLE
 CONF_LOCAL_MQTT_HOST = CONF_THIRD_PARTY_MQTT_IP
 
@@ -27,7 +27,7 @@ _DEVICE_ID = "device-1"
 _TARGET_DAY = date(2026, 8, 10)
 
 
-def _bare_coordinator() -> Any:
+def _bare_coordinator() -> Any:  # noqa: ANN401, RUF105
     """Return a coordinator shell with only state used by these contracts."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)

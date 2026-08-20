@@ -40,11 +40,11 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:
+def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: ANN401, RUF105
     return cast("Any", coordinator)._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
 
 
-def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:
+def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: ANN401, RUF105
     return cast("Any", coordinator)._async_publish_command.await_args  # ruff: ignore[private-member-access]
 
 

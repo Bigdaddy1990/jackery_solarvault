@@ -23,8 +23,9 @@ from custom_components.jackery_solarvault.const import (
 class MockJackeryApi(JackeryApi):
     """Mock JackeryApi with captured parameters."""
 
-    def __init__(self):
-        from unittest.mock import AsyncMock
+    def __init__(self) -> None:  # noqa: D107, RUF105
+        from unittest.mock import AsyncMock  # noqa: PLC0415, RUF105
+
         super().__init__(
             session=AsyncMock(),
             account="test_account",
@@ -38,7 +39,7 @@ class MockJackeryApi(JackeryApi):
 
 
 async def test_async_get_device_ct_stat_defaults_to_l1() -> None:
-    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""
+    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: E501, RUF105
     api = MockJackeryApi()
 
     await api.async_get_device_ct_stat(
@@ -144,7 +145,7 @@ async def test_async_get_device_ct_stat_year_type() -> None:
 
 
 async def test_async_get_device_eps_stat_defaults_to_l1() -> None:
-    """async_get_device_eps_stat defaults to EPS_STAT_TYPE_L1 (0) when stat_type not provided."""
+    """async_get_device_eps_stat defaults to EPS_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: E501, RUF105
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -241,7 +242,9 @@ async def test_ct_stat_type_parameter_in_request_meta() -> None:
 
     # Check that request metadata in stored response includes stat_type
     stored = api.last_device_period_stat_responses[f"{DEVICE_CT_STAT_PATH}:dev1:day"]
-    assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(CT_STAT_TYPE_L2)
+    assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(
+        CT_STAT_TYPE_L2
+    )  # noqa: E501, RUF100
 
 
 async def test_eps_stat_type_parameter_in_request_meta() -> None:
@@ -258,4 +261,6 @@ async def test_eps_stat_type_parameter_in_request_meta() -> None:
 
     # Check that request metadata in stored response includes stat_type
     stored = api.last_device_period_stat_responses[f"{DEVICE_EPS_STAT_PATH}:dev1:day"]
-    assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
+    assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(
+        EPS_STAT_TYPE_L1
+    )  # noqa: E501, RUF100

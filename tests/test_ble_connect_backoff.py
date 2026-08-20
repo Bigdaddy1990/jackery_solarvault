@@ -51,7 +51,7 @@ def test_fresh_backoff_allows_immediate_attempt() -> None:
 
 
 def test_first_failure_blocks_for_initial_window() -> None:
-    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""
+    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""  # noqa: E501, RUF105
     backoff = BleConnectBackoff()
 
     applied = backoff.record_failure(_NOW)
