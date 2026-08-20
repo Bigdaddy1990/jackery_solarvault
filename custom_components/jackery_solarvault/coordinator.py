@@ -816,7 +816,7 @@ def _slow_fetch_failure_log_level(
     failures must stay at WARNING even when suppressed/backed-off so
     the user can see third-party connectivity issues in default logs.
     """
-    # Check if this is a Shelly realtime fetch error (cache_key contains "shelly_realtime")  # ruff: ignore[line-too-long]
+    # Check if this is a Shelly realtime fetch error (cache_key contains "shelly_realtime")
     # The caller doesn't pass cache_key, so we infer from the error message.
     err_text = str(err).lower()
     is_shelly_realtime = "shelly_realtime" in err_text or "realtime-power" in err_text
@@ -827,7 +827,7 @@ def _slow_fetch_failure_log_level(
     return logging.WARNING
 
 
-def control_int(value: Any, field_name: str) -> int:  # ruff: ignore[any-type]
+def control_int(value: Any, field_name: str) -> int:
     """Return a finite integer control value or raise a coordinator error."""
     parsed = None if isinstance(value, bool) else safe_int(value)
     if parsed is None:
@@ -836,7 +836,7 @@ def control_int(value: Any, field_name: str) -> int:  # ruff: ignore[any-type]
     return parsed
 
 
-def transport_cmd(value: Any) -> int:  # ruff: ignore[any-type]
+def transport_cmd(value: Any) -> int:
     """Return a command integer for MQTT/BLE transport routing."""
     parsed = first_nonblank_int(value)
     if parsed is None:
@@ -2682,7 +2682,7 @@ def sanitize_main_properties(props: dict[str, Any]) -> dict[str, Any]:
 
 
 def merge_battery_pack_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while.
@@ -2736,7 +2736,7 @@ def merge_battery_pack_lists(
 
 
 def merge_subdevice_lists_by_sn(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
@@ -2790,7 +2790,7 @@ def merge_subdevice_lists_by_sn(
 
 
 def merge_subdevice_list_by_identity(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     update: dict[str, Any],
 ) -> list[dict[str, Any]]:
     """Merge Shelly Cloud accessory data by stable identity values and return an.
@@ -2830,7 +2830,7 @@ def merge_subdevice_list_by_identity(
 
 
 def merge_smart_plug_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental smart-plug telemetry entries using device serial numbers to.
@@ -2852,7 +2852,7 @@ def merge_smart_plug_lists(
 
 
 def merge_circuits(
-    current: Any,  # ruff: ignore[any-type]
+    current: Any,
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge incremental circuit breaker telemetry using idx to align updates."""
@@ -2860,7 +2860,7 @@ def merge_circuits(
 
 
 def merge_sub_devices(
-    current: Any,  # ruff: ignore[any-type]
+    current: Any,
     updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge generic sub-device telemetry using serial numbers to align updates."""
@@ -2868,9 +2868,9 @@ def merge_sub_devices(
 
 
 def _merge_subdevice_lists_by_fn(
-    current: Any,  # ruff: ignore[any-type]
+    current: Any,
     updates: list[dict[str, Any]],
-    serial_fn: Any,  # ruff: ignore[any-type]
+    serial_fn: Any,
 ) -> list[dict[str, Any]]:
     """Merge a list of subdevice telemetry entries with incoming updates, matching by.
 
@@ -2971,7 +2971,7 @@ def merge_pack_ota(pack: dict[str, Any], ota: dict[str, Any]) -> None:
 
 
 def merge_battery_pack_ota_lists(
-    current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+    current: Any,  # loose prior-state list, duck-typed via `current or []`
     ota_updates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Merge OTA metadata into a battery-pack list by matching serial numbers.
@@ -3512,7 +3512,7 @@ def _serialize_mqtt_messages_by_device(
         self: JackerySolarVaultCoordinator,
         topic: str,
         payload: dict[str, Any],
-        **kwargs: Any,  # ruff: ignore[any-type]
+        **kwargs: Any,
     ) -> str | None:
         device_id = self._resolve_device_id_from_mqtt(payload)
         lock_key = device_id or "__unresolved__"
@@ -4826,7 +4826,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return
 
     async def async_start_local_mqtt_listener(self) -> None:
-        """Subscribe to the user's HA MQTT broker for local bridge payloads (homeassistant/...)."""  # ruff: ignore[line-too-long]
+        """Subscribe to the user's HA MQTT broker for local bridge payloads (homeassistant/...)."""
         if not config_entry_bool_option(
             self.entry,
             CONF_LOCAL_MQTT_ENABLE,
@@ -4847,7 +4847,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
 
-        async def _handle_local_mqtt_message(message: Any) -> None:  # ruff: ignore[any-type]
+        async def _handle_local_mqtt_message(message: Any) -> None:
             raw_payload = message.payload
             if isinstance(raw_payload, bytes):
                 raw_payload = raw_payload.decode()
@@ -4872,7 +4872,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 return
             await self._async_handle_mqtt_message(str(message.topic), payload)
 
-        def _queue_local_mqtt_message(message: Any) -> None:  # ruff: ignore[any-type]
+        def _queue_local_mqtt_message(message: Any) -> None:
             self.hass.async_create_background_task(
                 _handle_local_mqtt_message(message),
                 name=f"{DOMAIN}_local_mqtt_message",
@@ -6931,7 +6931,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     def _property_update_was_accepted(
         accepted: Mapping[str, Any],
         key: str,
-        value: Any,  # ruff: ignore[any-type]
+        value: Any,
     ) -> bool:
         """Return whether an incoming scalar or sparse mapping reached the merge."""
         accepted_value = accepted.get(key)
@@ -7458,7 +7458,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     @classmethod
     def _merge_battery_pack_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields.
@@ -7536,7 +7536,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     @classmethod
     def _merge_subdevice_lists_by_sn(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge generic subdevice telemetry by ``deviceSn`` when available."""
@@ -7545,7 +7545,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     @classmethod
     def _merge_smart_plug_lists(
         cls,
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge incremental smart-plug telemetry by ``deviceSn``.
@@ -7823,7 +7823,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     @staticmethod
     def _merge_battery_pack_ota_lists(
-        current: Any,  # loose prior-state list, duck-typed via `current or []`  # ruff: ignore[any-type]
+        current: Any,  # loose prior-state list, duck-typed via `current or []`
         ota_updates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """Merge static OTA fields into packs without touching last-seen state."""
@@ -8483,7 +8483,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         # Also back off for DNS resolution failures on the Jackery cloud endpoint.
         # These are transient network issues that should not be hammered every cycle.
-        if backoff_key is not None and "dns" in str(err).lower():  # ruff: ignore[collapsible-if]
+        if backoff_key is not None and "dns" in str(err).lower():
             if isinstance(err.__cause__, Exception):
                 cause_name = type(err.__cause__).__name__
                 if "DNS" in cause_name or "ClientConnectorDNSError" in cause_name:
@@ -9017,7 +9017,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 )
 
     @staticmethod
-    def _coerce_transport_cmd(cmd: Any) -> int:  # ruff: ignore[any-type]
+    def _coerce_transport_cmd(cmd: Any) -> int:
         """Coerce transport cmd input to an integer.
 
         Accepts plain ints plus integral numeric strings (e.g. ``"107"``,
@@ -11307,7 +11307,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         self,
         device_id: str,
         *,
-        timeout: float = _THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC,  # ruff: ignore[async-function-with-timeout]
+        timeout: float = _THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC,
     ) -> dict[str, Any] | None:
         """Publish 3047 and wait for one complete device-reported config."""
         future: asyncio.Future[dict[str, Any]] = (
@@ -13493,11 +13493,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # ruff: ignore[any-type]
+            default: Any,  # generic TTL cache over arbitrary payloads
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff: ignore[any-type]
+        ) -> Any:  # generic TTL cache over arbitrary payloads
             """Generic TTL cache helper operating on any dict."""
             now = time.monotonic()
             entry = cache.get(cache_key)
@@ -13527,7 +13527,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 cache[cache_key] = (0.0, seeded_default)
                 return seeded_default
 
-            async def _fetch_uncached() -> Any:  # ruff: ignore[any-type]
+            async def _fetch_uncached() -> Any:
                 """Run one cache miss under the shared slow-HTTP limit."""
                 semaphore = getattr(self, "_slow_http_request_semaphore", None)
                 if not stale_ok and semaphore is not None:
@@ -13600,11 +13600,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             cache_key: str,
             ttl_sec: int,
             fetcher: Callable[[str], Awaitable[Any]],
-            default: Any,  # generic TTL cache over arbitrary payloads  # ruff: ignore[any-type]
+            default: Any,  # generic TTL cache over arbitrary payloads
             *,
             backoff_key: str | None = None,
             stale_ok: bool = False,
-        ) -> Any:  # generic TTL cache over arbitrary payloads  # ruff: ignore[any-type]
+        ) -> Any:  # generic TTL cache over arbitrary payloads
             """System-scoped TTL cache wrapper."""
             per_system = self._slow_cache.setdefault(sys_id, {})
             return await _get_with_ttl_for(
@@ -13967,7 +13967,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         cache_key: str,
                         request_kwargs: dict[str, str],
                     ) -> Callable[[], Awaitable[Any]]:
-                        async def _refresh() -> Any:  # ruff: ignore[any-type]
+                        async def _refresh() -> Any:
                             # Use the non-semaphore primitive here. The
                             # background pass already bounds every device
                             # refresher with the shared slow-HTTP semaphore in
@@ -13993,7 +13993,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     async def _fetch_previous_home_month(
                         month: int,
                         section_prefix: str,
-                    ) -> Any:  # forwards arbitrary cached payload  # ruff: ignore[any-type]
+                    ) -> Any:  # forwards arbitrary cached payload
                         request_kwargs = app_month_request_kwargs(today.year, month)
                         cache_key = (
                             f"{section_prefix}_{DATE_TYPE_MONTH}_"
@@ -15236,7 +15236,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             def _make_device_refresher(
                 descriptor: tuple[str, str | None, str | None, str | None],
             ) -> Callable[[], Awaitable[Any]]:
-                async def _refresh() -> Any:  # forwards device extras  # ruff: ignore[any-type]
+                async def _refresh() -> Any:  # forwards device extras
                     return await _fetch_device_extras(
                         descriptor[0],
                         descriptor[1],
@@ -15256,7 +15256,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 # buckets back into ``self.data`` and push a partial update.
                 # Auth / transient failures stay isolated so they never flip
                 # ``last_update_success``.
-                async def _refresh() -> Any:  # ruff: ignore[any-type]
+                async def _refresh() -> Any:
                     if not self.data or enrich_dev_id not in self.data:
                         return None
                     enrich_entry = dict(self.data[enrich_dev_id])
@@ -15307,7 +15307,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             device_refreshers.extend(historical_month_refreshers)
             if shelly_cache_stale:
 
-                async def _refresh_shelly() -> Any:  # ruff: ignore[any-type]
+                async def _refresh_shelly() -> Any:
                     return await _fetch_shelly_cloud_devices(stale_ok=False)
 
                 device_refreshers.append(_refresh_shelly)
@@ -15462,7 +15462,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
             async def _refresh_device(
                 refresh_device: Callable[[], Awaitable[Any]],
-            ) -> Any:  # ruff: ignore[any-type]
+            ) -> Any:
                 return await refresh_device()
 
             async def _refresh_devices() -> None:
@@ -16018,7 +16018,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # App 2.4.0 contains no Local-MQTT command publisher.
         return False
 
-    def _data_source_supervisor_available(  # Explicit transport exits keep diagnostic visibility rules auditable.  # ruff: ignore[line-too-long]
+    def _data_source_supervisor_available(  # Explicit transport exits keep diagnostic visibility rules auditable.
         self,
         source: str,
     ) -> bool:

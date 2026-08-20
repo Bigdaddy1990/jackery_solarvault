@@ -67,7 +67,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestJackerySolarVaultCoordinator:  # noqa: PLR0904, RUF105
     """Test JackerySolarVaultCoordinator class."""
 
-    def _create_coordinator(self, hass=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, hass=None):  # noqa: PLR6301, RUF105
         """Create a basic coordinator for testing."""
         if hass is None:
             hass = MagicMock()
@@ -225,7 +225,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904, RUF105
     def test_metric_source_candidates(self) -> None:
         """Test _metric_source_candidates method."""
         coordinator = self._create_coordinator()
-        # Function requires section_prefix, stat_key, metric_key and returns list of tuples  # noqa: E501, RUF105
+        # Function requires section_prefix, stat_key, metric_key and returns list of tuples  # noqa: RUF105
         candidates = coordinator._metric_source_candidates("test", "stat", "metric")  # noqa: RUF105, SLF001
         assert isinstance(candidates, list)
         assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)
@@ -696,7 +696,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
 
     def test_is_transient_connect_failure(self) -> None:  # noqa: PLR6301, RUF105
         """Test is_transient_connect_failure function."""
-        # Function checks for "server unavailable", "connection refused", "connection timed out", or "unknown"  # noqa: E501, RUF105
+        # Function checks for "server unavailable", "connection refused", "connection timed out", or "unknown"  # noqa: RUF105
         # but first excludes auth failures via is_mqtt_auth_failure
         assert is_transient_connect_failure("server unavailable") is True
         assert is_transient_connect_failure("connection refused") is True
@@ -870,7 +870,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
 
     def test_valid_price_sources(self) -> None:  # noqa: PLR6301, RUF105
         """Test valid_price_sources function."""
-        # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present  # noqa: E501, RUF105
+        # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present  # noqa: RUF105
         from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
             FIELD_PLATFORM_COMPANY_ID,
             FIELD_SYSTEM_REGION,
@@ -1367,7 +1367,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
 
     def test_is_smart_meter_accessory(self) -> None:  # noqa: PLR6301, RUF105
         """Test is_smart_meter_accessory function."""
-        # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)  # noqa: E501, RUF105
+        # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)  # noqa: RUF105
         from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
             FIELD_DEVICE_TYPE,
             FIELD_DEV_TYPE,
@@ -1482,7 +1482,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
             SUBDEVICE_DEV_TYPE_SOCKET,
         )
 
-        # Function checks for accessories with matching dev_type or bucket with dict items  # noqa: E501, RUF105
+        # Function checks for accessories with matching dev_type or bucket with dict items  # noqa: RUF105
         # Test with matching dev_type in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]}
         assert (
@@ -1554,7 +1554,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
             SUBDEVICE_DEV_TYPE_METER_HEAD,
         )
 
-        # Function checks for meter head (dev_type=4) or meter (dev_type=5) in accessories or meter_heads bucket  # noqa: E501, RUF105
+        # Function checks for meter head (dev_type=4) or meter (dev_type=5) in accessories or meter_heads bucket  # noqa: RUF105
         # Test with meter head in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_METER_HEAD}]}
         assert has_meter_head_accessory(payload) is True
@@ -1589,7 +1589,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
             SUBDEVICE_DEV_TYPE_SOCKET,
         )
 
-        # Function checks for smart plug (dev_type=6) in accessories or smart_plugs bucket  # noqa: E501, RUF105
+        # Function checks for smart plug (dev_type=6) in accessories or smart_plugs bucket  # noqa: RUF105
         # Test with smart plug in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]}
         assert has_smart_plug_accessory(payload) is True
@@ -1621,7 +1621,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904, RUF105
             SUBDEVICE_DEV_TYPE_BREAKER,
         )
 
-        # Function checks for breaker (dev_type=7) in accessories or circuit_property bucket  # noqa: E501, RUF105
+        # Function checks for breaker (dev_type=7) in accessories or circuit_property bucket  # noqa: RUF105
         # Test with breaker in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]}
         assert has_breaker_accessory(payload) is True

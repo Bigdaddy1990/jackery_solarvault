@@ -158,8 +158,8 @@ async def test_merge_concurrent_updates_preserves_layer5_deltas() -> None:  # no
         }
     }
 
-    # Use real merge function - it should preserve Layer-5 deltas for non-property fields  # noqa: E501, RUF105
-    def mock_merge(device_id, current, incoming):  # noqa: ANN001, ANN202, RUF105
+    # Use real merge function - it should preserve Layer-5 deltas for non-property fields  # noqa: RUF105
+    def mock_merge(device_id, current, incoming):  # noqa: RUF105
         return merge_present_dict_values(current, incoming)
 
     coordinator._merge_partial_device_update = MagicMock(side_effect=mock_merge)  # noqa: RUF105, SLF001
@@ -205,7 +205,7 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:  # noqa: RUF0
     # Mock _schedule_background_once to verify it's called for shadow queries
     scheduled_tasks = []
 
-    def mock_schedule_background_once(key, coro, name) -> None:  # noqa: ANN001, RUF105
+    def mock_schedule_background_once(key, coro, name) -> None:  # noqa: RUF105
         scheduled_tasks.append((key, coro, name))
 
     coordinator._schedule_background_once = mock_schedule_background_once  # noqa: RUF105, SLF001
@@ -301,7 +301,7 @@ async def test_merge_preserves_non_property_deltas_from_layer5() -> None:  # noq
     }  # Layer-5 update  # noqa: E501, RUF100
     result = {"device1": {"statistic": {"todayGeneration": "1.0"}}}  # HTTP unchanged
 
-    def mock_merge(device_id, current, incoming):  # noqa: ANN001, ANN202, RUF105
+    def mock_merge(device_id, current, incoming):  # noqa: RUF105
         return merge_present_dict_values(current, incoming)
 
     coordinator._merge_partial_device_update = MagicMock(side_effect=mock_merge)  # noqa: RUF105, SLF001

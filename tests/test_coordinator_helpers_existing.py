@@ -61,7 +61,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorHelpersExisting:  # noqa: PLR0904, RUF105
     """Test coordinator helper functions that exist in coordinator.py."""
 
-    def _bare_entry(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
+    def _bare_entry(self) -> Any:  # noqa: PLR6301, RUF105
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -312,7 +312,7 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904, RUF105
 
     def test_shelly_cloud_api_device_id(self) -> None:  # noqa: PLR6301, RUF105
         """Test shelly_cloud_api_device_id."""
-        # Item needs to match Shelly Cloud criteria (scan_name starts with "shelly" or is_cloud)  # noqa: E501, RUF105
+        # Item needs to match Shelly Cloud criteria (scan_name starts with "shelly" or is_cloud)  # noqa: RUF105
         item = {"scanName": "shelly_plug", "deviceId": "5c:cf:7f:12:34:56"}
         result = shelly_cloud_api_device_id(item)
         assert result == "5c:cf:7f:12:34:56"

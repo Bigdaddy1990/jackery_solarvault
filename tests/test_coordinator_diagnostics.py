@@ -33,7 +33,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _Coordinator = JackerySolarVaultCoordinator
 
 
-def _bare() -> Any:  # noqa: ANN401, RUF105
+def _bare() -> Any:  # noqa: RUF105
     """Return an uninitialised coordinator shell for attribute injection."""
     return cast("Any", _Coordinator.__new__(_Coordinator))
 

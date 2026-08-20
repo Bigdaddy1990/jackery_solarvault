@@ -208,7 +208,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def _coerce_service_int(raw: Any) -> int:  # ruff: ignore[any-type]
+def _coerce_service_int(raw: Any) -> int:
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
         msg = "expected integer"
@@ -237,7 +237,7 @@ def _coerce_service_int(raw: Any) -> int:  # ruff: ignore[any-type]
     raise vol.Invalid(msg)
 
 
-def _coerce_service_float(raw: Any) -> float:  # ruff: ignore[any-type]
+def _coerce_service_float(raw: Any) -> float:
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
         msg = "expected finite number"
@@ -1244,7 +1244,7 @@ def _service_validation_error(
 
 def _device_id_from_service(
     hass: HomeAssistant,
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     translation_key: str,
     extra_placeholders: dict[str, str] | None = None,
@@ -1266,7 +1266,7 @@ def _device_id_from_service(
     )
 
 
-def _rename_system_id_from_service(raw: Any) -> str:  # ruff: ignore[any-type]
+def _rename_system_id_from_service(raw: Any) -> str:
     """Return a validated system id from a direct rename service call."""
     system_id = ""
     if isinstance(raw, str):
@@ -1289,7 +1289,7 @@ def _rename_system_id_from_service(raw: Any) -> str:  # ruff: ignore[any-type]
     )
 
 
-def _rename_name_from_service(raw: Any, system_id: str) -> str:  # ruff: ignore[any-type]
+def _rename_name_from_service(raw: Any, system_id: str) -> str:
     """Return a validated system name from a direct rename service call."""
     if not isinstance(raw, str):
         raise ServiceValidationError(
@@ -1322,7 +1322,7 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:  # ruff: ignore[
     return parsed
 
 
-def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:  # ruff: ignore[any-type]
+def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:
     """Return a validated storm-alert id from a direct service call."""
     alert_id = ""
     if isinstance(raw, str):
@@ -1349,7 +1349,7 @@ def _reject_json_constant(constant: str) -> object:
     raise ValueError(msg)
 
 
-def _json_native_value(value: Any) -> Any:  # ruff: ignore[any-type]
+def _json_native_value(value: Any) -> Any:
     """Return a JSON-native value or raise ValueError."""
     if value is None or isinstance(value, str | bool | int):
         return value
@@ -1393,7 +1393,7 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     return normalized
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # ruff: ignore[any-type]
+def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
     """Parse a BLE command `body` value from a service call into a dict.
 
     Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.
@@ -1410,7 +1410,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
     Raises:
         ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object
         string, or if JSON parsing fails.
-    """  # ruff: ignore[line-too-long]
+    """
     if isinstance(raw_body, dict):
         return _json_native_body(raw_body, device_id)
     if isinstance(raw_body, str):
@@ -1442,7 +1442,7 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:  # 
     )
 
 
-def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:  # ruff: ignore[any-type]
+def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:
     """Return a TOU tasks list from a service object or JSON string."""
     parsed: Any = raw_body
     if isinstance(raw_body, str):
@@ -1481,7 +1481,7 @@ def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any
 
 
 def _service_bool(
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1499,7 +1499,7 @@ def _service_bool(
 
 
 def _service_required_text(
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1530,7 +1530,7 @@ def _service_required_text(
 
 
 def _service_optional_text(
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1557,7 +1557,7 @@ def _service_optional_text(
 
 
 def _service_int(
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -1584,7 +1584,7 @@ def _service_int(
 
 
 def _service_float(
-    raw: Any,  # ruff: ignore[any-type]
+    raw: Any,
     *,
     field_name: str,
     translation_key: str,
@@ -2059,7 +2059,7 @@ async def _async_handle_send_ble_command(
 
     Raises:
         ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
-    """  # ruff: ignore[line-too-long]
+    """
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -3671,7 +3671,7 @@ async def _async_handle_send_device_schedule(
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
         `body` is invalid, or if sending the schedule fails.
-    """  # ruff: ignore[line-too-long]
+    """
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

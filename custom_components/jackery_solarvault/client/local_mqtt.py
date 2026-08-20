@@ -24,7 +24,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     DOMAIN,
     MQTT_CLIENT_LIBRARY,
     MQTT_CONNACK_REASONS,
@@ -87,7 +87,7 @@ class JackeryLocalMqttClient:
             client_id (str): MQTT client identifier to use when connecting.
             sink (LocalMqttSink | None): Optional async callback invoked for each received message as (topic, parsed_dict_or_None, raw_bytes).
             topic_filter (str): MQTT subscription topic filter to use when the client connects.
-        """  # ruff: ignore[line-too-long]
+        """
         self._hass = hass
         self._host = host
         self._port = port
@@ -126,7 +126,7 @@ class JackeryLocalMqttClient:
         """Start the background MQTT session runner and trigger an initial connection attempt.
 
         If a runner is already active, this call is a no-op. Schedules the session task as a Home Assistant background task, resets connection state, increments the internal connect attempt counter, and waits up to 10 seconds for the initial connection result so diagnostics reflect the attempt.
-        """  # ruff: ignore[line-too-long]
+        """
         async with self._lock:
             if self._runner_task is not None and not self._runner_task.done():
                 return
@@ -154,7 +154,7 @@ class JackeryLocalMqttClient:
         """Stop the background MQTT session task and reset internal connection state.
 
         If a background session task exists it will be cancelled and awaited; cancellation, MQTT, and other finalization errors are suppressed. The client's connection state and stored client reference are cleared.
-        """  # ruff: ignore[line-too-long]
+        """
         async with self._lock:
             task = self._runner_task
             self._runner_task = None
@@ -176,7 +176,7 @@ class JackeryLocalMqttClient:
         """Manage a single MQTT session: connect to the configured broker, subscribe to the configured topic filter, and forward incoming messages to the client's message handler.
 
         On successful connection this updates the client's connection state and last-connect timestamp and begins consuming messages until the session ends. Subscription, connect, and disconnect failures are recorded for diagnostics. Ensures the internal connection event is set before exit so callers waiting for startup cannot deadlock.
-        """  # ruff: ignore[line-too-long]
+        """
         self._session_connected = False
         try:
             await self._async_consume_session()
@@ -251,7 +251,7 @@ class JackeryLocalMqttClient:
 
         Parameters:
             rc (int): MQTT CONNACK return code indicating the broker's refusal reason.
-        """  # ruff: ignore[line-too-long]
+        """
         self._connected = False
         reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
         self._last_error = f"connect rc={rc} ({reason})"
@@ -269,7 +269,7 @@ class JackeryLocalMqttClient:
         Parameters:
             error (str): Human-readable error message to record.
             was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened while attempting to connect.
-        """  # ruff: ignore[line-too-long]
+        """
         if was_connected:
             self._last_error = f"disconnect: {error}"
             _LOGGER.debug("Jackery local MQTT disconnected: %s", error)
@@ -325,7 +325,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             int: The MQTT return code if present, otherwise `0`.
-        """  # ruff: ignore[line-too-long]
+        """
         rc = getattr(err, "rc", None)
         if isinstance(rc, int):
             return rc
@@ -431,13 +431,13 @@ class JackeryLocalMqttClient:
         Parameters:
             coro (Awaitable[None]): Coroutine to run as a background task.
             label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
-        """  # ruff: ignore[line-too-long]
+        """
 
         async def _runner() -> None:
             """Await the provided coroutine and allow any exception it raises to propagate.
 
             This helper awaits the closure-captured coroutine `coro`. It does not swallow exceptions so that callers or task completion callbacks can observe and handle errors.
-            """  # ruff: ignore[line-too-long]
+            """
             await coro
 
         task = self._hass.async_create_task(
@@ -451,7 +451,7 @@ class JackeryLocalMqttClient:
 
             Parameters:
                 done (asyncio.Task[None]): Completed task to inspect for exceptions.
-            """  # ruff: ignore[line-too-long]
+            """
             try:
                 done.result()
             except asyncio.CancelledError:
@@ -477,7 +477,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             dict[str, Any]: A snapshot containing connection/configuration flags, topic diagnostics, message counters, last-seen timestamps/errors, connect attempts, and the MQTT client library identifier.
-        """  # ruff: ignore[line-too-long]
+        """
         # Explicit annotation so the redacted (all-str) and unredacted (str + int
         # port) branches do not lock the inferred dict type to ``dict[str, str]``.
         target: dict[str, Any]
@@ -555,7 +555,7 @@ class JackeryLocalMqttClient:
 
         Returns:
             ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
-        """  # ruff: ignore[line-too-long]
+        """
         return datetime.now(UTC).isoformat()
 
 
@@ -564,7 +564,7 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 def _local_mqtt_client(
     hass: HomeAssistant,
-    entry: Any,  # ruff: ignore[any-type]
+    entry: Any,
 ) -> JackeryLocalMqttClient | None:
     """Retrieve the JackeryLocalMqttClient for a config entry from hass.data.
 
@@ -574,7 +574,7 @@ def _local_mqtt_client(
 
     Returns:
         JackeryLocalMqttClient | None: The client instance for the entry, or `None` if not found or the stored value has a different type.
-    """  # ruff: ignore[line-too-long]
+    """
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None

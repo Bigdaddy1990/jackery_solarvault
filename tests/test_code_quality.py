@@ -364,7 +364,7 @@ def test_const_exports_are_not_reassigned() -> None:
         else:
             continue
         assert name not in seen, (
-            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # noqa: E501, RUF105
+            f"{path}:{node.lineno} reassigns {name}; first assignment at line {seen[name]}"  # noqa: RUF105
         )
         seen[name] = node.lineno
 
@@ -406,7 +406,7 @@ def test_mqtt_credential_keys_are_centralized() -> None:
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and node.value in forbidden:
                 raise AssertionError(
-                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # noqa: E501, RUF105
+                    f"{path}:{node.lineno} uses raw MQTT credential key {node.value!r}; "  # noqa: RUF105
                     "use const.py instead"
                 )
 
@@ -717,7 +717,7 @@ def test_subdevice_attributes_do_not_publish_serials_or_network_ids() -> None:
         binary_source
         .split("class JackerySmartPlugStateBinarySensor", 1)[1]
         .split(
-            "# ---------------------------------------------------------------------------",  # noqa: E501, RUF105
+            "# ---------------------------------------------------------------------------",  # noqa: RUF105
             1,
         )[0]
         .split("def extra_state_attributes", 1)[1]
@@ -958,7 +958,7 @@ def test_data_quality_warnings_are_normalized_and_formatted_for_repairs() -> Non
 
 
 def test_system_discovery_auth_errors_trigger_reauth() -> None:
-    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # noqa: E501, RUF105
+    """Auth failures in initial rediscovery are reauth problems, not generic UpdateFailed."""  # noqa: RUF105
     coordinator_source = (CUSTOM_COMPONENT / "coordinator.py").read_text(
         encoding="utf-8"
     )
@@ -998,7 +998,7 @@ def test_number_setter_rejects_non_finite_values_before_transform() -> None:
     """Number service writes must not let NaN/Infinity reach int(round(...))."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501, RUF105
+        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: RUF105
         "# Setup",
         1,
     )[0]
@@ -1029,7 +1029,7 @@ def test_number_allowed_value_checks_use_shared_rounding_helper() -> None:
     """Discrete number validation should centralize round/int conversion."""
     number_source = (CUSTOM_COMPONENT / "number.py").read_text(encoding="utf-8")
     block = number_source.split("async def async_set_native_value", 1)[1].split(
-        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: E501, RUF105
+        "\n\n# ---------------------------------------------------------------------------\n"  # noqa: RUF105
         "# Setup",
         1,
     )[0]
@@ -1172,7 +1172,7 @@ def test_config_entry_bool_option_calls_use_config_key_and_default() -> None:
     assert calls
     for call in calls:
         assert len(call.args) == 3, (
-            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # noqa: E501, RUF105
+            f"config_entry_bool_option call at line {call.lineno} must pass entry, key, default"  # noqa: RUF105
         )
 
     assert "CONF_CREATE_SMART_METER_DERIVED_SENSORS" in source
@@ -1308,7 +1308,7 @@ def test_rename_service_name_validates_direct_call_values() -> None:
 
 
 def test_delete_storm_alert_validates_direct_alert_id() -> None:
-    """Delete service alert_id constraints must not rely only on HA schema validation."""  # noqa: E501, RUF105
+    """Delete service alert_id constraints must not rely only on HA schema validation."""  # noqa: RUF105
     services_source = (CUSTOM_COMPONENT / "services.py").read_text(encoding="utf-8")
 
     assert "def _storm_alert_id_from_service(" in services_source
@@ -1659,7 +1659,7 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     """Pack firmware/update diagnostics must read the OTA-enriched fields."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
 
-    # The implementation lives in the module-level function _battery_pack_description_value  # noqa: E501, RUF105
+    # The implementation lives in the module-level function _battery_pack_description_value  # noqa: RUF105
     # which is called by JackeryBatteryPackSensor._value_from_pack
     impl_block = sensor_source.split("def _battery_pack_description_value(", 1)[
         1
@@ -1673,7 +1673,7 @@ def test_battery_pack_sensor_uses_ota_fallback_fields() -> None:
     )[1].split("class JackerySmartMeterSensor", 1)[0]
     assert "_battery_pack_description_value" in class_block
     assert "def _refresh_cache(self) -> None:" in class_block
-    # Fields that are actually used in the fallback logic within _battery_pack_description_value  # noqa: E501, RUF105
+    # Fields that are actually used in the fallback logic within _battery_pack_description_value  # noqa: RUF105
     for field in (
         "FIELD_VERSION",
         "FIELD_CURRENT_VERSION",
@@ -1807,7 +1807,7 @@ def test_sensor_setup_uses_shared_bool_option_fallback_helper() -> None:
     """Sensor setup should share one fallback path from options/data/defaults."""
     sensor_source = (CUSTOM_COMPONENT / "sensor.py").read_text(encoding="utf-8")
     setup_block = sensor_source.split("async def async_setup_entry", 1)[1].split(
-        "# ---------------------------------------------------------------------------\n# Entities",  # noqa: E501, RUF105
+        "# ---------------------------------------------------------------------------\n# Entities",  # noqa: RUF105
         1,
     )[0]
 
@@ -1853,7 +1853,7 @@ def test_no_direct_blocking_file_io_inside_async_functions() -> None:
                     name = call.func.attr
                 if name in forbidden:
                     raise AssertionError(
-                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"  # noqa: E501, RUF105
+                        f"{path}:{call.lineno} does blocking file IO in async function {node.name}()"  # noqa: RUF105
                     )
 
 
@@ -1947,7 +1947,7 @@ def test_brand_assets_are_packaged_without_runtime_sync() -> None:
 
 
 def test_brand_runtime_sync_is_absent() -> None:
-    """Read-only custom component mounts are safe because setup writes no brand files."""  # noqa: E501, RUF105
+    """Read-only custom component mounts are safe because setup writes no brand files."""  # noqa: RUF105
     init_source = (CUSTOM_COMPONENT / "__init__.py").read_text(encoding="utf-8")
     component_sources = "\n".join(
         path.read_text(encoding="utf-8")

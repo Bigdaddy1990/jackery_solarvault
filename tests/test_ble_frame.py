@@ -629,7 +629,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
     """Assert the integration manifest declares the BLE service matcher, manufacturer, dependency, and requirement.
 
     Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
-    """  # noqa: E501, RUF105
+    """  # noqa: RUF105
     import json  # ruff: ignore[import-outside-top-level]
     from pathlib import Path  # ruff: ignore[import-outside-top-level]
 
@@ -714,7 +714,7 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
-            """  # noqa: E501, RUF105
+            """  # noqa: RUF105
             await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)  # ruff: ignore[private-member-access]
 
         task = asyncio.create_task(_stuck())
@@ -742,8 +742,8 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # noqa: RUF012, RUF105
-        options = {  # noqa: RUF012, RUF105
+        data: dict[str, object] = {}  # noqa: RUF105
+        options = {  # noqa: RUF105
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -754,14 +754,14 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
             Raises:
                 AssertionError: Always raised with the message "BLE listener must not be called".
-            """  # noqa: E501, RUF105
+            """  # noqa: RUF105
             raise AssertionError("BLE listener must not be called")
 
     async def _run() -> None:
         """Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
 
         Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
-        """  # noqa: E501, RUF105
+        """  # noqa: RUF105
         self = cast(
             "Any",
             JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
@@ -786,8 +786,8 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # noqa: RUF012, RUF105
-        options = {  # noqa: RUF012, RUF105
+        data: dict[str, object] = {}  # noqa: RUF105
+        options = {  # noqa: RUF105
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: False,
         }
@@ -800,7 +800,7 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
 
             Returns:
                 stats (dict[str, object]): A snapshot mapping statistic names to their current values.
-            """  # noqa: E501, RUF105
+            """  # noqa: RUF105
             return {}
 
         def mtu_for_device(self, device_id: str) -> int:  # ruff: ignore[no-self-use]
@@ -847,8 +847,8 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # noqa: RUF012, RUF105
-        options = {  # noqa: RUF012, RUF105
+        data: dict[str, object] = {}  # noqa: RUF105
+        options = {  # noqa: RUF105
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -930,7 +930,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
             Raises:
                 AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
-            """  # noqa: E501, RUF105
+            """  # noqa: RUF105
             raise AssertionError("cmd=0 must not attempt BLE")
 
         async def _publish_mqtt(  # ruff: ignore[unused-async]
@@ -952,7 +952,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """  # noqa: E501, RUF105
+            """  # noqa: RUF105
             del cloud_attempt
             captured["device_id"] = device_id
             captured["message_type"] = message_type
@@ -1238,7 +1238,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
-    """  # noqa: D205, E501, RUF105
+    """  # noqa: D205, RUF105
 
     class _FakeClient:
         is_connected = True
@@ -1382,7 +1382,7 @@ def test_listener_async_stop_cancels_pending_acks() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
 
         Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
-        """  # noqa: E501, RUF105
+        """  # noqa: RUF105
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
@@ -1425,7 +1425,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
 
         Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """  # noqa: E501, RUF105
+        """  # noqa: RUF105
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
@@ -1457,8 +1457,8 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     )
 
     class _Entry:
-        data: dict[str, object] = {}  # noqa: RUF012, RUF105
-        options = {  # noqa: RUF012, RUF105
+        data: dict[str, object] = {}  # noqa: RUF105
+        options = {  # noqa: RUF105
             CONF_ENABLE_BLE_TRANSPORT: True,
             CONF_ENABLE_BLE_WRITES: True,
         }
@@ -1557,7 +1557,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
 
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
-    """  # noqa: E501, RUF105
+    """  # noqa: RUF105
     import asyncio  # ruff: ignore[import-outside-top-level]
     import base64  # ruff: ignore[import-outside-top-level]
 
@@ -1676,7 +1676,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """  # noqa: E501, RUF105
+        """  # noqa: RUF105
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
@@ -1733,7 +1733,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
 
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
-    """  # noqa: E501, RUF105
+    """  # noqa: RUF105
     import asyncio  # ruff: ignore[import-outside-top-level]
     import base64  # ruff: ignore[import-outside-top-level]
 
@@ -1746,7 +1746,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
 
         This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """  # noqa: E501, RUF105
+        """  # noqa: RUF105
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")

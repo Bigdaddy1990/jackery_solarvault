@@ -32,7 +32,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorMainPaths:
     """Test main coordinator paths for coverage."""
 
-    def _bare_coordinator(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
+    def _bare_coordinator(self) -> Any:  # noqa: PLR6301, RUF105
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = cast("Any", coordinator)
         shell._shutdown_started = False  # noqa: RUF105, SLF001
@@ -58,7 +58,7 @@ class TestCoordinatorMainPaths:
         coordinator = self._bare_coordinator()
         coordinator.async_test_method = AsyncMock(return_value="result")
 
-        async def run():  # noqa: ANN202, RUF105
+        async def run():  # noqa: RUF105
             return await call(coordinator, "async_test_method", "arg1", kwarg="value")
 
         result = asyncio.run(run())

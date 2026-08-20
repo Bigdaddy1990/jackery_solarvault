@@ -1227,7 +1227,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
         Returns:
             bool: `True` if the select entity for `key` is supported for this device,
             `False` otherwise.
-        """  # ruff: ignore[line-too-long]
+        """
         props = payload_properties_for_sources(payload)
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
         if key == "work_mode_select":

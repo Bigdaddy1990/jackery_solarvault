@@ -81,7 +81,7 @@ def _diagnostics_rig(  # test builder wires every accessor the export touches
     rejection_metrics: RejectionMetrics | None = None,
     hass_data: dict[str, Any] | None = None,
 ) -> tuple[Any, Any]:
-    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""  # noqa: E501, RUF105
+    """Build a bare coordinator + config entry for `async_get_config_entry_diagnostics`."""  # noqa: RUF105
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     entry = SimpleNamespace(
@@ -448,7 +448,7 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
 
 @pytest.mark.asyncio
 async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> None:
-    """A fully valid config with no registered client falls back to client_not_started."""  # noqa: E501, RUF105
+    """A fully valid config with no registered client falls back to client_not_started."""  # noqa: RUF105
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,

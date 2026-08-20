@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorClassMethods:
     """Test coordinator class methods."""
 
-    def _bare_coordinator(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
+    def _bare_coordinator(self) -> Any:  # noqa: PLR6301, RUF105
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = cast("Any", coordinator)
         shell._shutdown_started = False  # noqa: RUF105, SLF001

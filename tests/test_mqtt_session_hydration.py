@@ -63,7 +63,7 @@ class MockCoordinator:
     async def async_load_local_daily_snapshots(self) -> None:  # noqa: D102, RUF105
         pass
 
-    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # noqa: ANN401, D102, RUF105
+    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # noqa: D102, RUF105
         self._persisted_mqtt_session = persisted
         self._mqtt_session_cache_loaded = True
         return True
@@ -71,7 +71,7 @@ class MockCoordinator:
 
 async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  # noqa: RUF029, RUF105
     """_entry_bootstrap_mqtt_session extracts valid snapshot from entry.data."""
-    # Valid bootstrap session - 32 zero bytes base64 encoded = 43 'A' + '=' padding = 44 chars  # noqa: E501, RUF105
+    # Valid bootstrap session - 32 zero bytes base64 encoded = 43 'A' + '=' padding = 44 chars  # noqa: RUF105
     seed = "A" * 43 + "="
     entry = MockConfigEntry(
         data={

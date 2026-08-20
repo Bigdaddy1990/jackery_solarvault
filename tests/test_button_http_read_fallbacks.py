@@ -55,7 +55,7 @@ _LIVE_PACK_SOC = 80
 _SYSTEM_ENERGY_PLAN_POWER = 725
 
 
-def _description(key: str) -> Any:  # noqa: ANN401, RUF105
+def _description(key: str) -> Any:  # noqa: RUF105
     """Return one query-button description by key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -87,12 +87,12 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: ANN401, RUF105
+def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
     """Return the API test double behind the coordinator's typed boundary."""
     return cast("Any", coordinator.api)
 
 
-def _button(coordinator: Any, key: str) -> JackeryQueryButton:  # noqa: ANN401, RUF105
+def _button(coordinator: Any, key: str) -> JackeryQueryButton:  # noqa: RUF105
     """Create a query button against a lightweight coordinator double."""
     coordinator.data = {_DEVICE_ID: {}}
     coordinator.last_update_success = True

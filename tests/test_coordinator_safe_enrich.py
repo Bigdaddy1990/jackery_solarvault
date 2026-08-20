@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault.coordinator import _safe_enrich  # noq
 class TestSafeEnrich:
     """Test _safe_enrich helper function."""
 
-    def _bare_entry(self) -> Any:  # noqa: ANN401, PLR6301, RUF105
+    def _bare_entry(self) -> Any:  # noqa: PLR6301, RUF105
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -28,7 +28,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         enrich_called = False
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: ANN401, RUF029, RUF105
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: RUF029, RUF105
             nonlocal enrich_called
             enrich_called = True
 
@@ -43,7 +43,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: ANN401, RUF029, RUF105
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: RUF029, RUF105
             raise JackeryAuthError("auth failed")
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -58,7 +58,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: ANN401, RUF029, RUF105
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: RUF029, RUF105
             raise TimeoutError("timeout")
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -72,7 +72,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: ANN401, RUF029, RUF105
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: RUF029, RUF105
             raise JackeryError("api error")
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -83,7 +83,7 @@ class TestSafeEnrich:
         """Test _safe_enrich raises for unexpected exceptions."""
         entry = self._bare_entry()
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: ANN401, RUF029, RUF105
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # noqa: RUF029, RUF105
             raise ValueError("unexpected")
 
         with pytest.raises(ValueError, match="unexpected"):

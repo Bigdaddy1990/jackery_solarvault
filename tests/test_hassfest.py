@@ -14,7 +14,7 @@ _INTEGRATION_PATH = (
 )
 
 
-def _manifest(**overrides: Any) -> dict[str, Any]:  # noqa: ANN401, RUF105
+def _manifest(**overrides: Any) -> dict[str, Any]:  # noqa: RUF105
     """Return the smallest manifest accepted by the offline validator."""
     manifest: dict[str, Any] = {
         "codeowners": ["@owner"],
@@ -51,7 +51,7 @@ def test_project_manifest_passes_offline_validation() -> None:
 
 def test_hassfest_run_reports_each_validation_error(
     tmp_path: Path,
-    capsys: Any,  # noqa: ANN401, RUF105
+    capsys: Any,  # noqa: RUF105
 ) -> None:
     """A failing shim must expose actionable errors instead of exiting silently."""
     integration_path = tmp_path / "missing_integration"

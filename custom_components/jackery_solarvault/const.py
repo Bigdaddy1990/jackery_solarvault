@@ -1816,7 +1816,7 @@ REDACT_KEYS: Final = frozenset({
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
-    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)  # ruff: ignore[line-too-long]
+    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)
     "access_token",
     "refresh_token",
     "token",

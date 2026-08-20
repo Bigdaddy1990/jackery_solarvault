@@ -169,7 +169,7 @@ class TestSingleTariffDynamicUnit:
 class TestJackeryNumber:
     """Test JackeryNumber class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -187,7 +187,7 @@ class TestJackeryNumber:
         coordinator.async_portable_set_custom_use_battery = AsyncMock()
         return coordinator
 
-    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # noqa: PLR6301, RUF105
         """Create a number instance for testing."""
         description = JackeryNumberDescription(
             key=key,

@@ -160,7 +160,7 @@ def _is_portable_payload(
 # ---------------------------------------------------------------------------
 
 
-def _rounded_int(value: Any) -> int:  # ruff: ignore[any-type]
+def _rounded_int(value: Any) -> int:
     """Round a value accepted by Home Assistant as a number to the nearest integer.
 
     Parameters:
@@ -241,7 +241,7 @@ class JackeryNumberDescription(NumberEntityDescription):
 # ---------------------------------------------------------------------------
 
 
-def _wire_int(value: Any) -> int:  # ruff: ignore[any-type]
+def _wire_int(value: Any) -> int:
     """Parse the given value into an integer for coordinator setter calls.
 
     Parameters:
@@ -262,7 +262,7 @@ def _wire_int(value: Any) -> int:  # ruff: ignore[any-type]
     return parsed
 
 
-def _wire_float(value: Any) -> float:  # ruff: ignore[any-type]
+def _wire_float(value: Any) -> float:
     """Parse an arbitrary input into a float suitable for coordinator setter calls.
 
     Parameters:

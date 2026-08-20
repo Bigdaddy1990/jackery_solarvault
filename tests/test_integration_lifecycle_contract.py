@@ -31,7 +31,7 @@ def _function_source(name: str, *, source_path: Path | None = None) -> str:
 
     Raises:
         AssertionError: If a matching `async def {name}` block is not found in the file.
-    """  # noqa: E501, RUF105
+    """  # noqa: RUF105
     path = source_path or INIT
     source = path.read_text(encoding="utf-8")
     match = re.search(

@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def _consume_background_task(
-    coro: Any,  # noqa: ANN401, RUF105
+    coro: Any,  # noqa: RUF105
     *,
     name: str,
     eager_start: bool,
@@ -37,7 +37,7 @@ def _consume_background_task(
 def _guarded_coordinator(
     *,
     auth_failure_message: str | None = None,
-) -> Any:  # noqa: ANN401, RUF105
+) -> Any:  # noqa: RUF105
     """Build a bare coordinator wired for the guarded-update guard paths."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)

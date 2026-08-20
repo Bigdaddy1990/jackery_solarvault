@@ -36,7 +36,7 @@ class TestApp241Endpoints:
 
     @pytest.mark.asyncio
     async def test_app_241_uses_exact_pv_trends_endpoint(self) -> None:  # noqa: PLR6301, RUF105
-        """PV trends MUST use /v1/device/stat/sys/pv/trends (not sys/.../trends variants)."""  # noqa: E501, RUF105
+        """PV trends MUST use /v1/device/stat/sys/pv/trends (not sys/.../trends variants)."""  # noqa: RUF105
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"x": ["00:00"], "y": [100]}})
 
@@ -76,7 +76,7 @@ class TestApp241Endpoints:
 
     @pytest.mark.asyncio
     async def test_app_241_portable_ct_stat_requires_type_param(self) -> None:  # noqa: PLR6301, RUF105
-        """Portable CT stat MUST send APP_REQUEST_STAT_TYPE parameter (type=0 for L1)."""  # noqa: E501, RUF105
+        """Portable CT stat MUST send APP_REQUEST_STAT_TYPE parameter (type=0 for L1)."""  # noqa: RUF105
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"l1": 1.5, "l2": 2.0}})
 
@@ -97,7 +97,7 @@ class TestApp241Endpoints:
 
     @pytest.mark.asyncio
     async def test_no_aiems_energy_prediction_request_in_production_path(self) -> None:  # noqa: PLR6301, RUF105
-        """No request to unproven AIEMS endpoint (/api/aiems/report/energy/prediction)."""  # noqa: E501, RUF105
+        """No request to unproven AIEMS endpoint (/api/aiems/report/energy/prediction)."""  # noqa: RUF105
         api = _make_api()
 
         # Verify the AIEMS path is NOT in the API client's endpoint constants
@@ -118,9 +118,9 @@ class TestApp241Endpoints:
                 for const_val in source:
                     if isinstance(const_val, str) and "aiems" in const_val.lower():
                         pytest.fail(
-                            f"Method {method_name} contains unproven AIEMS path: {const_val}. "  # noqa: E501, RUF105
-                            f"App 2.4.1 does not use /api/aiems/report/energy/prediction "  # noqa: E501, RUF105
-                            f"in the production polling surface. Remove any AIEMS request."  # noqa: E501, RUF105
+                            f"Method {method_name} contains unproven AIEMS path: {const_val}. "  # noqa: RUF105
+                            f"App 2.4.1 does not use /api/aiems/report/energy/prediction "  # noqa: RUF105
+                            f"in the production polling surface. Remove any AIEMS request."  # noqa: RUF105
                         )
 
     @pytest.mark.asyncio
@@ -141,7 +141,7 @@ class TestApp241Endpoints:
         # The returned payload must include request metadata
         assert APP_REQUEST_META in result, (
             "PV trends response must include APP_REQUEST_META for diagnostics. "
-            "The api.py implementation adds request_meta_payload to the returned payload."  # noqa: E501, RUF105
+            "The api.py implementation adds request_meta_payload to the returned payload."  # noqa: RUF105
         )
         meta = result[APP_REQUEST_META]
         assert meta[APP_REQUEST_DATE_TYPE] == "day"

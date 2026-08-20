@@ -5,7 +5,7 @@ These drive `_async_query_system_info_for_missing`, `_async_query_weather_plan_f
 and `_async_query_subdevices_for_missing` through their state transitions with a
 stubbed coordinator, asserting business outcomes (which devices are queried,
 which queries are skipped by throttle/conditions) — never call order.
-"""  # noqa: E501, RUF105
+"""  # noqa: RUF105
 
 import time
 from typing import Any
@@ -27,7 +27,7 @@ from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
 )
 
 
-async def _teardown(hass, entry_id) -> None:  # noqa: ANN001, RUF105
+async def _teardown(hass, entry_id) -> None:  # noqa: RUF105
     """Unload the entry and drain background tasks."""
     await hass.config_entries.async_unload(entry_id)
     await hass.async_block_till_done()
@@ -100,7 +100,7 @@ def _device_payload(  # noqa: RUF105
 
 
 @pytest.fixture
-async def coordinator(hass):  # noqa: ANN001, ANN201, RUF105
+async def coordinator(hass):  # noqa: RUF105
     """Yield a coordinator with mocked api for enrichment query tests."""
     api = make_update_cycle_api()
     coord, entry, _api = await setup_update_cycle_coordinator(
@@ -123,7 +123,7 @@ async def coordinator(hass):  # noqa: ANN001, ANN201, RUF105
 
 
 @pytest.mark.asyncio
-async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> None:  # noqa: RUF105
     """A BLE-only enrichment pass dispatches without Cloud-MQTT startup."""
     coordinator._ble_listener = MagicMock()  # noqa: RUF105, SLF001
     coordinator._mqtt = None  # noqa: RUF105, SLF001
@@ -161,7 +161,7 @@ async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_skipped_without_transport(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_skipped_without_transport(coordinator) -> None:  # noqa: RUF105
     """No BLE and no Cloud MQTT: query is a no-op."""
     coordinator._ble_listener = None  # noqa: RUF105, SLF001
     coordinator._mqtt = None  # noqa: RUF105, SLF001
@@ -174,7 +174,7 @@ async def test_system_info_query_skipped_without_transport(coordinator) -> None:
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # noqa: RUF105
     """Connected Cloud MQTT enables the query path."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -197,7 +197,7 @@ async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # n
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # noqa: RUF105
     """Live BLE listener enables the query path."""
     coordinator._ble_listener = MagicMock()  # noqa: RUF105, SLF001
     coordinator._mqtt = None  # noqa: RUF105, SLF001
@@ -215,7 +215,7 @@ async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # no
 
 @pytest.mark.asyncio
 async def test_system_info_query_refreshes_complete_data_when_periodic_due(
-    coordinator,  # noqa: ANN001, RUF105
+    coordinator,  # noqa: RUF105
 ) -> None:
     """Complete data is refreshed after the periodic getter interval."""
     mqtt = MagicMock()
@@ -243,7 +243,7 @@ async def test_system_info_query_refreshes_complete_data_when_periodic_due(
 
 @pytest.mark.asyncio
 async def test_system_info_query_skips_complete_data_before_periodic_due(
-    coordinator,  # noqa: ANN001, RUF105
+    coordinator,  # noqa: RUF105
 ) -> None:
     """Complete data remains throttled until the periodic interval expires."""
     mqtt = MagicMock()
@@ -267,7 +267,7 @@ async def test_system_info_query_skips_complete_data_before_periodic_due(
 
 @pytest.mark.asyncio
 async def test_system_info_query_force_true_runs_even_with_complete_data(
-    coordinator,  # noqa: ANN001, RUF105
+    coordinator,  # noqa: RUF105
 ) -> None:
     """force=True overrides the completeness check."""
     mqtt = MagicMock()
@@ -284,7 +284,7 @@ async def test_system_info_query_force_true_runs_even_with_complete_data(
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_respects_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
     """A recent query for the same device is throttled."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -302,7 +302,7 @@ async def test_system_info_query_respects_throttle(coordinator) -> None:  # noqa
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
     """force=True ignores the throttle window."""
     import time  # noqa: PLC0415, RUF105
 
@@ -322,7 +322,7 @@ async def test_system_info_query_force_true_bypasses_throttle(coordinator) -> No
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_handles_device_info_failure(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_handles_device_info_failure(coordinator) -> None:  # noqa: RUF105
     """DeviceInfo error is caught, system-info query still runs."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -339,7 +339,7 @@ async def test_system_info_query_handles_device_info_failure(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_handles_system_info_failure(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_handles_system_info_failure(coordinator) -> None:  # noqa: RUF105
     """SystemInfo error is caught and logged."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -356,7 +356,7 @@ async def test_system_info_query_handles_system_info_failure(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: RUF105
     """A caller-provided snapshot overrides coordinator.data."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -383,7 +383,7 @@ async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_skipped_without_mqtt(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_weather_plan_query_skipped_without_mqtt(coordinator) -> None:  # noqa: RUF105
     """No Cloud MQTT: weather plan query is a no-op."""
     coordinator._mqtt = None  # noqa: RUF105, SLF001
     coordinator.data = {DEVICE_ID: _device_payload()}
@@ -395,7 +395,7 @@ async def test_weather_plan_query_skipped_without_mqtt(coordinator) -> None:  # 
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:  # noqa: RUF105
     """Connected Cloud MQTT enables the query."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -414,7 +414,7 @@ async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:
 
 @pytest.mark.asyncio
 async def test_weather_plan_query_refreshes_minutes_when_periodic_due(
-    coordinator,  # noqa: ANN001, RUF105
+    coordinator,  # noqa: RUF105
 ) -> None:
     """Existing lead-time fields are refreshed after the periodic interval."""
     mqtt = MagicMock()
@@ -437,7 +437,7 @@ async def test_weather_plan_query_refreshes_minutes_when_periodic_due(
 
 @pytest.mark.asyncio
 async def test_weather_plan_query_skips_minutes_before_periodic_due(
-    coordinator,  # noqa: ANN001, RUF105
+    coordinator,  # noqa: RUF105
 ) -> None:
     """Existing lead-time fields remain throttled before the interval expires."""
     mqtt = MagicMock()
@@ -457,7 +457,7 @@ async def test_weather_plan_query_skips_minutes_before_periodic_due(
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_force_true_bypasses_completeness(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_weather_plan_query_force_true_bypasses_completeness(coordinator) -> None:  # noqa: RUF105
     """force=True ignores existing lead-time fields."""
     mqtt = MagicMock()
     mqtt.is_connected = True
@@ -471,7 +471,7 @@ async def test_weather_plan_query_force_true_bypasses_completeness(coordinator) 
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_respects_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_weather_plan_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
     """A recent query for the same device is throttled."""
     import time  # noqa: PLC0415, RUF105
 
@@ -489,7 +489,7 @@ async def test_weather_plan_query_respects_throttle(coordinator) -> None:  # noq
 
 
 @pytest.mark.asyncio
-async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
     """force=True ignores the throttle window."""
     import time  # noqa: PLC0415, RUF105
 
@@ -512,7 +512,7 @@ async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> N
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:  # noqa: RUF105
     """No accessory flags: query is a no-op."""
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -531,7 +531,7 @@ async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_battery_packs_when_present(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_battery_packs_when_present(coordinator) -> None:  # noqa: RUF105
     """Battery pack accessory triggers pack query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -548,7 +548,7 @@ async def test_subdevice_query_battery_packs_when_present(coordinator) -> None: 
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None:  # noqa: RUF105
     """Breaker accessory triggers combo query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_breaker=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -565,7 +565,7 @@ async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None: 
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  # noqa: RUF105
     """Smart meter accessory triggers meter query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_smart_meter=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -582,7 +582,7 @@ async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  #
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> None:  # noqa: RUF105
     """CT meter in payload triggers smart meter query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_ct_meter=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -597,7 +597,7 @@ async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> Non
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # noqa: RUF105
     """Meter head accessory triggers meter head query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_meter_head=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -614,7 +614,7 @@ async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # 
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # noqa: RUF105
     """Smart plug accessory triggers smart plug query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_smart_plug=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -631,7 +631,7 @@ async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # 
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> None:  # noqa: RUF105
     """force=True triggers all subdevice query types for the device."""
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -650,7 +650,7 @@ async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> No
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_respects_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
     """A recent query for the same device is throttled."""
     import time  # noqa: PLC0415, RUF105
 
@@ -665,7 +665,7 @@ async def test_subdevice_query_respects_throttle(coordinator) -> None:  # noqa: 
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
     """force=True ignores the throttle window."""
     import time  # noqa: PLC0415, RUF105
 
@@ -682,7 +682,7 @@ async def test_subdevice_query_force_true_bypasses_throttle(coordinator) -> None
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: RUF105
     """A caller-provided snapshot overrides coordinator.data."""
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
     snapshot = {DEVICE_ID: _device_payload()}
@@ -694,7 +694,7 @@ async def test_subdevice_query_uses_snapshot_when_provided(coordinator) -> None:
 
 
 @pytest.mark.asyncio
-async def test_subdevice_query_handles_battery_pack_failure(coordinator) -> None:  # noqa: ANN001, RUF105
+async def test_subdevice_query_handles_battery_pack_failure(coordinator) -> None:  # noqa: RUF105
     """Battery pack error is caught, other queries still run."""
     coordinator.data = {
         DEVICE_ID: _device_payload(has_battery_packs=True, has_breaker=True)

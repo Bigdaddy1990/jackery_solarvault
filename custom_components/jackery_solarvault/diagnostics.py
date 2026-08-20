@@ -56,7 +56,7 @@ def _redacted_payload_map(
 
     Returns:
         dict[str, Any]: Mapping of generated labels to redacted payloads.
-    """  # ruff: ignore[line-too-long]
+    """
     redacted: dict[str, Any] = {}
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
@@ -84,7 +84,7 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             - `options`: redacted copy of the config entry's options.
             - `devices`: mapping of stable local device labels to redacted device payloads.
             - `raw_api`: redacted diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill.
-    """  # ruff: ignore[line-too-long]
+    """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys()
     sensitive_sources = (

@@ -13,7 +13,7 @@ import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     FIELD_BODY,
     FIELD_DATA,
     MQTT_AUTH_FAILURE_RCS,
@@ -326,7 +326,7 @@ class JackeryMqttPushClient:
 
         Parameters:
             timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """  # ruff: ignore[line-too-long]
+        """
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -475,7 +475,7 @@ class JackeryMqttPushClient:
                 self._last_connect_failure_signature = None
                 self._consecutive_auth_failures = 0
                 _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",  # ruff: ignore[line-too-long]
+                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
                     len(topics),
                     self._tls_certificate_source,
                 )
@@ -675,7 +675,7 @@ class JackeryMqttPushClient:
 
         Returns:
             bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """  # ruff: ignore[line-too-long]
+        """
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
@@ -692,7 +692,7 @@ class JackeryMqttPushClient:
         Returns:
             ssl.SSLContext: Configured context with `check_hostname = True` and
             `verify_mode = ssl.CERT_REQUIRED`.
-        """  # ruff: ignore[line-too-long]
+        """
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -1061,7 +1061,7 @@ class JackeryMqttPushClient:
               - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
                 "tls_certificate_source": TLS and certificate source flags
               - "library": identifier of the MQTT client library
-        """  # ruff: ignore[line-too-long]
+        """
 
         def topic_value(topic: str | None) -> str | None:
             """Produce a topic with its user-specific segment redacted.

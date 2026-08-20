@@ -43,7 +43,7 @@ class TestStandbyIsOn:
 class TestJackeryDescriptionSwitch:
     """Test JackeryDescriptionSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -168,7 +168,7 @@ class TestJackeryDescriptionSwitch:
 class TestJackerySmartPlugSwitch:
     """Test JackerySmartPlugSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -246,7 +246,7 @@ class TestJackerySmartPlugSwitch:
 class TestJackeryBreakerSwitch:
     """Test JackeryBreakerSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -343,7 +343,7 @@ class TestJackeryBreakerSwitch:
 class TestJackerySmartPlugPrioritySwitch:
     """Test JackerySmartPlugPrioritySwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}

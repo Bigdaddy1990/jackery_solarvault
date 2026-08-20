@@ -56,7 +56,7 @@ from custom_components.jackery_solarvault.const import (
 class TestJackeryApi:
     """Test JackeryApi class."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a basic client for testing with mocked dependencies."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -288,7 +288,7 @@ class TestCryptoFunctions:
 class TestMQTTCredentials:
     """Test MQTT credential derivation."""
 
-    def _create_client_with_session(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client_with_session(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session and valid login state."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -435,7 +435,7 @@ class TestMQTTCredentials:
 class TestAuthAndRelogin:
     """Test authentication and re-login logic."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -567,7 +567,7 @@ class TestAuthAndRelogin:
 class TestRequestMethods:
     """Test HTTP request methods (_get, _post, _get_json, etc.)."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -676,7 +676,7 @@ class TestRequestMethods:
 class TestDeviceEndpoints:
     """Test device-related API endpoints."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -790,7 +790,7 @@ class TestDeviceEndpoints:
 class TestPriceAndEnergyEndpoints:
     """Test price and energy endpoints."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -863,7 +863,7 @@ class TestPriceAndEnergyEndpoints:
 class TestOTAAndAccessoryEndpoints:
     """Test OTA and accessory endpoints."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -942,7 +942,7 @@ class TestOTAAndAccessoryEndpoints:
 class TestPayloadDebug:
     """Test payload debug callback."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -978,7 +978,7 @@ class TestPayloadDebug:
         callback = AsyncMock()
         client.payload_debug_callback = callback
 
-        def body_factory():  # noqa: ANN202, RUF105
+        def body_factory():  # noqa: RUF105
             return {"lazy": "data"}
 
         await client._emit_payload_debug(body_factory)  # noqa: RUF105, SLF001
@@ -989,7 +989,7 @@ class TestPayloadDebug:
 class TestAuthFailurePaths:
     """Test authentication failure and re-login paths."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -1044,7 +1044,7 @@ class TestAuthFailurePaths:
 
     @pytest.mark.asyncio
     async def test_relogin_and_retry_request_token_already_refreshed(self) -> None:
-        """Test _relogin_and_retry_request reuses token if already refreshed by another caller."""  # noqa: E501, RUF105
+        """Test _relogin_and_retry_request reuses token if already refreshed by another caller."""  # noqa: RUF105
         client = self._create_client()
         client._token = "already_new_token"  # noqa: RUF105, SLF001
         client._lock = asyncio.Lock()  # noqa: RUF105, SLF001
@@ -1157,7 +1157,7 @@ class TestAuthFailurePaths:
 class TestHttpErrorPaths:
     """Test HTTP error handling paths in api.py."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -1352,7 +1352,7 @@ class TestHttpErrorPaths:
 class TestAdditionalEndpoints:  # noqa: PLR0904, RUF105
     """Test additional endpoint methods not yet covered."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2402,7 +2402,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904, RUF105
 class TestCoalescedDayStat:
     """Test _coalesced_day_stat_copy method."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2493,7 +2493,7 @@ class TestCoalescedDayStat:
 class TestHttpPayloadDebug:
     """Test _http_payload_debug and _log_body integration."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2553,7 +2553,7 @@ class TestHttpPayloadDebug:
 class TestPayloadDictAndList:
     """Test _payload_dict and _payload_list edge cases."""
 
-    def _create_client(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_client(self):  # noqa: PLR6301, RUF105
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2580,7 +2580,7 @@ class TestPayloadDictAndList:
 
         assert result == {}
 
-    def test_payload_dict_logs_warning_on_unexpected_shape(self, caplog) -> None:  # noqa: ANN001, RUF105
+    def test_payload_dict_logs_warning_on_unexpected_shape(self, caplog) -> None:  # noqa: RUF105
         """Test _payload_dict logs warning on unexpected data shape."""
         client = self._create_client()
         data = {"code": 0, "data": "unexpected string"}
@@ -2617,7 +2617,7 @@ class TestPayloadDictAndList:
 
         assert result == []
 
-    def test_payload_list_logs_warning_on_unexpected_shape(self, caplog) -> None:  # noqa: ANN001, RUF105
+    def test_payload_list_logs_warning_on_unexpected_shape(self, caplog) -> None:  # noqa: RUF105
         """Test _payload_list logs warning on unexpected data shape."""
         client = self._create_client()
         data = {"code": 0, "data": "unexpected string"}
