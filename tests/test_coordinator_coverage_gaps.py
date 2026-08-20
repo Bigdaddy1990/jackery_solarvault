@@ -62,7 +62,7 @@ class TestBackfillPeriodIsClosed:
         )
 
     def test_month_type_december_boundary(self) -> None:  # noqa: PLR6301, RUF105
-        """MONTH bucket handles December -> January year rollover correctly (line 864)."""  # noqa: E501, RUF105
+        """MONTH bucket handles December -> January year rollover correctly (line 864)."""  # noqa: RUF105
         today = date(2026, 1, 15)
         dec_start = date(2025, 12, 1)
         # December period ends Dec 31, which is < Jan 15
@@ -122,7 +122,7 @@ class TestMqttConnectFailureSignature:
     """Test mqtt_connect_failure_signature edge cases."""
 
     def test_mqtt_not_connected_yet_prefix(self) -> None:  # noqa: PLR6301, RUF105
-        """Messages starting with 'MQTT not connected yet' return first 160 chars (line 1108)."""  # noqa: E501, RUF105
+        """Messages starting with 'MQTT not connected yet' return first 160 chars (line 1108)."""  # noqa: RUF105
         msg = "MQTT not connected yet - waiting for broker"
         result = mqtt_connect_failure_signature(msg)
         assert result == msg[:160]

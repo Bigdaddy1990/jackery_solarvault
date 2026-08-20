@@ -21,12 +21,12 @@ class TestJackeryLocalMqttClient:
         hass.config = SimpleNamespace()
         hass.config.path = MagicMock(return_value="/config")
 
-        def mock_create_task(coro, name=None):  # noqa: ANN001, ANN202, RUF105
+        def mock_create_task(coro, name=None):  # noqa: RUF105
             return MagicMock()
 
         hass.async_create_task = mock_create_task
 
-        def mock_schedule(coro_factory, name, eager_start=False):  # noqa: ANN001, ANN202, RUF105
+        def mock_schedule(coro_factory, name, eager_start=False):  # noqa: RUF105
             return MagicMock()
 
         hass.async_create_background_task = mock_schedule
@@ -93,7 +93,7 @@ class TestJackeryLocalMqttClient:
             mock_client.subscribe = AsyncMock()
             # Create an async iterator for messages
 
-            async def mock_messages():  # noqa: ANN202, RUF029, RUF105
+            async def mock_messages():  # noqa: RUF029, RUF105
                 return
                 yield  # pragma: no cover - make it an async generator
 

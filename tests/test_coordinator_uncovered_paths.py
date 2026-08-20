@@ -92,7 +92,7 @@ class TestNormalizeBackfillStatus:
         assert result == BackfillStatus.PENDING
 
     def test_unknown_closed_maps_to_pending(self) -> None:  # noqa: PLR6301, RUF105
-        """Unknown values return PENDING even when closed (not in known retryable list)."""  # noqa: E501, RUF105
+        """Unknown values return PENDING even when closed (not in known retryable list)."""  # noqa: RUF105
         result = _normalize_backfill_status("unknown", closed=True)
         assert result == BackfillStatus.PENDING
 

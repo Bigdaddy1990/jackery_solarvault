@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING, Any
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC  # ruff: ignore[relative-imports]
+from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
 
 if TYPE_CHECKING:
@@ -379,7 +379,7 @@ class JackeryBleListener:
     def _install_session(
         self,
         device_id: str,
-        client: Any,  # ruff: ignore[any-type]
+        client: Any,
         generation: int,
     ) -> _GattSession:
         """Invalidate the prior session and install a new owned GATT session."""
@@ -496,13 +496,13 @@ class JackeryBleListener:
                 else:
                     # Client not connected, no need to disconnect - just log at debug
                     _LOGGER.debug(
-                        "Jackery BLE %s: client not connected (state: %s), skipping disconnect",  # ruff: ignore[line-too-long]
+                        "Jackery BLE %s: client not connected (state: %s), skipping disconnect",
                         device_id,
                         getattr(client, "state", "unknown"),
                     )
             except Exception as err:  # ruff: ignore[blind-except]
                 _LOGGER.debug(
-                    "Jackery BLE: disconnect during teardown of %s failed (non-critical): %s",  # ruff: ignore[line-too-long]
+                    "Jackery BLE: disconnect during teardown of %s failed (non-critical): %s",
                     device_id,
                     err,
                 )
@@ -668,7 +668,7 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    async def async_ensure_connected(  # flat transport guard chain; the connect-backoff gate is the 7th early exit  # ruff: ignore[line-too-long]
+    async def async_ensure_connected(  # flat transport guard chain; the connect-backoff gate is the 7th early exit
         self,
         device_id: str,
         *,
@@ -1558,7 +1558,7 @@ class JackeryBleListener:
                 generation = self._next_session_generation(device_id)
 
                 def _disconnected_callback(
-                    disconnected_client: Any,  # ruff: ignore[any-type]
+                    disconnected_client: Any,
                     _generation: int = generation,
                 ) -> None:
                     """Record a disconnect for this session generation."""
@@ -1744,7 +1744,7 @@ class JackeryBleListener:
         device_id: str,
         *,
         generation: int | None = None,
-        client: Any | None = None,  # ruff: ignore[any-type]
+        client: Any | None = None,
     ) -> None:
         """Handle a peripheral disconnect for the given device.
 

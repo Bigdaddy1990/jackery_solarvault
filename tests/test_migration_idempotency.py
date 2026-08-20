@@ -106,7 +106,7 @@ def _serial_identifier(serial: str) -> str:
 def test_portable_screen_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: E501, RUF105
+    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: RUF105
     entry = _config_entry(hass)
     registry = er.async_get(hass)
 
@@ -150,7 +150,7 @@ def test_portable_screen_migration_is_idempotent_no_registry_writes(
 def test_grid_standard_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: E501, RUF105
+    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: RUF105
     entry = _config_entry(hass)
     registry = er.async_get(hass)
 
@@ -184,7 +184,7 @@ def test_grid_standard_migration_is_idempotent_no_registry_writes(
 def test_battery_pack_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated pack does not call registry.update/remove."""  # noqa: E501, RUF105
+    """Re-running migration on already-migrated pack does not call registry.update/remove."""  # noqa: RUF105
     entry = _config_entry(hass)
     registry = er.async_get(hass)
     device_registry = dr.async_get(hass)

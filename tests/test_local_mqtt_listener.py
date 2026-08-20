@@ -165,7 +165,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
     subscribe_call = mock_ha_mqtt.async_subscribe.call_args_list[0]
     subscribe_call.kwargs.get("callback") or subscribe_call.args[2]  # 3rd positional
 
-    # Simulate a message - callback is _queue_local_mqtt_message which schedules a background task  # noqa: E501, RUF105
+    # Simulate a message - callback is _queue_local_mqtt_message which schedules a background task  # noqa: RUF105
     # We directly call the internal handler _handle_local_mqtt_message to test the logic
     mock_message = MagicMock()
     mock_message.topic = "hb/app/device/test"
@@ -219,7 +219,7 @@ def test_local_mqtt_listener_ignores_non_json(monkeypatch: pytest.MonkeyPatch) -
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
-    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: E501, RUF105
+    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: RUF105
     # We test _handle_local_mqtt_message directly (the logic that filters non-JSON)
     import asyncio  # noqa: PLC0415, RUF105
 
@@ -264,13 +264,13 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
-    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: E501, RUF105
-    # We test _handle_local_mqtt_message logic directly (the logic that filters non-dict JSON)  # noqa: E501, RUF105
+    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: RUF105
+    # We test _handle_local_mqtt_message logic directly (the logic that filters non-dict JSON)  # noqa: RUF105
     import asyncio  # noqa: PLC0415, RUF105
 
     from custom_components.jackery_solarvault.coordinator import json  # noqa: RUF105
 
-    # Simulate JSON array payload - _handle_local_mqtt_message checks isinstance(payload, dict)  # noqa: E501, RUF105
+    # Simulate JSON array payload - _handle_local_mqtt_message checks isinstance(payload, dict)  # noqa: RUF105
     mock_message = MagicMock()
     mock_message.topic = "hb/app/device/test"
     mock_message.payload = b'["not", "a", "dict"]'

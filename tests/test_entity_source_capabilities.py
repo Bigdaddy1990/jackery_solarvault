@@ -23,13 +23,13 @@ class TestEntitySourceCapabilities:
             )
             if contract.classification == "entity":
                 assert contract.platform, (
-                    f"Entity contract missing platform: {contract.model}.{contract.field}"  # ruff: ignore[line-too-long]
+                    f"Entity contract missing platform: {contract.model}.{contract.field}"
                 )  # noqa: E501, RUF100
                 assert contract.entity_key, (
-                    f"Entity contract missing entity_key: {contract.model}.{contract.field}"  # ruff: ignore[line-too-long]
+                    f"Entity contract missing entity_key: {contract.model}.{contract.field}"
                 )  # noqa: E501, RUF100
                 assert contract.source_path, (
-                    f"Entity contract missing source_path: {contract.model}.{contract.field}"  # ruff: ignore[line-too-long]
+                    f"Entity contract missing source_path: {contract.model}.{contract.field}"
                 )  # noqa: E501, RUF100
             assert contract.sources, (
                 f"Contract missing sources: {contract.model}.{contract.field}"
@@ -50,7 +50,7 @@ class TestEntitySourceCapabilities:
         # source capabilities are validated against these contracts
         for contract in APP_FIELD_EXPOSURE_CONTRACTS:
             if contract.classification == "entity":
-                # For entity contracts, verify the source_path exists in coordinator data  # noqa: E501, RUF105
+                # For entity contracts, verify the source_path exists in coordinator data  # noqa: RUF105
                 # This is a structural check - actual transport capability validation
                 # happens in integration tests
                 assert contract.source_path in {
@@ -66,7 +66,7 @@ class TestEntitySourceCapabilities:
         for contract in APP_FIELD_EXPOSURE_CONTRACTS:
             if contract.classification == "internal":
                 assert contract.rationale, (
-                    f"Internal field {contract.model}.{contract.field} missing rationale"  # noqa: E501, RUF105
+                    f"Internal field {contract.model}.{contract.field} missing rationale"  # noqa: RUF105
                 )
                 assert contract.platform is None, (
                     "Internal fields should not have platform"

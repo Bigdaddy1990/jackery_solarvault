@@ -71,7 +71,7 @@
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
@@ -835,7 +835,7 @@
         "name": "Device battery discharge today"
       },
       "device_today_battery_to_ongrid": {
-        "name": "Device battery→on-grid today"
+        "name": "Device battery\u2192on-grid today"
       },
       "device_today_ongrid_input": {
         "name": "Device on-grid input today"
@@ -844,13 +844,13 @@
         "name": "Device on-grid output today"
       },
       "device_today_ongrid_to_battery": {
-        "name": "Device on-grid→battery today"
+        "name": "Device on-grid\u2192battery today"
       },
       "device_today_pv_energy": {
         "name": "Device PV today"
       },
       "device_today_pv_to_battery": {
-        "name": "Device PV→battery today"
+        "name": "Device PV\u2192battery today"
       },
       "dhg_recall": {
         "name": "DHG recall"
@@ -1459,7 +1459,7 @@
         "name": "Today solar energy"
       },
       "total_carbon_saved": {
-        "name": "Total CO₂ saved"
+        "name": "Total CO\u2082 saved"
       },
       "total_generation": {
         "name": "PV yield total"
@@ -1911,7 +1911,7 @@
           "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "scan_interval": "How often the Jackery cloud is polled for live values. Cloud MQTT and Bluetooth push faster updates independently; 30 s follows Home Assistant's guidance for cloud-polling integrations. Minimum 15 s.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md \u00a75 / \u00a715). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",

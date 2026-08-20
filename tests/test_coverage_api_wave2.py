@@ -66,19 +66,19 @@ class _Session:
             raise result
         return result
 
-    def get(self, url: str, **kwargs: Any) -> _Response:  # noqa: ANN401, RUF105
+    def get(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
         """Record one GET."""
         return self._request("GET", url, kwargs)
 
-    def put(self, url: str, **kwargs: Any) -> _Response:  # noqa: ANN401, RUF105
+    def put(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
         """Record one PUT."""
         return self._request("PUT", url, kwargs)
 
-    def post(self, url: str, **kwargs: Any) -> _Response:  # noqa: ANN401, RUF105
+    def post(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
         """Record one POST."""
         return self._request("POST", url, kwargs)
 
-    def delete(self, url: str, **kwargs: Any) -> _Response:  # noqa: ANN401, RUF105
+    def delete(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
         """Record one DELETE."""
         return self._request("DELETE", url, kwargs)
 
@@ -125,7 +125,7 @@ async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> No
         ),
     )
 
-    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):  # noqa: RUF043, RUF105
+    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):  # noqa: RUF105
         await JackeryApi._decode_login_response(response)  # ruff: ignore[private-member-access]
 
 

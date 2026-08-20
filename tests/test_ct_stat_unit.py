@@ -72,7 +72,7 @@ async def test_ct_stat_includes_type_parameter_l2() -> None:
 
 @pytest.mark.asyncio
 async def test_ct_stat_response_contains_y1_y2_arrays() -> None:
-    """CT stat response parsing preserves y1 (primary CT) and y2 (secondary CT) arrays."""  # noqa: E501, RUF105
+    """CT stat response parsing preserves y1 (primary CT) and y2 (secondary CT) arrays."""  # noqa: RUF105
     api = _api()
     payload = {
         "x": ["00:00", "00:05", "00:10"],
@@ -124,7 +124,7 @@ async def test_ct_stat_request_meta_includes_type() -> None:
 
 @pytest.mark.asyncio
 async def test_ct_stat_wrapper_delegates_with_system_id() -> None:
-    """async_get_device_ct_stat delegates to _async_get_device_period_stat with system_id."""  # noqa: E501, RUF105
+    """async_get_device_ct_stat delegates to _async_get_device_period_stat with system_id."""  # noqa: RUF105
     api = _api()
     delegate = AsyncMock(return_value={"x": [], "y1": [], "y2": [], "_request": {}})
 

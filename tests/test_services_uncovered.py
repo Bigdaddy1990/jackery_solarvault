@@ -37,7 +37,7 @@ class _Registry:
     def async_get(self, device_id: str) -> _Device | None:
         return self._devices.get(device_id)
 
-    def async_get_or_create(self, **kwargs) -> Mock:  # noqa: ANN003, PLR6301, RUF105
+    def async_get_or_create(self, **kwargs) -> Mock:  # noqa: PLR6301, RUF105
         return Mock()
 
 
@@ -259,7 +259,7 @@ class TestServices:
             lambda h, d: coordinator,
         )
 
-        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)  # noqa: E501, RUF105
+        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)  # noqa: RUF105
         call = _service_call({
             SERVICE_FIELD_DEVICE_ID: "test_device",
             SERVICE_FIELD_NICKNAME: "My AC",

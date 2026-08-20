@@ -4,7 +4,7 @@ import base64
 import secrets
 from typing import Any
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -42,7 +42,7 @@ def encode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` length is not 16 bytes.
-    """  # ruff: ignore[line-too-long]
+    """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
@@ -64,7 +64,7 @@ def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
 
     Raises:
         ValueError: If `bluetooth_key` does not have length 16, or if `value` is not a valid app-encoded field (invalid Base64 or decryption/UTF-8 decoding failure).
-    """  # ruff: ignore[line-too-long]
+    """
     if len(bluetooth_key) != BLE_AES_IV_LEN:
         raise ValueError(
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
@@ -107,7 +107,7 @@ def third_party_mqtt_config_from_options(
 
     Returns:
         dict[str, Any]: Mapping of app field constants to values ready for publishing to the device.
-    """  # ruff: ignore[line-too-long]
+    """
     token = str(
         options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN) or ""
     ).strip()
@@ -160,7 +160,7 @@ def stable_third_party_mqtt_token(
 
     Raises:
         ValueError: If a provided non-empty token is not exactly nine decimal digits.
-    """  # ruff: ignore[line-too-long]
+    """
     # ``None`` means "no token stored", not the literal string "None" -- the
     # latter would fail the 9-digit check and raise instead of falling back to
     # a generated token.
@@ -196,7 +196,7 @@ def decode_third_party_mqtt_config_body(
 
     Returns:
         dict[str, Any]: A new dict copying `body` with decoded credential fields (when decoded) and metadata keys `_ha_plaintext`, and either `_decode_failed_fields` or `_decode_error` as described above.
-    """  # ruff: ignore[line-too-long]
+    """
     config = dict(body)
     if bluetooth_key is None:
         config["_ha_plaintext"] = False
@@ -245,7 +245,7 @@ def third_party_mqtt_config_plaintext(
 
     Returns:
         dict[str, Any]: The merged plaintext ThirdPartMQTTConfig ready for entity setters.
-    """  # ruff: ignore[line-too-long]
+    """
     config = third_party_mqtt_config_from_options(options, generated_token)
     if isinstance(device_data, dict):
         current = device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)

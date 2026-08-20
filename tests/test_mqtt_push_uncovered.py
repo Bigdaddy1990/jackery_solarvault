@@ -11,7 +11,7 @@ from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX, REDACT
 class TestJackeryMqttPushClient:  # noqa: PLR0904, RUF105
     """Test JackeryMqttPushClient class."""
 
-    def _create_client(self, generation=0):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_client(self, generation=0):  # noqa: PLR6301, RUF105
         """Create a basic client for testing."""
         hass = MagicMock()
         hass.data = {}
@@ -30,7 +30,7 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904, RUF105
         client._session_generation = generation  # noqa: RUF105, SLF001
         return client
 
-    def _create_client_with_tls_ca_missing(self, generation=0):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_client_with_tls_ca_missing(self, generation=0):  # noqa: PLR6301, RUF105
         """Create a client with missing TLS CA file."""
         hass = MagicMock()
         hass.data = {}
@@ -124,7 +124,7 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904, RUF105
             mock_client.subscribe = AsyncMock()
             # messages needs to be an async iterator
 
-            async def mock_messages():  # noqa: ANN202, RUF029, RUF105
+            async def mock_messages():  # noqa: RUF029, RUF105
                 return
                 yield  # pragma: no cover
 
@@ -229,7 +229,7 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904, RUF105
         async def dummy_coro() -> str:  # noqa: RUF029, RUF105
             return "done"
 
-        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # noqa: E501, RUF105
+        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # noqa: RUF105
         # It schedules the coroutine but returns None (task is tracked internally)
         client._schedule_coroutine(lambda: dummy_coro(), "test")  # noqa: RUF105, SLF001
         # Verify it doesn't raise an error

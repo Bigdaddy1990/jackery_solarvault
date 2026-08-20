@@ -380,7 +380,7 @@ class TestPortableSelectCurrent:
 class TestJackerySelect:
     """Test JackerySelect class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -400,7 +400,7 @@ class TestJackerySelect:
         coordinator.async_set_storm_warning = AsyncMock()
         return coordinator
 
-    def _create_select(self, coordinator, key="work_mode_select"):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_select(self, coordinator, key="work_mode_select"):  # noqa: PLR6301, RUF105
         """Create a select instance for testing."""
         # Use an actual description from the module
         from custom_components.jackery_solarvault.select import SELECT_DESCRIPTIONS  # noqa: I001, PLC0415, RUF105

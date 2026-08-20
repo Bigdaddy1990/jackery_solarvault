@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export  # ruff: ignore[any-type]
+def __getattr__(name: str) -> Any:  # PEP 562 lazy re-export
     """Lazily resolve ``JackeryMqttPushClient`` on module attribute access.
 
     Parameters:

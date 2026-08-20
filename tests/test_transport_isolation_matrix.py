@@ -66,10 +66,10 @@ class TestTransportIsolationMatrix:
     # Matrix definition from plan:
     # | Enabled path | Disabled paths must fail if touched | Required proof |
     # |---|---|---|
-    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |  # noqa: E501, RUF105
-    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |  # noqa: E501, RUF105
-    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |  # noqa: E501, RUF105
-    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |  # noqa: E501, RUF105
+    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |  # noqa: RUF105
+    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |  # noqa: RUF105
+    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |  # noqa: RUF105
+    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |  # noqa: RUF105
     # | all paths | none | concurrent updates, provenance, reconnect, unload |
 
     @pytest.mark.parametrize(
@@ -147,7 +147,7 @@ class TestTransportIsolationMatrix:
                 # Local MQTT start is in __init__, not coordinator directly
 
         # Run the required proofs for this transport
-        # This is a structural test - the actual behavior is validated in integration tests  # noqa: E501, RUF105
+        # This is a structural test - the actual behavior is validated in integration tests  # noqa: RUF105
         for proof in required_proofs:
             # Verify the proof capability exists in the codebase
             # This is a placeholder - real tests are in specific test files

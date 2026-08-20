@@ -56,7 +56,7 @@ class TestMqttCredentialCanonical:
 
     @pytest.mark.asyncio
     async def test_base64_decode_error_raises_typed_error_not_nameerror(self) -> None:  # noqa: PLR6301, RUF105
-        """Base64 decoding failures return None, not NameError or unhandled exception."""  # noqa: E501, RUF105
+        """Base64 decoding failures return None, not NameError or unhandled exception."""  # noqa: RUF105
         api = _make_api()
         api._mqtt_user_id = "user123"  # noqa: RUF105, SLF001
         api._mqtt_seed_b64 = "not-valid-base64!!!"  # noqa: RUF105, SLF001
@@ -123,7 +123,7 @@ class TestMqttCredentialCanonical:
         with pytest.raises(binascii.Error):
             _rsa_pkcs1v15_encrypt(b"test", "not-valid-base64!!!")
 
-        # Valid base64 but invalid DER should raise ValueError (from load_der_public_key)  # noqa: E501, RUF105
+        # Valid base64 but invalid DER should raise ValueError (from load_der_public_key)  # noqa: RUF105
         import base64  # noqa: PLC0415, RUF105
 
         valid_b64_but_not_der = base64.b64encode(b"not a der key").decode("ascii")

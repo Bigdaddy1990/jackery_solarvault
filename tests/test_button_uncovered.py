@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.button import (
 class TestJackeryQueryButton:
     """Test JackeryQueryButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -29,7 +29,7 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(self, key="refresh_system_info"):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_query_description(self, key="refresh_system_info"):  # noqa: PLR6301, RUF105
         """Create a query button description for testing."""
         return JackeryQueryButtonDescription(
             key=key,
@@ -66,7 +66,7 @@ class TestJackeryQueryButton:
 class TestJackeryRebootButton:
     """Test JackeryRebootButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -96,7 +96,7 @@ class TestJackeryRebootButton:
 class TestJackeryRefreshWeatherPlanButton:
     """Test JackeryRefreshWeatherPlanButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {"test_device": {}}
@@ -131,7 +131,7 @@ class TestJackeryRefreshWeatherPlanButton:
 class TestJackeryReadScheduleButton:
     """Test JackeryReadScheduleButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -190,7 +190,7 @@ class TestJackeryReadScheduleButton:
 class TestJackeryDeleteStormAlertButton:
     """Test JackeryDeleteStormAlertButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}

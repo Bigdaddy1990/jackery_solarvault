@@ -53,7 +53,7 @@ class TestMergePresentDictValuesUncovered:
         assert len(result["packs"]) == 2
 
     def test_list_with_unidentified_items(self) -> None:  # noqa: PLR6301, RUF105
-        """Test list merge falls back to value when _merge_identified_dict_lists returns None (line 1619)."""  # noqa: E501, RUF105
+        """Test list merge falls back to value when _merge_identified_dict_lists returns None (line 1619)."""  # noqa: RUF105
         base = {"packs": [{"soc": 50}]}
         updates = {"packs": [{"soc": 60}]}
         result = merge_present_dict_values(base, updates)

@@ -65,7 +65,7 @@ class TestBackfillOpenPeriodState:
         assert not _backfill_period_is_closed(DATE_TYPE_YEAR, year_start, today=today)
 
     def test_two_empty_responses_do_not_make_open_period_terminal(self) -> None:  # noqa: PLR6301, RUF105
-        """An open period receiving two empty responses stays RETRYABLE, never IMPORTED."""  # noqa: E501, RUF105
+        """An open period receiving two empty responses stays RETRYABLE, never IMPORTED."""  # noqa: RUF105
         today = date.today()  # noqa: DTZ011, RUF105
         # Open period (yesterday's day)
         today - timedelta(days=1)
@@ -98,14 +98,14 @@ class TestBackfillOpenPeriodState:
         assert len(months) == 7
 
     def test_imported_recorder_value_reflected_in_coordinator(self) -> None:
-        """When a value is imported to recorder, coordinator snapshot should also have it."""  # noqa: E501, RUF105
+        """When a value is imported to recorder, coordinator snapshot should also have it."""  # noqa: RUF105
         # This tests the integration between recorder upsert and coordinator state
-        # The coordinator's async_add_external_statistics should also update its internal cache  # noqa: E501, RUF105
+        # The coordinator's async_add_external_statistics should also update its internal cache  # noqa: RUF105
         # This is an integration contract - the state machine must ensure consistency
         # Implementation detail - tested in coordinator_statistics tests
 
     def test_closed_periods_retry_bounded_times_before_unavailable(self) -> None:  # noqa: PLR6301, RUF105
-        """Closed periods retry a bounded number of times before becoming permanently unavailable."""  # noqa: E501, RUF105
+        """Closed periods retry a bounded number of times before becoming permanently unavailable."""  # noqa: RUF105
         # A closed period that was previously IMPORTED but needs repair
         # should go through RETRYABLE states with bounded retries
         # but never skip to a terminal "unavailable" state in one step
@@ -122,7 +122,7 @@ class TestBackfillOpenPeriodState:
     ) -> None:  # noqa: E501, RUF100
         """A value differing by >10% from recorded follows conservative minimum rule."""
         # When backfill finds a value that differs significantly from recorder,
-        # the repair uses the conservative minimum (lower value) as per project requirement  # noqa: E501, RUF105
+        # the repair uses the conservative minimum (lower value) as per project requirement  # noqa: RUF105
         # This is tested in test_coordinator_statistics_repair.py
 
     def test_legacy_statuses_map_to_state_machine(self) -> None:  # noqa: PLR6301, RUF105
@@ -147,7 +147,7 @@ class TestBackfillOpenPeriodState:
             assert status == BackfillStatus.RETRYABLE
 
     def test_no_active_period_becomes_unavailable_closed(self) -> None:  # noqa: PLR6301, RUF105
-        """No active (open) period should ever become a terminal unavailable_closed state."""  # noqa: E501, RUF105
+        """No active (open) period should ever become a terminal unavailable_closed state."""  # noqa: RUF105
         # The state machine has only three states:
         # PENDING -> RETRYABLE -> IMPORTED
         # There is no "unavailable_closed" state for open periods

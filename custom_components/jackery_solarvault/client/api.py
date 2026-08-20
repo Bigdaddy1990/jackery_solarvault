@@ -38,7 +38,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 
-from ..const import (  # ruff: ignore[relative-imports]
+from ..const import (
     ACCESSORIES_BIND_PATH,
     ACCESSORIES_EXIST_PATH,
     ACCESSORIES_JACKERY_EXIST_PATH,
@@ -256,7 +256,7 @@ from ..const import (  # ruff: ignore[relative-imports]
     VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
 )
-from ..util import (  # ruff: ignore[relative-imports]
+from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
@@ -468,7 +468,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     """Async client for the Jackery SolarVault cloud."""
 
     def __init__(
-        self,  # constructor takes distinct client-config values; a params object adds no clarity  # ruff: ignore[line-too-long]
+        self,  # constructor takes distinct client-config values; a params object adds no clarity
         session: aiohttp.ClientSession,
         account: str,
         password: str,
@@ -633,7 +633,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         url: str,
         form_body: dict[str, str],
         headers: dict[str, str],
-    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors  # ruff: ignore[any-type]
+    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors
         """POST the encrypted login form and return the decoded JSON response.
 
         Parameters:
@@ -666,7 +666,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     @staticmethod
     async def _decode_login_response(
         resp: aiohttp.ClientResponse,
-    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors  # ruff: ignore[any-type]
+    ) -> Any:  # decoded JSON is arbitrary; callers use dict .get accessors
         """Validate the login HTTP response and return its decoded JSON body.
 
         Parameters:
@@ -899,7 +899,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     def _is_token_expired_response(
         self,
         status: int,
-        data: dict[str, Any] | Any,  # ruff: ignore[any-type]
+        data: dict[str, Any] | Any,
     ) -> bool:
         """Detect token-expired responses across backend variants."""
         if not isinstance(data, dict):
@@ -1488,7 +1488,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
     async def async_get_alarm(
         self, system_id: str | int
-    ) -> Any:  # parsed JSON response, indexed by callers  # ruff: ignore[any-type]
+    ) -> Any:  # parsed JSON response, indexed by callers
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
             ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
@@ -2190,7 +2190,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         )
         return self._payload_dict(data, DEVICE_BLUETOOTH_KEY_PATH)
 
-    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:  # ruff: ignore[any-type]
+    async def async_create_system(self, **kwargs: Any) -> dict[str, Any]:
         """Create or configure a system using backend-provided parameters.
 
         Parameters:

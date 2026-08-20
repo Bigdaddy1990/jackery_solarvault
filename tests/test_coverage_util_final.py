@@ -191,7 +191,7 @@ def test_day_power_energy_points_rejects_invalid_bucket_sizes(
 
 
 def test_day_power_energy_points_rejects_unproven_scalar_and_unknown_unit() -> None:
-    """A scalar without positive curve energy and an unknown unit remain unimportable."""  # noqa: E501, RUF105
+    """A scalar without positive curve energy and an unknown unit remain unimportable."""  # noqa: RUF105
     today = date(2026, 8, 10)
     base = {
         APP_CHART_SERIES_Y: [0],

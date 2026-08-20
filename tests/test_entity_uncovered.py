@@ -11,7 +11,7 @@ from homeassistant.helpers.entity import EntityDescription
 class TestJackeryEntity:
     """Test JackeryEntity class."""
 
-    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -22,7 +22,7 @@ class TestJackeryEntity:
         coordinator.is_entity_source_available = MagicMock(return_value=True)
         return coordinator
 
-    def _create_entity(self, coordinator, key_suffix="test_key"):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_entity(self, coordinator, key_suffix="test_key"):  # noqa: PLR6301, RUF105
         """Create an entity instance for testing."""
         # Use a simple EntityDescription for testing
         description = EntityDescription(key=key_suffix, name="Test Entity")

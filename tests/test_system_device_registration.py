@@ -72,12 +72,12 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     async def _prepare_http(
         _hass: HomeAssistant,
         _entry: MockConfigEntry,
-        coordinator: Any,  # noqa: ANN401, RUF105
+        coordinator: Any,  # noqa: RUF105
     ) -> None:
         await asyncio.sleep(0)
         coordinator.data = {}
 
-    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # noqa: ANN401, RUF105
+    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # noqa: RUF105
         await asyncio.sleep(0)
         events.append("platforms")
 

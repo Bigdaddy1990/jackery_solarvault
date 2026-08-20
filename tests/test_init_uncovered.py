@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault import (
 class TestInitModule:
     """Test __init__.py module functions."""
 
-    def _create_hass(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_hass(self):  # noqa: PLR6301, RUF105
         """Create a mock hass."""
         hass = MagicMock()
         hass.data = {}
@@ -27,7 +27,7 @@ class TestInitModule:
         hass.states = MagicMock()
         return hass
 
-    def _create_config_entry(self, data=None, options=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
+    def _create_config_entry(self, data=None, options=None):  # noqa: PLR6301, RUF105
         """Create a mock config entry."""
         entry = MagicMock()
         entry.entry_id = "test_entry"
@@ -37,7 +37,7 @@ class TestInitModule:
         entry.minor_version = 0
         return entry
 
-    def _create_coordinator(self):  # noqa: ANN202, PLR6301, RUF105
+    def _create_coordinator(self):  # noqa: PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = AsyncMock()
         coordinator.async_setup = AsyncMock()

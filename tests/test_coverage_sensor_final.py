@@ -293,7 +293,7 @@ async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> No
     coordinator.last_update_success = True
     listeners: list[Any] = []
 
-    def _listen(callback: Any) -> Any:  # noqa: ANN401, RUF105
+    def _listen(callback: Any) -> Any:  # noqa: RUF105
         listeners.append(callback)
         return lambda: None
 
