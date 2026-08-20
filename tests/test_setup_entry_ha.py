@@ -1,7 +1,7 @@
 """HA fixture tests for setup/unload of a Jackery SolarVault config entry."""
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -79,8 +79,8 @@ async def test_setup_and_unload_round_trip(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
-            return_value=None,
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -139,8 +139,8 @@ async def test_services_register_on_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
-            return_value=None,
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
         ),
     ):
         await hass.config_entries.async_setup(entry.entry_id)

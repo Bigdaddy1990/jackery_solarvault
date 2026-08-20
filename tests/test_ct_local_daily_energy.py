@@ -175,6 +175,11 @@ def test_ct_week_delta_uses_persisted_complete_days_and_wh_scaling() -> None:
                 "2026-07-21": {FIELD_CT_TOTAL_PHASE_ENERGY: 2000},
                 "2026-07-22": {FIELD_CT_TOTAL_PHASE_ENERGY: 3000},
             },
+            "complete_days": [
+                "2026-07-20",
+                "2026-07-21",
+                "2026-07-22",
+            ],
         },
     }
     cast("Any", coordinator).data = {

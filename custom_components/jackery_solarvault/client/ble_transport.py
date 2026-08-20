@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import json
 import logging
+import random
 import sys
 from typing import TYPE_CHECKING, Any
 
@@ -174,6 +175,11 @@ class BleListenerStats:
     # how much BLE telemetry is still unconsumed (cmd=120 system /
     # per-device / CT variants currently — see coordinator sink).
     unrouted_frames_by_cmd: dict[int, int] = field(default_factory=dict)
+    # Keep-alive health counters (P3-3).
+    keep_alive_writes_attempted: int = 0
+    keep_alive_writes_succeeded: int = 0
+    keep_alive_writes_failed: int = 0
+    consecutive_keep_alive_failures: int = 0
 
 
 @dataclass(slots=True)
@@ -410,10 +416,55 @@ class JackeryBleListener:
         session.notify_tasks.difference_update(tasks)
         self._notify_tasks.difference_update(tasks)
         session.notify_task = None
-        while not session.notify_queue.empty():
-            with contextlib.suppress(asyncio.QueueEmpty):
+        while True:
+            try:
                 session.notify_queue.get_nowait()
-                session.notify_queue.task_done()
+            except asyncio.QueueEmpty:
+                break
+            session.notify_queue.task_done()
+
+    @staticmethod
+    async def _async_cancel_keep_alive(
+        device_id: str,
+        keep_alive_task: asyncio.Task[None] | None,
+    ) -> None:
+        """Cancel the keep-alive task and surface any failure it carried."""
+        if keep_alive_task is None or keep_alive_task.done():
+            return
+        keep_alive_task.cancel()
+        try:
+            await keep_alive_task
+        except asyncio.CancelledError:
+            return
+        except Exception as err:  # ruff: ignore[blind-except]
+            _LOGGER.warning(
+                "Jackery BLE keep-alive task for %s failed: %s",
+                device_id,
+                err,
+            )
+
+    def _invalidate_session(self, device_id: str) -> None:
+        """Invalidate the current session for a device to force reconnection.
+
+        Called by the keep-alive loop when consecutive failures exceed the
+        threshold. This wakes the connection runner which will back off and
+        re-establish a fresh GATT session.
+        """
+        session = self._sessions.get(device_id)
+        if session is not None:
+            session.active = False
+        if self._sessions.get(device_id) is session:
+            self._sessions.pop(device_id, None)
+        if self._clients.get(device_id) is not None:
+            self._clients.pop(device_id, None)
+        if self._mtu_owners.get(device_id) is session:
+            self._mtu_owners.pop(device_id, None)
+            self._mtu.pop(device_id, None)
+        self._clear_frame_assemblies(device_id, session)
+        # Note: we do NOT cancel notify tasks here - the connection runner
+        # owns the session lifecycle and will clean up when it detects the
+        # invalidated session. This avoids a race between the keep-alive
+        # task and the runner's finally block.
 
     async def _teardown_session(
         self,
@@ -434,8 +485,27 @@ class JackeryBleListener:
             self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
         self._cancel_session_pending_acks(device_id, session)
         await self._cancel_notify_tasks(session)
-        with contextlib.suppress(Exception):
-            await asyncio.wait_for(session.client.disconnect(), timeout=5.0)
+        # Handle BLE client disconnect more gracefully - the client may not be
+        # in a connected state or may be in HOST_RESOLVED state
+        client = session.client
+        if client is not None:
+            try:
+                # Check if client is actually connected before attempting disconnect
+                if getattr(client, "is_connected", False):
+                    await asyncio.wait_for(client.disconnect(), timeout=5.0)
+                else:
+                    # Client not connected, no need to disconnect - just log at debug
+                    _LOGGER.debug(
+                        "Jackery BLE %s: client not connected (state: %s), skipping disconnect",
+                        device_id,
+                        getattr(client, "state", "unknown"),
+                    )
+            except Exception as err:  # ruff: ignore[blind-except]
+                _LOGGER.debug(
+                    "Jackery BLE: disconnect during teardown of %s failed (non-critical): %s",
+                    device_id,
+                    err,
+                )
 
     async def _drain_notifications(
         self,
@@ -509,8 +579,16 @@ class JackeryBleListener:
                 session.notify_task = None
             session.notify_tasks.discard(completed)
             self._notify_tasks.discard(completed)
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                completed.exception()
+            try:
+                notify_err = completed.exception()
+            except asyncio.CancelledError:
+                notify_err = None
+            if notify_err is not None:
+                _LOGGER.warning(
+                    "Jackery BLE notify task %s failed: %s",
+                    completed.get_name(),
+                    notify_err,
+                )
 
         task.add_done_callback(_task_done)
 
@@ -546,11 +624,27 @@ class JackeryBleListener:
             return
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
+            if value is None:
+                continue
             if not isinstance(value, int):
+                _LOGGER.debug(
+                    "Jackery BLE %s: backend reported %s=%r (%s), not an int",
+                    device_id,
+                    attr,
+                    value,
+                    type(value).__name__,
+                )
                 continue
             try:
                 payload_size = ble.chunk_size_for_mtu(value)
-            except ValueError:
+            except ValueError as err:
+                _LOGGER.warning(
+                    "Jackery BLE %s: unusable negotiated %s=%d: %s",
+                    device_id,
+                    attr,
+                    value,
+                    err,
+                )
                 continue
             else:
                 self._mtu[device_id] = value
@@ -645,6 +739,10 @@ class JackeryBleListener:
         the sink merges into ``coordinator.data`` via the normal
         ``cmd=107`` path.
 
+        Robustness: consecutive keep-alive failures trigger a session
+        invalidation so the connection runner reconnects. This prevents
+        silent session death when the peripheral stops acknowledging writes.
+
         Cancellation contract: the parent connection runner cancels
         this task in its ``finally`` block on disconnect / shutdown.
         ``CancelledError`` propagates so the cancel sees a clean exit;
@@ -653,8 +751,16 @@ class JackeryBleListener:
         """
         if self._keep_alive_msg_id is None or self._keep_alive_ble_msg_type is None:
             return
+
+        # Track consecutive keep-alive failures for this device.
+        # 3 consecutive failures -> invalidate session to force reconnect.
+        max_keepalive_failures = 3
+        consecutive_failures = 0
+
         while not self._stop_event.is_set():
-            if await self._async_stop_requested_within(_KEEPALIVE_INTERVAL_SEC):
+            # Add ±2s jitter to desynchronize keep-alives across devices.
+            jittered_interval = _KEEPALIVE_INTERVAL_SEC + random.uniform(-2.0, 2.0)
+            if await self._async_stop_requested_within(jittered_interval):
                 return
             if session is not None:
                 if not self._session_is_current(device_id, session):
@@ -664,6 +770,7 @@ class JackeryBleListener:
             stats = self.stats_for(device_id)
             try:
                 # HomeControlFormat injects bleMsgType as "cmd" in the JSON body.
+                stats.keep_alive_writes_attempted += 1
                 sent = await self.async_send_command(
                     device_id,
                     msg_id=self._keep_alive_msg_id,
@@ -673,12 +780,40 @@ class JackeryBleListener:
                 )
             except (RuntimeError, ValueError) as err:
                 self._record_keep_alive_error(stats, device_id, str(err))
+                stats.keep_alive_writes_failed += 1
+                stats.consecutive_keep_alive_failures += 1
+                consecutive_failures += 1
+                if consecutive_failures >= max_keepalive_failures:
+                    _LOGGER.warning(
+                        "Jackery BLE %s: %d consecutive keep-alive failures; "
+                        "invalidating session to force reconnect",
+                        device_id,
+                        consecutive_failures,
+                    )
+                    self._invalidate_session(device_id)
+                    return
                 continue
             if not sent:
                 self._record_keep_alive_error(
                     stats, device_id, "no current connected GATT session"
                 )
+                stats.keep_alive_writes_failed += 1
+                stats.consecutive_keep_alive_failures += 1
+                consecutive_failures += 1
+                if consecutive_failures >= max_keepalive_failures:
+                    _LOGGER.warning(
+                        "Jackery BLE %s: %d consecutive keep-alive failures; "
+                        "invalidating session to force reconnect",
+                        device_id,
+                        consecutive_failures,
+                    )
+                    self._invalidate_session(device_id)
+                    return
                 continue
+            # Success: reset consecutive failure counter and clear error.
+            stats.keep_alive_writes_succeeded += 1
+            stats.consecutive_keep_alive_failures = 0
+            consecutive_failures = 0
             previous_error = stats.last_keep_alive_error
             if previous_error is not None:
                 stats.last_keep_alive_error = None
@@ -1232,8 +1367,16 @@ class JackeryBleListener:
                 timeout=_STOP_TIMEOUT_SEC,
             )
             for completed in done:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
+                try:
                     completed.result()
+                except asyncio.CancelledError:
+                    continue
+                except Exception as err:  # ruff: ignore[blind-except]
+                    _LOGGER.warning(
+                        "Jackery BLE task %s failed during stop: %s",
+                        completed.get_name(),
+                        err,
+                    )
         if still_pending or current_task_owned:
             remaining_count = len(still_pending) + int(current_task_owned)
             _LOGGER.warning(
@@ -1458,8 +1601,15 @@ class JackeryBleListener:
                 if self._stop_event.is_set() or not self._connection_is_current(
                     device_id, runner_task
                 ):
-                    with contextlib.suppress(Exception):
+                    try:
                         await asyncio.wait_for(client.disconnect(), timeout=5.0)
+                    except Exception as err:  # ruff: ignore[blind-except]
+                        _LOGGER.warning(
+                            "Jackery BLE: disconnect of superseded connection "
+                            "to %s failed: %s",
+                            device_id,
+                            err,
+                        )
                     return
 
                 session = self._install_session(device_id, client, generation)
@@ -1533,10 +1683,7 @@ class JackeryBleListener:
                             started_at=stable_session_started_at,
                             now=asyncio.get_running_loop().time(),
                         )
-                    if keep_alive_task is not None and not keep_alive_task.done():
-                        keep_alive_task.cancel()
-                        with contextlib.suppress(asyncio.CancelledError, Exception):
-                            await keep_alive_task
+                    await self._async_cancel_keep_alive(device_id, keep_alive_task)
                     await self._teardown_session(device_id, session)
                     stats.last_disconnect_at = datetime.now(UTC)
 

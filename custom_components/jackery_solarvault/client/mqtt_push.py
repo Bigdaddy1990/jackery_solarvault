@@ -1,7 +1,6 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
-import contextlib
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -209,8 +208,13 @@ class JackeryMqttPushClient:
             )
 
         if wait_connected:
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(self._connected_event.wait(), timeout=12.0)
+            try:
+                await asyncio.wait_for(self._connected_event.wait(), timeout=30.0)
+            except TimeoutError:
+                _LOGGER.warning(
+                    "Jackery cloud MQTT: broker did not confirm the connection "
+                    "within 30s; continuing without it",
+                )
 
     @staticmethod
     def _credential_fingerprint(client_id: str, username: str, password: str) -> str:
@@ -271,7 +275,7 @@ class JackeryMqttPushClient:
         generation = self._session_generation
         owner_task = self._runner_task
         if not self._connected:
-            await self._async_wait_connected(timeout_sec=12.0)
+            await self._async_wait_connected(timeout_sec=30.0)
         if not self._session_is_current(generation, owner_task):
             msg = "MQTT session ownership changed before publish"
             raise RuntimeError(msg)
@@ -295,7 +299,7 @@ class JackeryMqttPushClient:
         self._last_published_topic = topic
         self._last_publish_at = self._utc_now_iso()
 
-    async def async_wait_until_connected(self, timeout_sec: float = 15.0) -> None:
+    async def async_wait_until_connected(self, timeout_sec: float = 30.0) -> None:
         """Wait for the MQTT runner to connect before the specified timeout.
 
         Parameters:
@@ -400,12 +404,16 @@ class JackeryMqttPushClient:
             timeout=_MQTT_STOP_TIMEOUT_SEC,
         )
         for completed in done:
-            with contextlib.suppress(
-                asyncio.CancelledError,
-                MqttError,
-                Exception,
-            ):
+            try:
                 completed.result()
+            except asyncio.CancelledError:
+                continue
+            except Exception as err:  # ruff: ignore[blind-except]
+                _LOGGER.warning(
+                    "Jackery cloud MQTT task %s failed during stop: %s",
+                    completed.get_name(),
+                    err,
+                )
         if runner_task in done and self._runner_task is runner_task:
             self._runner_task = None
         for completed in done & lifecycle_tasks:
@@ -765,15 +773,21 @@ class JackeryMqttPushClient:
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as err:
             self._messages_dropped += 1
             self._last_message_error = f"invalid JSON payload: {err}"
-            _LOGGER.debug("Jackery MQTT: dropped invalid payload on %r: %s", topic, err)
+            _LOGGER.warning(
+                "Jackery MQTT: dropped unparsable payload on %r (%s bytes): %s",
+                topic,
+                len(payload),
+                err,
+            )
             return
         if not isinstance(data, dict):
             self._messages_dropped += 1
             self._last_message_error = "non-object JSON payload"
-            _LOGGER.debug(
-                "Jackery MQTT: dropped non-object JSON on %r: %s",
+            _LOGGER.warning(
+                "Jackery MQTT: dropped non-object JSON on %r (%s): %.400s",
                 topic,
                 type(data).__name__,
+                data,
             )
             return
         if not isinstance(data.get(FIELD_BODY), dict):

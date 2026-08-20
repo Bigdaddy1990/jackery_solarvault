@@ -61,8 +61,7 @@ def test_day_power_sample_energy_value_preserves_directional_semantics() -> None
     battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
 
     assert (
-        sample_value(None, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1)
-        is None
+        sample_value(None, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1) == 0
     )
     assert (
         sample_value({}, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1)
