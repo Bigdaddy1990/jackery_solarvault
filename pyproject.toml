@@ -35,8 +35,8 @@ requires-python = ">=3.14.6"
 dependencies = [
     "pip>=26.2.1",
     "pre-commit>=4.6.1",
-    "ruff>=0.16.2",
-    "ty>=0.0.69",
+    "ruff>=0.16.3",
+    "mypy>=2.3.0",
 ]
 
 [project.urls]
@@ -242,20 +242,15 @@ filterwarnings = [
   "ignore:defusedxml.cElementTree is deprecated, import from defusedxml.ElementTree instead:DeprecationWarning:rxv.ssdp",
 ]
 
-
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.16.1"
+required-version = ">=0.16.3"
 line-length = 88
 src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
 show-fixes = true
-# `ruff check` MUSS ein reiner Report sein. Mit `fix = true` schrieb jeder simple
-# `ruff check`-Aufruf still Dateien um (2026-08-13: 31 Auto-Fixes ungefragt, davor
-# der TID252-Importschaden, Integration nicht mehr ladbar). Fixen nur noch explizit
-# per `ruff check --fix`; unsichere Fixes nur per `--unsafe-fixes`.
-fix = false
-unsafe-fixes = false
+fix = true
+unsafe-fixes = true
 force-exclude = true
 output-format= "github"
 preview = true
@@ -297,7 +292,7 @@ exclude = [
     ".scripts",
 	".html",
     ".bat",
-    "123",
+    "123*",
 ]
 
 [tool.ruff.analyze]
