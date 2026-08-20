@@ -31,7 +31,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = ">=3.14.6"
+requires-python = ">=3.14.2"
 dependencies = [
     "pip>=26.2.1",
     "pre-commit>=4.6.1",

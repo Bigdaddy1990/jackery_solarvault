@@ -35,7 +35,7 @@ class AppFieldExposureContract:
 
 REST_ENDPOINTS: Final = MappingProxyType({
     "pv_trends": "/v1/device/stat/sys/pv/trends",
-    "dynamic_price": "/v1/device/dynamic/dynamicPrice",
+    "dynamic_price": "/v1/device/dynamic/v2/dynamicPrice",
 })
 
 # No App 2.4.0 evidence identifies a Jackery WebSocket or generic REST device

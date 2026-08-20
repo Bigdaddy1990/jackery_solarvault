@@ -15,14 +15,12 @@ across config-flow and entry-setup tests.
 """
 
 import asyncio
+from collections.abc import Generator, Mapping
 import inspect
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import patch
 
 import pytest
-
-if TYPE_CHECKING:
-    from collections.abc import Generator, Mapping
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -68,29 +66,9 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
     return True
 
 
-try:
-    from pytest_homeassistant_custom_component.common import (  # type: ignore[import-not-found]
-        enable_custom_integrations as _enable_custom_integrations,  # noqa: F401, RUF105
-    )
-
-    @pytest.fixture(autouse=True)
-    def auto_enable_custom_integrations(
-        enable_custom_integrations: None,
-    ) -> None:
-        """Auto-enable the custom_components dir for every HA fixture test.
-
-        Without this, ``await async_setup_component`` cannot find the
-        integration. The fixture itself comes from
-        ``pytest-homeassistant-custom-component``; we just opt in for the
-        whole HA suite by making it autouse.
-        """
-
-except ImportError:
-    # pytest-homeassistant-custom-component not available (e.g., on Windows without fcntl)  # noqa: RUF105
-    @pytest.fixture(autouse=True)
-    def auto_enable_custom_integrations() -> None:
-        """No-op when HA test plugin is not available."""
-        return
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
+    """Enable loading integrations from ``custom_components`` for every test."""
 
 
 @pytest.fixture

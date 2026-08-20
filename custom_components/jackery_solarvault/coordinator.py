@@ -4966,9 +4966,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             SLOW_METRICS_INTERVAL_SEC,
             int(update_interval.total_seconds()),
         )
-        # See ``_reschedule_after_cycle``: the stubs split the property/setter
-        # pair, so mypy misses the HA-public ``update_interval`` setter.
-        self.update_interval = update_interval  # type: ignore[misc]
+        self.update_interval = update_interval
 
     def _poll_cycle_timeout_seconds(self) -> float:
         """Return a cycle ceiling that preserves the configured poll cadence."""
@@ -5000,10 +4998,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             - elapsed
             - _POLL_CADENCE_SCHEDULER_MARGIN_SEC,
         )
-        # homeassistant-stubs 2026.7.2 splits the property/setter pair in its
-        # .pyi, so mypy misses the HA-public update_interval setter
-        # (helpers/update_coordinator.py:246) and wrongly reports read-only.
-        self.update_interval = timedelta(seconds=delay)  # type: ignore[misc]
+        self.update_interval = timedelta(seconds=delay)
         diagnostics = self._polling_diagnostics
         diagnostics["last_total_cycle_elapsed_sec"] = round(elapsed, 3)
         diagnostics["next_poll_delay_sec"] = round(delay, 3)
@@ -9244,7 +9239,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         eager_start=False,
                     ),
                 )
-            return asyncio.create_task(operation, name=task_name)
+            return cast(
+                "asyncio.Task[bool]",
+                self.hass.async_create_task(
+                    operation,
+                    name=task_name,
+                    eager_start=False,
+                ),
+            )
 
         task_operations: list[tuple[str, asyncio.Task[bool]]] = [
             (label, _create_command_task(label, operation))
@@ -9299,9 +9301,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             eager_start=False,
                         )
                     else:
-                        remainder_task = asyncio.create_task(
+                        remainder_task = self.hass.async_create_task(
                             remainder,
                             name=remainder_name,
+                            eager_start=False,
                         )
                         remainder_task.add_done_callback(
                             lambda done: done.exception(),
@@ -16453,8 +16456,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # normal initialized coordinators still perform the App-compatible
         # read-before-write sequence below.
         if not hasattr(self, "_third_party_mqtt_config_waiters"):
-            cached_config = (self.data or {}).get(device_id, {}).get(
-                PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+            cached_config = (
+                (self.data or {})
+                .get(device_id, {})
+                .get(
+                    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+                )
             )
             cached_token = (
                 cached_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)

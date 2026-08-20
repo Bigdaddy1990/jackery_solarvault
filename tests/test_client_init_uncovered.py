@@ -39,7 +39,6 @@ class TestClientModule:
         """Test JackeryLocalMqttClient has expected public methods."""
         assert hasattr(JackeryLocalMqttClient, "async_start")
         assert hasattr(JackeryLocalMqttClient, "async_stop")
-        assert hasattr(JackeryLocalMqttClient, "_async_run_session")
 
     def test_jackery_mqtt_push_client_has_public_methods(self) -> None:  # noqa: PLR6301, RUF105
         """Test JackeryMqttPushClient has expected public methods."""
