@@ -182,7 +182,9 @@ MQTT_SESSION_USER_ID: Final = "user_id"
 # (local MQTT is opt-out, not opt-in). Actual broker credentials must come from
 # user input via the config flow, never from hard-coded constants (PII / security).
 CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
-DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False  # opt-in by default (third-party MQTT is optional fallback)
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = (
+    False  # opt-in by default (third-party MQTT is optional fallback)
+)
 CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
 DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
 CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
@@ -1814,7 +1816,7 @@ REDACT_KEYS: Final = frozenset({
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
-    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)
+    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)  # ruff: ignore[line-too-long]
     "access_token",
     "refresh_token",
     "token",

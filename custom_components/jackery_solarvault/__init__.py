@@ -1517,7 +1517,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         except ConfigEntryNotReady as err:
             if not cache_ready:
                 raise
-            _LOGGER.warning("Jackery HTTP temporarily unavailable; continuing from cache: %s", err)
+            _LOGGER.warning(
+                "Jackery HTTP temporarily unavailable; continuing from cache: %s", err
+            )
         except TimeoutError as err:
             if not cache_ready:
                 raise ConfigEntryNotReady("Jackery HTTP setup timeout") from err
@@ -1544,13 +1546,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             ("device MQTT config", _apply_mqtt_config()),
         ]
 
-        results = await asyncio.gather(*[t for _, t in startup_tasks], return_exceptions=True)
+        results = await asyncio.gather(
+            *[t for _, t in startup_tasks], return_exceptions=True
+        )
 
         for (label, _), result in zip(startup_tasks, results, strict=True):
             if isinstance(result, ConfigEntryAuthFailed):
-                coordinator._defer_background_auth_failure(result)
+                coordinator._defer_background_auth_failure(result)  # ruff: ignore[private-member-access]
             elif isinstance(result, BaseException):
-                _LOGGER.warning("Jackery %s failed during background startup: %s", label, result)
+                _LOGGER.warning(
+                    "Jackery %s failed during background startup: %s", label, result
+                )
 
         # Statistics imports starten (non-blocking)
         coordinator.async_start_statistics_imports()

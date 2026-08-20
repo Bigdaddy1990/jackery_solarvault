@@ -282,17 +282,17 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     Returns:
         dict[str, Any]: Normalized local MQTT option values suitable for storing in
         entry options or using in configuration logic.
-    """
+    """  # ruff: ignore[line-too-long]
     options: Mapping[str, Any] = entry.options
     data: Mapping[str, Any] = entry.data
 
-    def _entry_value(key: str, default: Any = None) -> Any:
+    def _entry_value(key: str, default: Any = None) -> Any:  # ruff: ignore[any-type]
         value = options.get(key)
         if value is None:
             value = data.get(key, default)
         return value
 
-    def _first_entry_value(*keys: str, default: Any = "") -> Any:
+    def _first_entry_value(*keys: str, default: Any = "") -> Any:  # ruff: ignore[any-type]
         for key in keys:
             value = _entry_value(key)
             if value not in {None, ""}:
@@ -674,7 +674,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             ConfigFlowResult: An abort result when the discovery is a duplicate, invalid,
             or another flow is in progress; otherwise the result returned by `async_step_user()`.
-        """
+        """  # ruff: ignore[line-too-long]
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
 

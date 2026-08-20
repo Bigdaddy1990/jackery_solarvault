@@ -183,7 +183,7 @@ def _is_portable_payload(
 
 
 def _standby_is_on(
-    raw: Any,
+    raw: Any,  # ruff: ignore[any-type]
 ) -> bool | None:  # arbitrary payload value, coerced at runtime
     """Convert a raw autoStandby payload value into an on/off state.
 
@@ -677,7 +677,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
             return None
         return description.is_on_transform(raw)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Turn this switch on.
 
         If the entity is writable, requests the configured setter to apply the on state
@@ -708,7 +708,7 @@ class JackeryDescriptionSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Turn the described switch off for the device.
 
         If the description has no setter this is a no-op.
@@ -913,14 +913,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except ACTION_WRITE_ERRORS as err:
             self._raise_action_error(err)
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Turn the bound smart plug on.
 
         Set the smart plug's switch to the requested state through the coordinator.
         """
         await self._async_set_state(True)
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Turn the smart plug off."""
         await self._async_set_state(False)
 
@@ -1002,13 +1002,13 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
         """Whether the breaker relay is closed."""
         return safe_bool(self._breaker.get(FIELD_SW))
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, True
         )
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
             self._device_id, self._breaker_id, False

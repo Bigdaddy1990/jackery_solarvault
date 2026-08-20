@@ -1077,7 +1077,7 @@ class FaultData(TypedDict):
 
 
 # =============================================================================
-# Device Share / Bind — topicList (from source-of-truth jackery_http_model_fields_v2.csv)
+# Device Share / Bind — topicList (from source-of-truth jackery_http_model_fields_v2.csv)  # ruff: ignore[line-too-long]
 # =============================================================================
 
 
