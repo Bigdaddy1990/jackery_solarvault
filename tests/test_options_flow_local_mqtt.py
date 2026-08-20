@@ -24,11 +24,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -46,11 +41,13 @@ _ACCOUNT = "tester@example.com"
 _BRIDGE_PORT = 1885
 # The duplicate local-MQTT field block the owner asked to remove. The options
 # form must NOT expose these — the third-party fields are the single mask.
+# These are the LEGACY string field names that were used in config entry data.
+# They must NOT appear in the options form (the form uses third_party_mqtt_*).
 _DUPLICATE_LOCAL_FIELDS = (
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
-    CONF_LOCAL_MQTT_PASSWORD,
+    "local_mqtt_host",
+    "local_mqtt_port",
+    "local_mqtt_username",
+    "local_mqtt_password",
 )
 
 
@@ -108,8 +105,8 @@ async def _async_setup_entry(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
-            return_value=None,
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
@@ -168,9 +165,9 @@ async def test_bridge_submit_persists_and_derives_local(hass: HomeAssistant) -> 
     assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "192.168.2.212"
     assert entry.options[CONF_THIRD_PARTY_MQTT_PORT] == _BRIDGE_PORT
     # Local listener values derived from the single mask.
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
-    assert entry.options[CONF_LOCAL_MQTT_HOST] == "192.168.2.212"
-    assert entry.options[CONF_LOCAL_MQTT_PORT] == _BRIDGE_PORT
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "192.168.2.212"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_PORT] == _BRIDGE_PORT
 
     await _async_unload_entry(hass, entry)
 
@@ -194,7 +191,7 @@ async def test_untouched_submit_preserves_bridge(hass: HomeAssistant) -> None:
 
     assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
     assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "192.168.2.212"
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
 
     await _async_unload_entry(hass, entry)
 
@@ -216,6 +213,5 @@ async def test_untouched_submit_preserves_disabled_bridge(
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
     assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is False
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is False
 
     await _async_unload_entry(hass, entry)

@@ -143,8 +143,8 @@ async def night_setup(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
-            return_value=None,
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
         ),
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)

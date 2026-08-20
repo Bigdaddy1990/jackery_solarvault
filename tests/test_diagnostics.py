@@ -14,13 +14,13 @@ from typing import Any
 from scripts.check_reference_coverage import diagnostics_null_export_violations
 
 from custom_components.jackery_solarvault.const import (
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PASSWORD as CONF_LOCAL_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_USERNAME as CONF_LOCAL_MQTT_USERNAME,
     REDACT_KEYS,
 )
 from custom_components.jackery_solarvault.diagnostics import (
