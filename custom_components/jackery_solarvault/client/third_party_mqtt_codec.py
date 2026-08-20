@@ -1,10 +1,16 @@
 """App-compatible codec for ThirdPartMQTTConfig credential fields."""
 
 import base64
+import binascii
 import secrets
 from typing import Any
 
 from ..const import (
+    CONF_LOCAL_MQTT_ENABLE,
+    CONF_LOCAL_MQTT_HOST,
+    CONF_LOCAL_MQTT_PASSWORD,
+    CONF_LOCAL_MQTT_PORT,
+    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -71,10 +77,10 @@ def decode_third_party_mqtt_field(value: str, bluetooth_key: bytes) -> str:
             f"for bb/e.c(String), got {len(bluetooth_key)} bytes"
         )
     try:
-        ciphertext = base64.b64decode(value)
+        ciphertext = base64.b64decode(value, validate=True)
         plaintext = aes_decrypt(ciphertext, bluetooth_key, bluetooth_key)
         return plaintext.decode("utf-8")
-    except (ValueError, UnicodeDecodeError) as err:
+    except (binascii.Error, ValueError, UnicodeDecodeError) as err:
         raise ValueError("invalid app-encoded third-party MQTT field") from err
 
 
@@ -93,7 +99,7 @@ def third_party_mqtt_config_from_options(
 ) -> dict[str, Any]:
     """Build a device-ready app field mapping for ThirdPartMQTTConfig from Home Assistant options.
 
-    Selects the token from options (trimmed); if that token is empty and `generated_token`
+    Selects the token from options; if that token is empty and `generated_token`
     is provided, uses `generated_token`. Maps option values into app fields:
     - enable: `1` if configured truthy, else `0`
     - ip: string (empty if absent/falsey)
@@ -110,31 +116,55 @@ def third_party_mqtt_config_from_options(
     """
     token = str(
         options.get(CONF_THIRD_PARTY_MQTT_TOKEN, DEFAULT_THIRD_PARTY_MQTT_TOKEN) or ""
-    ).strip()
+    )
     if not token and generated_token is not None:
         token = generated_token
+
+    def _option(local_key: str, canonical_key: str, default: Any) -> Any:
+        """Prefer the local-listener option while accepting canonical storage."""
+        if local_key in options:
+            return options[local_key]
+        return options.get(canonical_key, default)
+
     return {
         FIELD_THIRD_PARTY_MQTT_ENABLE: 1
         if bool(
-            options.get(CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE)
+            _option(
+                CONF_LOCAL_MQTT_ENABLE,
+                CONF_THIRD_PARTY_MQTT_ENABLE,
+                DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+            )
         )
         else 0,
         FIELD_THIRD_PARTY_MQTT_IP: str(
-            options.get(CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP) or ""
+            _option(
+                CONF_LOCAL_MQTT_HOST,
+                CONF_THIRD_PARTY_MQTT_IP,
+                DEFAULT_THIRD_PARTY_MQTT_IP,
+            )
+            or ""
         ),
         FIELD_THIRD_PARTY_MQTT_PORT: int(
-            options.get(CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT)
+            _option(
+                CONF_LOCAL_MQTT_PORT,
+                CONF_THIRD_PARTY_MQTT_PORT,
+                DEFAULT_THIRD_PARTY_MQTT_PORT,
+            )
             or DEFAULT_THIRD_PARTY_MQTT_PORT
         ),
         FIELD_THIRD_PARTY_MQTT_USERNAME: str(
-            options.get(
-                CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
+            _option(
+                CONF_LOCAL_MQTT_USERNAME,
+                CONF_THIRD_PARTY_MQTT_USERNAME,
+                DEFAULT_THIRD_PARTY_MQTT_USERNAME,
             )
             or ""
         ),
         FIELD_THIRD_PARTY_MQTT_PASSWORD: str(
-            options.get(
-                CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+            _option(
+                CONF_LOCAL_MQTT_PASSWORD,
+                CONF_THIRD_PARTY_MQTT_PASSWORD,
+                DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
             )
             or ""
         ),
@@ -149,28 +179,20 @@ def stable_third_party_mqtt_token(
     """Normalize and validate a ThirdParty MQTT token and determine whether a generated token should be used.
 
     Parameters:
-        token (object): Candidate token value; `None` is treated as absent, anything else is coerced to string and stripped of surrounding whitespace.
+        token (object): Candidate token value; `None` is treated as absent and
+            anything else is preserved as App-compatible text.
         generated_token (str | None): Previously generated 9-digit token, or `None` if none exists.
 
     Returns:
         (token_str (str), use_generated (bool), new_generated_token (str | None)):
-            - token_str: The 9-digit token to use.
+            - token_str: The existing device token or a generated 9-digit token.
             - use_generated: `True` if the chosen token is (or should be treated as) a generated token, `False` if it is a valid user-provided token.
             - new_generated_token: The newly generated token when one was created, otherwise `None`.
 
-    Raises:
-        ValueError: If a provided non-empty token is not exactly nine decimal digits.
     """
-    # ``None`` means "no token stored", not the literal string "None" -- the
-    # latter would fail the 9-digit check and raise instead of falling back to
-    # a generated token.
-    raw_token = "" if token is None else str(token).strip()
+    # ``None`` means "no token stored", not the literal string "None".
+    raw_token = "" if token is None else str(token)
     if raw_token:
-        if len(raw_token) != 9 or not raw_token.isdecimal():
-            raise ValueError(
-                "Third-party MQTT token must be a separate 9-digit decimal "
-                "value; topic belongs in the topic filter option"
-            )
         if raw_token == generated_token:
             return raw_token, True, None
         return raw_token, False, None

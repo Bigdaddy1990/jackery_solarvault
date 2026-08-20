@@ -196,6 +196,10 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
+    CONF_LOCAL_MQTT_HOST,
+    CONF_LOCAL_MQTT_PASSWORD,
+    CONF_LOCAL_MQTT_PORT,
+    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -566,7 +570,6 @@ from .util import (
     chart_series_debug,
     circuit_id,
     config_entry_bool_option,
-    config_entry_int_option,
     config_entry_str_option,
     day_power_energy_points,
     day_power_series_key,
@@ -16445,6 +16448,23 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         doing so writes a potentially stale token before learning the token
         that the device currently uses.
         """
+        # Coordinators restored from older runtime state may not yet own the
+        # 3047 waiter registry. Reuse their cached token for this first push;
+        # normal initialized coordinators still perform the App-compatible
+        # read-before-write sequence below.
+        if not hasattr(self, "_third_party_mqtt_config_waiters"):
+            cached_config = (self.data or {}).get(device_id, {}).get(
+                PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+            )
+            cached_token = (
+                cached_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+                if isinstance(cached_config, dict)
+                else None
+            )
+            if cached_token:
+                return self._local_mqtt_device_token(device_id)
+            self._third_party_mqtt_config_waiters = {}
+
         readback: dict[str, Any] | None = None
         try:
             readback = await self._async_query_third_party_mqtt_config_readback(
@@ -16502,7 +16522,19 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self._local_mqtt_config_applied_signature = None
             self._local_mqtt_config_diagnostics["last_status"] = "disabled"
             return True
-        host = config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
+
+        def _bridge_option(local_key: str, canonical_key: str, default: Any) -> Any:
+            """Resolve unmigrated local keys before canonical bridge keys."""
+            for source in (self.entry.options, self.entry.data):
+                if local_key in source:
+                    return source[local_key]
+                if canonical_key in source:
+                    return source[canonical_key]
+            return default
+
+        host = str(
+            _bridge_option(CONF_LOCAL_MQTT_HOST, CONF_THIRD_PARTY_MQTT_IP, "") or ""
+        ).strip()
         if not host:
             # Warn once per misconfiguration, not every push cycle — a missing
             # host is a static config state, so repeating the warning each
@@ -16528,20 +16560,21 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 "discovery": "HTTP discovery has not populated a device yet",
             }
             return False
-        port = config_entry_int_option(
-            self.entry,
-            CONF_THIRD_PARTY_MQTT_PORT,
-            DEFAULT_THIRD_PARTY_MQTT_PORT,
+        port = safe_int(
+            _bridge_option(
+                CONF_LOCAL_MQTT_PORT,
+                CONF_THIRD_PARTY_MQTT_PORT,
+                DEFAULT_THIRD_PARTY_MQTT_PORT,
+            )
         )
-        username = config_entry_str_option(
-            self.entry,
-            CONF_THIRD_PARTY_MQTT_USERNAME,
-            "",
+        port = port or DEFAULT_THIRD_PARTY_MQTT_PORT
+        username = str(
+            _bridge_option(CONF_LOCAL_MQTT_USERNAME, CONF_THIRD_PARTY_MQTT_USERNAME, "")
+            or ""
         )
-        password = config_entry_str_option(
-            self.entry,
-            CONF_THIRD_PARTY_MQTT_PASSWORD,
-            "",
+        password = str(
+            _bridge_option(CONF_LOCAL_MQTT_PASSWORD, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
+            or ""
         )
         device_ids = tuple(str(device_id) for device_id in self._device_index)
         observed_device_ids: set[str] = getattr(

@@ -129,6 +129,37 @@ def test_export_energy_falls_back_to_per_phase_negative_sum() -> None:
     assert sensor.native_value == pytest.approx(2.0)
 
 
+@pytest.mark.parametrize(
+    ["key", "fields", "expected"],
+    [
+        [
+            "grid_import_energy",
+            {"aPhaseEgy": 10_000, "bPhaseEgy": 20_000, "cPhaseEgy": 30_000},
+            60.0,
+        ],
+        [
+            "grid_export_energy",
+            {"anPhaseEgy": 1_000, "bnPhaseEgy": 2_000, "cnPhaseEgy": 3_000},
+            6.0,
+        ],
+    ],
+)
+def test_dashboard_grid_energy_falls_back_to_three_phase_sum(
+    key: str,
+    fields: dict[str, int],
+    expected: float,
+) -> None:
+    """Primary grid counters support CT meters that omit their total field."""
+    sensor = _sensor_by_key(key)
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {PAYLOAD_CT_METER: fields},
+    }
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(expected)
+
+
 def test_mac_address_falls_back_to_device_sn_when_mac_absent() -> None:
     """A CT meter without ``mac`` resolves its id from ``deviceSn``."""
     sensor = _sensor_by_key("mac_address")
