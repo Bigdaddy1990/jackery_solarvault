@@ -86,6 +86,7 @@ from ..const import (
     CONTRACT_LIST_PATH,
     CT_STAT_TYPE_L1,
     CURRENCY_LIST_PATH,
+    EPS_STAT_TYPE_L1,
     CUTOFF_STAT_PATH,
     DATE_TYPE_DAY,
     DEVICE_ACCEPT_BIND_PATH,
@@ -175,6 +176,7 @@ from ..const import (
     HTTP_CONNECT_TIMEOUT_SEC,
     HTTP_CONTENT_TYPE_FORM,
     HTTP_CONTENT_TYPE_JSON,
+    HTTP_DNS_TIMEOUT_SEC,
     HTTP_HEADER_CONTENT_TYPE,
     HTTP_METHOD_GET,
     HTTP_METHOD_POST,
@@ -465,8 +467,8 @@ class MqttSessionSnapshot(TypedDict):
 class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented facade mirrors the app API
     """Async client for the Jackery SolarVault cloud."""
 
-    def __init__(  # constructor takes distinct client-config values; a params object adds no clarity
-        self,
+    def __init__(
+        self,  # constructor takes distinct client-config values; a params object adds no clarity
         session: aiohttp.ClientSession,
         account: str,
         password: str,
@@ -1716,20 +1718,24 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
+        system_id: str | int | None = None,
+        stat_type: int | None = None,
     ) -> dict[str, Any]:
         """GET /v1/device/stat/ct — app CT/smart-meter statistics.
 
         App 2.4.x ``CtStatChartVM.loadData`` passes its selected ``Integer``
-        through ``CtStatApi.type``. The integration currently requests the
-        app's first CT chart type (``0``), matching that request contract.
+        through ``CtStatApi.type``. The integration defaults to the
+        app's first CT chart type (``0`` = CT_STAT_TYPE_L1), matching that
+        request contract.
         """
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
             device_id=device_id,
+            system_id=system_id,
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
-            stat_type=CT_STAT_TYPE_L1,
+            stat_type=stat_type if stat_type is not None else CT_STAT_TYPE_L1,
         )
 
     async def async_get_device_meter_stat(
@@ -2338,6 +2344,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
+        stat_type: int | None = None,
     ) -> dict[str, Any]:
         """Retrieve device EPS input/output energy for a specified period.
 
@@ -2352,6 +2359,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
+            stat_type=stat_type if stat_type is not None else EPS_STAT_TYPE_L1,
         )
 
     async def async_get_today_energy(self, device_sn: str) -> dict[str, Any]:
@@ -2385,7 +2393,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """
         data = await self._get_json(
             DEVICE_PORTABLE_CT_STAT_PATH,
-            params={FIELD_DEVICE_ID: str(device_id)},
+            params={FIELD_DEVICE_ID: str(device_id), APP_REQUEST_STAT_TYPE: str(CT_STAT_TYPE_L1)},
         )
         return self._payload_dict(data, DEVICE_PORTABLE_CT_STAT_PATH)
 
@@ -3848,6 +3856,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 timeout=aiohttp.ClientTimeout(
                     total=effective_timeout,
                     connect=min(HTTP_CONNECT_TIMEOUT_SEC, effective_timeout),
+                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
                 ),
             ) as resp:
                 status = resp.status
@@ -3915,7 +3924,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
+                timeout=aiohttp.ClientTimeout(
+                    total=REQUEST_TIMEOUT_SEC,
+                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
+                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
+                ),
             ) as resp:
                 status = resp.status
                 try:
@@ -4059,7 +4072,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 data=_request_body(),
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
+                timeout=aiohttp.ClientTimeout(
+                    total=REQUEST_TIMEOUT_SEC,
+                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
+                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
+                ),
             ) as resp:
                 status = resp.status
                 try:
@@ -4240,7 +4257,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
+                timeout=aiohttp.ClientTimeout(
+                    total=REQUEST_TIMEOUT_SEC,
+                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
+                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
+                ),
             ) as resp:
                 status = resp.status
                 try:
@@ -4299,7 +4320,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 url,
                 json=payload,
                 headers=_request_headers(),
-                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SEC),
+                timeout=aiohttp.ClientTimeout(
+                    total=REQUEST_TIMEOUT_SEC,
+                    connect=min(HTTP_CONNECT_TIMEOUT_SEC, REQUEST_TIMEOUT_SEC),
+                    sock_connect=min(HTTP_DNS_TIMEOUT_SEC, HTTP_CONNECT_TIMEOUT_SEC),
+                ),
             ) as resp:
                 status = resp.status
                 try:

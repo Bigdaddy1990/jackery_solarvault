@@ -9,11 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coord_mod
+from custom_components.jackery_solarvault.const import (
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+)
 from custom_components.jackery_solarvault.coordinator import (
     BackfillStatus,
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
+
+# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)
+CONF_LOCAL_MQTT_ENABLE = CONF_THIRD_PARTY_MQTT_ENABLE
+CONF_LOCAL_MQTT_HOST = CONF_THIRD_PARTY_MQTT_IP
 
 _DEVICE_ID = "device-1"
 _TARGET_DAY = date(2026, 8, 10)
@@ -175,7 +183,7 @@ def test_transport_supervisors_are_independent_and_configuration_visible() -> No
     coordinator.entry = SimpleNamespace(
         options={
             coord_mod.CONF_ENABLE_BLE_TRANSPORT: True,
-            coord_mod.CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_ENABLE: True,
         },
         data={},
     )

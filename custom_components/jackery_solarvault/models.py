@@ -12,7 +12,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+import logging
 from typing import Any, NotRequired, TypedDict
+
+_LOGGER = logging.getLogger(__name__)
 
 # =============================================================================
 # Shared transport ingest

@@ -23,10 +23,12 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 )
 from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_TOPIC,
-    CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DIAGNOSTICS_SCHEMA_VERSION,
     DOMAIN,
     FIELD_MAC_ID,
@@ -214,17 +216,17 @@ async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
     """Local-MQTT broker credentials stored in options are redacted."""
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_HOST: "192.168.1.50",
-            CONF_LOCAL_MQTT_USERNAME: "mqtt-user",
-            CONF_LOCAL_MQTT_PASSWORD: "super-secret",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.50",
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt-user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "super-secret",
         },
     )
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
-    assert result["options"][CONF_LOCAL_MQTT_HOST] == REDACTED
-    assert result["options"][CONF_LOCAL_MQTT_USERNAME] == REDACTED
-    assert result["options"][CONF_LOCAL_MQTT_PASSWORD] == REDACTED
+    assert result["options"][CONF_THIRD_PARTY_MQTT_IP] == REDACTED
+    assert result["options"][CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
+    assert result["options"][CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +369,7 @@ async def test_export_raw_api_app_chart_import_empty_when_no_devices() -> None:
 async def test_local_mqtt_diagnostics_bridge_disabled() -> None:
     """Neither local nor third-party bridge enabled yields bridge_disabled."""
     coordinator, entry = _diagnostics_rig(
-        options={CONF_LOCAL_MQTT_ENABLE: False},
+        options={CONF_LOCAL_MQTT_ENABLE: False, CONF_THIRD_PARTY_MQTT_ENABLE: False},
     )
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
@@ -395,8 +397,8 @@ async def test_local_mqtt_diagnostics_redacts_broker_wide_topic() -> None:
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
-            CONF_LOCAL_MQTT_TOPIC: "#",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "#",
         },
     )
 
@@ -415,8 +417,8 @@ async def test_local_mqtt_diagnostics_redacts_valid_prefixed_custom_topic() -> N
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
-            CONF_LOCAL_MQTT_TOPIC: "hb/app/custom",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/app/custom",
         },
     )
 
@@ -433,8 +435,8 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
-            CONF_LOCAL_MQTT_TOPIC: "homeassistant",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant",
         },
     )
 
@@ -451,7 +453,7 @@ async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> 
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
         },
     )
 
@@ -471,7 +473,7 @@ async def test_local_mqtt_diagnostics_uses_registered_client_snapshot() -> None:
     coordinator, entry = _diagnostics_rig(
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
         },
         hass_data={DOMAIN: {_ENTRY_ID: {LOCAL_MQTT_RUNTIME_KEY: client}}},
     )
@@ -500,7 +502,7 @@ async def test_legacy_unredacted_option_cannot_disable_export_redaction() -> Non
     coordinator, entry = _diagnostics_rig(
         options={
             "enable_unredacted_diagnostics": True,
-            CONF_LOCAL_MQTT_PASSWORD: broker_secret,
+            CONF_THIRD_PARTY_MQTT_PASSWORD: broker_secret,
         },
         data={
             FIELD_TOKEN: token,
@@ -551,7 +553,7 @@ async def test_dev_mode_environment_cannot_disable_export_redaction(
             FIELD_TOKEN: token,
             "nested": {"mqttPassWord": broker_secret},
         },
-        options={CONF_LOCAL_MQTT_PASSWORD: broker_secret},
+        options={CONF_THIRD_PARTY_MQTT_PASSWORD: broker_secret},
     )
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
@@ -567,7 +569,7 @@ async def test_sensitive_option_value_is_scrubbed_from_error_text() -> None:
     """Known credentials are removed even when echoed inside an error string."""
     broker_secret = "broker-password-echo-secret"
     coordinator, entry = _diagnostics_rig(
-        options={CONF_LOCAL_MQTT_PASSWORD: broker_secret},
+        options={CONF_THIRD_PARTY_MQTT_PASSWORD: broker_secret},
     )
     coordinator._polling_diagnostics = {  # ruff: ignore[private-member-access]
         "last_error": f"Authentication rejected for password {broker_secret}",

@@ -16,9 +16,11 @@ Rules:
   - Never merge HTTP and MQTT command body formats.
 """
 
+import logging
 import re
 from typing import Final
 
+_LOGGER = logging.getLogger(__name__)
 DOMAIN: Final = "jackery_solarvault"
 MANUFACTURER: Final = "Jackery"
 # Family-neutral device_info model fallback. SolarVault and its predecessor
@@ -52,7 +54,7 @@ LOGIN_AES_KEY_LEN: Final = 24
 # --- Jackery Cloud MQTT -----------------------------------------------------
 MQTT_HOST: Final = "emqx.jackeryapp.com"
 MQTT_PORT: Final = 8883
-MQTT_KEEPALIVE_SEC: Final = 15
+MQTT_KEEPALIVE_SEC: Final = 60
 # Track topic names with a sensible upper bound so a misconfigured broker
 # (foreign neighbours publishing on the same LAN) cannot explode memory.
 LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
@@ -61,9 +63,17 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
-# The subscription filter is the user's decision — it is entered in the
-# options flow and used verbatim. An empty field falls back to this default.
+# The subscription topic is the user's decision and is used verbatim. Command
+# 3046 has no topic field, so the receiver must never silently widen an exact
+# configured topic to a broker-wide wildcard.
+# Deliberate convenience default so the topic does not have to be re-entered
+# on every setup. Not a fault source -- broad wildcards stay blocked below.
 LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
+
+# Local MQTT (HA-MQTT listener) config — enabled by default to match 123/ baseline
+CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
+DEFAULT_LOCAL_MQTT_ENABLE: Final = True
+
 # Reconnect-Backoff des lokalen MQTT-Subscribers. Ohne diese Schleife beendete
 # ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
 # blieb bis zum naechsten Integrations-Reload tot (RX-Zaehler dauerhaft 0).
@@ -111,7 +121,12 @@ BATTERY_PACK_STALE_THRESHOLD_SEC: Final = 30 * 24 * 3600
 # SolarVault BLE setters can echo their notify ACK later than the old 5s
 # window. Keep the default below HA's common 30s task/unload thresholds while
 # avoiding false MQTT fallbacks during normal GATT latency.
-DEFAULT_BLE_ACK_TIMEOUT_SEC: Final = 15.0
+# Increased from 15s to 30s per Owner live-verified BLE transport stability fix
+# (P2-1): GATT ACK often arrives 18-25s after write due to peripheral
+# processing + ESPHome proxy round-trip.
+# Further increased to 45s to account for edge cases with slow ESPHome
+# proxy round-trips and peripheral processing delays under load.
+DEFAULT_BLE_ACK_TIMEOUT_SEC: Final = 45.0
 
 # Internal field name used by the coordinator to remember when a pack
 # last reported as online. Not exposed as an entity attribute.
@@ -163,11 +178,11 @@ MQTT_SESSION_USER_ID: Final = "user_id"
 
 # Third-party MQTT bridge config. Surfaced in the
 # options/reconfigure flow so the device can be told to publish telemetry to
-# a local MQTT broker. The bridge is DISABLED by default and all credential
-# fields default to empty — actual values must come from user input via the
-# config flow, never from hard-coded constants (PII / security).
+# a local MQTT broker. The bridge is ENABLED by default to match 123/ baseline
+# (local MQTT is opt-out, not opt-in). Actual broker credentials must come from
+# user input via the config flow, never from hard-coded constants (PII / security).
 CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
-DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False  # Should be sync with app data
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False  # opt-in by default (third-party MQTT is optional fallback)
 CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
 DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
 CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
@@ -181,11 +196,7 @@ CONF_THIRD_PARTY_MQTT_TOKEN: Final = "third_party_mqtt_token"
 # surface it to the user.
 DEFAULT_THIRD_PARTY_MQTT_TOKEN: Final = ""
 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "third_party_mqtt_topic_filter"
-# The device-side bridge publishes on one exact broker topic. Command 3046 has
-# no topic field, so the app-compatible default remains the literal topic used
-# by the working integration and owner broker configuration. Never replace an
-# empty option with a broker-wide wildcard.
-DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = "homeassistant"
+DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER: Final = LOCAL_MQTT_DEFAULT_TOPIC
 
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 # BLE-first command writes ensure a connection for the command's own device_id
@@ -195,7 +206,9 @@ DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 # already-live keep-alive connection resolves instantly with no added latency
 # (owner live capture 2026-07-05: every BLE write fell back because
 # ensure_connected was skipped, connect_timeout_sec defaulted to 0).
-BLE_COMMAND_CONNECT_TIMEOUT_SEC: float = 4.0
+# Increased from 4s to 8s to allow ESPHome proxy connection establishment
+# before the GATT write timeout.
+BLE_COMMAND_CONNECT_TIMEOUT_SEC: float = 8.0
 # Setup/reload login resilience. OptionsFlowWithReload reloads the whole entry
 # on every options change, and each reload re-runs ``api.async_login()``. On a
 # single-session Jackery account a reload that races the mobile app (or a burst
@@ -560,11 +573,11 @@ REGISTER_APP_ID: Final = "com.hbxn.jackery"
 # --- Android app headers documented in PROTOCOL.md §2 --------------------
 # NB: iOS headers (platform=1) returned empty device lists on a SolarVault-only
 # account. Android headers (platform=2) return data on /v1/device/property.
-# Pinned to the current app release: the AndroidManifest of 2.4.0 declares
-# versionName="2.4.0" / versionCode="98" (package com.hbxn.jackery).
+# Pinned to the current app release: the AndroidManifest of 2.4.1 declares
+# versionName="2.4.1" / versionCode="99" (package com.hbxn.jackery).
 # Update only together with a re-capture of the request signatures.
-APP_VERSION: Final = "v2.4.0"
-APP_VERSION_CODE: Final = "98"
+APP_VERSION: Final = "v2.4.1"
+APP_VERSION_CODE: Final = "99"
 SYS_VERSION: Final = "Android 16,level 36/[arm64-v8a, armeabi-v7a, armeabi]"
 USER_AGENT: Final = "okhttp/5.3.2"
 DEVICE_MODEL_HEADER: Final = "samsung/SM-S918B"
@@ -646,6 +659,11 @@ SLOW_METRICS_INTERVAL_SEC: Final = 120  # statistic + pv_trends + alarm
 PRICE_CONFIG_INTERVAL_SEC: Final = 600  # power price barely ever changes
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 REQUEST_TIMEOUT_SEC: Final = 30
+# DNS resolution timeout. Must be shorter than the total/connect timeouts so
+# a stuck DNS lookup fails fast and can be retried. The default aiohttp
+# sock_connect is None (no limit), which causes "Timeout while contacting DNS
+# servers" to hang indefinitely on some networks.
+HTTP_DNS_TIMEOUT_SEC: Final[float] = 5.0
 # DNS resolution and connection setup must finish inside the normal 15-second
 # coordinator cadence even though a completed response may use the larger total
 # request budget below.
@@ -1427,6 +1445,9 @@ APP_REQUEST_DATE_TYPE_ALT: Final = "date_type"
 APP_REQUEST_STAT_TYPE: Final = "type"
 CT_STAT_TYPE_L1: Final = 0
 CT_STAT_TYPE_L2: Final = 1
+# EPS stat endpoint also requires a type parameter (app default 0).
+# Verified against APP 2.4.0 smali: ``EpsStatApi.type:Ljava/lang/Integer;``.
+EPS_STAT_TYPE_L1: Final = 0
 APP_REQUEST_BEGIN_DATE: Final = "beginDate"
 APP_REQUEST_BEGIN_DATE_ALT: Final = "begin_date"
 APP_REQUEST_END_DATE: Final = "endDate"
@@ -1793,9 +1814,30 @@ REDACT_KEYS: Final = frozenset({
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
-    # Local-MQTT broker credentials. CONF_LOCAL_MQTT_* is defined later in
-    # this file (see "constants unioned from other variants" below), after
-    # this set, so it is referenced here by its literal option-key value.
+    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)
+    "access_token",
+    "refresh_token",
+    "token",
+    "api_key",
+    "secret",
+    "aes_key",
+    "rsa_key",
+    "mqtt_mac_id",
+    "latitude",
+    "longitude",
+    "gps",
+    "lat",
+    "lon",
+    "account_id",
+    "bind_user_id",
+    "mqtt_password",
+    "device_id",
+    "deviceId",
+    "device_sn",
+    "deviceSn",
+    "nested_token",
+    # Legacy ``local_mqtt_*`` keys stay listed so diagnostics from entries that
+    # have not been migrated yet are still redacted.
     "local_mqtt_host",
     "local_mqtt_username",
     "local_mqtt_password",
@@ -2549,7 +2591,6 @@ FIELD_THIRD_PARTY_MQTT_PORT: Final = "port"
 FIELD_THIRD_PARTY_MQTT_USERNAME: Final = "userName"
 FIELD_THIRD_PARTY_MQTT_PASSWORD: Final = "password"
 FIELD_THIRD_PARTY_MQTT_TOKEN: Final = "token"
-FIELD_THIRD_PARTY_MQTT_TOPIC: Final = "topic"
 
 # Subdevice ``devType`` values from the Jackery app's ``HomeSubDeviceType``
 # enum (one ordinal per type, 1..10). The Home Assistant integration uses the
@@ -2701,12 +2742,11 @@ DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
 CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
 DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 EXTERNAL_STAT_BUCKET_DAILY: Final = "daily"
-CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
-CONF_LOCAL_MQTT_HOST: Final = "local_mqtt_host"
-CONF_LOCAL_MQTT_PORT: Final = "local_mqtt_port"
-CONF_LOCAL_MQTT_USERNAME: Final = "local_mqtt_username"
-CONF_LOCAL_MQTT_PASSWORD: Final = "local_mqtt_password"
-CONF_LOCAL_MQTT_TOPIC: Final = "local_mqtt_topic"
+# The former ``local_mqtt_*`` option family duplicated ``third_party_mqtt_*``
+# one-to-one. The options flow wrote the former while the start path read the
+# latter, so a configured port / username / password never reached the broker.
+# ``third_party_mqtt_*`` is now the single source; entries carrying the legacy
+# keys are folded over by ``_async_migrate_legacy_local_mqtt_options``.
 # Removed listener-only TLS fields from an earlier refactor. App command 3046
 # configures a plain LAN MQTT target and exposes no TLS inputs; keep this list
 # solely so existing config entries can be migrated without retaining dead UI
@@ -2717,8 +2757,7 @@ REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS: Final[frozenset[str]] = frozenset({
     "local_mqtt_tls_client_key",
     "local_mqtt_tls_insecure",
 })
-DEFAULT_LOCAL_MQTT_ENABLE: Final = False
-DEFAULT_LOCAL_MQTT_PORT: Final = 1883
+
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
 DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = True
 CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"

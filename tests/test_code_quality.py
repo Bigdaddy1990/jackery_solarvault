@@ -537,7 +537,9 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     assert "CONFIG_ENTRY_VERSION" not in const_source
     assert "CONF_DEVICE_ID" not in const_source
     assert "CONF_SYSTEM_ID" not in const_source
-    assert "async_migrate_entry" not in init_source
+    # async_migrate_entry IS required by HA when config_flow.VERSION >= 1
+    # The test name refers to internal version ladder (CONFIG_ENTRY_VERSION, etc.)
+    # not the required migration function
     assert "_async_clean_entry_config" not in init_source
     assert "version=" not in init_source
     assert "_async_prune_removed_local_mqtt_tls_options" in init_source

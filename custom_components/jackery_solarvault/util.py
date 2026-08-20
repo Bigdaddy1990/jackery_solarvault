@@ -5,6 +5,7 @@ import contextlib
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 import json
+import logging
 import math
 import operator
 from pathlib import Path
@@ -65,7 +66,6 @@ from .const import (
     APP_UNIT_KWH,
     APP_UNIT_WH,
     APP_YEAR_BACKFILL_META,
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
@@ -127,6 +127,8 @@ from .const import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+_LOGGER = logging.getLogger(__name__)
+
 # CPU-Optimierung: Regex auf Modulebene kompilieren, nicht pro Schleifendurchlauf
 _DAY_CHART_MINUTE_RE = re.compile(r"\s*(\d{1,2}):(\d{2})\s*")
 _MAX_COMPACT_YEAR_VALUE_TEXT_LENGTH = 64
@@ -162,27 +164,54 @@ def local_mqtt_opt_in(entry: object) -> bool:
 
     Single source for the opt-in so the options flow and the runtime start path
     cannot disagree. ``config_flow._current_local_mqtt_options`` documents the
-    same precedence: an explicit ``local_mqtt_enable`` wins, otherwise the
+    same precedence: an explicit ``local_mqtt_enable=True`` wins, an explicit
+    ``local_mqtt_enable=False`` wins (user choice respected), otherwise the
     app-synchronised ``third_party_mqtt_enable`` acts as the fallback opt-in.
     Reading only ``local_mqtt_enable`` at runtime made entries that carry just
     the third-party keys look disabled, so the receiver never started and its
     message counter stayed at zero.
+
+    Default is True to match 123/ baseline (DEFAULT_LOCAL_MQTT_ENABLE = True).
     """
     # Kein ``isinstance(..., Mapping)``: ``Mapping`` ist hier nur ein
     # TYPE_CHECKING-Import. ``in`` funktioniert fuer jedes Mapping, auch fuer
     # das ``MappingProxyType`` von ``ConfigEntry.options``.
-    for source in (getattr(entry, "options", None), getattr(entry, "data", None)):
-        if source and CONF_LOCAL_MQTT_ENABLE in source:
-            return config_entry_bool_option(
-                entry,
-                CONF_LOCAL_MQTT_ENABLE,
-                DEFAULT_LOCAL_MQTT_ENABLE,
-            )
-    return config_entry_bool_option(
-        entry,
-        CONF_THIRD_PARTY_MQTT_ENABLE,
-        DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    )
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+
+    # Check legacy local_mqtt_enable first - explicit True enables, explicit False disables,
+    # missing falls through to third_party_mqtt_enable
+    if "local_mqtt_enable" in options:
+        value = options["local_mqtt_enable"]
+        parsed = safe_bool(value)
+        if parsed is True:
+            return True
+        if parsed is False:
+            return False
+        # parsed is None -> fall through to third_party_mqtt_enable
+    elif "local_mqtt_enable" in data:
+        value = data["local_mqtt_enable"]
+        parsed = safe_bool(value)
+        if parsed is True:
+            return True
+        if parsed is False:
+            return False
+        # parsed is None -> fall through to third_party_mqtt_enable
+
+    # No explicit local_mqtt_enable (True or False) - check if third_party_mqtt_enable
+    # is explicitly set. If explicitly True -> opt in. If explicitly False -> opt out
+    # (user choice respected). If not set at all -> fall back to DEFAULT_LOCAL_MQTT_ENABLE.
+    options = getattr(entry, "options", {}) or {}
+    data = getattr(entry, "data", {}) or {}
+    if CONF_THIRD_PARTY_MQTT_ENABLE in options or CONF_THIRD_PARTY_MQTT_ENABLE in data:
+        return config_entry_bool_option(
+            entry,
+            CONF_THIRD_PARTY_MQTT_ENABLE,
+            DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+        )
+
+    # third_party_mqtt_enable not set anywhere - fall back to DEFAULT_LOCAL_MQTT_ENABLE
+    return DEFAULT_LOCAL_MQTT_ENABLE
 
 
 def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
@@ -193,16 +222,28 @@ def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
     unusable silently dropped valid Wh payloads, while passing them through
     unscaled would inflate them by 1000.
 
+    Missing/unknown units default to kWh (1.0) to match App behavior —
+    the App treats absent unit as kWh. This fixes CT/EPS week/month/year
+    energy sensors that were silently dropped due to missing unit field.
+
+    "W" (watts) is explicitly NOT an energy unit - it's a power unit.
+    Returning None signals the payload is invalid for energy purposes.
+
     Returns:
-        float | None: ``1.0`` for kWh (or a missing unit), ``0.001`` for Wh and
-        ``None`` when the unit is present but not a supported energy unit.
+        float | None: ``1.0`` for kWh (or missing unit), ``0.001`` for Wh,
+        ``None`` for invalid units like "W".
     """
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if not unit or unit == APP_UNIT_KWH:
         return 1.0
     if unit == APP_UNIT_WH:
         return 1 / _WATTS_PER_KILOWATT
-    return None
+    # "W" is a power unit, not an energy unit - explicitly invalid
+    if unit == "w":
+        return None
+    # Unknown unit → assume kWh (App default), don't discard data
+    _LOGGER.debug("Unknown energy unit %r, assuming kWh", unit)
+    return 1.0
 
 
 def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
@@ -223,9 +264,14 @@ def config_entry_bool_option(entry: object, key: str, default: bool) -> bool:
     """
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
-    value = options.get(key)
-    if value is None:
-        value = data.get(key, default)
+    # Check if key exists in either options or data (explicitly set)
+    if key in options:
+        value = options[key]
+    elif key in data:
+        value = data[key]
+    else:
+        # Key not present anywhere - return default
+        return default
     parsed = safe_bool(value)
     return default if parsed is None else parsed
 
@@ -1164,10 +1210,22 @@ def append_payload_debug_line(
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
         backup = debug_path.with_name(debug_path.name + PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX)
-        with contextlib.suppress(OSError):
-            backup.unlink()
-        with contextlib.suppress(OSError):
+        try:
+            backup.unlink(missing_ok=True)
+        except OSError as err:
+            _LOGGER.warning(
+                "Jackery: could not remove old payload debug backup %s: %s",
+                backup,
+                err,
+            )
+        try:
             debug_path.replace(backup)
+        except OSError as err:
+            _LOGGER.warning(
+                "Jackery: could not rotate payload debug log %s: %s",
+                debug_path,
+                err,
+            )
     redacted = redacted_json_safe_payload(event)
     with debug_path.open("a", encoding="utf-8") as file:
         file.write(
@@ -2683,7 +2741,16 @@ def _day_power_sample_energy_value(
 ) -> float | None:
     """Return the directional app day-curve sample value to integrate."""
     if raw is None:
-        return None
+        # For battery charge stats, missing evidence is treated as zero.
+        # For other stats, missing evidence is None (no artificial bars).
+        is_battery_charge = section.startswith((
+            APP_SECTION_BATTERY_STAT,
+            APP_SECTION_BATTERY_TRENDS,
+        )) and stat_key in {
+            APP_STAT_TOTAL_CHARGE,
+            APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+        }
+        return 0.0 if is_battery_charge else None
     value = safe_float(raw) if isinstance(raw, (int, float, str)) else None
     if value is None:
         return None
@@ -3700,7 +3767,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     is `kwh`.
     If the chart-series list is missing the function applies guarded fallbacks:
     - For home-stat sections: returns `0.0` when the server total equals `0.0` but grid-related series lists are present.
-    - For CT-stat sections: returns the server-reported total when present.
+    - For CT/EPS-stat sections: returns the server-reported total when present and unit is valid (including zero).
 
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total
@@ -3708,6 +3775,24 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     """
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
+
+        # Only reject "W" for CT/EPS day periods where the entire payload is invalid
+        # For PV/Home/Grid, "W" on day period means the power curves are in W
+        # but scalar totals are in kWh - this is valid
+        is_ct_eps_day = section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+        unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+        if is_ct_eps_day and unit == "w":
+            return None
+
+        if (
+            is_ct_eps_day
+            and total is not None
+            and total < 0
+        ):
+            # CT/EPS day endpoints commonly return a scalar negative alongside an
+            # empty/no-data power curve. Negative is not affirmative energy data.
+            # Zero is a valid reported value (no energy flow in that period).
+            return None
         return round(total, 2) if total is not None else None
 
     series_key = trend_series_key(section, stat_key)
@@ -3717,6 +3802,8 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     unit_scale = app_energy_unit_scale(source)
     if unit_scale is None:
         return None
+
+    is_ct_eps = section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
 
     series = source.get(series_key)
     if not isinstance(series, list):
@@ -3728,10 +3815,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return 0.0
-        if (
-            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
-            and server_total is not None
-        ):
+        if is_ct_eps and server_total is not None and server_total >= 0:
             return round(server_total * unit_scale, 2)
         return None
 
@@ -3740,10 +3824,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
 
     if not valid_values:
         server_total = effective_period_total_value(source, section, stat_key)
-        if (
-            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
-            and server_total is not None
-        ):
+        if is_ct_eps and server_total is not None and server_total >= 0:
             return round(server_total * unit_scale, 2)
         return None
 
@@ -3761,20 +3842,53 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
 
     Considers day-period scalars, chart-series lists for non-day periods (only when the
     unit is kWh or unspecified), and the module's special-case allowances for home and
-    CT sections when series data or server totals imply a valid value.
+    CT/EPS sections when series data or server totals imply a valid value.
 
     Returns:
         `true` if a numeric value can be derived from the payload for the section and
         stat_key, `false` otherwise.
     """
+    unit_scale = app_energy_unit_scale(source)
+    is_ct_eps = section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+
     if is_day_period_payload(source, section):
-        return safe_float(source.get(stat_key)) is not None
+        server_total = safe_float(source.get(stat_key))
+        # Only reject "W" for CT/EPS day periods where the entire payload is invalid
+        # For PV/Home/Grid, "W" on day period means the power curves are in W
+        # but scalar totals are in kWh - this is valid
+        is_ct_eps_day = is_ct_eps
+        unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+        if is_ct_eps_day and unit == "w":
+            return False
+
+        if is_ct_eps_day:
+            # For CT/EPS day periods: valid if unit is kWh and total is explicitly provided (>= 0)
+            # A zero total with valid unit means the device reported 0 energy for that period
+            return (
+                unit_scale is not None
+                and server_total is not None
+                and server_total >= 0
+            )
+        return server_total is not None
 
     series_key = trend_series_key(section, stat_key)
     if not series_key:
         return False
 
-    if app_energy_unit_scale(source) is None:
+    # Explicitly reject "W" (watts) for CT/EPS periods - it's a power unit, not an energy unit
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if is_ct_eps and unit == "w":
+        return False
+
+    if unit_scale is None:
+        # For CT/EPS stat, if unit is missing but we have valid totals, allow it
+        server_total = effective_period_total_value(source, section, stat_key)
+        if is_ct_eps and server_total is not None and server_total >= 0:
+            # Check if we have any series data at all
+            series = source.get(series_key) if series_key else None
+            if isinstance(series, list) and len(series) == 0:
+                # Empty series but valid total - this is a valid no-chart-data case
+                return True
         return False
 
     series = source.get(series_key)
@@ -3787,17 +3901,24 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
+        # For CT/EPS: valid if unit is kWh and total is explicitly provided (>= 0)
         return bool(
-            section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+            is_ct_eps
+            and unit_scale is not None
             and server_total is not None
+            and server_total >= 0
         )
 
     if any(safe_float(item) is not None for item in series):
         return True
 
+    # Empty series but valid unit: check if server total is explicitly provided (including zero)
+    stat_value = safe_float(source.get(stat_key))
     return bool(
-        section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
-        and safe_float(source.get(stat_key)) is not None
+        is_ct_eps
+        and unit_scale is not None
+        and stat_value is not None
+        and stat_value >= 0
     )
 
 
@@ -3856,6 +3977,10 @@ def trend_payload_has_value(
     Returns:
         True if a usable period value exists, False otherwise.
     """
+    if section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT)):
+        # Keep CT/EPS discovery aligned with the sensor resolver: a scalar
+        # zero plus an empty/missing series is the observed no-data shell.
+        return trend_series_has_value(source, section, stat_key)
     if trend_series_total(source, section, stat_key) is not None:
         return True
     return safe_float(source.get(stat_key)) is not None

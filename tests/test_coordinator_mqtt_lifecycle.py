@@ -161,7 +161,7 @@ async def test_ensure_mqtt_wait_connected_success_path(coordinator: Any) -> None
 
     await coordinator._async_ensure_mqtt(force=True, wait_connected=True)  # noqa: RUF105, SLF001
 
-    mqtt.async_wait_until_connected.assert_awaited_once_with(timeout_sec=15.0)
+    mqtt.async_wait_until_connected.assert_awaited_once_with(timeout_sec=30.0)
     assert coordinator._mqtt_mgr.fingerprint == fingerprint  # noqa: RUF105, SLF001
 
 
