@@ -1,20 +1,17 @@
 """Unit tests for local_mqtt_opt_in function."""
 
-import pytest
-from unittest.mock import MagicMock
 
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_ENABLE,
+    DEFAULT_THIRD_PARTY_MQTT_ENABLE,
 )
 from custom_components.jackery_solarvault.util import local_mqtt_opt_in
 
 
 class MockConfigEntry:
     """Mock ConfigEntry with options and data dicts."""
-    def __init__(self, options: dict = None, data: dict = None):
+    def __init__(self, options: dict | None = None, data: dict | None = None):
         self.options = options or {}
         self.data = data or {}
 

@@ -92,6 +92,7 @@ class TestJackeryLocalMqttClient:
 
             mock_client.subscribe = AsyncMock()
             # Create an async iterator for messages
+
             async def mock_messages():
                 return
                 yield  # pragma: no cover - make it an async generator
@@ -200,7 +201,6 @@ class TestJackeryLocalMqttClient:
 
     def test_extract_mqtt_code(self) -> None:
         """Test _extract_mqtt_code static method."""
-        from aiomqtt.exceptions import MqttCodeError
 
         class MockError:
             rc = 5

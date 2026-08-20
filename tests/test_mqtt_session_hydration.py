@@ -1,13 +1,14 @@
 """Unit tests for MQTT session cache hydration before Layer-5 start."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Any
+from unittest.mock import MagicMock
 
+from custom_components.jackery_solarvault.__init__ import (
+    _async_prime_entry_bootstrap_mqtt_session,
+    _entry_bootstrap_mqtt_session,
+)
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.client.mqtt_session_cache import (
-    async_load_mqtt_session,
-    async_save_mqtt_session,
     normalize_mqtt_session_snapshot,
 )
 from custom_components.jackery_solarvault.const import (
@@ -15,11 +16,6 @@ from custom_components.jackery_solarvault.const import (
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
-)
-from custom_components.jackery_solarvault.__init__ import (
-    _async_load_entry_caches,
-    _async_prime_entry_bootstrap_mqtt_session,
-    _entry_bootstrap_mqtt_session,
 )
 
 
@@ -33,7 +29,7 @@ class MockHass:
 
 class MockConfigEntry:
     """Mock ConfigEntry with data and options."""
-    def __init__(self, data: dict = None, options: dict = None, entry_id: str = "test_entry"):
+    def __init__(self, data: dict | None = None, options: dict | None = None, entry_id: str = "test_entry"):
         self.data = data or {}
         self.options = options or {}
         self.entry_id = entry_id

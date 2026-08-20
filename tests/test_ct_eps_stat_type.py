@@ -1,7 +1,6 @@
 """Unit tests for CT/EPS stat type parameter handling."""
 
-import pytest
-from typing import Any, cast
+from typing import Any
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
@@ -10,8 +9,8 @@ from custom_components.jackery_solarvault.const import (
     CT_STAT_TYPE_L1,
     CT_STAT_TYPE_L2,
     DATE_TYPE_DAY,
-    DATE_TYPE_WEEK,
     DATE_TYPE_MONTH,
+    DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     DEVICE_CT_STAT_PATH,
     DEVICE_EPS_STAT_PATH,

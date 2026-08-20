@@ -415,7 +415,10 @@ class TestAsyncSetupEntry:
 
         # Mock coordinator (entry.runtime_data IS the coordinator)
         coordinator = MagicMock()
-        from custom_components.jackery_solarvault.const import PAYLOAD_SMART_PLUGS, PAYLOAD_CIRCUIT_PROPERTY
+        from custom_components.jackery_solarvault.const import (
+            PAYLOAD_CIRCUIT_PROPERTY,
+            PAYLOAD_SMART_PLUGS,
+        )
         coordinator.data = {
             "test_device": {
                 "properties": {"swEps": 1},

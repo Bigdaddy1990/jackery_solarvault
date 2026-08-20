@@ -6,15 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
 from custom_components.jackery_solarvault.const import (
     DEFAULT_SCAN_INTERVAL_SEC,
     FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
     FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
     FIELD_MODEL_CODE,
 )
-
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 _TEST_HTTP_DATA = {
     "test-device": {

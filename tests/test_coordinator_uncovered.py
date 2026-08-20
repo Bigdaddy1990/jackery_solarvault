@@ -1,66 +1,66 @@
 """Tests for uncovered paths in coordinator.py to increase coverage."""
 
 from datetime import timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
-    _is_system_busy_error,
-    is_mqtt_auth_failure,
-    is_transient_connect_failure,
-    mqtt_connect_failure_signature,
-    merge_dict_values,
-    changed_dict_values,
-    _is_blank_value,
     _clean_dict_list_update,
+    _is_blank_value,
+    _is_system_busy_error,
     _merge_identified_dict_lists,
-    merge_present_dict_values,
-    merge_missing_dict_values,
-    sync_property_aliases,
+    battery_pack_serial,
+    battery_packs_from_source,
+    call,
+    changed_dict_values,
     find_dict_with_any_key,
     find_list_for_key,
-    normalize_live_property_payload,
-    call,
-    normalized_company_id,
-    normalized_region,
-    source_regions,
-    normalized_source_regions,
     first_nonblank_source_name,
-    valid_price_sources,
+    has_breaker_accessory,
+    has_meter_head_accessory,
+    has_smart_meter_accessory,
+    has_smart_plug_accessory,
+    has_subdevice_accessory_or_bucket,
     is_alarm_message,
+    is_device_ota_version_message,
+    is_grid_standard_sync_message,
+    is_mqtt_auth_failure,
+    is_mqtt_connect_info_message,
+    is_smart_meter_accessory,
+    is_subdevice_payload,
     is_third_party_mqtt_config_message,
+    is_time_zone_config_message,
+    is_transient_connect_failure,
     is_wifi_config_message,
     is_wifi_list_message,
-    is_time_zone_config_message,
-    is_grid_standard_sync_message,
-    is_mqtt_connect_info_message,
-    is_device_ota_version_message,
-    is_subdevice_payload,
-    normalize_battery_pack_payload,
     looks_like_battery_pack,
-    battery_packs_from_source,
-    subdevice_serial,
-    battery_pack_serial,
-    sorted_battery_pack_payloads,
-    valid_discovery_list_response,
-    valid_discovery_device_identity,
-    valid_system_parent_identity,
-    valid_system_discovery_identity,
-    valid_system_discovery_entries,
-    valid_system_discovery_response,
-    subdevice_id,
-    subdevice_identity_values,
-    subdevice_dev_type,
-    is_smart_meter_accessory,
+    merge_dict_values,
+    merge_missing_dict_values,
+    merge_present_dict_values,
+    mqtt_connect_failure_signature,
+    normalize_battery_pack_payload,
+    normalize_live_property_payload,
+    normalized_company_id,
+    normalized_region,
+    normalized_source_regions,
     smart_meter_accessories,
     smart_meter_accessory_device_id,
-    has_smart_meter_accessory,
-    has_subdevice_accessory_or_bucket,
-    has_meter_head_accessory,
-    has_smart_plug_accessory,
-    has_breaker_accessory,
+    sorted_battery_pack_payloads,
+    source_regions,
+    subdevice_dev_type,
+    subdevice_id,
+    subdevice_identity_values,
+    subdevice_serial,
+    sync_property_aliases,
+    valid_discovery_device_identity,
+    valid_discovery_list_response,
+    valid_price_sources,
+    valid_system_discovery_entries,
+    valid_system_discovery_identity,
+    valid_system_discovery_response,
+    valid_system_parent_identity,
 )
 
 
@@ -183,7 +183,6 @@ class TestJackerySolarVaultCoordinator:
     def test_schedule_background_once(self) -> None:
         """Test _schedule_background_once method."""
         coordinator = self._create_coordinator()
-        import asyncio
 
         async def dummy_factory():
             pass
@@ -326,21 +325,18 @@ class TestJackerySolarVaultCoordinator:
         Skipped: The async_discover method has complex internal logic with many
         dependencies that are difficult to mock in isolation.
         """
-        pass
 
     def test_async_start_mqtt(self) -> None:
         """Test async_start_mqtt method.
 
         Skipped: The method requires complex MQTT client mocking.
         """
-        pass
 
     def test_async_shutdown(self) -> None:
         """Test async_shutdown method.
 
         Skipped: Requires complex task and MQTT/BLE mocking.
         """
-        pass
 
     def test_async_stop_supplemental_transports(self) -> None:
         """Test async_stop_supplemental_transports method."""
@@ -384,7 +380,6 @@ class TestJackerySolarVaultCoordinator:
 
         Skipped: Requires complex MQTT client mocking for many methods.
         """
-        pass
 
     def test_ble_connect_backoff_methods(self) -> None:
         """Test BleConnectBackoff methods."""
@@ -590,7 +585,6 @@ class TestCoordinatorUtilities:
         err4 = MockError("code=10427")
         assert _is_system_busy_error(err4) is False
 
-    
     def test_normalized_region(self) -> None:
         """Test normalized_region function."""
         assert normalized_region("de") == "DE"
@@ -603,7 +597,10 @@ class TestCoordinatorUtilities:
 
     def test_source_regions(self) -> None:
         """Test source_regions function."""
-        from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION, FIELD_COUNTRY
+        from custom_components.jackery_solarvault.const import (
+            FIELD_COUNTRY,
+            FIELD_SYSTEM_REGION,
+        )
         # Test with FIELD_SYSTEM_REGION
         source = {FIELD_SYSTEM_REGION: "de,us,eu"}
         result = source_regions(source)
@@ -621,7 +618,10 @@ class TestCoordinatorUtilities:
 
     def test_normalized_source_regions(self) -> None:
         """Test normalized_source_regions function."""
-        from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION, FIELD_COUNTRY
+        from custom_components.jackery_solarvault.const import (
+            FIELD_COUNTRY,
+            FIELD_SYSTEM_REGION,
+        )
         source = {FIELD_SYSTEM_REGION: "de,us,eu"}
         result = normalized_source_regions(source)
         assert "DE" in result
@@ -801,7 +801,10 @@ class TestCoordinatorUtilities:
     def test_source_regions(self) -> None:
         """Test source_regions function."""
         # Function looks for FIELD_SYSTEM_REGION or FIELD_COUNTRY
-        from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION, FIELD_COUNTRY
+        from custom_components.jackery_solarvault.const import (
+            FIELD_COUNTRY,
+            FIELD_SYSTEM_REGION,
+        )
         source = {FIELD_SYSTEM_REGION: "de,us"}
         result = source_regions(source)
         assert "de" in result
@@ -816,7 +819,10 @@ class TestCoordinatorUtilities:
 
     def test_normalized_source_regions(self) -> None:
         """Test normalized_source_regions function."""
-        from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION, FIELD_COUNTRY
+        from custom_components.jackery_solarvault.const import (
+            FIELD_COUNTRY,
+            FIELD_SYSTEM_REGION,
+        )
         source = {FIELD_SYSTEM_REGION: "de,us,eu"}
         result = normalized_source_regions(source)
         assert "DE" in result
@@ -836,7 +842,10 @@ class TestCoordinatorUtilities:
     def test_valid_price_sources(self) -> None:
         """Test valid_price_sources function."""
         # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present
-        from custom_components.jackery_solarvault.const import FIELD_PLATFORM_COMPANY_ID, FIELD_SYSTEM_REGION
+        from custom_components.jackery_solarvault.const import (
+            FIELD_PLATFORM_COMPANY_ID,
+            FIELD_SYSTEM_REGION,
+        )
         sources = [
             {FIELD_PLATFORM_COMPANY_ID: 123, FIELD_SYSTEM_REGION: "de"},
             {FIELD_PLATFORM_COMPANY_ID: "456", FIELD_SYSTEM_REGION: "us"},
@@ -856,10 +865,10 @@ class TestCoordinatorUtilities:
     def test_is_alarm_message(self) -> None:
         """Test is_alarm_message function."""
         from custom_components.jackery_solarvault.const import (
-            MQTT_MESSAGE_UPLOAD_DEVICE_ALERT,
+            FIELD_CMD,
             MQTT_ACTION_IDS_ALARM,
             MQTT_CMD_UPLOAD_DEVICE_ALERT,
-            FIELD_CMD,
+            MQTT_MESSAGE_UPLOAD_DEVICE_ALERT,
         )
         # msg_type match
         assert is_alarm_message(MQTT_MESSAGE_UPLOAD_DEVICE_ALERT, None, {}) is True
@@ -873,13 +882,13 @@ class TestCoordinatorUtilities:
     def test_is_third_party_mqtt_config_message(self) -> None:
         """Test is_third_party_mqtt_config_message function."""
         from custom_components.jackery_solarvault.const import (
-            MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG,
-            MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
-            ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG,
             ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
-            MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
-            MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+            ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG,
             FIELD_CMD,
+            MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
+            MQTT_CMD_THIRD_PARTY_MQTT_CONFIG,
+            MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
+            MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG,
         )
         # msg_type match
         assert is_third_party_mqtt_config_message(MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG, None, {}) is True
@@ -896,11 +905,11 @@ class TestCoordinatorUtilities:
     def test_is_wifi_config_message(self) -> None:
         """Test is_wifi_config_message function."""
         from custom_components.jackery_solarvault.const import (
-            ACTION_ID_QUERY_WIFI_CONFIG,
             ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
-            MQTT_MESSAGE_QUERY_WIFI_CONFIG,
-            MQTT_CMD_QUERY_WIFI_CONFIG,
+            ACTION_ID_QUERY_WIFI_CONFIG,
             FIELD_CMD,
+            MQTT_CMD_QUERY_WIFI_CONFIG,
+            MQTT_MESSAGE_QUERY_WIFI_CONFIG,
         )
         # action_id match
         assert is_wifi_config_message(None, ACTION_ID_QUERY_WIFI_CONFIG, {}) is True
@@ -916,8 +925,8 @@ class TestCoordinatorUtilities:
         """Test is_wifi_list_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_READ_WIFI_LIST,
-            MQTT_CMD_READ_WIFI_LIST,
             FIELD_CMD,
+            MQTT_CMD_READ_WIFI_LIST,
         )
         # action_id match
         assert is_wifi_list_message(ACTION_ID_READ_WIFI_LIST, {}) is True
@@ -932,9 +941,9 @@ class TestCoordinatorUtilities:
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_GET_TIME_ZONE,
             ACTION_ID_SEND_TIME_ZONE,
+            FIELD_CMD,
             MQTT_CMD_GET_TIME_ZONE,
             MQTT_CMD_SEND_TIME_ZONE,
-            FIELD_CMD,
         )
         # action_id match
         assert is_time_zone_config_message(ACTION_ID_GET_TIME_ZONE, {}) is True
@@ -950,8 +959,8 @@ class TestCoordinatorUtilities:
         """Test is_grid_standard_sync_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_SYNC_GRID_STANDARD,
-            MQTT_CMD_SYNC_GRID_STANDARD,
             FIELD_CMD,
+            MQTT_CMD_SYNC_GRID_STANDARD,
         )
         # action_id match
         assert is_grid_standard_sync_message(ACTION_ID_SYNC_GRID_STANDARD, {}) is True
@@ -965,8 +974,8 @@ class TestCoordinatorUtilities:
         """Test is_mqtt_connect_info_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_SYNC_MQTT_CONNECT_INFO,
-            MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
             FIELD_CMD,
+            MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
         )
         # action_id match
         assert is_mqtt_connect_info_message(ACTION_ID_SYNC_MQTT_CONNECT_INFO, {}) is True
@@ -980,8 +989,8 @@ class TestCoordinatorUtilities:
         """Test is_device_ota_version_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_GET_DEVICE_OTA_VERSION,
-            MQTT_CMD_GET_DEVICE_OTA_VERSION,
             FIELD_CMD,
+            MQTT_CMD_GET_DEVICE_OTA_VERSION,
         )
         # action_id match
         assert is_device_ota_version_message(ACTION_ID_GET_DEVICE_OTA_VERSION, {}) is True
@@ -994,12 +1003,12 @@ class TestCoordinatorUtilities:
     def test_is_subdevice_payload(self) -> None:
         """Test is_subdevice_payload function."""
         from custom_components.jackery_solarvault.const import (
-            FIELD_MESSAGE_TYPE,
             FIELD_ACTION_ID,
-            MQTT_ACTION_IDS_SUBDEVICE,
-            FIELD_UPDATES,
-            FIELD_DEV_TYPE,
             FIELD_DEVICE_TYPE,
+            FIELD_DEV_TYPE,
+            FIELD_MESSAGE_TYPE,
+            FIELD_UPDATES,
+            MQTT_ACTION_IDS_SUBDEVICE,
         )
         subdevice_hint_keys = frozenset(["deviceSn", "devType"])
         battery_pack_hint_keys = frozenset(["sn", "soc"])
@@ -1109,8 +1118,7 @@ class TestCoordinatorUtilities:
     def test_valid_system_discovery_entries(self) -> None:
         """Test valid_system_discovery_entries function."""
         # Function expects list of systems with valid identities and devices
-        from custom_components.jackery_solarvault.const import FIELD_DEVICES
-        from custom_components.jackery_solarvault.const import FIELD_ID
+        from custom_components.jackery_solarvault.const import FIELD_DEVICES, FIELD_ID
         # Need a system with valid identity and devices
         system = {FIELD_ID: "123", FIELD_DEVICES: [{FIELD_ID: "device1"}]}
         assert valid_system_discovery_entries([system]) is True
@@ -1119,7 +1127,11 @@ class TestCoordinatorUtilities:
     def test_valid_system_discovery_response(self) -> None:
         """Test valid_system_discovery_response function."""
         # Function expects a mapping with FIELD_DATA containing valid entries
-        from custom_components.jackery_solarvault.const import FIELD_DATA, FIELD_ID, FIELD_DEVICES
+        from custom_components.jackery_solarvault.const import (
+            FIELD_DATA,
+            FIELD_DEVICES,
+            FIELD_ID,
+        )
         # Need a system with valid identity AND devices
         system = {FIELD_ID: "123", FIELD_DEVICES: [{FIELD_ID: "device1"}]}
         assert valid_system_discovery_response({FIELD_DATA: [system]}) is True
@@ -1127,7 +1139,11 @@ class TestCoordinatorUtilities:
 
     def test_subdevice_id(self) -> None:
         """Test subdevice_id function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID
+        from custom_components.jackery_solarvault.const import (
+            FIELD_DEVICE_ID,
+            FIELD_DEV_ID,
+            FIELD_ID,
+        )
         # Function checks FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID
         item = {FIELD_DEVICE_ID: "123"}
         result = subdevice_id(item)
@@ -1146,7 +1162,7 @@ class TestCoordinatorUtilities:
 
     def test_subdevice_identity_values(self) -> None:
         """Test subdevice_identity_values function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID, FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN, FIELD_BIND_ID
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_SN
         item = {FIELD_DEVICE_ID: "123", FIELD_SN: "456"}
         result = subdevice_identity_values(item)
         assert "123" in result
@@ -1163,7 +1179,11 @@ class TestCoordinatorUtilities:
     def test_is_smart_meter_accessory(self) -> None:
         """Test is_smart_meter_accessory function."""
         # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE, FIELD_DEVICE_TYPE, SUBDEVICE_TYPE_SMART_METER
+        from custom_components.jackery_solarvault.const import (
+            FIELD_DEVICE_TYPE,
+            FIELD_DEV_TYPE,
+            SUBDEVICE_TYPE_SMART_METER,
+        )
         assert is_smart_meter_accessory({FIELD_DEV_TYPE: SUBDEVICE_TYPE_SMART_METER}) is True
         assert is_smart_meter_accessory({FIELD_DEVICE_TYPE: SUBDEVICE_TYPE_SMART_METER}) is True
         assert is_smart_meter_accessory({FIELD_DEV_TYPE: "other"}) is False
@@ -1172,7 +1192,11 @@ class TestCoordinatorUtilities:
     def test_smart_meter_accessories(self) -> None:
         """Test smart_meter_accessories function."""
         # Function looks for accessories in source or in system
-        from custom_components.jackery_solarvault.const import FIELD_ACCESSORIES, PAYLOAD_SYSTEM, SUBDEVICE_TYPE_SMART_METER
+        from custom_components.jackery_solarvault.const import (
+            FIELD_ACCESSORIES,
+            PAYLOAD_SYSTEM,
+            SUBDEVICE_TYPE_SMART_METER,
+        )
         # Test with accessories directly in source
         source = {FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER}]}
         result = smart_meter_accessories(source)
@@ -1194,7 +1218,13 @@ class TestCoordinatorUtilities:
 
     def test_smart_meter_accessory_device_id(self) -> None:
         """Test smart_meter_accessory_device_id function."""
-        from custom_components.jackery_solarvault.const import FIELD_ACCESSORIES, FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID, PAYLOAD_CT_METER, SUBDEVICE_TYPE_SMART_METER
+        from custom_components.jackery_solarvault.const import (
+            FIELD_ACCESSORIES,
+            FIELD_DEVICE_ID,
+            FIELD_ID,
+            PAYLOAD_CT_METER,
+            SUBDEVICE_TYPE_SMART_METER,
+        )
         # Test with accessory having device_id
         source = {FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER, FIELD_DEVICE_ID: "123"}]}
         result = smart_meter_accessory_device_id(source)
@@ -1216,20 +1246,22 @@ class TestCoordinatorUtilities:
 
     def test_has_smart_meter_accessory(self) -> None:
         """Test has_smart_meter_accessory function."""
-        from custom_components.jackery_solarvault.const import FIELD_ACCESSORIES, SUBDEVICE_TYPE_SMART_METER
+        from custom_components.jackery_solarvault.const import (
+            FIELD_ACCESSORIES,
+            SUBDEVICE_TYPE_SMART_METER,
+        )
         assert has_smart_meter_accessory({FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER}]}) is True
         assert has_smart_meter_accessory({}) is False
 
     def test_has_subdevice_accessory_or_bucket(self) -> None:
         """Test has_subdevice_accessory_or_bucket function."""
         from custom_components.jackery_solarvault.const import (
-            SUBDEVICE_DEV_TYPE_SOCKET,
-            SUBDEVICE_DEV_TYPE_BREAKER,
-            PAYLOAD_SMART_PLUGS,
-            PAYLOAD_CIRCUIT_PROPERTY,
             FIELD_ACCESSORIES,
-            PAYLOAD_SYSTEM,
             FIELD_DEV_TYPE,
+            PAYLOAD_SMART_PLUGS,
+            PAYLOAD_SYSTEM,
+            SUBDEVICE_DEV_TYPE_BREAKER,
+            SUBDEVICE_DEV_TYPE_SOCKET,
         )
         # Function checks for accessories with matching dev_type or bucket with dict items
         # Test with matching dev_type in accessories
@@ -1252,12 +1284,12 @@ class TestCoordinatorUtilities:
     def test_has_meter_head_accessory(self) -> None:
         """Test has_meter_head_accessory function."""
         from custom_components.jackery_solarvault.const import (
-            SUBDEVICE_DEV_TYPE_METER_HEAD,
-            SUBDEVICE_DEV_TYPE_METER,
-            PAYLOAD_METER_HEADS,
             FIELD_ACCESSORIES,
-            PAYLOAD_SYSTEM,
             FIELD_DEV_TYPE,
+            PAYLOAD_METER_HEADS,
+            PAYLOAD_SYSTEM,
+            SUBDEVICE_DEV_TYPE_METER,
+            SUBDEVICE_DEV_TYPE_METER_HEAD,
         )
         # Function checks for meter head (dev_type=4) or meter (dev_type=5) in accessories or meter_heads bucket
         # Test with meter head in accessories
@@ -1280,11 +1312,11 @@ class TestCoordinatorUtilities:
     def test_has_smart_plug_accessory(self) -> None:
         """Test has_smart_plug_accessory function."""
         from custom_components.jackery_solarvault.const import (
-            SUBDEVICE_DEV_TYPE_SOCKET,
-            PAYLOAD_SMART_PLUGS,
             FIELD_ACCESSORIES,
-            PAYLOAD_SYSTEM,
             FIELD_DEV_TYPE,
+            PAYLOAD_SMART_PLUGS,
+            PAYLOAD_SYSTEM,
+            SUBDEVICE_DEV_TYPE_SOCKET,
         )
         # Function checks for smart plug (dev_type=6) in accessories or smart_plugs bucket
         # Test with smart plug in accessories
@@ -1304,11 +1336,11 @@ class TestCoordinatorUtilities:
     def test_has_breaker_accessory(self) -> None:
         """Test has_breaker_accessory function."""
         from custom_components.jackery_solarvault.const import (
-            SUBDEVICE_DEV_TYPE_BREAKER,
-            PAYLOAD_CIRCUIT_PROPERTY,
             FIELD_ACCESSORIES,
-            PAYLOAD_SYSTEM,
             FIELD_DEV_TYPE,
+            PAYLOAD_CIRCUIT_PROPERTY,
+            PAYLOAD_SYSTEM,
+            SUBDEVICE_DEV_TYPE_BREAKER,
         )
         # Function checks for breaker (dev_type=7) in accessories or circuit_property bucket
         # Test with breaker in accessories

@@ -7,11 +7,11 @@ Task 2 requirements:
 - No plaintext/token material in logs
 """
 
-from unittest.mock import Mock, patch
-import pytest
-
-import binascii
 import base64
+import binascii
+from unittest.mock import Mock
+
+import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 
@@ -32,7 +32,7 @@ class TestMqttCredentialCanonical:
         result_async = await api.async_get_mqtt_credentials()
         result_cached = api.get_cached_mqtt_credentials()
         # They should both return the same result (None when no session)
-        assert result_async == result_cached == None
+        assert result_async == result_cached is None
 
     @pytest.mark.asyncio
     async def test_get_cached_delegates_to_canonical(self) -> None:
@@ -90,8 +90,8 @@ class TestMqttCredentialCanonical:
         api._mqtt_mac_id = "2" + "a" * 32
 
         # Capture log output
-        import logging
         from io import StringIO
+        import logging
 
         log_stream = StringIO()
         handler = logging.StreamHandler(log_stream)
@@ -113,7 +113,9 @@ class TestMqttCredentialCanonical:
     @pytest.mark.asyncio
     async def test_no_direct_decoding_duplication_in_rsa_encrypt(self) -> None:
         """RSA encrypt uses base64.b64decode but handles exact exception."""
-        from custom_components.jackery_solarvault.client.api import _rsa_pkcs1v15_encrypt
+        from custom_components.jackery_solarvault.client.api import (
+            _rsa_pkcs1v15_encrypt,
+        )
 
         # Invalid base64 should raise binascii.Error (the exact exception)
         with pytest.raises(binascii.Error):

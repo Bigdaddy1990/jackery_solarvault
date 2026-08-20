@@ -1,15 +1,15 @@
 """Integration tests for full Jackery SolarVault setup and entity creation."""
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     FIELD_DEVICE_ID,
-    FIELD_DEVICE_SN,
     FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
     FIELD_MODEL_CODE,
 )
 from homeassistant.config_entries import ConfigEntryState
@@ -35,7 +35,7 @@ async def _setup_entry(
     http_data: dict | None = None,
 ) -> None:
     """Helper to set up a config entry with patched I/O."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -136,7 +136,7 @@ async def test_coordinator_poll_updates_entity_states(
     mock_jackery_login: None,
 ) -> None:
     """Coordinator polling must update entity states correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -297,7 +297,7 @@ async def test_integration_config_flow_reauth_updates_runtime(
     mock_jackery_login: None,
 ) -> None:
     """Reauth flow must update runtime data correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,
