@@ -896,7 +896,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         value = first_nonblank_int(data.get(FIELD_CODE))
         return int(value) if value is not None else None
 
-    def _is_token_expired_response(
+    def is_token_expired_response(
         self,
         status: int,
         data: dict[str, Any] | Any,
@@ -951,7 +951,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """Classify HTTP/API authorization failures for HA reauth handling."""
         if status in {401, 403}:
             return True
-        if self._is_token_expired_response(status, data):
+        if self.is_token_expired_response(status, data):
             return True
         if status != HTTPStatus.OK:
             return self._response_has_auth_failure_text(data)

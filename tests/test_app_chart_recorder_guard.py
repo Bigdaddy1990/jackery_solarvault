@@ -48,7 +48,7 @@ def test_day_chart_recorder_import_rejects_lagging_cloud_total() -> None:
         },
     }
 
-    points = coordinator._day_chart_points_for_metric(  # ruff: ignore[private-member-access]
+    points = coordinator._day_chart_points_for_metric(
         _DEVICE_ID,
         payload,
         APP_SECTION_PV_STAT,

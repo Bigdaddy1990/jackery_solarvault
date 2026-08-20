@@ -105,9 +105,9 @@ async def _run_owned_session(
     topics: tuple[str, ...],
 ) -> None:
     """Run one broker session while making its task the current owner."""
-    generation = client._session_generation  # ruff: ignore[private-member-access]
+    generation = client._session_generation
     task = asyncio.create_task(
-        client._async_run_session(  # ruff: ignore[private-member-access]
+        client._async_run_session(
             client_id="cloud-client",
             username="cloud-user",
             password="cloud-password",
@@ -116,7 +116,7 @@ async def _run_owned_session(
             generation=generation,
         )
     )
-    client._runner_task = task  # ruff: ignore[private-member-access]
+    client._runner_task = task
     await task
 
 
@@ -137,7 +137,7 @@ async def test_cloud_session_subscribes_and_delivers_every_payload(
     broker = _BrokerClient([frame], finish_event=finish_event)
     constructor_kwargs: dict[str, Any] = {}
 
-    def _make_broker(**kwargs: Any) -> _BrokerClient:  # noqa: RUF105
+    def _make_broker(**kwargs: Any) -> _BrokerClient:
         constructor_kwargs.update(kwargs)
         return broker
 
@@ -181,7 +181,7 @@ async def test_cloud_subscription_failure_is_reported_and_wakes_waiters(
     assert client.diagnostics_snapshot()["last_error"] == (
         "disconnect: subscribe failed for hb/app/user/device: denied"
     )
-    assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
+    assert client._connected_event.is_set()
 
 
 async def test_cloud_connect_failure_is_reported_without_local_retry(
@@ -193,7 +193,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     broker = _BrokerClient(enter_error=MqttError("network down"))
     calls = 0
 
-    def _make_broker(**_kwargs: Any) -> _BrokerClient:  # noqa: RUF105
+    def _make_broker(**_kwargs: Any) -> _BrokerClient:
         nonlocal calls
         calls += 1
         return broker
@@ -204,7 +204,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
 
     assert calls == 1
     assert client.diagnostics_snapshot()["last_error"] == "connect failed: network down"
-    assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
+    assert client._connected_event.is_set()
 
 
 async def test_publish_uses_compact_unicode_json_and_tracks_success(
@@ -213,8 +213,8 @@ async def test_publish_uses_compact_unicode_json_and_tracks_success(
     """Cloud publish preserves Unicode and records only the current session's write."""
     client = _client(hass)
     broker = _BrokerClient()
-    client._client = cast("Any", broker)  # ruff: ignore[private-member-access]
-    client._connected = True  # ruff: ignore[private-member-access]
+    client._client = cast("Any", broker)
+    client._connected = True
 
     await client.async_publish_json(
         "hb/app/user/action",
@@ -244,15 +244,15 @@ async def test_publish_error_invalidates_only_current_cloud_session(
             raise MqttError("socket lost")
 
     client = _client(hass)
-    client._client = cast("Any", _FailingPublisher())  # ruff: ignore[private-member-access]
-    client._connected = True  # ruff: ignore[private-member-access]
-    client._connected_event.set()  # ruff: ignore[private-member-access]
+    client._client = cast("Any", _FailingPublisher())
+    client._connected = True
+    client._connected_event.set()
 
     with pytest.raises(RuntimeError, match="MQTT publish failed: socket lost"):
         await client.async_publish_json("hb/app/user/action", {"cmd": 110})
 
     assert client.is_connected is False
-    assert not client._connected_event.is_set()  # ruff: ignore[private-member-access]
+    assert not client._connected_event.is_set()
     assert client.diagnostics_snapshot()["last_error"] == "publish failed: socket lost"
 
 
@@ -266,7 +266,7 @@ async def test_publish_rejects_session_generation_change_while_waiting(
     async def _replace_session(timeout_sec: float) -> None:
         await asyncio.sleep(0)
         assert timeout_sec == pytest.approx(30.0)
-        client._session_generation += 1  # ruff: ignore[private-member-access]
+        client._session_generation += 1
 
     monkeypatch.setattr(client, "_async_wait_connected", _replace_session)
 
@@ -280,10 +280,10 @@ async def test_response_correlation_keeps_normal_ingest_callback(
     """Getter correlation resolves its waiter without consuming the Cloud frame."""
     message_callback = AsyncMock()
     client = _client(hass, message_callback)
-    waiter = asyncio.create_task(client._wait_for_response(42, 1.0))  # ruff: ignore[private-member-access]
+    waiter = asyncio.create_task(client._wait_for_response(42, 1.0))
     await asyncio.sleep(0)
 
-    client._handle_message(  # ruff: ignore[private-member-access]
+    client._handle_message(
         "hb/app/user/action",
         '{"request_id":42,"body":{"soc":88}}',
     )
@@ -302,10 +302,10 @@ async def test_response_timeout_expires_and_removes_waiter(
     client = _client(hass)
 
     with pytest.raises(TimeoutError):
-        await client._wait_for_response(7, 0.001)  # ruff: ignore[private-member-access]
+        await client._wait_for_response(7, 0.001)
 
     assert client.responses_expired == 1
-    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
+    assert client._pending_responses == {}
 
 
 async def test_stop_cancels_owned_callbacks_and_clears_cloud_state(
@@ -316,12 +316,12 @@ async def test_stop_cancels_owned_callbacks_and_clears_cloud_state(
     runner = asyncio.create_task(asyncio.sleep(60))
     message_task = asyncio.create_task(asyncio.sleep(60))
     lifecycle_task = asyncio.create_task(asyncio.sleep(60))
-    client._runner_task = runner  # ruff: ignore[private-member-access]
-    client._client = cast("Any", _BrokerClient())  # ruff: ignore[private-member-access]
-    client._connected = True  # ruff: ignore[private-member-access]
-    client._fingerprint = "secret-free-hash"  # ruff: ignore[private-member-access]
-    client._message_tasks.add(message_task)  # ruff: ignore[private-member-access]
-    client._lifecycle_tasks[lifecycle_task] = object()  # ruff: ignore[private-member-access]
+    client._runner_task = runner
+    client._client = cast("Any", _BrokerClient())
+    client._connected = True
+    client._fingerprint = "secret-free-hash"
+    client._message_tasks.add(message_task)
+    client._lifecycle_tasks[lifecycle_task] = object()
 
     await client.async_stop()
 

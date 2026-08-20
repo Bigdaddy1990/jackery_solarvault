@@ -50,13 +50,13 @@ def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoor
         get_cached_mqtt_credentials=Mock(return_value=None),
         async_get_mqtt_credentials=AsyncMock(return_value=None),
     )
-    obj._device_index = {"dev-1": {}}  # noqa: RUF105, SLF001
-    obj._mqtt = None  # noqa: RUF105, SLF001
-    obj._ble_listener = None  # noqa: RUF105, SLF001
-    obj._local_mqtt_client = None  # noqa: RUF105, SLF001
-    obj._shutdown_started = False  # noqa: RUF105, SLF001
+    obj._device_index = {"dev-1": {}}
+    obj._mqtt = None
+    obj._ble_listener = None
+    obj._local_mqtt_client = None
+    obj._shutdown_started = False
     obj.data = data or {}
-    obj._ble_start_lock = asyncio.Lock()  # noqa: RUF105, SLF001
+    obj._ble_start_lock = asyncio.Lock()
     return coordinator
 
 
@@ -66,10 +66,10 @@ class TestTransportIsolationMatrix:
     # Matrix definition from plan:
     # | Enabled path | Disabled paths must fail if touched | Required proof |
     # |---|---|---|
-    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |  # noqa: RUF105
-    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |  # noqa: RUF105
-    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |  # noqa: RUF105
-    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |  # noqa: RUF105
+    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |
+    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |
+    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |
+    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |
     # | all paths | none | concurrent updates, provenance, reconnect, unload |
 
     @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ class TestTransportIsolationMatrix:
         ],
     )
     @pytest.mark.asyncio
-    async def test_transport_isolation(  # noqa: PLR6301, RUF105
+    async def test_transport_isolation(  # noqa: PLR6301
         self,
         enabled_path: str,
         disabled_paths: list[str],
@@ -128,7 +128,7 @@ class TestTransportIsolationMatrix:
         # Mock disabled transports to raise if touched
         for disabled in disabled_paths:
             if disabled == "ble":
-                coordinator._ble_listener = None  # noqa: RUF105, SLF001
+                coordinator._ble_listener = None
                 # BLE start should not be called
                 coordinator.async_start_ble_transport = AsyncMock(
                     side_effect=AssertionError(
@@ -136,18 +136,18 @@ class TestTransportIsolationMatrix:
                     )  # noqa: E501, RUF100
                 )
             elif disabled == "cloud_mqtt":
-                coordinator._mqtt = None  # noqa: RUF105, SLF001
+                coordinator._mqtt = None
                 coordinator.async_start_mqtt = AsyncMock(
                     side_effect=AssertionError(
                         f"Cloud MQTT should not be touched in {enabled_path}-only test"
                     )  # noqa: E501, RUF100
                 )
             elif disabled == "local_mqtt":
-                coordinator._local_mqtt_client = None  # noqa: RUF105, SLF001
+                coordinator._local_mqtt_client = None
                 # Local MQTT start is in __init__, not coordinator directly
 
         # Run the required proofs for this transport
-        # This is a structural test - the actual behavior is validated in integration tests  # noqa: RUF105
+        # This is a structural test - the actual behavior is validated in integration tests
         for proof in required_proofs:
             # Verify the proof capability exists in the codebase
             # This is a placeholder - real tests are in specific test files
@@ -167,7 +167,7 @@ class TestTransportIsolationMatrix:
             }
 
     @pytest.mark.asyncio
-    async def test_all_paths_concurrent_updates_provenance_reconnect_unload(  # noqa: PLR6301, RUF105
+    async def test_all_paths_concurrent_updates_provenance_reconnect_unload(  # noqa: PLR6301
         self,
     ) -> None:
         """All paths enabled: concurrent updates, provenance, reconnect, unload."""
@@ -214,7 +214,7 @@ class TestTransportIsolationMatrix:
         assert states["local_mqtt"] == SupervisorState.RUNNING
 
         # Verify they have independent states
-        assert len(manager._supervisors) == 3  # noqa: RUF105, SLF001
+        assert len(manager._supervisors) == 3
 
         # Stop all
         await manager.async_stop_all()
@@ -230,13 +230,13 @@ class TestProvenanceIsolation:
         [DataSource.HTTP, DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT, DataSource.BLE],
     )
     @pytest.mark.asyncio
-    async def test_first_observation_from_every_transport_accepted(  # noqa: PLR6301, RUF105
+    async def test_first_observation_from_every_transport_accepted(  # noqa: PLR6301
         self, source: DataSource
     ) -> None:
         """Every supported transport can independently populate live properties."""
-        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806, RUF105
-        DEVICE_ID = "device-1"  # noqa: N806, RUF105
-        FIELD = "pvPw"  # noqa: N806, RUF105
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806
+        DEVICE_ID = "device-1"  # noqa: N806
+        FIELD = "pvPw"  # noqa: N806
 
         observation = Observation(
             source=source,
@@ -259,9 +259,9 @@ class TestProvenanceIsolation:
         assert result.accepted_fields == frozenset({FIELD})
         assert result.provenance[FIELD].source is source
 
-    def test_provenance_metadata_never_leaks_into_entity_payload(self) -> None:  # noqa: PLR6301, RUF105
+    def test_provenance_metadata_never_leaks_into_entity_payload(self) -> None:  # noqa: PLR6301
         """Source timestamps stay outside coordinator/entity-visible state."""
-        from datetime import UTC, datetime  # noqa: PLC0415, RUF105
+        from datetime import UTC, datetime
 
         result = ingest_observation(
             Observation(
@@ -284,11 +284,11 @@ class TestProvenanceIsolation:
         assert "request_id" not in result.payload
         assert result.provenance["pvPw"].request_id == "mqtt-42"
 
-    def test_same_field_different_sections_independent_provenance(self) -> None:  # noqa: PLR6301, RUF105
+    def test_same_field_different_sections_independent_provenance(self) -> None:  # noqa: PLR6301
         """One section's timestamp must never block another section."""
-        from datetime import UTC, datetime  # noqa: PLC0415, RUF105
+        from datetime import UTC, datetime
 
-        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806, RUF105
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806
 
         properties = ingest_observation(
             Observation(
@@ -296,7 +296,7 @@ class TestProvenanceIsolation:
                 device_id="device-1",
                 section=PAYLOAD_PROPERTIES,
                 payload={"pvPw": 1},
-                observed_at=BASE_TIME + timedelta(minutes=1),  # noqa: F821, RUF105
+                observed_at=BASE_TIME + timedelta(minutes=1),  # noqa: F821
             ),
             current={},
             provenance={},
@@ -327,16 +327,16 @@ class TestReconnectIndependence:
     """Test that reconnect loops are bounded and independent."""
 
     @pytest.mark.asyncio
-    async def test_ble_reconnect_does_not_block_http(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_ble_reconnect_does_not_block_http(self) -> None:  # noqa: PLR6301
         """BLE reconnect retry doesn't stall HTTP coordinator."""
         coordinator = _coordinator()
-        coordinator._ble_listener = None  # noqa: RUF105, SLF001
-        coordinator._shutdown_started = False  # noqa: RUF105, SLF001
+        coordinator._ble_listener = None
+        coordinator._shutdown_started = False
 
         # Mock BLE start to fail repeatedly
         call_count = 0
 
-        async def failing_ble_start() -> None:  # noqa: RUF029, RUF105
+        async def failing_ble_start() -> None:  # noqa: RUF029
             nonlocal call_count
             call_count += 1
             raise RuntimeError("BLE unavailable")
@@ -351,27 +351,27 @@ class TestReconnectIndependence:
         assert result == {"soc": 73, "batState": 1}
 
     @pytest.mark.asyncio
-    async def test_mqtt_reconnect_does_not_block_ble(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_mqtt_reconnect_does_not_block_ble(self) -> None:  # noqa: PLR6301
         """MQTT reconnect retry doesn't stall BLE."""
         coordinator = _coordinator()
-        coordinator._mqtt = None  # noqa: RUF105, SLF001
-        coordinator._shutdown_started = False  # noqa: RUF105, SLF001
+        coordinator._mqtt = None
+        coordinator._shutdown_started = False
 
         # MQTT start fails
-        async def failing_mqtt_start() -> None:  # noqa: RUF029, RUF105
+        async def failing_mqtt_start() -> None:  # noqa: RUF029
             raise RuntimeError("MQTT unavailable")
 
         coordinator.async_start_mqtt = failing_mqtt_start
 
         # BLE should still work
-        coordinator._ble_listener = Mock()  # noqa: RUF105, SLF001
-        coordinator._ble_listener.async_stop = AsyncMock()  # noqa: RUF105, SLF001
-        coordinator._ble_listener.address_for_device_id = Mock(  # ruff: ignore[private-member-access]
+        coordinator._ble_listener = Mock()
+        coordinator._ble_listener.async_stop = AsyncMock()
+        coordinator._ble_listener.address_for_device_id = Mock(
             return_value="aa:bb:cc:dd:ee:ff"
         )  # noqa: E501, RUF100, SLF001
 
         # Verify BLE listener is available
-        assert coordinator._ble_listener is not None  # noqa: RUF105, SLF001
+        assert coordinator._ble_listener is not None
 
 
 class TestCommandRoutingIsolation:
@@ -391,12 +391,12 @@ class TestCommandRoutingIsolation:
             ["set_peaks_troughs", "ble"],
         ],
     )
-    def test_command_transport_mapping(  # noqa: PLR6301, RUF105
+    def test_command_transport_mapping(  # noqa: PLR6301
         self, command: str, expected_transport: str
     ) -> None:
         """Commands only route through their proven transport."""
         # This validates the command catalog fixture
-        from tests.fixtures.jackery_app_2_4_0_contracts import (  # noqa: PLC0415, RUF105, TID251
+        from tests.fixtures.jackery_app_2_4_0_contracts import (  # noqa: TID251
             HOME_COMMANDS,
             PORTABLE_COMMANDS,
         )

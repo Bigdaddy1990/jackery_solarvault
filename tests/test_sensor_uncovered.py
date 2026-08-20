@@ -26,7 +26,7 @@ from custom_components.jackery_solarvault.sensor import (
 class TestSensorCreation:
     """Test sensor creation and basic properties."""
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -35,7 +35,7 @@ class TestSensorCreation:
         coordinator.config_entry.runtime_data = MagicMock()
         return coordinator
 
-    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # noqa: PLR6301, RUF105
+    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # noqa: PLR6301
         """Create a sensor instance for testing."""
         description = JackerySensorDescription(
             key="test_key",
@@ -178,7 +178,7 @@ class TestSensorCreation:
 class TestSensorState:
     """Test sensor state handling."""
 
-    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:  # noqa: RUF105
+    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:
         """Create a sensor with specific coordinator data."""
         coordinator = self._create_coordinator(data)
         description = JackerySensorDescription(
@@ -193,9 +193,9 @@ class TestSensorState:
             coordinator=coordinator, device_id="test_device", description=description
         )  # noqa: E501, RUF100
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301
         """Create a mock coordinator."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES  # noqa: I001
 
         coordinator = MagicMock()
         # The sensor uses device_id as key in coordinator.data, and the payload
@@ -232,7 +232,7 @@ class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301
         """Test async_setup_entry creates sensors."""
         hass = MagicMock()
         config_entry = MagicMock()

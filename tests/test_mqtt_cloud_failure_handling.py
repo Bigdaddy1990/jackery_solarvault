@@ -43,9 +43,9 @@ _TWO_ATTEMPTS = 2
 def test_connack_ban_class_codes_are_auth_failures() -> None:
     """MQTT v5 reason codes 128-135 must pause like credential rejections."""
     for rc in (4, 5, 128, 133, 134, 135):
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff: ignore[private-member-access]
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc
     for rc in (0, 2, 3, 136):
-        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc  # ruff: ignore[private-member-access]
+        assert not JackeryMqttPushClient._is_connect_auth_failure_rc(rc), rc
 
 
 def test_is_mqtt_auth_failure_matches_rc133_and_code128() -> None:
@@ -171,7 +171,7 @@ async def test_birth_snapshot_not_dispatched_when_connection_lost(
     assert client.is_connected is False
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
+        client._schedule_birth_snapshot(callback)
         await hass.async_block_till_done()
 
     callback.assert_not_awaited()
@@ -189,12 +189,12 @@ async def test_birth_snapshot_not_connected_error_is_debug_and_deduplicated(
     error = RuntimeError(f"MQTT not connected yet ({_RC133_MESSAGE})")
     callback = AsyncMock(side_effect=error)
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True  # ruff: ignore[private-member-access]
+    client._connected = True
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
+        client._schedule_birth_snapshot(callback)
         await hass.async_block_till_done()
-        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
+        client._schedule_birth_snapshot(callback)
         await hass.async_block_till_done()
 
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
@@ -210,10 +210,10 @@ async def test_birth_snapshot_unexpected_error_still_logged_as_error(
     """Genuine handler bugs keep surfacing at ERROR."""
     callback = AsyncMock(side_effect=ValueError("boom"))
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
-    client._connected = True  # ruff: ignore[private-member-access]
+    client._connected = True
 
     with caplog.at_level(logging.DEBUG, logger=_PUSH_LOGGER):
-        client._schedule_birth_snapshot(callback)  # ruff: ignore[private-member-access]
+        client._schedule_birth_snapshot(callback)
         await hass.async_block_till_done()
 
     assert any(

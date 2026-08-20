@@ -23,8 +23,8 @@ from custom_components.jackery_solarvault.const import (
 class MockJackeryApi(JackeryApi):
     """Mock JackeryApi with captured parameters."""
 
-    def __init__(self) -> None:  # noqa: D107, RUF105
-        from unittest.mock import AsyncMock  # noqa: PLC0415, RUF105
+    def __init__(self) -> None:  # noqa: D107
+        from unittest.mock import AsyncMock
 
         super().__init__(
             session=AsyncMock(),
@@ -39,7 +39,7 @@ class MockJackeryApi(JackeryApi):
 
 
 async def test_async_get_device_ct_stat_defaults_to_l1() -> None:
-    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: RUF105
+    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""
     api = MockJackeryApi()
 
     await api.async_get_device_ct_stat(
@@ -145,7 +145,7 @@ async def test_async_get_device_ct_stat_year_type() -> None:
 
 
 async def test_async_get_device_eps_stat_defaults_to_l1() -> None:
-    """async_get_device_eps_stat defaults to EPS_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: RUF105
+    """async_get_device_eps_stat defaults to EPS_STAT_TYPE_L1 (0) when stat_type not provided."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(

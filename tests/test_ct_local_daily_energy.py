@@ -25,7 +25,7 @@ _TODAY = date(2026, 7, 23)
 def _coordinator() -> JackerySolarVaultCoordinator:
     """Return a bare coordinator with a persisted same-day CT anchor."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    cast("Any", coordinator)._local_daily_snapshots = {  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_daily_snapshots = {
         _DEVICE_ID: {
             "day": _TODAY.isoformat(),
             "values": {
@@ -74,7 +74,7 @@ def test_ct_bucket_is_merged_into_local_daily_counter_properties() -> None:
         },
     }
 
-    result = JackerySolarVaultCoordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
+    result = JackerySolarVaultCoordinator._local_daily_counter_properties(
         properties,
         payload,
     )
@@ -87,7 +87,7 @@ def test_ct_bucket_is_merged_into_local_daily_counter_properties() -> None:
 def test_ct_daily_deltas_are_reported_in_kwh() -> None:
     """Same-day CT lifetime growth becomes positive local import/export energy."""
     coordinator = _coordinator()
-    properties = coordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
+    properties = coordinator._local_daily_counter_properties(
         {},
         {
             PAYLOAD_CT_METER: {
@@ -97,7 +97,7 @@ def test_ct_daily_deltas_are_reported_in_kwh() -> None:
         },
     )
 
-    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
+    deltas = coordinator._refresh_local_daily_for_device(
         _DEVICE_ID,
         properties,
         today=_TODAY,
@@ -137,9 +137,9 @@ def test_jackery_main_daily_delta_uses_hundredths_of_kwh() -> None:
 def test_cold_start_seeds_anchor_then_reports_same_day_growth() -> None:
     """A missing Store row must be seeded instead of staying empty forever."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    cast("Any", coordinator)._local_daily_snapshots = {}  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_daily_snapshots = {}
 
-    first = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
+    first = coordinator._refresh_local_daily_for_device(
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 77_000},
         today=_TODAY,
@@ -147,12 +147,12 @@ def test_cold_start_seeds_anchor_then_reports_same_day_growth() -> None:
     )
 
     assert first == {}
-    assert coordinator._local_daily_snapshots[_DEVICE_ID] == {  # ruff: ignore[private-member-access]
+    assert coordinator._local_daily_snapshots[_DEVICE_ID] == {
         "day": _TODAY.isoformat(),
         "values": {FIELD_CT_TOTAL_PHASE_ENERGY: 77_000},
     }
 
-    second = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
+    second = coordinator._refresh_local_daily_for_device(
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 77_913},
         today=_TODAY,
@@ -166,7 +166,7 @@ def test_ct_week_delta_uses_persisted_complete_days_and_wh_scaling() -> None:
     """A fully covered local CT week is summed in Wh and exposed in kWh."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     today = date(2026, 7, 23)
-    cast("Any", coordinator)._local_daily_snapshots = {  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_daily_snapshots = {
         _DEVICE_ID: {
             "day": today.isoformat(),
             "values": {FIELD_CT_TOTAL_PHASE_ENERGY: 90_000},

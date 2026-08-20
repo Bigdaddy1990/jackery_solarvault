@@ -32,20 +32,20 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.data = {}
-    obj._async_publish_command = AsyncMock()  # ruff: ignore[private-member-access]
-    obj._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]
-    obj._apply_local_property_patch = MagicMock()  # ruff: ignore[private-member-access]
-    obj._apply_local_system_patch = MagicMock()  # ruff: ignore[private-member-access]
-    obj._apply_local_weather_plan_patch = MagicMock()  # ruff: ignore[private-member-access]
+    obj._async_publish_command = AsyncMock()
+    obj._async_publish_command_ble_first = AsyncMock()
+    obj._apply_local_property_patch = MagicMock()
+    obj._apply_local_system_patch = MagicMock()
+    obj._apply_local_weather_plan_patch = MagicMock()
     return coordinator
 
 
-def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
-    return cast("Any", coordinator)._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
+def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:
+    return cast("Any", coordinator)._async_publish_command_ble_first.await_args
 
 
-def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
-    return cast("Any", coordinator)._async_publish_command.await_args  # ruff: ignore[private-member-access]
+def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:
+    return cast("Any", coordinator)._async_publish_command.await_args
 
 
 @pytest.mark.asyncio
@@ -59,7 +59,7 @@ async def test_set_eps_enabled_sends_one_and_patches() -> None:
     assert call.args[0] == _DEVICE
     assert call.kwargs["action_id"] == coord_mod.ACTION_ID_EPS_ENABLED
     assert call.kwargs["body_fields"] == {coord_mod.FIELD_SW_EPS: 1}
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_SW_EPS: 1},
     )
@@ -136,7 +136,7 @@ async def test_set_max_feed_grid_mirrors_both_fields() -> None:
     assert _ble_call(coordinator).kwargs["body_fields"] == {
         coord_mod.FIELD_MAX_FEED_GRID: 800,
     }
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_MAX_FEED_GRID: 800, coord_mod.FIELD_MAX_GRID_STD_PW: 800},
     )
@@ -164,7 +164,7 @@ async def test_set_auto_standby_hours_is_boolean_flag() -> None:
     assert _ble_call(coordinator).kwargs["body_fields"] == {
         coord_mod.FIELD_IS_AUTO_STANDBY: 1,
     }
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_IS_AUTO_STANDBY: 1, coord_mod.FIELD_AUTO_STANDBY: 1},
     )
@@ -180,7 +180,7 @@ async def test_set_auto_standby_hours_zero_disables() -> None:
     assert _ble_call(coordinator).kwargs["body_fields"] == {
         coord_mod.FIELD_IS_AUTO_STANDBY: 0,
     }
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_IS_AUTO_STANDBY: 0, coord_mod.FIELD_AUTO_STANDBY: 2},
     )
@@ -290,11 +290,11 @@ async def test_set_storm_warning_uses_plain_publish_and_dual_patch() -> None:
     await coordinator.async_set_storm_warning(_DEVICE, enabled=True)
 
     assert _plain_call(coordinator).kwargs["body_fields"] == {coord_mod.FIELD_WPS: 1}
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_WPS: 1},
     )
-    cast("Any", coordinator)._apply_local_weather_plan_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_weather_plan_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_WPS: 1},
     )
@@ -309,7 +309,7 @@ async def test_set_storm_minutes_mirrors_wpc_and_interval() -> None:
 
     body = _plain_call(coordinator).kwargs["body_fields"]
     assert body == {coord_mod.FIELD_MINS_INTERVAL: 30}
-    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_property_patch.assert_called_once_with(
         _DEVICE,
         {coord_mod.FIELD_WPC: 30, coord_mod.FIELD_MINS_INTERVAL: 30},
     )
@@ -397,7 +397,7 @@ async def test_set_smart_plug_switch_on_patches_state() -> None:
     """Toggling a plug on sends sysSwitch=1 and optimistically patches it."""
     coordinator = _coordinator()
     patch = MagicMock()
-    cast("Any", coordinator)._apply_local_smart_plug_switch_patch = patch  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_smart_plug_switch_patch = patch
 
     await coordinator.async_set_smart_plug_switch(_DEVICE, plug_sn="P1", on=True)
 
@@ -411,7 +411,7 @@ async def test_set_smart_plug_switch_on_patches_state() -> None:
 async def test_set_breaker_switch_off_sends_zero() -> None:
     """Toggling a breaker off sends sw=0 with the breaker index."""
     coordinator = _coordinator()
-    cast("Any", coordinator)._apply_local_breaker_switch_patch = MagicMock()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_breaker_switch_patch = MagicMock()
 
     await coordinator.async_set_breaker_switch(_DEVICE, "2", on=False)
 
@@ -425,7 +425,7 @@ async def test_set_smart_plug_priority_patches_priority() -> None:
     """Enabling plug priority sends socketPri=1 and mirrors it into the plug."""
     coordinator = _coordinator()
     patch = MagicMock()
-    cast("Any", coordinator)._apply_local_smart_plug_patch = patch  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_smart_plug_patch = patch
 
     await coordinator.async_set_smart_plug_priority(_DEVICE, plug_sn="P1", enabled=True)
 
@@ -440,7 +440,7 @@ async def test_set_shelly_cloud_switch_uses_cloud_api() -> None:
     coordinator = _coordinator()
     cast("Any", coordinator).api = MagicMock()
     cast("Any", coordinator).api.async_control_shelly_device = AsyncMock()
-    cast("Any", coordinator)._apply_local_smart_plug_switch_patch = MagicMock()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._apply_local_smart_plug_switch_patch = MagicMock()
 
     await coordinator.async_set_shelly_cloud_switch(
         _DEVICE,

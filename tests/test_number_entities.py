@@ -49,7 +49,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     return next(desc for desc in NUMBER_DESCRIPTIONS if desc.key == key)
 
 
@@ -75,7 +75,7 @@ def _number(key: str, data: dict[str, Any]) -> JackeryNumber:
     entity = JackeryNumber.__new__(JackeryNumber)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = _description(key)
     return entity
 
@@ -141,7 +141,7 @@ def test_dynamic_max_and_allowed_values_scale_with_capability() -> None:
     )
 
     assert entity.native_max_value == pytest.approx(2500.0)
-    assert entity._allowed_values() == (800.0, 2500.0)  # ruff: ignore[private-member-access]
+    assert entity._allowed_values() == (800.0, 2500.0)
 
 
 def test_dynamic_max_limits_low_power_device_to_single_choice() -> None:
@@ -152,7 +152,7 @@ def test_dynamic_max_limits_low_power_device_to_single_choice() -> None:
     )
 
     assert entity.native_max_value == pytest.approx(800.0)
-    assert entity._allowed_values() == (800.0,)  # ruff: ignore[private-member-access]
+    assert entity._allowed_values() == (800.0,)
 
 
 def test_dynamic_unit_prefers_price_currency() -> None:
