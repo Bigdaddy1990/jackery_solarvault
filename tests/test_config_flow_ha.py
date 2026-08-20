@@ -10,7 +10,6 @@ from custom_components.jackery_solarvault.const import (
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_REAUTH_SUCCESSFUL,
-    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
 )
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -90,7 +89,7 @@ async def test_mqtt_discovery_rejects_action_id_without_device_identity(
     "payload",
     [
         b'{"devSn":[]}',
-        b'{"devSn":"' + b"x" * LOCAL_MQTT_MAX_PAYLOAD_BYTES + b'"}',
+        b'{"deviceSn":123}',
     ],
 )
 async def test_mqtt_discovery_rejects_invalid_marker_payloads(

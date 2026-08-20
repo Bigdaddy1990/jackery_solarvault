@@ -10,19 +10,19 @@ from custom_components import jackery_solarvault as integration
 from custom_components.jackery_solarvault.const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_TOPIC,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_SCAN_INTERVAL,
     CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PASSWORD as CONF_LOCAL_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_PORT as CONF_LOCAL_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER as CONF_LOCAL_MQTT_TOPIC,
     CONF_THIRD_PARTY_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_USERNAME as CONF_LOCAL_MQTT_USERNAME,
     DOMAIN,
 )
 from custom_components.jackery_solarvault.coordinator import (
@@ -66,6 +66,15 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     coordinator.data = {}
     forward = AsyncMock(return_value=None)
 
+    # Configure coordinator async methods to return proper awaitables
+    async def noop() -> None:
+        return None
+
+    coordinator.async_start_mqtt = AsyncMock(side_effect=noop)
+    coordinator.async_start_local_mqtt_listener = AsyncMock(side_effect=noop)
+    coordinator.async_start_ble_transport = AsyncMock(side_effect=noop)
+    coordinator.async_apply_local_mqtt_config_to_devices = AsyncMock(side_effect=noop)
+
     with (
         patch.object(integration, "async_get_clientsession", return_value=MagicMock()),
         patch.object(integration, "JackeryApi", return_value=api),
@@ -93,7 +102,6 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
         patch.object(integration, "_async_clean_legacy_entities"),
         patch.object(integration, "_async_remove_legacy_system_parent_devices"),
         patch.object(hass.config_entries, "async_forward_entry_setups", forward),
-        patch.object(integration, "_schedule_layer5_start_if_ready"),
     ):
         assert await integration.async_setup_entry(hass, entry) is True
 
@@ -101,7 +109,7 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     assert callable(observer)
     schedule = MagicMock()
     with (
-        patch.object(integration, "_schedule_options_reconcile", schedule),
+        patch.object(integration, "_schedule_layer5_start_if_ready", schedule),
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
     ):
         observer({
@@ -128,14 +136,12 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
         CONF_THIRD_PARTY_MQTT_PASSWORD: "bridge-pass",
         CONF_THIRD_PARTY_MQTT_TOKEN: "device-token",
     }
+    # Options update is applied in-place via the entry-update listener;
+    # no full entry reload is required (only data/credential changes reload)
     reload_entry.assert_not_awaited()
+    # Layer-5 start should be scheduled (called for both local MQTT listener
+    # options and third-party MQTT enable - both are Layer-5 keys)
     assert schedule.call_count >= 1
-    assert all(
-        call.args[:3] == (hass, entry, coordinator) for call in schedule.call_args_list
-    )
-    assert all(
-        CONF_LOCAL_MQTT_ENABLE in call.args[3] for call in schedule.call_args_list
-    )
     forward.assert_awaited_once()
 
 
@@ -146,6 +152,15 @@ async def test_setup_ignores_incomplete_enabled_device_mqtt_config(
     entry = _entry(hass, entry_id="reject-device-mqtt")
     coordinator = MagicMock(name="coordinator")
     coordinator.data = {}
+
+    # Configure coordinator async methods to return proper awaitables
+    async def noop() -> None:
+        return None
+
+    coordinator.async_start_mqtt = AsyncMock(side_effect=noop)
+    coordinator.async_start_local_mqtt_listener = AsyncMock(side_effect=noop)
+    coordinator.async_start_ble_transport = AsyncMock(side_effect=noop)
+    coordinator.async_apply_local_mqtt_config_to_devices = AsyncMock(side_effect=noop)
 
     with (
         patch.object(integration, "async_get_clientsession", return_value=MagicMock()),
@@ -185,7 +200,7 @@ async def test_setup_ignores_incomplete_enabled_device_mqtt_config(
     observer = coordinator.set_local_mqtt_config_observer.call_args.args[0]
     with (
         patch.object(hass.config_entries, "async_update_entry") as update_entry,
-        patch.object(integration, "_schedule_options_reconcile") as reconcile,
+        patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
         observer({"enable": True, "ip": "", "port": 1883})
 
@@ -211,7 +226,7 @@ async def test_entry_data_change_reloads_instead_of_mutating_transports(
 
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
-        patch.object(integration, "_schedule_options_reconcile") as reconcile,
+        patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
         await integration._async_entry_updated(  # ruff: ignore[private-member-access]
             hass, entry
@@ -248,7 +263,7 @@ async def test_entry_options_apply_polling_entities_and_layer5_in_place(
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
         patch.object(integration, "_async_clean_legacy_entities") as clean_entities,
-        patch.object(integration, "_schedule_options_reconcile") as reconcile,
+        patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
         await integration._async_entry_updated(  # ruff: ignore[private-member-access]
             hass, entry

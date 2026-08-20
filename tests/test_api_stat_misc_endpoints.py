@@ -6,7 +6,9 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
+    APP_REQUEST_STAT_TYPE,
     BLE_OTA_VERSIONS_PATH,
+    CT_STAT_TYPE_L1,
     DEVICE_PORTABLE_CT_STAT_PATH,
     DEVICE_SOCKET_STATISTIC_PATH,
     DEVICE_TODAY_ENERGY_PATH,
@@ -50,7 +52,8 @@ async def test_portable_ct_stat_gets_by_device_id() -> None:
 
     assert result == payload
     get_json.assert_awaited_once_with(
-        DEVICE_PORTABLE_CT_STAT_PATH, params={FIELD_DEVICE_ID: "11"}
+        DEVICE_PORTABLE_CT_STAT_PATH,
+        params={FIELD_DEVICE_ID: "11", APP_REQUEST_STAT_TYPE: str(CT_STAT_TYPE_L1)},
     )
 
 

@@ -105,7 +105,7 @@ def _capture_named_background_task(captured: dict[str, Any], wanted_prefix: str)
         coro: Any,
         name: str,
         *,
-        eager_start: bool,
+        eager_start: bool = True,
     ) -> asyncio.Task[None]:
         del eager_start
         if name.startswith(wanted_prefix):
