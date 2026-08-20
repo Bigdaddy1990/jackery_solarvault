@@ -24,6 +24,7 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
+from ..credentials import redacted_error
 
 if TYPE_CHECKING:
     from homeassistant.components.mqtt.models import ReceiveMessage
@@ -134,8 +135,10 @@ class JackeryLocalMqttClient:
             raise
         except Exception as err:  # ruff: ignore[blind-except]
             unsubscribe_status()
-            self._last_error = f"{type(err).__name__}: {err}"
-            _LOGGER.warning("Unable to subscribe to local Jackery MQTT: %s", err)
+            self._last_error = redacted_error(err)
+            _LOGGER.warning(
+                "Unable to subscribe to local Jackery MQTT: %s", redacted_error(err)
+            )
             return False
         if self._stopping:
             unsubscribe()

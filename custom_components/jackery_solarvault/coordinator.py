@@ -1146,7 +1146,7 @@ class MqttConnectionManager:
             backoff_signature (str | None): Normalized signature of the last failure
             used to deduplicate/backoff progression.
         """
-        self.fingerprint: tuple[str | None, str | None, str | None] | None = None
+        self.fingerprint: str | None = None
         self.generated_mac_warning_logged = False
         self.last_connect_attempt: float = 0.0
         self.paused_until_monotonic: float = 0.0
@@ -1283,7 +1283,7 @@ class MqttConnectionManager:
     def should_skip_reconnect(
         self,
         mqtt: JackeryMqttPushClient | None,
-        current_fingerprint: tuple[str | None, str | None, str | None] | None,
+        current_fingerprint: str | None,
         *,
         force: bool = False,
     ) -> bool:
@@ -1368,7 +1368,7 @@ class MqttConnectionManager:
     def record_connect_success(
         self,
         mqtt: JackeryMqttPushClient | None,
-        current_fingerprint: tuple[str | None, str | None, str | None] | None,
+        current_fingerprint: str | None,
     ) -> None:
         """Record a successful MQTT connection, update its fingerprint, and.
 
@@ -1377,7 +1377,7 @@ class MqttConnectionManager:
         Parameters:
             mqtt (JackeryMqttPushClient | None): The MQTT client that succeeded; if
             None, no state is changed.
-            current_fingerprint (tuple[str | None, str | None, str | None] | None):
+            current_fingerprint (str | None):
             Fingerprint tuple to store as the last successful connection.
         """
         if mqtt is not None:
