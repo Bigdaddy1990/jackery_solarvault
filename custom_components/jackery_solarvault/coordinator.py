@@ -4852,6 +4852,28 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 "provides the device inventory"
             )
             return
+
+        async def _run_birth_query(
+            query: Callable[..., Coroutine[Any, Any, Any]],
+        ) -> None:
+            """Run one independent birth query without cancelling its siblings."""
+            try:
+                await query(force=True, ensure_mqtt=False, snapshot=snapshot)
+            except ConfigEntryAuthFailed as err:
+                self._defer_background_auth_failure(err)
+            except Exception:
+                _LOGGER.exception("Jackery Cloud MQTT birth query failed")
+
+        async with asyncio.TaskGroup() as task_group:
+            for query in (
+                self._async_query_system_info_for_missing,
+                self._async_query_weather_plan_for_missing,
+                self._async_query_subdevices_for_missing,
+            ):
+                task_group.create_task(_run_birth_query(query))
+
+        if session_generation == self._mqtt_session_generation:
+            self._mqtt_birth_snapshot_pending = False
         try:
             await self._async_query_system_info_for_missing(
                 force=True,
