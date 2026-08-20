@@ -17,11 +17,11 @@ from custom_components.jackery_solarvault.client.third_party_mqtt_codec import (
 class TestThirdPartyMqttCodecExtra:
     """Additional tests for third_party_mqtt_codec to increase coverage."""
 
-    def _create_bluetooth_key(self) -> bytes:
+    def _create_bluetooth_key(self) -> bytes:  # noqa: PLR6301, RUF105
         """Create a valid 16-byte bluetooth key."""
         return b"0123456789abcdef"
 
-    def test_ble_aes_iv_len_constant(self) -> None:
+    def test_ble_aes_iv_len_constant(self) -> None:  # noqa: PLR6301, RUF105
         """Test BLE_AES_IV_LEN constant value."""
         assert BLE_AES_IV_LEN == 16
 
@@ -41,14 +41,14 @@ class TestThirdPartyMqttCodecExtra:
         decoded = decode_third_party_mqtt_field(encoded, bluetooth_key)
         assert decoded == value
 
-    def test_generate_token_format(self) -> None:
+    def test_generate_token_format(self) -> None:  # noqa: PLR6301, RUF105
         """Test token generation format."""
         for _ in range(100):
             token = generate_third_party_mqtt_token()
             assert len(token) == 9
             assert token.isdigit()
 
-    def test_stable_token_all_cases(self) -> None:
+    def test_stable_token_all_cases(self) -> None:  # noqa: PLR6301, RUF105
         """Test stable_third_party_mqtt_token all branches."""
         # Case 1: user token provided, valid length
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
@@ -83,7 +83,7 @@ class TestThirdPartyMqttCodecExtra:
         assert use_generated is True
         assert new_generated is None
 
-    def test_config_from_options_all_defaults(self) -> None:
+    def test_config_from_options_all_defaults(self) -> None:  # noqa: PLR6301, RUF105
         """Test config from options with all defaults."""
         options = {}
         generated_token = "123456789"
@@ -95,7 +95,7 @@ class TestThirdPartyMqttCodecExtra:
         assert config["password"] == ""
         assert config["token"] == "123456789"
 
-    def test_config_plaintext_all_paths(self) -> None:
+    def test_config_plaintext_all_paths(self) -> None:  # noqa: PLR6301, RUF105
         """Test config plaintext with various scenarios."""
         options = {
             "third_party_mqtt_enable": True,
@@ -143,7 +143,7 @@ class TestThirdPartyMqttCodecExtra:
         assert "_decode_failed_fields" not in result
 
         # Case: valid fields
-        userName = encode_third_party_mqtt_field("user", bluetooth_key)
+        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806, RUF105
         password = encode_third_party_mqtt_field("pass", bluetooth_key)
         body = {"userName": userName, "password": password}
         result = decode_third_party_mqtt_config_body(body, bluetooth_key)

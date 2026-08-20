@@ -90,7 +90,7 @@ def test_json_native_body_rejects_non_dict_normalization() -> None:
 
 
 def test_ble_body_from_service_rejects_invalid_types() -> None:
-    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""
+    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""  # noqa: E501, RUF105
     with pytest.raises(ServiceValidationError) as exc:
         services._ble_body_from_service("[1, 2, 3]", "dev1")  # ruff: ignore[private-member-access]
     assert "must be an object" in _translation_error(exc.value)

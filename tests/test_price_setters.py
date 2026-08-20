@@ -67,7 +67,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
     Returns:
         JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
-    """
+    """  # noqa: E501, RUF105
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.api = _RejectingPriceApi()
@@ -97,7 +97,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
         Raises:
             AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
-        """
+        """  # noqa: E501, RUF105
         raise AssertionError("rejected writer must not patch local price data")
 
     obj._push_partial_update = _fail_push  # ruff: ignore[private-member-access]

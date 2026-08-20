@@ -16,9 +16,9 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_ZONE_ID,
 )
 from custom_components.jackery_solarvault.services import (
-    _async_handle_report_device_timezone,
-    _async_handle_set_ac_nickname,
-    _async_handle_unbind_accessories,
+    _async_handle_report_device_timezone,  # noqa: PLC2701, RUF105
+    _async_handle_set_ac_nickname,  # noqa: PLC2701, RUF105
+    _async_handle_unbind_accessories,  # noqa: PLC2701, RUF105
 )
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
@@ -37,7 +37,7 @@ class _Registry:
     def async_get(self, device_id: str) -> _Device | None:
         return self._devices.get(device_id)
 
-    def async_get_or_create(self, **kwargs) -> Mock:
+    def async_get_or_create(self, **kwargs) -> Mock:  # noqa: ANN003, PLR6301, RUF105
         return Mock()
 
 
@@ -73,7 +73,9 @@ class TestServices:
     """Test services module handler functions directly."""
 
     @pytest.mark.asyncio
-    async def test_service_unbind_accessories(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_unbind_accessories(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_unbind_accessories handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -103,7 +105,9 @@ class TestServices:
         assert result == {"result": {"success": True}}
 
     @pytest.mark.asyncio
-    async def test_service_unbind_accessories_no_coordinator(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_unbind_accessories_no_coordinator(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_unbind_accessories when no coordinator found."""
         hass = _test_hass()
 
@@ -131,11 +135,15 @@ class TestServices:
         assert "unbind_accessories_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio
-    async def test_service_unbind_accessories_auth_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_unbind_accessories_auth_error(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_unbind_accessories with auth error."""
         hass = _test_hass()
         coordinator = _Coordinator()
-        coordinator.async_unbind_accessories = AsyncMock(side_effect=ConfigEntryAuthFailed("auth failed"))
+        coordinator.async_unbind_accessories = AsyncMock(
+            side_effect=ConfigEntryAuthFailed("auth failed")
+        )  # noqa: E501, RUF100
 
         # Mock device registry
         registry = _Registry({
@@ -160,7 +168,9 @@ class TestServices:
             await _async_handle_unbind_accessories(hass, call)
 
     @pytest.mark.asyncio
-    async def test_service_set_ac_nickname(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_set_ac_nickname(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_set_ac_nickname handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -187,10 +197,14 @@ class TestServices:
         })
         await _async_handle_set_ac_nickname(hass, call)
 
-        coordinator.async_set_ac_nickname.assert_called_once_with("test_serial", ac_port=1, name="My AC")
+        coordinator.async_set_ac_nickname.assert_called_once_with(
+            "test_serial", ac_port=1, name="My AC"
+        )  # noqa: E501, RUF100
 
     @pytest.mark.asyncio
-    async def test_service_set_ac_nickname_no_coordinator(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_set_ac_nickname_no_coordinator(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_set_ac_nickname when no coordinator found."""
         hass = _test_hass()
 
@@ -219,12 +233,17 @@ class TestServices:
         assert "set_ac_nickname_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio
-    async def test_service_set_ac_nickname_auth_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_set_ac_nickname_auth_error(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_set_ac_nickname with auth error."""
-        from custom_components.jackery_solarvault.client import JackeryAuthError
+        from custom_components.jackery_solarvault.client import JackeryAuthError  # noqa: I001, PLC0415, RUF105
+
         hass = _test_hass()
         coordinator = _Coordinator()
-        coordinator.async_set_ac_nickname = AsyncMock(side_effect=JackeryAuthError("auth failed"))
+        coordinator.async_set_ac_nickname = AsyncMock(
+            side_effect=JackeryAuthError("auth failed")
+        )  # noqa: E501, RUF100
 
         # Mock device registry
         registry = _Registry({
@@ -240,7 +259,7 @@ class TestServices:
             lambda h, d: coordinator,
         )
 
-        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)
+        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)  # noqa: E501, RUF105
         call = _service_call({
             SERVICE_FIELD_DEVICE_ID: "test_device",
             SERVICE_FIELD_NICKNAME: "My AC",
@@ -250,7 +269,9 @@ class TestServices:
             await _async_handle_set_ac_nickname(hass, call)
 
     @pytest.mark.asyncio
-    async def test_service_report_device_timezone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_report_device_timezone(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_report_device_timezone handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -277,10 +298,14 @@ class TestServices:
         })
         await _async_handle_report_device_timezone(hass, call)
 
-        coordinator.async_report_device_timezone.assert_called_once_with("test_serial", zone_id="zone1", time_offset=3600)
+        coordinator.async_report_device_timezone.assert_called_once_with(
+            "test_serial", zone_id="zone1", time_offset=3600
+        )  # noqa: E501, RUF100
 
     @pytest.mark.asyncio
-    async def test_service_report_device_timezone_no_coordinator(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_report_device_timezone_no_coordinator(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_report_device_timezone when no coordinator found."""
         hass = _test_hass()
 
@@ -309,11 +334,15 @@ class TestServices:
         assert "report_device_timezone_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio
-    async def test_service_report_device_timezone_auth_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_service_report_device_timezone_auth_error(  # ruff: ignore[no-self-use]
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:  # noqa: E501, PLR6301, RUF100
         """Test _async_handle_report_device_timezone with auth error."""
         hass = _test_hass()
         coordinator = _Coordinator()
-        coordinator.async_report_device_timezone = AsyncMock(side_effect=ConfigEntryAuthFailed("auth failed"))
+        coordinator.async_report_device_timezone = AsyncMock(
+            side_effect=ConfigEntryAuthFailed("auth failed")
+        )  # noqa: E501, RUF100
 
         # Mock device registry
         registry = _Registry({

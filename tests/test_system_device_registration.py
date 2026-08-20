@@ -72,26 +72,26 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     async def _prepare_http(
         _hass: HomeAssistant,
         _entry: MockConfigEntry,
-        coordinator: Any,
+        coordinator: Any,  # noqa: ANN401, RUF105
     ) -> None:
         await asyncio.sleep(0)
         coordinator.data = {}
 
-    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:
+    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # noqa: ANN401, RUF105
         await asyncio.sleep(0)
         events.append("platforms")
 
     # Mock Layer-5 startup tasks to track execution order
-    async def mock_start_mqtt():
+    async def mock_start_mqtt() -> None:  # noqa: RUF029, RUF105
         events.append("layer5")
 
-    async def mock_start_local_mqtt_listener():
+    async def mock_start_local_mqtt_listener() -> None:  # noqa: RUF029, RUF105
         return None
 
-    async def mock_start_ble_transport():
+    async def mock_start_ble_transport() -> None:  # noqa: RUF029, RUF105
         return None
 
-    async def mock_apply_mqtt_config():
+    async def mock_apply_mqtt_config() -> None:  # noqa: RUF029, RUF105
         return None
 
     with (
@@ -126,9 +126,13 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         # Configure the mock coordinator to track Layer-5 startup
         mock_coordinator = mock_coordinator_class.return_value
         mock_coordinator.async_start_mqtt = mock_start_mqtt
-        mock_coordinator.async_start_local_mqtt_listener = mock_start_local_mqtt_listener
+        mock_coordinator.async_start_local_mqtt_listener = (
+            mock_start_local_mqtt_listener  # noqa: E501, RUF100
+        )
         mock_coordinator.async_start_ble_transport = mock_start_ble_transport
-        mock_coordinator.async_apply_local_mqtt_config_to_devices = mock_apply_mqtt_config
+        mock_coordinator.async_apply_local_mqtt_config_to_devices = (
+            mock_apply_mqtt_config  # noqa: E501, RUF100
+        )
         mock_coordinator.async_start_statistics_imports = AsyncMock(return_value=None)
 
         assert await integration.async_setup_entry(hass, entry)

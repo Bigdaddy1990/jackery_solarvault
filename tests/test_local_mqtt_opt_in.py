@@ -1,6 +1,5 @@
 """Unit tests for local_mqtt_opt_in function."""
 
-
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_ENABLE,
@@ -11,14 +10,15 @@ from custom_components.jackery_solarvault.util import local_mqtt_opt_in
 
 class MockConfigEntry:
     """Mock ConfigEntry with options and data dicts."""
-    def __init__(self, options: dict | None = None, data: dict | None = None):
+
+    def __init__(self, options: dict | None = None, data: dict | None = None) -> None:  # noqa: D107, RUF105
         self.options = options or {}
         self.data = data or {}
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:  # noqa: ANN001, D105, RUF105
         return key in self.options or key in self.data
 
-    def get(self, key, default=None):
+    def get(self, key, default=None):  # noqa: ANN001, ANN201, D102, RUF105
         return self.options.get(key, self.data.get(key, default))
 
 
@@ -29,10 +29,9 @@ def test_local_mqtt_opt_in_legacy_true() -> None:
 
 
 def test_local_mqtt_opt_in_explicit_false_respected() -> None:
-    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""
+    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""  # noqa: E501, RUF105
     entry = MockConfigEntry(
-        options={"local_mqtt_enable": False},
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
+        options={"local_mqtt_enable": False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
     )
     # Explicit False in options means user chose to disable local MQTT
     assert local_mqtt_opt_in(entry) is False
@@ -41,30 +40,23 @@ def test_local_mqtt_opt_in_explicit_false_respected() -> None:
 def test_local_mqtt_opt_in_legacy_false_third_party_false() -> None:
     """Both False should return False."""
     entry = MockConfigEntry(
-        options={"local_mqtt_enable": False},
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: False}
+        options={"local_mqtt_enable": False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: False}
     )
     assert local_mqtt_opt_in(entry) is False
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:
-    entry = MockConfigEntry(
-        options={},
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
-    )
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:  # noqa: D103, RUF105
+    entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True})
     assert local_mqtt_opt_in(entry) is True
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:
-    entry = MockConfigEntry(
-        options={},
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: False}
-    )
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  # noqa: D103, RUF105
+    entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: False})
     assert local_mqtt_opt_in(entry) is False
 
 
 def test_local_mqtt_opt_in_defaults_match_123_baseline() -> None:
-    """Default constants: local_mqtt enabled by default, third_party_mqtt opt-in (disabled)."""
+    """Default constants: local_mqtt enabled by default, third_party_mqtt opt-in (disabled)."""  # noqa: E501, RUF105
     assert DEFAULT_LOCAL_MQTT_ENABLE is True
     assert DEFAULT_THIRD_PARTY_MQTT_ENABLE is False
 
@@ -80,7 +72,7 @@ def test_local_mqtt_opt_in_legacy_missing_fallbacks_to_third_party() -> None:
     """Missing legacy key should fall back to third_party_mqtt_enable."""
     entry = MockConfigEntry(
         options={},  # no local_mqtt_enable
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
+        data={CONF_THIRD_PARTY_MQTT_ENABLE: True},
     )
     assert local_mqtt_opt_in(entry) is True
 
@@ -89,7 +81,7 @@ def test_local_mqtt_opt_in_data_takes_precedence_when_no_options() -> None:
     """When no options, data should be used for both keys."""
     entry = MockConfigEntry(
         options={},
-        data={"local_mqtt_enable": True, CONF_THIRD_PARTY_MQTT_ENABLE: False}
+        data={"local_mqtt_enable": True, CONF_THIRD_PARTY_MQTT_ENABLE: False},
     )
     # Legacy in data wins
     assert local_mqtt_opt_in(entry) is True
@@ -99,7 +91,7 @@ def test_local_mqtt_opt_in_options_override_data() -> None:
     """Options should override data for both keys."""
     entry = MockConfigEntry(
         options={"local_mqtt_enable": False},
-        data={"local_mqtt_enable": True, CONF_THIRD_PARTY_MQTT_ENABLE: False}
+        data={"local_mqtt_enable": True, CONF_THIRD_PARTY_MQTT_ENABLE: False},
     )
     # Options win
     assert local_mqtt_opt_in(entry) is False

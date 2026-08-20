@@ -8,10 +8,10 @@ from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPus
 from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX, REDACTED_VALUE
 
 
-class TestJackeryMqttPushClient:
+class TestJackeryMqttPushClient:  # noqa: PLR0904, RUF105
     """Test JackeryMqttPushClient class."""
 
-    def _create_client(self, generation=0):
+    def _create_client(self, generation=0):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a basic client for testing."""
         hass = MagicMock()
         hass.data = {}
@@ -27,10 +27,10 @@ class TestJackeryMqttPushClient:
             hass=hass,
             message_callback=mock_message_callback,
         )
-        client._session_generation = generation
+        client._session_generation = generation  # noqa: RUF105, SLF001
         return client
 
-    def _create_client_with_tls_ca_missing(self, generation=0):
+    def _create_client_with_tls_ca_missing(self, generation=0):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a client with missing TLS CA file."""
         hass = MagicMock()
         hass.data = {}
@@ -46,15 +46,15 @@ class TestJackeryMqttPushClient:
             hass=hass,
             message_callback=mock_message_callback,
         )
-        client._session_generation = generation
+        client._session_generation = generation  # noqa: RUF105, SLF001
         return client
 
     def test_creation(self) -> None:
         """Test client creation."""
         client = self._create_client()
         assert client is not None
-        assert client._connected is False
-        assert client._session_generation == 0
+        assert client._connected is False  # noqa: RUF105, SLF001
+        assert client._session_generation == 0  # noqa: RUF105, SLF001
 
     def test_connected_property(self) -> None:
         """Test connected property."""
@@ -124,14 +124,17 @@ class TestJackeryMqttPushClient:
             mock_client.subscribe = AsyncMock()
             # messages needs to be an async iterator
 
-            async def mock_messages():
+            async def mock_messages():  # noqa: ANN202, RUF029, RUF105
                 return
                 yield  # pragma: no cover
+
             mock_client.messages = mock_messages()
 
             # Mock the background task creation to return our mock task
-            with patch.object(
-                client._hass, "async_create_background_task", return_value=mock_runner_task
+            with patch.object(  # noqa: RUF105, SIM117
+                client._hass,  # ruff: ignore[private-member-access]
+                "async_create_background_task",
+                return_value=mock_runner_task,  # noqa: E501, RUF100, SLF001
             ):
                 # Mock the SSL context creation
                 with patch.object(
@@ -147,15 +150,15 @@ class TestJackeryMqttPushClient:
             # The runner task should be started
             assert client.is_started is True
             # Verify the fingerprint was set
-            assert client._fingerprint is not None
-            assert client._connect_attempts == 1
+            assert client._fingerprint is not None  # noqa: RUF105, SLF001
+            assert client._connect_attempts == 1  # noqa: RUF105, SLF001
 
     @pytest.mark.asyncio
     async def test_stop(self) -> None:
         """Test stop method."""
         client = self._create_client()
-        client._connected = True
-        client._client = AsyncMock()
+        client._connected = True  # noqa: RUF105, SLF001
+        client._client = AsyncMock()  # noqa: RUF105, SLF001
 
         await client.async_stop()
         assert client.is_connected is False
@@ -163,11 +166,11 @@ class TestJackeryMqttPushClient:
     def test_handle_message_valid(self) -> None:
         """Test _handle_message with valid message."""
         client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()
+        client._message_callback = AsyncMock()  # noqa: RUF105, SLF001
 
         # _handle_message signature: (topic, payload, generation=None, runner_task=None)
         # It schedules the callback but doesn't return a coroutine
-        client._handle_message(
+        client._handle_message(  # noqa: RUF105, SLF001
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
@@ -175,60 +178,60 @@ class TestJackeryMqttPushClient:
         )
         # The callback is scheduled as a background task, not awaited directly
         # Just verify the message was processed (messages_seen incremented)
-        assert client._messages_seen == 1
+        assert client._messages_seen == 1  # noqa: RUF105, SLF001
 
     def test_handle_message_wrong_generation(self) -> None:
         """Test _handle_message with wrong generation."""
         client = self._create_client(generation=1)
-        client._message_callback = AsyncMock()
+        client._message_callback = AsyncMock()  # noqa: RUF105, SLF001
 
-        client._handle_message(
+        client._handle_message(  # noqa: RUF105, SLF001
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
             runner_task=None,
         )
         # Message should be ignored due to wrong generation
-        assert client._messages_seen == 0
+        assert client._messages_seen == 0  # noqa: RUF105, SLF001
 
     def test_handle_message_no_body_field_fallback(self) -> None:
         """Test _handle_message without body field (falls back to data)."""
         client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()
+        client._message_callback = AsyncMock()  # noqa: RUF105, SLF001
 
-        client._handle_message(
+        client._handle_message(  # noqa: RUF105, SLF001
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
             runner_task=None,
         )
-        assert client._messages_seen == 1
+        assert client._messages_seen == 1  # noqa: RUF105, SLF001
 
     def test_handle_message_invalid_json(self) -> None:
         """Test _handle_message with invalid JSON."""
         client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()
+        client._message_callback = AsyncMock()  # noqa: RUF105, SLF001
 
-        client._handle_message(
+        client._handle_message(  # noqa: RUF105, SLF001
             "jackery/device/123/status",
             b"invalid json",
             generation=0,
             runner_task=None,
         )
         # Invalid JSON should be dropped
-        assert client._messages_seen == 0
-        assert client._messages_dropped == 1
+        assert client._messages_seen == 0  # noqa: RUF105, SLF001
+        assert client._messages_dropped == 1  # noqa: RUF105, SLF001
 
     def test_schedule_coroutine(self) -> None:
         """Test _schedule_coroutine method."""
         client = self._create_client()
 
-        async def dummy_coro() -> str:
+        async def dummy_coro() -> str:  # noqa: RUF029, RUF105
             return "done"
 
-        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks
+        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # noqa: E501, RUF105
         # It schedules the coroutine but returns None (task is tracked internally)
-        client._schedule_coroutine(lambda: dummy_coro(), "test")
+        client._schedule_coroutine(lambda: dummy_coro(), "test")  # noqa: RUF105, SLF001
         # Verify it doesn't raise an error
         assert True
 
@@ -236,37 +239,37 @@ class TestJackeryMqttPushClient:
     async def test_publish(self) -> None:
         """Test publish method."""
         client = self._create_client()
-        client._connected = True
-        client._client = AsyncMock()
+        client._connected = True  # noqa: RUF105, SLF001
+        client._client = AsyncMock()  # noqa: RUF105, SLF001
 
         await client.async_publish_json("test/topic", {"key": "value"})
-        client._client.publish.assert_called_once()
+        client._client.publish.assert_called_once()  # noqa: RUF105, SLF001
 
     @pytest.mark.asyncio
     async def test_publish_not_connected(self) -> None:
         """Test publish when not connected."""
         client = self._create_client()
-        client._connected = False
+        client._connected = False  # noqa: RUF105, SLF001
 
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017, RUF105
             await client.async_publish_json("test/topic", {"key": "value"})
 
-    def test_credential_fingerprint(self) -> None:
+    def test_credential_fingerprint(self) -> None:  # noqa: PLR6301, RUF105
         """Test _credential_fingerprint static method."""
-        fp1 = JackeryMqttPushClient._credential_fingerprint(
+        fp1 = JackeryMqttPushClient._credential_fingerprint(  # noqa: RUF105, SLF001
             "client1", "user1", "pass1"
         )
-        fp2 = JackeryMqttPushClient._credential_fingerprint(
+        fp2 = JackeryMqttPushClient._credential_fingerprint(  # noqa: RUF105, SLF001
             "client1", "user1", "pass1"
         )
-        fp3 = JackeryMqttPushClient._credential_fingerprint(
+        fp3 = JackeryMqttPushClient._credential_fingerprint(  # noqa: RUF105, SLF001
             "client2", "user1", "pass1"
         )
         assert fp1 == fp2
         assert fp1 != fp3
         assert len(fp1) == 64  # SHA-256 hex
 
-    def test_extract_mqtt_code(self) -> None:
+    def test_extract_mqtt_code(self) -> None:  # noqa: PLR6301, RUF105
         """Test _extract_mqtt_code static method."""
 
         # Create mock error with rc attribute
@@ -274,7 +277,7 @@ class TestJackeryMqttPushClient:
             rc = 5
 
         err = MockError()
-        code = JackeryMqttPushClient._extract_mqtt_code(err)
+        code = JackeryMqttPushClient._extract_mqtt_code(err)  # noqa: RUF105, SLF001
         assert code == 5
 
         # Test with rc.value
@@ -285,48 +288,50 @@ class TestJackeryMqttPushClient:
             rc = RC()
 
         err2 = MockError2()
-        code2 = JackeryMqttPushClient._extract_mqtt_code(err2)
+        code2 = JackeryMqttPushClient._extract_mqtt_code(err2)  # noqa: RUF105, SLF001
         assert code2 == 135
 
-    def test_is_connect_auth_failure_rc(self) -> None:
+    def test_is_connect_auth_failure_rc(self) -> None:  # noqa: PLR6301, RUF105
         """Test _is_connect_auth_failure_rc static method."""
         # Auth failure codes: 4, 5, 134, 135
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(4) is True
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(5) is True
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(134) is True
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(135) is True
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(0) is False
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(1) is False
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(4) is True  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(5) is True  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(134) is True  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(135) is True  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(0) is False  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(1) is False  # noqa: RUF105, SLF001
 
-    def test_is_connect_failure_error(self) -> None:
+    def test_is_connect_failure_error(self) -> None:  # noqa: PLR6301, RUF105
         """Test _is_connect_failure_error static method."""
         assert (
-            JackeryMqttPushClient._is_connect_failure_error("connect rc=5 (auth)")
+            JackeryMqttPushClient._is_connect_failure_error("connect rc=5 (auth)")  # noqa: RUF105, SLF001
             is True
         )
         assert (
-            JackeryMqttPushClient._is_connect_failure_error("connect failed: timeout")
+            JackeryMqttPushClient._is_connect_failure_error("connect failed: timeout")  # noqa: RUF105, SLF001
             is True
         )
-        assert JackeryMqttPushClient._is_connect_failure_error("disconnect: error") is False
-        assert JackeryMqttPushClient._is_connect_failure_error(None) is False
-        assert JackeryMqttPushClient._is_connect_failure_error("") is False
+        assert (
+            JackeryMqttPushClient._is_connect_failure_error("disconnect: error")  # ruff: ignore[private-member-access]
+            is False
+        )  # noqa: E501, RUF100, SLF001
+        assert JackeryMqttPushClient._is_connect_failure_error(None) is False  # noqa: RUF105, SLF001
+        assert JackeryMqttPushClient._is_connect_failure_error("") is False  # noqa: RUF105, SLF001
 
-    def test_redact_topic(self) -> None:
+    def test_redact_topic(self) -> None:  # noqa: PLR6301, RUF105
         """Test _redact_topic static method."""
-
         topic = f"{MQTT_TOPIC_PREFIX}/user123/status"
-        redacted = JackeryMqttPushClient._redact_topic(topic)
+        redacted = JackeryMqttPushClient._redact_topic(topic)  # noqa: RUF105, SLF001
         assert REDACTED_VALUE in redacted
         assert "user123" not in redacted
 
         # Non-matching topic
         topic2 = "other/prefix/user123/status"
-        redacted2 = JackeryMqttPushClient._redact_topic(topic2)
+        redacted2 = JackeryMqttPushClient._redact_topic(topic2)  # noqa: RUF105, SLF001
         assert redacted2 == topic2
 
         # None
-        assert JackeryMqttPushClient._redact_topic(None) is None
+        assert JackeryMqttPushClient._redact_topic(None) is None  # noqa: RUF105, SLF001
 
 
 if __name__ == "__main__":

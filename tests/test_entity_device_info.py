@@ -46,7 +46,7 @@ def _entity(payload: dict[str, Any]) -> JackeryEntity:
     return entity
 
 
-def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:
+def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:  # noqa: ANN401, RUF105
     """Instantiate any ``JackeryEntity`` subclass bound to a coordinator snapshot.
 
     Mirrors ``_entity()`` above for the subdevice sensor/switch/binary_sensor

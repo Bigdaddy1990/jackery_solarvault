@@ -60,7 +60,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:
+def _description(key: str) -> Any:  # noqa: ANN401, RUF105
     return next(desc for desc in SWITCH_DESCRIPTIONS if desc.key == key)
 
 

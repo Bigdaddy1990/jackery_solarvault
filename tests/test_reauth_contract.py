@@ -31,7 +31,7 @@ def _read(name: str) -> str:
 
     Returns:
         str: The file contents decoded as UTF-8.
-    """
+    """  # noqa: E501, RUF105
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 

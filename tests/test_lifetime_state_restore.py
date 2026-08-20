@@ -64,7 +64,7 @@ async def test_restore_validator_accepts_nonnegative_kwh_lifetime_value() -> Non
     assert restored == pytest.approx(54.25)
 
 
-async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]
+async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]  # noqa: ANN401, RUF105
     """Return one value through the same await boundary as RestoreSensor."""
     return value
 

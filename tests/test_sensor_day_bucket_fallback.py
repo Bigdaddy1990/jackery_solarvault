@@ -228,7 +228,7 @@ async def test_day_period_sensor_prefers_scalar_total_over_power_curve_sum(
     assert state.state == "3.58"
 
 
-async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_is_higher(
+async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_is_higher(  # noqa: E501, RUF105
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:

@@ -10,7 +10,7 @@ from custom_components.jackery_solarvault.switch import (
     JackerySmartPlugPrioritySwitch,
     JackerySmartPlugSwitch,
     JackerySwitchDescription,
-    _standby_is_on,
+    _standby_is_on,  # noqa: PLC2701, RUF105
     async_setup_entry,
 )
 from homeassistant.helpers.entity import EntityCategory
@@ -19,23 +19,23 @@ from homeassistant.helpers.entity import EntityCategory
 class TestStandbyIsOn:
     """Test _standby_is_on helper function."""
 
-    def test_none_returns_none(self) -> None:
+    def test_none_returns_none(self) -> None:  # noqa: PLR6301, RUF105
         """Test None returns None."""
         assert _standby_is_on(None) is None
 
-    def test_one_returns_true(self) -> None:
+    def test_one_returns_true(self) -> None:  # noqa: PLR6301, RUF105
         """Test 1 returns True."""
         assert _standby_is_on(1) is True
 
-    def test_zero_returns_false(self) -> None:
+    def test_zero_returns_false(self) -> None:  # noqa: PLR6301, RUF105
         """Test 0 returns False."""
         assert _standby_is_on(0) is False
 
-    def test_true_returns_true(self) -> None:
+    def test_true_returns_true(self) -> None:  # noqa: PLR6301, RUF105
         """Test True returns True."""
         assert _standby_is_on(True) is True
 
-    def test_false_returns_false(self) -> None:
+    def test_false_returns_false(self) -> None:  # noqa: PLR6301, RUF105
         """Test False returns False."""
         assert _standby_is_on(False) is False
 
@@ -43,7 +43,7 @@ class TestStandbyIsOn:
 class TestJackeryDescriptionSwitch:
     """Test JackeryDescriptionSwitch class."""
 
-    def _create_coordinator(self, data=None):
+    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -168,7 +168,7 @@ class TestJackeryDescriptionSwitch:
 class TestJackerySmartPlugSwitch:
     """Test JackerySmartPlugSwitch class."""
 
-    def _create_coordinator(self, data=None):
+    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -196,7 +196,7 @@ class TestJackerySmartPlugSwitch:
             plug_key="test_key",
         )
         assert sensor is not None
-        assert sensor._plug_sn == "plug123"
+        assert sensor._plug_sn == "plug123"  # noqa: RUF105, SLF001
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
@@ -246,7 +246,7 @@ class TestJackerySmartPlugSwitch:
 class TestJackeryBreakerSwitch:
     """Test JackeryBreakerSwitch class."""
 
-    def _create_coordinator(self, data=None):
+    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -258,7 +258,8 @@ class TestJackeryBreakerSwitch:
 
     def test_creation(self) -> None:
         """Test breaker switch creation."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 1}]}
         })
@@ -270,11 +271,12 @@ class TestJackeryBreakerSwitch:
             breaker_key="test_key",
         )
         assert sensor is not None
-        assert sensor._breaker_id == "br1"
+        assert sensor._breaker_id == "br1"  # noqa: RUF105, SLF001
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 1}]}
         })
@@ -289,7 +291,8 @@ class TestJackeryBreakerSwitch:
 
     def test_is_on_false_with_data(self) -> None:
         """Test is_on property with false data."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 0}]}
         })
@@ -340,7 +343,7 @@ class TestJackeryBreakerSwitch:
 class TestJackerySmartPlugPrioritySwitch:
     """Test JackerySmartPlugPrioritySwitch class."""
 
-    def _create_coordinator(self, data=None):
+    def _create_coordinator(self, data=None):  # noqa: ANN001, ANN202, PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -353,9 +356,7 @@ class TestJackerySmartPlugPrioritySwitch:
     def test_creation(self) -> None:
         """Test priority switch creation."""
         coordinator = self._create_coordinator({
-            "test_device": {
-                "smart_plugs": [{"deviceSn": "plug123", "socketPri": 1}]
-            }
+            "test_device": {"smart_plugs": [{"deviceSn": "plug123", "socketPri": 1}]}
         })
         sensor = JackerySmartPlugPrioritySwitch(
             coordinator=coordinator,
@@ -365,14 +366,12 @@ class TestJackerySmartPlugPrioritySwitch:
             plug_key="test_key",
         )
         assert sensor is not None
-        assert sensor._plug_sn == "plug123"
+        assert sensor._plug_sn == "plug123"  # noqa: RUF105, SLF001
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
         coordinator = self._create_coordinator({
-            "test_device": {
-                "smart_plugs": [{"deviceSn": "plug123", "socketPri": 1}]
-            }
+            "test_device": {"smart_plugs": [{"deviceSn": "plug123", "socketPri": 1}]}
         })
         sensor = JackerySmartPlugPrioritySwitch(
             coordinator=coordinator,
@@ -386,9 +385,7 @@ class TestJackerySmartPlugPrioritySwitch:
     def test_is_on_false_with_data(self) -> None:
         """Test is_on property with false data."""
         coordinator = self._create_coordinator({
-            "test_device": {
-                "smart_plugs": [{"deviceSn": "plug123", "socketPri": 0}]
-            }
+            "test_device": {"smart_plugs": [{"deviceSn": "plug123", "socketPri": 0}]}
         })
         sensor = JackerySmartPlugPrioritySwitch(
             coordinator=coordinator,
@@ -404,7 +401,7 @@ class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:
+    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
         """Test async_setup_entry creates switch entities."""
         hass = MagicMock()
         config_entry = MagicMock()
@@ -415,10 +412,11 @@ class TestAsyncSetupEntry:
 
         # Mock coordinator (entry.runtime_data IS the coordinator)
         coordinator = MagicMock()
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
             PAYLOAD_CIRCUIT_PROPERTY,
             PAYLOAD_SMART_PLUGS,
         )
+
         coordinator.data = {
             "test_device": {
                 "properties": {"swEps": 1},

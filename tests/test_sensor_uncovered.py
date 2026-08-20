@@ -26,7 +26,7 @@ from custom_components.jackery_solarvault.sensor import (
 class TestSensorCreation:
     """Test sensor creation and basic properties."""
 
-    def _create_coordinator(self, data=None) -> MagicMock:
+    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: ANN001, PLR6301, RUF105
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -35,7 +35,7 @@ class TestSensorCreation:
         coordinator.config_entry.runtime_data = MagicMock()
         return coordinator
 
-    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:
+    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # noqa: ANN001, ANN003, PLR6301, RUF105
         """Create a sensor instance for testing."""
         description = JackerySensorDescription(
             key="test_key",
@@ -45,7 +45,9 @@ class TestSensorCreation:
             state_class="measurement",
             getter=lambda props: props.get("test_key"),
         )
-        return JackerySensor(coordinator=coordinator, device_id="test_device", description=description)
+        return JackerySensor(
+            coordinator=coordinator, device_id="test_device", description=description
+        )  # noqa: E501, RUF100
 
     def test_jackery_sensor_base(self) -> None:
         """Test JackerySensor base class."""
@@ -65,7 +67,9 @@ class TestSensorCreation:
             state_class="total_increasing",
             stat_key="pv",
         )
-        sensor = JackeryStatSensor(coordinator=coordinator, device_id="test_device", description=description)
+        sensor = JackeryStatSensor(
+            coordinator=coordinator, device_id="test_device", description=description
+        )  # noqa: E501, RUF100
         assert sensor is not None
 
     def test_jackery_battery_pack_sensor(self) -> None:
@@ -174,7 +178,7 @@ class TestSensorCreation:
 class TestSensorState:
     """Test sensor state handling."""
 
-    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:
+    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:  # noqa: ANN001, ANN003, RUF105
         """Create a sensor with specific coordinator data."""
         coordinator = self._create_coordinator(data)
         description = JackerySensorDescription(
@@ -185,15 +189,22 @@ class TestSensorState:
             state_class="measurement",
             getter=lambda props: props.get("test_key"),
         )
-        return JackerySensor(coordinator=coordinator, device_id="test_device", description=description)
+        return JackerySensor(
+            coordinator=coordinator, device_id="test_device", description=description
+        )  # noqa: E501, RUF100
 
-    def _create_coordinator(self, data=None) -> MagicMock:
+    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: ANN001, PLR6301, RUF105
         """Create a mock coordinator."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
+        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES  # noqa: I001, PLC0415, RUF105
+
         coordinator = MagicMock()
         # The sensor uses device_id as key in coordinator.data, and the payload
         # must contain PAYLOAD_PROPERTIES section
-        coordinator.data = {"test_device": {PAYLOAD_PROPERTIES: data}} if data else {"test_device": {PAYLOAD_PROPERTIES: {}}}
+        coordinator.data = (
+            {"test_device": {PAYLOAD_PROPERTIES: data}}
+            if data
+            else {"test_device": {PAYLOAD_PROPERTIES: {}}}
+        )  # noqa: E501, RUF100
         coordinator.config_entry = MagicMock()
         coordinator.config_entry.entry_id = "test_entry"
         coordinator.config_entry.runtime_data = MagicMock()
@@ -221,7 +232,7 @@ class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
     @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:
+    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
         """Test async_setup_entry creates sensors."""
         hass = MagicMock()
         config_entry = MagicMock()
