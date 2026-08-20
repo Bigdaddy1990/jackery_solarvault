@@ -67,7 +67,7 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     forward = AsyncMock(return_value=None)
 
     # Configure coordinator async methods to return proper awaitables
-    async def noop() -> None:  # noqa: RUF029, RUF105
+    async def noop() -> None:  # noqa: RUF029
         return None
 
     coordinator.async_start_mqtt = AsyncMock(side_effect=noop)
@@ -154,7 +154,7 @@ async def test_setup_ignores_incomplete_enabled_device_mqtt_config(
     coordinator.data = {}
 
     # Configure coordinator async methods to return proper awaitables
-    async def noop() -> None:  # noqa: RUF029, RUF105
+    async def noop() -> None:  # noqa: RUF029
         return None
 
     coordinator.async_start_mqtt = AsyncMock(side_effect=noop)
@@ -215,22 +215,18 @@ async def test_entry_data_change_reloads_instead_of_mutating_transports(
     entry = _entry(hass, entry_id="data-change")
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(  # ruff: ignore[private-member-access]
-        hass, entry
-    )
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
+    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = {
         CONF_USERNAME: "old@example.com",
         CONF_PASSWORD: "secret",
     }
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}
 
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
         patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
-        await integration._async_entry_updated(  # ruff: ignore[private-member-access]
-            hass, entry
-        )
+        await integration._async_entry_updated(hass, entry)
 
     reload_entry.assert_awaited_once_with(entry.entry_id)
     reconcile.assert_not_called()
@@ -252,22 +248,16 @@ async def test_entry_options_apply_polling_entities_and_layer5_in_place(
     )
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(  # ruff: ignore[private-member-access]
-        hass, entry
-    )
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(  # ruff: ignore[private-member-access]
-        entry.data
-    )
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}  # ruff: ignore[private-member-access]
+    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}
 
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
         patch.object(integration, "_async_clean_legacy_entities") as clean_entities,
         patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
-        await integration._async_entry_updated(  # ruff: ignore[private-member-access]
-            hass, entry
-        )
+        await integration._async_entry_updated(hass, entry)
 
     reload_entry.assert_not_awaited()
     coordinator.async_set_scan_interval.assert_called_once_with(timedelta(seconds=37))
@@ -285,10 +275,8 @@ async def test_options_reconcile_keeps_ble_running_when_local_mqtt_fails(
     coordinator = MagicMock(name="coordinator")
     coordinator.async_reconcile_ble_transport = AsyncMock(return_value=None)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(  # ruff: ignore[private-member-access]
-        hass, entry
-    )
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
+    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
         CONF_LOCAL_MQTT_TOPIC,
         CONF_ENABLE_BLE_TRANSPORT,
     }
@@ -299,7 +287,7 @@ async def test_options_reconcile_keeps_ble_running_when_local_mqtt_fails(
         "_async_start_local_mqtt",
         AsyncMock(side_effect=local_failure),
     ) as start_local:
-        await integration._async_reconcile_entry_options(  # ruff: ignore[private-member-access]
+        await integration._async_reconcile_entry_options(
             hass,
             entry,
             coordinator,
@@ -317,11 +305,9 @@ async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
     entry = _entry(hass, entry_id="fenced-owner")
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(  # ruff: ignore[private-member-access]
-        hass, entry
-    )
-    bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator  # ruff: ignore[private-member-access]
-    bucket[integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY] = coordinator  # ruff: ignore[private-member-access]
+    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
+    bucket[integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY] = coordinator
 
     with (
         patch.object(
@@ -332,23 +318,16 @@ async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
         patch.object(integration, "_defer_supplemental_transports") as defer,
         patch.object(integration, "_schedule_supplemental_cleanup") as cleanup,
     ):
-        assert not await integration._async_release_fenced_coordinator(  # ruff: ignore[private-member-access]
-            hass, entry
-        )
+        assert not await integration._async_release_fenced_coordinator(hass, entry)
         assert entry.runtime_data is coordinator
-        assert (
-            bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY]  # ruff: ignore[private-member-access]
-            is coordinator
-        )
+        assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator
 
-        assert await integration._async_release_fenced_coordinator(  # ruff: ignore[private-member-access]
-            hass, entry
-        )
+        assert await integration._async_release_fenced_coordinator(hass, entry)
 
     assert shutdown.await_count == 2
     assert entry.runtime_data is None
-    assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
-    assert integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
+    assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket
+    assert integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY not in bucket
     defer.assert_called_once_with(hass, entry, coordinator)
     cleanup.assert_called_once_with(hass, entry)
 
@@ -376,10 +355,7 @@ async def test_failed_platform_unload_preserves_http_runtime_fence(
     shutdown.assert_not_awaited()
     assert entry.runtime_data is coordinator
     bucket = hass.data[DOMAIN][entry.entry_id]
-    assert (
-        bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY]  # ruff: ignore[private-member-access]
-        is coordinator
-    )
+    assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator
 
 
 def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
@@ -400,7 +376,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
         via_device=(DOMAIN, "head-1"),
     )
 
-    assert integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
+    assert integration._battery_pack_registry_identity(
         registry,
         child,
     ) == ("head-1", "head-1_battery_pack_PACK-1", "PACK-1")
@@ -416,7 +392,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
         via_device=(DOMAIN, "head-1"),
     )
     assert (
-        integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
+        integration._battery_pack_registry_identity(
             registry,
             ambiguous,
         )
@@ -447,7 +423,7 @@ def test_phantom_cleanup_removes_head_unit_duplicate_pack(
         via_device=(DOMAIN, "head-2"),
     )
 
-    integration._async_remove_phantom_battery_pack_devices(  # ruff: ignore[private-member-access]
+    integration._async_remove_phantom_battery_pack_devices(
         hass,
         entry,
     )

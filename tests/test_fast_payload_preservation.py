@@ -68,7 +68,7 @@ async def test_mqtt_only_sections_survive_http_rebuild(hass: HomeAssistant) -> N
     }
     coordinator.data = {DEVICE_ID: dict(mqtt_only_sections)}
 
-    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+    result = await coordinator._async_update_data_guarded()
     await hass.async_block_till_done()
 
     for key, value in mqtt_only_sections.items():
@@ -87,7 +87,7 @@ async def test_mqtt_pushed_alarm_survives_http_rebuild(hass: HomeAssistant) -> N
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
     coordinator.data = {DEVICE_ID: {PAYLOAD_ALARM: {"pushed": "via-mqtt"}}}
 
-    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+    result = await coordinator._async_update_data_guarded()
     await hass.async_block_till_done()
 
     assert result[DEVICE_ID][PAYLOAD_ALARM] == {"pushed": "via-mqtt"}
@@ -130,7 +130,7 @@ async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     }
     coordinator.data = {DEVICE_ID: dict(shadow_buckets)}
 
-    result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+    result = await coordinator._async_update_data_guarded()
     await hass.async_block_till_done(wait_background_tasks=True)
 
     for key, value in shadow_buckets.items():

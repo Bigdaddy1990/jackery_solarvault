@@ -44,7 +44,7 @@ def test_trend_series_total_eps_day_zero_accepted() -> None:
     """EPS day period with zero total should return 0.0, not None."""
     section = f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}"
     source = {APP_STAT_TOTAL_IN_EPS_ENERGY: "0"}
-    assert util.trend_series_total(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY) == 0.0  # noqa: RUF069, RUF105
+    assert util.trend_series_total(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY) == 0.0  # noqa: RUF069
 
 
 def test_trend_series_total_eps_day_negative_dropped() -> None:

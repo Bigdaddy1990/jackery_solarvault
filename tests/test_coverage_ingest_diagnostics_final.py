@@ -17,9 +17,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from custom_components.jackery_solarvault.diagnostics import (
-    _local_mqtt_diagnostics,  # ruff: ignore[import-private-name]
-)
+from custom_components.jackery_solarvault.diagnostics import _local_mqtt_diagnostics
 from custom_components.jackery_solarvault.ingest import (
     allow_periodic_section_from_source,
     ingest_observation,
@@ -336,7 +334,7 @@ def test_fresh_layer5_nested_value_rejects_redundant_http_snapshot() -> None:
     assert result.accepted_fields == frozenset()
 
 
-def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:  # noqa: RUF105
+def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:
     """Return the minimal config-entry surface used by diagnostics."""
     return SimpleNamespace(
         data={},

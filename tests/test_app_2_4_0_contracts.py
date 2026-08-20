@@ -60,8 +60,7 @@ def test_app_240_does_not_expose_unproven_aiems_endpoint() -> None:
     assert not hasattr(const_module, "AIEMS_ENERGY_PREDICTION_PATH")
     assert not hasattr(const_module, "SERVICE_GET_AIEMS_ENERGY_PREDICTION")
     assert "get_aiems_energy_prediction" not in {
-        registration.name
-        for registration in services_module._service_registrations()  # ruff: ignore[private-member-access]
+        registration.name for registration in services_module._service_registrations()
     }
 
 

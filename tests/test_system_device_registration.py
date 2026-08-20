@@ -39,7 +39,7 @@ def test_obsolete_system_parent_is_removed_and_head_is_detached(
     )
     assert head.via_device_id == parent.id
 
-    integration._async_remove_legacy_system_parent_devices(  # ruff: ignore[private-member-access]
+    integration._async_remove_legacy_system_parent_devices(
         hass,
         entry,
     )
@@ -72,26 +72,26 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     async def _prepare_http(
         _hass: HomeAssistant,
         _entry: MockConfigEntry,
-        coordinator: Any,  # noqa: RUF105
+        coordinator: Any,
     ) -> None:
         await asyncio.sleep(0)
         coordinator.data = {}
 
-    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # noqa: RUF105
+    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:
         await asyncio.sleep(0)
         events.append("platforms")
 
     # Mock Layer-5 startup tasks to track execution order
-    async def mock_start_mqtt() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_mqtt() -> None:  # noqa: RUF029
         events.append("layer5")
 
-    async def mock_start_local_mqtt_listener() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_local_mqtt_listener() -> None:  # noqa: RUF029
         return None
 
-    async def mock_start_ble_transport() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_ble_transport() -> None:  # noqa: RUF029
         return None
 
-    async def mock_apply_mqtt_config() -> None:  # noqa: RUF029, RUF105
+    async def mock_apply_mqtt_config() -> None:  # noqa: RUF029
         return None
 
     with (

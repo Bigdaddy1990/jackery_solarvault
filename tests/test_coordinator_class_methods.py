@@ -9,7 +9,7 @@ import pytest
 
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
-    _merge_identified_dict_lists,  # noqa: PLC2701, RUF105
+    _merge_identified_dict_lists,
     merge_missing_dict_values,
     merge_present_dict_values,
 )
@@ -18,20 +18,20 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorClassMethods:
     """Test coordinator class methods."""
 
-    def _bare_coordinator(self) -> Any:  # noqa: PLR6301, RUF105
+    def _bare_coordinator(self) -> Any:  # noqa: PLR6301
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = cast("Any", coordinator)
-        shell._shutdown_started = False  # noqa: RUF105, SLF001
-        shell._property_source_state = {}  # noqa: RUF105, SLF001
-        shell._accessory_source_state = {}  # noqa: RUF105, SLF001
-        shell._property_overrides = {}  # noqa: RUF105, SLF001
-        shell._background_tasks = {}  # noqa: RUF105, SLF001
-        shell._configured_update_interval = timedelta(seconds=15)  # noqa: RUF105, SLF001
-        shell._polling_diagnostics = {}  # noqa: RUF105, SLF001
-        shell._polling_timeout_started_monotonic = None  # noqa: RUF105, SLF001
-        shell._mqtt = None  # noqa: RUF105, SLF001
-        shell._ble_listener = None  # noqa: RUF105, SLF001
-        shell._device_index = {}  # noqa: RUF105, SLF001
+        shell._shutdown_started = False
+        shell._property_source_state = {}
+        shell._accessory_source_state = {}
+        shell._property_overrides = {}
+        shell._background_tasks = {}
+        shell._configured_update_interval = timedelta(seconds=15)
+        shell._polling_diagnostics = {}
+        shell._polling_timeout_started_monotonic = None
+        shell._mqtt = None
+        shell._ble_listener = None
+        shell._device_index = {}
         shell.entry = SimpleNamespace(options={}, data={})
         shell.api = SimpleNamespace(get_cached_mqtt_credentials=lambda: None)
         shell.hass = SimpleNamespace(
@@ -46,21 +46,21 @@ class TestCoordinatorClassMethods:
         coordinator = self._bare_coordinator()
         assert coordinator is not None
 
-    def test_merge_identified_dict_lists_with_coordinator(self) -> None:  # noqa: PLR6301, RUF105
+    def test_merge_identified_dict_lists_with_coordinator(self) -> None:  # noqa: PLR6301
         """Test _merge_identified_dict_lists with coordinator context."""
         base = [{"deviceSn": "p1", "soc": 50}]
         updates = [{"deviceSn": "p1", "soc": 60}]
         result = _merge_identified_dict_lists(base, updates)
         assert result[0]["soc"] == 60
 
-    def test_merge_present_dict_values_with_coordinator(self) -> None:  # noqa: PLR6301, RUF105
+    def test_merge_present_dict_values_with_coordinator(self) -> None:  # noqa: PLR6301
         """Test merge_present_dict_values with coordinator context."""
         base = {"key": "value"}
         updates = {"key": None}
         result = merge_present_dict_values(base, updates)
         assert result["key"] == "value"
 
-    def test_merge_missing_dict_values_with_coordinator(self) -> None:  # noqa: PLR6301, RUF105
+    def test_merge_missing_dict_values_with_coordinator(self) -> None:  # noqa: PLR6301
         """Test merge_missing_dict_values with coordinator context."""
         base = {"device": {"soc": 50}}
         updates = {"device": {"temp": 25}}

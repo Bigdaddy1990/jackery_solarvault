@@ -26,11 +26,11 @@ from custom_components.jackery_solarvault.models import (
 from custom_components.jackery_solarvault.number import (
     JackeryNumber,
     JackeryNumberDescription,
-    _is_portable_payload as number_is_portable_payload,  # ruff: ignore[import-private-name]
-    _payload_has_home_payload_evidence as number_has_home_evidence,  # ruff: ignore[import-private-name]
-    _set_max_feed_grid,  # ruff: ignore[import-private-name]
-    _wire_float,  # ruff: ignore[import-private-name]
-    _wire_int,  # ruff: ignore[import-private-name]
+    _is_portable_payload as number_is_portable_payload,
+    _payload_has_home_payload_evidence as number_has_home_evidence,
+    _set_max_feed_grid,
+    _wire_float,
+    _wire_int,
 )
 from custom_components.jackery_solarvault.text import (
     JackeryDeviceNameText,
@@ -73,17 +73,17 @@ def _number(
     mutable.coordinator = _coordinator({
         _DEVICE_ID: {PAYLOAD_PROPERTIES: properties or {}},
     })
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = description
     return entity
 
 
-def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:  # noqa: RUF105
+def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:
     """Build a real text entity with a mocked transport boundary."""
     entity = object.__new__(entity_type)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -177,7 +177,7 @@ def test_number_description_resolves_smali_and_explicit_capabilities() -> None:
 
 
 @pytest.mark.parametrize("parser", [_wire_int, _wire_float])
-def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:  # noqa: RUF105
+def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:
     """Wire values fail closed instead of silently coercing invalid input."""
     with pytest.raises(HomeAssistantError, match="invalid number value"):
         parser("not-a-number")
@@ -209,7 +209,7 @@ def test_number_static_fallbacks_and_non_numeric_native_value() -> None:
     assert entity.native_max_value == pytest.approx(42)
     assert entity.native_unit_of_measurement == "widgets"
     assert entity.suggested_display_precision == 2
-    assert entity._allowed_values() == (1.0, 2.0)  # ruff: ignore[private-member-access]
+    assert entity._allowed_values() == (1.0, 2.0)
 
 
 def test_number_empty_description_has_safe_defaults() -> None:
@@ -217,7 +217,7 @@ def test_number_empty_description_has_safe_defaults() -> None:
     entity = _number(JackeryNumberDescription(key="empty"))
 
     assert entity.native_max_value == pytest.approx(0)
-    assert entity._allowed_values() == ()  # ruff: ignore[private-member-access]
+    assert entity._allowed_values() == ()
 
 
 async def test_number_without_setter_validates_then_performs_no_write() -> None:
@@ -436,10 +436,10 @@ def _third_party() -> JackeryThirdPartyMqttText:
     entity = JackeryThirdPartyMqttText.__new__(JackeryThirdPartyMqttText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator({_DEVICE_ID: {}})
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable._field = FIELD_THIRD_PARTY_MQTT_IP  # ruff: ignore[private-member-access]
-    mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
-    mutable._attr_mode = TextMode.TEXT  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
+    mutable._field = FIELD_THIRD_PARTY_MQTT_IP
+    mutable._attr_translation_key = "third_party_mqtt_ip"
+    mutable._attr_mode = TextMode.TEXT
     return entity
 
 

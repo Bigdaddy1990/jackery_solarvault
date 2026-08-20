@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
+from homeassistant.components.mqtt.util import valid_subscribe_topic
 from homeassistant.config_entries import ConfigFlow, OptionsFlow, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -32,6 +33,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -45,6 +47,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
@@ -73,6 +76,12 @@ from .const import (
     REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
+)
+from .credentials import (
+    MAX_PASSWORD_LENGTH,
+    MAX_USERNAME_LENGTH,
+    credential_text,
+    redacted_error,
 )
 from .util import (
     config_entry_bool_option,
@@ -322,6 +331,11 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
                 default=None,
             ),
         ),
+        CONF_THIRD_PARTY_MQTT_QOS: int(
+            _first_entry_value(
+                CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS
+            )
+        ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             _first_entry_value(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -413,6 +427,12 @@ def _merge_local_mqtt_options(
                 ),
             ),
         ),
+        CONF_THIRD_PARTY_MQTT_QOS: int(
+            user_input.get(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                current[CONF_THIRD_PARTY_MQTT_QOS],
+            )
+        ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -460,6 +480,9 @@ def _reconfigure_options(
     """
     current_local_mqtt = _current_local_mqtt_options(entry)
     merged = dict(entry.options)
+    # Cloud credentials have one owner: entry.data. Remove legacy duplicates.
+    merged.pop(CONF_USERNAME, None)
+    merged.pop(CONF_PASSWORD, None)
     merged.pop("enable_unredacted_diagnostics", None)
     for key in REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS:
         merged.pop(key, None)
@@ -476,8 +499,18 @@ def _reconfigure_options(
 
 
 USER_SCHEMA = vol.Schema({
-    vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1)),
-    vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+    vol.Required(CONF_USERNAME): vol.All(
+        lambda value: credential_text(
+            value, field="username", max_length=MAX_USERNAME_LENGTH
+        ),
+        vol.Length(min=1),
+    ),
+    vol.Required(CONF_PASSWORD): vol.All(
+        lambda value: credential_text(
+            value, field="password", max_length=MAX_PASSWORD_LENGTH
+        ),
+        vol.Length(min=1),
+    ),
     vol.Optional(
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         default=DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -601,6 +634,10 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.In((0, 1, 2)),
+            vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
@@ -620,7 +657,7 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
+            ): vol.All(str, valid_subscribe_topic),
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
@@ -791,7 +828,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug("Cannot connect to Jackery during setup: %s", err)
+                _LOGGER.debug(
+                    "Cannot connect to Jackery during setup: %s", redacted_error(err)
+                )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
@@ -895,7 +934,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
                 except JackeryError as err:
                     _LOGGER.debug(
-                        "Cannot connect to Jackery during reconfigure: %s", err
+                        "Cannot connect to Jackery during reconfigure: %s",
+                        redacted_error(err),
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
@@ -949,6 +989,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.In((0, 1, 2)),
+            vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
@@ -966,7 +1010,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
+            ): vol.All(str, valid_subscribe_topic),
         })
         return self.async_show_form(
             step_id=FLOW_STEP_RECONFIGURE_CREDENTIALS,
@@ -1019,7 +1063,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 # next refresh, which triggers the standard reauth flow.
                 return self.async_abort(reason=FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED)
             except JackeryError as err:
-                _LOGGER.debug("Cannot accept shared Jackery device: %s", err)
+                _LOGGER.debug(
+                    "Cannot accept shared Jackery device: %s", redacted_error(err)
+                )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
                 coordinator = cast(
@@ -1084,7 +1130,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
+                _LOGGER.debug(
+                    "Cannot connect to Jackery during reauth: %s", redacted_error(err)
+                )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_update_and_abort(

@@ -33,7 +33,7 @@ def _eval_static_string(node: ast.AST, constants: dict[str, str]) -> str | None:
 
     Returns:
         str | None: The resolved string when determinable, otherwise `None`.
-    """  # noqa: RUF105
+    """
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.Name):
@@ -75,7 +75,7 @@ def _state_class_keyword(call: ast.Call) -> str | None:
 
     Returns:
         str | None: The `attr` string from the `state_class=` keyword when its value is an `ast.Attribute`, or `None` if the keyword is absent or not an attribute.
-    """  # noqa: RUF105
+    """
     for keyword in call.keywords:
         if keyword.arg == "state_class":
             value = keyword.value
@@ -92,7 +92,7 @@ def _device_class_keyword(call: ast.Call) -> str | None:
 
     Returns:
         str | None: The attribute name (the `.attr` value) if `device_class` is provided as an `ast.Attribute`, `None` otherwise.
-    """  # noqa: RUF105
+    """
     for keyword in call.keywords:
         if keyword.arg == "device_class":
             value = keyword.value
@@ -128,7 +128,7 @@ def _stat_description_calls() -> list[ast.Call]:
 
     Returns:
         list[ast.Call]: AST `Call` nodes corresponding to each `JackeryStatSensorDescription(...)` call found when parsing the file at `SENSOR_PATH`.
-    """  # noqa: RUF105
+    """
     tree = ast.parse(SENSOR_PATH.read_text(encoding="utf-8"))
     return [
         node
@@ -146,7 +146,7 @@ def _savings_detail_description_calls() -> list[ast.Call]:
 
     Returns:
         calls (list[ast.Call]): List of matching AST `Call` nodes.
-    """  # noqa: RUF105
+    """
     tree = ast.parse(SENSOR_PATH.read_text(encoding="utf-8"))
     return [
         node
@@ -167,7 +167,7 @@ def _stat_description_metadata() -> dict[str, dict[str, object]]:
 
     Returns:
         A dict mapping each description `key` (string) to its metadata dict as described above.
-    """  # noqa: RUF105
+    """
     metadata: dict[str, dict[str, object]] = {}
     for call in _stat_description_calls():
         key = _const_keyword(call, "key")
@@ -193,7 +193,7 @@ def _const_string_assignments(path: Path) -> dict[str, str]:
         dict[str, str]: Mapping of top-level variable names to their string literal values.
         Only plain assignments and annotated assignments where the value is a string literal
         are included; other statement forms and non-string values are ignored.
-    """  # noqa: RUF105
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     assignments: dict[str, str] = {}
     for node in tree.body:
@@ -221,7 +221,7 @@ def test_app_period_stat_descriptions_use_total_with_reset_period() -> None:
     Asserts that the set of stat description keys present in the integration matches the expected app-period keys, and for each key:
     - the `state_class` is `"TOTAL"`;
     - the `reset_period` equals the expected period string (`"day"`, `"week"`, `"month"`, or `"year"`).
-    """  # noqa: RUF105
+    """
     expected: dict[str, str] = {
         "today_load": "day",
         "device_today_pv_energy": "day",
@@ -271,7 +271,7 @@ def test_documented_stat_paths_match_const_values() -> None:
     """Verify top-level statistic path constants in const.py match the expected API endpoint strings.
 
     Asserts that each documented constant (e.g., DEVICE_STATISTIC_PATH, PV_TRENDS_PATH) is defined as the exact path string expected by the integration.
-    """  # noqa: RUF105
+    """
     expected_paths = {
         "DEVICE_STATISTIC_PATH": "/v1/device/stat/deviceStatistic",
         "DEVICE_PV_STAT_PATH": "/v1/device/stat/pv",
@@ -291,7 +291,7 @@ def test_week_month_year_sensors_keep_same_source_family() -> None:
     """Assert that week, month, and year energy stat descriptions use the same source-family section naming pattern.
 
     This test builds expected source-prefix mappings for several energy families (pv, home, battery_charge, battery_discharge, device_ongrid_input, device_ongrid_output) and verifies that each `<family>_{period}_energy` stat description reports a `section` equal to `<expected_prefix>_{period}` for period in `("week", "month", "year")`.
-    """  # noqa: RUF105
+    """
     metadata = _stat_description_metadata()
     expected_source_prefix = {
         "pv": "device_pv_stat",
@@ -367,7 +367,7 @@ def test_obsolete_period_entities_are_not_created() -> None:
     - The `JackeryPvTrendsTodaySensor` class is not present in the sensor source.
     - Period-scoped grid import/export keys for week/month/year are not present in `sensor.py` but their corresponding internal constant names (prefixed with `_`) exist in `const.py`.
     - `_pv_today_energy` and `_system_pv_today_energy` internal constants exist in `const.py`.
-    """  # noqa: RUF105
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
@@ -392,7 +392,7 @@ def test_non_app_diagnostic_sensors_are_not_created() -> None:
     """Verify non-app diagnostic sensor classes are not appended to entity lists while their class definitions and diagnostic suffixes remain present.
 
     This test asserts that specific diagnostic sensor class names appear in the sensor source but are not added to entity construction via `_append_unique(<ClassName>`, and that the corresponding legacy diagnostic suffix strings exist in the constants source.
-    """  # noqa: RUF105
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     INIT_PATH.read_text(encoding="utf-8")
     const_source = CONST_PATH.read_text(encoding="utf-8")
@@ -428,7 +428,7 @@ def test_former_disabled_app_sensor_suffixes_remain_documented() -> None:
     """Ensure legacy disabled app sensor suffix strings remain present in the integration's constants.
 
     Asserts that a fixed set of former sensor suffix identifiers (kept for documentation/compatibility) are still contained in the `const.py` source.
-    """  # noqa: RUF105
+    """
     const_source = CONST_PATH.read_text(encoding="utf-8")
 
     for suffix in (
@@ -446,7 +446,7 @@ def test_external_app_chart_statistics_are_period_scoped() -> None:
     """Verify external app chart statistic bucket constants are period-scoped.
 
     Asserts that the module-level constants map each DATE_TYPE to the appropriate EXTERNAL_STAT_BUCKET for day, week, month, and year, and that literal string mappings like `"daily"` or `"monthly"` are not used for month/year.
-    """  # noqa: RUF105
+    """
     source = CONST_PATH.read_text(encoding="utf-8")
 
     assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in source
@@ -476,7 +476,7 @@ def test_period_sensor_translations_do_not_use_this_period_wording() -> None:
     """Assert that the integration's translation files do not contain locale phrases that use "this week", "this month", or "this year" wording.
 
     This test reads the component's strings.json and all JSON files in the translations directory and fails if any of the forbidden phrases (English, German, Spanish, and French variants) appear in the source.
-    """  # noqa: RUF105
+    """
     for path in (
         COMPONENT_PATH / "strings.json",
         *sorted((COMPONENT_PATH / "translations").glob("*.json")),
@@ -560,7 +560,7 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
     - The set of discovered keys matches the expected matrix.
     - Each discovered entry's `(state_class, reset_period)` equals the expected tuple.
     - Any stat description that declares `reset_period` as `day`, `week`, `month`, or `year` uses `state_class == "TOTAL"`.
-    """  # noqa: RUF105
+    """
     matrix = {
         "today_load": ("TOTAL", "day"),
         "total_generation": ("TOTAL_INCREASING", None),
@@ -604,7 +604,7 @@ def test_last_reset_is_data_driven_not_wall_clock() -> None:
     """Ensure an entity's `last_reset` is derived from the API request's `begin_date` metadata rather than the wall-clock period start.
 
     This prevents a midnight race where the recorder records a new day's `last_reset` before fresh period totals arrive, which could appear as a sudden drop. The test verifies the sensor implements `_period_begin_from_meta()`, uses `begin_iso = self._period_begin_from_meta()`, and only falls back to the wall-clock `_period_start` when `begin_iso is None`.
-    """  # noqa: RUF105
+    """
     sensor_source = (
         Path(__file__).resolve().parents[1]
         / "custom_components"
@@ -649,7 +649,7 @@ def test_total_revenue_uses_total_increasing_without_monetary_class() -> None:
     """Ensure the `total_revenue` stat description uses SensorStateClass.TOTAL_INCREASING and does not include SensorDeviceClass.MONETARY.
 
     This test verifies the integration documents `total_revenue` with the `TOTAL_INCREASING` state class and without the `MONETARY` device class to prevent Recorder midnight-reset regressions caused by the validator interaction between `MONETARY` and `state_class`.
-    """  # noqa: RUF105
+    """
     sensor_source = SENSOR_PATH.read_text(encoding="utf-8")
     pattern = re.compile(
         r"JackeryStatSensorDescription\(\s*\n"

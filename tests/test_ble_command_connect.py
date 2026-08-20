@@ -44,13 +44,13 @@ def _ble_first_coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator).hass = object()
     cast("Any", coordinator).entry = _ImmediateBackgroundEntry()
-    cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=_CMD)  # ruff: ignore[private-member-access]
-    cast("Any", coordinator)._command_body_for_transport = MagicMock(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=_CMD)
+    cast("Any", coordinator)._command_body_for_transport = MagicMock(
         return_value=b"body",
     )
-    cast("Any", coordinator)._bind_cloud_command_attempt = MagicMock()  # ruff: ignore[private-member-access]
-    cast("Any", coordinator)._record_successful_command_transports = MagicMock()  # ruff: ignore[private-member-access]
-    cast("Any", coordinator)._record_independent_cloud_mqtt_result = MagicMock()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._bind_cloud_command_attempt = MagicMock()
+    cast("Any", coordinator)._record_successful_command_transports = MagicMock()
+    cast("Any", coordinator)._record_independent_cloud_mqtt_result = MagicMock()
     return coordinator
 
 
@@ -61,9 +61,9 @@ async def test_ble_first_ensures_connection_before_write() -> None:
     send_ble = AsyncMock(return_value=True)
     cast("Any", coordinator).async_send_ble_command = send_ble
     publish_mqtt = AsyncMock()
-    cast("Any", coordinator)._async_publish_command = publish_mqtt  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_publish_command = publish_mqtt
 
-    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+    await coordinator._async_publish_command_ble_first(
         _DEVICE_ID,
         message_type="DevicePropertyChange",
         action_id=_ACTION_ID,
@@ -91,9 +91,9 @@ async def test_ble_write_unavailable_does_not_block_mqtt() -> None:
     coordinator = _ble_first_coordinator()
     cast("Any", coordinator).async_send_ble_command = AsyncMock(return_value=False)
     publish_mqtt = AsyncMock()
-    cast("Any", coordinator)._async_publish_command = publish_mqtt  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_publish_command = publish_mqtt
 
-    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+    await coordinator._async_publish_command_ble_first(
         _DEVICE_ID,
         message_type="DevicePropertyChange",
         action_id=_ACTION_ID,
@@ -124,14 +124,14 @@ async def test_ble_error_and_mqtt_failure_both_raise() -> None:
         side_effect=RuntimeError("ble write timed out"),
     )
     mqtt_error = HomeAssistantError("MQTT client not initialized")
-    cast("Any", coordinator)._async_publish_command = AsyncMock(side_effect=mqtt_error)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_publish_command = AsyncMock(side_effect=mqtt_error)
 
     with pytest.raises(RuntimeError, match="ble write timed out"):
-        await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+        await coordinator._async_publish_command_ble_first(
             _DEVICE_ID,
             message_type="DevicePropertyChange",
             action_id=_ACTION_ID,
             cmd=_CMD,
             body_fields={},
         )
-    cast("Any", coordinator)._async_publish_command.assert_awaited_once()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_publish_command.assert_awaited_once()

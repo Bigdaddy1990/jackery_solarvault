@@ -85,7 +85,7 @@ def test_service_integer_parser_rejects_oversized_digit_strings() -> None:
     sys.set_int_max_str_digits(640)
     try:
         with pytest.raises(vol.Invalid):
-            services._coerce_service_int("9" * 700)  # ruff: ignore[private-member-access]
+            services._coerce_service_int("9" * 700)
     finally:
         sys.set_int_max_str_digits(old_limit)
 
@@ -131,7 +131,7 @@ class _AuthApi:
 
         Raises:
             JackeryAuthError: If the request fails due to authentication (invalid or expired credentials).
-        """  # noqa: RUF105
+        """
         raise JackeryAuthError("invalid token")
 
 
@@ -166,15 +166,15 @@ def test_resolve_jackery_device_id_follows_subdevice_parent(
     monkeypatch.setattr(services.dr, "async_get", lambda _hass: registry)
 
     assert (
-        services._resolve_jackery_device_id(_test_hass(), "smart-plug-ha-id")  # ruff: ignore[private-member-access]
+        services._resolve_jackery_device_id(_test_hass(), "smart-plug-ha-id")
         == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(_test_hass(), "solarvault-ha-id")  # ruff: ignore[private-member-access]
+        services._resolve_jackery_device_id(_test_hass(), "solarvault-ha-id")
         == "573702884982521856"
     )
     assert (
-        services._resolve_jackery_device_id(_test_hass(), "573702884982521856")  # ruff: ignore[private-member-access]
+        services._resolve_jackery_device_id(_test_hass(), "573702884982521856")
         == "573702884982521856"
     )
 
@@ -191,7 +191,7 @@ async def test_rename_service_rejects_false_api_result(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(  # ruff: ignore[private-member-access]
+        await services._async_handle_rename(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -215,7 +215,7 @@ async def test_rename_service_reauth_on_auth_error(
     )
 
     with pytest.raises(ConfigEntryAuthFailed):
-        await services._async_handle_rename(  # ruff: ignore[private-member-access]
+        await services._async_handle_rename(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -253,13 +253,13 @@ async def test_rename_service_rejects_direct_invalid_system_id(
 
         Raises:
             AssertionError: Always raised with message "invalid system_id must stop before coordinator lookup".
-        """  # noqa: RUF105
+        """
         raise AssertionError("invalid system_id must stop before coordinator lookup")
 
     monkeypatch.setattr(services, "_coordinator_for_system", _fail_coordinator_lookup)
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(  # ruff: ignore[private-member-access]
+        await services._async_handle_rename(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_SYSTEM_ID: system_id,
@@ -295,7 +295,7 @@ async def test_rename_service_rejects_direct_invalid_new_name(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_rename(  # ruff: ignore[private-member-access]
+        await services._async_handle_rename(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_SYSTEM_ID: "123",
@@ -328,7 +328,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
 
             Raises:
                 HomeAssistantError: If the MQTT command fails for the device (message includes the device_id).
-            """  # noqa: RUF105
+            """
             raise HomeAssistantError(f"MQTT command failed for {device_id}")
 
     monkeypatch.setattr(
@@ -343,7 +343,7 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_refresh_weather_plan(  # ruff: ignore[private-member-access]
+        await services._async_handle_refresh_weather_plan(
             _test_hass(),
             _service_call({SERVICE_FIELD_DEVICE_ID: "dev1"}),
         )
@@ -373,13 +373,13 @@ async def test_refresh_weather_plan_service_rejects_direct_invalid_device_id(
         """Stub resolver used in tests to ensure device-id validation halts before registry lookup.
 
         Always raises an AssertionError with the message "invalid device_id must stop before registry lookup" when invoked.
-        """  # noqa: RUF105
+        """
         raise AssertionError("invalid device_id must stop before registry lookup")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", _fail_resolve)
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_refresh_weather_plan(  # ruff: ignore[private-member-access]
+        await services._async_handle_refresh_weather_plan(
             _test_hass(),
             _service_call({SERVICE_FIELD_DEVICE_ID: device_id}),
         )
@@ -404,7 +404,7 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator should not be reached for invalid input.
-            """  # noqa: RUF105
+            """
             raise AssertionError("blank alert_id must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -415,7 +415,7 @@ async def test_delete_storm_alert_service_rejects_direct_blank_alert_id(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_delete_storm_alert(  # ruff: ignore[private-member-access]
+        await services._async_handle_delete_storm_alert(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -456,7 +456,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # noqa: RUF105
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -473,7 +473,7 @@ async def test_set_third_party_mqtt_service_parses_boolean_string(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+    await services._async_handle_set_third_party_mqtt_config(
         _test_hass(),
         _service_call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -524,7 +524,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
             """Record a third-party MQTT configuration call for the given device.
 
             Appends a dictionary with keys "device_id", "enable", "ip", "port", "username", "password", and "token" to self.calls.
-            """  # noqa: RUF105
+            """
             self.calls.append({
                 "device_id": device_id,
                 "enable": enable,
@@ -541,7 +541,7 @@ async def test_set_third_party_mqtt_service_keeps_none_credentials_empty(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+    await services._async_handle_set_third_party_mqtt_config(
         _test_hass(),
         _service_call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -583,7 +583,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
 
             Raises:
                 AssertionError: with message "non-text credentials must stop before coordinator call"
-            """  # noqa: RUF105
+            """
             raise AssertionError(
                 "non-text credentials must stop before coordinator call"
             )
@@ -596,7 +596,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_non_text_credentials(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+        await services._async_handle_set_third_party_mqtt_config(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -626,7 +626,7 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
             """Apply third-party MQTT configuration to the coordinator.
 
             Test-only stub: raises AssertionError if invoked to assert that input validation prevented the coordinator from being called.
-            """  # noqa: RUF105
+            """
             raise AssertionError("invalid boolean must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -637,7 +637,7 @@ async def test_set_third_party_mqtt_service_preserves_invalid_boolean_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+        await services._async_handle_set_third_party_mqtt_config(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -678,7 +678,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
 
             Raises:
                 AssertionError: In the test stub, always raised to indicate the coordinator should not be called.
-            """  # noqa: RUF105
+            """
             raise AssertionError("invalid port must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -689,7 +689,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_invalid_port(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+        await services._async_handle_set_third_party_mqtt_config(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -758,7 +758,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
 
             Returns:
                 None
-            """  # noqa: RUF105
+            """
             raise AssertionError("blank IP must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -769,7 +769,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_blank_ip(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+        await services._async_handle_set_third_party_mqtt_config(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -805,7 +805,7 @@ async def test_set_third_party_mqtt_service_rejects_direct_long_token(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_set_third_party_mqtt_config(  # ruff: ignore[private-member-access]
+        await services._async_handle_set_third_party_mqtt_config(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -856,7 +856,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
 
             Returns:
                 bool: `True` if the command was accepted, `False` otherwise.
-            """  # noqa: RUF105
+            """
             self.calls.append({
                 "device_id": device_id,
                 "cmd": cmd,
@@ -874,7 +874,7 @@ async def test_send_ble_command_service_parses_wait_for_ack_string(
         services, "_coordinator_for_device", lambda _hass, _device_id: coordinator
     )
 
-    await services._async_handle_send_ble_command(  # ruff: ignore[private-member-access]
+    await services._async_handle_send_ble_command(
         _test_hass(),
         _service_call({
             SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -901,7 +901,7 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
 
             Returns:
                 bool: `True` if the device acknowledged the command, `False` otherwise.
-            """  # noqa: RUF105
+            """
             raise AssertionError("invalid boolean must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -910,7 +910,7 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(  # ruff: ignore[private-member-access]
+        await services._async_handle_send_ble_command(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -950,7 +950,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     Parameters:
         body (object): The raw `body` value passed to the service; must be a non-JSON-native case to trigger validation.
         expected_error (str): The exact error message expected in the service error translation placeholders.
-    """  # noqa: RUF105
+    """
 
     class _BleCoordinator:
         async def async_send_ble_command(self, *args: object) -> bool:  # ruff: ignore[no-self-use]
@@ -961,7 +961,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
 
             Returns:
                 bool: `True` if the BLE command succeeded, `False` otherwise.
-            """  # noqa: RUF105
+            """
             raise AssertionError("invalid body must stop before coordinator call")
 
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _hass, raw: raw)
@@ -970,7 +970,7 @@ async def test_send_ble_command_service_rejects_non_json_native_body(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(  # ruff: ignore[private-member-access]
+        await services._async_handle_send_ble_command(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",
@@ -1033,7 +1033,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_numeric_fields(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(  # ruff: ignore[private-member-access]
+        await services._async_handle_send_ble_command(
             _test_hass(),
             _service_call({SERVICE_FIELD_DEVICE_ID: "dev1", **call_data}),
         )
@@ -1058,7 +1058,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
 
             Raises:
                 AssertionError: Always raised to indicate the coordinator method should not be called during validation tests.
-            """  # noqa: RUF105
+            """
             raise AssertionError(
                 "invalid ack_timeout must stop before coordinator call"
             )
@@ -1069,7 +1069,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     )
 
     with pytest.raises(ServiceValidationError) as err:
-        await services._async_handle_send_ble_command(  # ruff: ignore[private-member-access]
+        await services._async_handle_send_ble_command(
             _test_hass(),
             _service_call({
                 SERVICE_FIELD_DEVICE_ID: "dev1",

@@ -37,12 +37,12 @@ _CT_DEVICE_ID = "2057219036232777730"
 
 def test_accessory_id_resolved_from_system_accessories() -> None:
     """A devType=3 accessory's deviceId is returned for the CT-stat call."""
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import (
         FIELD_ACCESSORIES,
         FIELD_SYSTEM_ID,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
@@ -62,35 +62,35 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
     }
 
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)  # ruff: ignore[private-member-access]
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)
         == _CT_DEVICE_ID
     )
 
 
 def test_accessory_id_none_without_smart_meter() -> None:
     """Return ``None`` when neither discovery nor live data has a CT accessory."""
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import (
         FIELD_ACCESSORIES,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
     idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
-    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None
 
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
-    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # ruff:ignore[unsorted-imports]  # ruff: ignore[import-outside-top-level]
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # ruff:ignore[unsorted-imports]
+    from custom_components.jackery_solarvault.coordinator import (
         JackerySolarVaultCoordinator,
     )
 
     source = {PAYLOAD_CT_METER: {"devType": 3, "deviceId": 2057219036232777730}}
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)  # ruff: ignore[private-member-access]
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)
         == _CT_DEVICE_ID
     )
 
@@ -100,7 +100,7 @@ async def test_update_cycle_uses_accessory_id_for_ct_stats(
     hass: HomeAssistant,
 ) -> None:
     """Pass the discovered CT accessory id to every CT-stat request."""
-    from custom_components.jackery_solarvault.const import FIELD_DEVICES  # ruff:ignore[unsorted-imports]  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import FIELD_DEVICES  # ruff:ignore[unsorted-imports]
 
     api = make_update_cycle_api()
     systems = await api.async_get_system_list()
@@ -114,8 +114,8 @@ async def test_update_cycle_uses_accessory_id_for_ct_stats(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-        slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
+        slow_metrics_task = coordinator._slow_metrics_bg_task
         assert slow_metrics_task is not None
         await slow_metrics_task
         await hass.async_block_till_done()

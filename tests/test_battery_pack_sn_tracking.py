@@ -24,7 +24,7 @@ from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 _async_migrate_battery_pack_identities = (
-    _init_module._async_migrate_battery_pack_identities  # noqa: RUF105, SLF001
+    _init_module._async_migrate_battery_pack_identities
 )
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ def _coordinator(
     shell.data = {
         _PARENT_ID: {PAYLOAD_BATTERY_PACKS: list(packs or [])},
     }
-    shell._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
+    shell._battery_pack_identity_overrides = {}
     return coordinator
 
 
@@ -141,8 +141,8 @@ def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
 def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
     """A newly inserted earlier serial cannot rebind the existing entity."""
     sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
-    sensor._pack_index = 1  # ruff: ignore[private-member-access]
-    sensor._pack_sn = None  # ruff: ignore[private-member-access]
+    sensor._pack_index = 1
+    sensor._pack_sn = None
 
     initial = {
         PAYLOAD_BATTERY_PACKS: [
@@ -162,11 +162,11 @@ def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
         new_callable=PropertyMock,
     ) as payload:
         payload.return_value = initial
-        first: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
+        first: dict[str, Any] = sensor._pack
         assert first["deviceSn"] == _SN_A
 
         payload.return_value = shifted
-        second: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
+        second: dict[str, Any] = sensor._pack
         assert second["deviceSn"] == _SN_A
         assert second["batSoc"] == _SOC_A
 
@@ -200,15 +200,15 @@ def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
 
     def _resolve(pack_index: int, payload: dict[str, Any]) -> str | None:
         sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
-        sensor._pack_index = pack_index  # ruff: ignore[private-member-access]
-        sensor._pack_sn = None  # fresh entity, as after a restart  # ruff: ignore[private-member-access]
+        sensor._pack_index = pack_index
+        sensor._pack_sn = None  # fresh entity, as after a restart
         with patch.object(
             JackeryBatteryPackSensor,
             "_payload",
             new_callable=PropertyMock,
         ) as mock_payload:
             mock_payload.return_value = payload
-            pack: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
+            pack: dict[str, Any] = sensor._pack
             return battery_pack_serial(pack)
 
     assert _resolve(1, first_boot) == _SN_A
@@ -225,7 +225,7 @@ def test_communication_state_derived_from_live_pack_presence() -> None:
     connected state (``commState == 1`` semantics) from the pack's live
     telemetry so the entity is not stuck on "unknown".
     """
-    from custom_components.jackery_solarvault.sensor import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.sensor import (
         BATTERY_PACK_SENSOR_DESCRIPTIONS,
     )
 
@@ -238,10 +238,10 @@ def test_communication_state_derived_from_live_pack_presence() -> None:
     sensor.entity_description = description
 
     fresh_pack = {"deviceSn": _SN_A, "batSoc": _SOC_A, "inPw": 286, "cellTemp": 259}
-    assert sensor._value_from_pack(fresh_pack) == 1  # ruff: ignore[private-member-access]
+    assert sensor._value_from_pack(fresh_pack) == 1
 
     # An empty/absent pack (no live telemetry) stays unknown -> disconnected.
-    assert sensor._value_from_pack({}) is None  # ruff: ignore[private-member-access]
+    assert sensor._value_from_pack({}) is None
 
 
 def test_registry_migration_rekeys_pack_and_preserves_entity_id(

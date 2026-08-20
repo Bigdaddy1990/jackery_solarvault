@@ -381,15 +381,15 @@ def test_mqtt_auth_pause_never_invalidates_http_session() -> None:
     api = MagicMock()
     coordinator.api = cast("Any", api)
     coordinator.rejection_metrics = RejectionMetrics()
-    coordinator._mqtt_mgr = MqttConnectionManager()  # ruff: ignore[private-member-access]
+    coordinator._mqtt_mgr = MqttConnectionManager()
 
-    coordinator._pause_mqtt_after_auth_failure(  # ruff: ignore[private-member-access]
+    coordinator._pause_mqtt_after_auth_failure(
         "connect rc=134 (bad user name or password)",
         streak=1,
     )
 
     api.invalidate_mqtt_session_for_http_refresh.assert_not_called()
-    assert coordinator._mqtt_mgr.app_conflict_pause_cycles == 1  # ruff: ignore[private-member-access]
+    assert coordinator._mqtt_mgr.app_conflict_pause_cycles == 1
 
 
 def test_handle_connect_error_non_auth_path_backs_off(
