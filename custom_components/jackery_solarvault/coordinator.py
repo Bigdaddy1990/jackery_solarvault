@@ -5048,7 +5048,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         ) -> None:
             try:
                 results[key] = await self._async_http_call(call)
-            except (JackeryAuthError, asyncio.CancelledError):
+            except JackeryAuthError, asyncio.CancelledError:
                 raise
             except Exception as err:  # ruff: ignore[blind-except]  # isolate transport/payload errors
                 results[key] = err
@@ -14427,7 +14427,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             ) -> None:
                 try:
                     values_by_endpoint[dev_id, endpoint] = await request
-                except (JackeryAuthError, asyncio.CancelledError):
+                except JackeryAuthError, asyncio.CancelledError:
                     raise
                 except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
                     values_by_endpoint[dev_id, endpoint] = err
@@ -14623,7 +14623,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     month_sources[prefix, month] = await _fetch_device_month(
                         prefix, month
                     )
-                except (JackeryAuthError, asyncio.CancelledError):
+                except JackeryAuthError, asyncio.CancelledError:
                     raise
                 except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
                     month_sources[prefix, month] = err

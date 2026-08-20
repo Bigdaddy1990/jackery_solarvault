@@ -320,14 +320,14 @@ async def test_rpc_disconnect_fails_waiter_with_transport_error(
 ) -> None:
     """Disconnect completes every open RPC rather than leaking its future."""
     client = _client(hass)
-    waiter = asyncio.create_task(client._wait_for_response(8))  # ruff: ignore[private-member-access]
+    waiter = asyncio.create_task(client._wait_for_response(8))
     await asyncio.sleep(0)
 
-    client._fail_pending_responses("connection lost")  # ruff: ignore[private-member-access]
+    client._fail_pending_responses("connection lost")
 
     with pytest.raises(JackeryMqttTransportError, match="connection lost"):
         await waiter
-    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
+    assert client._pending_responses == {}
 
 
 async def test_late_or_wrong_kind_response_cannot_cross_session(
@@ -336,20 +336,16 @@ async def test_late_or_wrong_kind_response_cannot_cross_session(
     """RPC matching includes generation, request ID and response kind."""
     client = _client(hass)
     waiter = asyncio.create_task(
-        client._wait_for_response(9, expected_response_type=3031)  # ruff: ignore[private-member-access]
+        client._wait_for_response(9, expected_response_type=3031)
     )
     await asyncio.sleep(0)
 
-    client._resolve_pending_response(  # ruff: ignore[private-member-access]
-        {"request_id": 9, "actionId": 3032}
-    )
+    client._resolve_pending_response({"request_id": 9, "actionId": 3032})
     assert not waiter.done()
-    client._session_generation += 1  # ruff: ignore[private-member-access]
-    client._resolve_pending_response(  # ruff: ignore[private-member-access]
-        {"request_id": 9, "actionId": 3031}
-    )
+    client._session_generation += 1
+    client._resolve_pending_response({"request_id": 9, "actionId": 3031})
     assert not waiter.done()
-    client._fail_pending_responses("new session")  # ruff: ignore[private-member-access]
+    client._fail_pending_responses("new session")
     with pytest.raises(JackeryMqttTransportError):
         await waiter
 
@@ -368,17 +364,17 @@ async def test_birth_once_per_generation_and_rebirth_next_generation(
     """Birth succeeds once in each fully subscribed broker generation."""
     birth = AsyncMock()
     client = _client(hass)
-    client._connected = True  # ruff: ignore[private-member-access]
-    client._session_state = MqttSessionState.SUBSCRIBED  # ruff: ignore[private-member-access]
+    client._connected = True
+    client._session_state = MqttSessionState.SUBSCRIBED
 
-    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
-    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=0)
+    client._schedule_birth_snapshot(birth, generation=0)
     await hass.async_block_till_done()
     assert birth.await_count == 1
     assert client.diagnostics_snapshot()["birth_publishes"] == 1
 
-    client._session_generation = 1  # ruff: ignore[private-member-access]
-    client._schedule_birth_snapshot(birth, generation=1)  # ruff: ignore[private-member-access]
+    client._session_generation = 1
+    client._schedule_birth_snapshot(birth, generation=1)
     await hass.async_block_till_done()
     assert birth.await_count == 2
     assert client.diagnostics_snapshot()["session_state"] == "online"
