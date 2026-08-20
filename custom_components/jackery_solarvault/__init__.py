@@ -53,8 +53,10 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
     CT_PERIOD_SENSOR_SUFFIXES,
@@ -350,6 +352,7 @@ _LOCAL_MQTT_OPTION_KEYS = frozenset({
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
 })
@@ -1199,10 +1202,14 @@ async def _async_start_local_mqtt(
             raw_bytes,
         )
 
+    configured_qos = config_entry_int_option(
+        entry, CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS
+    )
     client = JackeryLocalMqttClient(
         hass,
         sink=_handle_local_mqtt_data,
         topic_filter=configured_topic_filter,
+        qos=configured_qos,
     )
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return

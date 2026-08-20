@@ -82,7 +82,7 @@ async def test_homeassistant_topic_is_preserved_verbatim(
         await _async_start_local_mqtt(hass, entry, coordinator)
 
     client_cls.assert_called_once()
-    assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant"
+    assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant/#"
     coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 

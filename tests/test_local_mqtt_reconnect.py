@@ -233,3 +233,65 @@ def test_connection_status_is_observational_only(hass: HomeAssistant) -> None:
     client._async_connection_status_changed(False)  # ruff: ignore[private-member-access]
     assert not client.is_connected
     assert client.diagnostics_snapshot()["last_disconnect_at"] is not None
+
+@pytest.mark.asyncio
+async def test_qos_wildcard_and_retained_semantics(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wildcard uses configured QoS and ignores stale retained telemetry."""
+    sink = AsyncMock(return_value=True)
+    subscribe = AsyncMock(return_value=MagicMock())
+    monkeypatch.setattr(
+        local_mqtt.mqtt, "async_wait_for_mqtt_client", AsyncMock(return_value=True)
+    )
+    monkeypatch.setattr(local_mqtt.mqtt, "async_subscribe", subscribe)
+    monkeypatch.setattr(
+        local_mqtt.mqtt,
+        "async_subscribe_connection_status",
+        lambda *_args: MagicMock(),
+    )
+    monkeypatch.setattr(local_mqtt.mqtt, "is_connected", lambda _hass: True)
+    client = JackeryLocalMqttClient(
+        hass, sink=sink, topic_filter="homeassistant/#", qos=2
+    )
+
+    await client.async_start()
+    callback = subscribe.await_args.args[2]
+    await callback(
+        MagicMock(topic="homeassistant/device", payload=b'{"batSoc": 1}', retain=True)
+    )
+
+    assert subscribe.await_args.kwargs["qos"] == 2
+    sink.assert_not_awaited()
+    assert client.diagnostics_snapshot()["retained_messages_dropped"] == 1
+    await client.async_stop()
+
+
+@pytest.mark.asyncio
+async def test_repeated_start_stop_unsubscribes_once_per_start(
+    hass: HomeAssistant, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Repeated lifecycle calls are idempotent without leaking listeners."""
+    unsubscribe = MagicMock()
+    unsubscribe_status = MagicMock()
+    monkeypatch.setattr(
+        local_mqtt.mqtt, "async_wait_for_mqtt_client", AsyncMock(return_value=True)
+    )
+    monkeypatch.setattr(
+        local_mqtt.mqtt, "async_subscribe", AsyncMock(return_value=unsubscribe)
+    )
+    monkeypatch.setattr(
+        local_mqtt.mqtt,
+        "async_subscribe_connection_status",
+        lambda *_args: unsubscribe_status,
+    )
+    monkeypatch.setattr(local_mqtt.mqtt, "is_connected", lambda _hass: True)
+    client = JackeryLocalMqttClient(hass)
+
+    await client.async_start()
+    await client.async_start()
+    await client.async_stop()
+    await client.async_stop()
+
+    unsubscribe.assert_called_once_with()
+    unsubscribe_status.assert_called_once_with()
