@@ -14,7 +14,7 @@ import asyncio
 import base64
 import binascii
 from collections import deque
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Hashable, Mapping
 import contextlib
 import copy
 from dataclasses import dataclass, field as dataclass_field
@@ -23,7 +23,6 @@ from enum import StrEnum
 from functools import partial, wraps
 import importlib
 import inspect
-from itertools import starmap
 import json
 from json import JSONDecodeError
 import logging
@@ -3389,6 +3388,8 @@ _LOCAL_DAILY_METRIC_BY_CHART_METRIC_KEY: Final[dict[str, str]] = {
     "eps_output_energy": APP_DEVICE_STAT_EPS_OUTPUT,
 }
 _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS = 120
+CONF_HTTP_MAX_PARALLEL_REQUESTS = "http_max_parallel_requests"
+DEFAULT_HTTP_MAX_PARALLEL_REQUESTS = 4
 _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS = 120
 # The backend serializes statistics reads and returns 10426 under bursts. One
 # complete six-source device/day (or closed-period family) per slow-metrics
@@ -3695,6 +3696,21 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         self.rejection_metrics = RejectionMetrics()
         self.entry = entry
         self._configured_update_interval = update_interval
+        http_parallelism = max(
+            1,
+            safe_int(
+                entry.options.get(
+                    CONF_HTTP_MAX_PARALLEL_REQUESTS,
+                    DEFAULT_HTTP_MAX_PARALLEL_REQUESTS,
+                )
+            )
+            or DEFAULT_HTTP_MAX_PARALLEL_REQUESTS,
+        )
+        # One coordinator-owned gate covers Layer-3 calls across foreground
+        # polling, discovery, shadows and historical jobs.  A single shared
+        # gate is important: per-feature semaphores still allow aggregate
+        # bursts large enough for the cloud to return 10426.
+        self._http_request_semaphore = asyncio.Semaphore(http_parallelism)
         interval_sec = max(15, safe_int(update_interval.total_seconds()) or 15)
         # Fast property polling should follow the configured interval, but
         # server-side slow endpoints (stats/trends/price) should keep their
@@ -3931,7 +3947,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # home_trends, battery_trends, statistic, price, alarm etc.)
         # without blocking the main coordinator update cycle.
         self._slow_metrics_bg_task: asyncio.Task[None] | None = None
-        self._slow_http_request_semaphore = asyncio.Semaphore(2)
+        self._slow_http_request_semaphore = self._http_request_semaphore
         self._system_info_cache_monotonic: dict[str, float] = {}
         # Poll-cadence watchdog (P6): the scheduled interval tick and the
         # background-refresh chain both proved losable during a BLE
@@ -4383,7 +4399,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             time.monotonic(),
         ):
             try:
-                await self.api.async_sync_smart_accessories()
+                await self._async_http_call(self.api.async_sync_smart_accessories)
+            except JackeryAuthError:
+                raise
             except JackeryError as err:
                 # A persistent code=10600 opens/extends the backoff window so the
                 # sync stops re-firing every discovery cycle; transient failures
@@ -4395,17 +4413,22 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 _LOGGER.debug("Jackery: accessory sync failed (best-effort): %s", err)
             else:
                 self._endpoint_backoff_note_success(_ACCESSORIES_SYNC_BACKOFF_KEY)
-        for dev_id, record in index.items():
-            try:
-                accessories = await self.api.async_get_accessories_list(dev_id)
-            except JackeryError as err:
+        calls = {
+            (dev_id, "accessories"): partial(
+                self.api.async_get_accessories_list, dev_id
+            )
+            for dev_id in index
+        }
+        results = await self._async_http_calls(calls)
+        for (dev_id, _endpoint), accessories in results.items():
+            if isinstance(accessories, BaseException):
                 _LOGGER.debug(
                     "Jackery: accessory enumeration failed for %s (best-effort): %s",
                     dev_id,
-                    err,
+                    accessories,
                 )
                 continue
-            self._overlay_http_accessories(record, accessories)
+            self._overlay_http_accessories(index[dev_id], accessories)
 
     async def _async_refresh_http_accessories(self) -> None:
         """Refresh HTTP accessory discovery outside the live-property hot path."""
@@ -4953,6 +4976,46 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """The integration's coordinator polling interval."""
         return self._configured_update_interval
 
+    async def _async_http_call(
+        self,
+        call: Callable[[], Coroutine[Any, Any, Any]],
+    ) -> Any:
+        """Run one Layer-3 operation under the coordinator-wide limit."""
+        async with self._http_request_semaphore:
+            return await call()
+
+    async def _async_http_calls(
+        self,
+        calls: Mapping[Hashable, Callable[[], Coroutine[Any, Any, Any]]],
+    ) -> dict[Hashable, Any | BaseException]:
+        """Run keyed independent HTTP calls with structured concurrency.
+
+        Transport and payload failures remain values owned by their stable
+        device/endpoint key. Authentication failures escape the worker and
+        make ``TaskGroup`` cancel siblings immediately. Cancellation is never
+        converted into data, which lets config-entry unload drain cleanly.
+        """
+        results: dict[Hashable, Any | BaseException] = {}
+
+        async def _worker(
+            key: Hashable,
+            call: Callable[[], Coroutine[Any, Any, Any]],
+        ) -> None:
+            try:
+                results[key] = await self._async_http_call(call)
+            except (JackeryAuthError, asyncio.CancelledError):
+                raise
+            except Exception as err:  # ruff: ignore[blind-except]  # isolate transport/payload errors
+                results[key] = err
+
+        try:
+            async with asyncio.TaskGroup() as group:
+                for key, call in calls.items():
+                    group.create_task(_worker(key, call), name=f"{DOMAIN}_http_{key}")
+        except* JackeryAuthError as auth_group:
+            raise auth_group.exceptions[0] from None
+        return results
+
     def async_set_scan_interval(self, update_interval: timedelta) -> None:
         """Apply a new live-poll interval without reloading the config entry.
 
@@ -4988,20 +5051,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # shorter than the HTTP timeout and causes every cycle to timeout.
         # Use the HTTP budget as the primary ceiling, bounded by the hard timeout.
         return min(hard_timeout, http_budget)
-
-    def _set_next_poll_delay(self, started: float, completed: float) -> None:
-        """Use only the unused portion of the start-to-start polling budget."""
-        elapsed = max(0.0, completed - started)
-        delay = max(
-            _POLL_CADENCE_MIN_DELAY_SEC,
-            self._configured_update_interval.total_seconds()
-            - elapsed
-            - _POLL_CADENCE_SCHEDULER_MARGIN_SEC,
-        )
-        self.update_interval = timedelta(seconds=delay)
-        diagnostics = self._polling_diagnostics
-        diagnostics["last_total_cycle_elapsed_sec"] = round(elapsed, 3)
-        diagnostics["next_poll_delay_sec"] = round(delay, 3)
 
     def _schedule_background_once(
         self,
@@ -13179,7 +13228,13 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         try:
             return await self._async_update_data_with_timeout()
         finally:
-            self._set_next_poll_delay(cycle_started, time.monotonic())
+            elapsed = max(0.0, time.monotonic() - cycle_started)
+            self._polling_diagnostics["last_total_cycle_elapsed_sec"] = round(
+                elapsed, 3
+            )
+            self._polling_diagnostics["next_poll_delay_sec"] = round(
+                self._configured_update_interval.total_seconds(), 3
+            )
             if current_task is not None:
                 self._active_http_update_tasks.discard(current_task)
 
@@ -13964,7 +14019,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             system_cache[sys_id] = bundle
             return bundle
 
-        async def _fetch_device_extras(  # ruff: ignore[too-many-locals]  # Endpoint results retain independent cache identities.
+        async def _fetch_device_extras(  # ruff: ignore[complex-structure, too-many-locals]  # Endpoint results retain independent cache identities.
             dev_id: str,
             dev_sn: str | None,
             sys_id: str | None,
@@ -14218,7 +14273,30 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             # payload-parse error must not abort the whole zip and blank every
             # per-device entity; map exceptions back to the structural default
             # expected by downstream consumers.
-            raw_values = await asyncio.gather(*tasks, return_exceptions=True)
+            values_by_endpoint: dict[tuple[str, str], Any | BaseException] = {}
+
+            async def _fetch_device_endpoint(
+                endpoint: str, request: Coroutine[Any, Any, Any]
+            ) -> None:
+                try:
+                    values_by_endpoint[dev_id, endpoint] = await request
+                except (JackeryAuthError, asyncio.CancelledError):
+                    raise
+                except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
+                    values_by_endpoint[dev_id, endpoint] = err
+
+            try:
+                async with asyncio.TaskGroup() as group:
+                    for endpoint, request in zip(task_names, tasks, strict=True):
+                        group.create_task(
+                            _fetch_device_endpoint(endpoint, request),
+                            name=f"{DOMAIN}_http_{dev_id}_{endpoint}",
+                        )
+            except* JackeryAuthError as auth_group:
+                raise auth_group.exceptions[0] from None
+            raw_values = [
+                values_by_endpoint[dev_id, endpoint] for endpoint in task_names
+            ]
             device_extras_defaults: dict[str, Any] = {
                 PAYLOAD_DEVICE_STATISTIC: {},
                 PAYLOAD_LOCATION: {},
@@ -14389,21 +14467,30 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
             # Flatten all prefixes into one bounded queue. This avoids five
             # serial timeout waves without allowing an unbounded request burst.
-            month_request_semaphore = asyncio.Semaphore(8)
-
-            async def _fetch_bounded_device_month(
-                prefix: str,
-                month: int,
-            ) -> dict[str, Any]:
-                async with month_request_semaphore:
-                    return await _fetch_device_month(prefix, month)
-
             # Same year-backfill robustness as the home-trends path: a single
             # 404/timeout for one early month must not abort the entire year.
-            sources = await asyncio.gather(
-                *starmap(_fetch_bounded_device_month, month_requests),
-                return_exceptions=True,
-            )
+            month_sources: dict[tuple[str, int], Any | BaseException] = {}
+
+            async def _fetch_month(prefix: str, month: int) -> None:
+                try:
+                    month_sources[prefix, month] = await _fetch_device_month(
+                        prefix, month
+                    )
+                except (JackeryAuthError, asyncio.CancelledError):
+                    raise
+                except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
+                    month_sources[prefix, month] = err
+
+            try:
+                async with asyncio.TaskGroup() as group:
+                    for prefix, month in month_requests:
+                        group.create_task(
+                            _fetch_month(prefix, month),
+                            name=f"{DOMAIN}_http_{dev_id}_{prefix}_{month}",
+                        )
+            except* JackeryAuthError as auth_group:
+                raise auth_group.exceptions[0] from None
+            sources = [month_sources[key] for key in month_requests]
             for (prefix, month), source in zip(
                 month_requests,
                 sources,
@@ -14664,10 +14751,13 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             f"{self.entry.entry_id}_{d}_{REPAIR_ISSUE_DEVICE_NOT_ACTIVATED}"
             for d, _ in device_items
         }
-        property_results = await asyncio.gather(
-            *(self.api.async_get_device_property(dev_id) for dev_id, _ in device_items),
-            return_exceptions=True,
-        )
+        property_by_key = await self._async_http_calls({
+            (dev_id, "property"): partial(self.api.async_get_device_property, dev_id)
+            for dev_id, _ in device_items
+        })
+        property_results = [
+            property_by_key[dev_id, "property"] for dev_id, _ in device_items
+        ]
         first_property_failure: tuple[str, JackeryError] | None = None
         for (dev_id, idx), property_result in zip(
             device_items, property_results, strict=True
