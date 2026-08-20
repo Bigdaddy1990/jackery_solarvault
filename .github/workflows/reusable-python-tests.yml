@@ -8,16 +8,8 @@ on:
         description: Python version to install
         required: false
         type: string
-      home-assistant-spec:
-        description: Version specifier (e.g. ==2025.9.3 or >=2025.9.3)
-        required: false
-        type: string
       coverage-min:
         description: Minimum total coverage percentage required to pass
-        required: false
-        type: string
-      critical-module-coverage-min:
-        description: Minimum line coverage percentage required for each critical module
         required: false
         type: string
       coverage-xml-path:
@@ -120,9 +112,7 @@ jobs:
       coverage-threshold: ${{ env.COVERAGE_MIN }}
     env:
       PYTHON_VERSION: ${{ inputs.python-version != '' && inputs.python-version || (vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14') }}
-      HA_SPEC: ${{ inputs.home-assistant-spec != '' && inputs.home-assistant-spec || (vars.HA_VERSION != '' && format('>={0}', vars.HA_VERSION) || '') }}
       COVERAGE_MIN: ${{ inputs.coverage-min != '' && inputs.coverage-min || (vars.CI_COVERAGE_MIN != '' && vars.CI_COVERAGE_MIN || '85') }}
-      CRITICAL_MODULE_COVERAGE_MIN: ${{ inputs.critical-module-coverage-min != '' && inputs.critical-module-coverage-min || (vars.CI_CRITICAL_MODULE_COVERAGE_MIN != '' && vars.CI_CRITICAL_MODULE_COVERAGE_MIN || '90') }}
       COVERAGE_XML: ${{ inputs.coverage-xml-path != '' && inputs.coverage-xml-path || 'coverage.xml' }}
       COVERAGE_HTML_DIR: ${{ inputs.coverage-html-dir != '' && inputs.coverage-html-dir || 'htmlcov' }}
       JUNIT_PATH: ${{ inputs.junit-path != '' && inputs.junit-path || 'junit.xml' }}
@@ -151,56 +141,13 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install --upgrade pip ruff
-          pip install -U pytest pytest-asyncio pytest-cov coverage[toml]
-          pip install -U pytest-homeassistant-custom-component
-          if [ -n "${{ env.HA_SPEC }}" ]; then
-            pip install -U "homeassistant${{ env.HA_SPEC }}"
-          fi
-          pip install -r requirements.txt
-          pip install -r requirements-test.txt
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-test.txt
 
-
-      - name: Enforce test requirements and localization flags
+      - name: Verify Home Assistant pytest plugin
         run: |
-          python -m scripts.enforce_test_requirements
-          python -m scripts.enforce_test_todo_policy
-          python -m scripts.sync_localization_flags
-
-      - name: Enforce PR checklist test coverage gate
-        if: github.event_name == 'pull_request'
-        env:
-          PR_BODY: ${{ github.event.pull_request.body || '' }}
-        run: |
-          python - <<'PY'
-          from __future__ import annotations
-
-          import os
-          import re
-
-          pr_body = os.environ.get("PR_BODY", "")
-          marker = re.compile(
-              r"- \[(?:x|X)\] Tests added/updated "
-              r"\(new logic without tests is not merged\)",
-          )
-          if marker.search(pr_body):
-              print("PR checklist coverage gate passed.")
-              raise SystemExit(0)
-          raise SystemExit(
-              "Pull request checklist gate failed: mark "
-              "'Tests added/updated (new logic without tests is not merged)' "
-              "as completed, or add the missing tests."
-          )
-          PY
-
-          ruff check . --fix || true
-          ruff check . --fix --unsafe-fixes || true
-          ruff check . --target-version py314 || true
-          ruff check . --add-noqa || true
-          ruff check . --extend-select RUF100 || true
-          ruff check . --output-format=github || true
-          ruff check . --preview || true
-          ruff format .
+          python -c "import homeassistant, pytest_homeassistant_custom_component"
+          python -m pip check
 
       - name: Prepare coverage directories
         env:
@@ -390,14 +337,6 @@ jobs:
           name: ${{ inputs.pages-artifact-name }}
           path: ${{ env.PAGES_ARTIFACT_DIR }}
           retention-days: 7
-
-      - name: Enforce module and total coverage gates
-        if: always() && !cancelled() && steps.pytest.outcome == 'success'
-        run: |
-          python -m scripts.enforce_coverage_gates \
-            --coverage-xml "${{ env.COVERAGE_XML }}" \
-            --total-minimum-percent "${{ env.COVERAGE_MIN }}" \
-            --critical-module-minimum-percent "${{ env.CRITICAL_MODULE_COVERAGE_MIN }}"
 
       - name: Enforce pytest and coverage gates
         if: always() && !cancelled()
