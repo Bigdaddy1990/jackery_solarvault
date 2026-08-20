@@ -71,6 +71,8 @@
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
           "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabh\u00e4ngig davon weiterhin importiert.",
+          "local_mqtt_enable": "Abonniert den lokalen MQTT-Broker der SolarVault f\u00fcr LAN-Telemetrie. Cloud-MQTT pausiert, solange die lokale Verbindung aktiv ist; die Cloud-HTTP-API pollt weiter.",
+          "local_mqtt_host": "IP oder Hostname des lokalen MQTT-Brokers, an den die SolarVault publiziert, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md \u00a75 / \u00a715). Experimentell: Der Cloud-REST-Relay fuer diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
