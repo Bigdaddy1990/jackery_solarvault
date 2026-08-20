@@ -81,19 +81,6 @@ from .client.third_party_mqtt_codec import (
     stable_third_party_mqtt_token,
     third_party_mqtt_config_plaintext,
 )
-
-try:
-    from homeassistant.components import mqtt as ha_mqtt
-    from homeassistant.exceptions import HomeAssistantError
-except ImportError:  # HA core without MQTT
-    import types
-
-    ha_mqtt = types.ModuleType("mqtt")
-    # pragma: no cover
-    import sys
-
-    sys.modules["homeassistant.components.mqtt"] = ha_mqtt
-
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_BIND_SMART_PART,
@@ -209,7 +196,6 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -231,7 +217,6 @@ from .const import (
     DEFAULT_ENABLE_MONTH_STATISTICS,
     DEFAULT_ENABLE_WEEK_STATISTICS,
     DEFAULT_ENABLE_YEAR_STATISTICS,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DIAGNOSTICS_SCHEMA_VERSION,
@@ -472,7 +457,6 @@ from .const import (
     MQTT_SESSION_MAC_ID,
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
-    MQTT_TOPIC_SUFFIXES,
     MQTT_TRANSIENT_BACKOFF_STEPS_SEC,
     NON_BATTERY_SUBDEVICE_TYPES,
     PACK_FIELD_LAST_SEEN_AT,
@@ -3783,7 +3767,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # /v1/device/property. Generic MQTT traffic (CT frames, config echoes,
         # HA recorder events on local MQTT) is tracked for diagnostics only.
         self._last_property_push_monotonic: float = float("-inf")
-        self._local_mqtt_unsubs: list[Callable[[], None]] = []
         # Per-field freshness prevents an older HTTP/Shelly cache snapshot from
         # reversing a newer MQTT/BLE value while also letting genuinely stale
         # push data expire.  Message locks preserve callback arrival order per
@@ -4824,81 +4807,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 err,
             )
             return
-
-    async def async_start_local_mqtt_listener(self) -> None:
-        """Subscribe to the user's HA MQTT broker for local bridge payloads (homeassistant/...)."""
-        if not config_entry_bool_option(
-            self.entry,
-            CONF_LOCAL_MQTT_ENABLE,
-            DEFAULT_LOCAL_MQTT_ENABLE,
-        ):
-            return
-        if hasattr(self, "_local_mqtt_unsubs") and self._local_mqtt_unsubs:
-            return
-
-        if not hasattr(self, "_local_mqtt_unsubs"):
-            self._local_mqtt_unsubs = []
-
-        if not getattr(
-            sys.modules.get("homeassistant.components"), "mqtt", None
-        ):  # pragma: no cover
-            _LOGGER.debug("Jackery local MQTT listener skipped: mqtt not available")
-            return
-
-        topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
-
-        async def _handle_local_mqtt_message(message: Any) -> None:
-            raw_payload = message.payload
-            if isinstance(raw_payload, bytes):
-                raw_payload = raw_payload.decode()
-            if isinstance(raw_payload, str):
-                try:
-                    payload = json.loads(raw_payload)
-                except json.JSONDecodeError as err:
-                    _LOGGER.debug(
-                        "Jackery local MQTT payload on %s not JSON: %s",
-                        message.topic,
-                        err,
-                    )
-                    return
-            else:
-                payload = raw_payload
-            if not isinstance(payload, dict):
-                _LOGGER.debug(
-                    "Jackery local MQTT payload on %s is %s",
-                    message.topic,
-                    type(payload).__name__,
-                )
-                return
-            await self._async_handle_mqtt_message(str(message.topic), payload)
-
-        def _queue_local_mqtt_message(message: Any) -> None:
-            self.hass.async_create_background_task(
-                _handle_local_mqtt_message(message),
-                name=f"{DOMAIN}_local_mqtt_message",
-            )
-
-        try:
-            for topic in topics:
-                unsubscribe = await ha_mqtt.async_subscribe(
-                    self.hass,
-                    topic,
-                    _queue_local_mqtt_message,
-                    qos=0,
-                    encoding="utf-8",
-                )
-                self._local_mqtt_unsubs.append(unsubscribe)
-        except (HomeAssistantError, RuntimeError) as err:
-            for unsub in self._local_mqtt_unsubs:
-                with contextlib.suppress(Exception):
-                    unsub()
-            self._local_mqtt_unsubs.clear()
-            _LOGGER.warning("Jackery local MQTT listener subscribe failed: %s", err)
-            return
-        _LOGGER.info(
-            "Jackery local MQTT listener subscribed to %d topics",
-            len(self._local_mqtt_unsubs),
-        )
 
     async def _async_mqtt_connected(self) -> None:
         """Request a full app-style MQTT snapshot after every broker connect."""

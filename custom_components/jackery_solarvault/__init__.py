@@ -1133,7 +1133,7 @@ async def _async_start_local_mqtt(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """Start an entry-owned aiomqtt subscriber on the user's LAN broker."""
+    """Register an entry-owned subscription on Home Assistant's MQTT client."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
     # ``local_mqtt_enable`` gewinnt, sonst gilt das app-synchronisierte
@@ -1148,38 +1148,10 @@ async def _async_start_local_mqtt(
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
         or LOCAL_MQTT_DEFAULT_TOPIC
     ).strip()
-    # JackeryLocalMqttClient is an aiomqtt client against the user's LAN
-    # broker -- it needs the full connection tuple, not just a topic filter.
-    # The 3047 readback writes exactly these keys via
-    # ``_adopt_device_local_mqtt_config``; the explicit ``local_mqtt_*`` option
-    # wins over the app-synchronised ``third_party_mqtt_*`` copy, mirroring the
-    # opt-in precedence in ``local_mqtt_opt_in``.
-    host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
-    port = config_entry_int_option(
-        entry,
-        CONF_THIRD_PARTY_MQTT_PORT,
-        DEFAULT_THIRD_PARTY_MQTT_PORT,
-    )
-    username = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_USERNAME, "") or None
-    )
-    password = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "") or None
-    )
-    # A broker rejects duplicate client identifiers by disconnecting the older
-    # session, so this must stay unique per config entry.
-    client_id = f"ha-jackery-{entry.entry_id[:8]}"
-    # Without a reachable broker there is nothing to connect to.
-    broker_ready = bool(host) and 1 <= port <= 65535
-    if enabled and not broker_ready:
-        _LOGGER.warning(
-            "Jackery local MQTT is enabled but no usable broker is configured "
-            "(host=%r, port=%r); the local listener stays off until the device "
-            "3047 readback or the options flow supplies one",
-            host,
-            port,
-        )
-    should_run = enabled and broker_ready
+    # Home Assistant owns broker credentials and connection lifecycle. Device
+    # command 3047 remains useful for configuring the Jackery publisher, but it
+    # must never create a second MQTT connection inside this integration.
+    should_run = enabled
     existing_client = _local_mqtt_client(hass, entry)
     if existing_client is not None:
         if coordinator.local_mqtt_client is existing_client:
@@ -1209,7 +1181,7 @@ async def _async_start_local_mqtt(
         topic: str,
         data: dict[str, Any] | None,
         raw_bytes: bytes,
-    ) -> None:
+    ) -> bool:
         """Dispatch a decoded local MQTT candidate to the coordinator.
 
         The device bridge may publish plaintext JSON or an app-framed binary
@@ -1219,11 +1191,9 @@ async def _async_start_local_mqtt(
             topic (str): MQTT topic the message was received on.
             data (dict[str, Any] | None): Parsed JSON object when available.
         """
-        # Forward all messages to the coordinator without transport filtering.
-        # The transport fires the sink through ``_schedule_coroutine`` and
-        # discards whatever it returns, so an accept/reject result would be
-        # silently dropped -- the coordinator owns that decision itself.
-        await coordinator.async_handle_local_mqtt_message(
+        # The coordinator owns semantic validation; its result feeds the
+        # adapter's accepted/rejected diagnostics.
+        return await coordinator.async_handle_local_mqtt_message(
             topic,
             data,
             raw_bytes,
@@ -1231,11 +1201,6 @@ async def _async_start_local_mqtt(
 
     client = JackeryLocalMqttClient(
         hass,
-        host=host,
-        port=port,
-        username=username,
-        password=password,
-        client_id=client_id,
         sink=_handle_local_mqtt_data,
         topic_filter=configured_topic_filter,
     )
@@ -1540,8 +1505,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
         startup_tasks: list[tuple[str, Any]] = [
             ("cloud MQTT", coordinator.async_start_mqtt()),
-            ("local MQTT (HA listener)", coordinator.async_start_local_mqtt_listener()),
-            ("local MQTT (direct)", _start_local_mqtt()),
+            ("local MQTT", _start_local_mqtt()),
             ("BLE transport", coordinator.async_start_ble_transport()),
             ("device MQTT config", _apply_mqtt_config()),
         ]
