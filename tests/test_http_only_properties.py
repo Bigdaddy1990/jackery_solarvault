@@ -29,7 +29,7 @@ async def test_http_system_shadow_fetch_is_transport_independent() -> None:
     get_shadow = AsyncMock(return_value={"soc": 73, "batState": 1})
     coordinator = _coordinator_with_api(async_get_system_shadow=get_shadow)
 
-    result = await coordinator._async_fetch_system_shadow_body(  # ruff: ignore[private-member-access]
+    result = await coordinator._async_fetch_system_shadow_body(
         "device-1",
         parent_sn="SN-1",
         system_id="system-1",
@@ -49,7 +49,7 @@ async def test_http_system_shadow_auth_failure_is_not_downgraded_to_empty() -> N
     coordinator = _coordinator_with_api(async_get_system_shadow=get_shadow)
 
     with pytest.raises(JackeryAuthError, match="token rejected"):
-        await coordinator._async_fetch_system_shadow_body(  # ruff: ignore[private-member-access]
+        await coordinator._async_fetch_system_shadow_body(
             "device-1",
             parent_sn="SN-1",
             system_id="system-1",
@@ -63,7 +63,7 @@ async def test_http_sub_shadow_auth_failure_is_not_downgraded_to_empty() -> None
     coordinator = _coordinator_with_api(async_get_sub_shadow=get_shadow)
 
     with pytest.raises(JackeryAuthError, match="token rejected"):
-        await coordinator._async_fetch_sub_shadow_body(  # ruff: ignore[private-member-access]
+        await coordinator._async_fetch_sub_shadow_body(
             "device-1",
             dev_type=4,
             parent_sn="SN-1",
@@ -77,7 +77,7 @@ async def test_http_optional_shadow_transport_failure_returns_no_replacement() -
     get_shadow = AsyncMock(side_effect=JackeryApiError("temporarily unavailable"))
     coordinator = _coordinator_with_api(async_get_system_shadow=get_shadow)
 
-    result = await coordinator._async_fetch_system_shadow_body(  # ruff: ignore[private-member-access]
+    result = await coordinator._async_fetch_system_shadow_body(
         "device-1",
         parent_sn="SN-1",
         system_id="system-1",
@@ -93,7 +93,7 @@ async def test_http_shadow_cancellation_propagates() -> None:
     coordinator = _coordinator_with_api(async_get_system_shadow=get_shadow)
 
     with pytest.raises(asyncio.CancelledError):
-        await coordinator._async_fetch_system_shadow_body(  # ruff: ignore[private-member-access]
+        await coordinator._async_fetch_system_shadow_body(
             "device-1",
             parent_sn="SN-1",
             system_id="system-1",

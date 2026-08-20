@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault import (
 class TestInitModule:
     """Test __init__.py module functions."""
 
-    def _create_hass(self):  # noqa: PLR6301, RUF105
+    def _create_hass(self):  # noqa: PLR6301
         """Create a mock hass."""
         hass = MagicMock()
         hass.data = {}
@@ -27,7 +27,7 @@ class TestInitModule:
         hass.states = MagicMock()
         return hass
 
-    def _create_config_entry(self, data=None, options=None):  # noqa: PLR6301, RUF105
+    def _create_config_entry(self, data=None, options=None):  # noqa: PLR6301
         """Create a mock config entry."""
         entry = MagicMock()
         entry.entry_id = "test_entry"
@@ -37,7 +37,7 @@ class TestInitModule:
         entry.minor_version = 0
         return entry
 
-    def _create_coordinator(self):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = AsyncMock()
         coordinator.async_setup = AsyncMock()
@@ -88,7 +88,7 @@ class TestInitModule:
         coordinator.battery_pack_observed_serial = MagicMock(return_value=None)
         coordinator.battery_pack_identity_serial = MagicMock(return_value=None)
         coordinator.set_battery_pack_identity_override = MagicMock()
-        coordinator._defer_background_auth_failure = MagicMock()  # noqa: RUF105, SLF001
+        coordinator.defer_background_auth_failure = MagicMock()
         coordinator.mark_mqtt_session_cache_loaded = MagicMock()
         return coordinator
 
@@ -113,7 +113,7 @@ class TestInitModule:
 
         coordinator = self._create_coordinator()
 
-        with patch(  # noqa: PLR1702, RUF105, SIM117
+        with patch(  # noqa: PLR1702, SIM117
             "custom_components.jackery_solarvault.JackerySolarVaultCoordinator",
             return_value=coordinator,
         ):
@@ -173,7 +173,7 @@ class TestInitModule:
         # Set up coordinator in hass.data
         hass.data["jackery_solarvault"] = {config_entry.entry_id: coordinator}
 
-        with patch(  # noqa: PLR1702, RUF105, SIM117
+        with patch(  # noqa: PLR1702, SIM117
             "custom_components.jackery_solarvault._entry_runtime_bucket",
             return_value={},
         ):

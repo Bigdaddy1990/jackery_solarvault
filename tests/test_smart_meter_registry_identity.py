@@ -22,9 +22,7 @@ if TYPE_CHECKING:
 
 _PARENT_ID = "device-1"
 _METER_SN = "SMART-METER-SN-1"
-_migrate_smart_meter_identity = (
-    init_module._async_migrate_smart_meter_identity  # noqa: RUF105, SLF001
-)
+_migrate_smart_meter_identity = init_module._async_migrate_smart_meter_identity
 
 
 def _coordinator(smart_meter: dict[str, Any]) -> JackerySolarVaultCoordinator:

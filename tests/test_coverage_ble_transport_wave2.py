@@ -14,8 +14,8 @@ from custom_components.jackery_solarvault.client import ble
 from custom_components.jackery_solarvault.client.ble_transport import (
     BleFrameObservation,
     JackeryBleListener,
-    _GattSession,  # ruff: ignore[import-private-name]
-    _body_is_complete_json_object,  # ruff: ignore[import-private-name]
+    _GattSession,
+    _body_is_complete_json_object,
 )
 
 
@@ -70,10 +70,10 @@ def _attach_session(
     client: object,
 ) -> _GattSession:
     """Install a current fake GATT session."""
-    return listener._install_session(  # ruff: ignore[private-member-access]
+    return listener._install_session(
         device_id,
         client,
-        listener._next_session_generation(device_id),  # ruff: ignore[private-member-access]
+        listener._next_session_generation(device_id),
     )
 
 
@@ -164,12 +164,12 @@ async def test_async_start_registers_matcher_and_uses_cached_address(
 def test_address_binding_rejects_foreign_and_ambiguous_devices() -> None:
     """One adapter address cannot silently bind to two cached device identities."""
     listener = _listener()
-    listener._configured_device_ids = frozenset({"dev-a", "dev-b"})  # ruff: ignore[private-member-access]
+    listener._configured_device_ids = frozenset({"dev-a", "dev-b"})
 
-    assert listener._bind_device_address("foreign", "AA") is False  # ruff: ignore[private-member-access]
-    assert listener._bind_device_address("dev-a", "  ") is False  # ruff: ignore[private-member-access]
-    assert listener._bind_device_address("dev-a", "AA:BB") is True  # ruff: ignore[private-member-access]
-    assert listener._bind_device_address("dev-b", "aa:bb") is False  # ruff: ignore[private-member-access]
+    assert listener._bind_device_address("foreign", "AA") is False
+    assert listener._bind_device_address("dev-a", "  ") is False
+    assert listener._bind_device_address("dev-a", "AA:BB") is True
+    assert listener._bind_device_address("dev-b", "aa:bb") is False
 
 
 def test_negotiated_mtu_is_owned_by_current_session() -> None:
@@ -185,20 +185,20 @@ def test_negotiated_mtu_is_owned_by_current_session() -> None:
     current = _attach_session(listener, "dev", client)
     stale = _GattSession(generation=0, client=client)
 
-    listener._record_negotiated_mtu(  # ruff: ignore[private-member-access]
+    listener._record_negotiated_mtu(
         "dev",
         cast("Any", client),
         session=stale,
     )
     assert listener.mtu_for_device("dev") == ble.DEFAULT_BLE_MTU
 
-    listener._record_negotiated_mtu(  # ruff: ignore[private-member-access]
+    listener._record_negotiated_mtu(
         "dev",
         cast("Any", client),
         session=current,
     )
     assert listener.mtu_for_device("dev") == 247
-    assert listener._mtu_owners["dev"] is current  # ruff: ignore[private-member-access]
+    assert listener._mtu_owners["dev"] is current
 
 
 @pytest.mark.asyncio
@@ -209,7 +209,7 @@ async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence()
     await asyncio.sleep(0)
     listener = _listener()
 
-    incomplete, sequence = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+    incomplete, sequence = listener._reassemble_frame(
         "dev",
         _frame(index=2, count=2, body=b"world}"),
         notify_sequence=12,
@@ -217,7 +217,7 @@ async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence()
     assert incomplete is None
     assert sequence is None
 
-    assembled, sequence = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+    assembled, sequence = listener._reassemble_frame(
         "dev",
         _frame(index=1, count=2, body=b'{"hello":"'),
         notify_sequence=11,
@@ -234,19 +234,19 @@ async def test_reassembly_drops_conflicting_duplicate_chunk() -> None:
     """A duplicate chunk with different bytes invalidates the assembly."""
     await asyncio.sleep(0)
     listener = _listener()
-    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+    listener._reassemble_frame(
         "dev",
         _frame(index=2, count=2, body=b"first"),
     )
 
     with pytest.raises(ValueError, match="conflicting duplicate BLE chunk"):
-        listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        listener._reassemble_frame(
             "dev",
             _frame(index=2, count=2, body=b"changed"),
         )
 
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1
-    assert listener._frame_assemblies.get("dev") == {}  # ruff: ignore[private-member-access]
+    assert listener._frame_assemblies.get("dev") == {}
 
 
 @pytest.mark.parametrize(
@@ -265,7 +265,7 @@ async def test_reassembly_rejects_impossible_chunk_headers(
     await asyncio.sleep(0)
     listener = _listener()
     with pytest.raises(ValueError):
-        listener._reassemble_frame("dev", frame)  # ruff: ignore[private-member-access]
+        listener._reassemble_frame("dev", frame)
 
 
 @pytest.mark.asyncio
@@ -289,7 +289,7 @@ async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     )
     encrypted = ble.encrypt_binary_notify(plaintext, key, iv=bytes(16))
 
-    await listener._handle_notification(  # ruff: ignore[private-member-access]
+    await listener._handle_notification(
         "dev",
         base64.b64encode(encrypted),
     )
@@ -319,7 +319,7 @@ async def test_notification_without_key_records_decode_failure_and_forwards_raw(
         return True
 
     listener = _listener(key=None, sink=_sink)
-    await listener._handle_notification("dev", b"opaque")  # ruff: ignore[private-member-access]
+    await listener._handle_notification("dev", b"opaque")
 
     assert observations[0].raw_bytes == b"opaque"
     assert observations[0].parsed is None
@@ -350,13 +350,13 @@ async def test_sink_failure_is_recorded_and_successful_frame_clears_it() -> None
         iv=bytes(16),
     )
 
-    await listener._handle_notification("dev", raw)  # ruff: ignore[private-member-access]
+    await listener._handle_notification("dev", raw)
     stats = listener.stats_for("dev")
     assert stats.last_sink_error == "sink failed: merge failed"
     assert stats.last_error == stats.last_sink_error
 
     fail = False
-    await listener._handle_notification("dev", raw)  # ruff: ignore[private-member-access]
+    await listener._handle_notification("dev", raw)
     assert stats.last_sink_error is None
     assert stats.last_error is None
 
@@ -371,7 +371,7 @@ async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> 
     _attach_session(listener, "dev", current_client)
     stale = _GattSession(generation=0, client=stale_client)
 
-    await listener._handle_notification(  # ruff: ignore[private-member-access]
+    await listener._handle_notification(
         "dev",
         b"late",
         session=stale,
@@ -412,7 +412,7 @@ async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> 
             wait_for_ack=True,
         )
 
-    assert "dev" not in listener._pending_acks  # ruff: ignore[private-member-access]
+    assert "dev" not in listener._pending_acks
 
 
 @pytest.mark.asyncio
@@ -421,15 +421,15 @@ async def test_stop_clears_session_owned_state_and_pending_ack() -> None:
     listener = _listener()
     client = SimpleNamespace(is_connected=True)
     session = _attach_session(listener, "dev", client)
-    listener._mtu["dev"] = 247  # ruff: ignore[private-member-access]
-    listener._mtu_owners["dev"] = session  # ruff: ignore[private-member-access]
-    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+    listener._mtu["dev"] = 247
+    listener._mtu_owners["dev"] = session
+    listener._reassemble_frame(
         "dev",
         _frame(index=1, count=2, body=b"partial"),
         session=session,
         notify_sequence=1,
     )
-    pending = listener._register_pending_ack(  # ruff: ignore[private-member-access]
+    pending = listener._register_pending_ack(
         "dev",
         session,
         3022,
@@ -439,8 +439,8 @@ async def test_stop_clears_session_owned_state_and_pending_ack() -> None:
     await listener.async_stop()
 
     assert pending.future.cancelled()
-    assert "dev" not in listener._sessions  # ruff: ignore[private-member-access]
-    assert "dev" not in listener._clients  # ruff: ignore[private-member-access]
-    assert "dev" not in listener._mtu  # ruff: ignore[private-member-access]
-    assert "dev" not in listener._frame_assemblies  # ruff: ignore[private-member-access]
+    assert "dev" not in listener._sessions
+    assert "dev" not in listener._clients
+    assert "dev" not in listener._mtu
+    assert "dev" not in listener._frame_assemblies
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1

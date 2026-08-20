@@ -66,19 +66,19 @@ class _Session:
             raise result
         return result
 
-    def get(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def get(self, url: str, **kwargs: Any) -> _Response:
         """Record one GET."""
         return self._request("GET", url, kwargs)
 
-    def put(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def put(self, url: str, **kwargs: Any) -> _Response:
         """Record one PUT."""
         return self._request("PUT", url, kwargs)
 
-    def post(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def post(self, url: str, **kwargs: Any) -> _Response:
         """Record one POST."""
         return self._request("POST", url, kwargs)
 
-    def delete(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def delete(self, url: str, **kwargs: Any) -> _Response:
         """Record one DELETE."""
         return self._request("DELETE", url, kwargs)
 
@@ -89,7 +89,7 @@ def _api(responses: list[_Response | BaseException] | None = None) -> JackeryApi
     client = JackeryApi(
         cast("aiohttp.ClientSession", session), "owner@example.com", "pw"
     )
-    client._token = "token-1"  # ruff: ignore[private-member-access]
+    client._token = "token-1"
     return client
 
 
@@ -110,7 +110,7 @@ async def test_login_response_rejects_non_ok_statuses(
     response = cast("aiohttp.ClientResponse", _Response(status))
 
     with pytest.raises(expected_error, match=f"Login HTTP {status}"):
-        await JackeryApi._decode_login_response(response)  # ruff: ignore[private-member-access]
+        await JackeryApi._decode_login_response(response)
 
 
 @pytest.mark.asyncio
@@ -125,8 +125,8 @@ async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> No
         ),
     )
 
-    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):  # noqa: RUF105
-        await JackeryApi._decode_login_response(response)  # ruff: ignore[private-member-access]
+    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):
+        await JackeryApi._decode_login_response(response)
 
 
 @pytest.mark.asyncio
@@ -138,14 +138,14 @@ async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> Non
     payload_debug = AsyncMock()
     client.payload_debug_callback = payload_debug
 
-    result = await client._get_json(  # ruff: ignore[private-member-access]
+    result = await client._get_json(
         "/v1/example",
         {"deviceId": "42"},
         request_timeout=3,
     )
 
     assert result[const.FIELD_DATA] == {"v": 1}
-    session = cast("_Session", client._session)  # ruff: ignore[private-member-access]
+    session = cast("_Session", client._session)
     method, url, kwargs = session.calls[0]
     assert method == "GET"
     assert url.endswith("/v1/example")
@@ -171,11 +171,11 @@ async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> Non
         )
     ])
     with pytest.raises(JackeryApiError, match="GET /broken returned invalid JSON"):
-        await invalid._get_json("/broken")  # ruff: ignore[private-member-access]
+        await invalid._get_json("/broken")
 
     timed_out = _api([TimeoutError()])
     with pytest.raises(JackeryApiError, match="GET /slow request failed: TimeoutError"):
-        await timed_out._get_json("/slow")  # ruff: ignore[private-member-access]
+        await timed_out._get_json("/slow")
 
     assert timed_out.diagnostics_snapshot() == {
         "requests_total": 1,
@@ -229,7 +229,7 @@ async def test_non_json_error_response_is_classified_without_decoder_leak() -> N
     ])
 
     with pytest.raises(JackeryApiError, match="GET /upstream HTTP 502"):
-        await client._get_json("/upstream")  # ruff: ignore[private-member-access]
+        await client._get_json("/upstream")
 
 
 def test_mqtt_session_cache_and_credentials_cover_invalid_and_valid_seeds() -> None:

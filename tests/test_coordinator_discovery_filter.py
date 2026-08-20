@@ -35,8 +35,8 @@ def _discovery_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Build a bare coordinator whose discovery boundaries are mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {}  # ruff: ignore[private-member-access]
-    coordinator._pending_discovery_parent_removals = set()  # ruff: ignore[private-member-access]
+    coordinator._device_index = {}
+    coordinator._pending_discovery_parent_removals = set()
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_system_list=AsyncMock(return_value=systems),
         async_list_devices_legacy=AsyncMock(return_value=legacy),
@@ -46,8 +46,8 @@ def _discovery_coordinator(
         last_legacy_device_list_response={FIELD_CODE: 0, FIELD_DATA: legacy},
     )
     mutable = cast("Any", coordinator)
-    mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
-    mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
+    mutable._async_save_discovery_cache = AsyncMock()
+    mutable._schedule_background_once = lambda *_args, **_kwargs: None
     return coordinator
 
 
@@ -90,8 +90,8 @@ async def test_legacy_shelly_is_not_a_property_device() -> None:
 
     await coordinator.async_discover()
 
-    assert "5c013b048e3c" not in coordinator._device_index  # ruff: ignore[private-member-access]
-    assert "portable-1" in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert "5c013b048e3c" not in coordinator._device_index
+    assert "portable-1" in coordinator._device_index
 
 
 @pytest.mark.asyncio
@@ -106,7 +106,7 @@ async def test_legacy_real_portable_still_discovered() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
+    assert list(coordinator._device_index) == ["explorer-9"]
 
 
 @pytest.mark.asyncio
@@ -119,7 +119,7 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     }
     coordinator = _discovery_coordinator(systems=[], legacy=[portable])
     await coordinator.async_discover()
-    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
+    assert list(coordinator._device_index) == ["explorer-9"]
 
     cast("Any", coordinator).api.async_get_system_list = AsyncMock(return_value=[])
     cast("Any", coordinator).api.async_list_devices_legacy = AsyncMock(return_value=[])
@@ -134,4 +134,4 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
+    assert list(coordinator._device_index) == ["explorer-9"]

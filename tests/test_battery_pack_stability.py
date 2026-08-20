@@ -31,7 +31,7 @@ def _read(name: str) -> str:
 
     Returns:
         file_text (str): The file contents decoded as UTF-8.
-    """  # noqa: RUF105
+    """
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
@@ -92,7 +92,7 @@ def test_stale_drop_helper_logic_unit() -> None:
 
         Returns:
             tuple[list[dict], int]: A pair (kept_packs, stale_count) where `kept_packs` is the list of packs retained and `stale_count` is the number of packs considered stale and dropped.
-        """  # noqa: RUF105
+        """
         kept: list[PackRow] = []
         stale = 0
         for pack in packs:
@@ -148,7 +148,7 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
 
         Returns:
             list: The subset of `packs` retained — packs that do not have a string `_last_seen_at`, have an unparsable `_last_seen_at`, or whose parsed `_last_seen_at` is within `threshold_seconds` of `now`.
-        """  # noqa: RUF105
+        """
         kept: list[PackRow] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
@@ -212,7 +212,7 @@ def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     assert "_schedule_battery_pack_ota_enrichment(dev_id)" in update_body, update_body
 
     handler_match = re.search(
-        r"async def _async_handle_mqtt_message\(.*?(?=\n    def _resolve_device_id_from_mqtt)",  # noqa: RUF105
+        r"async def _async_handle_mqtt_message\(.*?(?=\n    def _resolve_device_id_from_mqtt)",
         src,
         re.DOTALL,
     )

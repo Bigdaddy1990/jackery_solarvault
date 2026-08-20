@@ -64,7 +64,7 @@ def _description_switch(
     entity = JackeryDescriptionSwitch.__new__(JackeryDescriptionSwitch)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator({_DEVICE_ID: payload or {}})
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = description
     return entity
 
@@ -81,12 +81,10 @@ def _plug_switch(
     mutable.coordinator = _coordinator(
         {_DEVICE_ID: {PAYLOAD_SMART_PLUGS: [plug]}},
     )
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable._plug_index = 1  # ruff: ignore[private-member-access]
-    mutable._plug_sn = str(  # ruff: ignore[private-member-access]
-        plug.get("deviceSn") or "bound-sn"
-    )
-    mutable._plug_key = "smart_plug_1"  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
+    mutable._plug_index = 1
+    mutable._plug_sn = str(plug.get("deviceSn") or "bound-sn")
+    mutable._plug_key = "smart_plug_1"
     return entity
 
 
@@ -97,9 +95,9 @@ def _breaker_switch(breakers: list[dict[str, Any]]) -> JackeryBreakerSwitch:
     mutable.coordinator = _coordinator(
         {_DEVICE_ID: {PAYLOAD_CIRCUIT_PROPERTY: breakers}},
     )
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable._breaker_index = 1  # ruff: ignore[private-member-access]
-    mutable._breaker_id = "3"  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
+    mutable._breaker_index = 1
+    mutable._breaker_id = "3"
     return entity
 
 
@@ -110,27 +108,27 @@ def test_payload_family_detection_prefers_home_evidence() -> None:
             PAYLOAD_DISCOVERY_SOURCE: DISCOVERY_SOURCE_LEGACY_BIND_LIST,
         }
     }
-    assert switch_mod._is_portable_payload(portable) is True  # ruff: ignore[private-member-access]
+    assert switch_mod._is_portable_payload(portable) is True
     assert (
-        switch_mod._is_portable_payload(  # ruff: ignore[private-member-access]
+        switch_mod._is_portable_payload(
             portable,
             {"swEps": 1},
         )
         is False
     )
     assert (
-        switch_mod._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
-            {PAYLOAD_SYSTEM: {"systemId": "system-1"}}
-        )
+        switch_mod._payload_has_home_payload_evidence({
+            PAYLOAD_SYSTEM: {"systemId": "system-1"}
+        })
         is True
     )
     assert (
-        switch_mod._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
-            {"http_properties": {"batSoc": 50}}
-        )
+        switch_mod._payload_has_home_payload_evidence({
+            "http_properties": {"batSoc": 50}
+        })
         is True
     )
-    assert switch_mod._is_portable_payload({}) is False  # ruff: ignore[private-member-access]
+    assert switch_mod._is_portable_payload({}) is False
 
 
 def test_description_resolves_app_and_transport_sources() -> None:
@@ -138,7 +136,7 @@ def test_description_resolves_app_and_transport_sources() -> None:
     writable = JackerySwitchDescription(
         key="writable",
         source_keys=("field",),
-        setter=switch_mod._set_eps,  # ruff: ignore[private-member-access]
+        setter=switch_mod._set_eps,
     )
     http_only = JackerySwitchDescription(
         key="http_only",
@@ -190,9 +188,7 @@ async def test_third_party_mqtt_helper_encodes_boolean() -> None:
     """The third-party bridge setter encodes HA booleans as app integers."""
     coordinator = _coordinator()
 
-    await switch_mod._set_third_party_mqtt_enabled(  # ruff: ignore[private-member-access]
-        coordinator, _DEVICE_ID, False
-    )
+    await switch_mod._set_third_party_mqtt_enabled(coordinator, _DEVICE_ID, False)
 
     coordinator.async_update_third_party_mqtt_config.assert_awaited_once_with(
         _DEVICE_ID,
@@ -331,15 +327,15 @@ def test_smart_plug_identity_state_and_attributes_fallbacks() -> None:
         "commState": 1,
     }
     entity = _plug_switch(plug)
-    cast("Any", entity)._plug_sn = "plug-dev-sn"  # ruff: ignore[private-member-access]
+    cast("Any", entity)._plug_sn = "plug-dev-sn"
 
     assert entity.is_on is True
-    assert entity._cloud_device_id(plug) == "cloud-id"  # ruff: ignore[private-member-access]
-    assert entity._jackery_device_sn(plug) == "plug-dev-sn"  # ruff: ignore[private-member-access]
-    assert entity._cloud_device_id({"devId": "fallback-id"}) == "fallback-id"  # ruff: ignore[private-member-access]
-    assert entity._cloud_device_id({}) is None  # ruff: ignore[private-member-access]
-    assert entity._jackery_device_sn({"sn": "fallback-sn"}) == "fallback-sn"  # ruff: ignore[private-member-access]
-    assert entity._jackery_device_sn({}) is None  # ruff: ignore[private-member-access]
+    assert entity._cloud_device_id(plug) == "cloud-id"
+    assert entity._jackery_device_sn(plug) == "plug-dev-sn"
+    assert entity._cloud_device_id({"devId": "fallback-id"}) == "fallback-id"
+    assert entity._cloud_device_id({}) is None
+    assert entity._jackery_device_sn({"sn": "fallback-sn"}) == "fallback-sn"
+    assert entity._jackery_device_sn({}) is None
     assert entity.extra_state_attributes == {
         "plug_index": 1,
         "deviceName": "Office",
@@ -456,15 +452,15 @@ async def test_breaker_lookup_state_writes_metadata_and_attributes() -> None:
         "pc": 10,
         "sw": 1,
     }
-    info = entity._build_breaker_device_info(  # ruff: ignore[private-member-access]
+    info = entity._build_breaker_device_info(
         1,
-        entity._breaker,  # ruff: ignore[private-member-access]
+        entity._breaker,
         "breaker_1",
     )
     assert info["name"] == "Jackery device-1 Kitchen"
 
-    cast("Any", entity)._breaker_id = "missing"  # ruff: ignore[private-member-access]
-    assert entity._breaker == {}  # ruff: ignore[private-member-access]
+    cast("Any", entity)._breaker_id = "missing"
+    assert entity._breaker == {}
     assert entity.is_on is None
 
 

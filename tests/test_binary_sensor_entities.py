@@ -44,9 +44,9 @@ def _alarm_sensor_for_dev_type(dev_type: int) -> JackerySubdeviceAlarmBinarySens
         JackerySubdeviceAlarmBinarySensor
     )
     mutable = cast("Any", entity)
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
-    mutable._sub_device_sn = _SUB_DEVICE_SN  # ruff: ignore[private-member-access]
+    mutable._sub_device_sn = _SUB_DEVICE_SN
     mutable.entity_description = SUBDEVICE_ALARM_DESCRIPTIONS[0]
     return entity
 

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _LOCAL_MQTT_RUNTIME_KEY,  # ruff: ignore[import-private-name]
+    _LOCAL_MQTT_RUNTIME_KEY,
     JackeryLocalMqttClient,
     async_unload_entry,
 )

@@ -2,9 +2,7 @@
 
 import pytest
 
-from custom_components.jackery_solarvault.number import (
-    _rounded_int,  # ruff: ignore[import-private-name]
-)
+from custom_components.jackery_solarvault.number import _rounded_int
 from homeassistant.exceptions import HomeAssistantError
 
 
