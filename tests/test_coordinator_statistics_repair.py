@@ -10,6 +10,7 @@ mapping; everything else is real production logic, so nothing internal is
 mocked.
 """
 
+import asyncio
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any, cast
@@ -253,6 +254,52 @@ async def test_startup_sync_completes_only_after_both_queues_are_terminal() -> N
     assert day_backfill.await_args is not None
     assert day_backfill.await_args.kwargs["include_current_year"] is True
     period_backfill.assert_awaited_once_with(snapshot)
+
+
+async def test_backfill_runs_independent_devices_with_one_shared_budget() -> None:
+    """Device queues overlap, while their allocated requests remain bounded."""
+    coordinator = _coordinator()
+    coordinator._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
+    coordinator._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    active = 0
+    peak = 0
+    budgets: list[int] = []
+
+    async def day_backfill(
+        _snapshot: dict[str, dict[str, object]],
+        **kwargs: object,
+    ) -> dict[str, int]:
+        nonlocal active, peak
+        budgets.append(int(kwargs["request_budget"]))
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return {"requests": int(kwargs["request_budget"]), "actionable_sources": 0}
+
+    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
+    coordinator._async_http_backfill_period_statistics = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value={"requests": 0, "actionable_sources": 0},
+    )
+
+    await coordinator._async_advance_statistics_backfill({  # ruff: ignore[private-member-access]
+        "device-a": {},
+        "device-b": {},
+        "device-c": {},
+    })
+
+    assert peak == co._STATISTICS_HTTP_DEVICE_CONCURRENCY  # ruff: ignore[private-member-access]
+    assert sum(budgets) == co._STATISTICS_HTTP_CYCLE_REQUEST_BUDGET  # ruff: ignore[private-member-access]
+
+
+def test_rate_limit_retry_after_header_is_honoured() -> None:
+    """A server Retry-After value overrides the generic busy cooldown."""
+
+    class RateLimitedError(Exception):
+        headers = {"Retry-After": "17"}
+
+    assert co._rate_limit_retry_after_seconds(RateLimitedError()) == 17  # ruff: ignore[private-member-access]
 
 
 # --- app-chart period / name lookups -------------------------------------
