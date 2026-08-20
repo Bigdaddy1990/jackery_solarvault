@@ -1,21 +1,16 @@
 """Diagnostics support for Jackery SolarVault."""
 
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
 
 # _local_mqtt_client moved to coordinator property
 from .const import (
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_USERNAME,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DIAGNOSTICS_SCHEMA_VERSION,
     DOMAIN,
@@ -25,9 +20,9 @@ from .const import (
 from .coordinator import JackerySolarVaultCoordinator
 from .util import (
     active_redact_keys,
-    config_entry_bool_option,
     config_entry_int_option,
     config_entry_str_option,
+    local_mqtt_opt_in,
     redacted_json_safe_payload,
 )
 
@@ -38,6 +33,8 @@ if TYPE_CHECKING:
 
     from . import JackeryConfigEntry
     from .client.local_mqtt import JackeryLocalMqttClient
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _redacted_payload_map(
@@ -243,30 +240,20 @@ def _local_mqtt_diagnostics(
         dict[str, Any]: ``{"enabled": False, "disabled_reason": ...}`` when no local
         MQTT client is available, otherwise the client's diagnostics snapshot.
     """
-    enabled = config_entry_bool_option(
-        entry,
-        CONF_LOCAL_MQTT_ENABLE,
-        DEFAULT_LOCAL_MQTT_ENABLE,
-    )
-    host = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_HOST, "")
-        or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "")
-    ).strip()
+    enabled = local_mqtt_opt_in(entry)
+    host = config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
     port = str(
-        config_entry_int_option(entry, CONF_LOCAL_MQTT_PORT, 0)
-        or config_entry_int_option(
+        config_entry_int_option(
             entry,
             CONF_THIRD_PARTY_MQTT_PORT,
             DEFAULT_THIRD_PARTY_MQTT_PORT,
         )
     ).strip()
-    username = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_USERNAME, "")
-        or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_USERNAME, "")
+    username = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_USERNAME, ""
     ).strip()
-    password = (
-        config_entry_str_option(entry, CONF_LOCAL_MQTT_PASSWORD, "")
-        or config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
+    password = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_PASSWORD, ""
     ).strip()
     diagnostic_host = REDACTED_VALUE if host else ""
     diagnostic_port = REDACTED_VALUE if port else ""

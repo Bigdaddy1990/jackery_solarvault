@@ -1238,7 +1238,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
-    """  # ruff: ignore[missing-blank-line-after-summary]
+    """
 
     class _FakeClient:
         is_connected = True

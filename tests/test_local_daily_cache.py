@@ -128,6 +128,7 @@ def test_refresh_snapshot_archives_latest_delta_on_day_rollover() -> None:
     previous = {
         "day": "2024-05-20",
         "values": {"pvEgy": 1000},
+        "complete_days": ["2024-05-20"],
         "last_deltas": {"pvEgy": 250},
     }
 
@@ -135,13 +136,48 @@ def test_refresh_snapshot_archives_latest_delta_on_day_rollover() -> None:
         previous,
         today=date(2024, 5, 21),
         current_values={"pvEgy": 1300},
+        baseline_covers_full_day=True,
     )
 
     assert result == {
         "day": "2024-05-21",
         "values": {"pvEgy": 1300},
         "completed_days": {"2024-05-20": {"pvEgy": 250}},
+        "complete_days": ["2024-05-20", "2024-05-21"],
     }
+
+
+def test_refresh_snapshot_does_not_archive_partial_cold_start_day() -> None:
+    """A midday anchor cannot become a fabricated complete day at rollover."""
+    partial = cache.refresh_snapshot(
+        None,
+        today=date(2024, 5, 20),
+        current_values={"pvEgy": 1000},
+    )
+    partial = cache.record_latest_deltas(partial, {"pvEgy": 250})
+
+    result = cache.refresh_snapshot(
+        partial,
+        today=date(2024, 5, 21),
+        current_values={"pvEgy": 1300},
+        baseline_covers_full_day=True,
+    )
+
+    assert result == {
+        "day": "2024-05-21",
+        "values": {"pvEgy": 1300},
+        "complete_days": ["2024-05-21"],
+    }
+    assert (
+        cache.period_delta(
+            result,
+            "pvEgy",
+            0,
+            today=date(2024, 5, 21),
+            period="week",
+        )
+        is None
+    )
 
 
 def test_period_delta_requires_every_elapsed_calendar_day() -> None:
@@ -153,6 +189,7 @@ def test_period_delta_requires_every_elapsed_calendar_day() -> None:
             "2024-05-20": {"pvEgy": 100},
             "2024-05-21": {"pvEgy": 200},
         },
+        "complete_days": ["2024-05-20", "2024-05-21"],
     }
 
     assert cache.period_delta(
@@ -170,6 +207,26 @@ def test_period_delta_requires_every_elapsed_calendar_day() -> None:
             "pvEgy",
             300,
             today=date(2024, 5, 22),
+            period="week",
+        )
+        is None
+    )
+
+
+def test_period_delta_rejects_unmarked_legacy_completed_days() -> None:
+    """Legacy history has no proof that its rows cover complete local days."""
+    legacy_snapshot = {
+        "day": "2024-05-21",
+        "values": {"pvEgy": 1300},
+        "completed_days": {"2024-05-20": {"pvEgy": 250}},
+    }
+
+    assert (
+        cache.period_delta(
+            legacy_snapshot,
+            "pvEgy",
+            100,
+            today=date(2024, 5, 21),
             period="week",
         )
         is None
@@ -245,10 +302,10 @@ async def test_async_load_daily_cache_cleans_and_filters(
 
 
 @pytest.mark.asyncio
-async def test_async_load_daily_cache_archives_older_reauth_last_delta(
+async def test_async_load_daily_cache_does_not_archive_unobserved_reauth_delta(
     hass: HomeAssistant,
 ) -> None:
-    """A replacement entry cannot discard the old entry's completed day."""
+    """A reauth row merge cannot pretend that it observed midnight rollover."""
     stored = {
         "entries": {
             "new-entry": {
@@ -270,7 +327,6 @@ async def test_async_load_daily_cache_archives_older_reauth_last_delta(
         "dev-a": {
             "day": "2024-05-21",
             "values": {"pvEgy": 1300},
-            "completed_days": {"2024-05-20": {"pvEgy": 250}},
         },
     }
 
@@ -298,6 +354,7 @@ async def test_async_save_daily_cache_persists_cleaned_snapshots(
             "day": _TODAY_ISO,
             "values": {"pvEgy": 1000, "bad": "x"},
             "completed_days": {"2024-05-19": {"pvEgy": "250", "bad": "x"}},
+            "complete_days": ["2024-05-19", "bad", 7],
             "last_deltas": {"pvEgy": "300", "bad": "x"},
         },
         "dev-b": "not-a-dict",
@@ -311,6 +368,7 @@ async def test_async_save_daily_cache_persists_cleaned_snapshots(
             "day": _TODAY_ISO,
             "values": {"pvEgy": 1000},
             "completed_days": {"2024-05-19": {"pvEgy": 250}},
+            "complete_days": ["2024-05-19"],
             "last_deltas": {"pvEgy": 300},
         },
     }

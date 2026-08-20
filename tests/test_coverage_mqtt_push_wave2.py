@@ -265,7 +265,7 @@ async def test_publish_rejects_session_generation_change_while_waiting(
 
     async def _replace_session(timeout_sec: float) -> None:
         await asyncio.sleep(0)
-        assert timeout_sec == pytest.approx(12.0)
+        assert timeout_sec == pytest.approx(30.0)
         client._session_generation += 1  # ruff: ignore[private-member-access]
 
     monkeypatch.setattr(client, "_async_wait_connected", _replace_session)

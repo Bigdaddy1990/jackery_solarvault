@@ -7,8 +7,8 @@ from typing import Any, cast
 import pytest
 
 from custom_components.jackery_solarvault.const import (
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
+    CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     DOMAIN,
     LOCAL_MQTT_RUNTIME_KEY,
     PAYLOAD_PROPERTIES,
