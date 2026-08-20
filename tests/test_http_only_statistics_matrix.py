@@ -85,15 +85,15 @@ def _stat_sensor(
         ),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._device_id = _DEVICE_ID
     mutable.entity_description = description
-    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
-    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
-    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
-    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
+    mutable._reset_period = description.reset_period
+    mutable._cached_native_value = None
+    mutable._cached_attrs = {}
+    mutable._cached_source_section = description.section
 
-    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
-    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    context = sensor._capture_refresh_context(payload)
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))
     return sensor
 
 
@@ -149,7 +149,7 @@ def test_compact_today_energy_uses_only_positive_documented_fallbacks() -> None:
         PAYLOAD_HOME_TRENDS: {APP_STAT_TOTAL_HOME_ENERGY: "0.75"},
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
         payload,
         today=date(2026, 8, 11),
     )
@@ -227,7 +227,7 @@ def test_compact_today_local_delta_can_beat_lagging_positive_http_value() -> Non
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
         payload,
         today=date(2026, 8, 13),
     )
@@ -285,7 +285,7 @@ def test_compact_today_energy_uses_current_month_home_bucket() -> None:
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
         payload,
         today=today,
     )
@@ -411,9 +411,9 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
-        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
+        assert coordinator._slow_metrics_bg_task is not None
+        await coordinator._slow_metrics_bg_task
 
         for endpoint_name in (
             "async_get_device_pv_stat",
@@ -453,11 +453,11 @@ async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
-        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
+        assert coordinator._slow_metrics_bg_task is not None
+        await coordinator._slow_metrics_bg_task
 
-        result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        result = await coordinator._async_update_data_guarded()
 
         assert result[DEVICE_ID][APP_SECTION_TODAY_ENERGY][
             APP_STAT_TODAY_HOME_LOAD_ENERGY
@@ -477,7 +477,7 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     active_slow_fetches = 0
     max_active_slow_fetches = 0
 
-    async def _hold_slow_fetch(result: Any) -> Any:  # noqa: RUF105
+    async def _hold_slow_fetch(result: Any) -> Any:
         nonlocal active_slow_fetches, max_active_slow_fetches
         active_slow_fetches += 1
         max_active_slow_fetches = max(
@@ -492,8 +492,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
             active_slow_fetches -= 1
         return result
 
-    def _blocking_endpoint(result: Any) -> AsyncMock:  # noqa: RUF105
-        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:  # noqa: RUF105
+    def _blocking_endpoint(result: Any) -> AsyncMock:
+        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:
             return await _hold_slow_fetch(result)
 
         return AsyncMock(side_effect=_fetch)
@@ -513,8 +513,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     slow_refresh_task = None
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-        slow_refresh_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
+        slow_refresh_task = coordinator._slow_metrics_bg_task
         assert slow_refresh_task is not None
 
         await asyncio.wait_for(concurrency_limit_reached.wait(), timeout=1)

@@ -24,7 +24,7 @@ from custom_components.jackery_solarvault.const import (
     REDACT_KEYS,
 )
 from custom_components.jackery_solarvault.diagnostics import (
-    _diagnostic_json_null_free,  # test drives the module-private normalizer  # ruff: ignore[import-private-name]
+    _diagnostic_json_null_free,  # test drives the module-private normalizer
 )
 from custom_components.jackery_solarvault.util import active_redact_keys
 from homeassistant.components.diagnostics import REDACTED, async_redact_data

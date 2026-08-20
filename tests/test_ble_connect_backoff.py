@@ -51,7 +51,7 @@ def test_fresh_backoff_allows_immediate_attempt() -> None:
 
 
 def test_first_failure_blocks_for_initial_window() -> None:
-    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""  # noqa: RUF105
+    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""
     backoff = BleConnectBackoff()
 
     applied = backoff.record_failure(_NOW)
@@ -179,7 +179,7 @@ def _make_listener(
         keep_alive_msg_id=None,
         keep_alive_ble_msg_type=None,
     )
-    listener._device_addresses[_DEVICE_ID] = _ADDRESS  # ruff: ignore[private-member-access]
+    listener._device_addresses[_DEVICE_ID] = _ADDRESS
     return listener
 
 
@@ -214,10 +214,10 @@ async def test_advertisement_callback_owns_runner_during_backoff() -> None:
     hass = _StubHass()
     backoff = BleConnectBackoff()
     listener = _make_listener(hass, backoff)
-    cast("Any", listener)._device_id_from_service_info = lambda _info: _DEVICE_ID  # ruff: ignore[private-member-access]
+    cast("Any", listener)._device_id_from_service_info = lambda _info: _DEVICE_ID
     backoff.record_failure(asyncio.get_running_loop().time())
 
-    listener._on_advertisement(  # ruff: ignore[private-member-access]
+    listener._on_advertisement(
         SimpleNamespace(address=_ADDRESS, source="proxy"),  # type: ignore[arg-type]
         MagicMock(),
     )
@@ -231,16 +231,16 @@ async def test_owned_runner_waits_before_physical_connect_during_backoff() -> No
     backoff = BleConnectBackoff()
     listener = _make_listener(hass, backoff)
     bluetooth = MagicMock()
-    listener._ha_bluetooth = bluetooth  # ruff: ignore[private-member-access]
+    listener._ha_bluetooth = bluetooth
     backoff.record_failure(asyncio.get_running_loop().time())
 
     runner = asyncio.create_task(
-        listener._async_run_connection(_DEVICE_ID, _ADDRESS),  # ruff: ignore[private-member-access]
+        listener._async_run_connection(_DEVICE_ID, _ADDRESS),
     )
     await asyncio.sleep(0)
 
     bluetooth.async_ble_device_from_address.assert_not_called()
-    listener._stop_event.set()  # ruff: ignore[private-member-access]
+    listener._stop_event.set()
     await runner
 
 
@@ -248,10 +248,10 @@ def test_short_session_does_not_reset_connect_backoff() -> None:
     """A bare GATT connect is not success until notify traffic stays stable."""
     listener = _make_listener(_StubHass())
     reset = MagicMock()
-    cast("Any", listener)._connect_backoff_note_success = reset  # ruff: ignore[private-member-access]
+    cast("Any", listener)._connect_backoff_note_success = reset
 
     assert (
-        listener._reset_backoff_after_stable_session(  # ruff: ignore[private-member-access]
+        listener._reset_backoff_after_stable_session(
             _DEVICE_ID,
             started_at=100.0,
             now=159.0,
@@ -260,7 +260,7 @@ def test_short_session_does_not_reset_connect_backoff() -> None:
     )
     reset.assert_not_called()
     assert (
-        listener._reset_backoff_after_stable_session(  # ruff: ignore[private-member-access]
+        listener._reset_backoff_after_stable_session(
             _DEVICE_ID,
             started_at=100.0,
             now=160.0,

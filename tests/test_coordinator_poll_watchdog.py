@@ -94,7 +94,7 @@ async def watchdog_setup(
         await hass.async_block_till_done()
 
     coordinator = entry.runtime_data
-    coordinator._async_update_data = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
+    coordinator._async_update_data = AsyncMock(return_value={})
 
     yield entry
 
@@ -115,7 +115,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
 ) -> None:
     """A silent poll stall triggers a warning and a forced refresh."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _STALL_AGE_SEC  # ruff: ignore[private-member-access]
+    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _STALL_AGE_SEC
 
     with (
         caplog.at_level(
@@ -129,7 +129,7 @@ async def test_watchdog_forces_refresh_after_poll_stall(
         ) as forced_refresh,
     ):
         await _tick_watchdog(hass)
-        coordinator._last_http_cycle_completed_monotonic = time.monotonic()  # ruff: ignore[private-member-access]
+        coordinator._last_http_cycle_completed_monotonic = time.monotonic()
 
     assert any(
         "poll watchdog" in record.getMessage().lower() for record in caplog.records
@@ -144,7 +144,7 @@ async def test_watchdog_stays_silent_while_polling_is_healthy(
 ) -> None:
     """A recent completed refresh must not trigger the watchdog."""
     coordinator = watchdog_setup.runtime_data
-    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _FRESH_AGE_SEC  # ruff: ignore[private-member-access]
+    coordinator._last_http_cycle_completed_monotonic = time.monotonic() - _FRESH_AGE_SEC
 
     with caplog.at_level(
         logging.WARNING,
@@ -166,17 +166,17 @@ async def test_background_slow_metrics_wait_for_scheduled_http_poll(
         JackerySolarVaultCoordinator,
     )
     coordinator.hass = hass
-    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
-    coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]
-    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False
+    coordinator._slow_metrics_bg_task = None
+    coordinator._slow_cache = {}
     coordinator.data = {"device": {"statistic": {"todayGeneration": "1.0"}}}
     mutable = cast("Any", coordinator)
     mutable.async_request_refresh = AsyncMock()
     mutable.async_set_updated_data = MagicMock()
 
-    coordinator._launch_background_slow_refresh(set(), AsyncMock())  # ruff: ignore[private-member-access]
-    assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
-    await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+    coordinator._launch_background_slow_refresh(set(), AsyncMock())
+    assert coordinator._slow_metrics_bg_task is not None
+    await coordinator._slow_metrics_bg_task
 
     mutable.async_set_updated_data.assert_not_called()
     mutable.async_request_refresh.assert_not_awaited()

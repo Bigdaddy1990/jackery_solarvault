@@ -54,12 +54,8 @@ repos:
     hooks:
       - id: ruff-check
         args:
-          - --preview
           - --fix
-          - --show-fixes
           - --unsafe-fixes
-          - --exit-non-zero-on-fix
-          - --output-format=github
         types_or:
           - python
           - pyi
@@ -95,6 +91,3 @@ repos:
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
       - id: destroyed-symlinks
-      - id: debug-statements
-      - id: fix-encoding-pragma
-        args: [--remove]

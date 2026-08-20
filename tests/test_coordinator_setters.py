@@ -22,23 +22,23 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 _DEVICE = "dev-1"
 
 
-def _coordinator(props: dict[str, Any] | None = None) -> Any:  # noqa: RUF105
+def _coordinator(props: dict[str, Any] | None = None) -> Any:
     """Bare coordinator with a mocked command-dispatch seam."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
     shell.data = {_DEVICE: {PAYLOAD_PROPERTIES: dict(props or {})}}
-    shell._shutdown_started = False  # ruff: ignore[private-member-access]
-    shell._property_overrides = {}  # ruff: ignore[private-member-access]
-    shell._live_property_key_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._listeners = {}  # ruff: ignore[private-member-access]
-    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
-    shell._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]
+    shell._shutdown_started = False
+    shell._property_overrides = {}
+    shell._live_property_key_monotonic = {}
+    shell._listeners = {}
+    shell._device_registry_observer = None
+    shell._async_publish_command_ble_first = AsyncMock()
     return shell
 
 
-def _sent_body(coordinator: Any) -> dict[str, Any]:  # noqa: RUF105
+def _sent_body(coordinator: Any) -> dict[str, Any]:
     """Return the body_fields the setter asked the dispatcher to send."""
-    await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
+    await_args = coordinator._async_publish_command_ble_first.await_args
     assert await_args is not None
     return cast("dict[str, Any]", await_args.kwargs["body_fields"])
 
@@ -127,7 +127,7 @@ async def test_set_soc_limits_requires_at_least_one_side() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_set_soc_limits(_DEVICE)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -152,7 +152,7 @@ async def test_set_soc_limits_rejects_out_of_range_charge() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_set_soc_limits(_DEVICE, charge_limit=150)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -183,7 +183,7 @@ async def test_custom_use_battery_requires_a_bound() -> None:
     with pytest.raises(UpdateFailed):
         await coordinator.async_portable_set_custom_use_battery(_DEVICE)
 
-    coordinator._async_publish_command_ble_first.assert_not_awaited()  # ruff: ignore[private-member-access]
+    coordinator._async_publish_command_ble_first.assert_not_awaited()
 
 
 @pytest.mark.asyncio

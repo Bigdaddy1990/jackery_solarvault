@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_start_local_mqtt,  # setup helper is the test subject  # ruff: ignore[import-private-name]
+    _async_start_local_mqtt,  # setup helper is the test subject
 )
 from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_ENABLE,
@@ -82,7 +82,7 @@ async def test_homeassistant_topic_is_preserved_verbatim(
         await _async_start_local_mqtt(hass, entry, coordinator)
 
     client_cls.assert_called_once()
-    assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant"
+    assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant/#"
     coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 

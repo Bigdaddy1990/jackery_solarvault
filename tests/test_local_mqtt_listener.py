@@ -18,9 +18,9 @@ from custom_components.jackery_solarvault.coordinator import (
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for testing without HA setup."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._local_mqtt_unsubs = []  # noqa: RUF105, SLF001
-    coordinator._local_mqtt_client = None  # noqa: RUF105, SLF001
-    coordinator._shutdown_started = False  # noqa: RUF105, SLF001
+    coordinator._local_mqtt_unsubs = []
+    coordinator._local_mqtt_client = None
+    coordinator._shutdown_started = False
     coordinator.hass = MagicMock()
     coordinator.entry = MagicMock()
     coordinator.entry.data = {}
@@ -36,11 +36,11 @@ def test_local_mqtt_listener_disabled_by_default(
     coordinator.entry.options = {CONF_LOCAL_MQTT_ENABLE: False}
 
     # Should return without doing anything
-    import asyncio  # noqa: PLC0415, RUF105
+    import asyncio
 
     asyncio.run(coordinator.async_start_local_mqtt_listener())
 
-    assert coordinator._local_mqtt_unsubs == []  # noqa: RUF105, SLF001
+    assert coordinator._local_mqtt_unsubs == []
 
 
 def test_local_mqtt_listener_enabled_by_default(
@@ -56,12 +56,12 @@ def test_local_mqtt_listener_enabled_by_default(
         sys.modules.get("homeassistant.components", MagicMock()), "mqtt", raising=False
     )  # noqa: E501, RUF100
 
-    import asyncio  # noqa: PLC0415, RUF105
+    import asyncio
 
     asyncio.run(coordinator.async_start_local_mqtt_listener())
 
     # With mqtt not available, should log and return early
-    assert coordinator._local_mqtt_unsubs == []  # noqa: RUF105, SLF001
+    assert coordinator._local_mqtt_unsubs == []
 
 
 def test_local_mqtt_listener_subscribes_to_expected_topics(
@@ -79,7 +79,7 @@ def test_local_mqtt_listener_subscribes_to_expected_topics(
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
@@ -112,12 +112,12 @@ def test_local_mqtt_listener_handles_subscribe_failure(
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
     # Should clear partial subscriptions
-    assert coordinator._local_mqtt_unsubs == []  # noqa: RUF105, SLF001
+    assert coordinator._local_mqtt_unsubs == []
 
 
 def test_local_mqtt_listener_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -133,7 +133,7 @@ def test_local_mqtt_listener_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
         asyncio.run(coordinator.async_start_local_mqtt_listener())
@@ -148,7 +148,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
     """Received messages are forwarded to _async_handle_mqtt_message."""
     coordinator = _bare_coordinator()
     coordinator.entry.options = {CONF_LOCAL_MQTT_ENABLE: True}
-    coordinator._async_handle_mqtt_message = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message = AsyncMock()
 
     mock_ha_mqtt = MagicMock()
     mock_ha_mqtt.async_subscribe = AsyncMock(return_value=MagicMock())
@@ -157,7 +157,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
@@ -165,7 +165,7 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
     subscribe_call = mock_ha_mqtt.async_subscribe.call_args_list[0]
     subscribe_call.kwargs.get("callback") or subscribe_call.args[2]  # 3rd positional
 
-    # Simulate a message - callback is _queue_local_mqtt_message which schedules a background task  # noqa: RUF105
+    # Simulate a message - callback is _queue_local_mqtt_message which schedules a background task
     # We directly call the internal handler _handle_local_mqtt_message to test the logic
     mock_message = MagicMock()
     mock_message.topic = "hb/app/device/test"
@@ -173,9 +173,9 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
 
     # Find the _handle_local_mqtt_message function from the coordinator
     # It's created inside async_start_local_mqtt_listener, so we test the logic directly
-    import asyncio  # noqa: PLC0415, RUF105
+    import asyncio
 
-    from custom_components.jackery_solarvault.coordinator import json  # noqa: RUF105
+    from custom_components.jackery_solarvault.coordinator import json
 
     # Simulate what _handle_local_mqtt_message does
     raw_payload = mock_message.payload
@@ -189,15 +189,15 @@ def test_local_mqtt_listener_message_handler_passes_to_mqtt_handler(
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(
-            coordinator._async_handle_mqtt_message(str(mock_message.topic), payload)  # ruff: ignore[private-member-access]
+            coordinator._async_handle_mqtt_message(str(mock_message.topic), payload)
         )  # noqa: E501, RUF100, SLF001
     finally:
         loop.close()
         asyncio.set_event_loop(None)
 
     # Should forward to _async_handle_mqtt_message
-    coordinator._async_handle_mqtt_message.assert_called_once()  # noqa: RUF105, SLF001
-    args, _ = coordinator._async_handle_mqtt_message.call_args  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message.assert_called_once()
+    args, _ = coordinator._async_handle_mqtt_message.call_args
     assert args[0] == "hb/app/device/test"
     assert args[1] == {"deviceId": "test", "batSoc": 50}
 
@@ -206,7 +206,7 @@ def test_local_mqtt_listener_ignores_non_json(monkeypatch: pytest.MonkeyPatch) -
     """Non-JSON payloads are ignored silently."""
     coordinator = _bare_coordinator()
     coordinator.entry.options = {CONF_LOCAL_MQTT_ENABLE: True}
-    coordinator._async_handle_mqtt_message = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message = AsyncMock()
 
     mock_ha_mqtt = MagicMock()
     mock_ha_mqtt.async_subscribe = AsyncMock(return_value=MagicMock())
@@ -215,15 +215,15 @@ def test_local_mqtt_listener_ignores_non_json(monkeypatch: pytest.MonkeyPatch) -
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
-    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: RUF105
+    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message
     # We test _handle_local_mqtt_message directly (the logic that filters non-JSON)
-    import asyncio  # noqa: PLC0415, RUF105
+    import asyncio
 
-    from custom_components.jackery_solarvault.coordinator import json  # noqa: RUF105
+    from custom_components.jackery_solarvault.coordinator import json
 
     # Simulate non-JSON payload - _handle_local_mqtt_message catches JSONDecodeError
     mock_message = MagicMock()
@@ -242,7 +242,7 @@ def test_local_mqtt_listener_ignores_non_json(monkeypatch: pytest.MonkeyPatch) -
         pass  # Ignored silently - this is what the handler does
 
     # Should not call _async_handle_mqtt_message for non-JSON
-    coordinator._async_handle_mqtt_message.assert_not_called()  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message.assert_not_called()
 
 
 def test_local_mqtt_listener_ignores_non_dict_payload(
@@ -251,7 +251,7 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
     """JSON arrays/primitives are ignored."""
     coordinator = _bare_coordinator()
     coordinator.entry.options = {CONF_LOCAL_MQTT_ENABLE: True}
-    coordinator._async_handle_mqtt_message = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message = AsyncMock()
 
     mock_ha_mqtt = MagicMock()
     mock_ha_mqtt.async_subscribe = AsyncMock(return_value=MagicMock())
@@ -260,17 +260,17 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
     with patch(
         "custom_components.jackery_solarvault.coordinator.ha_mqtt", mock_ha_mqtt
     ):  # noqa: E501, RUF100
-        import asyncio  # noqa: PLC0415, RUF105
+        import asyncio
 
         asyncio.run(coordinator.async_start_local_mqtt_listener())
 
-    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message  # noqa: RUF105
-    # We test _handle_local_mqtt_message logic directly (the logic that filters non-dict JSON)  # noqa: RUF105
-    import asyncio  # noqa: PLC0415, RUF105
+    # The callback is _queue_local_mqtt_message which schedules _handle_local_mqtt_message
+    # We test _handle_local_mqtt_message logic directly (the logic that filters non-dict JSON)
+    import asyncio
 
-    from custom_components.jackery_solarvault.coordinator import json  # noqa: RUF105
+    from custom_components.jackery_solarvault.coordinator import json
 
-    # Simulate JSON array payload - _handle_local_mqtt_message checks isinstance(payload, dict)  # noqa: RUF105
+    # Simulate JSON array payload - _handle_local_mqtt_message checks isinstance(payload, dict)
     mock_message = MagicMock()
     mock_message.topic = "hb/app/device/test"
     mock_message.payload = b'["not", "a", "dict"]'
@@ -279,7 +279,7 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
     raw_payload = mock_message.payload
     if isinstance(raw_payload, bytes):
         raw_payload = raw_payload.decode()
-    try:  # noqa: PLW0717, RUF105
+    try:  # noqa: PLW0717
         if isinstance(raw_payload, str):
             payload = json.loads(raw_payload)
         # Check if it's a dict - if not, ignore silently
@@ -291,7 +291,7 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
             asyncio.set_event_loop(loop)
             try:
                 loop.run_until_complete(
-                    coordinator._async_handle_mqtt_message(  # ruff: ignore[private-member-access]
+                    coordinator._async_handle_mqtt_message(
                         str(mock_message.topic), payload
                     )
                 )  # noqa: E501, RUF100, SLF001
@@ -302,4 +302,4 @@ def test_local_mqtt_listener_ignores_non_dict_payload(
         pass  # Ignored silently
 
     # Should not call _async_handle_mqtt_message for non-dict JSON
-    coordinator._async_handle_mqtt_message.assert_not_called()  # noqa: RUF105, SLF001
+    coordinator._async_handle_mqtt_message.assert_not_called()
