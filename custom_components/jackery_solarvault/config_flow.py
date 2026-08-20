@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
+from homeassistant.components.mqtt.util import valid_subscribe_topic
 from homeassistant.config_entries import ConfigFlow, OptionsFlow, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -32,6 +33,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -45,6 +47,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
@@ -322,6 +325,11 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
                 default=None,
             ),
         ),
+        CONF_THIRD_PARTY_MQTT_QOS: int(
+            _first_entry_value(
+                CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS
+            )
+        ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             _first_entry_value(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -412,6 +420,12 @@ def _merge_local_mqtt_options(
                     current[CONF_THIRD_PARTY_MQTT_PORT],
                 ),
             ),
+        ),
+        CONF_THIRD_PARTY_MQTT_QOS: int(
+            user_input.get(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                current[CONF_THIRD_PARTY_MQTT_QOS],
+            )
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
@@ -601,6 +615,10 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.In((0, 1, 2)),
+            vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
@@ -620,7 +638,7 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
+            ): vol.All(str, valid_subscribe_topic),
         })
         return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
 
@@ -949,6 +967,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.In((0, 1, 2)),
+            vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
@@ -966,7 +988,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): str,
+            ): vol.All(str, valid_subscribe_topic),
         })
         return self.async_show_form(
             step_id=FLOW_STEP_RECONFIGURE_CREDENTIALS,

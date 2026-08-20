@@ -11,9 +11,10 @@ import contextlib
 from datetime import UTC, datetime
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from homeassistant.components import mqtt
+from homeassistant.components.mqtt.util import valid_subscribe_topic
 
 from ..const import (
     DOMAIN,
@@ -31,7 +32,8 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-LOCAL_MQTT_DEFAULT_TOPIC = "homeassistant"
+LOCAL_MQTT_DEFAULT_TOPIC = "homeassistant/#"
+MqttQos = Literal[0, 1, 2]
 LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[bool | None]]
 
 
@@ -44,11 +46,16 @@ class JackeryLocalMqttClient:
         *,
         sink: LocalMqttSink | None = None,
         topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
+        qos: MqttQos = 0,
     ) -> None:
         """Initialize an adapter without opening a network connection."""
         self._hass = hass
         self._sink = sink
         self._topic_filter = topic_filter
+        if qos not in {0, 1, 2}:
+            raise ValueError("MQTT QoS must be 0, 1, or 2")
+        self._qos = qos
+        self._lifecycle_lock = asyncio.Lock()
         self._unsubscribe: Callable[[], None] | None = None
         self._unsubscribe_status: Callable[[], None] | None = None
         self._retry_task: asyncio.Task[None] | None = None
@@ -62,6 +69,7 @@ class JackeryLocalMqttClient:
         self._messages_rejected_by_sink = 0
         self._sink_errors = 0
         self._payload_too_large_count = 0
+        self._retained_messages_dropped = 0
         self._topics_seen: list[str] = []
         self._topics_seen_set: set[str] = set()
         self._topics_seen_truncated = False
@@ -75,17 +83,18 @@ class JackeryLocalMqttClient:
 
     async def async_start(self) -> None:
         """Register the subscription, retrying transient MQTT startup gaps."""
-        self._stopping = False
-        if self._unsubscribe is not None or (
-            self._retry_task is not None and not self._retry_task.done()
-        ):
-            return
-        if not await self._async_subscribe_once():
-            self._retry_task = self._hass.async_create_background_task(
-                self._async_retry_subscription(),
-                name="jackery_local_mqtt_subscription_retry",
-                eager_start=False,
-            )
+        async with self._lifecycle_lock:
+            self._stopping = False
+            if self._unsubscribe is not None or (
+                self._retry_task is not None and not self._retry_task.done()
+            ):
+                return
+            if not await self._async_subscribe_once():
+                self._retry_task = self._hass.async_create_background_task(
+                    self._async_retry_subscription(),
+                    name="jackery_local_mqtt_subscription_retry",
+                    eager_start=False,
+                )
 
     async def async_stop(self) -> None:
         """Remove subscriptions and quiesce callbacks during entry unload."""
@@ -102,7 +111,8 @@ class JackeryLocalMqttClient:
         if self._unsubscribe_status is not None:
             self._unsubscribe_status()
             self._unsubscribe_status = None
-        tasks = tuple(self._message_tasks)
+        current_task = asyncio.current_task()
+        tasks = tuple(task for task in self._message_tasks if task is not current_task)
         for task in tasks:
             task.cancel()
         if tasks:
@@ -112,31 +122,47 @@ class JackeryLocalMqttClient:
     async def _async_subscribe_once(self) -> bool:
         """Attempt one HA MQTT subscription registration."""
         self._connect_attempts += 1
+        try:
+            valid_subscribe_topic(self._topic_filter)
+        except ValueError as err:
+            self._last_error = f"Invalid MQTT topic filter: {err}"
+            _LOGGER.error("Invalid local Jackery MQTT topic filter: %s", err)
+            return False
         self._mqtt_integration_available = await mqtt.async_wait_for_mqtt_client(
             self._hass
         )
         if not self._mqtt_integration_available:
             self._last_error = "Home Assistant MQTT client unavailable"
             return False
-        unsubscribe_status = mqtt.async_subscribe_connection_status(
-            self._hass, self._async_connection_status_changed
-        )
+        unsubscribe_status: Callable[[], None] | None = None
+        unsubscribe: Callable[[], None] | None = None
         try:
+            unsubscribe_status = mqtt.async_subscribe_connection_status(
+                self._hass, self._async_connection_status_changed
+            )
             unsubscribe = await mqtt.async_subscribe(
                 self._hass,
                 self._topic_filter,
                 self._async_message_received,
-                qos=0,
+                qos=self._qos,
                 encoding=None,
             )
         except asyncio.CancelledError:
-            unsubscribe_status()
+            if unsubscribe is not None:
+                unsubscribe()
+            if unsubscribe_status is not None:
+                unsubscribe_status()
             raise
         except Exception as err:  # ruff: ignore[blind-except]
-            unsubscribe_status()
+            if unsubscribe is not None:
+                unsubscribe()
+            if unsubscribe_status is not None:
+                unsubscribe_status()
             self._last_error = f"{type(err).__name__}: {err}"
             _LOGGER.warning("Unable to subscribe to local Jackery MQTT: %s", err)
             return False
+        assert unsubscribe is not None
+        assert unsubscribe_status is not None
         if self._stopping:
             unsubscribe()
             unsubscribe_status()
@@ -188,6 +214,12 @@ class JackeryLocalMqttClient:
         if task is not None:
             self._message_tasks.add(task)
         try:
+            if message.retain:
+                # Jackery publishes live telemetry with retain=False. Replayed
+                # retained frames are stale broker state and must not update devices.
+                self._retained_messages_dropped += 1
+                self._messages_dropped += 1
+                return
             await self._handle_message(str(message.topic), message.payload)
         finally:
             if task is not None:
@@ -263,6 +295,8 @@ class JackeryLocalMqttClient:
             "started": self.is_started,
             "subscription_retry_active": self._retry_task is not None,
             "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
+            "qos": self._qos,
+            "retained_messages_dropped": self._retained_messages_dropped,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,
@@ -284,9 +318,13 @@ class JackeryLocalMqttClient:
             "messages_oversized": self._payload_too_large_count,
         }
 
-    def matches_configuration(self, topic_filters: tuple[str, ...]) -> bool:
+    def matches_configuration(
+        self, topic_filters: tuple[str, ...], qos: MqttQos | None = None
+    ) -> bool:
         """Whether the adapter already owns exactly this subscription."""
-        return topic_filters == (self._topic_filter,)
+        return topic_filters == (self._topic_filter,) and (
+            qos is None or qos == self._qos
+        )
 
     @property
     def is_connected(self) -> bool:
