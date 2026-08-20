@@ -25,6 +25,7 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
+from ..credentials import redacted_error
 
 if TYPE_CHECKING:
     from homeassistant.components.mqtt.models import ReceiveMessage
