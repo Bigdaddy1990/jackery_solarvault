@@ -1,6 +1,5 @@
 """Run the Home Assistant test harness with predictable coverage behavior."""
 
-from __future__ import annotations
 
 import sys
 

@@ -1,6 +1,5 @@
 """Run deterministic local repository gates."""
 
-from __future__ import annotations
 
 from subprocess import run
 from typing import Final

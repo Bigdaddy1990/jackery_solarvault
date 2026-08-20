@@ -1,6 +1,5 @@
 """Small offline manifest validator used when the official action is unavailable."""
 
-from __future__ import annotations
 
 import argparse
 import json

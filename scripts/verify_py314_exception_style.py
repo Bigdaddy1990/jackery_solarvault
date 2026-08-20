@@ -1,6 +1,5 @@
 """Verify Python 3.14 multi-exception handler syntax."""
 
-from __future__ import annotations
 
 import ast
 from pathlib import Path
