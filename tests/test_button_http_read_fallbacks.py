@@ -55,7 +55,7 @@ _LIVE_PACK_SOC = 80
 _SYSTEM_ENERGY_PLAN_POWER = 725
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     """Return one query-button description by key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -70,29 +70,29 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     shell.api.async_get_system_shadow = AsyncMock(return_value={})
     shell.api.async_get_battery_pack_list = AsyncMock(return_value=[])
     shell.api.async_get_sub_shadow = AsyncMock(return_value={})
-    shell._shutdown_started = False  # ruff: ignore[private-member-access]
-    shell._listeners = {}  # ruff: ignore[private-member-access]
-    shell._property_overrides = {}  # ruff: ignore[private-member-access]
-    shell._property_source_state = {}  # ruff: ignore[private-member-access]
-    shell._accessory_source_state = {}  # ruff: ignore[private-member-access]
-    shell._live_property_received_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._live_ct_received_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._last_http_device_refresh_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
-    shell._system_info_cache = {}  # ruff: ignore[private-member-access]
-    shell._system_info_cache_monotonic = {}  # ruff: ignore[private-member-access]
-    shell._pending_device_removals = []  # ruff: ignore[private-member-access]
-    shell._device_index = {}  # ruff: ignore[private-member-access]
-    shell._device_registry_observer = None  # ruff: ignore[private-member-access]
+    shell._shutdown_started = False
+    shell._listeners = {}
+    shell._property_overrides = {}
+    shell._property_source_state = {}
+    shell._accessory_source_state = {}
+    shell._live_property_received_monotonic = {}
+    shell._live_ct_received_monotonic = {}
+    shell._last_http_device_refresh_monotonic = {}
+    shell._configured_update_interval = timedelta(seconds=15)
+    shell._system_info_cache = {}
+    shell._system_info_cache_monotonic = {}
+    shell._pending_device_removals = []
+    shell._device_index = {}
+    shell._device_registry_observer = None
     return coordinator
 
 
-def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
+def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:
     """Return the API test double behind the coordinator's typed boundary."""
     return cast("Any", coordinator.api)
 
 
-def _button(coordinator: Any, key: str) -> JackeryQueryButton:  # noqa: RUF105
+def _button(coordinator: Any, key: str) -> JackeryQueryButton:
     """Create a query button against a lightweight coordinator double."""
     coordinator.data = {_DEVICE_ID: {}}
     coordinator.last_update_success = True
@@ -179,13 +179,13 @@ async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
         FIELD_PLUGS: [{FIELD_DEVICE_SN: plug_sn, "sysSwitch": 0}],
     }
     coordinator_mock = cast("Any", coordinator)
-    coordinator_mock._async_publish_command_ble_first = AsyncMock(  # ruff: ignore[private-member-access]
+    coordinator_mock._async_publish_command_ble_first = AsyncMock(
         side_effect=HomeAssistantError("push unavailable"),
     )
-    coordinator_mock._merge_subdevice_data = MagicMock(  # ruff: ignore[private-member-access]
+    coordinator_mock._merge_subdevice_data = MagicMock(
         return_value=False,
     )
-    coordinator_mock._push_partial_update = MagicMock()  # ruff: ignore[private-member-access]
+    coordinator_mock._push_partial_update = MagicMock()
     button = JackeryQueryButton(
         coordinator,
         _DEVICE_ID,
@@ -195,7 +195,7 @@ async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
     await button.async_press()
 
     assert coordinator.data[_DEVICE_ID][PAYLOAD_SMART_PLUGS] == [live_plug]
-    coordinator_mock._push_partial_update.assert_not_called()  # ruff: ignore[private-member-access]
+    coordinator_mock._push_partial_update.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -245,7 +245,7 @@ async def test_device_property_http_read_preserves_fresh_live_value() -> None:
         **entry,
         PAYLOAD_PROPERTIES: {"pvPw": _NEWER_LIVE_PV_POWER},
     }
-    coordinator._property_source_state = {  # ruff: ignore[private-member-access]
+    coordinator._property_source_state = {
         _DEVICE_ID: {
             "pvPw": FieldProvenance(
                 source=TransportSource.LOCAL_MQTT,
@@ -310,7 +310,7 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
     }
     coordinator = _bare_coordinator(entry)
     api = _mock_api(coordinator)
-    coordinator._accessory_source_state = {  # ruff: ignore[private-member-access]
+    coordinator._accessory_source_state = {
         (_DEVICE_ID, PAYLOAD_BATTERY_PACKS, pack_sn): {
             FIELD_BAT_SOC: FieldProvenance(
                 source=TransportSource.BLE,

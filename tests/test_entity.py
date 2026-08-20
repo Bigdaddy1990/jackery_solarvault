@@ -44,12 +44,12 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
 
     Returns:
         JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
-    """  # noqa: RUF105
+    """
     coordinator = cast("Any", SimpleNamespace(data={"dev1": payload}))
     return JackeryEntity(coordinator, "dev1", "test")
 
 
-def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # noqa: RUF105
+def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     """Create and initialize an instance of the given sensor class for tests using the provided device payload.
 
     Parameters:
@@ -58,7 +58,7 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # noqa: 
 
     Returns:
         Any: An instance of `cls` initialized with the given payload.
-    """  # noqa: RUF105
+    """
     entity = cast("Any", cls).__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
         entity,
@@ -99,7 +99,7 @@ def test_smart_plug_device_info_ignores_blank_metadata_fields() -> None:
         PAYLOAD_PROPERTIES: {FIELD_WNAME: " Main Name "},
     })
 
-    info = entity._build_smart_plug_device_info(  # ruff: ignore[private-member-access]
+    info = entity._build_smart_plug_device_info(
         2,
         {
             FIELD_DEVICE_NAME: " ",
@@ -139,11 +139,11 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._pack_index = 1  # ruff: ignore[private-member-access]
+    entity._pack_index = 1
     # Anonymous pack (no registry-pinned serial): device_info falls back to
     # the payload serial fields.
-    entity._pack_sn = None  # ruff: ignore[private-member-access]
-    entity._pack_key = "battery_pack_1"  # ruff: ignore[private-member-access]
+    entity._pack_sn = None
+    entity._pack_key = "battery_pack_1"
 
     info = entity.device_info
 
@@ -174,7 +174,7 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
             ],
         },
     )
-    entity._meter_head_index = 1  # ruff: ignore[private-member-access]
+    entity._meter_head_index = 1
 
     info = entity.device_info
 

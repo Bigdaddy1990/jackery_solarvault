@@ -113,7 +113,7 @@ async def test_unavailable_ha_mqtt_subscription_retries_until_available(
     client = JackeryLocalMqttClient(hass, topic_filter="homeassistant")
 
     await client.async_start()
-    retry_task = client._retry_task  # ruff: ignore[private-member-access]
+    retry_task = client._retry_task
     assert retry_task is not None
     await retry_task
 
@@ -177,7 +177,7 @@ async def test_stop_cancels_inflight_message_sink(hass: HomeAssistant) -> None:
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="homeassistant")
     message_task = asyncio.create_task(
-        client._async_message_received(  # ruff: ignore[private-member-access]
+        client._async_message_received(
             MagicMock(topic="homeassistant/device", payload=b"{}"),
         )
     )
@@ -206,12 +206,12 @@ async def test_broker_selected_payloads_reach_sink_without_content_filtering(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="#")
-    await client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(
         "homeassistant/device",
         b'{"batSoc":80}',
     )
     for index in range(_OPAQUE_FRAME_COUNT):
-        await client._handle_message(  # ruff: ignore[private-member-access]
+        await client._handle_message(
             "jackery/device",
             b"\xff" + bytes([index]),
         )
@@ -228,8 +228,8 @@ def test_connection_status_is_observational_only(hass: HomeAssistant) -> None:
     """Shared broker transitions change diagnostics, never other layers."""
     client = JackeryLocalMqttClient(hass, topic_filter="homeassistant")
 
-    client._async_connection_status_changed(True)  # ruff: ignore[private-member-access]
+    client._async_connection_status_changed(True)
     assert client.is_connected
-    client._async_connection_status_changed(False)  # ruff: ignore[private-member-access]
+    client._async_connection_status_changed(False)
     assert not client.is_connected
     assert client.diagnostics_snapshot()["last_disconnect_at"] is not None

@@ -35,7 +35,7 @@ async def _setup_entry(
     http_data: dict | None = None,
 ) -> None:
     """Helper to set up a config entry with patched I/O."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001, PLC0415, RUF105
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -96,7 +96,7 @@ async def test_integration_setup_creates_expected_entities(
     assert coordinator is not None
 
     # Verify entities are registered in entity registry
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF105
+    from homeassistant.helpers import entity_registry as er
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -137,7 +137,7 @@ async def test_coordinator_poll_updates_entity_states(
     mock_jackery_login: None,
 ) -> None:
     """Coordinator polling must update entity states correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001, PLC0415, RUF105
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -192,7 +192,7 @@ async def test_coordinator_poll_updates_entity_states(
         assert coordinator is not None
 
     # Get the battery state sensor entity ID
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF105
+    from homeassistant.helpers import entity_registry as er
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -220,7 +220,7 @@ async def test_integration_unload_removes_entities(
     entry = await _setup_entry(hass, mock_jackery_login)
 
     # Verify entities exist before unload
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF105
+    from homeassistant.helpers import entity_registry as er
 
     ent_reg = er.async_get(hass)
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -244,7 +244,7 @@ async def test_reload_integration_preserves_entities(
     """Reloading integration must preserve entities."""
     entry = await _setup_entry(hass, mock_jackery_login)
 
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF105
+    from homeassistant.helpers import entity_registry as er
 
     ent_reg = er.async_get(hass)
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -285,7 +285,7 @@ async def test_integration_with_multiple_devices(
 
     entry = await _setup_entry(hass, mock_jackery_login, http_data=multi_device_data)
 
-    from homeassistant.helpers import entity_registry as er  # noqa: PLC0415, RUF105
+    from homeassistant.helpers import entity_registry as er
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -306,7 +306,7 @@ async def test_integration_config_flow_reauth_updates_runtime(
     mock_jackery_login: None,
 ) -> None:
     """Reauth flow must update runtime data correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001, PLC0415, RUF105
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
 
     entry = MockConfigEntry(
         domain=DOMAIN,

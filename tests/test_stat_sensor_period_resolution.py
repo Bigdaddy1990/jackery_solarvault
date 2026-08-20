@@ -17,7 +17,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.sensor import (
     JackeryStatSensor,
     JackeryStatSensorDescription,
-    _StatRefreshContext,  # ruff: ignore[import-private-name]
+    _StatRefreshContext,
 )
 from custom_components.jackery_solarvault.util import safe_float
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
@@ -53,7 +53,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
     )
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     sensor.entity_description = description
-    sensor._reset_period = DATE_TYPE_YEAR  # ruff: ignore[private-member-access]
+    sensor._reset_period = DATE_TYPE_YEAR
     context = _StatRefreshContext(
         payload=payload,
         local_now=datetime(2026, 8, 13, 22, 41, tzinfo=UTC),
@@ -62,7 +62,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
         local_period_raw=None,
     )
 
-    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})
 
     assert snapshot.native_value == pytest.approx(954.98)
     assert snapshot.attrs["server_total"] == pytest.approx(954.98)

@@ -35,8 +35,8 @@ class TestApp241Endpoints:
     """Contract tests for App 2.4.1 exact endpoint paths."""
 
     @pytest.mark.asyncio
-    async def test_app_241_uses_exact_pv_trends_endpoint(self) -> None:  # noqa: PLR6301, RUF105
-        """PV trends MUST use /v1/device/stat/sys/pv/trends (not sys/.../trends variants)."""  # noqa: RUF105
+    async def test_app_241_uses_exact_pv_trends_endpoint(self) -> None:  # noqa: PLR6301
+        """PV trends MUST use /v1/device/stat/sys/pv/trends (not sys/.../trends variants)."""
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"x": ["00:00"], "y": [100]}})
 
@@ -58,7 +58,7 @@ class TestApp241Endpoints:
         )
 
     @pytest.mark.asyncio
-    async def test_app_241_uses_exact_dynamic_price_endpoint(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_app_241_uses_exact_dynamic_price_endpoint(self) -> None:  # noqa: PLR6301
         """Dynamic price MUST use /v1/device/dynamic/v2/dynamicPrice (v2 path)."""
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"price": 0.35}})
@@ -75,8 +75,8 @@ class TestApp241Endpoints:
         )
 
     @pytest.mark.asyncio
-    async def test_app_241_portable_ct_stat_requires_type_param(self) -> None:  # noqa: PLR6301, RUF105
-        """Portable CT stat MUST send APP_REQUEST_STAT_TYPE parameter (type=0 for L1)."""  # noqa: RUF105
+    async def test_app_241_portable_ct_stat_requires_type_param(self) -> None:  # noqa: PLR6301
+        """Portable CT stat MUST send APP_REQUEST_STAT_TYPE parameter (type=0 for L1)."""
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"l1": 1.5, "l2": 2.0}})
 
@@ -96,8 +96,8 @@ class TestApp241Endpoints:
         )
 
     @pytest.mark.asyncio
-    async def test_no_aiems_energy_prediction_request_in_production_path(self) -> None:  # noqa: PLR6301, RUF105
-        """No request to unproven AIEMS endpoint (/api/aiems/report/energy/prediction)."""  # noqa: RUF105
+    async def test_no_aiems_energy_prediction_request_in_production_path(self) -> None:  # noqa: PLR6301
+        """No request to unproven AIEMS endpoint (/api/aiems/report/energy/prediction)."""
         api = _make_api()
 
         # Verify the AIEMS path is NOT in the API client's endpoint constants
@@ -118,13 +118,13 @@ class TestApp241Endpoints:
                 for const_val in source:
                     if isinstance(const_val, str) and "aiems" in const_val.lower():
                         pytest.fail(
-                            f"Method {method_name} contains unproven AIEMS path: {const_val}. "  # noqa: RUF105
-                            f"App 2.4.1 does not use /api/aiems/report/energy/prediction "  # noqa: RUF105
-                            f"in the production polling surface. Remove any AIEMS request."  # noqa: RUF105
+                            f"Method {method_name} contains unproven AIEMS path: {const_val}. "
+                            f"App 2.4.1 does not use /api/aiems/report/energy/prediction "
+                            f"in the production polling surface. Remove any AIEMS request."
                         )
 
     @pytest.mark.asyncio
-    async def test_pv_trends_returns_request_meta_for_diagnostics(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_pv_trends_returns_request_meta_for_diagnostics(self) -> None:  # noqa: PLR6301
         """PV trends response MUST include APP_REQUEST_META with request parameters."""
         api = _make_api()
         mock_payload = {"x": ["00:00"], "y": [100], "y1": [50], "y2": [50]}
@@ -141,7 +141,7 @@ class TestApp241Endpoints:
         # The returned payload must include request metadata
         assert APP_REQUEST_META in result, (
             "PV trends response must include APP_REQUEST_META for diagnostics. "
-            "The api.py implementation adds request_meta_payload to the returned payload."  # noqa: RUF105
+            "The api.py implementation adds request_meta_payload to the returned payload."
         )
         meta = result[APP_REQUEST_META]
         assert meta[APP_REQUEST_DATE_TYPE] == "day"
@@ -150,7 +150,7 @@ class TestApp241Endpoints:
         assert FIELD_SYSTEM_ID not in meta  # system_id excluded from meta
 
     @pytest.mark.asyncio
-    async def test_dynamic_price_returns_request_meta_for_diagnostics(self) -> None:  # noqa: PLR6301, RUF105
+    async def test_dynamic_price_returns_request_meta_for_diagnostics(self) -> None:  # noqa: PLR6301
         """Dynamic price response MUST include APP_REQUEST_META."""
         api = _make_api()
         get_json = AsyncMock(return_value={FIELD_DATA: {"priceConfig": {}}})

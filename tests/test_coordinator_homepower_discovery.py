@@ -60,8 +60,8 @@ from custom_components.jackery_solarvault.entity import payload_properties_for_s
 from custom_components.jackery_solarvault.sensor import (
     SMART_MODE_SENSOR_DESCRIPTIONS,
     JackerySensor,
-    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]  # noqa: RUF105
-    _is_portable_payload,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
+    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier
+    _is_portable_payload,  # test drives the module-private Home/Portable classifier
 )
 
 if TYPE_CHECKING:
@@ -131,8 +131,8 @@ def _discovery_coordinator(*, systems: list[Any]) -> JackerySolarVaultCoordinato
     state that only the real ``__init__`` (skipped here) initialises.
     """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {}  # ruff: ignore[private-member-access]
-    coordinator._pending_discovery_parent_removals = set()  # ruff: ignore[private-member-access]
+    coordinator._device_index = {}
+    coordinator._pending_discovery_parent_removals = set()
     mutable = cast("Any", coordinator)
     mutable.api = SimpleNamespace(
         async_get_system_list=AsyncMock(return_value=systems),
@@ -142,8 +142,8 @@ def _discovery_coordinator(*, systems: list[Any]) -> JackerySolarVaultCoordinato
         last_system_list_response={FIELD_CODE: 0, FIELD_DATA: systems},
         last_legacy_device_list_response={FIELD_CODE: 0, FIELD_DATA: []},
     )
-    mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
-    mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
+    mutable._async_save_discovery_cache = AsyncMock()
+    mutable._schedule_background_once = lambda *_args, **_kwargs: None
     return coordinator
 
 
@@ -162,8 +162,8 @@ def _home_power_sensor(
     sensor = JackerySensor.__new__(JackerySensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(data={dev_id: payload})
-    mutable._device_id = dev_id  # ruff: ignore[private-member-access]
-    mutable._attr_unique_id = f"{dev_id}_{description.key}"  # ruff: ignore[private-member-access]
+    mutable._device_id = dev_id
+    mutable._attr_unique_id = f"{dev_id}_{description.key}"
     mutable.entity_description = description
     return sensor
 
@@ -182,7 +182,7 @@ def test_home_modelcode_is_admitted_as_property_device_candidate(
     """
     dev = _home_power_dev_entry(model_code)
 
-    assert JackerySolarVaultCoordinator._is_property_device_candidate(dev) is True  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._is_property_device_candidate(dev) is True
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)
@@ -207,8 +207,8 @@ async def test_home_modelcode_is_discovered_into_device_index(
 
     await coordinator.async_discover()
 
-    assert dev_id in coordinator._device_index  # ruff: ignore[private-member-access]
-    indexed = coordinator._device_index[dev_id]  # ruff: ignore[private-member-access]
+    assert dev_id in coordinator._device_index
+    indexed = coordinator._device_index[dev_id]
     assert set(indexed) == {FIELD_SYSTEM_ID, PAYLOAD_SYSTEM_META, PAYLOAD_DEVICE_META}
     assert indexed[FIELD_SYSTEM_ID] == _SYSTEM_ID
     assert indexed[PAYLOAD_DEVICE_META][FIELD_MODEL_CODE] == model_code
@@ -234,7 +234,7 @@ async def test_empty_outer_system_list_is_not_parent_removal_evidence() -> None:
     mutable.api.last_system_list_response = {FIELD_CODE: 0, FIELD_DATA: []}
     await coordinator.async_discover()
 
-    assert _home_power_dev_id(3002) in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert _home_power_dev_id(3002) in coordinator._device_index
 
 
 @pytest.mark.asyncio
@@ -260,10 +260,10 @@ async def test_identified_system_with_empty_devices_confirms_parent_removal() ->
         FIELD_DATA: [empty_system],
     }
     await coordinator.async_discover()
-    assert _home_power_dev_id(3002) in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert _home_power_dev_id(3002) in coordinator._device_index
 
     await coordinator.async_discover()
-    assert _home_power_dev_id(3002) not in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert _home_power_dev_id(3002) not in coordinator._device_index
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)

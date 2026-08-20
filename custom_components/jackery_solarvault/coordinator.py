@@ -4689,7 +4689,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Record HTTP/API authentication rejection metrics."""
         reason = f"http_{status}"
         # The API client owns the App-specific token-expiry payload contract.
-        if self.api._is_token_expired_response(status, data):  # ruff: ignore[private-member-access]
+        if self.api.is_token_expired_response(status, data):
             self.rejection_metrics.increment("auth_token_expiry_rejections", reason)
             return
         self.rejection_metrics.increment("http_auth_rejections", reason)
@@ -4698,7 +4698,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Record a schema/data-quality rejection."""
         self.rejection_metrics.increment("schema_rejections", reason)
 
-    def _defer_background_auth_failure(self, err: ConfigEntryAuthFailed) -> None:
+    def defer_background_auth_failure(self, err: ConfigEntryAuthFailed) -> None:
         """Route background auth failures through the next coordinator refresh."""
         self._mqtt_mgr.defer_background_auth_failure(self._mqtt, str(err))
 
@@ -4802,7 +4802,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             # MQTT is a supplemental transport. A connect/startup failure must
             # not open reauth or stop the HTTP coordinator; the HTTP/API path is
             # the only auth authority.
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except RuntimeError as err:
             _LOGGER.debug(
                 "Jackery MQTT initial connect did not complete; "
@@ -4846,7 +4846,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 snapshot=snapshot,
             )
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         else:
             if session_generation == self._mqtt_session_generation:
                 self._mqtt_birth_snapshot_pending = False
@@ -4920,7 +4920,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     # left a disconnected client parked until an unrelated call.
                     await self._async_ensure_mqtt(force=True, wait_connected=True)
                 except ConfigEntryAuthFailed as err:
-                    self._defer_background_auth_failure(err)
+                    self.defer_background_auth_failure(err)
                 except JackeryAuthError as err:
                     if self._mqtt_mgr.retry_delay() <= 0:
                         self._mqtt_mgr.handle_connect_error(mqtt, err)
@@ -5031,7 +5031,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             except asyncio.CancelledError:
                 return
             except ConfigEntryAuthFailed as err:
-                self._defer_background_auth_failure(err)
+                self.defer_background_auth_failure(err)
             except Exception as err:  # ruff: ignore[blind-except]  # Callback must consume every failed task.
                 _LOGGER.debug("Jackery background task %s failed: %s", key, err)
 
@@ -7714,7 +7714,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             new_data[device_id] = entry
             self._push_partial_update(new_data)
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Jackery pack OTA background refresh failed: %s", err)
         finally:
@@ -7741,7 +7741,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         return smart_meter_accessory_device_id(source)
 
     @classmethod
-    def _has_smart_meter_accessory(cls, payload: dict[str, Any]) -> bool:
+    def has_smart_meter_accessory(cls, payload: dict[str, Any]) -> bool:
         """Return True when discovery metadata contains a CT/smart meter accessory."""
         return has_smart_meter_accessory(payload)
 
@@ -12054,7 +12054,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     ACTION_ID_SUBDEVICE_3031,
                     require_response=False,
                 )
-                or self._has_smart_meter_accessory(payload)
+                or self.has_smart_meter_accessory(payload)
                 or isinstance(payload.get(PAYLOAD_CT_METER), dict)
             )
             should_query_packs = (
@@ -12237,7 +12237,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         except asyncio.CancelledError:
             raise
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except RECORDER_BACKGROUND_TASK_ERRORS:
             # RECORDER_BACKGROUND_TASK_ERRORS = base task errors + recorder/DB
             # errors (incl. SQLAlchemyError) so a recorder/database failure can
@@ -12289,7 +12289,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         except asyncio.CancelledError:
             raise
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except RECORDER_BACKGROUND_TASK_ERRORS:
             _LOGGER.exception("Jackery historical statistics backfill failed")
         finally:
@@ -16737,7 +16737,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 ensure_mqtt=False,
             )
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Jackery MQTT polling query failed: %s",
@@ -16818,7 +16818,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         try:
             await self._async_shadow_fallback_for_missing(snapshot)
         except ConfigEntryAuthFailed as err:
-            self._defer_background_auth_failure(err)
+            self.defer_background_auth_failure(err)
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug(
                 "Jackery shadow fallback failed: %s",

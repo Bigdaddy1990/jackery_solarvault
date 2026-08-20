@@ -158,7 +158,7 @@ async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
             AsyncMock(return_value=user_result),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
+        result = await flow._async_route_discovery_to_user("Jackery Device")
 
     assert result == user_result
     abort_guard.assert_called_once_with()
@@ -190,7 +190,7 @@ async def test_route_discovery_to_user_short_circuits_on_duplicate() -> None:
             AsyncMock(return_value={"type": FlowResultType.FORM}),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
+        result = await flow._async_route_discovery_to_user("Jackery Device")
 
     assert result == abort_result
     assert "title_placeholders" not in flow.context
@@ -260,7 +260,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[object()]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
+        result = flow._async_abort_duplicate_discovery()
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -271,7 +271,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[object()]),
     ):
-        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
+        result = flow._async_abort_duplicate_discovery()
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -282,7 +282,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        assert flow._async_abort_duplicate_discovery() is None  # ruff: ignore[private-member-access]
+        assert flow._async_abort_duplicate_discovery() is None
 
 
 @pytest.mark.asyncio

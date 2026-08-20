@@ -1014,9 +1014,7 @@ def _handle_optional_startup_result(
         label (str): Short label identifying the startup layer (used in logs).
     """
     if isinstance(result, ConfigEntryAuthFailed):
-        coordinator._defer_background_auth_failure(  # ruff: ignore[private-member-access]
-            result
-        )
+        coordinator.defer_background_auth_failure(result)
     elif isinstance(result, BaseException):
         _LOGGER.warning("Jackery %s could not start: %s", label, result)
 
@@ -1516,7 +1514,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
 
         for (label, _), result in zip(startup_tasks, results, strict=True):
             if isinstance(result, ConfigEntryAuthFailed):
-                coordinator._defer_background_auth_failure(result)  # ruff: ignore[private-member-access]
+                coordinator.defer_background_auth_failure(result)
             elif isinstance(result, BaseException):
                 _LOGGER.warning(
                     "Jackery %s failed during background startup: %s", label, result

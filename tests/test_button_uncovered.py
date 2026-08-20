@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.button import (
 class TestJackeryQueryButton:
     """Test JackeryQueryButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -29,7 +29,7 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(self, key="refresh_system_info"):  # noqa: PLR6301, RUF105
+    def _create_query_description(self, key="refresh_system_info"):  # noqa: PLR6301
         """Create a query button description for testing."""
         return JackeryQueryButtonDescription(
             key=key,
@@ -48,7 +48,7 @@ class TestJackeryQueryButton:
             coordinator=coordinator, device_id="test_device", description=description
         )
         assert sensor is not None
-        assert sensor._query_description.key == "refresh_system_info"  # noqa: RUF105, SLF001
+        assert sensor._query_description.key == "refresh_system_info"
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
@@ -66,7 +66,7 @@ class TestJackeryQueryButton:
 class TestJackeryRebootButton:
     """Test JackeryRebootButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -81,7 +81,7 @@ class TestJackeryRebootButton:
         coordinator = self._create_coordinator()
         sensor = JackeryRebootButton(coordinator=coordinator, device_id="test_device")
         assert sensor is not None
-        assert sensor._attr_translation_key == "reboot_device"  # noqa: RUF105, SLF001
+        assert sensor._attr_translation_key == "reboot_device"
 
     @pytest.mark.asyncio
     async def test_async_press(self) -> None:
@@ -96,7 +96,7 @@ class TestJackeryRebootButton:
 class TestJackeryRefreshWeatherPlanButton:
     """Test JackeryRefreshWeatherPlanButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {"test_device": {}}
@@ -114,7 +114,7 @@ class TestJackeryRefreshWeatherPlanButton:
             coordinator=coordinator, device_id="test_device"
         )
         assert sensor is not None
-        assert sensor._attr_translation_key == "refresh_weather_plan"  # noqa: RUF105, SLF001
+        assert sensor._attr_translation_key == "refresh_weather_plan"
 
     @pytest.mark.asyncio
     async def test_async_press(self) -> None:
@@ -131,7 +131,7 @@ class TestJackeryRefreshWeatherPlanButton:
 class TestJackeryReadScheduleButton:
     """Test JackeryReadScheduleButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -152,7 +152,7 @@ class TestJackeryReadScheduleButton:
             translation_key="test_schedule",
         )
         assert sensor is not None
-        assert sensor._task_type == 1  # noqa: RUF105, SLF001
+        assert sensor._task_type == 1
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
@@ -190,7 +190,7 @@ class TestJackeryReadScheduleButton:
 class TestJackeryDeleteStormAlertButton:
     """Test JackeryDeleteStormAlertButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None):  # noqa: PLR6301
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -209,7 +209,7 @@ class TestJackeryDeleteStormAlertButton:
             alert_id="alert123",
         )
         assert sensor is not None
-        assert sensor._alert_id == "alert123"  # noqa: RUF105, SLF001
+        assert sensor._alert_id == "alert123"
 
     def test_available_property(self) -> None:
         """Test available property."""
@@ -244,7 +244,7 @@ class TestJackeryDeleteStormAlertButton:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
+    def test_async_setup_entry(self) -> None:  # noqa: PLR6301
         """Test async_setup_entry function signature and structure."""
         # This test validates the function signature and basic structure
         # Full integration test is complex due to signature caching logic

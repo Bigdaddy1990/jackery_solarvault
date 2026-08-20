@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 
 def _consume_background_task(
-    coro: Any,  # noqa: RUF105
+    coro: Any,
     *,
     name: str,
     eager_start: bool,
@@ -37,17 +37,17 @@ def _consume_background_task(
 def _guarded_coordinator(
     *,
     auth_failure_message: str | None = None,
-) -> Any:  # noqa: RUF105
+) -> Any:
     """Build a bare coordinator wired for the guarded-update guard paths."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
-    obj._mqtt_mgr = SimpleNamespace(auth_failure_message=auth_failure_message)  # ruff: ignore[private-member-access]
-    obj._mqtt = None  # ruff: ignore[private-member-access]
-    obj._device_index = {}  # ruff: ignore[private-member-access]
-    obj._shutdown_started = False  # ruff: ignore[private-member-access]
-    obj._background_tasks = {}  # ruff: ignore[private-member-access]
+    obj._mqtt_mgr = SimpleNamespace(auth_failure_message=auth_failure_message)
+    obj._mqtt = None
+    obj._device_index = {}
+    obj._shutdown_started = False
+    obj._background_tasks = {}
     obj.hass = SimpleNamespace(async_create_background_task=_consume_background_task)
-    obj._async_query_system_info_for_missing = AsyncMock()  # ruff: ignore[private-member-access]
+    obj._async_query_system_info_for_missing = AsyncMock()
     obj.async_discover = AsyncMock()
     return coordinator
 
@@ -58,7 +58,7 @@ async def test_guarded_update_raises_when_no_devices_discovered() -> None:
     coordinator = _guarded_coordinator()
 
     with pytest.raises(UpdateFailed, match="No Jackery devices found"):
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
 
     coordinator.async_discover.assert_awaited_once()
 
@@ -75,10 +75,10 @@ async def test_guarded_update_clears_deferred_auth_notice_without_pausing() -> N
     coordinator = _guarded_coordinator(auth_failure_message="broker rejected")
 
     with pytest.raises(UpdateFailed, match="No Jackery devices found"):
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
 
     # The deferred notice was consumed rather than re-raised as reauth.
-    assert coordinator._mqtt_mgr.auth_failure_message is None  # ruff: ignore[private-member-access]
+    assert coordinator._mqtt_mgr.auth_failure_message is None
 
 
 @pytest.mark.asyncio
@@ -87,8 +87,8 @@ async def test_guarded_update_dispatches_system_body_fill_off_critical_path() ->
     coordinator = _guarded_coordinator()
 
     with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        await coordinator._async_update_data_guarded()
 
-    coordinator._async_query_system_info_for_missing.assert_called_once_with(  # ruff: ignore[private-member-access]
+    coordinator._async_query_system_info_for_missing.assert_called_once_with(
         ensure_mqtt=False,
     )

@@ -5262,7 +5262,7 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
             # Create them when discovery confirms a meter accessory, or when a
             # CT payload was already received before entity setup.
             has_smart_meter = bool(
-                coordinator._has_smart_meter_accessory(  # ruff: ignore[private-member-access]  # same-integration discovery predicate
+                coordinator.has_smart_meter_accessory(
                     payload
                 )  # same-package discovery helper
                 or payload.get(PAYLOAD_CT_METER)
@@ -5275,7 +5275,7 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
                     # even without current values. Entities with no current
                     # value will show as unavailable.
                     if not _smart_meter_description_has_value(payload, ct_desc):
-                        if not coordinator._has_smart_meter_accessory(payload):  # ruff: ignore[private-member-access]  # same-integration discovery predicate
+                        if not coordinator.has_smart_meter_accessory(payload):
                             continue
                     _append_unique(
                         entities,

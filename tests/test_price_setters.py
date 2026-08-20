@@ -67,7 +67,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
     Returns:
         JackerySolarVaultCoordinator: A coordinator instance preconfigured for price write tests.
-    """  # noqa: RUF105
+    """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.api = _RejectingPriceApi()
@@ -85,9 +85,9 @@ def _coordinator() -> JackerySolarVaultCoordinator:
             },
         }
     }
-    coordinator._device_index = {"dev1": {FIELD_SYSTEM_ID: "sys1"}}  # ruff: ignore[private-member-access]
-    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
-    coordinator._price_overrides = {}  # ruff: ignore[private-member-access]
+    coordinator._device_index = {"dev1": {FIELD_SYSTEM_ID: "sys1"}}
+    coordinator._slow_cache = {}
+    coordinator._price_overrides = {}
 
     def _fail_push(_data: object) -> None:
         """Assert handler used to ensure no local data patch occurs when a write is rejected.
@@ -97,10 +97,10 @@ def _coordinator() -> JackerySolarVaultCoordinator:
 
         Raises:
             AssertionError: Always raised to signal that a rejected writer attempted to modify local price data.
-        """  # noqa: RUF105
+        """
         raise AssertionError("rejected writer must not patch local price data")
 
-    obj._push_partial_update = _fail_push  # ruff: ignore[private-member-access]
+    obj._push_partial_update = _fail_push
     return coordinator
 
 
@@ -133,7 +133,7 @@ async def test_dynamic_price_rejects_false_api_response() -> None:
 
 def test_valid_price_sources_filters_blank_company_and_region() -> None:
     """Coordinator price-source validation rejects whitespace-only fields."""
-    assert JackerySolarVaultCoordinator._valid_price_sources([  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._valid_price_sources([
         {FIELD_PLATFORM_COMPANY_ID: "", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "  ", FIELD_COUNTRY: "DE"},
         {FIELD_PLATFORM_COMPANY_ID: "abc", FIELD_COUNTRY: "DE"},
@@ -159,7 +159,7 @@ def test_find_matching_price_source_normalizes_current_price_fields() -> None:
     }
 
     assert (
-        coordinator._find_matching_price_source(  # ruff: ignore[private-member-access]
+        coordinator._find_matching_price_source(
             "dev1",
             [source],
             {FIELD_PLATFORM_COMPANY_ID: " 8 ", FIELD_SYSTEM_REGION: " de "},
@@ -177,7 +177,7 @@ async def test_dynamic_price_mode_normalizes_current_provider_fields() -> None:
         FIELD_PLATFORM_COMPANY_ID: " 8.0 ",
         FIELD_SYSTEM_REGION: " DE ",
     }
-    cast("Any", coordinator)._push_partial_update = lambda data: setattr(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._push_partial_update = lambda data: setattr(
         coordinator,
         "data",
         data,
@@ -196,7 +196,7 @@ async def test_price_source_write_normalizes_blank_company_name() -> None:
     api = _AcceptingPriceApi()
     coordinator = _coordinator()
     cast("Any", coordinator).api = api
-    cast("Any", coordinator)._push_partial_update = lambda data: setattr(  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._push_partial_update = lambda data: setattr(
         coordinator,
         "data",
         data,
