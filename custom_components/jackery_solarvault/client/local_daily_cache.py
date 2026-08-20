@@ -21,11 +21,11 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
-from __future__ import annotations
 
 import asyncio
 from datetime import date, timedelta
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.core import HomeAssistant
@@ -41,6 +41,7 @@ from ..const import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+_LOGGER = logging.getLogger(__name__)
 _STORAGE_VERSION: Final = 1
 _STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
@@ -48,8 +49,34 @@ _KEY_ENTRIES: Final = "entries"
 _KEY_DAY: Final = "day"
 _KEY_VALUES: Final = "values"
 _KEY_COMPLETED_DAYS: Final = "completed_days"
+_KEY_COMPLETE_DAYS: Final = "complete_days"
 _KEY_LAST_DELTAS: Final = "last_deltas"
 _MAX_COMPLETED_DAY_HISTORY: Final = 400
+
+
+def _is_iso_day(day: object, *, context: str) -> bool:
+    """Validate an ISO day string, reporting why a value was rejected."""
+    if not isinstance(day, str):
+        _LOGGER.warning(
+            "Jackery daily cache: dropping non-string %s key %r", context, day
+        )
+        return False
+    try:
+        canonical = date.fromisoformat(day).isoformat()
+    except ValueError as err:
+        _LOGGER.warning(
+            "Jackery daily cache: dropping unparsable %s %r: %s", context, day, err
+        )
+        return False
+    if canonical != day:
+        _LOGGER.warning(
+            "Jackery daily cache: dropping non-canonical %s %r (expected %r)",
+            context,
+            day,
+            canonical,
+        )
+        return False
+    return True
 
 
 def _clean_metric_values(values: object) -> dict[str, int]:
@@ -59,13 +86,29 @@ def _clean_metric_values(values: object) -> dict[str, int]:
     cleaned: dict[str, int] = {}
     for metric, value in values.items():
         if not isinstance(metric, str):
+            _LOGGER.warning(
+                "Jackery daily cache: dropping non-string metric key %r", metric
+            )
             continue
         try:
             normalized = int(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as err:
+            _LOGGER.warning(
+                "Jackery daily cache: dropping metric %s with unusable value "
+                "%r: %s",
+                metric,
+                value,
+                err,
+            )
             continue
-        if normalized >= 0:
-            cleaned[metric] = normalized
+        if normalized < 0:
+            _LOGGER.warning(
+                "Jackery daily cache: dropping negative metric %s=%d",
+                metric,
+                normalized,
+            )
+            continue
+        cleaned[metric] = normalized
     return cleaned
 
 
@@ -75,16 +118,23 @@ def _clean_completed_days(value: object) -> dict[str, dict[str, int]]:
         return {}
     cleaned: dict[str, dict[str, int]] = {}
     for day, metrics in value.items():
-        if not isinstance(day, str):
-            continue
-        try:
-            if date.fromisoformat(day).isoformat() != day:
-                continue
-        except ValueError:
+        if not _is_iso_day(day, context="completed-day history"):
             continue
         clean_metrics = _clean_metric_values(metrics)
         if clean_metrics:
             cleaned[day] = clean_metrics
+    return cleaned
+
+
+def _clean_complete_days(value: object) -> set[str]:
+    """Return ISO days whose anchors and rollover samples cover a full day."""
+    if not isinstance(value, list):
+        return set()
+    cleaned: set[str] = set()
+    for day in value:
+        if not _is_iso_day(day, context="complete-day marker"):
+            continue
+        cleaned.add(day)
     return cleaned
 
 
@@ -124,6 +174,9 @@ def _normalize_snapshot(payload: object) -> dict[str, Any] | None:
     completed_days = _clean_completed_days(payload.get(_KEY_COMPLETED_DAYS))
     if completed_days:
         normalized[_KEY_COMPLETED_DAYS] = completed_days
+    complete_days = _clean_complete_days(payload.get(_KEY_COMPLETE_DAYS))
+    if complete_days:
+        normalized[_KEY_COMPLETE_DAYS] = sorted(complete_days)
     last_deltas = _clean_metric_values(payload.get(_KEY_LAST_DELTAS))
     if last_deltas:
         normalized[_KEY_LAST_DELTAS] = last_deltas
@@ -141,17 +194,12 @@ def _merge_snapshots(
         _clean_completed_days(existing.get(_KEY_COMPLETED_DAYS)),
         _clean_completed_days(incoming.get(_KEY_COMPLETED_DAYS)),
     )
+    merged_complete_days = _clean_complete_days(existing.get(_KEY_COMPLETE_DAYS))
+    merged_complete_days.update(
+        _clean_complete_days(incoming.get(_KEY_COMPLETE_DAYS))
+    )
     existing_day = existing.get(_KEY_DAY)
     incoming_day = incoming[_KEY_DAY]
-    if isinstance(existing_day, str) and existing_day != incoming_day:
-        older = existing if existing_day < incoming_day else incoming
-        older_day = older.get(_KEY_DAY)
-        older_last_deltas = _clean_metric_values(older.get(_KEY_LAST_DELTAS))
-        if isinstance(older_day, str) and older_last_deltas:
-            merged_history = _merge_completed_days(
-                merged_history,
-                {older_day: older_last_deltas},
-            )
     if not isinstance(existing_day, str) or incoming_day > existing_day:
         merged = dict(incoming)
     elif incoming_day < existing_day:
@@ -182,6 +230,8 @@ def _merge_snapshots(
             merged[_KEY_LAST_DELTAS] = merged_last_deltas
     if merged_history:
         merged[_KEY_COMPLETED_DAYS] = merged_history
+    if merged_complete_days:
+        merged[_KEY_COMPLETE_DAYS] = sorted(merged_complete_days)
     return merged
 
 
@@ -287,12 +337,14 @@ async def async_save_daily_cache(
             continue
         day = payload.get(_KEY_DAY)
         values = payload.get(_KEY_VALUES)
-        if not isinstance(day, str) or not isinstance(values, dict):
+        if not isinstance(values, dict):
+            _LOGGER.warning(
+                "Jackery daily cache: dropping day %r with non-dict values %r",
+                day,
+                values,
+            )
             continue
-        try:
-            if date.fromisoformat(day).isoformat() != day:
-                continue
-        except ValueError:
+        if not _is_iso_day(day, context="stored day"):
             continue
         clean_values = _clean_metric_values(values)
         if not clean_values:
@@ -304,6 +356,9 @@ async def async_save_daily_cache(
         completed_days = _clean_completed_days(payload.get(_KEY_COMPLETED_DAYS))
         if completed_days:
             clean_snapshot[_KEY_COMPLETED_DAYS] = completed_days
+        complete_days = _clean_complete_days(payload.get(_KEY_COMPLETE_DAYS))
+        if complete_days:
+            clean_snapshot[_KEY_COMPLETE_DAYS] = sorted(complete_days)
         last_deltas = _clean_metric_values(payload.get(_KEY_LAST_DELTAS))
         if last_deltas:
             clean_snapshot[_KEY_LAST_DELTAS] = last_deltas
@@ -381,6 +436,7 @@ def refresh_snapshot(
     *,
     today: date,
     current_values: dict[str, int | float | None],
+    baseline_covers_full_day: bool = False,
 ) -> dict[str, Any]:
     """Produce today's snapshot with integer anchors for lifetime metrics.
 
@@ -393,6 +449,9 @@ def refresh_snapshot(
         today (date): Current date used as the snapshot day.
         current_values (dict[str, int | float | None]): Current lifetime metric
         readings; `None` or non-numeric values are ignored.
+        baseline_covers_full_day: Whether this anchor was established by a
+            continuously observed local-day rollover. Cold-start anchors must
+            leave this false because they omit energy produced before startup.
 
     Returns:
         dict[str, Any]: Snapshot with an ISO ``day`` and a ``values`` mapping
@@ -403,12 +462,20 @@ def refresh_snapshot(
     completed_days = _clean_completed_days(
         snapshot.get(_KEY_COMPLETED_DAYS) if isinstance(snapshot, dict) else None
     )
+    complete_days = _clean_complete_days(
+        snapshot.get(_KEY_COMPLETE_DAYS) if isinstance(snapshot, dict) else None
+    )
     if not isinstance(snapshot, dict) or snapshot.get(_KEY_DAY) != today_iso:
         previous_day = snapshot.get(_KEY_DAY) if isinstance(snapshot, dict) else None
         last_deltas = _clean_metric_values(
             snapshot.get(_KEY_LAST_DELTAS) if isinstance(snapshot, dict) else None
         )
-        if isinstance(previous_day, str) and last_deltas:
+        if (
+            baseline_covers_full_day
+            and isinstance(previous_day, str)
+            and previous_day in complete_days
+            and last_deltas
+        ):
             try:
                 parsed_previous_day = date.fromisoformat(previous_day)
             except ValueError:
@@ -422,13 +489,22 @@ def refresh_snapshot(
         completed_days = {
             day: metrics for day, metrics in completed_days.items() if day >= cutoff
         }
+        complete_days = {day for day in complete_days if day >= cutoff}
+        if baseline_covers_full_day:
+            complete_days.add(today_iso)
         clean_values: dict[str, int] = {}
         for metric, value in current_values.items():
             if value is None:
                 continue
             try:
                 clean_values[metric] = int(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as err:
+                _LOGGER.warning(
+                    "Jackery daily cache: dropping current metric %s=%r: %s",
+                    metric,
+                    value,
+                    err,
+                )
                 continue
         refreshed: dict[str, Any] = {
             _KEY_DAY: today_iso,
@@ -436,6 +512,8 @@ def refresh_snapshot(
         }
         if completed_days:
             refreshed[_KEY_COMPLETED_DAYS] = completed_days
+        if complete_days:
+            refreshed[_KEY_COMPLETE_DAYS] = sorted(complete_days)
         return refreshed
     existing_values = snapshot.get(_KEY_VALUES)
     if not isinstance(existing_values, dict):
@@ -443,10 +521,19 @@ def refresh_snapshot(
     merged: dict[str, int] = {}
     for metric, value in existing_values.items():
         if not isinstance(metric, str):
+            _LOGGER.warning(
+                "Jackery daily cache: dropping non-string metric key %r", metric
+            )
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as err:
+            _LOGGER.warning(
+                "Jackery daily cache: dropping stored metric %s=%r: %s",
+                metric,
+                value,
+                err,
+            )
             continue
     for metric, value in current_values.items():
         if metric in merged:
@@ -455,11 +542,21 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as err:
+            _LOGGER.warning(
+                "Jackery daily cache: dropping incoming metric %s=%r: %s",
+                metric,
+                value,
+                err,
+            )
             continue
     refreshed = {_KEY_DAY: today_iso, _KEY_VALUES: merged}
     if completed_days:
         refreshed[_KEY_COMPLETED_DAYS] = completed_days
+    if baseline_covers_full_day:
+        complete_days.add(today_iso)
+    if complete_days:
+        refreshed[_KEY_COMPLETE_DAYS] = sorted(complete_days)
     last_deltas = _clean_metric_values(snapshot.get(_KEY_LAST_DELTAS))
     if last_deltas:
         refreshed[_KEY_LAST_DELTAS] = last_deltas
@@ -510,10 +607,16 @@ def period_delta(
     completed_days = _clean_completed_days(
         snapshot.get(_KEY_COMPLETED_DAYS) if isinstance(snapshot, dict) else None
     )
+    complete_days = _clean_complete_days(
+        snapshot.get(_KEY_COMPLETE_DAYS) if isinstance(snapshot, dict) else None
+    )
     total = current_delta
     cursor = period_start
     while cursor < today:
-        metrics = completed_days.get(cursor.isoformat())
+        cursor_iso = cursor.isoformat()
+        if cursor_iso not in complete_days:
+            return None
+        metrics = completed_days.get(cursor_iso)
         if metrics is None or metric_key not in metrics:
             return None
         total += metrics[metric_key]

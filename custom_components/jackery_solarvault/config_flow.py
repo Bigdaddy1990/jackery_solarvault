@@ -1,5 +1,6 @@
 """Config flow for Jackery SolarVault."""
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
@@ -9,6 +10,7 @@ from homeassistant.config_entries import ConfigFlow, OptionsFlow, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
 from .const import (
@@ -21,12 +23,6 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_TOPIC,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
     CONF_SCAN_INTERVAL,
@@ -44,8 +40,6 @@ from .const import (
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
-    DEFAULT_LOCAL_MQTT_ENABLE,
-    DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_IP,
@@ -250,25 +244,25 @@ def _entry_data_from_api_login(
 def _coerce_local_mqtt_port(value: object) -> int:
     """Return a safe local MQTT port value from stored options or form input."""
     if value in {None, ""}:
-        return DEFAULT_LOCAL_MQTT_PORT
+        return DEFAULT_THIRD_PARTY_MQTT_PORT
     try:
         return int(cast("Any", value))
     except TypeError as err:
         _LOGGER.debug(
             "Local MQTT port %r has an unusable type; using default %d: %s",
             value,
-            DEFAULT_LOCAL_MQTT_PORT,
+            DEFAULT_THIRD_PARTY_MQTT_PORT,
             err,
         )
-        return DEFAULT_LOCAL_MQTT_PORT
+        return DEFAULT_THIRD_PARTY_MQTT_PORT
     except ValueError as err:
         _LOGGER.debug(
             "Local MQTT port %r is not a valid integer; using default %d: %s",
             value,
-            DEFAULT_LOCAL_MQTT_PORT,
+            DEFAULT_THIRD_PARTY_MQTT_PORT,
             err,
         )
-        return DEFAULT_LOCAL_MQTT_PORT
+        return DEFAULT_THIRD_PARTY_MQTT_PORT
 
 
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
@@ -276,12 +270,12 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
 
     The returned mapping contains the following keys with normalized types and safe
     defaults:
-    - CONF_LOCAL_MQTT_ENABLE: bool — whether local MQTT is enabled (falls back
+    - CONF_THIRD_PARTY_MQTT_ENABLE: bool — whether local MQTT is enabled (falls back
     to the third-party bridge default unless explicitly stored)
-    - CONF_LOCAL_MQTT_HOST: str — MQTT host (empty string when not set)
-    - CONF_LOCAL_MQTT_PORT: int — MQTT port (defaults to DEFAULT_LOCAL_MQTT_PORT)
-    - CONF_LOCAL_MQTT_USERNAME: str — MQTT username (empty string when not set)
-    - CONF_LOCAL_MQTT_PASSWORD: str — MQTT password (empty string when not set)
+    - CONF_THIRD_PARTY_MQTT_IP: str — MQTT host (empty string when not set)
+    - CONF_THIRD_PARTY_MQTT_PORT: int — MQTT port (defaults to DEFAULT_THIRD_PARTY_MQTT_PORT)
+    - CONF_THIRD_PARTY_MQTT_USERNAME: str — MQTT username (empty string when not set)
+    - CONF_THIRD_PARTY_MQTT_PASSWORD: str — MQTT password (empty string when not set)
     - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — exact topic trimmed of surrounding
     whitespace (the app-compatible default when not set)
 
@@ -305,51 +299,45 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
                 return value
         return default
 
-    if CONF_LOCAL_MQTT_ENABLE in options or CONF_LOCAL_MQTT_ENABLE in data:
-        enable_value = _entry_value(CONF_LOCAL_MQTT_ENABLE, DEFAULT_LOCAL_MQTT_ENABLE)
-        enable_default = DEFAULT_LOCAL_MQTT_ENABLE
-    elif (
-        CONF_THIRD_PARTY_MQTT_ENABLE in options or CONF_THIRD_PARTY_MQTT_ENABLE in data
-    ):
+    enable_default = DEFAULT_THIRD_PARTY_MQTT_ENABLE
+    if CONF_THIRD_PARTY_MQTT_ENABLE in options or CONF_THIRD_PARTY_MQTT_ENABLE in data:
         enable_value = _entry_value(
             CONF_THIRD_PARTY_MQTT_ENABLE,
             DEFAULT_THIRD_PARTY_MQTT_ENABLE,
         )
-        enable_default = DEFAULT_THIRD_PARTY_MQTT_ENABLE
     else:
         enable_value = DEFAULT_THIRD_PARTY_MQTT_ENABLE
-        enable_default = DEFAULT_THIRD_PARTY_MQTT_ENABLE
     parsed_enable = safe_bool(enable_value)
     return {
-        CONF_LOCAL_MQTT_ENABLE: (
+        CONF_THIRD_PARTY_MQTT_ENABLE: (
             enable_default if parsed_enable is None else parsed_enable
         ),
-        CONF_LOCAL_MQTT_HOST: str(
-            _first_entry_value(CONF_LOCAL_MQTT_HOST, CONF_THIRD_PARTY_MQTT_IP),
+        CONF_THIRD_PARTY_MQTT_IP: str(
+            _first_entry_value(CONF_THIRD_PARTY_MQTT_IP, CONF_THIRD_PARTY_MQTT_IP),
         ).strip(),
-        CONF_LOCAL_MQTT_PORT: _coerce_local_mqtt_port(
+        CONF_THIRD_PARTY_MQTT_PORT: _coerce_local_mqtt_port(
             _first_entry_value(
-                CONF_LOCAL_MQTT_PORT,
+                CONF_THIRD_PARTY_MQTT_PORT,
                 CONF_THIRD_PARTY_MQTT_PORT,
                 default=None,
             ),
         ),
-        CONF_LOCAL_MQTT_USERNAME: str(
+        CONF_THIRD_PARTY_MQTT_USERNAME: str(
             _first_entry_value(
-                CONF_LOCAL_MQTT_USERNAME,
+                CONF_THIRD_PARTY_MQTT_USERNAME,
                 CONF_THIRD_PARTY_MQTT_USERNAME,
             ),
         ).strip(),
-        CONF_LOCAL_MQTT_PASSWORD: str(
+        CONF_THIRD_PARTY_MQTT_PASSWORD: str(
             _first_entry_value(
-                CONF_LOCAL_MQTT_PASSWORD,
+                CONF_THIRD_PARTY_MQTT_PASSWORD,
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
             ),
         ),
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
             _first_entry_value(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                CONF_LOCAL_MQTT_TOPIC,
+                CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
             ),
         ).strip(),
@@ -378,11 +366,11 @@ def _merge_local_mqtt_options(
 
     Returns:
         dict[str, Any]: Merged local-MQTT options with keys
-            - CONF_LOCAL_MQTT_ENABLE (bool)
-            - CONF_LOCAL_MQTT_HOST (str)
-            - CONF_LOCAL_MQTT_PORT (int)
-            - CONF_LOCAL_MQTT_USERNAME (str)
-            - CONF_LOCAL_MQTT_PASSWORD (str)
+            - CONF_THIRD_PARTY_MQTT_ENABLE (bool)
+            - CONF_THIRD_PARTY_MQTT_IP (str)
+            - CONF_THIRD_PARTY_MQTT_PORT (int)
+            - CONF_THIRD_PARTY_MQTT_USERNAME (str)
+            - CONF_THIRD_PARTY_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
     """
     # The options/reconfigure forms expose these fields under the legacy
@@ -394,49 +382,53 @@ def _merge_local_mqtt_options(
     # and the toggle appeared to do nothing. ``local_*`` precedence also avoids
     # the reconfigure form's ``bool``-typed ``third_party_mqtt_ip`` field.
     enable_value = user_input.get(
-        CONF_LOCAL_MQTT_ENABLE,
+        CONF_THIRD_PARTY_MQTT_ENABLE,
         user_input.get(
             CONF_THIRD_PARTY_MQTT_ENABLE,
-            current[CONF_LOCAL_MQTT_ENABLE],
+            current[CONF_THIRD_PARTY_MQTT_ENABLE],
         ),
     )
     parsed_enable = safe_bool(enable_value)
     return {
-        CONF_LOCAL_MQTT_ENABLE: (
-            current[CONF_LOCAL_MQTT_ENABLE] if parsed_enable is None else parsed_enable
+        CONF_THIRD_PARTY_MQTT_ENABLE: (
+            current[CONF_THIRD_PARTY_MQTT_ENABLE]
+            if parsed_enable is None
+            else parsed_enable
         ),
-        CONF_LOCAL_MQTT_HOST: str(
+        CONF_THIRD_PARTY_MQTT_IP: str(
             user_input.get(
-                CONF_LOCAL_MQTT_HOST,
-                user_input.get(CONF_THIRD_PARTY_MQTT_IP, current[CONF_LOCAL_MQTT_HOST]),
+                CONF_THIRD_PARTY_MQTT_IP,
+                user_input.get(
+                    CONF_THIRD_PARTY_MQTT_IP, current[CONF_THIRD_PARTY_MQTT_IP]
+                ),
             )
             or "",
         ).strip(),
-        CONF_LOCAL_MQTT_PORT: _coerce_local_mqtt_port(
+        CONF_THIRD_PARTY_MQTT_PORT: _coerce_local_mqtt_port(
             user_input.get(
-                CONF_LOCAL_MQTT_PORT,
+                CONF_THIRD_PARTY_MQTT_PORT,
                 user_input.get(
                     CONF_THIRD_PARTY_MQTT_PORT,
-                    current[CONF_LOCAL_MQTT_PORT],
+                    current[CONF_THIRD_PARTY_MQTT_PORT],
                 ),
             ),
         ),
-        CONF_LOCAL_MQTT_USERNAME: str(
+        CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
-                CONF_LOCAL_MQTT_USERNAME,
+                CONF_THIRD_PARTY_MQTT_USERNAME,
                 user_input.get(
                     CONF_THIRD_PARTY_MQTT_USERNAME,
-                    current[CONF_LOCAL_MQTT_USERNAME],
+                    current[CONF_THIRD_PARTY_MQTT_USERNAME],
                 ),
             )
             or "",
         ),
-        CONF_LOCAL_MQTT_PASSWORD: str(
+        CONF_THIRD_PARTY_MQTT_PASSWORD: str(
             user_input.get(
-                CONF_LOCAL_MQTT_PASSWORD,
+                CONF_THIRD_PARTY_MQTT_PASSWORD,
                 user_input.get(
                     CONF_THIRD_PARTY_MQTT_PASSWORD,
-                    current[CONF_LOCAL_MQTT_PASSWORD],
+                    current[CONF_THIRD_PARTY_MQTT_PASSWORD],
                 ),
             )
             or "",
@@ -598,23 +590,23 @@ class JackeryOptionsFlow(OptionsFlow):
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_ENABLE],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_ENABLE],
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_IP,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_HOST],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_IP],
             ): str,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_PORT,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_PORT],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_USERNAME],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PASSWORD],
             ): str,
             # Single bridge mask (owner rule 2026-07-05): the third-party
             # fields above ARE the one mask. The local listener derives its
@@ -666,6 +658,41 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             return abort_result
         self.context["title_placeholders"] = {"name": discovered_name}
         await self._async_handle_discovery_without_unique_id()
+        return await self.async_step_user()
+
+    async def async_step_mqtt(
+        self,
+        discovery_info: MqttServiceInfo,
+    ) -> ConfigFlowResult:
+        """Handle a discovered MQTT device and route to the user configuration step if not a duplicate.
+
+        Validates that the MQTT payload contains a Jackery device identity (`devSn`).
+        Aborts when a configured entry already exists, another in-progress flow is present,
+        or the payload is not a valid Jackery discovery message; otherwise delegates to
+        `async_step_user()`.
+
+        Returns:
+            ConfigFlowResult: An abort result when the discovery is a duplicate, invalid,
+            or another flow is in progress; otherwise the result returned by `async_step_user()`.
+        """
+        if (abort_result := self._async_abort_duplicate_discovery()) is not None:
+            return abort_result
+
+        # Validate payload contains a Jackery device identity (devSn)
+        payload = discovery_info.payload
+        if not isinstance(payload, (bytes, bytearray)):
+            return self.async_abort(reason="invalid_discovery_info")
+
+        try:
+            payload_dict = json.loads(payload.decode())
+        except json.JSONDecodeError, UnicodeDecodeError:
+            return self.async_abort(reason="invalid_discovery_info")
+
+        # MQTT discovery payloads use "deviceSn" (FIELD_DEVICE_SN), not "devSn"
+        dev_sn = payload_dict.get("deviceSn") or payload_dict.get("devSn")
+        if not isinstance(dev_sn, str) or not dev_sn:
+            return self.async_abort(reason="invalid_discovery_info")
+
         return await self.async_step_user()
 
     async def async_step_bluetooth(
@@ -907,11 +934,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_ENABLE],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_ENABLE],
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_IP,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_HOST],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_IP],
             ): str,
             vol.Optional(
                 CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
@@ -919,15 +946,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_PORT,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_PORT],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_USERNAME],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
-                default=current_local_mqtt[CONF_LOCAL_MQTT_PASSWORD],
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PASSWORD],
             ): str,
             # The reconfigure-credentials form exposes the local-MQTT fields under the
             # legacy ``third_party_mqtt_*`` input keys (see _merge_local_mqtt_options),
