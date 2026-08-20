@@ -72,6 +72,10 @@ LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
 
 # Local MQTT (HA-MQTT listener) config — enabled by default to match 123/ baseline
 CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
+CONF_LOCAL_MQTT_HOST: Final = "local_mqtt_host"
+CONF_LOCAL_MQTT_PORT: Final = "local_mqtt_port"
+CONF_LOCAL_MQTT_USERNAME: Final = "local_mqtt_username"
+CONF_LOCAL_MQTT_PASSWORD: Final = "local_mqtt_password"
 DEFAULT_LOCAL_MQTT_ENABLE: Final = True
 
 # Reconnect-Backoff des lokalen MQTT-Subscribers. Ohne diese Schleife beendete

@@ -4186,6 +4186,11 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         key="grid_import_energy",
         translation_key="smart_meter_grid_import_energy",
         field=FIELD_CT_TOTAL_PHASE_ENERGY,
+        sum_fields=(
+            FIELD_CT_A_PHASE_ENERGY,
+            FIELD_CT_B_PHASE_ENERGY,
+            FIELD_CT_C_PHASE_ENERGY,
+        ),
         transform=_div(1000),
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -4195,6 +4200,11 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         key="grid_export_energy",
         translation_key="smart_meter_grid_export_energy",
         field=FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
+        sum_fields=(
+            FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
+            FIELD_CT_B_NEGATIVE_PHASE_ENERGY,
+            FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
+        ),
         transform=_div(1000),
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,

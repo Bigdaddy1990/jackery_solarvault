@@ -173,6 +173,16 @@ def test_config_from_options_uses_device_token_when_empty() -> None:
     assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "555555555"
 
 
+def test_config_from_options_preserves_existing_token_verbatim() -> None:
+    """Device-issued tokens must not be normalized before encryption."""
+    result = codec.third_party_mqtt_config_from_options(
+        {CONF_THIRD_PARTY_MQTT_TOKEN: " device-token "},
+        None,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == " device-token "
+
+
 # --- decode body ----------------------------------------------------------
 
 

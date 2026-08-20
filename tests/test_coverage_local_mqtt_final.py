@@ -305,6 +305,26 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
     assert snapshot["messages_forwarded"] == 1
 
 
+@pytest.mark.asyncio
+async def test_oversized_payload_is_rejected_before_decode(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The receive limit must protect both the JSON decoder and coordinator."""
+    sink = AsyncMock(return_value=True)
+    monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_PAYLOAD_BYTES", 2)
+    client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
+
+    await client._handle_message("jackery/device", b"{} ")  # ruff: ignore[private-member-access]
+
+    sink.assert_not_awaited()
+    snapshot = client.diagnostics_snapshot(redact=False)
+    assert snapshot["messages_received"] == 1
+    assert snapshot["messages_dropped"] == 1
+    assert snapshot["messages_oversized"] == 1
+    assert "exceeds 2 byte limit" in cast_str(snapshot["last_error"])
+
+
 def cast_str(value: object) -> str:
     """Return a diagnostic value as text for an explicit substring assertion."""
     return str(value)

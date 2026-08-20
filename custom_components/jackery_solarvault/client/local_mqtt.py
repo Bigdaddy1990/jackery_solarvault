@@ -215,6 +215,11 @@ class JackeryLocalMqttClient:
         self._last_message_at = self._utc_now_iso()
         if len(raw) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
             self._payload_too_large_count += 1
+            self._messages_dropped += 1
+            self._last_error = (
+                f"MQTT payload exceeds {LOCAL_MQTT_MAX_PAYLOAD_BYTES} byte limit"
+            )
+            return
         data: dict[str, Any] | None = None
         try:
             parsed = json.loads(raw.decode())
