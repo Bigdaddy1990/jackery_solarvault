@@ -1111,6 +1111,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(entry: ConfigEntry) -> JackeryOptionsFlow:
+    def async_get_options_flow(config_entry: ConfigEntry) -> JackeryOptionsFlow:
         """Return the options flow handler for this entry."""
         return JackeryOptionsFlow()

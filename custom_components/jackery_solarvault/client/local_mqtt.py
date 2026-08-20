@@ -1,15 +1,8 @@
-"""Local third-party MQTT subscriber for Jackery SolarVault.
+"""Home Assistant MQTT adapter for local Jackery telemetry.
 
-Separate from :mod:`.mqtt_push` (cloud broker, TLS, fixed Jackery topics).
-This client connects to the user's LAN broker — see PROTOCOL.md §5 /
-docs/Markdown/APP_POLLING_MQTT.md — to capture telemetry that the
-SolarVault publishes when the device-side third-party bridge is enabled.
-
-Topics published by the firmware are not fully documented across all
-SKUs, so users must configure the subscription filter explicitly in the
-options flow. Decoded payloads are pushed to an optional sink callback;
-we do NOT touch the coordinator from here so the cloud parsing pipeline
-stays the single source of truth.
+The integration deliberately shares Home Assistant's MQTT connection.  Owning a
+second broker client here duplicates credentials, reconnect handling and network
+resources, and can race Home Assistant during shutdown.
 """
 
 import asyncio
@@ -20,91 +13,55 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-import aiomqtt
-from aiomqtt import MqttError
-from aiomqtt.exceptions import MqttCodeError
+from homeassistant.components import mqtt
 
 from ..const import (
     DOMAIN,
-    MQTT_CLIENT_LIBRARY,
-    MQTT_CONNACK_REASONS,
-    MQTT_KEEPALIVE_SEC,
+    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
+    LOCAL_MQTT_MAX_TOPIC_NAMES,
+    LOCAL_MQTT_RECONNECT_FACTOR,
+    LOCAL_MQTT_RECONNECT_INITIAL_SEC,
+    LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
 
 if TYPE_CHECKING:
-    from aiomqtt import Client as MQTTClient
-
+    from homeassistant.components.mqtt.models import ReceiveMessage
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
-_AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
-logging.getLogger("aiomqtt").setLevel(logging.WARNING)
-# The per-client aiomqtt logger can emit one DEBUG line per PUBLISH frame.
-# Keep it at WARNING so enabling integration DEBUG does not create a
-# packet-log storm on busy brokers.
-_AIOMQTT_LOGGER.setLevel(logging.WARNING)
 
-# Strict by default: no implicit wildcard subscription.
-# Must match const.py LOCAL_MQTT_DEFAULT_TOPIC ("homeassistant") — owner intent
-LOCAL_MQTT_DEFAULT_TOPIC: str = "homeassistant"
-
-# Track topic names with a sensible upper bound so a misconfigured broker
-# (foreign neighbours publishing on the same LAN) cannot explode memory.
-LOCAL_MQTT_MAX_TOPIC_NAMES: int = 256
-
-# Guardrail for unexpectedly large broker payloads.
-LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
-
-# Sink signature kept loose so the wiring layer can pass any async callable
-# that accepts ``(topic, payload_dict_or_None, raw_payload_bytes)``. ``None``
-# for the dict means the payload was not valid JSON; the raw bytes are still
-# forwarded so a future binary protocol decoder can plug in without touching
-# this module.
-LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[None]]
+LOCAL_MQTT_DEFAULT_TOPIC = "homeassistant"
+LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[bool | None]]
 
 
 class JackeryLocalMqttClient:
-    """Async-native subscriber for the user's local MQTT broker."""
+    """Receive local Jackery frames through Home Assistant's MQTT client."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         *,
-        host: str,
-        port: int,
-        username: str | None,
-        password: str | None,
-        client_id: str,
         sink: LocalMqttSink | None = None,
         topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
     ) -> None:
-        """Configure the client's runtime state for a local LAN MQTT subscriber without initiating a network connection.
-
-        Parameters:
-            host (str): MQTT broker hostname or IP address.
-            port (int): MQTT broker TCP port.
-            client_id (str): MQTT client identifier to use when connecting.
-            sink (LocalMqttSink | None): Optional async callback invoked for each received message as (topic, parsed_dict_or_None, raw_bytes).
-            topic_filter (str): MQTT subscription topic filter to use when the client connects.
-        """
+        """Initialize an adapter without opening a network connection."""
         self._hass = hass
-        self._host = host
-        self._port = port
-        self._username = username or None
-        self._password = password or None
-        self._client_id = client_id
         self._sink = sink
         self._topic_filter = topic_filter
-        self._lock = asyncio.Lock()
-        self._client: MQTTClient | None = None
-        self._runner_task: asyncio.Task[None] | None = None
-        self._connected_event = asyncio.Event()
+        self._unsubscribe: Callable[[], None] | None = None
+        self._unsubscribe_status: Callable[[], None] | None = None
+        self._retry_task: asyncio.Task[None] | None = None
+        self._message_tasks: set[asyncio.Task[Any]] = set()
+        self._stopping = False
+        self._mqtt_integration_available = False
         self._connected = False
-        self._session_connected = False
         self._messages_received = 0
         self._messages_dropped = 0
         self._messages_forwarded = 0
+        self._messages_rejected_by_sink = 0
+        self._sink_errors = 0
+        self._payload_too_large_count = 0
         self._topics_seen: list[str] = []
         self._topics_seen_set: set[str] = set()
         self._topics_seen_truncated = False
@@ -113,449 +70,231 @@ class JackeryLocalMqttClient:
         self._last_connect_at: str | None = None
         self._last_disconnect_at: str | None = None
         self._last_error: str | None = None
+        self._last_sink_error: str | None = None
         self._connect_attempts = 0
-        self._blocked_by_filter_count = 0
-        self._payload_too_large_count = 0
-        self._home_assistant_event_count = 0
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
 
     async def async_start(self) -> None:
-        """Start the background MQTT session runner and trigger an initial connection attempt.
-
-        If a runner is already active, this call is a no-op. Schedules the session task as a Home Assistant background task, resets connection state, increments the internal connect attempt counter, and waits up to 10 seconds for the initial connection result so diagnostics reflect the attempt.
-        """
-        async with self._lock:
-            if self._runner_task is not None and not self._runner_task.done():
-                return
-            self._connected_event.clear()
-            self._connected = False
-            self._last_error = None
-            self._connect_attempts += 1
-            _LOGGER.info(
-                "Jackery local MQTT: connecting to %s:%s (topic filter=%r)",
-                self._host,
-                self._port,
-                self._topic_filter,
+        """Register the subscription, retrying transient MQTT startup gaps."""
+        self._stopping = False
+        if self._unsubscribe is not None or (
+            self._retry_task is not None and not self._retry_task.done()
+        ):
+            return
+        if not await self._async_subscribe_once():
+            self._retry_task = self._hass.async_create_background_task(
+                self._async_retry_subscription(),
+                name="jackery_local_mqtt_subscription_retry",
+                eager_start=False,
             )
-            self._runner_task = self._hass.async_create_background_task(
-                self._async_run_session(),
-                name="jackery_local_mqtt_runner",
-            )
-        # Surface the initial outcome to diagnostics within a bounded window
-        # without keeping the start-lock open. Reconnection is handled by the
-        # session task itself on next ``async_start`` cycle.
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(self._connected_event.wait(), timeout=10.0)
 
     async def async_stop(self) -> None:
-        """Stop the background MQTT session task and reset internal connection state.
+        """Remove subscriptions and quiesce callbacks during entry unload."""
+        self._stopping = True
+        retry_task = self._retry_task
+        self._retry_task = None
+        if retry_task is not None and retry_task is not asyncio.current_task():
+            retry_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await retry_task
+        if self._unsubscribe is not None:
+            self._unsubscribe()
+            self._unsubscribe = None
+        if self._unsubscribe_status is not None:
+            self._unsubscribe_status()
+            self._unsubscribe_status = None
+        tasks = tuple(self._message_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._connected = False
 
-        If a background session task exists it will be cancelled and awaited; cancellation, MQTT, and other finalization errors are suppressed. The client's connection state and stored client reference are cleared.
-        """
-        async with self._lock:
-            task = self._runner_task
-            self._runner_task = None
-            self._client = None
-            self._connected = False
-            self._connected_event.clear()
-            if task is None:
-                return
-            if not task.done():
-                task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, MqttError, Exception):
-                await task
-
-    # ------------------------------------------------------------------
-    # Session
-    # ------------------------------------------------------------------
-
-    async def _async_run_session(self) -> None:
-        """Manage a single MQTT session: connect to the configured broker, subscribe to the configured topic filter, and forward incoming messages to the client's message handler.
-
-        On successful connection this updates the client's connection state and last-connect timestamp and begins consuming messages until the session ends. Subscription, connect, and disconnect failures are recorded for diagnostics. Ensures the internal connection event is set before exit so callers waiting for startup cannot deadlock.
-        """
-        self._session_connected = False
+    async def _async_subscribe_once(self) -> bool:
+        """Attempt one HA MQTT subscription registration."""
+        self._connect_attempts += 1
+        self._mqtt_integration_available = await mqtt.async_wait_for_mqtt_client(
+            self._hass
+        )
+        if not self._mqtt_integration_available:
+            self._last_error = "Home Assistant MQTT client unavailable"
+            return False
+        unsubscribe_status = mqtt.async_subscribe_connection_status(
+            self._hass, self._async_connection_status_changed
+        )
         try:
-            await self._async_consume_session()
-        except MqttCodeError as err:
-            self._handle_connect_failure(self._extract_mqtt_code(err))
-        except MqttError as err:
-            self._handle_disconnect_error(str(err), self._session_connected)
+            unsubscribe = await mqtt.async_subscribe(
+                self._hass,
+                self._topic_filter,
+                self._async_message_received,
+                qos=0,
+                encoding=None,
+            )
         except asyncio.CancelledError:
+            unsubscribe_status()
             raise
         except Exception as err:  # ruff: ignore[blind-except]
-            self._last_error = f"connect failed: {err}"
-            self._connected_event.set()
-            _LOGGER.warning(
-                "Jackery local MQTT connect setup failed for %s:%s: %s",
-                self._host,
-                self._port,
-                err,
-            )
-        finally:
-            was_connected = self._session_connected
-            self._client = None
-            self._connected = False
-            if was_connected:
-                self._last_disconnect_at = self._utc_now_iso()
-            # Make sure waiters in ``async_start`` cannot deadlock on a session
-            # that exited before the broker accepted us.
-            self._connected_event.set()
-            # Automatic reconnection: if the session ended and the client is still
-            # supposed to be running, schedule a reconnect with exponential backoff.
-            if self._runner_task is not None and not self._runner_task.done():
-                asyncio.create_task(self._async_reconnect_with_backoff())  # ruff: ignore[asyncio-dangling-task]
-
-    async def _async_consume_session(self) -> None:
-        """Connect, subscribe and consume until the broker session ends."""
-        async with aiomqtt.Client(
-            hostname=self._host,
-            port=self._port,
-            identifier=self._client_id,
-            username=self._username,
-            password=self._password,
-            keepalive=MQTT_KEEPALIVE_SEC,
-            clean_session=True,
-            logger=_AIOMQTT_LOGGER,
-        ) as client:
-            self._client = client
-            self._connected = True
-            self._session_connected = True
+            unsubscribe_status()
+            self._last_error = f"{type(err).__name__}: {err}"
+            _LOGGER.warning("Unable to subscribe to local Jackery MQTT: %s", err)
+            return False
+        if self._stopping:
+            unsubscribe()
+            unsubscribe_status()
+            return False
+        self._unsubscribe = unsubscribe
+        self._unsubscribe_status = unsubscribe_status
+        self._connected = mqtt.is_connected(self._hass)
+        if self._connected:
             self._last_connect_at = self._utc_now_iso()
-            self._last_error = None
-            self._connected_event.set()
-            _LOGGER.info(
-                "Jackery local MQTT connected to %s:%s; subscribing %r",
-                self._host,
-                self._port,
-                self._topic_filter,
-            )
-            try:
-                await client.subscribe(self._topic_filter, qos=0)
-            except MqttError as err:
-                self._last_error = f"subscribe failed: {err}"
-                _LOGGER.warning(
-                    "Jackery local MQTT subscribe failed for %r: %s",
-                    self._topic_filter,
-                    err,
+        self._last_error = None
+        return True
+
+    async def _async_retry_subscription(self) -> None:
+        """Retry subscription registration with capped exponential backoff."""
+        delay = float(LOCAL_MQTT_RECONNECT_INITIAL_SEC)
+        try:
+            while not self._stopping:
+                await asyncio.sleep(delay)
+                if await self._async_retry_subscription_once():
+                    return
+                delay = min(
+                    delay * LOCAL_MQTT_RECONNECT_FACTOR,
+                    float(LOCAL_MQTT_RECONNECT_MAX_SEC),
                 )
-                return
-            async for message in client.messages:
-                self._handle_message(str(message.topic), message.payload)
+        finally:
+            self._retry_task = None
 
-    def _handle_connect_failure(self, rc: int) -> None:
-        """Mark the client as disconnected after a broker CONNACK refusal and record the refusal reason for diagnostics.
+    async def _async_retry_subscription_once(self) -> bool:
+        """Return whether retry supervision should stop."""
+        if self._stopping or self._unsubscribe is not None:
+            return True
+        return await self._async_subscribe_once()
 
-        Parameters:
-            rc (int): MQTT CONNACK return code indicating the broker's refusal reason.
-        """
-        self._connected = False
-        reason = MQTT_CONNACK_REASONS.get(rc, "unknown")
-        self._last_error = f"connect rc={rc} ({reason})"
-        self._connected_event.set()
-        _LOGGER.warning(
-            "Jackery local MQTT connect rejected by %s:%s — %s",
-            self._host,
-            self._port,
-            self._last_error,
-        )
-
-    def _handle_disconnect_error(self, error: str, was_connected: bool) -> None:
-        """Record a connection setup failure or a disconnect and update the client's last-error state.
-
-        Parameters:
-            error (str): Human-readable error message to record.
-            was_connected (bool): True if the client had already established a connection when the error occurred; False if the failure happened while attempting to connect.
-        """
-        if was_connected:
-            self._last_error = f"disconnect: {error}"
-            _LOGGER.debug("Jackery local MQTT disconnected: %s", error)
+    def _async_connection_status_changed(self, connected: bool) -> None:
+        """Observe the shared broker status without controlling it."""
+        if connected == self._connected:
+            return
+        self._connected = connected
+        if connected:
+            self._last_connect_at = self._utc_now_iso()
         else:
-            self._last_error = f"connect failed: {error}"
-            _LOGGER.debug("Jackery local MQTT connect setup failed: %s", error)
+            self._last_disconnect_at = self._utc_now_iso()
 
-    async def _async_reconnect_with_backoff(self) -> None:
-        """Reconnect to the broker with exponential backoff.
+    async def _async_message_received(self, message: ReceiveMessage) -> None:
+        """Normalize an HA MQTT message and track the in-flight callback."""
+        if self._stopping:
+            return
+        task = asyncio.current_task()
+        if task is not None:
+            self._message_tasks.add(task)
+        try:
+            await self._handle_message(str(message.topic), message.payload)
+        finally:
+            if task is not None:
+                self._message_tasks.discard(task)
 
-        This is called when a session ends unexpectedly while the client is
-        still supposed to be running. It waits with increasing delays
-        (1s, 2s, 4s, 8s, max 60s) before attempting to reconnect.
-        """
-        max_delay = 60.0
-        base_delay = 1.0
-        attempt = 0
-        while self._runner_task is not None and not self._runner_task.done():
-            delay = min(base_delay * (2**attempt), max_delay)
-            _LOGGER.info(
-                "Jackery local MQTT: scheduling reconnect in %.1fs (attempt %d)",
-                delay,
-                attempt + 1,
-            )
-            await asyncio.sleep(delay)
-            attempt += 1
-            # Check if we should still be running
-            if self._runner_task is None or self._runner_task.done():
-                break
-            async with self._lock:
-                if self._runner_task is not None and not self._runner_task.done():
-                    self._connected_event.clear()
-                    self._connected = False
-                    self._last_error = None
-                    self._connect_attempts += 1
-                    _LOGGER.info(
-                        "Jackery local MQTT: reconnecting to %s:%s (topic filter=%r)",
-                        self._host,
-                        self._port,
-                        self._topic_filter,
-                    )
-                    self._runner_task = self._hass.async_create_background_task(
-                        self._async_run_session(),
-                        name="jackery_local_mqtt_runner",
-                    )
-
-    @staticmethod
-    def _extract_mqtt_code(err: MqttCodeError) -> int:
-        """Extract the numeric MQTT return code from a MqttCodeError instance.
-
-        Parameters:
-            err (MqttCodeError): The exception object that may contain an `rc` attribute or an `rc.value` holding the numeric code.
-
-        Returns:
-            int: The MQTT return code if present, otherwise `0`.
-        """
-        rc = getattr(err, "rc", None)
-        if isinstance(rc, int):
-            return rc
-        value = getattr(rc, "value", None)
-        if isinstance(value, int):
-            return value
-        return 0
-
-    # ------------------------------------------------------------------
-    # Message handling
-    # ------------------------------------------------------------------
-
-    def _handle_message(
-        self,
-        topic: str,
-        payload: bytes | bytearray | str,
+    async def _handle_message(
+        self, topic: str, payload: bytes | bytearray | str
     ) -> None:
-        """Forward every received MQTT message to the configured sink.
-
-        Nothing is dropped here. Payload classification belongs to the
-        coordinator, which owns the parsing pipeline and can log what it did
-        not understand. Silently discarding messages in the transport hid real
-        payloads behind a "received" counter that never turned into data.
-        """
+        """Decode JSON when possible and forward every broker-selected frame."""
+        if self._stopping:
+            return
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
                 self._topics_seen.append(topic)
-                _LOGGER.debug("Jackery local MQTT: first message on topic %r", topic)
             else:
                 self._topics_seen_truncated = True
+        raw = (
+            payload.encode(errors="replace")
+            if isinstance(payload, str)
+            else bytes(payload)
+        )
         self._messages_received += 1
         self._last_topic = topic
         self._last_message_at = self._utc_now_iso()
-
-        raw_bytes: bytes
-        decoded_text_hint: str | None
-        if isinstance(payload, str):
-            raw_bytes = payload.encode("utf-8", errors="replace")
-            decoded_text_hint = payload
-        elif isinstance(payload, bytes):
-            raw_bytes = payload
-            decoded_text_hint = None
-        else:
-            raw_bytes = bytes(payload)
-            decoded_text_hint = None
-
-        if len(raw_bytes) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
-            # Surfaced, not suppressed: the message is still forwarded.
+        if len(raw) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
             self._payload_too_large_count += 1
-            _LOGGER.warning(
-                "Jackery local MQTT: oversized payload on %r (%s bytes > %s), "
-                "forwarding anyway",
-                topic,
-                len(raw_bytes),
-                LOCAL_MQTT_MAX_PAYLOAD_BYTES,
-            )
-        # No sink means nobody is listening -- not a filter.
-        if self._sink is None:
-            return
-
-        if decoded_text_hint is not None:
-            text = decoded_text_hint
-        else:
-            try:
-                text = raw_bytes.decode("utf-8")
-            except UnicodeDecodeError:
-                text = None
-
         data: dict[str, Any] | None = None
-        if text is None:
-            _LOGGER.debug(
-                "Jackery local MQTT: non-UTF-8 payload on %r (%s bytes): %s",
-                topic,
-                len(raw_bytes),
-                raw_bytes[:120].hex(),
-            )
-        else:
-            try:
-                parsed = json.loads(text)
-            except json.JSONDecodeError, ValueError:
-                parsed = None
-                _LOGGER.debug(
-                    "Jackery local MQTT: non-JSON payload on %r: %s",
-                    topic,
-                    text[:400],
-                )
+        try:
+            parsed = json.loads(raw.decode())
             if isinstance(parsed, dict):
                 data = parsed
-            elif parsed is not None:
-                _LOGGER.debug(
-                    "Jackery local MQTT: non-object JSON on %r: %s",
-                    topic,
-                    text[:400],
-                )
-
+        except UnicodeDecodeError, json.JSONDecodeError:
+            pass
+        if self._sink is None:
+            self._messages_dropped += 1
+            return
+        try:
+            accepted = await self._sink(topic, data, raw)
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            self._sink_errors += 1
+            self._messages_dropped += 1
+            self._last_sink_error = f"{type(err).__name__}: {err}"
+            _LOGGER.exception("Local Jackery MQTT sink failed")
+            return
+        if accepted is False:
+            self._messages_rejected_by_sink += 1
+            self._messages_dropped += 1
+            return
         self._messages_forwarded += 1
-        self._schedule_coroutine(self._sink(topic, data, raw_bytes), label="sink")
-
-    def _schedule_coroutine(self, coro: Awaitable[None], label: str) -> None:
-        """Schedule an awaitable as a Home Assistant background task and log any non-cancellation exceptions from it.
-
-        Parameters:
-            coro (Awaitable[None]): Coroutine to run as a background task.
-            label (str): Short label used to name the task (`jackery_local_mqtt_{label}`) and included in error logs.
-        """
-
-        async def _runner() -> None:
-            """Await the provided coroutine and allow any exception it raises to propagate.
-
-            This helper awaits the closure-captured coroutine `coro`. It does not swallow exceptions so that callers or task completion callbacks can observe and handle errors.
-            """
-            await coro
-
-        task = self._hass.async_create_task(
-            _runner(), name=f"jackery_local_mqtt_{label}"
-        )
-
-        def _log_task_result(done: asyncio.Task[None]) -> None:
-            """Log exceptions raised by a completed asyncio Task, ignoring CancelledError.
-
-            Inspects the task's result and logs any exception (other than CancelledError) at error level.
-
-            Parameters:
-                done (asyncio.Task[None]): Completed task to inspect for exceptions.
-            """
-            try:
-                done.result()
-            except asyncio.CancelledError:
-                return
-            except Exception as err:
-                _LOGGER.exception(
-                    "Jackery local MQTT %s handler failed: %s",
-                    label,
-                    err,  # ruff: ignore[verbose-log-message]
-                )
-
-        task.add_done_callback(_log_task_result)
-
-    # ------------------------------------------------------------------
-    # Diagnostics
-    # ------------------------------------------------------------------
 
     def diagnostics_snapshot(self, *, redact: bool = True) -> dict[str, Any]:
-        """Produce a JSON-serializable snapshot of the client's runtime state for diagnostics.
-
-        Parameters:
-            redact (bool): If True, redact sensitive fields (host, port, and topic names); if False, include real host, port, and topic names.
-
-        Returns:
-            dict[str, Any]: A snapshot containing connection/configuration flags, topic diagnostics, message counters, last-seen timestamps/errors, connect attempts, and the MQTT client library identifier.
-        """
-        # Explicit annotation so the redacted (all-str) and unredacted (str + int
-        # port) branches do not lock the inferred dict type to ``dict[str, str]``.
-        target: dict[str, Any]
-        if redact:
-            target = {
-                "host": REDACTED_VALUE,
-                "port": REDACTED_VALUE,
-            }
-            last_topic: str | None = (
-                REDACTED_VALUE if self._last_topic is not None else None
-            )
-            # Topic NAMES can contain device IDs / MAC fragments; redact them
-            # in normal diagnostics exports. The count and ``topics_truncated``
-            # flag are still useful to confirm the listener is receiving.
-            topics = [REDACTED_VALUE for _ in self._topics_seen]
-            topic_filter = REDACTED_VALUE
-        else:
-            target = {"host": self._host, "port": self._port}
-            last_topic = self._last_topic
-            topics = list(self._topics_seen)
-            topic_filter = self._topic_filter
-        routing_warning = None
-        if (
-            self._messages_received > 0
-            and self._messages_forwarded == 0
-            and self._home_assistant_event_count == self._messages_received
-        ):
-            routing_warning = "topic_receives_home_assistant_event_stream_only"
+        """Return privacy-safe transport diagnostics."""
+        topics = (
+            [REDACTED_VALUE] * len(self._topics_seen)
+            if redact
+            else list(self._topics_seen)
+        )
         return {
             "enabled": True,
-            "configured_target": target,
+            "transport": "homeassistant.components.mqtt",
+            "library": "homeassistant.components.mqtt",
+            "mqtt_integration_available": self._mqtt_integration_available,
+            "subscribed": self.is_started,
             "connected": self._connected,
-            "started": self._runner_task is not None,
-            "topic_filter": topic_filter,
+            "started": self.is_started,
+            "subscription_retry_active": self._retry_task is not None,
+            "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
             "topics_seen_count": len(self._topics_seen),
             "topics_seen": topics,
             "topics_seen_truncated": self._topics_seen_truncated,
             "messages_received": self._messages_received,
             "messages_dropped": self._messages_dropped,
             "messages_forwarded": self._messages_forwarded,
-            "last_topic": last_topic,
+            "messages_rejected_by_sink": self._messages_rejected_by_sink,
+            "sink_errors": self._sink_errors,
+            "last_sink_error": self._last_sink_error,
+            "last_topic": REDACTED_VALUE
+            if redact and self._last_topic
+            else self._last_topic,
             "last_message_at": self._last_message_at,
             "last_connect_at": self._last_connect_at,
             "last_disconnect_at": self._last_disconnect_at,
             "last_error": self._last_error,
             "connect_attempts": self._connect_attempts,
-            "blocked_by_filter_count": self._blocked_by_filter_count,
             "payload_too_large_count": self._payload_too_large_count,
-            "home_assistant_event_count": self._home_assistant_event_count,
-            "routing_warning": routing_warning,
-            "library": MQTT_CLIENT_LIBRARY,
+            "messages_oversized": self._payload_too_large_count,
         }
+
+    def matches_configuration(self, topic_filters: tuple[str, ...]) -> bool:
+        """Whether the adapter already owns exactly this subscription."""
+        return topic_filters == (self._topic_filter,)
 
     @property
     def is_connected(self) -> bool:
-        """Indicates whether the client currently has an active MQTT broker session.
-
-        Returns:
-            True if the client has an active MQTT broker session, False otherwise.
-        """
+        """Whether Home Assistant's shared broker is connected."""
         return self._connected
 
     @property
     def is_started(self) -> bool:
-        """Report whether the background MQTT session runner task has been started.
-
-        Returns:
-            True if the runner task exists, False otherwise.
-        """
-        return self._runner_task is not None
+        """Whether the HA MQTT subscription is registered."""
+        return self._unsubscribe is not None
 
     @staticmethod
     def _utc_now_iso() -> str:
-        """Return the current UTC time as an ISO 8601 string with a timezone offset.
-
-        Returns:
-            ISO 8601 formatted UTC timestamp including timezone offset (e.g. "2026-05-27T12:34:56+00:00").
-        """
         return datetime.now(UTC).isoformat()
 
 
@@ -563,18 +302,13 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant,
-    entry: Any,
+    hass: HomeAssistant, entry: Any
 ) -> JackeryLocalMqttClient | None:
-    """Retrieve the JackeryLocalMqttClient for a config entry from hass.data.
-
-    Parameters:
-        hass (HomeAssistant): Home Assistant runtime container.
-        entry: Config entry-like object with an `entry_id` attribute used to locate the per-entry bucket.
-
-    Returns:
-        JackeryLocalMqttClient | None: The client instance for the entry, or `None` if not found or the stored value has a different type.
-    """
+    """Return the local MQTT adapter stored for a config entry."""
+    coordinator = getattr(entry, "runtime_data", None)
+    runtime_client = getattr(coordinator, "local_mqtt_client", None)
+    if isinstance(runtime_client, JackeryLocalMqttClient):
+        return runtime_client
     bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if not isinstance(bucket, dict):
         return None
