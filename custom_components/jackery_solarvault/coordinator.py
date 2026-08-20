@@ -19,6 +19,7 @@ import contextlib
 import copy
 from dataclasses import dataclass, field as dataclass_field
 from datetime import UTC, date, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from enum import StrEnum
 from functools import partial, wraps
 import importlib
@@ -933,6 +934,24 @@ _ENDPOINT_BACKOFF_UNSUPPORTED_DELAYS_SEC: tuple[int, ...] = (21600,)
 def _is_system_busy_error(err: BaseException) -> bool:
     """Return whether Jackery rejected a request with its transient busy code."""
     return f"code={_SYSTEM_BUSY_API_CODE}" in str(err)
+
+
+def _rate_limit_retry_after_seconds(err: BaseException) -> float:
+    """Return a bounded Retry-After delay exposed by common HTTP clients."""
+    value: object = getattr(err, "retry_after", None)
+    response = getattr(err, "response", None)
+    headers = getattr(response, "headers", None) or getattr(err, "headers", None)
+    if value is None and isinstance(headers, Mapping):
+        value = headers.get("Retry-After") or headers.get("retry-after")
+    if isinstance(value, timedelta):
+        seconds = value.total_seconds()
+    else:
+        seconds = safe_float(value)
+    if seconds is None and isinstance(value, str):
+        with contextlib.suppress(ValueError, TypeError, OverflowError):
+            retry_at = parsedate_to_datetime(value)
+            seconds = (retry_at.astimezone(UTC) - datetime.now(UTC)).total_seconds()
+    return max(1.0, seconds or _STATISTICS_HTTP_TRANSIENT_RETRY_SEC)
 
 
 # Timeouts carry no cloud error ``code=`` token, so the code-based backoff above
@@ -3397,6 +3416,9 @@ _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS = 120
 # former 50/20-request storm that competed with current HTTP statistics.
 _STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET = 12
 _STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET = 6
+_STATISTICS_HTTP_CYCLE_REQUEST_BUDGET = 12
+_STATISTICS_HTTP_CYCLE_TIME_BUDGET_SEC = 20.0
+_STATISTICS_HTTP_DEVICE_CONCURRENCY = 2
 _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_BACKFILL_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS = 2
@@ -3764,6 +3786,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # the short Recorder read/upsert section is serialized so a long HTTP
         # backfill can never fence the current day import.
         self._statistics_recorder_lock = asyncio.Lock()
+        self._statistics_backfill_store_lock = asyncio.Lock()
         self._statistics_import_ready = False
         self._battery_pack_ota_tasks: dict[str, asyncio.Task[None]] = {}
         # Experimental BLE transport (Phase 3a — gated by
@@ -5025,7 +5048,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         ) -> None:
             try:
                 results[key] = await self._async_http_call(call)
-            except (JackeryAuthError, asyncio.CancelledError):
+            except JackeryAuthError, asyncio.CancelledError:
                 raise
             except Exception as err:  # ruff: ignore[blind-except]  # isolate transport/payload errors
                 results[key] = err
@@ -12374,19 +12397,58 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Advance the bounded historical HTTP queues outside current imports."""
         if not snapshot:
             return
+        retry_until = safe_float(getattr(self, "_statistics_rate_limit_until", None))
+        if retry_until is not None and retry_until > time.time():
+            self._statistics_import_diagnostics.update({
+                "last_http_backfill_rate_limited": True,
+                "next_http_backfill_allowed_in_seconds": round(
+                    retry_until - time.time(),
+                    3,
+                ),
+                "last_period_backfill_skipped_reason": "global_rate_limit",
+            })
+            return
 
         startup_sync = self._statistics_startup_sync_pending
-        backfill_result = await self._async_http_backfill_recent_day_statistics(
-            snapshot,
-            force=startup_sync,
-            window_days=(
-                _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
-                if startup_sync
-                else _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS
-            ),
-            include_current_year=startup_sync,
-            request_budget=_STATISTICS_HTTP_BACKFILL_REQUEST_BUDGET,
+        deadline = time.monotonic() + _STATISTICS_HTTP_CYCLE_TIME_BUDGET_SEC
+        self._statistics_backfill_deadline = deadline
+        devices = sorted(snapshot.items(), key=lambda item: str(item[0]))
+        semaphore = asyncio.Semaphore(_STATISTICS_HTTP_DEVICE_CONCURRENCY)
+
+        async def _day(
+            item: tuple[str, dict[str, Any]],
+            budget: int,
+        ) -> dict[str, Any]:
+            async with semaphore:
+                if (
+                    getattr(self, "_shutdown_started", False)
+                    or time.monotonic() >= deadline
+                ):
+                    return {"requests": 0, "actionable_sources": 1}
+                device_id, payload = item
+                return await self._async_http_backfill_recent_day_statistics(
+                    {device_id: payload},
+                    force=startup_sync,
+                    window_days=(
+                        _STATISTICS_HTTP_STARTUP_BACKFILL_MIN_DAYS
+                        if startup_sync
+                        else _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS
+                    ),
+                    include_current_year=startup_sync,
+                    request_budget=budget,
+                )
+
+        day_results = await asyncio.gather(
+            *map(
+                _day,
+                devices,
+                self._split_backfill_request_budget(
+                    _STATISTICS_HTTP_CYCLE_REQUEST_BUDGET, len(devices)
+                ),
+                strict=True,
+            )
         )
+        backfill_result = self._merge_backfill_results(day_results)
         day_pending = backfill_result.get("actionable_sources", 0)
         if backfill_result.get("rate_limited") is True:
             self._statistics_import_diagnostics[
@@ -12397,12 +12459,68 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             "last_period_backfill_skipped_reason",
             None,
         )
-        period_backfill_result = await self._async_http_backfill_period_statistics(
-            snapshot,
+        remaining = max(
+            0,
+            _STATISTICS_HTTP_CYCLE_REQUEST_BUDGET
+            - int(backfill_result.get("requests", 0)),
         )
+
+        async def _period(
+            item: tuple[str, dict[str, Any]],
+            budget: int,
+        ) -> dict[str, Any]:
+            async with semaphore:
+                if (
+                    getattr(self, "_shutdown_started", False)
+                    or time.monotonic() >= deadline
+                ):
+                    return {"requests": 0, "actionable_sources": 1}
+                device_id, payload = item
+                device_snapshot = {device_id: payload}
+                if budget == _STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET:
+                    return await self._async_http_backfill_period_statistics(
+                        device_snapshot,
+                    )
+                return await self._async_http_backfill_period_statistics(
+                    device_snapshot,
+                    request_budget=budget,
+                )
+
+        period_results = await asyncio.gather(
+            *map(
+                _period,
+                devices,
+                self._split_backfill_request_budget(
+                    min(remaining, _STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET),
+                    len(devices),
+                ),
+                strict=True,
+            )
+        )
+        period_backfill_result = self._merge_backfill_results(period_results)
         period_pending = period_backfill_result.get("actionable_sources", 0)
         if startup_sync and period_pending == 0 and day_pending == 0:
             self._statistics_startup_sync_pending = False
+
+    @staticmethod
+    def _split_backfill_request_budget(total: int, workers: int) -> list[int]:
+        """Split one hard request cap fairly between independent devices."""
+        if workers <= 0:
+            return []
+        quotient, remainder = divmod(max(0, total), workers)
+        return [quotient + int(index < remainder) for index in range(workers)]
+
+    @staticmethod
+    def _merge_backfill_results(results: list[dict[str, Any]]) -> dict[str, Any]:
+        """Merge per-device queue accounting without losing rate limits."""
+        merged: dict[str, Any] = {}
+        for result in results:
+            for key, value in result.items():
+                if key == "rate_limited":
+                    merged[key] = bool(merged.get(key)) or value is True
+                elif isinstance(value, int | float) and not isinstance(value, bool):
+                    merged[key] = merged.get(key, 0) + value
+        return merged
 
     # ------------------------------------------------------------------
     # Statistics import & data-quality reporting
@@ -12505,9 +12623,16 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     async def _async_save_statistics_backfill_state(self) -> None:
         """Persist recorder-statistics repair state."""
-        await self._statistics_backfill_store.async_save(
-            self._statistics_backfill_state,
-        )
+        lock = getattr(self, "_statistics_backfill_store_lock", None)
+        if lock is None:
+            await self._statistics_backfill_store.async_save(
+                copy.deepcopy(self._statistics_backfill_state),
+            )
+            return
+        async with lock:
+            await self._statistics_backfill_store.async_save(
+                copy.deepcopy(self._statistics_backfill_state),
+            )
 
     async def _async_ensure_statistics_backfill_state_loaded(self) -> None:
         """Load persistent repair state on demand."""
@@ -14302,7 +14427,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             ) -> None:
                 try:
                     values_by_endpoint[dev_id, endpoint] = await request
-                except (JackeryAuthError, asyncio.CancelledError):
+                except JackeryAuthError, asyncio.CancelledError:
                     raise
                 except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
                     values_by_endpoint[dev_id, endpoint] = err
@@ -14498,7 +14623,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     month_sources[prefix, month] = await _fetch_device_month(
                         prefix, month
                     )
-                except (JackeryAuthError, asyncio.CancelledError):
+                except JackeryAuthError, asyncio.CancelledError:
                     raise
                 except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
                     month_sources[prefix, month] = err
@@ -17525,6 +17650,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             error_status = (
                 "rate_limited" if _is_system_busy_error(err) else "transport_error"
             )
+            if error_status == "rate_limited":
+                self._statistics_rate_limit_until = (
+                    time.time() + _rate_limit_retry_after_seconds(err)
+                )
         except Exception as err:  # ruff: ignore[blind-except]  # Dynamic endpoint failures remain retryable per source.
             _LOGGER.debug(
                 "Jackery historical %s fetch for %s on %s failed: %s",
@@ -17933,6 +18062,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         day_state: dict[str, Any],
         *,
         status: str,
+        retry_until: float | None = None,
     ) -> bool:
         """Apply retry state for one unsuccessful day fetch.
 
@@ -17943,7 +18073,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         attempts_now = attempts if isinstance(attempts, int) else 0
         if status == "rate_limited":
             day_state[_STATISTICS_HTTP_RETRY_AFTER_EPOCH] = (
-                time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+                retry_until or time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
             )
             return True
         if (
@@ -17963,7 +18093,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
         return False
 
-    async def _async_http_backfill_recent_day_statistics(  # ruff: ignore[too-many-locals]  # Keep persistent per-source accounting explicit.
+    async def _async_http_backfill_recent_day_statistics(  # ruff: ignore[complex-structure, too-many-locals]  # Keep persistent per-source accounting explicit.
         self,
         snapshot: dict[str, dict[str, Any]],
         *,
@@ -18163,6 +18293,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             day_state,
             days_state,
         ) in candidates[: max(0, request_budget)]:
+            deadline = getattr(self, "_statistics_backfill_deadline", None)
+            if getattr(self, "_shutdown_started", False) or (
+                isinstance(deadline, int | float) and time.monotonic() >= deadline
+            ):
+                break
             requests += 1
             status, source = await self._async_fetch_historical_day_chart_source(
                 device_id=device_id,
@@ -18187,6 +18322,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 rate_limited = self._apply_unfetched_day_backfill_status(
                     day_state,
                     status=status,
+                    retry_until=getattr(
+                        self,
+                        "_statistics_rate_limit_until",
+                        None,
+                    ),
                 )
                 actionable_sources_total -= int(
                     day_state.get(_STATISTICS_HTTP_RETRY_AFTER_EPOCH) is not None
@@ -18554,6 +18694,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             bucket_state,
             type_state,
         ) in candidates[: max(0, request_budget)]:
+            deadline = getattr(self, "_statistics_backfill_deadline", None)
+            if getattr(self, "_shutdown_started", False) or (
+                isinstance(deadline, int | float) and time.monotonic() >= deadline
+            ):
+                break
             _LOGGER.debug(
                 "Period backfill processing: device=%s prefix=%s "
                 "date_type=%s period=%s status=%s",
@@ -18593,6 +18738,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 status = (
                     "rate_limited" if _is_system_busy_error(err) else "transport_error"
                 )
+                if status == "rate_limited":
+                    self._statistics_rate_limit_until = (
+                        time.time() + _rate_limit_retry_after_seconds(err)
+                    )
                 _LOGGER.debug(
                     "Jackery period backfill failed for %s %s %s: %s",
                     device_id,
@@ -18672,7 +18821,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 bucket_state.update({
                     "status": BackfillStatus.RETRYABLE.value,
                     _STATISTICS_HTTP_RETRY_AFTER_EPOCH: (
-                        time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC
+                        getattr(
+                            self,
+                            "_statistics_rate_limit_until",
+                            time.time() + _STATISTICS_HTTP_TRANSIENT_RETRY_SEC,
+                        )
                     ),
                 })
                 actionable_sources_total -= 1
