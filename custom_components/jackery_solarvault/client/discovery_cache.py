@@ -7,17 +7,23 @@ import logging
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
-from ..const import DOMAIN
+from ..const import (
+    CACHE_ENTRIES_KEY,
+    CACHE_STORAGE_VERSION,
+    DISCOVERY_CACHE_DEVICE_INDEX_KEY,
+    DISCOVERY_CACHE_STORAGE_KEY,
+    DOMAIN,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
-_STORAGE_VERSION: Final = 1
-_STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"
+_STORAGE_VERSION: Final = CACHE_STORAGE_VERSION
+_STORAGE_KEY: Final = DISCOVERY_CACHE_STORAGE_KEY
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
-_KEY_ENTRIES: Final = "entries"
-_KEY_DEVICE_INDEX: Final = "device_index"
+_KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
+_KEY_DEVICE_INDEX: Final = DISCOVERY_CACHE_DEVICE_INDEX_KEY
 
 
 def _store_lock(hass: HomeAssistant) -> asyncio.Lock:

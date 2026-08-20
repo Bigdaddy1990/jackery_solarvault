@@ -176,6 +176,25 @@ MQTT_SESSION_MAC_ID_SOURCE: Final = "mac_id_source"
 MQTT_SESSION_SEED_B64: Final = "seed_b64"
 MQTT_SESSION_USER_ID: Final = "user_id"
 
+# Home Assistant Store schemas used by the client caches. Keeping these names
+# here prevents cache readers, writers and migrations from silently diverging.
+CACHE_STORAGE_VERSION: Final = 1
+CACHE_ENTRIES_KEY: Final = "entries"
+DISCOVERY_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.discovery_cache"
+DISCOVERY_CACHE_DEVICE_INDEX_KEY: Final = "device_index"
+LOCAL_DAILY_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
+LOCAL_DAILY_CACHE_DAY_KEY: Final = "day"
+LOCAL_DAILY_CACHE_VALUES_KEY: Final = "values"
+LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY: Final = "completed_days"
+LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY: Final = "complete_days"
+LOCAL_DAILY_CACHE_LAST_DELTAS_KEY: Final = "last_deltas"
+LOCAL_DAILY_CACHE_HISTORY_DAYS: Final = 400
+MQTT_SESSION_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
+MQTT_SESSION_CACHE_CACHED_AT_KEY: Final = "cached_at"
+MQTT_SESSION_CACHE_EXPIRES_AT_KEY: Final = "expires_at"
+MQTT_SESSION_CACHE_CLOCK_SKEW_SEC: Final = 300.0
+MQTT_SESSION_SEED_LEN: Final = 32
+
 # Third-party MQTT bridge config. Surfaced in the
 # options/reconfigure flow so the device can be told to publish telemetry to
 # a local MQTT broker. The bridge is ENABLED by default to match 123/ baseline
@@ -2915,12 +2934,6 @@ DEFAULT_LIVE_SOURCES: Final[tuple[str, ...]] = (
     "ble",
 )
 DEFAULT_NULL_SEMANTICS: Final = "ignore"
-_STORAGE_VERSION: Final = 1
-_KEY_ENTRIES: Final = "entries"
-_KEY_CACHED_AT: Final = "cached_at"
-_KEY_DEVICE_INDEX: Final = "device_index"
-_KEY_DAY: Final = "day"
-_KEY_VALUES: Final = "values"
 # Limit concurrent control-write/update calls. This is a setter platform:
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
 # the broker bounded and prevents reordering of `DevicePropertyChange`

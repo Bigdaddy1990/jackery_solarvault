@@ -27,6 +27,7 @@ from custom_components.jackery_solarvault.client.mqtt_session_cache import (
     async_save_mqtt_session,
 )
 from custom_components.jackery_solarvault.client.local_daily_cache import (
+    async_load_daily_cache,
     async_save_daily_cache,
 )
 from custom_components.jackery_solarvault.const import (
@@ -318,3 +319,44 @@ async def test_discovery_cache_rejects_blank_identity_and_empty_record(
     assert await async_load_discovery_cache(hass, "invalid-discovery") == {
         "valid": {"model": "SolarVault"},
     }
+
+
+@pytest.mark.asyncio
+async def test_daily_cache_rejects_blank_devices_and_non_finite_counters(
+    hass: HomeAssistant,
+) -> None:
+    """Malformed local counters cannot abort persistence or create ghost devices."""
+    await async_save_daily_cache(
+        hass,
+        "daily-validation",
+        snapshots={
+            " ": {"day": "2026-08-20", "values": {"pvEgy": 10}},
+            "device": {
+                "day": "2026-08-20",
+                "values": {
+                    "valid": 12,
+                    "boolean": True,
+                    "infinite": float("inf"),
+                },
+            },
+        },
+    )
+
+    assert await async_load_daily_cache(hass, "daily-validation") == {
+        "device": {"day": "2026-08-20", "values": {"valid": 12}},
+    }
+
+
+def test_mqtt_session_normalization_trims_identifiers() -> None:
+    """Whitespace around broker identities never reaches credential generation."""
+    normalized = mqtt_session_cache_module.normalize_mqtt_session_snapshot({
+        MQTT_SESSION_USER_ID: " user ",
+        MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+        MQTT_SESSION_MAC_ID: " AABBCCDDEEFF ",
+        MQTT_SESSION_MAC_ID_SOURCE: " api ",
+    })
+
+    assert normalized is not None
+    assert normalized[MQTT_SESSION_USER_ID] == "user"
+    assert normalized[MQTT_SESSION_MAC_ID] == "AABBCCDDEEFF"
+    assert normalized[MQTT_SESSION_MAC_ID_SOURCE] == "api"

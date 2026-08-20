@@ -31,27 +31,36 @@ from typing import TYPE_CHECKING, Any, Final
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from ..const import (
+    CACHE_ENTRIES_KEY,
+    CACHE_STORAGE_VERSION,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     DOMAIN,
+    LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY,
+    LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY,
+    LOCAL_DAILY_CACHE_DAY_KEY,
+    LOCAL_DAILY_CACHE_HISTORY_DAYS,
+    LOCAL_DAILY_CACHE_LAST_DELTAS_KEY,
+    LOCAL_DAILY_CACHE_STORAGE_KEY,
+    LOCAL_DAILY_CACHE_VALUES_KEY,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
 _LOGGER = logging.getLogger(__name__)
-_STORAGE_VERSION: Final = 1
-_STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
+_STORAGE_VERSION: Final = CACHE_STORAGE_VERSION
+_STORAGE_KEY: Final = LOCAL_DAILY_CACHE_STORAGE_KEY
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
-_KEY_ENTRIES: Final = "entries"
-_KEY_DAY: Final = "day"
-_KEY_VALUES: Final = "values"
-_KEY_COMPLETED_DAYS: Final = "completed_days"
-_KEY_COMPLETE_DAYS: Final = "complete_days"
-_KEY_LAST_DELTAS: Final = "last_deltas"
-_MAX_COMPLETED_DAY_HISTORY: Final = 400
+_KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
+_KEY_DAY: Final = LOCAL_DAILY_CACHE_DAY_KEY
+_KEY_VALUES: Final = LOCAL_DAILY_CACHE_VALUES_KEY
+_KEY_COMPLETED_DAYS: Final = LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY
+_KEY_COMPLETE_DAYS: Final = LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY
+_KEY_LAST_DELTAS: Final = LOCAL_DAILY_CACHE_LAST_DELTAS_KEY
+_MAX_COMPLETED_DAY_HISTORY: Final = LOCAL_DAILY_CACHE_HISTORY_DAYS
 
 
 def _is_iso_day(day: object, *, context: str) -> bool:
@@ -90,9 +99,14 @@ def _clean_metric_values(values: object) -> dict[str, int]:
                 "Jackery daily cache: dropping non-string metric key %r", metric
             )
             continue
+        if isinstance(value, bool):
+            _LOGGER.warning(
+                "Jackery daily cache: dropping boolean metric %s=%r", metric, value
+            )
+            continue
         try:
             normalized = int(value)
-        except (TypeError, ValueError) as err:
+        except (OverflowError, TypeError, ValueError) as err:
             _LOGGER.warning(
                 "Jackery daily cache: dropping metric %s with unusable value "
                 "%r: %s",
@@ -362,7 +376,9 @@ async def async_save_daily_cache(
         last_deltas = _clean_metric_values(payload.get(_KEY_LAST_DELTAS))
         if last_deltas:
             clean_snapshot[_KEY_LAST_DELTAS] = last_deltas
-        cleaned[str(device_id)] = clean_snapshot
+        normalized_device_id = str(device_id).strip()
+        if normalized_device_id:
+            cleaned[normalized_device_id] = clean_snapshot
 
     async def _async_persist() -> None:
         """Finish the serialized Store transaction even if setup is cancelled."""
@@ -405,11 +421,11 @@ def daily_delta(
         int | None: The computed delta in the metric's raw counter unit when the
         snapshot and current lifetime counter are valid; otherwise ``None``.
     """
-    if current_lifetime_value is None:
+    if current_lifetime_value is None or isinstance(current_lifetime_value, bool):
         return None
     try:
         current = int(current_lifetime_value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     if not isinstance(snapshot, dict):
         return None
@@ -420,11 +436,11 @@ def daily_delta(
     if not isinstance(values, dict):
         return None
     anchor = values.get(metric_key)
-    if anchor is None:
+    if anchor is None or isinstance(anchor, bool):
         return None
     try:
         anchor_int = int(anchor)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     if current < anchor_int:
         return None
@@ -498,7 +514,7 @@ def refresh_snapshot(
                 continue
             try:
                 clean_values[metric] = int(value)
-            except (TypeError, ValueError) as err:
+            except (OverflowError, TypeError, ValueError) as err:
                 _LOGGER.warning(
                     "Jackery daily cache: dropping current metric %s=%r: %s",
                     metric,
@@ -527,7 +543,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError) as err:
+        except (OverflowError, TypeError, ValueError) as err:
             _LOGGER.warning(
                 "Jackery daily cache: dropping stored metric %s=%r: %s",
                 metric,
@@ -542,7 +558,7 @@ def refresh_snapshot(
             continue
         try:
             merged[metric] = int(value)
-        except (TypeError, ValueError) as err:
+        except (OverflowError, TypeError, ValueError) as err:
             _LOGGER.warning(
                 "Jackery daily cache: dropping incoming metric %s=%r: %s",
                 metric,
@@ -586,11 +602,11 @@ def period_delta(
     period: str,
 ) -> int | None:
     """Sum a native-unit period delta only when every elapsed day is covered."""
-    if current_day_delta is None:
+    if current_day_delta is None or isinstance(current_day_delta, bool):
         return None
     try:
         current_delta = int(current_day_delta)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     if current_delta < 0:
         return None

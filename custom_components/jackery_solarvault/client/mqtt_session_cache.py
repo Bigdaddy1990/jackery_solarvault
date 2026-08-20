@@ -26,10 +26,17 @@ from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.helpers.storage import Store
 from ..const import (
+    CACHE_ENTRIES_KEY,
+    CACHE_STORAGE_VERSION,
     DOMAIN,
+    MQTT_SESSION_CACHE_CACHED_AT_KEY,
+    MQTT_SESSION_CACHE_CLOCK_SKEW_SEC,
+    MQTT_SESSION_CACHE_EXPIRES_AT_KEY,
+    MQTT_SESSION_CACHE_STORAGE_KEY,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_SEED_LEN,
     MQTT_SESSION_USER_ID,
 )
 
@@ -37,14 +44,14 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
-_STORAGE_VERSION: Final = 1
-_STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
+_STORAGE_VERSION: Final = CACHE_STORAGE_VERSION
+_STORAGE_KEY: Final = MQTT_SESSION_CACHE_STORAGE_KEY
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
-_KEY_ENTRIES: Final = "entries"
-_KEY_CACHED_AT: Final = "cached_at"
-_KEY_EXPIRES_AT: Final = "expires_at"
-_CACHE_CLOCK_SKEW_SEC: Final = 300.0
-_MQTT_SEED_LEN: Final = 32
+_KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
+_KEY_CACHED_AT: Final = MQTT_SESSION_CACHE_CACHED_AT_KEY
+_KEY_EXPIRES_AT: Final = MQTT_SESSION_CACHE_EXPIRES_AT_KEY
+_CACHE_CLOCK_SKEW_SEC: Final = MQTT_SESSION_CACHE_CLOCK_SKEW_SEC
+_MQTT_SEED_LEN: Final = MQTT_SESSION_SEED_LEN
 
 
 def normalize_mqtt_session_snapshot(
@@ -88,13 +95,13 @@ def normalize_mqtt_session_snapshot(
     if len(seed) != _MQTT_SEED_LEN:
         return None
     result = {
-        MQTT_SESSION_USER_ID: user_id,
+        MQTT_SESSION_USER_ID: user_id.strip(),
         MQTT_SESSION_SEED_B64: seed_b64,
-        MQTT_SESSION_MAC_ID: mac_id,
+        MQTT_SESSION_MAC_ID: mac_id.strip(),
     }
     source = raw.get(MQTT_SESSION_MAC_ID_SOURCE)
     if isinstance(source, str) and source.strip():
-        result[MQTT_SESSION_MAC_ID_SOURCE] = source
+        result[MQTT_SESSION_MAC_ID_SOURCE] = source.strip()
     return result
 
 
@@ -189,6 +196,9 @@ async def async_save_mqtt_session(
     ):
         msg = "MQTT session expires_at must be a finite UNIX timestamp"
         raise ValueError(msg)
+    normalized_user_id = user_id.strip()
+    normalized_mac_id = mac_id.strip()
+    normalized_mac_id_source = mac_id_source.strip() if mac_id_source else None
 
     async def _async_persist() -> None:
         """Finish the serialized Store transaction even if setup is cancelled."""
@@ -199,12 +209,12 @@ async def async_save_mqtt_session(
             raw_entries = data.get(_KEY_ENTRIES)
             entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
             row: dict[str, Any] = {
-                MQTT_SESSION_USER_ID: user_id,
+                MQTT_SESSION_USER_ID: normalized_user_id,
                 MQTT_SESSION_SEED_B64: seed_b64,
-                MQTT_SESSION_MAC_ID: mac_id,
+                MQTT_SESSION_MAC_ID: normalized_mac_id,
             }
-            if mac_id_source:
-                row[MQTT_SESSION_MAC_ID_SOURCE] = mac_id_source
+            if normalized_mac_id_source:
+                row[MQTT_SESSION_MAC_ID_SOURCE] = normalized_mac_id_source
             row[_KEY_CACHED_AT] = effective_cached_at
             if expires_at is not None:
                 row[_KEY_EXPIRES_AT] = expires_at
