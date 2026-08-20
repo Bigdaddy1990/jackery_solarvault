@@ -51,8 +51,6 @@
           "enable_payload_debug_log": "Enable redacted payload debug log",
           "enable_week_statistics": "Wochenstatistiken importieren",
           "enable_year_statistics": "Jahresstatistiken importieren",
-          "local_mqtt_enable": "Lokalen MQTT-Listener aktivieren",
-          "local_mqtt_host": "Host des lokalen MQTT-Brokers",
           "password": "Passwort",
           "third_party_mqtt_enable": "Third-Party-MQTT-Bridge aktivieren",
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",

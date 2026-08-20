@@ -43,13 +43,16 @@ def _freeze_monotonic(monkeypatch: pytest.MonkeyPatch, value: float) -> None:
 
 
 def test_ble_backoff_starts_at_initial_delay() -> None:
-    """The first failure opens a window one initial-delay wide."""
+    """The first failure opens a window one initial-delay wide (±25% jitter)."""
     backoff = BleConnectBackoff()
 
     delay = backoff.record_failure(now=100.0)
 
     assert delay == backoff.initial_sec
-    assert backoff.seconds_until_allowed(now=100.0) == backoff.initial_sec
+    # seconds_until_allowed includes ±25% jitter (0.75-1.25 x initial_sec)
+    wait = backoff.seconds_until_allowed(now=100.0)
+    assert wait >= backoff.initial_sec * 0.75
+    assert wait <= backoff.initial_sec * 1.25
 
 
 def test_ble_backoff_doubles_until_capped() -> None:
@@ -82,11 +85,13 @@ def test_ble_backoff_success_resets_ladder() -> None:
 
 
 def test_ble_backoff_window_elapses_with_time() -> None:
-    """Once the clock passes the window, no wait remains."""
+    """Once the clock passes the window (including ±25% jitter), no wait remains."""
     backoff = BleConnectBackoff()
-    delay = backoff.record_failure(now=100.0)
+    backoff.record_failure(now=100.0)
+    # The actual window includes ±25% jitter, so wait until max possible jittered delay
+    max_wait = backoff.initial_sec * 1.25
 
-    assert backoff.seconds_until_allowed(now=100.0 + delay + 1) == pytest.approx(0.0)
+    assert backoff.seconds_until_allowed(now=100.0 + max_wait + 1) == pytest.approx(0.0)
 
 
 # ---------------------------------------------------------------------------

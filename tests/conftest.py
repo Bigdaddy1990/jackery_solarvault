@@ -68,17 +68,28 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
     return True
 
 
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(
-    enable_custom_integrations: None,
-) -> None:
-    """Auto-enable the custom_components dir for every HA fixture test.
+try:
+    from pytest_homeassistant_custom_component.common import (  # type: ignore[import-not-found]
+        enable_custom_integrations as _enable_custom_integrations,
+    )
 
-    Without this, ``await async_setup_component`` cannot find the
-    integration. The fixture itself comes from
-    ``pytest-homeassistant-custom-component``; we just opt in for the
-    whole HA suite by making it autouse.
-    """
+    @pytest.fixture(autouse=True)
+    def auto_enable_custom_integrations(
+        enable_custom_integrations: None,
+    ) -> None:
+        """Auto-enable the custom_components dir for every HA fixture test.
+
+        Without this, ``await async_setup_component`` cannot find the
+        integration. The fixture itself comes from
+        ``pytest-homeassistant-custom-component``; we just opt in for the
+        whole HA suite by making it autouse.
+        """
+except ImportError:
+    # pytest-homeassistant-custom-component not available (e.g., on Windows without fcntl)
+    @pytest.fixture(autouse=True)
+    def auto_enable_custom_integrations() -> None:
+        """No-op when HA test plugin is not available."""
+        yield
 
 
 @pytest.fixture

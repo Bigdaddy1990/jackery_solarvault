@@ -51,20 +51,19 @@ def test_fresh_backoff_allows_immediate_attempt() -> None:
 
 
 def test_first_failure_blocks_for_initial_window() -> None:
-    """After one failed connect the next attempt waits the initial delay."""
+    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""
     backoff = BleConnectBackoff()
 
     applied = backoff.record_failure(_NOW)
 
     assert applied == pytest.approx(BLE_CONNECT_BACKOFF_INITIAL_SEC)
-    assert backoff.seconds_until_allowed(_NOW) == pytest.approx(
-        BLE_CONNECT_BACKOFF_INITIAL_SEC
-    )
-    halfway = _NOW + BLE_CONNECT_BACKOFF_INITIAL_SEC / 2
-    assert backoff.seconds_until_allowed(halfway) == pytest.approx(
-        BLE_CONNECT_BACKOFF_INITIAL_SEC / 2
-    )
-    after = _NOW + BLE_CONNECT_BACKOFF_INITIAL_SEC
+    # seconds_until_allowed includes ±25% jitter (0.75-1.25 x initial_sec)
+    wait = backoff.seconds_until_allowed(_NOW)
+    assert wait >= BLE_CONNECT_BACKOFF_INITIAL_SEC * 0.75
+    assert wait <= BLE_CONNECT_BACKOFF_INITIAL_SEC * 1.25
+    halfway = _NOW + wait / 2
+    assert backoff.seconds_until_allowed(halfway) == pytest.approx(wait / 2, rel=0.01)
+    after = _NOW + wait
     assert backoff.seconds_until_allowed(after) == pytest.approx(0.0)
 
 
@@ -109,9 +108,10 @@ def test_success_resets_escalation_from_capped_delay() -> None:
     backoff = BleConnectBackoff()
     for _ in range(8):
         backoff.record_failure(_NOW)
-    assert backoff.seconds_until_allowed(_NOW) == pytest.approx(
-        BLE_CONNECT_BACKOFF_MAX_SEC
-    )
+    # At cap, seconds_until_allowed includes ±25% jitter (0.75-1.25 x max_sec)
+    wait_at_cap = backoff.seconds_until_allowed(_NOW)
+    assert wait_at_cap >= BLE_CONNECT_BACKOFF_MAX_SEC * 0.75
+    assert wait_at_cap <= BLE_CONNECT_BACKOFF_MAX_SEC * 1.25
 
     backoff.record_success()
 

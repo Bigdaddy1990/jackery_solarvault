@@ -25,6 +25,7 @@ by an immediate cloud fallback snapshot; it never stops independent transports
 from continuing to publish.
 """
 
+import logging
 import time
 from typing import TYPE_CHECKING, Any, Final
 
@@ -48,6 +49,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from .models import Observation
+
+_LOGGER = logging.getLogger(__name__)
 
 # Compatibility name retained for existing transport decoders. New code should
 # use ``DataSource`` so the source type is shared with Observation/IngestResult.

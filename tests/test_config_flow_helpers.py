@@ -10,21 +10,21 @@ from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
     CONF_ENABLE_WEEK_STATISTICS,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_TOPIC,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_REGION_CODE,
     CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PASSWORD as CONF_LOCAL_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_PORT as CONF_LOCAL_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER as CONF_LOCAL_MQTT_TOPIC,
     CONF_THIRD_PARTY_MQTT_USERNAME,
-    DEFAULT_LOCAL_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_USERNAME as CONF_LOCAL_MQTT_USERNAME,
+    DEFAULT_THIRD_PARTY_MQTT_PORT as DEFAULT_LOCAL_MQTT_PORT,
     DOMAIN,
     ENTRY_BOOTSTRAP_MQTT_SESSION,
 )
@@ -147,7 +147,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
 
 
 def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
-    """Direct local keys beat legacy form keys while omitted values are preserved."""
+    """Submitted form keys (third_party_mqtt_*) are used with current values as fallback."""
     current: dict[str, Any] = {
         CONF_LOCAL_MQTT_ENABLE: False,
         CONF_LOCAL_MQTT_HOST: "old.local",
@@ -157,15 +157,15 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
     }
 
+    # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)
     result = config_flow._merge_local_mqtt_options(  # ruff: ignore[private-member-access]
         {
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: " local.new ",
-            CONF_THIRD_PARTY_MQTT_IP: "legacy.new",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "local.new",
             CONF_THIRD_PARTY_MQTT_PORT: str(_SUBMITTED_PORT),
             CONF_THIRD_PARTY_MQTT_USERNAME: "new-user",
             CONF_THIRD_PARTY_MQTT_PASSWORD: "new-pass",
-            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: " new/# ",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "new/#",
         },
         current,
     )

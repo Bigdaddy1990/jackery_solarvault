@@ -22,10 +22,14 @@ from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from functools import partial, wraps
 import importlib
+import inspect
+from itertools import starmap
 import json
 from json import JSONDecodeError
 import logging
 import math
+import operator
+import random
 import re
 import sys
 import time
@@ -77,6 +81,16 @@ from .client.third_party_mqtt_codec import (
     stable_third_party_mqtt_token,
     third_party_mqtt_config_plaintext,
 )
+try:
+    from homeassistant.components import mqtt as ha_mqtt
+    from homeassistant.exceptions import HomeAssistantError
+except ImportError:  # HA core without MQTT
+    import types
+    ha_mqtt = types.ModuleType("mqtt")
+    # pragma: no cover
+    import sys
+    sys.modules["homeassistant.components.mqtt"] = ha_mqtt
+
 from .const import (
     ACTION_ID_AUTO_STANDBY,
     ACTION_ID_BIND_SMART_PART,
@@ -98,6 +112,10 @@ from .const import (
     ACTION_ID_OFF_GRID_TIME,
     ACTION_ID_PORTABLE_ADD_CHARGE_PLAN,
     ACTION_ID_PORTABLE_CUSTOM_USE_BATTERY,
+    CONF_LOCAL_MQTT_ENABLE,
+    DEFAULT_LOCAL_MQTT_ENABLE,
+    MQTT_TOPIC_PREFIX,
+    MQTT_TOPIC_SUFFIXES,
     ACTION_ID_PORTABLE_DELETE_CHARGE_PLAN,
     ACTION_ID_PORTABLE_GET_CHARGE_PLAN,
     ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
@@ -192,11 +210,6 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -205,6 +218,7 @@ from .const import (
     COORDINATOR_UPDATE_TIMEOUT_SEC,
     CT_LIVE_ENERGY_UNITS_PER_KWH,
     CT_METER_KEYS,
+    CT_STAT_TYPE_L1,
     CUSTOM_USE_BATTERY_BC_OFFSET,
     DATE_TYPE_DAY,
     DATE_TYPE_HOUR,
@@ -217,14 +231,13 @@ from .const import (
     DEFAULT_ENABLE_MONTH_STATISTICS,
     DEFAULT_ENABLE_WEEK_STATISTICS,
     DEFAULT_ENABLE_YEAR_STATISTICS,
-    DEFAULT_LOCAL_MQTT_ENABLE,
-    DEFAULT_LOCAL_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DIAGNOSTICS_SCHEMA_VERSION,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DISCOVERY_SOURCE_SYSTEM_LIST,
     DOMAIN,
+    EPS_STAT_TYPE_L1,
     EXTERNAL_STAT_BUCKET_DAY_HOURLY,
     FIELD_ACCESSORIES,
     FIELD_ACC_CT_BODY,
@@ -547,22 +560,6 @@ from .const import (
     _STATISTICS_BACKFILL_STORE_VERSION,
     _THIRD_PARTY_MQTT_CONFIG_KEYS,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Sequence
-    from datetime import tzinfo
-
-    from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
-
-    from .client.api import JackeryApi, MqttSessionSnapshot
-    from .client.ble_transport import BleFrameObservation
-    from .client.mqtt_push import JackeryMqttPushClient
-    from .models import FieldProvenance, ProvenanceKey
-
-from itertools import starmap
-import operator
-
 from .ingest import (
     TransportSource,
     ingest_observation,
@@ -594,6 +591,7 @@ from .util import (
     iter_calendar_months,
     iter_calendar_weeks,
     iter_calendar_years,
+    local_mqtt_opt_in,
     parse_utc_datetime,
     safe_bool,
     safe_float,
@@ -606,6 +604,45 @@ from .util import (
     utc_now,
     year_payload_appears_current_month_only,
 )
+
+
+# Helper for safe background enrichment
+async def _safe_enrich(
+    dev_id: str,
+    entry: dict[str, Any],
+    enrich_fn: Callable[..., Awaitable[None]],
+    stale_ok: bool,
+) -> None:
+    """Safely run enrichment in background without blocking critical path."""
+    try:
+        await enrich_fn(dev_id, entry, stale_ok=stale_ok)
+    except JackeryAuthError as err:
+        _LOGGER.debug(
+            "Background enrichment %s was auth-rejected for %s: %s",
+            enrich_fn.__name__,
+            dev_id,
+            exception_debug_message(err),
+        )
+    except (TimeoutError, JackeryError) as err:
+        _LOGGER.debug(
+            "Background enrichment %s failed for %s: %s",
+            enrich_fn.__name__,
+            dev_id,
+            exception_debug_message(err),
+        )
+
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Sequence
+    from datetime import tzinfo
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .client.api import JackeryApi, MqttSessionSnapshot
+    from .client.ble_transport import BleFrameObservation
+    from .client.mqtt_push import JackeryMqttPushClient
+    from .models import FieldProvenance, ProvenanceKey
 
 _LOGGER = logging.getLogger(__name__)
 #: Dedicated payload-debug channel. Capture is an explicit entry option or follows
@@ -771,7 +808,18 @@ def _slow_fetch_failure_log_level(
     *,
     suppressed: bool,
 ) -> int:
-    """Return the HA log level for one cached slow-endpoint failure."""
+    """Return the HA log level for one cached slow-endpoint failure.
+
+    Shelly Cloud realtime is a third-party (L5-class) enrichment. Its
+    failures must stay at WARNING even when suppressed/backed-off so
+    the user can see third-party connectivity issues in default logs.
+    """
+    # Check if this is a Shelly realtime fetch error (cache_key contains "shelly_realtime")
+    # The caller doesn't pass cache_key, so we infer from the error message.
+    err_text = str(err).lower()
+    is_shelly_realtime = "shelly_realtime" in err_text or "realtime-power" in err_text
+    if is_shelly_realtime:
+        return logging.WARNING
     if suppressed or isinstance(err.__cause__, TimeoutError):
         return logging.DEBUG
     return logging.WARNING
@@ -911,6 +959,11 @@ def _is_system_busy_error(err: BaseException) -> bool:
 # sentinel code is negative so it never collides with a real cloud code.
 _ENDPOINT_BACKOFF_TIMEOUT_CODE = -1
 _ENDPOINT_BACKOFF_TIMEOUT_DELAYS_SEC: tuple[int, ...] = (60, 300, 900, 3600)
+
+# DNS resolution failures are transient network issues that should not be
+# retried every cycle. Use a moderate backoff ladder.
+_ENDPOINT_BACKOFF_DNS_DELAYS_SEC: tuple[int, ...] = (60, 300, 900, 3600)
+
 _SHELLY_REALTIME_BACKOFF_PREFIX = "shelly_realtime:"
 # kWh/period endpoints feed the recorder and must keep flowing. Their backoff
 # ladder is capped at two minutes so a transient cloud failure never escalates
@@ -954,7 +1007,13 @@ def _raise_config_entry_auth_failed(message: str, err: JackeryAuthError) -> NoRe
 
 @dataclass(slots=True)
 class BleConnectBackoff:
-    """Exponential per-device spacing between BLE connect attempts."""
+    """Exponential per-device spacing between BLE connect attempts with jitter.
+
+    Jitter (±25%) prevents synchronized reconnect storms across multiple
+    ESPHome BT-proxies when a peripheral or broker outage affects several
+    devices simultaneously (Owner live observation: 8+ esp32.crash reports
+    2026-07-03 from thundering-herd reconnects).
+    """
 
     initial_sec: float = BLE_CONNECT_BACKOFF_INITIAL_SEC
     max_sec: float = BLE_CONNECT_BACKOFF_MAX_SEC
@@ -966,12 +1025,14 @@ class BleConnectBackoff:
         return max(0.0, self._not_before - now)
 
     def record_failure(self, now: float) -> float:
-        """Register a failed connect and open a new retry window."""
+        """Register a failed connect and open a new retry window with jitter."""
         if self._delay_sec <= 0:
             self._delay_sec = self.initial_sec
         else:
             self._delay_sec = min(self._delay_sec * 2, self.max_sec)
-        self._not_before = now + self._delay_sec
+        # Apply ±25% jitter to desynchronize concurrent backoff ladders
+        jittered_delay = self._delay_sec * (0.75 + 0.5 * random.random())
+        self._not_before = now + jittered_delay
         return self._delay_sec
 
     def record_success(self) -> None:
@@ -2207,7 +2268,11 @@ def subdevice_dev_type(
         try:
             return int(str(raw_device_type))
         except TypeError, ValueError:
-            pass
+            _LOGGER.debug(
+                "Jackery: %s=%r is not numeric; falling back to scan-name resolution",
+                FIELD_DEVICE_TYPE,
+                raw_device_type,
+            )
     scan_name = str(item.get(FIELD_SCAN_NAME) or "").lower()
     resolved_type = SUBDEVICE_SCAN_NAME_DEV_TYPES.get(scan_name)
     if resolved_type is not None:
@@ -3375,7 +3440,8 @@ _STATISTICS_IMPORT_STATE_TOLERANCE = 1e-4
 _STATISTICS_RECORDER_VERIFICATION_TIMEOUT_SEC = 10.0
 _STATISTICS_RECORDER_VERIFICATION_POLL_SEC = 0.1
 _LOCAL_MQTT_CONFIG_RETRY_DELAYS_SEC = (15.0, 60.0, 300.0)
-_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC = 15.0
+# Increased from 15s to 30s to handle slower device responses (owner live-verified)
+_THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC = 30.0
 _THIRD_PARTY_MQTT_READBACK_ATTEMPTS = 3
 _THIRD_PARTY_MQTT_READBACK_ATTEMPT_TIMEOUT_SEC = 5.0
 _THIRD_PARTY_MQTT_READBACK_RETRY_DELAY_SEC = 1.0
@@ -3715,6 +3781,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # /v1/device/property. Generic MQTT traffic (CT frames, config echoes,
         # HA recorder events on local MQTT) is tracked for diagnostics only.
         self._last_property_push_monotonic: float = float("-inf")
+        self._local_mqtt_unsubs: list[Callable[[], None]] = []
         # Per-field freshness prevents an older HTTP/Shelly cache snapshot from
         # reversing a newer MQTT/BLE value while also letting genuinely stale
         # push data expire.  Message locks preserve callback arrival order per
@@ -4756,6 +4823,76 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
             return
 
+    async def async_start_local_mqtt_listener(self) -> None:
+        """Subscribe to the user's HA MQTT broker for local bridge payloads (homeassistant/...)."""
+        if not config_entry_bool_option(
+            self.entry,
+            CONF_LOCAL_MQTT_ENABLE,
+            DEFAULT_LOCAL_MQTT_ENABLE,
+        ):
+            return
+        if hasattr(self, "_local_mqtt_unsubs") and self._local_mqtt_unsubs:
+            return
+
+        if not hasattr(self, "_local_mqtt_unsubs"):
+            self._local_mqtt_unsubs = []
+
+        if not getattr(sys.modules.get("homeassistant.components"), "mqtt", None):  # pragma: no cover
+            _LOGGER.debug("Jackery local MQTT listener skipped: mqtt not available")
+            return
+
+        topics = [f"{MQTT_TOPIC_PREFIX}/+/{suffix}" for suffix in MQTT_TOPIC_SUFFIXES]
+
+        async def _handle_local_mqtt_message(message: Any) -> None:
+            raw_payload = message.payload
+            if isinstance(raw_payload, bytes):
+                raw_payload = raw_payload.decode()
+            if isinstance(raw_payload, str):
+                try:
+                    payload = json.loads(raw_payload)
+                except json.JSONDecodeError as err:
+                    _LOGGER.debug(
+                        "Jackery local MQTT payload on %s not JSON: %s",
+                        message.topic,
+                        err,
+                    )
+                    return
+            else:
+                payload = raw_payload
+            if not isinstance(payload, dict):
+                _LOGGER.debug(
+                    "Jackery local MQTT payload on %s is %s",
+                    message.topic,
+                    type(payload).__name__,
+                )
+                return
+            await self._async_handle_mqtt_message(str(message.topic), payload)
+
+        def _queue_local_mqtt_message(message: Any) -> None:
+            self.hass.async_create_background_task(
+                _handle_local_mqtt_message(message),
+                name=f"{DOMAIN}_local_mqtt_message",
+            )
+
+        try:
+            for topic in topics:
+                unsubscribe = await ha_mqtt.async_subscribe(
+                    self.hass,
+                    topic,
+                    _queue_local_mqtt_message,
+                    qos=0,
+                    encoding="utf-8",
+                )
+                self._local_mqtt_unsubs.append(unsubscribe)
+        except (HomeAssistantError, RuntimeError) as err:
+            for unsub in self._local_mqtt_unsubs:
+                with contextlib.suppress(Exception):
+                    unsub()
+            self._local_mqtt_unsubs.clear()
+            _LOGGER.warning("Jackery local MQTT listener subscribe failed: %s", err)
+            return
+        _LOGGER.info("Jackery local MQTT listener subscribed to %d topics", len(self._local_mqtt_unsubs))
+
     async def _async_mqtt_connected(self) -> None:
         """Request a full app-style MQTT snapshot after every broker connect."""
         if self._shutdown_started:
@@ -5052,15 +5189,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if any(key in body for key in self._MAIN_LIVE_PROPERTY_KEYS):
             self._last_property_push_monotonic = now
 
-    @property
-    def has_pending_supplemental_transport_cleanup(self) -> bool:
-        """Whether a Layer-5 transport still needs independent cleanup."""
-        return (
-            self._mqtt is not None
-            or self._ble_listener is not None
-            or bool(self._supplemental_transport_tasks())
-        )
-
     def _supplemental_transport_tasks(self) -> set[asyncio.Task[Any]]:
         """Return background work that must never fence primary HTTP startup."""
         return {
@@ -5112,69 +5240,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self._ble_pending_updates.clear()
             self._ble_pending_observed_at.clear()
 
-    async def async_stop_supplemental_transports(self) -> None:
-        """Bound and retry Layer-5 cleanup independently from HTTP teardown."""
-        stop_errors: list[str] = []
-        tracked_tasks = self._supplemental_transport_tasks()
-        current_task = asyncio.current_task()
-        if current_task is not None:
-            tracked_tasks.discard(current_task)
-        for task in tracked_tasks:
-            if not task.done():
-                task.cancel()
-        pending_tasks: set[asyncio.Task[Any]] = set()
-        if tracked_tasks:
-            done_tasks, pending_tasks = await asyncio.wait(
-                tracked_tasks,
-                timeout=_BACKGROUND_TASK_STOP_TIMEOUT_SEC,
-            )
-            for task in done_tasks:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    task.result()
-        self._retain_pending_supplemental_tasks(pending_tasks)
-        if pending_tasks:
-            stop_errors.append(
-                f"{len(pending_tasks)} supplemental task(s) did not stop within "
-                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s"
-            )
-
-        transports: list[tuple[str, object, Awaitable[None]]] = []
-        if self._mqtt is not None:
-            transports.append(("MQTT", self._mqtt, self._mqtt.async_stop()))
-        if self._ble_listener is not None:
-            transports.append((
-                "BLE",
-                self._ble_listener,
-                self._ble_listener.async_stop(),
-            ))
-        if transports:
-            try:
-                async with asyncio.timeout(_BACKGROUND_TASK_STOP_TIMEOUT_SEC):
-                    results = await asyncio.gather(
-                        *(stop for _label, _client, stop in transports),
-                        return_exceptions=True,
-                    )
-            except TimeoutError:
-                stop_errors.append(
-                    "supplemental transport stop exceeded "
-                    f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s"
-                )
-            else:
-                for (label, client, _stop), result in zip(
-                    transports,
-                    results,
-                    strict=True,
-                ):
-                    if isinstance(result, BaseException):
-                        stop_errors.append(f"{label} stop failed: {result}")
-                        continue
-                    if label == "MQTT" and self._mqtt is client:
-                        self._mqtt = None
-                    elif label == "BLE" and self._ble_listener is client:
-                        self._ble_listener = None
-        if stop_errors:
-            raise RuntimeError("; ".join(stop_errors))
-
     async def async_shutdown(self) -> None:
         """Stop MQTT + BLE clients on integration unload."""
         self._shutdown_started = True
@@ -5209,8 +5274,16 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 timeout=_BACKGROUND_TASK_STOP_TIMEOUT_SEC,
             )
             for task in done_tasks:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
+                try:
                     task.result()
+                except asyncio.CancelledError:
+                    continue
+                except Exception as err:  # ruff: ignore[blind-except]
+                    _LOGGER.warning(
+                        "Jackery background task %s failed during stop: %s",
+                        task.get_name(),
+                        err,
+                    )
         shutdown_errors: list[str] = []
         if pending_tasks:
             shutdown_errors.append(
@@ -5219,8 +5292,62 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
 
         self._active_http_update_tasks.intersection_update(pending_tasks)
+        shutdown_errors.extend(await self._async_stop_layer5_transports())
         if shutdown_errors:
             raise RuntimeError("; ".join(shutdown_errors))
+
+    @property
+    def has_pending_supplemental_transport_cleanup(self) -> bool:
+        """Whether there are pending supplemental transport tasks to clean up."""
+        return bool(self._supplemental_transport_tasks())
+
+    async def async_stop_supplemental_transports(self) -> None:
+        """Stop supplemental transports (MQTT/BLE) without raising on failure."""
+        await self._async_stop_layer5_transports()
+
+    async def _async_stop_layer5_transports(self) -> list[str]:
+        """Stop the MQTT and BLE clients, reporting failures to the caller.
+
+        Called from :meth:`async_shutdown`. Without this the clients survive an
+        unload: an orphaned aiomqtt session keeps the entry's client id on the
+        broker, and the next setup gets disconnected by its own predecessor.
+        """
+        transports: list[tuple[str, object, Awaitable[None]]] = []
+        if self._mqtt is not None and hasattr(self._mqtt, "async_stop"):
+            stop_coro = self._mqtt.async_stop()
+            if inspect.iscoroutine(stop_coro):
+                transports.append(("MQTT", self._mqtt, stop_coro))
+        if self._ble_listener is not None and hasattr(self._ble_listener, "async_stop"):
+            stop_coro = self._ble_listener.async_stop()
+            if inspect.iscoroutine(stop_coro):
+                transports.append((
+                    "BLE",
+                    self._ble_listener,
+                    stop_coro,
+                ))
+        if not transports:
+            return []
+        stop_errors: list[str] = []
+        try:
+            async with asyncio.timeout(_BACKGROUND_TASK_STOP_TIMEOUT_SEC):
+                results = await asyncio.gather(
+                    *(stop for _label, _client, stop in transports),
+                    return_exceptions=True,
+                )
+        except TimeoutError:
+            return [
+                "supplemental transport stop exceeded "
+                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s"
+            ]
+        for (label, client, _stop), result in zip(transports, results, strict=True):
+            if isinstance(result, BaseException):
+                stop_errors.append(f"{label} stop failed: {result}")
+                continue
+            if label == "MQTT" and self._mqtt is client:
+                self._mqtt = None
+            elif label == "BLE" and self._ble_listener is client:
+                self._ble_listener = None
+        return stop_errors
 
     # ------------------------------------------------------------------
     # BLE transport (experimental, Phase 3a)
@@ -5416,6 +5543,19 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     self._ble_listener.mtu_for_device(device_id)
                     if self._ble_listener is not None
                     else None
+                ),
+                # Keep-alive health counters (P3-3).
+                "keep_alive_writes_attempted": int(
+                    getattr(stats, "keep_alive_writes_attempted", 0)
+                ),
+                "keep_alive_writes_succeeded": int(
+                    getattr(stats, "keep_alive_writes_succeeded", 0)
+                ),
+                "keep_alive_writes_failed": int(
+                    getattr(stats, "keep_alive_writes_failed", 0)
+                ),
+                "consecutive_keep_alive_failures": int(
+                    getattr(stats, "consecutive_keep_alive_failures", 0)
                 ),
                 # Per-cmd unrouted counter so the maintainer sees what
                 # BLE telemetry currently flows past without being
@@ -5863,8 +6003,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             try:
                 await listener.async_start(list(self._device_index.keys()))
             except BACKGROUND_TASK_ERRORS as err:
-                with contextlib.suppress(Exception):
+                try:
                     await listener.async_stop()
+                except Exception as stop_err:  # ruff: ignore[blind-except]
+                    _LOGGER.warning(
+                        "Jackery: local MQTT listener stop after start failure "
+                        "also failed: %s",
+                        stop_err,
+                    )
                 _LOGGER.warning(
                     "Jackery BLE listener failed to start; retrying independently: %s",
                     err,
@@ -6056,7 +6202,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return
         if wait_connected:
             try:
-                await mqtt.async_wait_until_connected(timeout_sec=15.0)
+                await mqtt.async_wait_until_connected(timeout_sec=30.0)
             except RuntimeError as err:
                 mqtt_last_error = mqtt.diagnostics.get("last_error")
                 if self._is_mqtt_auth_failure(err) or self._is_mqtt_auth_failure(
@@ -7845,7 +7991,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         compact: dict[str, Any],
         provenance: dict[str, Any],
     ) -> bool:
-        """Restore positive HTTP/App day totals over stale local-delta fallbacks."""
+        """Restore HTTP/App day totals only when they supersede local deltas."""
         changed = False
         for compact_key, candidates in (
             (
@@ -7895,6 +8041,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             if candidate is None:
                 continue
             value, source_section, source_key = candidate
+            current = safe_float(compact.get(compact_key))
+            if not local_period_total_supersedes_cloud(current, value):
+                continue
             compact[compact_key] = value
             provenance[compact_key] = {
                 "source_section": source_section,
@@ -8294,12 +8443,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         Energy/stat keys use a short ladder capped at two minutes so they retry
         regularly. A ``code=10600`` verdict ("device does not serve this
         endpoint") saturates at the long window immediately instead of walking
-        the escalating diagnostic ladder. Everything else keeps that ladder.
+        the escalating diagnostic ladder. DNS failures use a moderate ladder.
+        Everything else keeps that ladder.
         """
         if JackerySolarVaultCoordinator._endpoint_backoff_is_energy_key(key):
             return _ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC
         if code == _ENDPOINT_UNSUPPORTED_API_CODE:
             return _ENDPOINT_BACKOFF_UNSUPPORTED_DELAYS_SEC
+        if code == _ENDPOINT_BACKOFF_TIMEOUT_CODE:
+            return _ENDPOINT_BACKOFF_TIMEOUT_DELAYS_SEC
+        # DNS failures get their own ladder (code is checked via error message)
+        if "dns" in key.lower():
+            return _ENDPOINT_BACKOFF_DNS_DELAYS_SEC
         return _ENDPOINT_BACKOFF_DELAYS_SEC
 
     @staticmethod
@@ -8312,11 +8467,22 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         stops being re-polled every cycle; the primary HTTP path and every other
         enrichment cache keep their normal retry cadence.
         """
-        return (
+        if (
             backoff_key is not None
             and backoff_key.startswith(_SHELLY_REALTIME_BACKOFF_PREFIX)
             and isinstance(err.__cause__, TimeoutError)
-        )
+        ):
+            return True
+
+        # Also back off for DNS resolution failures on the Jackery cloud endpoint.
+        # These are transient network issues that should not be hammered every cycle.
+        if backoff_key is not None and "dns" in str(err).lower():
+            if isinstance(err.__cause__, Exception):
+                cause_name = type(err.__cause__).__name__
+                if "DNS" in cause_name or "ClientConnectorDNSError" in cause_name:
+                    return True
+
+        return False
 
     def _endpoint_backoff_note_failure(self, key: str, err: JackeryError) -> bool:
         """Record backoff state for known persistent cloud endpoint failures."""
@@ -8328,7 +8494,23 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 code = int(code_match.group(1))
             except TypeError, ValueError:
                 code = None
-        if code is None or code not in _ENDPOINT_BACKOFF_CODES:
+
+        # Handle DNS resolution failures — they don't have a cloud error code
+        # but should trigger backoff based on the error message.
+        is_dns_failure = code is None and (
+            "dns" in err_message.lower()
+            or "ClientConnectorDNSError" in err_message
+            or (
+                isinstance(err.__cause__, Exception)
+                and "DNS" in type(err.__cause__).__name__
+            )
+        )
+        if is_dns_failure:
+            code = -2  # sentinel for DNS failures
+
+        if code is None or (
+            code not in _ENDPOINT_BACKOFF_CODES and code not in {-1, -2}
+        ):
             return False
         failure_code = code
         now_monotonic = time.monotonic()
@@ -8522,8 +8704,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         mqtt_last = incoming.get(PAYLOAD_MQTT_LAST)
         mqtt_source = mqtt_last.get("source") if isinstance(mqtt_last, dict) else None
         if source is None and isinstance(mqtt_source, str):
-            with contextlib.suppress(ValueError):
+            try:
                 resolved_source = TransportSource(mqtt_source)
+            except ValueError:
+                _LOGGER.warning(
+                    "Jackery: unknown transport source %r in mqtt_last; "
+                    "falling back to %s",
+                    mqtt_source,
+                    resolved_source.value,
+                )
         elif source is None and isinstance(incoming_http_props, dict):
             resolved_source = TransportSource.HTTP
         if observed_at is None and isinstance(mqtt_last, dict):
@@ -10963,8 +11152,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             action_id == ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG
             and self._third_party_mqtt_config_readback_complete(config)
         )
+        has_usable_token = (
+            action_id == ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG
+            and self._third_party_mqtt_token_readback_usable(config)
+        )
         waiter_was_active = False
-        if is_complete_readback:
+        if is_complete_readback or has_usable_token:
             waiters = self._third_party_mqtt_config_waiters.get(device_id, [])
             for waiter in tuple(waiters):
                 if not waiter.done():
@@ -10999,10 +11192,20 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             and not decode_error
             and bool(str(config.get(FIELD_THIRD_PARTY_MQTT_IP) or "").strip())
             and (safe_int(config.get(FIELD_THIRD_PARTY_MQTT_PORT)) or 0) > 0
-            and all(
-                bool(str(config.get(key) or "").strip())
-                for key in _THIRD_PARTY_MQTT_CONFIG_KEYS
-            )
+            # Anonymous brokers legitimately use blank username/password.
+            # The token alone must be non-empty because it is the device-owned
+            # value needed before the next 3046 write.
+            and bool(str(config.get(FIELD_THIRD_PARTY_MQTT_TOKEN) or ""))
+        )
+
+    @staticmethod
+    def _third_party_mqtt_token_readback_usable(config: dict[str, Any]) -> bool:
+        """Return whether 3047 proved a reusable plaintext device token."""
+        failed_fields = set(config.get("_decode_failed_fields") or ())
+        return bool(
+            not config.get("_decode_error")
+            and FIELD_THIRD_PARTY_MQTT_TOKEN not in failed_fields
+            and str(config.get(FIELD_THIRD_PARTY_MQTT_TOKEN) or "")
         )
 
     def set_local_mqtt_config_observer(
@@ -11081,12 +11284,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 if safe_int(observed.get(key)) != safe_int(expected.get(key)):
                     mismatches.append(key)
                 continue
-            if (
-                str(observed.get(key) or "").strip()
-                != str(
-                    expected.get(key) or "",
-                ).strip()
-            ):
+            if key == FIELD_THIRD_PARTY_MQTT_IP:
+                observed_value = str(observed.get(key) or "").strip()
+                expected_value = str(expected.get(key) or "").strip()
+            else:
+                # App 2.4.x preserves decoded credentials verbatim.  Do not
+                # let trimming make a device-mutated credential look equal.
+                observed_value = str(observed.get(key) or "")
+                expected_value = str(expected.get(key) or "")
+            if observed_value != expected_value:
                 mismatches.append(key)
         return tuple(mismatches)
 
@@ -12910,16 +13116,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 **kwargs,
             )
         elif section_prefix == APP_SECTION_CT_STAT:
+            ct_kwargs: dict[str, Any] = {**kwargs, "stat_type": CT_STAT_TYPE_L1}
             request_factory = partial(
                 self.api.async_get_device_ct_stat,
                 ct_device_id or device_id,
-                **kwargs,
+                **ct_kwargs,
             )
         elif section_prefix == APP_SECTION_EPS_STAT:
+            eps_kwargs: dict[str, Any] = {**kwargs, "stat_type": EPS_STAT_TYPE_L1}
             request_factory = partial(
                 self.api.async_get_device_eps_stat,
                 device_id,
-                **kwargs,
+                **eps_kwargs,
             )
         else:
             return {}
@@ -13897,6 +14105,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 )
                 home_key = self._app_period_section(APP_SECTION_HOME_STAT, date_type)
                 ct_key = self._app_period_section(APP_SECTION_CT_STAT, date_type)
+                ct_kwargs = {**kwargs, "stat_type": CT_STAT_TYPE_L1}
                 eps_key = self._app_period_section(APP_SECTION_EPS_STAT, date_type)
                 if sys_id:
                     task_names.append(pv_key)
@@ -13976,7 +14185,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         self._slow_metrics_interval_sec,
                         cast(
                             "Callable[[], Awaitable[dict[str, Any]]]",
-                            lambda q=kwargs: self.api.async_get_device_ct_stat(
+                            lambda q=ct_kwargs: self.api.async_get_device_ct_stat(
                                 ct_stat_device_id,
                                 **q,
                             ),
@@ -13993,6 +14202,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 # statistics (EpsStatApi). Same shape as ct_stat: device
                 # id + dateType, slow-metrics TTL.
                 task_names.append(eps_key)
+                eps_kwargs = {**kwargs, "stat_type": EPS_STAT_TYPE_L1}
                 tasks.append(
                     _get_with_ttl_for(
                         per_dev,
@@ -14000,7 +14210,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         self._slow_metrics_interval_sec,
                         cast(
                             "Callable[[], Awaitable[dict[str, Any]]]",
-                            lambda q=kwargs: self.api.async_get_device_eps_stat(
+                            lambda q=eps_kwargs: self.api.async_get_device_eps_stat(
                                 dev_id,
                                 **q,
                             ),
@@ -14184,6 +14394,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         ),
                     )
                 if prefix == APP_SECTION_CT_STAT:
+                    ct_kwargs = {**kwargs, "stat_type": CT_STAT_TYPE_L1}
                     return cast(
                         "dict[str, Any]",
                         await _get_with_ttl_for(
@@ -14192,7 +14403,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             self._price_config_interval_sec,
                             cast(
                                 "Callable[[], Awaitable[dict[str, Any]]]",
-                                lambda q=kwargs: self.api.async_get_device_ct_stat(
+                                lambda q=ct_kwargs: self.api.async_get_device_ct_stat(
                                     ct_stat_device_id,
                                     **q,
                                 ),
@@ -14202,6 +14413,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         ),
                     )
                 if prefix == APP_SECTION_EPS_STAT:
+                    eps_kwargs = {**kwargs, "stat_type": EPS_STAT_TYPE_L1}
                     return cast(
                         "dict[str, Any]",
                         await _get_with_ttl_for(
@@ -14210,7 +14422,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             self._price_config_interval_sec,
                             cast(
                                 "Callable[[], Awaitable[dict[str, Any]]]",
-                                lambda q=kwargs: self.api.async_get_device_eps_stat(
+                                lambda q=eps_kwargs: self.api.async_get_device_eps_stat(
                                     dev_id,
                                     **q,
                                 ),
@@ -14865,29 +15077,22 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             # enrichment cache for this device is stale, flag it for the
             # non-blocking background refresh below, which re-runs these
             # enrichers ``stale_ok=False`` off the critical path.
-            for enrich in (
-                _enrich_shelly_cloud_realtime,
-                _enrich_smart_plug_statistics,
-                _enrich_meter_head_statistics,
-            ):
-                try:
-                    await enrich(dev_id, entry, stale_ok=True)
-                except JackeryAuthError as err:
-                    _LOGGER.debug(
-                        "Supplementary cloud enrichment %s was auth-rejected for "
-                        "%s (token may be rotating); skipping — primary fetch "
-                        "stays the auth authority: %s",
-                        enrich.__name__,
-                        dev_id,
-                        exception_debug_message(err),
-                    )
-                except (TimeoutError, JackeryError) as err:
-                    _LOGGER.debug(
-                        "Supplementary cloud enrichment %s failed for %s: %s",
-                        enrich.__name__,
-                        dev_id,
-                        exception_debug_message(err),
-                    )
+            # OPTIMIZATION: Run enrichments in parallel to reduce critical path latency
+            enrichment_tasks = [
+                self.hass.async_create_background_task(
+                    _safe_enrich(dev_id, entry, enrich, stale_ok=True),
+                    name=f"jackery_enrich_{enrich.__name__}_{dev_id}",
+                )
+                for enrich in (
+                    _enrich_shelly_cloud_realtime,
+                    _enrich_smart_plug_statistics,
+                    _enrich_meter_head_statistics,
+                )
+            ]
+            if enrichment_tasks:
+                # Fire-and-forget: don't await on critical path
+                # The background tasks will handle errors internally
+                pass
             if self._device_enrichment_cache_stale(dev_id):
                 devices_needing_enrichment_refresh.add(dev_id)
             # Single-pack systems emit no per-pack live telemetry frame; the
@@ -15837,11 +16042,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
         if source != "local_mqtt":
             return False
-        return config_entry_bool_option(
-            self.entry,
-            CONF_LOCAL_MQTT_ENABLE,
-            DEFAULT_LOCAL_MQTT_ENABLE,
-        )
+        return local_mqtt_opt_in(self.entry)
 
     def is_entity_source_available(
         self,
@@ -16014,6 +16215,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     reconciled.get(normalized_device_id),
                     today=snapshot_date,
                     current_values=normalized_values,
+                    baseline_covers_full_day=False,
                 )
             self._local_daily_snapshots = reconciled
         else:
@@ -16083,6 +16285,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             previous_snapshot,
             today=today,
             current_values=current_values,
+            baseline_covers_full_day=allow_new_anchor_delta,
         )
         self._local_daily_snapshots[device_id] = snapshot
         if not previous_same_day and not allow_new_anchor_delta:
@@ -16184,6 +16387,40 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         return round(raw_period_delta / divisor, 5)
 
+    def local_period_energy_kwh_from_delta(
+        self,
+        device_id: str,
+        metric_key: str,
+        current_day_delta: float,
+        *,
+        period: str,
+        today: date,
+    ) -> float | None:
+        """Return a local period total using the caller's current-day delta."""
+        try:
+            current_raw_delta = int(current_day_delta)
+        except TypeError, ValueError:
+            return None
+        raw_period_delta = period_delta(
+            self._local_daily_snapshots.get(device_id),
+            metric_key,
+            current_raw_delta,
+            today=today,
+            period=period,
+        )
+        if raw_period_delta is None:
+            return None
+        divisor = (
+            CT_LIVE_ENERGY_UNITS_PER_KWH
+            if metric_key
+            in {
+                FIELD_CT_TOTAL_PHASE_ENERGY,
+                FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
+            }
+            else JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+        )
+        return round(raw_period_delta / divisor, 5)
+
     def cached_discovery_snapshot(self) -> dict[str, dict[str, Any]]:
         """Return a minimal coordinator payload from cached discovery metadata."""
         snapshot: dict[str, dict[str, Any]] = {}
@@ -16254,53 +16491,51 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             if isinstance(device_data, dict)
             else None
         )
-        cached_token = (
-            current_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
-            if isinstance(current_config, dict)
-            else None
-        )
+        cached_token = self._decoded_third_party_mqtt_cached_token(current_config)
+        # App 2.4.x reads 3047 before writing 3046.  The token already stored
+        # by the device is therefore authoritative for this device.  Cached
+        # device state is the next-best fallback; the config-entry value is
+        # used only when the device cannot provide a token during this run.
         token, _use_generated = self._stable_third_party_mqtt_token(
-            configured_token or readback_token or cached_token,
+            readback_token or cached_token or configured_token,
         )
         return token
+
+    @staticmethod
+    def _decoded_third_party_mqtt_cached_token(
+        config: object,
+    ) -> object | None:
+        """Return a cache token only when its plaintext provenance is proven."""
+        if not isinstance(config, dict):
+            return None
+        failed_fields = set(config.get("_decode_failed_fields") or ())
+        if config.get("_decode_error") or FIELD_THIRD_PARTY_MQTT_TOKEN in failed_fields:
+            return None
+        decoded_fields = set(config.get("_decoded_fields") or ())
+        if not (
+            config.get("_ha_plaintext") is True
+            or FIELD_THIRD_PARTY_MQTT_TOKEN in decoded_fields
+        ):
+            return None
+        token = config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
+        return token if token is not None and str(token) else None
 
     async def _async_local_mqtt_device_token(self, device_id: str) -> str:
         """Resolve the bridge token in the same order as App 2.4.0.
 
         ``MqttMsgActivity`` reads command 3047 before saving command 3046 and
         reuses the decoded device token. Only a missing config body causes the
-        App to generate its nine-digit fallback. A hidden token already stored
-        in the config entry remains authoritative across Home Assistant
-        restarts and therefore needs no device query.
+        App to fall back to cached/config-entry state and finally generate its
+        nine-digit token. A persisted Home Assistant token must not skip 3047:
+        doing so writes a potentially stale token before learning the token
+        that the device currently uses.
         """
-        configured_token = config_entry_str_option(
-            self.entry,
-            CONF_THIRD_PARTY_MQTT_TOKEN,
-            DEFAULT_THIRD_PARTY_MQTT_TOKEN,
-        )
-        if configured_token:
-            return self._local_mqtt_device_token(device_id)
-
-        device_data = (self.data or {}).get(device_id)
-        current_config = (
-            device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
-            if isinstance(device_data, dict)
-            else None
-        )
-        cached_token = (
-            current_config.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
-            if isinstance(current_config, dict)
-            else None
-        )
-        if cached_token:
-            return self._local_mqtt_device_token(device_id)
-
         readback: dict[str, Any] | None = None
         try:
             readback = await self._async_query_third_party_mqtt_config_readback(
                 device_id,
             )
-        except BACKGROUND_TASK_ERRORS as err:
+        except (JackeryError, HomeAssistantError, TimeoutError, OSError) as err:
             _LOGGER.debug(
                 "Jackery local MQTT bridge: initial 3047 token readback failed "
                 "for %s; using the App fallback for this attempt: %s",
@@ -16310,6 +16545,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         readback_token = (
             readback.get(FIELD_THIRD_PARTY_MQTT_TOKEN)
             if isinstance(readback, dict)
+            and self._third_party_mqtt_token_readback_usable(readback)
             else None
         )
         if readback_token:
@@ -16346,22 +16582,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # fallback, a host stored under ``third_party_mqtt_ip`` reads back
         # empty here even though the bridge is enabled, so the push is wrongly
         # skipped ("enabled but no host configured"). Keep both in sync.
-        # Only the explicit Home Assistant local-MQTT option authorizes a
-        # device-side config push. The app-synchronised legacy enable field is
-        # device state, not permission to mutate the device during HA startup.
-        enabled = config_entry_bool_option(
-            self.entry,
-            CONF_LOCAL_MQTT_ENABLE,
-            DEFAULT_LOCAL_MQTT_ENABLE,
-        )
+        enabled = local_mqtt_opt_in(self.entry)
         if not enabled:
             self._local_mqtt_config_applied_signature = None
             self._local_mqtt_config_diagnostics["last_status"] = "disabled"
             return True
-        host = (
-            config_entry_str_option(self.entry, CONF_LOCAL_MQTT_HOST, "").strip()
-            or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
-        )
+        host = config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_IP, "").strip()
         if not host:
             # Warn once per misconfiguration, not every push cycle — a missing
             # host is a static config state, so repeating the warning each
@@ -16389,89 +16615,114 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return False
         port = config_entry_int_option(
             self.entry,
-            CONF_LOCAL_MQTT_PORT,
-            0,
-        ) or config_entry_int_option(
-            self.entry,
             CONF_THIRD_PARTY_MQTT_PORT,
-            DEFAULT_LOCAL_MQTT_PORT,
+            DEFAULT_THIRD_PARTY_MQTT_PORT,
         )
         username = config_entry_str_option(
             self.entry,
-            CONF_LOCAL_MQTT_USERNAME,
+            CONF_THIRD_PARTY_MQTT_USERNAME,
             "",
-        ) or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_USERNAME, "")
+        )
         password = config_entry_str_option(
             self.entry,
-            CONF_LOCAL_MQTT_PASSWORD,
+            CONF_THIRD_PARTY_MQTT_PASSWORD,
             "",
-        ) or config_entry_str_option(self.entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "")
-        # App 2.4.0 reads 3047 before 3046 and reuses the decoded token. Resolve
-        # each device independently in that order; only a genuinely missing
-        # config body receives the persisted nine-digit App fallback.
-        per_device_tokens: dict[str, str] = {}
-        for device_id in self._device_index:
-            per_device_tokens[
-                str(device_id)
-            ] = await self._async_local_mqtt_device_token(str(device_id))
-        signature = (
-            host,
-            port,
-            username,
-            password,
-            tuple(sorted(per_device_tokens.items())),
-            tuple(sorted(self._device_index)),
         )
-        if self._local_mqtt_config_applied_signature != signature:
-            # Traffic observed for an older broker/configuration cannot prove
-            # that the newly requested 3046 target is publishing.
-            self._local_mqtt_device_traffic_observed = False
-            self._local_mqtt_device_traffic_observed_ids = set()
+        device_ids = tuple(str(device_id) for device_id in self._device_index)
         observed_device_ids: set[str] = getattr(
             self,
             "_local_mqtt_device_traffic_observed_ids",
             set(),
         )
-        configured_device_ids = {str(device_id) for device_id in self._device_index}
+        configured_device_ids = set(device_ids)
         devices_with_traffic = configured_device_ids & observed_device_ids
         all_devices_observed = bool(configured_device_ids) and (
             devices_with_traffic == configured_device_ids
         )
-        if self._local_mqtt_config_applied_signature == signature:
-            if all_devices_observed:
-                diagnostics["last_status"] = "unchanged_with_device_traffic"
-                return True
-            diagnostics["last_status"] = "awaiting_device_traffic"
-        success = True
+        previous_signature = self._local_mqtt_config_applied_signature
+        previous_base_matches = bool(
+            isinstance(previous_signature, tuple)
+            and len(previous_signature) == 6
+            and previous_signature[:4] == (host, port, username, password)
+            and tuple(sorted(device_ids)) == previous_signature[5]
+        )
+        if previous_base_matches and all_devices_observed:
+            diagnostics["last_status"] = "unchanged_with_device_traffic"
+            return True
+
+        # App 2.4.x reads 3047 immediately before 3046.  Keep that ordering per
+        # device while running different devices independently, so one missing
+        # response cannot serialize every other bridge configuration.
+        async def _async_configure_device(device_id: str) -> tuple[str, str]:
+            device_token = await self._async_local_mqtt_device_token(device_id)
+            await self.async_set_third_party_mqtt_config(
+                device_id,
+                enable=True,
+                ip=host,
+                port=port,
+                username=username,
+                password=password,
+                token=device_token,
+            )
+            return device_id, device_token
+
+        results = await asyncio.gather(
+            *(_async_configure_device(device_id) for device_id in device_ids),
+            return_exceptions=True,
+        )
+        per_device_tokens: dict[str, str] = {}
         config_errors: dict[str, str] = {}
-        for device_id in tuple(self._device_index):
-            device_token = per_device_tokens[str(device_id)]
-            try:
-                await self.async_set_third_party_mqtt_config(
-                    device_id,
-                    enable=True,
-                    ip=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    token=device_token,
-                )
-                config_errors.pop(str(device_id), None)
-            except BACKGROUND_TASK_ERRORS as err:
-                success = False
-                error = exception_debug_message(err)
+        expected_errors = (JackeryError, HomeAssistantError, TimeoutError, OSError)
+        prior_errors = diagnostics.get("last_errors")
+        prior_errors = prior_errors if isinstance(prior_errors, dict) else {}
+        for device_id, result in zip(device_ids, results, strict=True):
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, BaseException):
+                if not isinstance(result, expected_errors):
+                    raise result
+                error = exception_debug_message(result)
                 log = (
                     _LOGGER.warning
-                    if config_errors.get(str(device_id)) != error
+                    if prior_errors.get(device_id) != error
                     else _LOGGER.debug
                 )
-                config_errors[str(device_id)] = error
+                config_errors[device_id] = error
                 log(
                     "Jackery local MQTT bridge: failed to push config to "
                     "device %s (%s); scheduling a bounded retry",
                     device_id,
                     error,
                 )
+                continue
+            result_device_id, device_token = result
+            per_device_tokens[result_device_id] = device_token
+
+        success = not config_errors and len(per_device_tokens) == len(device_ids)
+        signature = (
+            host,
+            port,
+            username,
+            password,
+            tuple(sorted(per_device_tokens.items())),
+            tuple(sorted(device_ids)),
+        )
+        if success and previous_signature != signature:
+            previous_tokens: dict[str, str] = {}
+            if previous_base_matches and previous_signature is not None:
+                previous_tokens = dict(previous_signature[4])
+            changed_device_ids = {
+                device_id
+                for device_id, token in per_device_tokens.items()
+                if not previous_base_matches or previous_tokens.get(device_id) != token
+            }
+            observed_device_ids -= changed_device_ids
+            self._local_mqtt_device_traffic_observed_ids = observed_device_ids
+            self._local_mqtt_device_traffic_observed = bool(observed_device_ids)
+            devices_with_traffic = configured_device_ids & observed_device_ids
+            all_devices_observed = bool(configured_device_ids) and (
+                devices_with_traffic == configured_device_ids
+            )
         diagnostics["last_errors"] = dict(config_errors)
         diagnostics["last_status"] = (
             "config_confirmed_awaiting_device_traffic"
@@ -17141,16 +17392,24 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 **request_kwargs,
             )
         elif section_prefix == APP_SECTION_CT_STAT:
+            ct_request_kwargs: dict[str, Any] = {
+                **request_kwargs,
+                "stat_type": CT_STAT_TYPE_L1,
+            }
             request_factory = partial(
                 self.api.async_get_device_ct_stat,
                 ct_device_id or device_id,
-                **request_kwargs,
+                **ct_request_kwargs,
             )
         elif section_prefix == APP_SECTION_EPS_STAT:
+            eps_request_kwargs: dict[str, Any] = {
+                **request_kwargs,
+                "stat_type": EPS_STAT_TYPE_L1,
+            }
             request_factory = partial(
                 self.api.async_get_device_eps_stat,
                 device_id,
-                **request_kwargs,
+                **eps_request_kwargs,
             )
         elif section_prefix == APP_SECTION_PV_STAT and system_id is not None:
             request_factory = partial(

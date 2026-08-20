@@ -1665,7 +1665,7 @@ def _stat_section_has_values(
     source = payload.get(section)
     if not isinstance(source, dict):
         return False
-    if section.startswith(APP_SECTION_CT_STAT):
+    if section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT)):
         return trend_series_has_value(source, section, stat_key)
     return any(key != APP_REQUEST_META for key in source)
 
@@ -5387,8 +5387,16 @@ class JackerySensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """The last reset time for periodic sensors."""
-        if self.entity_description.reset_period is None:
+        """The last reset time for periodic sensors (state_class=TOTAL only).
+
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
+        """
+        if (
+            self.entity_description.reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return _period_start(
             self.entity_description.reset_period, self._local_timezone()
@@ -5607,8 +5615,16 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """The last reset time for periodic sensors."""
-        if self._reset_period is None:
+        """The last reset time for periodic sensors (state_class=TOTAL only).
+
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
+        """
+        if (
+            self._reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return self._compute_period_start(self._reset_period)
 
@@ -5855,6 +5871,19 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         cache_key = (id(source), section, stat_key)
         if cache_key in period_cache:
             return period_cache[cache_key]
+
+        # For day period payloads, the chart series is a power curve (unit "w")
+        # while the scalar total (e.g., totalSolarEnergy) is already in kWh.
+        # We must not apply the chart series unit_scale to the scalar total.
+        is_day_payload = is_day_period_payload(source, section)
+
+        unit_scale = app_energy_unit_scale(source)
+        if unit_scale is None and not is_day_payload:
+            # For non-day payloads, missing unit_scale means we can't process
+            resolution: _PeriodResolution = (None, None, None, False)
+            period_cache[cache_key] = resolution
+            return resolution
+
         values = effective_trend_series_values(source, section, stat_key)
         chart_series_sum: float | None = None
         numeric_values = (
@@ -5862,9 +5891,16 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             if isinstance(values, list)
             else []
         )
-        if numeric_values:
-            chart_series_sum = round(sum(numeric_values), 2)
+        if numeric_values and unit_scale is not None:
+            chart_series_sum = round(
+                sum(value * unit_scale for value in numeric_values), 2
+            )
         scalar_total = safe_float(source.get(stat_key))
+        if scalar_total is not None:
+            # For day payloads, scalar total is already in kWh; don't scale it.
+            # For other payloads, apply unit_scale if available.
+            if not is_day_payload and unit_scale is not None:
+                scalar_total = round(scalar_total * unit_scale, 2)
         server_total = scalar_total
         if is_device_year_period_section(source, section) and values is not None:
             server_total = chart_series_sum
@@ -6414,13 +6450,19 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         """Capture event-loop inputs around a detached device payload."""
         local_timezone = self._local_timezone()
         local_now = dt_util.now(local_timezone)
+        local_daily_raw = (
+            self._local_daily_raw_from_payload(payload) or self._local_daily_raw()
+        )
         return _StatRefreshContext(
             payload=payload,
             local_now=local_now,
             local_today=local_now.date(),
-            local_daily_raw=self._local_daily_raw_from_payload(payload)
-            or self._local_daily_raw(),
-            local_period_raw=self._local_period_raw(local_now.date()),
+            local_daily_raw=local_daily_raw,
+            local_period_raw=self._local_period_raw_from_payload(
+                payload,
+                local_now.date(),
+            )
+            or self._local_period_raw(local_now.date()),
         )
 
     @callback
@@ -6569,6 +6611,35 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             else JACKERY_LIVE_ENERGY_UNITS_PER_KWH
         )
         return round(raw_value / divisor, 5), metric_key
+
+    def _local_period_raw_from_payload(
+        self,
+        payload: dict[str, Any],
+        today: date,
+    ) -> tuple[float, str] | None:
+        """Return a covered local period delta from the refresh payload."""
+        metric_key = self._local_daily_metric_key()
+        if metric_key is None or self._reset_period is None:
+            return None
+        section = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
+        if not isinstance(section, dict):
+            return None
+        raw_value = safe_float(section.get(metric_key))
+        if raw_value is None or raw_value < 0:
+            return None
+        getter = getattr(self.coordinator, "local_period_energy_kwh_from_delta", None)
+        if not callable(getter):
+            return None
+        value = getter(
+            self._device_id,
+            metric_key,
+            raw_value,
+            period=self._reset_period,
+            today=today,
+        )
+        if value is None:
+            return None
+        return value, metric_key
 
     def _local_period_raw(self, today: date) -> tuple[float, str] | None:
         """Return a fully covered local period delta in kWh for this sensor."""
@@ -7007,8 +7078,16 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """The last reset time for periodic sensors."""
-        if self._reset_period is None:
+        """The last reset time for periodic sensors (state_class=TOTAL only).
+
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
+        """
+        if (
+            self._reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return _period_start(self._reset_period, self._local_timezone())
 
@@ -7416,13 +7495,16 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """Compute the start datetime of the configured reset period for this entity.
+        """The last reset time for periodic sensors (state_class=TOTAL only).
 
-        Returns:
-            datetime: The period start datetime for the configured reset period (local
-            timezone), or `None` when no reset period is configured.
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
         """
-        if self._reset_period is None:
+        if (
+            self._reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return _period_start(self._reset_period)
 
@@ -7670,8 +7752,16 @@ class JackeryMeterHeadSensor(JackeryEntity, SensorEntity):
 
     @property
     def last_reset(self) -> datetime | None:
-        """The last reset time for periodic sensors."""
-        if self._reset_period is None:
+        """The last reset time for periodic sensors (state_class=TOTAL only).
+
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
+        """
+        if (
+            self._reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return _period_start(self._reset_period, self._local_timezone())
 
@@ -7839,8 +7929,16 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
 
     @property
     def last_reset(self) -> datetime | None:
-        """The last reset time for periodic sensors."""
-        if self._reset_period is None:
+        """The last reset time for periodic sensors (state_class=TOTAL only).
+
+        Per HA contract, last_reset must only be set for state_class=TOTAL
+        (period totals that reset at boundaries), never for TOTAL_INCREASING
+        (lifetime cumulative counters).
+        """
+        if (
+            self._reset_period is None
+            or self.entity_description.state_class != SensorStateClass.TOTAL
+        ):
             return None
         return _period_start(self._reset_period, self._local_timezone())
 

@@ -17,10 +17,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
@@ -89,8 +89,8 @@ async def _submit_reconfigure_credentials(
             return_value=None,
         ),
         patch(
-            "custom_components.jackery_solarvault._defer_layer5_start_task",
-            return_value=None,
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
         ),
     ):
         result = await entry.start_reconfigure_flow(hass)

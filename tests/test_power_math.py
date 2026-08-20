@@ -11,6 +11,8 @@ import sys
 import types
 from typing import Any
 
+import pytest
+
 
 def _load_util_module() -> types.ModuleType:
     """Load and return the local `custom_components.jackery_solarvault.util` module for tests.
@@ -763,9 +765,48 @@ def test_device_grid_and_ct_period_stats_follow_app_series_keys() -> None:
     )
 
 
-def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
-    """Implement test empty ct period series falls back to server totals."""
-    source = {
+def test_empty_ct_period_zero_shell_is_not_energy_data() -> None:
+    """An empty CT chart plus scalar zero with invalid unit remains an unconfirmed shell.
+
+    The key distinction: when unit is kWh (valid energy unit) and total is explicitly
+    provided as zero, this IS valid data - the device reported 0 energy for that period.
+    This test ensures the OLD behavior for truly unconfirmed data (invalid unit).
+    """
+    # Invalid unit (W instead of kWh) with zero - this IS an unconfirmed shell
+    source_invalid_unit = {
+        "unit": "W",  # Invalid energy unit
+        "totalInCtEnergy": "0",
+        "totalOutCtEnergy": "0",
+        "y1": [],
+        "y2": [],
+    }
+
+    assert not util.trend_series_has_value(
+        source_invalid_unit,
+        "device_ct_stat_month",
+        "totalInCtEnergy",
+    )
+    assert not util.trend_series_has_value(
+        source_invalid_unit,
+        "device_ct_stat_month",
+        "totalOutCtEnergy",
+    )
+    assert (
+        util.trend_series_total(
+            source_invalid_unit,
+            "device_ct_stat_month",
+            "totalInCtEnergy",
+        )
+        is None
+    )
+    assert not util.trend_payload_has_value(
+        source_invalid_unit,
+        "device_ct_stat_month",
+        "totalInCtEnergy",
+    )
+
+    # Valid unit (kWh) with zero total - this IS valid data (device reported 0 kWh)
+    source_valid_unit = {
         "unit": "kWh",
         "totalInCtEnergy": "0",
         "totalOutCtEnergy": "0",
@@ -774,23 +815,38 @@ def test_empty_ct_period_series_falls_back_to_server_totals() -> None:
     }
 
     assert util.trend_series_has_value(
-        source,
+        source_valid_unit,
         "device_ct_stat_month",
         "totalInCtEnergy",
     )
     assert util.trend_series_has_value(
-        source,
+        source_valid_unit,
         "device_ct_stat_month",
         "totalOutCtEnergy",
     )
-    assert (
-        util.trend_series_total(  # ruff: ignore[float-equality-comparison]
-            source,
-            "device_ct_stat_month",
-            "totalInCtEnergy",
-        )
-        == 0.0
-    )
+    assert util.trend_series_total(
+        source_valid_unit,
+        "device_ct_stat_month",
+        "totalInCtEnergy",
+    ) == pytest.approx(0.0)
+    assert util.trend_series_total(
+        source_valid_unit,
+        "device_ct_stat_month",
+        "totalOutCtEnergy",
+    ) == pytest.approx(0.0)
+
+
+def test_empty_ct_eps_day_zero_shell_is_not_energy_data() -> None:
+    """A lone CT/EPS day scalar zero does not prove an energy value."""
+    for section, stat_key in (
+        ("device_ct_stat_day", "totalInCtEnergy"),
+        ("device_eps_stat_day", "totalOutEpsEnergy"),
+    ):
+        source = {"unit": "W", stat_key: "0", "y1": [], "y2": []}
+
+        assert not util.trend_series_has_value(source, section, stat_key)
+        assert util.trend_series_total(source, section, stat_key) is None
+        assert not util.trend_payload_has_value(source, section, stat_key)
 
 
 def test_zero_filled_ct_period_series_is_a_valid_zero_statistic() -> None:

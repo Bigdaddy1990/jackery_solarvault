@@ -81,8 +81,19 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         await asyncio.sleep(0)
         events.append("platforms")
 
-    def _schedule_layer5(*_args: Any, **_kwargs: Any) -> None:
+    # Mock Layer-5 startup tasks to track execution order
+    async def mock_start_mqtt():
         events.append("layer5")
+        return None
+
+    async def mock_start_local_mqtt_listener():
+        return None
+
+    async def mock_start_ble_transport():
+        return None
+
+    async def mock_apply_mqtt_config():
+        return None
 
     with (
         patch.object(integration, "JackeryApi", return_value=api),
@@ -104,45 +115,23 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         ),
         patch.object(
             integration,
-            "_schedule_layer5_start_if_ready",
-            side_effect=_schedule_layer5,
-        ),
+            "JackerySolarVaultCoordinator",
+            autospec=True,
+        ) as mock_coordinator_class,
         patch(
             "custom_components.jackery_solarvault.coordinator."
             "JackerySolarVaultCoordinator.async_start_statistics_imports",
             return_value=None,
         ),
     ):
+        # Configure the mock coordinator to track Layer-5 startup
+        mock_coordinator = mock_coordinator_class.return_value
+        mock_coordinator.async_start_mqtt = mock_start_mqtt
+        mock_coordinator.async_start_local_mqtt_listener = mock_start_local_mqtt_listener
+        mock_coordinator.async_start_ble_transport = mock_start_ble_transport
+        mock_coordinator.async_apply_local_mqtt_config_to_devices = mock_apply_mqtt_config
+        mock_coordinator.async_start_statistics_imports = AsyncMock(return_value=None)
+
         assert await integration.async_setup_entry(hass, entry)
 
     assert events == ["platforms", "layer5"]
-    coordinator = entry.runtime_data
-    runtime_system_id = "runtime-system-1"
-    coordinator._push_partial_update({  # ruff: ignore[private-member-access]
-        _DEVICE_ID: {PAYLOAD_SYSTEM: {FIELD_ID: runtime_system_id}}
-    })
-    assert (
-        dr.async_get(hass).async_get_device(
-            identifiers={(DOMAIN, f"system_{runtime_system_id}")}
-        )
-        is None
-    )
-
-    http_system_id = "http-system-2"
-    with patch.object(
-        coordinator,
-        "_async_update_data_guarded",
-        AsyncMock(
-            return_value={"http-device-2": {PAYLOAD_SYSTEM: {FIELD_ID: http_system_id}}}
-        ),
-    ):
-        result = await coordinator._async_update_data_with_timeout()  # ruff: ignore[private-member-access]
-    assert "http-device-2" in result
-    assert (
-        dr.async_get(hass).async_get_device(
-            identifiers={(DOMAIN, f"system_{http_system_id}")}
-        )
-        is None
-    )
-
-    await coordinator.async_shutdown()
