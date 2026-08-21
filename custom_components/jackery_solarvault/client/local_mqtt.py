@@ -18,8 +18,10 @@ from homeassistant.components.mqtt.util import valid_subscribe_topic
 
 from ..const import (
     DOMAIN,
+    LOCAL_MQTT_DEFAULT_TOPIC,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_MAX_TOPIC_NAMES,
+    LOCAL_MQTT_POLL_INTERVAL_SEC,
     LOCAL_MQTT_RECONNECT_FACTOR,
     LOCAL_MQTT_RECONNECT_INITIAL_SEC,
     LOCAL_MQTT_RECONNECT_MAX_SEC,
@@ -32,9 +34,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-LOCAL_MQTT_DEFAULT_TOPIC = "homeassistant/#"
 MqttQos = Literal[0, 1, 2]
 LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[bool | None]]
+LocalMqttPoller = Callable[[], Awaitable[int]]
 
 
 class JackeryLocalMqttClient:
@@ -59,6 +61,8 @@ class JackeryLocalMqttClient:
         self._unsubscribe: Callable[[], None] | None = None
         self._unsubscribe_status: Callable[[], None] | None = None
         self._retry_task: asyncio.Task[None] | None = None
+        self._poll_task: asyncio.Task[None] | None = None
+        self._poller: LocalMqttPoller | None = None
         self._message_tasks: set[asyncio.Task[Any]] = set()
         self._stopping = False
         self._mqtt_integration_available = False
@@ -80,6 +84,9 @@ class JackeryLocalMqttClient:
         self._last_error: str | None = None
         self._last_sink_error: str | None = None
         self._connect_attempts = 0
+        self._messages_published = 0
+        self._publish_errors = 0
+        self._last_publish_at: str | None = None
 
     async def async_start(self) -> None:
         """Register the subscription, retrying transient MQTT startup gaps."""
@@ -105,6 +112,12 @@ class JackeryLocalMqttClient:
             retry_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await retry_task
+        poll_task = self._poll_task
+        self._poll_task = None
+        if poll_task is not None and poll_task is not asyncio.current_task():
+            poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await poll_task
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
@@ -231,6 +244,11 @@ class JackeryLocalMqttClient:
         """Decode JSON when possible and forward every broker-selected frame."""
         if self._stopping:
             return
+        # The default ``hb/device/#`` subscription also receives the requests
+        # this adapter publishes. They are commands, not device telemetry, and
+        # must not inflate receive/reject diagnostics or reach the ingest sink.
+        if topic.endswith("/action"):
+            return
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
@@ -278,6 +296,61 @@ class JackeryLocalMqttClient:
             return
         self._messages_forwarded += 1
 
+    def start_periodic_requests(self, poller: LocalMqttPoller) -> None:
+        """Start one adapter-owned official-protocol request loop."""
+        self._poller = poller
+        if self._poll_task is not None and not self._poll_task.done():
+            return
+        self._poll_task = self._hass.async_create_background_task(
+            self._async_periodic_requests(),
+            name="jackery_local_mqtt_periodic_requests",
+            eager_start=False,
+        )
+
+    async def _async_periodic_requests(self) -> None:
+        """Poll Jackery hosts while the shared HA broker is connected."""
+        try:
+            while not self._stopping:
+                poller = self._poller
+                if poller is not None and self._connected:
+                    try:
+                        await poller()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as err:  # ruff: ignore[blind-except]
+                        self._last_error = f"{type(err).__name__}: {err}"
+                        _LOGGER.warning(
+                            "Unable to poll local Jackery MQTT devices: %s", err
+                        )
+                await asyncio.sleep(LOCAL_MQTT_POLL_INTERVAL_SEC)
+        finally:
+            self._poll_task = None
+
+    async def async_publish(
+        self,
+        topic: str,
+        payload: dict[str, Any],
+        *,
+        qos: MqttQos = 0,
+        retain: bool = False,
+    ) -> None:
+        """Publish one JSON request through Home Assistant's MQTT connection."""
+        try:
+            await mqtt.async_publish(
+                self._hass,
+                topic,
+                json.dumps(payload, separators=(",", ":")),
+                qos=qos,
+                retain=retain,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self._publish_errors += 1
+            raise
+        self._messages_published += 1
+        self._last_publish_at = self._utc_now_iso()
+
     def diagnostics_snapshot(self, *, redact: bool = True) -> dict[str, Any]:
         """Return privacy-safe transport diagnostics."""
         topics = (
@@ -294,6 +367,7 @@ class JackeryLocalMqttClient:
             "connected": self._connected,
             "started": self.is_started,
             "subscription_retry_active": self._retry_task is not None,
+            "periodic_requests_active": self._poll_task is not None,
             "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
             "qos": self._qos,
             "retained_messages_dropped": self._retained_messages_dropped,
@@ -303,6 +377,9 @@ class JackeryLocalMqttClient:
             "messages_received": self._messages_received,
             "messages_dropped": self._messages_dropped,
             "messages_forwarded": self._messages_forwarded,
+            "messages_published": self._messages_published,
+            "publish_errors": self._publish_errors,
+            "last_publish_at": self._last_publish_at,
             "messages_rejected_by_sink": self._messages_rejected_by_sink,
             "sink_errors": self._sink_errors,
             "last_sink_error": self._last_sink_error,

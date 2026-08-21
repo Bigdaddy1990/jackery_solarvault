@@ -327,9 +327,9 @@
         "name": "Phase CT",
         "state": {
           "combined_phases": "Phases combinees",
-          "phase_1": "Phase 1",
-          "phase_2": "Phase 2",
-          "phase_3": "Phase 3",
+          "phase_1": "Phase A",
+          "phase_2": "Phase B",
+          "phase_3": "Phase C",
           "phase_4": "Phases combinees"
         }
       },
@@ -1258,79 +1258,79 @@
         "name": "\u00c9nergie de d\u00e9charge du panneau Smart Meter"
       },
       "smart_meter_phase_1_apparent_power": {
-        "name": "Puissance apparente phase 1 du Smart Meter"
+        "name": "Puissance apparente phase A du CT"
       },
       "smart_meter_phase_1_current": {
-        "name": "Courant phase 1 du Smart Meter"
+        "name": "Courant phase A du CT"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 1 du Smart Meter"
+        "name": "Export r\u00e9seau total phase A du CT"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 1 du Smart Meter"
+        "name": "Import r\u00e9seau total phase A du CT"
       },
       "smart_meter_phase_1_power": {
-        "name": "Puissance phase 1 du Smart Meter"
+        "name": "Puissance phase A du CT"
       },
       "smart_meter_phase_1_power_factor": {
-        "name": "Facteur de puissance phase 1 du Smart Meter"
+        "name": "Facteur de puissance phase A du CT"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "Puissance r\u00e9active phase 1 du Smart Meter"
+        "name": "Puissance r\u00e9active phase A du CT"
       },
       "smart_meter_phase_1_voltage": {
-        "name": "Tension phase 1 du Smart Meter"
+        "name": "Tension phase A du CT"
       },
       "smart_meter_phase_2_apparent_power": {
-        "name": "Puissance apparente phase 2 du Smart Meter"
+        "name": "Puissance apparente phase B du CT"
       },
       "smart_meter_phase_2_current": {
-        "name": "Courant phase 2 du Smart Meter"
+        "name": "Courant phase B du CT"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 2 du Smart Meter"
+        "name": "Export r\u00e9seau total phase B du CT"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 2 du Smart Meter"
+        "name": "Import r\u00e9seau total phase B du CT"
       },
       "smart_meter_phase_2_power": {
-        "name": "Puissance phase 2 du Smart Meter"
+        "name": "Puissance phase B du CT"
       },
       "smart_meter_phase_2_power_factor": {
-        "name": "Facteur de puissance phase 2 du Smart Meter"
+        "name": "Facteur de puissance phase B du CT"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "Puissance r\u00e9active phase 2 du Smart Meter"
+        "name": "Puissance r\u00e9active phase B du CT"
       },
       "smart_meter_phase_2_voltage": {
-        "name": "Tension phase 2 du Smart Meter"
+        "name": "Tension phase B du CT"
       },
       "smart_meter_phase_3_apparent_power": {
-        "name": "Puissance apparente phase 3 du Smart Meter"
+        "name": "Puissance apparente phase C du CT"
       },
       "smart_meter_phase_3_current": {
-        "name": "Courant phase 3 du Smart Meter"
+        "name": "Courant phase C du CT"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "Export r\u00e9seau total phase 3 du Smart Meter"
+        "name": "Export r\u00e9seau total phase C du CT"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "Import r\u00e9seau total phase 3 du Smart Meter"
+        "name": "Import r\u00e9seau total phase C du CT"
       },
       "smart_meter_phase_3_power": {
-        "name": "Puissance phase 3 du Smart Meter"
+        "name": "Puissance phase C du CT"
       },
       "smart_meter_phase_3_power_factor": {
-        "name": "Facteur de puissance phase 3 du Smart Meter"
+        "name": "Facteur de puissance phase C du CT"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "Puissance r\u00e9active phase 3 du Smart Meter"
+        "name": "Puissance r\u00e9active phase C du CT"
       },
       "smart_meter_phase_3_voltage": {
-        "name": "Tension phase 3 du Smart Meter"
+        "name": "Tension phase C du CT"
       },
       "smart_meter_power": {
-        "name": "Puissance nette du Smart Meter"
+        "name": "Puissance phase T du CT"
       },
       "smart_meter_power_factor": {
         "name": "Facteur de puissance du Smart Meter"

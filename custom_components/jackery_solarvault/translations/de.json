@@ -76,7 +76,7 @@
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "MQTT-Topic-Filter fuer den direkten lokalen Broker-Fallback. Leer lassen, solange das exakte Jackery-Bridge-Topic nicht bekannt ist. `homeassistant` ist hier meist falsch, weil dann nur der Event-Stream von Home Assistant selbst getroffen wird.",
+          "third_party_mqtt_topic_filter": "MQTT-Subscription-Filter fuer lokale Bridge-Telemetrie. Standard ist `homeassistant/#`; ein gespeicherter Legacy-Wert `homeassistant` wird auf diesen Child-Topic-Wildcard normalisiert. Wenn bekannt, kann ein engeres Jackery-Topic verwendet werden. Fremde Payloads werden durch die geraetebezogene Verarbeitung abgewiesen.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum urspr\u00fcnglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. F\u00fcr einen Kontowechsel zuerst den Eintrag entfernen.",
@@ -326,11 +326,11 @@
       "ct_phase_select": {
         "name": "CT-Phase",
         "state": {
-          "combined_phases": "Kombinierte Phasen",
-          "phase_1": "Phase 1",
-          "phase_2": "Phase 2",
-          "phase_3": "Phase 3",
-          "phase_4": "Kombinierte Phasen"
+          "combined_phases": "Kombinierte Phase",
+          "phase_1": "Phase A",
+          "phase_2": "Phase B",
+          "phase_3": "Phase C",
+          "phase_4": "Kombinierte Phase"
         }
       },
       "electricity_price_mode": {
@@ -1258,79 +1258,79 @@
         "name": "Smart-Meter Panel Entladeenergie"
       },
       "smart_meter_phase_1_apparent_power": {
-        "name": "Smart-Meter Phase 1 Scheinleistung"
+        "name": "CT-Phase A Scheinleistung"
       },
       "smart_meter_phase_1_current": {
-        "name": "Smart-Meter Phase 1 Strom"
+        "name": "CT-Phase A Strom"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "Smart-Meter Phase 1 Netzeinspeisung Gesamt"
+        "name": "CT-Phase A Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "Smart-Meter Phase 1 Netzbezug Gesamt"
+        "name": "CT-Phase A Netzbezug Gesamt"
       },
       "smart_meter_phase_1_power": {
-        "name": "Smart-Meter Phase 1 Leistung"
+        "name": "CT-Phase A Leistung"
       },
       "smart_meter_phase_1_power_factor": {
-        "name": "Smart-Meter Phase 1 Leistungsfaktor"
+        "name": "CT-Phase A Leistungsfaktor"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "Smart-Meter Phase 1 Blindleistung"
+        "name": "CT-Phase A Blindleistung"
       },
       "smart_meter_phase_1_voltage": {
-        "name": "Smart-Meter Phase 1 Spannung"
+        "name": "CT-Phase A Spannung"
       },
       "smart_meter_phase_2_apparent_power": {
-        "name": "Smart-Meter Phase 2 Scheinleistung"
+        "name": "CT-Phase B Scheinleistung"
       },
       "smart_meter_phase_2_current": {
-        "name": "Smart-Meter Phase 2 Strom"
+        "name": "CT-Phase B Strom"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "Smart-Meter Phase 2 Netzeinspeisung Gesamt"
+        "name": "CT-Phase B Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "Smart-Meter Phase 2 Netzbezug Gesamt"
+        "name": "CT-Phase B Netzbezug Gesamt"
       },
       "smart_meter_phase_2_power": {
-        "name": "Smart-Meter Phase 2 Leistung"
+        "name": "CT-Phase B Leistung"
       },
       "smart_meter_phase_2_power_factor": {
-        "name": "Smart-Meter Phase 2 Leistungsfaktor"
+        "name": "CT-Phase B Leistungsfaktor"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "Smart-Meter Phase 2 Blindleistung"
+        "name": "CT-Phase B Blindleistung"
       },
       "smart_meter_phase_2_voltage": {
-        "name": "Smart-Meter Phase 2 Spannung"
+        "name": "CT-Phase B Spannung"
       },
       "smart_meter_phase_3_apparent_power": {
-        "name": "Smart-Meter Phase 3 Scheinleistung"
+        "name": "CT-Phase C Scheinleistung"
       },
       "smart_meter_phase_3_current": {
-        "name": "Smart-Meter Phase 3 Strom"
+        "name": "CT-Phase C Strom"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "Smart-Meter Phase 3 Netzeinspeisung Gesamt"
+        "name": "CT-Phase C Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "Smart-Meter Phase 3 Netzbezug Gesamt"
+        "name": "CT-Phase C Netzbezug Gesamt"
       },
       "smart_meter_phase_3_power": {
-        "name": "Smart-Meter Phase 3 Leistung"
+        "name": "CT-Phase C Leistung"
       },
       "smart_meter_phase_3_power_factor": {
-        "name": "Smart-Meter Phase 3 Leistungsfaktor"
+        "name": "CT-Phase C Leistungsfaktor"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "Smart-Meter Phase 3 Blindleistung"
+        "name": "CT-Phase C Blindleistung"
       },
       "smart_meter_phase_3_voltage": {
-        "name": "Smart-Meter Phase 3 Spannung"
+        "name": "CT-Phase C Spannung"
       },
       "smart_meter_power": {
-        "name": "Smart-Meter Netzleistung saldiert"
+        "name": "CT-Phase T Leistung"
       },
       "smart_meter_power_factor": {
         "name": "Smart-Meter Leistungsfaktor"
@@ -1916,7 +1916,7 @@
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "MQTT-Topic-Filter fuer den direkten lokalen Broker-Fallback. Leer lassen, solange das exakte Jackery-Bridge-Topic nicht bekannt ist. `homeassistant` ist hier meist falsch, weil dann nur der Event-Stream von Home Assistant selbst getroffen wird.",
+          "third_party_mqtt_topic_filter": "MQTT-Subscription-Filter fuer lokale Bridge-Telemetrie. Standard ist `homeassistant/#`; ein gespeicherter Legacy-Wert `homeassistant` wird auf diesen Child-Topic-Wildcard normalisiert. Wenn bekannt, kann ein engeres Jackery-Topic verwendet werden. Fremde Payloads werden durch die geraetebezogene Verarbeitung abgewiesen.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",

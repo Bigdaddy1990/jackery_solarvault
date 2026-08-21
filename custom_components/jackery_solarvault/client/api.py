@@ -119,7 +119,6 @@ from ..const import (
     DEVICE_UNBIND_PATH,
     DYNAMIC_PRICE_LOGIN_URL_PATH,
     DYNAMIC_PRICE_PATH,
-    EPS_STAT_TYPE_L1,
     FAQ_ANSWER_PATH,
     FAQ_LIST_PATH,
     FEEDBACK_PATH,
@@ -643,7 +642,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     @staticmethod
     def _response_media_type(resp: aiohttp.ClientResponse) -> str:
         """Return the normalized response media type."""
-        content_type = resp.headers.get(HTTP_HEADER_CONTENT_TYPE, "")
+        content_type: object = resp.headers.get(HTTP_HEADER_CONTENT_TYPE, "")
         if not isinstance(content_type, str):  # lightweight protocol test doubles
             content_type = getattr(resp, "content_type", "")
         if not isinstance(content_type, str):
@@ -674,13 +673,14 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> object:
         """Decode only a bounded JSON response with a JSON media type."""
         media_type = cls._response_media_type(resp)
-        if not media_type and not isinstance(resp.content, aiohttp.StreamReader):
+        response_content: object = resp.content
+        if not media_type and not isinstance(response_content, aiohttp.StreamReader):
             media_type = "application/json"  # lightweight protocol test doubles
         if media_type not in _JSON_MEDIA_TYPES and not media_type.endswith("+json"):
             raise JackeryApiError(
                 f"Unexpected Content-Type {media_type or "(missing)"}; expected JSON"
             )
-        if not isinstance(resp.content, aiohttp.StreamReader):
+        if not isinstance(response_content, aiohttp.StreamReader):
             try:
                 return await resp.json(content_type=None)
             except (
@@ -699,6 +699,28 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             raise JackeryApiError(
                 "HTTP response contained invalid JSON (redacted)"
             ) from err
+
+    @classmethod
+    async def _decode_authenticated_json_attempt(
+        cls,
+        resp: aiohttp.ClientResponse,
+        *,
+        policy: HttpTransportPolicy = _HTTP_POLICY,
+    ) -> tuple[int, object]:
+        """Decode JSON while preserving an authoritative non-200 status.
+
+        Upstream gateways and auth proxies may return HTML or malformed JSON.
+        Their HTTP status still owns classification; only an invalid HTTP-200
+        body is a payload error.
+        """
+        status = resp.status
+        try:
+            body = await cls._decode_json_response(resp, policy=policy)
+        except JackeryApiError:
+            if status == HTTPStatus.OK:
+                raise
+            body = {}
+        return status, body
 
     @classmethod
     async def _decode_text_response(
@@ -2557,7 +2579,6 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
-        stat_type: int | None = None,
     ) -> dict[str, Any]:
         """Retrieve device EPS input/output energy for a specified period.
 
@@ -2572,7 +2593,6 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             date_type=date_type,
             begin_date=begin_date,
             end_date=end_date,
-            stat_type=stat_type if stat_type is not None else EPS_STAT_TYPE_L1,
         )
 
     async def async_get_today_energy(self, device_sn: str) -> dict[str, Any]:
@@ -4073,9 +4093,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=_request_headers(),
                 timeout=policy.timeout(effective_timeout),
             ) as resp:
-                status = resp.status
-                body = await self._decode_json_response(resp, policy=policy)
-                return status, body
+                return await self._decode_authenticated_json_attempt(
+                    resp,
+                    policy=policy,
+                )
 
         started_at = time.monotonic()
         status, data = await self._perform_authenticated_json_request(
@@ -4126,9 +4147,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
-                status = resp.status
-                body = await self._decode_json_response(resp)
-                return status, body
+                return await self._decode_authenticated_json_attempt(resp)
 
         status, data = await self._perform_authenticated_json_request(
             method=HTTP_METHOD_PUT,
@@ -4255,9 +4274,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
-                status = resp.status
-                data = await self._decode_json_response(resp)
-                return status, data
+                return await self._decode_authenticated_json_attempt(resp)
 
         status, data = await self._perform_authenticated_json_request(
             method=HTTP_METHOD_POST,
@@ -4421,9 +4438,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
-                status = resp.status
-                data = await self._decode_json_response(resp)
-                return status, data
+                return await self._decode_authenticated_json_attempt(resp)
 
         status, data = await self._perform_authenticated_json_request(
             method=_HTTP_METHOD_DELETE,
@@ -4465,9 +4480,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
-                status = resp.status
-                data = await self._decode_json_response(resp)
-                return status, data
+                return await self._decode_authenticated_json_attempt(resp)
 
         status, data = await self._perform_authenticated_json_request(
             method=HTTP_METHOD_POST,

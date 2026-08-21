@@ -15,8 +15,10 @@ from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
 from ..const import (
+    FIELD_ACTION_ID,
     FIELD_BODY,
     FIELD_DATA,
+    FIELD_ID,
     MQTT_AUTH_FAILURE_RCS,
     MQTT_AUTH_FAILURE_TOLERANCE,
     MQTT_CLIENT_LIBRARY,
@@ -1080,6 +1082,20 @@ class JackeryMqttPushClient:
         return "/".join(parts)
 
     # Getter response correlation (bounded session state)
+    @staticmethod
+    def _normalize_response_type(value: object) -> str | int | None:
+        """Canonicalize numeric protocol types while preserving named types."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        return int(normalized) if normalized.isdecimal() else normalized
+
     async def _wait_for_response(
         self,
         request_id: int,
@@ -1105,7 +1121,11 @@ class JackeryMqttPushClient:
             raise RuntimeError(msg)
 
         generation = self._session_generation
-        key = (generation, request_id, expected_response_type)
+        key = (
+            generation,
+            request_id,
+            self._normalize_response_type(expected_response_type),
+        )
         future = asyncio.get_running_loop().create_future()
         self._pending_responses[key] = future
         try:
@@ -1122,8 +1142,18 @@ class JackeryMqttPushClient:
         Args:
             data: The parsed MQTT message data containing request_id and response.
         """
-        request_id = data.get("request_id")
-        response_type = data.get("response_type", data.get("actionId"))
+        raw_request_id = data.get("request_id", data.get(FIELD_ID))
+        if not isinstance(raw_request_id, (str, int)) or isinstance(
+            raw_request_id, bool
+        ):
+            return
+        try:
+            request_id = int(raw_request_id)
+        except (TypeError, ValueError):
+            return
+        response_type = self._normalize_response_type(
+            data.get("response_type", data.get(FIELD_ACTION_ID))
+        )
         keys = (
             (self._session_generation, request_id, response_type),
             (self._session_generation, request_id, None),
