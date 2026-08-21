@@ -476,6 +476,7 @@ from .entity import (
     property_data_sources,
 )
 from .ingest import local_period_total_supersedes_cloud
+from .mqtt_discovery import JackeryMqttSensorPublisher
 from .util import (
     app_energy_unit_scale,
     append_unique_entity,
@@ -495,6 +496,7 @@ from .util import (
     jackery_grid_side_output_power,
     jackery_inverter_ac_input_power,
     jackery_inverter_ac_output_power,
+    local_mqtt_opt_in,
     meter_head_serial,
     nonblank_text,
     redacted_json_safe_payload,
@@ -2688,8 +2690,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     # ------------------------------------------------------------------
     # EPS / off-grid period totals (EpsStatApi$Bean).
     # Polled by the coordinator under APP_SECTION_EPS_STAT for each dateType.
-    #  The fields stay ``unknown`` on hardware that never
-    # operates off-grid: that is correct HA behaviour. This installer's
+    # The fields stay ``unavailable`` on hardware that never
+    # operates off-grid, while their stable entity identities remain. This installer's
     # SolarVault may not exercise EPS often, but the contract is in the
     # Smali docs (jackery_smali_home_assistant_report.html "Statistik-
     # Endpunkte") and we must mirror it so users with EPS-active setups
@@ -4825,6 +4827,13 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
     battery_pack_identities: dict[tuple[str, int], tuple[str | None, str]] = {}
+    mqtt_publisher = (
+        JackeryMqttSensorPublisher(hass, entry_id=entry.entry_id)
+        if hass is not None
+        and "mqtt" in hass.config.components
+        and local_mqtt_opt_in(entry)
+        else None
+    )
 
     def _entity_option_signature() -> tuple[bool, bool, bool]:
         """Return the current options that control sensor registration."""
@@ -4847,7 +4856,8 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
         )
 
     def _append_unique(entities: list[SensorEntity], entity: SensorEntity) -> None:
-        append_unique_entity(entities, seen_unique_ids, entity)
+        if append_unique_entity(entities, seen_unique_ids, entity) and mqtt_publisher:
+            mqtt_publisher.track(entity)
 
     def _registration_eligibility() -> set[tuple[str, str, str]]:
         """Return value-gated entity keys supported by the latest payload."""
@@ -5350,6 +5360,12 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
 
     _add_new_entities()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    if mqtt_publisher is not None:
+        mqtt_publisher.async_schedule_publish()
+        entry.async_on_unload(
+            coordinator.async_add_listener(mqtt_publisher.async_schedule_publish)
+        )
+        entry.async_on_unload(mqtt_publisher.async_shutdown)
 
 
 # ---------------------------------------------------------------------------
@@ -5931,6 +5947,10 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             not has_numeric_series_sample
             and server_total is not None
             and not server_total
+            and not (
+                section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+                and trend_series_has_value(source, section, stat_key)
+            )
         ):
             server_total = None
         resolution = values, chart_series_sum, server_total, zero_observed
@@ -5971,7 +5991,14 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             period_zero_sources: set[str] = set()
             if zero_observed:
                 period_zero_sources.add(section)
-            if raw is not None and not raw:
+            if (
+                raw is not None
+                and not raw
+                and not (
+                    section.startswith((APP_SECTION_CT_STAT, APP_SECTION_EPS_STAT))
+                    and trend_series_has_value(source, section, stat_key)
+                )
+            ):
                 # A scalar and chart series from one HTTP response are one
                 # source bucket, not two independent confirmations.  Preserve
                 # the zero as evidence but do not publish it until a distinct
@@ -7995,6 +8022,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         - "calculation": calculation mode when the entity description specifies a derived calculation.
         - "source": origin of the reported value (e.g., "total_fields", "phase_fields", "total_field", "phase_sum", "raw_field").
         - "phase_a_signed_power", "phase_b_signed_power", "phase_c_signed_power": signed per-phase powers (positive = grid import, negative = grid export) when available.
+        - "phase_t_signed_power": signed total (T) power reported by the CT meter when available.
         - "signed_phase_convention": string describing the sign convention for signed phase powers.
         - Any keys from CT_ATTRIBUTE_FIELDS that are present in the CT payload are copied through.
         - For the "power" entity: "phase_sum_power" and/or "total_field_power" when those computed directional sums are available.
@@ -8060,6 +8088,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
                 attrs["phase_sum_power"] = phase_sum
             if total_field is not None:
                 attrs["total_field_power"] = total_field
+                attrs["phase_t_signed_power"] = total_field
             attrs["source"] = (
                 "total_field"
                 if total_field is not None

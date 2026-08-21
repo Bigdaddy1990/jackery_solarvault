@@ -14,7 +14,7 @@ import operator
 import os
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EntityCategory
@@ -390,8 +390,6 @@ def _async_migrate_legacy_local_mqtt_options(
 ) -> None:
     """Fold legacy ``local_mqtt_*`` options into the ``third_party_mqtt_*`` family."""
     legacy_present = _LEGACY_LOCAL_MQTT_OPTION_MAP.keys() & entry.options.keys()
-    if not legacy_present:
-        return
     options = dict(entry.options)
     migrated: list[str] = []
     for legacy_key in sorted(legacy_present):
@@ -405,6 +403,14 @@ def _async_migrate_legacy_local_mqtt_options(
         if options.get(canonical_key) != legacy_value:
             options[canonical_key] = legacy_value
             migrated.append(f"{legacy_key} -> {canonical_key}")
+    configured_topic = str(
+        options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "") or ""
+    ).strip()
+    if configured_topic in {"homeassistant", "homeassistant/#"}:
+        options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = LOCAL_MQTT_DEFAULT_TOPIC
+        migrated.append(f"{configured_topic} -> {LOCAL_MQTT_DEFAULT_TOPIC}")
+    if options == dict(entry.options):
+        return
     hass.config_entries.async_update_entry(entry, options=options)
     _LOGGER.info(
         "Jackery: migrated legacy local MQTT options (%s)",
@@ -1140,15 +1146,15 @@ async def _async_start_local_mqtt(
     # ``local_mqtt_enable`` gewinnt, sonst gilt das app-synchronisierte
     # ``third_party_mqtt_enable`` als Fallback.
     enabled = local_mqtt_opt_in(entry)
-    # The filter is used verbatim for exactly one broker subscription. App
-    # 2.4.0 command 3046 does not carry a topic field, so this is intentionally
-    # independent of the device-side bridge settings. An empty value falls back
-    # to LOCAL_MQTT_DEFAULT_TOPIC -- a deliberate convenience so the topic does
-    # not have to be re-entered on every setup.
+    # The filter is used for exactly one broker subscription. Historical
+    # generated defaults under ``homeassistant`` are repaired by setup
+    # migration; explicit custom filters remain verbatim.
     configured_topic_filter = (
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
         or LOCAL_MQTT_DEFAULT_TOPIC
     ).strip()
+    if configured_topic_filter in {"homeassistant", "homeassistant/#"}:
+        configured_topic_filter = LOCAL_MQTT_DEFAULT_TOPIC
     # Home Assistant owns broker credentials and connection lifecycle. Device
     # command 3047 remains useful for configuring the Jackery publisher, but it
     # must never create a second MQTT connection inside this integration.
@@ -1200,8 +1206,11 @@ async def _async_start_local_mqtt(
             raw_bytes,
         )
 
-    configured_qos = config_entry_int_option(
-        entry, CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS
+    configured_qos = cast(
+        "Literal[0, 1, 2]",
+        config_entry_int_option(
+            entry, CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS
+        ),
     )
     client = JackeryLocalMqttClient(
         hass,
@@ -1227,6 +1236,19 @@ async def _async_start_local_mqtt(
             coordinator.set_local_mqtt_client(None)
         await _async_stop_local_mqtt_client(hass, entry, client)
         return
+    topic_marker = "/device/"
+    if topic_marker in configured_topic_filter:
+        topic_prefix, topic_suffix = configured_topic_filter.split(topic_marker, 1)
+        suffix_parts = topic_suffix.split("/")
+        official_response_filter = topic_suffix == "#" or (
+            len(suffix_parts) == 2
+            and bool(suffix_parts[0])
+            and suffix_parts[1] in {"#", "+", "status", "event"}
+        )
+        if topic_prefix and official_response_filter:
+            client.start_periodic_requests(
+                lambda: coordinator.async_poll_local_mqtt_devices(topic_prefix)
+            )
     # Device-side publishing is configured separately with the App-proven
     # 3046/BLE-113 command router. This subscriber never publishes it.
     coordinator.async_schedule_local_mqtt_device_config()

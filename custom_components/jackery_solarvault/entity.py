@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -464,7 +465,13 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             )
         if not super().available and not transport_reachable:
             return False
-        return self._online_marker_available(transport_reachable)
+        if not self._online_marker_available(transport_reachable):
+            return False
+        # Home Assistant renders a sensor whose native value is ``None`` as
+        # ``unknown``. Keep the stable entity identity, but expose the more
+        # accurate ``unavailable`` state until one transport materializes its
+        # value. Other Jackery entity platforms retain their existing rules.
+        return not isinstance(self, SensorEntity) or self.native_value is not None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity is added to Home Assistant."""

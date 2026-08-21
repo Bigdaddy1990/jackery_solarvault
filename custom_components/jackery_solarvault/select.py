@@ -194,6 +194,13 @@ _CT_PHASE_TO_OPTION = {
 }
 _OPTION_TO_CT_PHASE = {value: key for key, value in _CT_PHASE_TO_OPTION.items()}
 _OPTION_TO_CT_PHASE["phase_4"] = 4  # legacy option name kept for service callers
+_OPTION_TO_CT_PHASE.update({
+    "phase_a": 1,
+    "phase_b": 2,
+    "phase_c": 3,
+    "combined_phase": 4,
+    "phase_t": 4,
+})
 
 
 def _raise_select_action_error(

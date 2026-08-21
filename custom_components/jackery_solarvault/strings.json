@@ -76,7 +76,7 @@
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
+          "third_party_mqtt_topic_filter": "MQTT subscription filter for local bridge telemetry. The default is `homeassistant/#`; a legacy exact `homeassistant` value is normalized to that child-topic wildcard. Use a narrower proven Jackery topic when available. Foreign payloads are rejected by device-aware ingest.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Update the password, optional sensor toggles, and the experimental Third-Party MQTT bridge for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
@@ -326,11 +326,11 @@
       "ct_phase_select": {
         "name": "CT phase",
         "state": {
-          "combined_phases": "Combined phases",
-          "phase_1": "Phase 1",
-          "phase_2": "Phase 2",
-          "phase_3": "Phase 3",
-          "phase_4": "Combined phases"
+          "combined_phases": "Combined phase",
+          "phase_1": "Phase A",
+          "phase_2": "Phase B",
+          "phase_3": "Phase C",
+          "phase_4": "Combined phase"
         }
       },
       "electricity_price_mode": {
@@ -1258,79 +1258,79 @@
         "name": "Smart Meter panel discharging energy"
       },
       "smart_meter_phase_1_apparent_power": {
-        "name": "Smart meter phase 1 apparent power"
+        "name": "CT phase A apparent power"
       },
       "smart_meter_phase_1_current": {
-        "name": "Smart meter phase 1 current"
+        "name": "CT phase A current"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "Smart meter phase 1 lifetime grid export"
+        "name": "CT phase A lifetime grid export"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "Smart meter phase 1 lifetime grid import"
+        "name": "CT phase A lifetime grid import"
       },
       "smart_meter_phase_1_power": {
-        "name": "Smart meter phase 1 power"
+        "name": "CT phase A power"
       },
       "smart_meter_phase_1_power_factor": {
-        "name": "Smart meter phase 1 power factor"
+        "name": "CT phase A power factor"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "Smart meter phase 1 reactive power"
+        "name": "CT phase A reactive power"
       },
       "smart_meter_phase_1_voltage": {
-        "name": "Smart meter phase 1 voltage"
+        "name": "CT phase A voltage"
       },
       "smart_meter_phase_2_apparent_power": {
-        "name": "Smart meter phase 2 apparent power"
+        "name": "CT phase B apparent power"
       },
       "smart_meter_phase_2_current": {
-        "name": "Smart meter phase 2 current"
+        "name": "CT phase B current"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "Smart meter phase 2 lifetime grid export"
+        "name": "CT phase B lifetime grid export"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "Smart meter phase 2 lifetime grid import"
+        "name": "CT phase B lifetime grid import"
       },
       "smart_meter_phase_2_power": {
-        "name": "Smart meter phase 2 power"
+        "name": "CT phase B power"
       },
       "smart_meter_phase_2_power_factor": {
-        "name": "Smart meter phase 2 power factor"
+        "name": "CT phase B power factor"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "Smart meter phase 2 reactive power"
+        "name": "CT phase B reactive power"
       },
       "smart_meter_phase_2_voltage": {
-        "name": "Smart meter phase 2 voltage"
+        "name": "CT phase B voltage"
       },
       "smart_meter_phase_3_apparent_power": {
-        "name": "Smart meter phase 3 apparent power"
+        "name": "CT phase C apparent power"
       },
       "smart_meter_phase_3_current": {
-        "name": "Smart meter phase 3 current"
+        "name": "CT phase C current"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "Smart meter phase 3 lifetime grid export"
+        "name": "CT phase C lifetime grid export"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "Smart meter phase 3 lifetime grid import"
+        "name": "CT phase C lifetime grid import"
       },
       "smart_meter_phase_3_power": {
-        "name": "Smart meter phase 3 power"
+        "name": "CT phase C power"
       },
       "smart_meter_phase_3_power_factor": {
-        "name": "Smart meter phase 3 power factor"
+        "name": "CT phase C power factor"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "Smart meter phase 3 reactive power"
+        "name": "CT phase C reactive power"
       },
       "smart_meter_phase_3_voltage": {
-        "name": "Smart meter phase 3 voltage"
+        "name": "CT phase C voltage"
       },
       "smart_meter_power": {
-        "name": "Smart meter net power"
+        "name": "CT phase T power"
       },
       "smart_meter_power_factor": {
         "name": "Smart meter power factor"
@@ -1916,7 +1916,7 @@
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
+          "third_party_mqtt_topic_filter": "MQTT subscription filter for local bridge telemetry. The default is `homeassistant/#`; a legacy exact `homeassistant` value is normalized to that child-topic wildcard. Use a narrower proven Jackery topic when available. Foreign payloads are rejected by device-aware ingest.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values. The Third-Party MQTT bridge is experimental and asks the SolarVault to publish telemetry to your local broker as documented in PROTOCOL.md \u00a75.",

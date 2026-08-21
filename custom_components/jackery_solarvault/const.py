@@ -63,12 +63,16 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
-# The subscription topic is the user's decision and is used verbatim. Command
-# 3046 has no topic field, so the receiver must never silently widen an exact
-# configured topic to a broker-wide wildcard.
-# Device telemetry is published below Home Assistant's topic prefix; subscribe to
-# that complete subtree while leaving broker-wide ``#`` opt-in.
-LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant/#"
+# Command 3046 configures the broker but no topic. Jackery firmware owns the
+# LAN protocol tree: ``<prefix>/device/<serial>/{status,event,action}``. ``hb``
+# is the App/official-integration prefix; never point the generated default at
+# Home Assistant's discovery/status tree, which also contains unrelated devices.
+LOCAL_MQTT_DEFAULT_TOPIC: Final = "hb/device/#"
+# The App presents these values as live telemetry. Five seconds made LAN MQTT
+# visibly slower than the cloud push path and contradicted that contract. One
+# second keeps the complete official request family together while removing
+# the avoidable UI/broker lag.
+LOCAL_MQTT_POLL_INTERVAL_SEC: Final = 1.0
 
 # Local MQTT (HA-MQTT listener) config — enabled by default to match 123/ baseline
 CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
@@ -1472,9 +1476,6 @@ APP_REQUEST_DATE_TYPE_ALT: Final = "date_type"
 APP_REQUEST_STAT_TYPE: Final = "type"
 CT_STAT_TYPE_L1: Final = 0
 CT_STAT_TYPE_L2: Final = 1
-# EPS stat endpoint also requires a type parameter (app default 0).
-# Verified against APP 2.4.0 smali: ``EpsStatApi.type:Ljava/lang/Integer;``.
-EPS_STAT_TYPE_L1: Final = 0
 APP_REQUEST_BEGIN_DATE: Final = "beginDate"
 APP_REQUEST_BEGIN_DATE_ALT: Final = "begin_date"
 APP_REQUEST_END_DATE: Final = "endDate"
@@ -2857,6 +2858,10 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "broker_connected",
     "subscribed",
     "started",
+    "periodic_requests_active",
+    "messages_published",
+    "publish_errors",
+    "last_publish_at",
     "subscription_filter_count",
     "topics_seen_count",
     "topics_seen_truncated",

@@ -499,18 +499,8 @@ def _reconfigure_options(
 
 
 USER_SCHEMA = vol.Schema({
-    vol.Required(CONF_USERNAME): vol.All(
-        lambda value: credential_text(
-            value, field="username", max_length=MAX_USERNAME_LENGTH
-        ),
-        vol.Length(min=1),
-    ),
-    vol.Required(CONF_PASSWORD): vol.All(
-        lambda value: credential_text(
-            value, field="password", max_length=MAX_PASSWORD_LENGTH
-        ),
-        vol.Length(min=1),
-    ),
+    vol.Required(CONF_USERNAME): str,
+    vol.Required(CONF_PASSWORD): str,
     vol.Optional(
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         default=DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -553,10 +543,18 @@ class JackeryOptionsFlow(OptionsFlow):
         """
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
+        errors: dict[str, str] = {}
         if user_input is not None:
-            merged = _flow_options(user_input, current_options)
-            merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
-            return self.async_create_entry(title="", data=merged)
+            try:
+                valid_subscribe_topic(
+                    user_input.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
+                )
+            except vol.Invalid:
+                errors[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = FLOW_ERROR_BASE
+            else:
+                merged = _flow_options(user_input, current_options)
+                merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
+                return self.async_create_entry(title="", data=merged)
 
         current_create_derived = current_options[
             CONF_CREATE_SMART_METER_DERIVED_SENSORS
@@ -657,9 +655,13 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): vol.All(str, valid_subscribe_topic),
+            ): str,
         })
-        return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
+        return self.async_show_form(
+            step_id=FLOW_STEP_INIT,
+            data_schema=schema,
+            errors=errors,
+        )
 
 
 class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -806,6 +808,24 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            try:
+                credential_text(
+                    user_input[CONF_USERNAME],
+                    field="username",
+                    max_length=MAX_USERNAME_LENGTH,
+                )
+                credential_text(
+                    user_input[CONF_PASSWORD],
+                    field="password",
+                    max_length=MAX_PASSWORD_LENGTH,
+                )
+            except KeyError, vol.Invalid, TypeError:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
+                return self.async_show_form(
+                    step_id=FLOW_STEP_USER,
+                    data_schema=USER_SCHEMA,
+                    errors=errors,
+                )
             account = _normalize_account(user_input[CONF_USERNAME])
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
@@ -912,8 +932,26 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            account = _normalize_account(user_input[CONF_USERNAME])
-            if not account:
+            try:
+                account = _normalize_account(
+                    credential_text(
+                        user_input[CONF_USERNAME],
+                        field="username",
+                        max_length=MAX_USERNAME_LENGTH,
+                    )
+                )
+                password = credential_text(
+                    user_input[CONF_PASSWORD],
+                    field="password",
+                    max_length=MAX_PASSWORD_LENGTH,
+                )
+            except KeyError, vol.Invalid, TypeError:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
+                account = ""
+                password = ""
+            if not password:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
+            elif not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
             elif account.lower() != str(entry.unique_id or "").lower():
                 return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
@@ -924,7 +962,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 api = JackeryApi(
                     session=session,
                     account=account,
-                    password=user_input[CONF_PASSWORD],
+                    password=password,
                     mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
                     region_code=entry.data.get(CONF_REGION_CODE),
                 )
@@ -949,7 +987,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                         entry,
                         data_updates=_entry_data_from_api_login(
                             account,
-                            user_input[CONF_PASSWORD],
+                            password,
                             api,
                             entry,
                         ),
@@ -960,10 +998,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
         schema = vol.Schema({
-            vol.Required(
-                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
-            ): vol.All(str, vol.Length(min=1)),
-            vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+            vol.Required(CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")): str,
+            vol.Required(CONF_PASSWORD): str,
             vol.Optional(
                 CONF_ENABLE_BLE_TRANSPORT,
                 default=current_options[CONF_ENABLE_BLE_TRANSPORT],
@@ -1010,7 +1046,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
-            ): vol.All(str, valid_subscribe_topic),
+            ): str,
         })
         return self.async_show_form(
             step_id=FLOW_STEP_RECONFIGURE_CREDENTIALS,
@@ -1117,40 +1153,50 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-            api = JackeryApi(
-                session=session,
-                account=stored_username,
-                password=user_input[CONF_PASSWORD],
-                mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
-                region_code=entry.data.get(CONF_REGION_CODE),
-            )
             try:
-                await api.async_login()
-            except JackeryAuthError:
-                errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
-            except JackeryError as err:
-                _LOGGER.debug(
-                    "Cannot connect to Jackery during reauth: %s", redacted_error(err)
+                password = credential_text(
+                    user_input[CONF_PASSWORD],
+                    field="password",
+                    max_length=MAX_PASSWORD_LENGTH,
                 )
-                errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+            except KeyError, vol.Invalid, TypeError:
+                password = ""
+            if not password:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
             else:
-                return self.async_update_and_abort(
-                    entry,
-                    data_updates=_entry_data_from_api_login(
-                        stored_username,
-                        user_input[CONF_PASSWORD],
-                        api,
-                        entry,
-                    ),
-                    reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
+                session = async_get_clientsession(self.hass)
+                api = JackeryApi(
+                    session=session,
+                    account=stored_username,
+                    password=password,
+                    mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                    region_code=entry.data.get(CONF_REGION_CODE),
                 )
+                try:
+                    await api.async_login()
+                except JackeryAuthError:
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+                except JackeryError as err:
+                    _LOGGER.debug(
+                        "Cannot connect to Jackery during reauth: %s",
+                        redacted_error(err),
+                    )
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+                else:
+                    return self.async_update_and_abort(
+                        entry,
+                        data_updates=_entry_data_from_api_login(
+                            stored_username,
+                            password,
+                            api,
+                            entry,
+                        ),
+                        reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
+                    )
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
-            data_schema=vol.Schema({
-                vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
-            }),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             description_placeholders={
                 "username": entry.data[CONF_USERNAME],
             },
