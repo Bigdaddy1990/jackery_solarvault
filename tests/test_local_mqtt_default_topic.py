@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
+    _async_migrate_legacy_local_mqtt_options,
     _async_start_local_mqtt,  # setup helper is the test subject
 )
 from custom_components.jackery_solarvault.const import (
@@ -55,21 +56,22 @@ async def test_empty_filter_uses_exact_default_topic(
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
 
-async def test_homeassistant_topic_is_preserved_verbatim(
+async def test_historical_homeassistant_topic_is_migrated_to_jackery_tree(
     hass: HomeAssistant,
 ) -> None:
-    """The known device topic must never be rewritten to a wildcard sentinel."""
+    """The obsolete generated topic never keeps listening to Shelly traffic."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={},
         options={
             CONF_LOCAL_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
-            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant/#",
         },
         entry_id="local-mqtt-topic-homeassistant",
     )
     entry.add_to_hass(hass)
+    _async_migrate_legacy_local_mqtt_options(hass, entry)
     coordinator = MagicMock()
     entry.runtime_data = coordinator
     client = MagicMock()
@@ -82,7 +84,14 @@ async def test_homeassistant_topic_is_preserved_verbatim(
         await _async_start_local_mqtt(hass, entry, coordinator)
 
     client_cls.assert_called_once()
-    assert client_cls.call_args.kwargs["topic_filter"] == "homeassistant/#"
+    assert (
+        client_cls.call_args.kwargs["topic_filter"]
+        == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+    )
+    assert (
+        entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+        == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+    )
     coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
@@ -115,5 +124,6 @@ async def test_explicit_scoped_local_topic_is_used_verbatim(
 
     client_cls.assert_called_once()
     assert client_cls.call_args.kwargs["topic_filter"] == "jackery/device/telemetry"
+    client.start_periodic_requests.assert_not_called()
     coordinator.set_local_mqtt_client.assert_called_once_with(client)
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()

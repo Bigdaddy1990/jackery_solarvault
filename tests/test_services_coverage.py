@@ -84,7 +84,9 @@ def test_json_native_body_rejects_non_dict_normalization() -> None:
     """Test _json_native_body rejects a string body after normalization."""
     with pytest.raises(ServiceValidationError) as exc:
         services._json_native_body(cast("dict[Any, Any]", [1, 2, 3]), "dev1")
-    assert "Expected dict body" in _translation_error(exc.value)
+    error = _translation_error(exc.value)
+    assert error == "TypeError: **REDACTED**"
+    assert "Expected dict body" not in error
 
 
 def test_ble_body_from_service_rejects_invalid_types() -> None:

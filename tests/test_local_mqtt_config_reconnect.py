@@ -8,6 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
+from custom_components.jackery_solarvault.client.local_mqtt import (
+    JackeryLocalMqttClient,
+)
 from custom_components.jackery_solarvault.const import (
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
     CONF_LOCAL_MQTT_ENABLE,
@@ -396,8 +399,10 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
     obj._local_mqtt_config_diagnostics = {}
     obj._local_mqtt_no_host_warned = False
     obj._generated_third_party_mqtt_token = None
-    obj._device_index = {"device-1": {}}
-    obj.data = {"device-1": {}}
+    obj._device_index = {
+        "device-1": {"device_meta": {"deviceSn": "SV3PM123456"}},
+    }
+    obj.data = {"device-1": {"device": {"deviceSn": "SV3PM123456"}}}
     call_order: list[str] = []
 
     def _readback(_device_id: str) -> dict[str, Any]:
@@ -423,6 +428,16 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
     assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
     assert call_order == ["3047", "3046"]
     obj.hass.config_entries.async_update_entry.assert_not_called()
+
+    client = JackeryLocalMqttClient.__new__(JackeryLocalMqttClient)
+    client._connected = True
+    client.async_publish = AsyncMock()  # type: ignore[method-assign]
+    obj._local_mqtt_client = client
+
+    assert await coordinator.async_poll_local_mqtt_devices("hb") == 5
+    assert {
+        call.args[1]["token"] for call in client.async_publish.await_args_list
+    } == {"123456789"}
 
 
 def _rediscovery_coordinator(*, connected: bool) -> tuple[Any, MagicMock]:
@@ -543,6 +558,7 @@ def test_incomplete_3047_echo_does_not_resolve_readback_waiter() -> None:
 
     waiter.set_result.assert_called_once_with(complete)
     observer.assert_not_called()
+    assert obj._local_mqtt_device_tokens == {"device-1": "123456789"}
 
 
 @pytest.mark.asyncio

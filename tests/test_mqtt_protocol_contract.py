@@ -6,6 +6,8 @@ from typing import Any, cast
 
 import pytest
 
+from custom_components.jackery_solarvault.const import DOMAIN
+
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 MQTT_PUSH_PATH = (
@@ -67,6 +69,7 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
     Earlier packet captures had 3022/3023 and the SOC actionIds wrong; the
     smali is the source of truth.
     """
+    assert DOMAIN == "jackery_solarvault"
     eps = _function_source(COORDINATOR_PATH, "async_set_eps")
     assert "action_id=ACTION_ID_EPS_ENABLED" in eps
     assert "FIELD_SW_EPS" in eps
@@ -528,8 +531,9 @@ def test_mqtt_uses_captured_qos_zero() -> None:
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
-    assert "qos: int = 0" in mqtt_source
-    assert "subscribe(topic, qos=0)" in mqtt_source
+    assert "MqttMessageSpec(" in mqtt_source
+    assert "topic_suffixes=MQTT_TOPIC_SUFFIXES, qos=0, retain=False" in mqtt_source
+    assert "qos=MQTT_MESSAGE_SPECS[MqttMessageType.SUBSCRIPTION].qos" in mqtt_source
     assert (
         "async_publish_json(topic, payload, qos=0, retain=False)" in coordinator_source
     )
@@ -594,11 +598,15 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
     """On reconnect the integration asks the app protocol for a fresh snapshot."""
     connected = _function_source(COORDINATOR_PATH, "_async_mqtt_connected")
     assert "async_schedule_local_mqtt_device_config" in connected
-    assert "_async_query_system_info_for_missing" in connected
-    assert "_async_query_weather_plan_for_missing" in connected
-    assert "_async_query_subdevices_for_missing" in connected
-    assert "force=True" in connected
-    assert "ensure_mqtt=False" in connected
+    assert "_async_mqtt_poll_queries" in connected
+
+    shared_poll = _function_source(COORDINATOR_PATH, "_async_mqtt_poll_queries")
+    assert "_async_query_third_party_mqtt_configs" in shared_poll
+    assert "_async_query_system_info_for_missing" in shared_poll
+    assert "_async_query_weather_plan_for_missing" in shared_poll
+    assert "_async_query_subdevices_for_missing" in shared_poll
+    assert "force=force_birth_snapshot" in shared_poll
+    assert "ensure_mqtt=False" in shared_poll
 
     layer5 = _function_source(
         ROOT / "custom_components" / "jackery_solarvault" / "__init__.py",

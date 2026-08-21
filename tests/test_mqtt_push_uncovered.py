@@ -1,5 +1,7 @@
 """Tests for uncovered paths in mqtt_push.py to increase coverage."""
 
+import asyncio
+from collections.abc import Coroutine
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -11,11 +13,26 @@ from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX, REDACT
 class TestJackeryMqttPushClient:  # noqa: PLR0904
     """Test JackeryMqttPushClient class."""
 
-    def _create_client(self, generation=0):  # noqa: PLR6301
+    @staticmethod
+    def _background_task_mock() -> MagicMock:
+        """Return an HA task factory mock that consumes scheduled coroutines."""
+
+        task = MagicMock()
+        task.done.return_value = False
+        task.cancelled.return_value = False
+        task.cancel.return_value = None
+
+        def _create(coro: Coroutine[object, object, object], **_kwargs: object):
+            coro.close()
+            return task
+
+        return MagicMock(side_effect=_create)
+
+    def _create_client(self, generation=0):
         """Create a basic client for testing."""
         hass = MagicMock()
         hass.data = {}
-        hass.async_create_background_task = MagicMock()
+        hass.async_create_background_task = self._background_task_mock()
         hass.async_add_executor_job = AsyncMock(return_value=MagicMock())
         hass.config = MagicMock()
         hass.config.path = MagicMock(return_value="/config")
@@ -30,11 +47,11 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         client._session_generation = generation
         return client
 
-    def _create_client_with_tls_ca_missing(self, generation=0):  # noqa: PLR6301
+    def _create_client_with_tls_ca_missing(self, generation=0):
         """Create a client with missing TLS CA file."""
         hass = MagicMock()
         hass.data = {}
-        hass.async_create_background_task = MagicMock()
+        hass.async_create_background_task = self._background_task_mock()
         hass.async_add_executor_job = AsyncMock(return_value=MagicMock())
         hass.config = MagicMock()
         hass.config.path = MagicMock(return_value="/config")
@@ -130,11 +147,17 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
 
             mock_client.messages = mock_messages()
 
+            def _create_task(
+                coro: Coroutine[object, object, object], **_kwargs: object
+            ) -> MagicMock:
+                coro.close()
+                return mock_runner_task
+
             # Mock the background task creation to return our mock task
             with patch.object(  # noqa: SIM117
                 client._hass,
                 "async_create_background_task",
-                return_value=mock_runner_task,  # noqa: E501, RUF100, SLF001
+                side_effect=_create_task,  # noqa: E501, RUF100, SLF001
             ):
                 # Mock the SSL context creation
                 with patch.object(
@@ -222,16 +245,27 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         assert client._messages_seen == 0
         assert client._messages_dropped == 1
 
-    def test_schedule_coroutine(self) -> None:
+    @pytest.mark.asyncio
+    async def test_schedule_coroutine(self) -> None:
         """Test _schedule_coroutine method."""
         client = self._create_client()
+        scheduled: list[asyncio.Task[None]] = []
+
+        def _create_task(
+            coro: Coroutine[object, object, object], **_kwargs: object
+        ) -> asyncio.Task[None]:
+            task = asyncio.create_task(coro)
+            scheduled.append(task)
+            return task
 
         async def dummy_coro() -> str:  # noqa: RUF029
             return "done"
 
+        client._hass.async_create_background_task = _create_task
         # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks
         # It schedules the coroutine but returns None (task is tracked internally)
         client._schedule_coroutine(lambda: dummy_coro(), "test")
+        await asyncio.gather(*scheduled)
         # Verify it doesn't raise an error
         assert True
 

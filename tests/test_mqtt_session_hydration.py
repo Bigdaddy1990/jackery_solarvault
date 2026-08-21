@@ -292,5 +292,7 @@ async def test_mqtt_fingerprint_changes_after_new_login() -> None:  # noqa: RUF0
     fp2 = api.mqtt_fingerprint
 
     assert fp1 != fp2
-    assert fp1 == ("user123", "mac456", seed1)
-    assert fp2 == ("user123", "mac456", seed2)
+    assert isinstance(fp1, str) and len(fp1) == 64
+    assert isinstance(fp2, str) and len(fp2) == 64
+    assert all(secret not in fp1 for secret in ("user123", "mac456", seed1))
+    assert all(secret not in fp2 for secret in ("user123", "mac456", seed2))

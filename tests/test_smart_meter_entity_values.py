@@ -172,3 +172,21 @@ def test_mac_address_falls_back_to_device_sn_when_mac_absent() -> None:
     sensor._refresh_cache()
 
     assert sensor.native_value == "5c013b048e3c"
+
+
+def test_total_power_exposes_signed_ct_phase_t_attribute() -> None:
+    """The App's T channel is the signed total CT power field."""
+    sensor = _sensor_by_key("power")
+    cast("Any", sensor).coordinator.data = {
+        _DEVICE_ID: {
+            PAYLOAD_CT_METER: {
+                "tPhasePw": 100,
+                "tnPhasePw": 25,
+            },
+        },
+    }
+
+    sensor._refresh_cache()
+
+    assert sensor.native_value == pytest.approx(75.0)
+    assert sensor.extra_state_attributes["phase_t_signed_power"] == pytest.approx(75.0)

@@ -292,11 +292,11 @@ async def test_day_period_sensor_never_integrates_day_power_curve_over_scalar(
     assert "day_power_curve_has_activity" not in state.attributes
 
 
-async def test_day_period_sensor_stays_unknown_without_todays_bucket(
+async def test_day_period_sensor_is_unavailable_without_todays_bucket(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """Without today's bucket in any sibling chart the sensor stays unknown.
+    """Without today's bucket the stable sensor identity is unavailable.
 
     A stale month chart (yesterday's range) must not leak an old bucket
     into today's value — the midnight-race guard semantics stay intact.
@@ -321,7 +321,7 @@ async def test_day_period_sensor_stays_unknown_without_todays_bucket(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "unknown"
+    assert state.state == "unavailable"
 
 
 async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
@@ -351,7 +351,7 @@ async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "unknown"
+    assert state.state == "unavailable"
 
 
 async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(

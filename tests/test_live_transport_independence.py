@@ -131,6 +131,14 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     assert "dev-1_smart_meter_grid_import_energy" in unique_ids
     assert "dev-1_smart_meter_phase_3_lifetime_import_energy" in unique_ids
     assert "dev-1_home_consumption_power" in unique_ids
+    unsupported_voltage = next(
+        entity
+        for entity in added
+        if entity.unique_id == "dev-1_smart_meter_phase_1_voltage"
+    )
+    unsupported_voltage._refresh_cache()
+    assert unsupported_voltage.native_value is None
+    assert unsupported_voltage.available is False
 
 
 async def test_discovered_accessory_sensors_register_before_live_push() -> None:

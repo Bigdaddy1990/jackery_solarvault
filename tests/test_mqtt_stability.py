@@ -63,13 +63,15 @@ def test_mqtt_client_disables_internal_reconnect_loop() -> None:
 def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
     """Ensure the MQTT client's credential-change detection does not retain raw password data.
 
-    Verifies the module computes and stores a hashed credential fingerprint (using `hashlib.sha256` and `_credential_fingerprint`) and exposes a `_fingerprint` member, and asserts the source does not contain a stored tuple of raw credentials `(client_id, username, password)`.
+    Verifies the module delegates to the shared length-delimited credential
+    fingerprint helper, stores only the digest, and never stores a tuple of raw
+    credentials.
     """
     src = _read("mqtt_push.py")
-    assert "import hashlib" in src, src
+    assert "from ..credentials import credential_fingerprint" in src, src
     assert "self._fingerprint: str | None = None" in src, src
     assert "def _credential_fingerprint(" in src, src
-    assert "hashlib.sha256()" in src, src
+    assert "return credential_fingerprint({" in src, src
     assert "fingerprint = self._credential_fingerprint(" in src, src
     assert "fingerprint = (client_id, username, password)" not in src, src
 

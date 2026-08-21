@@ -131,7 +131,10 @@ async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     coordinator.data = {DEVICE_ID: dict(shadow_buckets)}
 
     result = await coordinator._async_update_data_guarded()
-    await hass.async_block_till_done(wait_background_tasks=True)
+    # The coordinator owns long-lived watchdog/retry background tasks. The
+    # preservation result is complete when the foreground HTTP cycle returns;
+    # waiting for every background task would intentionally never quiesce.
+    await hass.async_block_till_done()
 
     for key, value in shadow_buckets.items():
         assert result[DEVICE_ID][key] == value

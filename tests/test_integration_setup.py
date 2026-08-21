@@ -13,7 +13,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_MODEL_CODE,
 )
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, STATE_UNAVAILABLE
 from homeassistant.data_entry_flow import FlowResultType
 
 if TYPE_CHECKING:
@@ -216,7 +216,7 @@ async def test_integration_unload_removes_entities(
     hass: HomeAssistant,
     mock_jackery_login: None,
 ) -> None:
-    """Unloading integration must remove all entities."""
+    """Unload removes states while preserving HA's entity-registry identity."""
     entry = await _setup_entry(hass, mock_jackery_login)
 
     # Verify entities exist before unload
@@ -225,15 +225,21 @@ async def test_integration_unload_removes_entities(
     ent_reg = er.async_get(hass)
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert len(entities_before) > 0
+    entity_ids_before = {entity.entity_id for entity in entities_before}
 
     # Unload
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state == ConfigEntryState.NOT_LOADED
 
-    # Entities should be removed
+    # Home Assistant deliberately retains registry entries across unload/reload
+    # so entity IDs and user customizations remain stable. Runtime states vanish.
     entities_after = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-    assert len(entities_after) == 0
+    assert {entity.entity_id for entity in entities_after} == entity_ids_before
+    states_after = [hass.states.get(entity_id) for entity_id in entity_ids_before]
+    assert all(
+        state is None or state.state == STATE_UNAVAILABLE for state in states_after
+    )
 
 
 @pytest.mark.asyncio
@@ -251,9 +257,36 @@ async def test_reload_integration_preserves_entities(
     entity_ids_before = {e.entity_id for e in entities_before}
     assert len(entity_ids_before) > 0
 
-    # Reload
-    assert await hass.config_entries.async_reload(entry.entry_id)
-    await hass.async_block_till_done()
+    # Reload under the same mocked I/O boundary used for initial setup. The
+    # registry is the subject of this test, not a live Jackery discovery call.
+    with (
+        patch(
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator.async_discover",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_update_data",
+            return_value=_TEST_HTTP_DATA,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator.async_start_statistics_imports",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.coordinator."
+            "JackerySolarVaultCoordinator._async_ensure_mqtt",
+            return_value=None,
+        ),
+        patch(
+            "custom_components.jackery_solarvault._async_start_layer5_transports",
+            AsyncMock(return_value=None),
+        ),
+    ):
+        assert await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
     assert entry.state == ConfigEntryState.LOADED
 
     # Entities should still exist with same IDs

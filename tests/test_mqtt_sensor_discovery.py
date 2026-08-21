@@ -1,0 +1,823 @@
+"""Broker-facing MQTT sensor discovery regressions."""
+
+import asyncio
+import contextlib
+from dataclasses import dataclass
+from enum import StrEnum
+import json
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from custom_components.jackery_solarvault import mqtt_discovery, sensor as sensor_module
+from custom_components.jackery_solarvault.const import (
+    FIELD_CT_A_NEGATIVE_PHASE_POWER,
+    FIELD_CT_A_PHASE_POWER,
+    FIELD_CT_B_NEGATIVE_PHASE_POWER,
+    FIELD_CT_B_PHASE_POWER,
+    FIELD_CT_C_NEGATIVE_PHASE_POWER,
+    FIELD_CT_C_PHASE_POWER,
+    FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER,
+    FIELD_CT_TOTAL_PHASE_POWER,
+    FIELD_SW_EPS_IN_PW,
+    FIELD_SW_EPS_OUT_PW,
+    LOCAL_MQTT_POLL_INTERVAL_SEC,
+    PAYLOAD_CT_METER,
+    PAYLOAD_DEVICE,
+    PAYLOAD_PROPERTIES,
+)
+from custom_components.jackery_solarvault.mqtt_discovery import (
+    JackeryMqttSensorPublisher,
+)
+from custom_components.jackery_solarvault.sensor import (
+    SENSOR_DESCRIPTIONS,
+    SMART_METER_SENSOR_DESCRIPTIONS,
+    JackerySensor,
+    JackerySmartMeterSensor,
+)
+from homeassistant.components.mqtt.sensor import DISCOVERY_SCHEMA
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+
+@dataclass
+class _Description:
+    """Minimal sensor-description surface used by the publisher."""
+
+    key: str
+    translation_key: str
+    native_unit_of_measurement: str | None = None
+    device_class: Any = None
+    state_class: Any = None
+    entity_category: Any = None
+    entity_registry_enabled_default: bool = True
+
+
+class _DeviceClass(StrEnum):
+    """Representative Home Assistant string enum."""
+
+    BATTERY = "battery"
+
+
+class _StateClass(StrEnum):
+    """Representative Home Assistant string enum."""
+
+    MEASUREMENT = "measurement"
+
+
+class _Sensor:
+    """Mutable sensor double matching the native entity publication surface."""
+
+    def __init__(self, unique_id: str, value: Any, description: _Description) -> None:
+        self.unique_id = unique_id
+        self.native_value = value
+        self.available = True
+        self.entity_description = description
+        self.device_info = {
+            "identifiers": {("jackery_solarvault", "device-1")},
+            "name": "SolarVault",
+            "manufacturer": "Jackery",
+            "model": "HomePower 2000 Ultra",
+        }
+        self._attr_entity_registry_enabled_default = True
+
+
+@pytest.mark.asyncio
+async def test_scheduled_snapshot_is_a_background_task() -> None:
+    """A large retained snapshot must not delay Home Assistant bootstrap."""
+
+    def _create_task(coro: Any, **_kwargs: Any) -> asyncio.Task[Any]:
+        return asyncio.create_task(coro)
+
+    create_task = MagicMock(side_effect=_create_task)
+    create_background_task = MagicMock(side_effect=_create_task)
+    hass = SimpleNamespace(
+        async_create_task=create_task,
+        async_create_background_task=create_background_task,
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    publisher.track(
+        _Sensor(
+            "device-1_soc",
+            62,
+            _Description(key="soc", translation_key="state_of_charge"),
+        )
+    )
+
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        publisher.async_schedule_publish()
+        assert publisher._task is not None
+        await publisher._task
+
+    create_background_task.assert_called_once()
+    create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_initial_snapshot_uses_bounded_parallel_entity_publishes() -> None:
+    """Discovery ACK latency is amortized without flooding the HA broker."""
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    for index in range(mqtt_discovery._PUBLISH_CONCURRENCY + 4):
+        publisher.track(
+            _Sensor(
+                f"device-1_value_{index}",
+                index,
+                _Description(
+                    key=f"value_{index}",
+                    translation_key=f"value_{index}",
+                ),
+            )
+        )
+
+    release = asyncio.Event()
+    concurrency_reached = asyncio.Event()
+    active = 0
+    max_active = 0
+
+    async def _blocked_publish(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        if active == mqtt_discovery._PUBLISH_CONCURRENCY:
+            concurrency_reached.set()
+        await release.wait()
+        active -= 1
+
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(side_effect=_blocked_publish),
+    ):
+        task = asyncio.create_task(publisher.async_publish_pending())
+        try:
+            await asyncio.wait_for(concurrency_reached.wait(), timeout=0.2)
+            reached = True
+        except TimeoutError:
+            reached = False
+        finally:
+            release.set()
+            await task
+
+    assert reached
+    assert max_active == mqtt_discovery._PUBLISH_CONCURRENCY
+
+
+@pytest.mark.asyncio
+async def test_value_sensor_publishes_retained_discovery_and_state() -> None:
+    """A current native value becomes a broker-discovered MQTT sensor."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(
+            key="soc",
+            translation_key="state_of_charge",
+            native_unit_of_measurement="%",
+            device_class=_DeviceClass.BATTERY,
+            state_class=_StateClass.MEASUREMENT,
+        ),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as async_publish:
+        await publisher.async_publish_pending()
+
+    assert async_publish.await_count == 3
+    calls_by_topic = {call.args[1]: call for call in async_publish.await_args_list}
+    config_topic = "homeassistant/sensor/jackery_solarvault/device_1_soc/config"
+    state_topic = "jackery_solarvault/device-1/sensor/soc/state"
+    availability_topic = "jackery_solarvault/device-1/sensor/soc/availability"
+    assert set(calls_by_topic) == {config_topic, state_topic, availability_topic}
+
+    config = json.loads(calls_by_topic[config_topic].args[2])
+    assert config == {
+        "availability_topic": availability_topic,
+        "device": {
+            "identifiers": ["jackery_solarvault:device-1"],
+            "manufacturer": "Jackery",
+            "model": "HomePower 2000 Ultra",
+            "name": "SolarVault",
+        },
+        "device_class": "battery",
+        "enabled_by_default": True,
+        "name": "State Of Charge",
+        "origin": {
+            "name": "Jackery SolarVault",
+            "support_url": "https://github.com/Bigdaddy1990/jackery_solarvault",
+        },
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "state_class": "measurement",
+        "state_topic": state_topic,
+        "unique_id": "jackery_solarvault_mqtt_device-1_soc",
+        "unit_of_measurement": "%",
+    }
+    assert DISCOVERY_SCHEMA(config)["state_topic"] == state_topic
+    assert calls_by_topic[config_topic].kwargs == {"qos": 0, "retain": True}
+    assert calls_by_topic[state_topic].args[2] == "62"
+    assert calls_by_topic[state_topic].kwargs == {"qos": 0, "retain": True}
+    assert calls_by_topic[availability_topic].args[2] == "online"
+
+
+@pytest.mark.asyncio
+async def test_unknown_sensor_is_not_discovered_and_unchanged_state_is_deduplicated() -> (
+    None
+):
+    """Missing values remove retained ghosts once and repeated values stay quiet."""
+    known = _Sensor(
+        "device-1_ct_phase_a",
+        123.4,
+        _Description(key="ct_phase_a", translation_key="ct_phase_a"),
+    )
+    unknown = _Sensor(
+        "device-1_missing",
+        None,
+        _Description(key="missing", translation_key="missing"),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    publisher.track(known)
+    publisher.track(unknown)
+
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as async_publish:
+        await publisher.async_publish_pending()
+        first_count = async_publish.await_count
+        await publisher.async_publish_pending()
+
+    assert first_count == 6
+    assert async_publish.await_count == first_count
+    missing_calls = [
+        call for call in async_publish.await_args_list if "missing" in call.args[1]
+    ]
+    assert len(missing_calls) == 3
+    assert all(call.args[2] == "" for call in missing_calls)
+    assert {call.args[1].rsplit("/", 1)[-1] for call in missing_calls} == {
+        "config",
+        "state",
+        "availability",
+    }
+
+
+@pytest.mark.parametrize("loss_mode", ["unknown", "unavailable"])
+@pytest.mark.asyncio
+async def test_published_sensor_goes_offline_and_clears_state_until_recovery(
+    loss_mode: str,
+) -> None:
+    """A lost value cannot leave a retained online sensor with stale data."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    state_topic = "jackery_solarvault/device-1/sensor/soc/state"
+    availability_topic = "jackery_solarvault/device-1/sensor/soc/availability"
+
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as async_publish:
+        await publisher.async_publish_pending()
+        async_publish.reset_mock()
+
+        if loss_mode == "unknown":
+            sensor.native_value = None
+        else:
+            sensor.available = False
+        await publisher.async_publish_pending()
+        assert [
+            (call.args[1], call.args[2]) for call in async_publish.await_args_list
+        ] == [
+            (availability_topic, "offline"),
+            (state_topic, ""),
+        ]
+        async_publish.reset_mock()
+
+        sensor.native_value = 63
+        sensor.available = True
+        await publisher.async_publish_pending()
+
+    assert [(call.args[1], call.args[2]) for call in async_publish.await_args_list] == [
+        (state_topic, "63"),
+        (availability_topic, "online"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_real_ct_phase_and_eps_entities_are_exported() -> None:
+    """The APP-facing A/B/C/T and EPS entities use the same broker export path."""
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {
+        "device-1": {
+            PAYLOAD_DEVICE: {"deviceName": "SolarVault"},
+            PAYLOAD_PROPERTIES: {
+                FIELD_SW_EPS_IN_PW: 321,
+                FIELD_SW_EPS_OUT_PW: 287,
+            },
+            PAYLOAD_CT_METER: {
+                "deviceSn": "CT123",
+                FIELD_CT_A_PHASE_POWER: 110,
+                FIELD_CT_A_NEGATIVE_PHASE_POWER: 10,
+                FIELD_CT_B_PHASE_POWER: 220,
+                FIELD_CT_B_NEGATIVE_PHASE_POWER: 20,
+                FIELD_CT_C_PHASE_POWER: 330,
+                FIELD_CT_C_NEGATIVE_PHASE_POWER: 30,
+                FIELD_CT_TOTAL_PHASE_POWER: 660,
+                FIELD_CT_TOTAL_NEGATIVE_PHASE_POWER: 60,
+            },
+        }
+    }
+    entities: list[Any] = []
+    for key in ("eps_in_power", "eps_out_power"):
+        sensor_description = next(
+            item for item in SENSOR_DESCRIPTIONS if item.key == key
+        )
+        entities.append(JackerySensor(coordinator, "device-1", sensor_description))
+    for key in ("phase_1_power", "phase_2_power", "phase_3_power", "power"):
+        smart_meter_description = next(
+            item for item in SMART_METER_SENSOR_DESCRIPTIONS if item.key == key
+        )
+        entity = JackerySmartMeterSensor(
+            coordinator, "device-1", smart_meter_description
+        )
+        entity._refresh_cache()
+        entities.append(entity)
+
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    for entity in entities:
+        publisher.track(entity)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as async_publish:
+        await publisher.async_publish_pending()
+
+    topics = {call.args[1] for call in async_publish.await_args_list}
+    expected_state_suffixes = {
+        "eps_in_power",
+        "eps_out_power",
+        "smart_meter_phase_1_power",
+        "smart_meter_phase_2_power",
+        "smart_meter_phase_3_power",
+        "smart_meter_power",
+    }
+    assert {
+        topic.rsplit("/", 2)[-2]
+        for topic in topics
+        if topic.startswith("jackery_solarvault/") and topic.endswith("/state")
+    } == expected_state_suffixes
+    assert sum(topic.endswith("/config") for topic in topics) == len(
+        expected_state_suffixes
+    )
+    configs = {
+        json.loads(call.args[2])["name"]
+        for call in async_publish.await_args_list
+        if call.args[1].endswith("/config")
+    }
+    assert {"CT Phase A", "CT Phase B", "CT Phase C", "CT Phase T"} <= configs
+
+
+@pytest.mark.asyncio
+async def test_shutdown_clears_all_retained_topics() -> None:
+    """Unload removes discovery, state, and availability retained messages."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, SimpleNamespace()), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    unsubscribe = MagicMock()
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=AsyncMock(),
+        ) as async_publish,
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            return_value=unsubscribe,
+        ) as subscribe_connection,
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.0,),
+        ),
+    ):
+        await publisher.async_publish_pending()
+        published_topics = {call.args[1] for call in async_publish.await_args_list}
+        async_publish.reset_mock()
+        await publisher.async_shutdown()
+
+    assert {call.args[1] for call in async_publish.await_args_list} == published_topics
+    assert all(call.args[2] == "" for call in async_publish.await_args_list)
+    assert all(
+        call.kwargs == {"qos": 0, "retain": True}
+        for call in async_publish.await_args_list
+    )
+    subscribe_connection.assert_called_once()
+    unsubscribe.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_does_not_block_unload_when_broker_is_unavailable() -> None:
+    """Failed retained cleanup is retried after the broker reconnects."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    hass = SimpleNamespace(
+        async_create_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+        async_create_background_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        await publisher.async_publish_pending()
+    unsubscribe = MagicMock()
+    cleanup_started_after_subscription: list[bool] = []
+
+    def _broker_unavailable(*_args: Any, **_kwargs: Any) -> None:
+        cleanup_started_after_subscription.append(subscribe_connection.called)
+        raise RuntimeError("broker unavailable")
+
+    recovered_publish = AsyncMock(side_effect=_broker_unavailable)
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=recovered_publish,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            return_value=unsubscribe,
+        ) as subscribe_connection,
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.0,),
+        ),
+    ):
+        await publisher.async_shutdown()
+        subscribe_connection.assert_called_once()
+        assert cleanup_started_after_subscription == [True, True, True]
+        reconnect_callback = subscribe_connection.call_args.args[1]
+        recovered_publish.reset_mock(side_effect=True)
+        reconnect_callback(True)
+        assert publisher._cleanup_task is not None
+        await publisher._cleanup_task
+
+    assert recovered_publish.await_count == 3
+    assert all(call.args[2] == "" for call in recovered_publish.await_args_list)
+    unsubscribe.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_reconnect_during_initial_cleanup_is_serialized() -> None:
+    """A reconnect callback cannot run retained cleanup concurrently."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    hass = SimpleNamespace(
+        async_create_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+        async_create_background_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        await publisher.async_publish_pending()
+
+    active_publishes = 0
+    max_active_publishes = 0
+    publish_count = 0
+    subscribe_connection = MagicMock(return_value=MagicMock())
+
+    async def _cleanup_publish(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal active_publishes, max_active_publishes, publish_count
+        active_publishes += 1
+        max_active_publishes = max(max_active_publishes, active_publishes)
+        publish_count += 1
+        if publish_count == 1:
+            reconnect_callback = subscribe_connection.call_args.args[1]
+            reconnect_callback(True)
+            await asyncio.sleep(0)
+        active_publishes -= 1
+
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=AsyncMock(side_effect=_cleanup_publish),
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            new=subscribe_connection,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.0,),
+        ),
+    ):
+        await publisher.async_shutdown()
+        assert publisher._cleanup_task is not None
+        await publisher._cleanup_task
+
+    assert max_active_publishes == 1
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cleanup_timeout_preserves_topics_for_reconnect() -> None:
+    """A broker that never ACKs cannot block config-entry unload."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    hass = SimpleNamespace(
+        async_create_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+        async_create_background_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        await publisher.async_publish_pending()
+
+    never_ack = asyncio.Event()
+
+    async def _never_ack(*_args: Any, **_kwargs: Any) -> None:
+        await never_ack.wait()
+
+    blocking_publish = AsyncMock(side_effect=_never_ack)
+    unsubscribe = MagicMock()
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=blocking_publish,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            return_value=unsubscribe,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_TIMEOUT_SEC",
+            0.01,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.0,),
+            create=True,
+        ),
+    ):
+        await asyncio.wait_for(publisher.async_shutdown(), timeout=0.2)
+        blocking_publish.reset_mock(side_effect=True)
+        assert publisher._cleanup_task is not None
+        await publisher._cleanup_task
+
+    assert blocking_publish.await_count == 3
+    assert all(call.args[2] == "" for call in blocking_publish.await_args_list)
+    unsubscribe.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_while_disconnected_defers_cleanup_until_reconnect() -> None:
+    """A known-disconnected broker is not awaited during entry unload."""
+    sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    hass = SimpleNamespace(
+        async_create_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+        async_create_background_task=lambda coro, **_kwargs: asyncio.create_task(coro),
+    )
+    publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    publisher.track(sensor)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        await publisher.async_publish_pending()
+
+    cleanup_publish = AsyncMock()
+    unsubscribe = MagicMock()
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=cleanup_publish,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            return_value=unsubscribe,
+        ) as subscribe_connection,
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            side_effect=(False, True),
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.0,),
+        ),
+    ):
+        await publisher.async_shutdown()
+        cleanup_publish.assert_not_awaited()
+        reconnect_callback = subscribe_connection.call_args.args[1]
+        reconnect_callback(True)
+        assert publisher._cleanup_task is not None
+        await publisher._cleanup_task
+
+    assert cleanup_publish.await_count == 3
+    unsubscribe.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_reload_retires_old_background_cleanup_owner() -> None:
+    """An old generation cannot delete retained topics republished on reload."""
+
+    def _create_task(coro: Any, **_kwargs: Any) -> asyncio.Task[Any]:
+        return asyncio.create_task(coro)
+
+    create_background_task = MagicMock(side_effect=_create_task)
+    hass = SimpleNamespace(
+        data={},
+        async_create_task=_create_task,
+        async_create_background_task=create_background_task,
+    )
+    old_sensor = _Sensor(
+        "device-1_soc",
+        62,
+        _Description(key="soc", translation_key="state_of_charge"),
+    )
+    old_publisher = JackeryMqttSensorPublisher(
+        cast(HomeAssistant, hass), entry_id="entry-1"
+    )
+    old_publisher.track(old_sensor)
+    with patch(
+        "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+        new=AsyncMock(),
+    ):
+        await old_publisher.async_publish_pending()
+
+    never_ack = asyncio.Event()
+
+    async def _never_ack(*_args: Any, **_kwargs: Any) -> None:
+        await never_ack.wait()
+
+    broker_publish = AsyncMock(side_effect=_never_ack)
+    with (
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_publish",
+            new=broker_publish,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.async_subscribe_connection_status",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery.mqtt.is_connected",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_TIMEOUT_SEC",
+            0.01,
+        ),
+        patch(
+            "custom_components.jackery_solarvault.mqtt_discovery._CLEANUP_RETRY_DELAYS_SEC",
+            (0.01,),
+        ),
+    ):
+        await old_publisher.async_shutdown()
+        old_cleanup_task = old_publisher._cleanup_task
+        broker_publish.reset_mock(side_effect=True)
+
+        new_sensor = _Sensor(
+            "device-1_soc",
+            63,
+            _Description(key="soc", translation_key="state_of_charge"),
+        )
+        new_publisher = JackeryMqttSensorPublisher(
+            cast(HomeAssistant, hass), entry_id="entry-1"
+        )
+        new_publisher.track(new_sensor)
+        await new_publisher.async_publish_pending()
+        new_publish_count = broker_publish.await_count
+
+        if old_cleanup_task is not None:
+            with contextlib.suppress(asyncio.CancelledError):
+                await old_cleanup_task
+
+    create_background_task.assert_called_once()
+    assert all(
+        call.args[2] != ""
+        for call in broker_publish.await_args_list[new_publish_count:]
+    )
+
+
+@pytest.mark.asyncio
+async def test_sensor_platform_tracks_entities_when_local_mqtt_is_enabled() -> None:
+    """Platform setup wires native entity registration to broker publication."""
+    coordinator = MagicMock()
+    coordinator.data = {
+        "device-1": {
+            PAYLOAD_DEVICE: {"deviceName": "SolarVault"},
+            PAYLOAD_PROPERTIES: {"soc": 62},
+        }
+    }
+    coordinator.last_update_success = True
+    coordinator.has_smart_meter_accessory.return_value = False
+    coordinator.async_add_listener.side_effect = lambda _callback: lambda: None
+    entry = SimpleNamespace(
+        entry_id="entry-1",
+        data={},
+        options={"third_party_mqtt_enable": True},
+        runtime_data=coordinator,
+        async_on_unload=MagicMock(),
+    )
+    hass = SimpleNamespace(config=SimpleNamespace(components={"mqtt"}))
+    publisher = MagicMock()
+    publisher.async_shutdown = AsyncMock()
+    batches: list[list[Any]] = []
+
+    with patch.object(
+        sensor_module,
+        "JackeryMqttSensorPublisher",
+        return_value=publisher,
+    ):
+        await sensor_module.async_setup_entry(
+            cast(HomeAssistant, hass),
+            cast(ConfigEntry[Any], entry),
+            cast(
+                AddEntitiesCallback,
+                lambda entities: batches.append(list(entities)),
+            ),
+        )
+
+    assert batches
+    assert publisher.track.call_count == len(batches[0])
+    publisher.async_schedule_publish.assert_called_once_with()
+    assert any(
+        call.args == (publisher.async_schedule_publish,)
+        for call in coordinator.async_add_listener.call_args_list
+    )
+    entry.async_on_unload.assert_any_call(publisher.async_shutdown)
+
+
+def test_local_mqtt_live_poll_is_no_slower_than_one_second() -> None:
+    """LAN telemetry must not inherit the old five-second visibility lag."""
+    assert LOCAL_MQTT_POLL_INTERVAL_SEC <= 1.0

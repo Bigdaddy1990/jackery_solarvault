@@ -351,8 +351,9 @@ async def test_refresh_weather_plan_service_translates_home_assistant_error(
     assert err.value.translation_key == "refresh_weather_plan_failed"
     assert err.value.translation_placeholders == {
         "device_id": "dev1",
-        "error": "MQTT command failed for dev1",
+        "error": "HomeAssistantError: **REDACTED**",
     }
+    assert "MQTT command failed" not in str(err.value.translation_placeholders)
 
 
 @pytest.mark.parametrize(
@@ -930,8 +931,8 @@ async def test_send_ble_command_service_preserves_invalid_wait_for_ack_error(
 @pytest.mark.parametrize(
     ["body", "expected_error"],
     [
-        [{1: "x"}, "body object keys must be strings"],
-        [{"cmd": object()}, "body must contain only JSON-compatible values"],
+        [{1: "x"}, "TypeError: **REDACTED**"],
+        [{"cmd": object()}, "ValueError: **REDACTED**"],
         ['{"cmd": NaN}', "body is not valid JSON: invalid JSON constant: NaN"],
     ],
 )

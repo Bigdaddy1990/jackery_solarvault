@@ -178,7 +178,7 @@ async def test_stop_cancels_inflight_message_sink(hass: HomeAssistant) -> None:
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="homeassistant")
     message_task = asyncio.create_task(
         client._async_message_received(
-            MagicMock(topic="homeassistant/device", payload=b"{}"),
+            MagicMock(topic="homeassistant/device", payload=b"{}", retain=False),
         )
     )
     await sink_started.wait()

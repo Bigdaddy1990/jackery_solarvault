@@ -31,21 +31,57 @@ _TEST_HTTP_DATA = {
 }
 
 
-def _make_coordinator() -> JackerySolarVaultCoordinator:
-    """Create a coordinator instance with mocked dependencies."""
+def _background_task_mock(*args, **_kwargs):
+    """Consume coroutines scheduled by MagicMock HA/entry objects."""
+    for arg in args:
+        if asyncio.iscoroutine(arg):
+            arg.close()
+    task = MagicMock()
+    task.done.return_value = False
+    return task
+
+
+def _make_hass_entry_api() -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Create mocked constructor dependencies."""
     hass = MagicMock()
-    loop = asyncio.new_event_loop()
-    hass.loop = loop
+    hass.loop = asyncio.get_running_loop()
+    hass.data = {}
+    hass.config = MagicMock()
+    hass.config.path = MagicMock(return_value="/config")
+    hass.async_create_background_task = MagicMock(side_effect=_background_task_mock)
+    hass.async_create_task = MagicMock(side_effect=_background_task_mock)
 
     entry = MagicMock()
     entry.entry_id = "test-entry"
+    entry.title = "Test Entry"
     entry.data = {"username": "user@example.com", "password": "pass"}
     entry.options = {}
     entry.runtime_data = None
+    entry.async_create_background_task = MagicMock(side_effect=_background_task_mock)
 
     api = MagicMock()
     api.mqtt_session_snapshot = MagicMock(return_value=None)
 
+    return hass, entry, api
+
+
+def _finalize_coordinator(
+    coordinator: JackerySolarVaultCoordinator,
+    data: dict[str, dict[str, object]],
+) -> JackerySolarVaultCoordinator:
+    """Set the current wrapper seam and clean constructor background hooks."""
+    poll_unsub = getattr(coordinator, "_poll_watchdog_unsub", None)
+    if poll_unsub is not None:
+        poll_unsub()
+        coordinator._poll_watchdog_unsub = None
+    coordinator.data = data
+    coordinator._async_update_data_with_timeout = AsyncMock(return_value=data)
+    return coordinator
+
+
+def _make_coordinator() -> JackerySolarVaultCoordinator:
+    """Create a coordinator instance with mocked dependencies."""
+    hass, entry, api = _make_hass_entry_api()
     update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
     with (
@@ -69,21 +105,15 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
             AsyncMock(return_value=None),
         ),
         patch(
-            "custom_components.jackery_solarvault.coordinator."
-            "JackerySolarVaultCoordinator._async_update_data",
-            return_value=_TEST_HTTP_DATA,
-        ),
-        patch(
             "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
             AsyncMock(return_value=None),
         ),
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
         # Manually initialize since we're not going through HA setup
-        coordinator.data = _TEST_HTTP_DATA
         coordinator._device_registry_synced = True
 
-    return coordinator
+    return _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
 
 
 def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
@@ -103,19 +133,7 @@ def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
         },
     }
 
-    hass = MagicMock()
-    loop = asyncio.new_event_loop()
-    hass.loop = loop
-
-    entry = MagicMock()
-    entry.entry_id = "test-entry"
-    entry.data = {"username": "user@example.com", "password": "pass"}
-    entry.options = {}
-    entry.runtime_data = None
-
-    api = MagicMock()
-    api.mqtt_session_snapshot = MagicMock(return_value=None)
-
+    hass, entry, api = _make_hass_entry_api()
     update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
     with (
@@ -139,19 +157,13 @@ def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
             AsyncMock(return_value=None),
         ),
         patch(
-            "custom_components.jackery_solarvault.coordinator."
-            "JackerySolarVaultCoordinator._async_update_data",
-            return_value=multi_device_data,
-        ),
-        patch(
             "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
             AsyncMock(return_value=None),
         ),
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
-        coordinator.data = multi_device_data
 
-    return coordinator
+    return _finalize_coordinator(coordinator, multi_device_data)
 
 
 class TestCoordinatorEntityManagement:
@@ -237,20 +249,8 @@ class TestCoordinatorErrorHandling:
         """Coordinator handles API errors gracefully."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
-        # Create coordinator with error-raising _async_update_data
-        hass = MagicMock()
-        loop = asyncio.new_event_loop()
-        hass.loop = loop
-
-        entry = MagicMock()
-        entry.entry_id = "test-entry"
-        entry.data = {"username": "user@example.com", "password": "pass"}
-        entry.options = {}
-        entry.runtime_data = None
-
-        api = MagicMock()
-        api.mqtt_session_snapshot = MagicMock(return_value=None)
-
+        # Create coordinator with error-raising wrapped update path.
+        hass, entry, api = _make_hass_entry_api()
         update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
         with (
@@ -274,11 +274,6 @@ class TestCoordinatorErrorHandling:
                 AsyncMock(return_value=None),
             ),
             patch(
-                "custom_components.jackery_solarvault.coordinator."
-                "JackerySolarVaultCoordinator._async_update_data",
-                side_effect=Exception("API Error"),
-            ),
-            patch(
                 "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
                 AsyncMock(return_value=None),
             ),
@@ -286,8 +281,12 @@ class TestCoordinatorErrorHandling:
             coordinator = JackerySolarVaultCoordinator(
                 hass, entry, api, update_interval
             )  # noqa: E501, RUF100
+            _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
+            coordinator._async_update_data_with_timeout = AsyncMock(
+                side_effect=UpdateFailed("API Error")
+            )
 
-            # Should raise UpdateFailed
+            # Current wrapper propagates UpdateFailed raised by the wrapped path.
             with pytest.raises(UpdateFailed):
                 await coordinator._async_update_data()
 
