@@ -27,6 +27,14 @@ _TEST_HTTP_DATA = {
 }
 
 
+def _cancel_poll_watchdog(coordinator: JackerySolarVaultCoordinator) -> None:
+    """Cancel constructor-owned timers in these lightweight coordinator tests."""
+    obj = getattr(coordinator, "_poll_watchdog_unsub", None)
+    if obj is not None:
+        obj()
+        coordinator._poll_watchdog_unsub = None
+
+
 def _make_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator instance with mocked dependencies."""
     hass = MagicMock()
@@ -67,15 +75,21 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
             return_value=_TEST_HTTP_DATA,
         ),
         patch(
-            "custom_components.jackery_solarvault.coordinator."
-            "JackerySolarVaultCoordinator._async_prime_entry_bootstrap_mqtt_session",
+            "custom_components.jackery_solarvault."
+            "_async_prime_entry_bootstrap_mqtt_session",
             AsyncMock(return_value=None),
         ),
     ):
-        coordinator = JackerySolarVaultCoordinator(hass, entry, api)
+        coordinator = JackerySolarVaultCoordinator(
+            hass,
+            entry,
+            api,
+            timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC),
+        )
         # Manually initialize since we're not going through HA setup
         coordinator.data = _TEST_HTTP_DATA
         coordinator._device_registry_synced = True
+        _cancel_poll_watchdog(coordinator)
 
     return coordinator
 
@@ -99,6 +113,7 @@ class TestCoordinatorIntegration:
     async def test_coordinator_async_update_data_returns_data(self) -> None:  # noqa: PLR6301
         """_async_update_data returns device data correctly."""
         coordinator = _make_coordinator()
+        coordinator._async_update_data_guarded = AsyncMock(return_value=_TEST_HTTP_DATA)
 
         data = await coordinator._async_update_data()
         assert data == _TEST_HTTP_DATA
@@ -155,8 +170,8 @@ class TestCoordinatorIntegration:
                 return_value=multi_device_data,
             ),
             patch(
-                "custom_components.jackery_solarvault.coordinator."
-                "JackerySolarVaultCoordinator._async_prime_entry_bootstrap_mqtt_session",
+                "custom_components.jackery_solarvault."
+                "_async_prime_entry_bootstrap_mqtt_session",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -169,8 +184,14 @@ class TestCoordinatorIntegration:
             api = MagicMock()
             api.mqtt_session_snapshot = MagicMock(return_value=None)
 
-            coordinator = JackerySolarVaultCoordinator(hass, entry, api)
+            coordinator = JackerySolarVaultCoordinator(
+                hass,
+                entry,
+                api,
+                timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC),
+            )
             coordinator.data = multi_device_data
+            _cancel_poll_watchdog(coordinator)
 
             assert len(coordinator.data) == 2
             assert "device-1" in coordinator.data
@@ -205,6 +226,7 @@ class TestCoordinatorUpdateCycle:
     async def test_multiple_updates(self) -> None:  # noqa: PLR6301
         """Multiple updates work correctly."""
         coordinator = _make_coordinator()
+        coordinator._async_update_data_guarded = AsyncMock(return_value=_TEST_HTTP_DATA)
 
         for _ in range(3):
             data = await coordinator._async_update_data()
@@ -215,8 +237,8 @@ class TestCoordinatorErrorHandling:
     """Test coordinator error handling."""
 
     @pytest.mark.asyncio
-    async def test_coordinator_handles_api_error(self) -> None:  # noqa: PLR6301
-        """Coordinator handles API errors gracefully."""
+    async def test_coordinator_wraps_update_timeout(self) -> None:  # noqa: PLR6301
+        """Coordinator wraps timeout failures as UpdateFailed when no data exists."""
         with (
             patch(
                 "custom_components.jackery_solarvault.coordinator."
@@ -238,13 +260,8 @@ class TestCoordinatorErrorHandling:
                 AsyncMock(return_value=None),
             ),
             patch(
-                "custom_components.jackery_solarvault.coordinator."
-                "JackerySolarVaultCoordinator._async_update_data",
-                side_effect=Exception("API Error"),
-            ),
-            patch(
-                "custom_components.jackery_solarvault.coordinator."
-                "JackerySolarVaultCoordinator._async_prime_entry_bootstrap_mqtt_session",
+                "custom_components.jackery_solarvault."
+                "_async_prime_entry_bootstrap_mqtt_session",
                 AsyncMock(return_value=None),
             ),
         ):
@@ -257,9 +274,16 @@ class TestCoordinatorErrorHandling:
             api = MagicMock()
             api.mqtt_session_snapshot = MagicMock(return_value=None)
 
-            coordinator = JackerySolarVaultCoordinator(hass, entry, api)
+            coordinator = JackerySolarVaultCoordinator(
+                hass,
+                entry,
+                api,
+                timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC),
+            )
+            coordinator.data = {}
+            coordinator._async_update_data_guarded = AsyncMock(side_effect=TimeoutError)
+            _cancel_poll_watchdog(coordinator)
 
-            # Should raise UpdateFailed
             from homeassistant.helpers.update_coordinator import UpdateFailed  # noqa: I001
 
             with pytest.raises(UpdateFailed):

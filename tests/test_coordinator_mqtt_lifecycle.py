@@ -7,6 +7,7 @@ triggered) — never call order. The governing invariant: MQTT is a supplemental
 Layer-5 transport that must never gate the HTTP path or open HA reauth.
 """
 
+import asyncio
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -339,6 +340,63 @@ async def test_mqtt_connected_records_success_and_queries_missing(
     query_sub.assert_awaited_once_with(
         force=True, ensure_mqtt=False, snapshot={"device-1": {}}
     )
+
+
+@pytest.mark.asyncio
+async def test_mqtt_birth_and_poll_overlap_share_one_query_flight(
+    coordinator: Any,
+) -> None:
+    """A scheduled poll must not duplicate an in-flight connect birth."""
+    coordinator._mqtt = _fake_mqtt(connected=True)
+    coordinator.data = {"device-1": {}}
+    coordinator.api.mqtt_fingerprint = ("c", "h", "s")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def _block_first_query(**_kwargs: Any) -> None:
+        entered.set()
+        await release.wait()
+
+    with (
+        patch.object(
+            coordinator,
+            "async_schedule_local_mqtt_device_config",
+            return_value=None,
+        ),
+        patch.object(
+            coordinator,
+            "_async_query_third_party_mqtt_configs",
+            AsyncMock(return_value=None),
+        ) as query_third_party,
+        patch.object(
+            coordinator,
+            "_async_query_subdevices_for_missing",
+            AsyncMock(side_effect=_block_first_query),
+        ) as query_sub,
+        patch.object(
+            coordinator,
+            "_async_query_system_info_for_missing",
+            AsyncMock(return_value=None),
+        ) as query_system,
+        patch.object(
+            coordinator,
+            "_async_query_weather_plan_for_missing",
+            AsyncMock(return_value=None),
+        ) as query_weather,
+    ):
+        connect_task = asyncio.create_task(coordinator._async_mqtt_connected())
+        await entered.wait()
+        poll_task = asyncio.create_task(
+            coordinator._async_mqtt_poll_queries({"device-1": {}})
+        )
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.gather(connect_task, poll_task)
+
+    query_third_party.assert_awaited_once_with({"device-1": {}})
+    query_sub.assert_awaited_once()
+    query_system.assert_awaited_once()
+    query_weather.assert_awaited_once()
 
 
 @pytest.mark.asyncio

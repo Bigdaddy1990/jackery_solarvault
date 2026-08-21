@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+import voluptuous_serialize
 
 from custom_components.jackery_solarvault.client.api import (
     JackeryAuthError,
@@ -313,6 +314,14 @@ async def test_user_step_without_input_shows_form() -> None:
 
 
 @pytest.mark.asyncio
+async def test_user_form_schema_is_serializable_for_home_assistant_ui() -> None:
+    """The initial form exposes only UI-serializable validators."""
+    result = await _flow().async_step_user()
+
+    assert voluptuous_serialize.convert(result["data_schema"])
+
+
+@pytest.mark.asyncio
 async def test_user_step_aborts_when_entry_already_exists(
     hass: HomeAssistant,
 ) -> None:
@@ -497,6 +506,36 @@ async def test_reconfigure_credentials_maps_login_errors(
 
 
 @pytest.mark.asyncio
+async def test_reconfigure_credentials_form_schema_is_serializable(
+    hass: HomeAssistant,
+) -> None:
+    """Reconfigure credentials remain renderable by the Home Assistant UI."""
+    flow = _flow(hass)
+    entry = SimpleNamespace(
+        data={CONF_USERNAME: _ACCOUNT}, options={}, unique_id=_ACCOUNT
+    )
+    with patch.object(flow, "_get_reconfigure_entry", return_value=entry):
+        result = await flow.async_step_reconfigure_credentials()
+
+    assert voluptuous_serialize.convert(result["data_schema"])
+    validators = {
+        marker.schema: validator
+        for marker, validator in result["data_schema"].schema.items()
+    }
+    assert validators[CONF_USERNAME] is str
+    assert validators[CONF_PASSWORD] is str
+
+    with patch.object(flow, "_get_reconfigure_entry", return_value=entry):
+        invalid = await flow.async_step_reconfigure_credentials({
+            CONF_USERNAME: _ACCOUNT,
+            CONF_PASSWORD: "",
+        })
+
+    assert invalid["type"] is FlowResultType.FORM
+    assert invalid["errors"] == {FLOW_ERROR_BASE: FLOW_ERROR_BASE}
+
+
+@pytest.mark.asyncio
 async def test_reauth_confirm_missing_entry_and_empty_username() -> None:
     """Reauth aborts explicitly when the target entry cannot be used.
 
@@ -532,6 +571,18 @@ async def test_reauth_confirm_form_and_success(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == FLOW_STEP_REAUTH_CONFIRM
+    assert voluptuous_serialize.convert(result["data_schema"])
+    validators = {
+        marker.schema: validator
+        for marker, validator in result["data_schema"].schema.items()
+    }
+    assert validators[CONF_PASSWORD] is str
+
+    with patch.object(flow, "_get_reauth_entry", return_value=entry):
+        invalid = await flow.async_step_reauth_confirm({CONF_PASSWORD: ""})
+
+    assert invalid["type"] is FlowResultType.FORM
+    assert invalid["errors"] == {FLOW_ERROR_BASE: FLOW_ERROR_BASE}
 
     flow = _flow(hass)
     api = SimpleNamespace(

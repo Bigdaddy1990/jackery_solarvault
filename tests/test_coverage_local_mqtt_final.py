@@ -210,10 +210,14 @@ async def test_message_wrapper_handles_text_and_bytearray_payloads(
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="jackery/#")
     await client._async_message_received(
-        MagicMock(topic="jackery/device", payload='{"soc":80}'),
+        MagicMock(topic="jackery/device", payload='{"soc":80}', retain=False),
     )
     await client._async_message_received(
-        MagicMock(topic="jackery/device", payload=bytearray(b"not-json")),
+        MagicMock(
+            topic="jackery/device",
+            payload=bytearray(b"not-json"),
+            retain=False,
+        ),
     )
 
     assert received == [({"soc": 80}, b'{"soc":80}'), (None, b"not-json")]

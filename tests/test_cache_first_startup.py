@@ -248,7 +248,10 @@ class TestTransportSupervisorManager:
     async def test_manager_continues_on_individual_failure(self) -> None:
         """One supervisor's failure doesn't block others."""
         hass = SimpleNamespace(
-            async_create_background_task=Mock(return_value=Mock()),
+            async_create_background_task=lambda coro, name=None: asyncio.create_task(
+                coro,
+                name=name,
+            ),
         )
         entry = SimpleNamespace(entry_id="test", data={}, options={})
         coordinator = Mock()
@@ -397,16 +400,11 @@ class TestCacheFirstStartup:
             cache_ready = False
 
         # HTTP fails
-        http_failed = True
-        try:
+        with pytest.raises(Exception, match="HTTP unavailable"):
             await coordinator.api.async_login()
-            http_failed = False
-        except Exception:
-            pass
 
         # With cache_ready=True and http_failed, setup should continue
         assert cache_ready is True
-        assert http_failed is True
         # The coordinator would continue with cached data
 
 

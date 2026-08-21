@@ -24,8 +24,6 @@ _MODULE = "custom_components.jackery_solarvault.coordinator"
 _POLL_INTERVAL_SEC = 15.0
 _BOOTSTRAP_TIMEOUT_SEC = 90.0
 _SHORT_CYCLE_ELAPSED_SEC = 2.0
-_HA_MAX_SCHEDULER_STAGGER_SEC = 0.5
-_MAX_SHORT_CYCLE_FOLLOWUP_DELAY_SEC = _POLL_INTERVAL_SEC - _SHORT_CYCLE_ELAPSED_SEC
 
 
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
@@ -100,26 +98,34 @@ async def test_cold_auth_failure_starts_reauth_and_propagates() -> None:
     entry.async_start_reauth.assert_called_once_with(hass)
 
 
-def test_completed_cycle_shortens_followup_delay_to_keep_start_cadence() -> None:
-    """The next HA interval consumes only the unused part of the 15 s budget."""
+@pytest.mark.asyncio
+async def test_completed_cycle_records_configured_followup_delay() -> None:
+    """A completed cycle records elapsed time and the configured HA interval."""
     coordinator = _bare_coordinator()
-
-    coordinator._set_next_poll_delay(
-        100.0,
-        100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+    data: dict[str, dict[str, Any]] = {"dev-1": {"soc": 80}}
+    cast("Any", coordinator)._async_update_data_guarded = AsyncMock(
+        return_value=data,
     )
 
-    assert coordinator.update_interval is not None
-    assert (
-        0
-        < coordinator.update_interval.total_seconds()
-        < _MAX_SHORT_CYCLE_FOLLOWUP_DELAY_SEC
-    )
+    with patch(
+        f"{_MODULE}.time.monotonic",
+        side_effect=[
+            100.0,
+            100.0,
+            100.0,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+        ],
+    ):
+        result = await coordinator._async_update_data()
+
+    assert result == data
     diagnostics = coordinator.polling_diagnostics
     assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(
         _SHORT_CYCLE_ELAPSED_SEC
     )
-    assert diagnostics["next_poll_delay_sec"] < _MAX_SHORT_CYCLE_FOLLOWUP_DELAY_SEC
+    assert diagnostics["next_poll_delay_sec"] == pytest.approx(_POLL_INTERVAL_SEC)
 
 
 def test_cold_first_refresh_keeps_bootstrap_timeout() -> None:

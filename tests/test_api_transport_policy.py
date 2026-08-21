@@ -35,11 +35,13 @@ def _response(content_type: str, *, json_value: object = None):
 
 
 async def test_json_decoder_rejects_wrong_content_type() -> None:
+    """Reject JSON decoding when the response advertises a non-JSON type."""
     with pytest.raises(JackeryApiError, match="Content-Type"):
         await JackeryApi._decode_json_response(_response("text/html"))
 
 
 async def test_limited_reader_rejects_declared_and_streamed_oversize() -> None:
+    """Enforce the response-size limit for declared and streamed bodies."""
     declared = SimpleNamespace(content_length=11, content=_Chunks(b"ok"))
     with pytest.raises(JackeryApiError, match="exceeds"):
         await JackeryApi._read_limited_bytes(declared, limit=10)
@@ -52,6 +54,7 @@ async def test_limited_reader_rejects_declared_and_streamed_oversize() -> None:
 
 
 async def test_json_decoder_redacts_non_json_failure() -> None:
+    """Keep malformed JSON details out of the surfaced API error."""
     response = _response("application/json")
     response.json.side_effect = JSONDecodeError("secret-token", "secret-token", 0)
     with pytest.raises(JackeryApiError, match="redacted") as raised:
@@ -60,6 +63,7 @@ async def test_json_decoder_redacts_non_json_failure() -> None:
 
 
 def test_http_diagnostic_redacts_credentials_and_bounds_values() -> None:
+    """Redact credentials and bound oversized HTTP diagnostic values."""
     event = JackeryApi._http_payload_debug(
         method="POST",
         path="/test",
@@ -73,6 +77,7 @@ def test_http_diagnostic_redacts_credentials_and_bounds_values() -> None:
 
 
 def test_fast_profile_is_policy_only() -> None:
+    """Keep FASTHTTP as a bounded policy on the shared HTTP transport."""
     assert (
         JackeryApi._policy(HttpProfile.FAST).max_payload_bytes
         < JackeryApi._policy().max_payload_bytes

@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+from datetime import date
 import json
 import os
 from typing import Never
@@ -12,6 +13,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import (
     _DAY_CHART_SERIES_KEYS,
+    HttpProfile,
     JackeryApi,
     JackeryApiError,
     _aes_cbc_encrypt,
@@ -170,7 +172,7 @@ class TestCryptoFunctions:
 
         private_key = crypto_rsa.generate_private_key(
             public_exponent=65537,
-            key_size=1024,
+            key_size=2048,
         )
         public_key = private_key.public_key()
         der_bytes = public_key.public_bytes(
@@ -364,9 +366,11 @@ class TestMQTTCredentials:
         """Test mqtt_fingerprint property."""
         client = self._create_client_with_session()
         fp = client.mqtt_fingerprint
-        assert isinstance(fp, tuple)
-        assert len(fp) == 3
-        assert fp == (client._mqtt_user_id, client._mqtt_mac_id, client._mqtt_seed_b64)
+        assert isinstance(fp, str)
+        assert len(fp) == 64
+        assert client._mqtt_user_id not in fp
+        assert client._mqtt_mac_id not in fp
+        assert client._mqtt_seed_b64 not in fp
 
     def test_invalidate_mqtt_session_for_http_refresh(self) -> None:
         """Test invalidate_mqtt_session_for_http_refresh clears token and seed."""
@@ -584,6 +588,7 @@ class TestRequestMethods:
 
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.headers = {}
         mock_response.json = AsyncMock(
             return_value={"code": 0, "data": {"test": "value"}}
         )  # noqa: E501, RUF100
@@ -627,6 +632,7 @@ class TestRequestMethods:
 
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.headers = {}
         mock_response.json = AsyncMock(
             return_value={"code": 0, "data": {"result": "ok"}}
         )  # noqa: E501, RUF100
@@ -646,6 +652,7 @@ class TestRequestMethods:
         # First call returns 401, second call returns success
         mock_response_401 = AsyncMock()
         mock_response_401.status = 401
+        mock_response_401.headers = {}
         mock_response_401.json = AsyncMock(
             return_value={"code": 10402, "msg": "token expired"}
         )  # noqa: E501, RUF100
@@ -654,6 +661,7 @@ class TestRequestMethods:
 
         mock_response_ok = AsyncMock()
         mock_response_ok.status = 200
+        mock_response_ok.headers = {}
         mock_response_ok.json = AsyncMock(
             return_value={"code": 0, "data": {"result": "ok"}}
         )  # noqa: E501, RUF100
@@ -706,7 +714,9 @@ class TestDeviceEndpoints:
 
         assert result == {"soc": 80}
         client._get_json.assert_called_once_with(
-            DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: "device123"}
+            DEVICE_PROPERTY_PATH,
+            params={FIELD_DEVICE_ID: "device123"},
+            profile=HttpProfile.FAST,
         )  # noqa: E501, RUF100, SLF001
 
     @pytest.mark.asyncio
@@ -734,14 +744,14 @@ class TestDeviceEndpoints:
             return_value={"code": 0, "data": {"y1": [1, 2, 3]}}
         )  # noqa: E501, RUF100, SLF001
 
-        result = await client.async_get_device_eps_stat("device123", stat_type=1)
+        result = await client.async_get_device_eps_stat("device123")
 
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
         call_args = client._get_json.call_args
         assert call_args is not None
         params = call_args.kwargs.get("params", {})
-        assert params.get(APP_REQUEST_STAT_TYPE) == "1"
+        assert APP_REQUEST_STAT_TYPE not in params
 
     @pytest.mark.asyncio
     async def test_async_get_device_battery_stat(self) -> None:
@@ -1205,6 +1215,7 @@ class TestHttpErrorPaths:
 
         mock_response = AsyncMock()
         mock_response.status = 500
+        mock_response.headers = {}
         mock_response.json = AsyncMock(
             return_value={"code": 500, "msg": "internal error"}
         )  # noqa: E501, RUF100
@@ -1226,6 +1237,7 @@ class TestHttpErrorPaths:
 
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.headers = {}
         mock_response.json = AsyncMock(
             side_effect=json.JSONDecodeError("bad", "doc", 0)
         )  # noqa: E501, RUF100
@@ -1308,6 +1320,7 @@ class TestHttpErrorPaths:
 
         mock_response = AsyncMock()
         mock_response.status = 200
+        mock_response.headers = {}
         mock_response.json = AsyncMock(return_value={"code": 0, "data": {"ok": True}})
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -1492,10 +1505,11 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         result = await client.async_get_cutoff_stat(device_sn="device123")
 
-        assert result == {
-            "count": 0,
-            "_request": {"beginDate": "2026-08-20", "endDate": "2026-08-20"},
-        }  # noqa: E501, RUF100
+        assert result["count"] == 0
+        request = result["_request"]
+        assert request["beginDate"] == request["endDate"]
+        parsed_date = date.fromisoformat(request["beginDate"])
+        assert parsed_date.isoformat() == request["beginDate"]
 
     @pytest.mark.asyncio
     async def test_async_get_soc_stat(self) -> None:

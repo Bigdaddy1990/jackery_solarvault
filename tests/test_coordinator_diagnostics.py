@@ -75,6 +75,22 @@ def test_endpoint_backoff_diagnostics_reports_only_active_non_energy(
     assert "expired" not in diagnostics["active"]
 
 
+def test_endpoint_backoff_diagnostics_reports_unsupported_energy_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A suppressed unsupported PV endpoint remains observable in diagnostics."""
+    monkeypatch.setattr(co.time, "monotonic", lambda: 1_000.0)
+    coordinator = _bare()
+    coordinator._endpoint_backoff = {
+        "pv_stat": {"until": 1_030.0, "code": 10600, "level": 0, "unsupported": True}
+    }
+
+    diagnostics = coordinator.endpoint_backoff_diagnostics()
+
+    assert diagnostics["active_count"] == 1
+    assert diagnostics["active"]["pv_stat"]["unsupported"] is True
+
+
 def test_endpoint_backoff_active_count_ignores_energy_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

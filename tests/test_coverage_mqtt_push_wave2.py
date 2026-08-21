@@ -185,9 +185,11 @@ async def test_cloud_subscription_failure_is_reported_and_wakes_waiters(
     await _run_owned_session(client, topics=("hb/app/user/device",))
 
     assert client.is_connected is False
-    assert client.diagnostics_snapshot()["last_error"] == (
-        "disconnect: subscribe failed for hb/app/user/device: denied"
+    last_error = client.diagnostics_snapshot()["last_error"]
+    assert last_error == (
+        "disconnect: subscribe failed for hb/app/user/device: MqttError: **REDACTED**"
     )
+    assert "denied" not in last_error
     assert client._connected_event.is_set()
 
 
@@ -210,7 +212,9 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     await _run_owned_session(client, topics=("hb/app/user/device",))
 
     assert calls == 1
-    assert client.diagnostics_snapshot()["last_error"] == "connect failed: network down"
+    last_error = client.diagnostics_snapshot()["last_error"]
+    assert last_error == "connect failed: MqttError: **REDACTED**"
+    assert "network down" not in last_error
     assert client._connected_event.is_set()
 
 
@@ -300,6 +304,44 @@ async def test_response_correlation_keeps_normal_ingest_callback(
     assert response == {"request_id": 42, "body": {"soc": 88}}
     assert client.responses_correlated == 1
     message_callback.assert_awaited_once_with("hb/app/user/action", response)
+
+
+async def test_response_correlation_accepts_app_envelope_id(
+    hass: HomeAssistant,
+) -> None:
+    """App responses correlate via envelope ``id`` plus ``actionId``."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(1776548805134, 1.0, expected_response_type=3047)
+    )
+    await asyncio.sleep(0)
+
+    response = {
+        "id": 1776548805134,
+        "actionId": 3047,
+        "body": {"enable": 1},
+    }
+    client._resolve_pending_response(response)
+
+    assert await waiter == response
+    assert client.responses_correlated == 1
+
+
+async def test_response_correlation_normalizes_numeric_string_id(
+    hass: HomeAssistant,
+) -> None:
+    """A JSON string ID still resolves the integer-keyed RPC waiter."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(42, 1.0, expected_response_type=3047)
+    )
+    await asyncio.sleep(0)
+
+    response = {"id": "42", "actionId": "3047", "body": {"enable": 1}}
+    client._resolve_pending_response(response)
+
+    assert await asyncio.wait_for(waiter, timeout=0.1) == response
+    assert client.responses_correlated == 1
 
 
 async def test_response_timeout_expires_and_removes_waiter(

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryApi
+from custom_components.jackery_solarvault.client.api import HttpProfile, JackeryApi
 from custom_components.jackery_solarvault.const import (
     ALARM_PATH,
     DEVICE_PROPERTY_PATH,
@@ -91,7 +91,7 @@ async def test_get_device_property_uses_device_id_param() -> None:
 
     assert result == props
     get_json.assert_awaited_once_with(
-        DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: "42"}
+        DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: "42"}, profile=HttpProfile.FAST
     )
 
 

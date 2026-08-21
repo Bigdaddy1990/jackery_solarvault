@@ -11,20 +11,19 @@ cloud channel.
 
 import time
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApiError
-from custom_components.jackery_solarvault.const import MQTT_LIVE_THRESHOLD_SEC
+from custom_components.jackery_solarvault.const import (
+    MQTT_LIVE_THRESHOLD_SEC,
+    PAYLOAD_DYNAMIC_PRICE,
+)
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
-    SYSTEM_ID,
-    make_update_cycle_api,
-    setup_update_cycle_coordinator,
-)
+from tests._update_cycle_fixture import SYSTEM_ID  # ruff:ignore[banned-api]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -63,6 +62,28 @@ def test_energy_key_is_never_suppressed_even_while_windowed(
     coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)
 
     assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is False
+
+
+def test_unsupported_energy_endpoint_is_suppressed_while_windowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cloud 10600 verdict prevents repeated unsupported PV trend calls."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _bare_coordinator()
+    coordinator._endpoint_backoff_note_failure(
+        _ENERGY_KEY,
+        JackeryApiError("cloud says code=10600"),
+    )
+
+    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is True
+
+
+def test_unsupported_energy_endpoint_uses_terminal_retry_window() -> None:
+    """A 10600 verdict does not use the normal short energy retry ladder."""
+    assert JackerySolarVaultCoordinator._endpoint_backoff_delays_for_key(
+        _ENERGY_KEY,
+        10600,
+    ) == (21600,)
 
 
 def test_diagnostic_key_suppressed_only_inside_window(
@@ -269,51 +290,76 @@ def test_dynamic_price_backs_off_on_unsupported_code(
 @pytest.mark.asyncio
 async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
     hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A cold post-boot dynamic-price failure backs off in the background."""
-    # Keep monotonic time below the price TTL. A cold-cache timestamp of 0.0
-    # must still trigger the off-path refresh immediately after HA starts.
-    _freeze(monkeypatch, 10.0)
-    api = make_update_cycle_api()
-    api.async_get_dynamic_price = AsyncMock(
+    coordinator = _bare_coordinator()
+    coordinator.hass = hass
+    coordinator._shutdown_started = False
+    coordinator._slow_metrics_bg_task = None
+    coordinator._slow_metrics_interval_sec = 120
+    coordinator._price_config_interval_sec = 600
+    coordinator._slow_cache = {}
+    coordinator._last_stat_import_monotonic = 0.0
+    coordinator._trend_query_kwargs = MagicMock(return_value={})
+    coordinator._app_period_section = MagicMock(
+        side_effect=lambda section, period: f"{section}:{period}"
+    )
+    coordinator.api = MagicMock()
+    dynamic_price = AsyncMock(
         side_effect=JackeryApiError(
             "GET /v1/device/dynamic/v2/dynamicPrice code=10600 msg=unsupported",
         ),
     )
-    coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
+    coordinator.api.async_get_dynamic_price = dynamic_price
 
-    await coordinator._async_update_data_guarded()
-    # The background slow-metric refresh runs as an ``async_create_background_task``
-    # (excluded from the default ``async_block_till_done`` wait set), so it must
-    # be waited for explicitly here.
-    slow_metrics_task = coordinator._slow_metrics_bg_task
-    assert slow_metrics_task is not None
-    await slow_metrics_task
-    await hass.async_block_till_done(wait_background_tasks=True)
+    async def get_with_ttl(
+        system_id: str,
+        cache_key: str,
+        _ttl: int,
+        fetcher,
+        default,
+        *,
+        backoff_key: str | None = None,
+    ):
+        """Model the guarded fetch seam used by the background launcher."""
+        if cache_key != PAYLOAD_DYNAMIC_PRICE:
+            return default
+        if backoff_key and coordinator._endpoint_backoff_active(
+            backoff_key,
+            time.monotonic(),
+        ):
+            return default
+        try:
+            return await fetcher(system_id)
+        except JackeryApiError as err:
+            assert backoff_key is not None
+            coordinator._endpoint_backoff_note_failure(backoff_key, err)
+            return default
+
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)
+    first_task = coordinator._slow_metrics_bg_task
+    assert first_task is not None
+    await first_task
 
     # The cold slow-metric cache is served stale_ok on the foreground path
     # (no fetch attempted there), so the failure above only came from the
     # background refresh — proving its call now carries the backoff key too.
     assert f"dynamic_price:{SYSTEM_ID}" in coordinator._endpoint_backoff
-    calls_after_first_cycle = api.async_get_dynamic_price.call_count
+    calls_after_first_cycle = dynamic_price.call_count
     assert calls_after_first_cycle >= 1
 
-    await coordinator._async_update_data_guarded()
-    slow_metrics_task = coordinator._slow_metrics_bg_task
-    assert slow_metrics_task is not None
-    await slow_metrics_task
-    await hass.async_block_till_done(wait_background_tasks=True)
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)
+    second_task = coordinator._slow_metrics_bg_task
+    assert second_task is not None
+    assert second_task is not first_task
+    await second_task
 
     # The system's slow-metric cache never advances its timestamp on a
     # permanent failure, so it re-enters "needs refresh" every cycle. Without
     # the backoff key on the background call this re-invokes (and re-logs)
     # the endpoint every cycle; with it, the open backoff window suppresses
     # the retry.
-    assert api.async_get_dynamic_price.call_count == calls_after_first_cycle
-
-    await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done(wait_background_tasks=True)
+    assert dynamic_price.call_count == calls_after_first_cycle
 
 
 # --- Shelly realtime timeout backoff (codeless failure must still back off) ---

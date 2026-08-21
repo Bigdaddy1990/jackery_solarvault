@@ -19,6 +19,7 @@ from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_PASSWORD as CONF_LOCAL_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_PORT as CONF_LOCAL_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER as CONF_LOCAL_MQTT_TOPIC,
@@ -143,6 +144,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "user",
         CONF_LOCAL_MQTT_PASSWORD: " pass ",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "jackery/#",
+        CONF_THIRD_PARTY_MQTT_QOS: 0,
     }
 
 
@@ -155,6 +157,7 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "old-user",
         CONF_LOCAL_MQTT_PASSWORD: "old-pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
+        CONF_THIRD_PARTY_MQTT_QOS: 0,
     }
 
     # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)
@@ -177,6 +180,7 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_LOCAL_MQTT_USERNAME: "new-user",
         CONF_LOCAL_MQTT_PASSWORD: "new-pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "new/#",
+        CONF_THIRD_PARTY_MQTT_QOS: 0,
     }
 
 
@@ -257,6 +261,7 @@ def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
         CONF_LOCAL_MQTT_USERNAME: "user",
         CONF_LOCAL_MQTT_PASSWORD: "pass",
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "old/#",
+        CONF_THIRD_PARTY_MQTT_QOS: 0,
     }
     user_input = {
         CONF_ENABLE_BLE_TRANSPORT: True,

@@ -300,6 +300,15 @@ def test_rate_limit_retry_after_header_is_honoured() -> None:
     assert co._rate_limit_retry_after_seconds(RateLimitedError()) == 17
 
 
+def test_rate_limit_retry_after_zero_uses_minimum_delay() -> None:
+    """An explicit zero means retry promptly, not use the generic cooldown."""
+
+    class RateLimitedError(Exception):
+        headers = {"Retry-After": "0"}
+
+    assert co._rate_limit_retry_after_seconds(RateLimitedError()) == 1
+
+
 # --- app-chart period / name lookups -------------------------------------
 
 

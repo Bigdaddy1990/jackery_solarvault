@@ -8,6 +8,7 @@ contract: the right client method with the right arguments, value passthrough,
 and — where the code does it — the refresh / guard / systemId behavior.
 """
 
+import asyncio
 import time
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -37,6 +38,7 @@ def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
     obj.data = (
         {_DEVICE: {PAYLOAD_SYSTEM: {"id": "sys-1"}}} if home_config else {_DEVICE: {}}
     )
+    obj._http_request_semaphore = asyncio.Semaphore(1)
     obj.api = MagicMock()
     obj.async_request_refresh = AsyncMock()
     return coordinator

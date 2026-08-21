@@ -14,6 +14,7 @@ from custom_components.jackery_solarvault.const import (
     CT_STAT_TYPE_L1,
     DATE_TYPE_DAY,
     DEVICE_CT_STAT_PATH,
+    DEVICE_EPS_STAT_PATH,
     DEVICE_PV_STAT_PATH,
     DEVICE_STATISTIC_PATH,
     FIELD_DATA,
@@ -116,6 +117,22 @@ async def test_ct_stat_uses_app_first_chart_type() -> None:
     args, kwargs = awaited
     assert args[0] == DEVICE_CT_STAT_PATH
     assert kwargs["params"][APP_REQUEST_STAT_TYPE] == str(CT_STAT_TYPE_L1)
+
+
+@pytest.mark.asyncio
+async def test_eps_stat_omits_ct_only_type_parameter() -> None:
+    """The App EpsStatApi contract has no ``type`` request field."""
+    api = _api()
+    get_json = AsyncMock(return_value={FIELD_DATA: {"totalInEpsEnergy": "1.5"}})
+
+    with patch.object(api, "_get_json", get_json):
+        await api.async_get_device_eps_stat(11, date_type=DATE_TYPE_DAY)
+
+    awaited = get_json.await_args
+    assert awaited is not None
+    args, kwargs = awaited
+    assert args[0] == DEVICE_EPS_STAT_PATH
+    assert APP_REQUEST_STAT_TYPE not in kwargs["params"]
 
 
 @pytest.mark.asyncio

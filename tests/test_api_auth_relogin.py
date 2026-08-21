@@ -25,6 +25,8 @@ from custom_components.jackery_solarvault.const import (
     FIELD_CODE,
     FIELD_DATA,
     FIELD_MSG,
+    HTTP_CONTENT_TYPE_JSON,
+    HTTP_HEADER_CONTENT_TYPE,
 )
 
 _UNAUTHORIZED_BODY = {FIELD_MSG: "Unauthorized"}
@@ -38,6 +40,8 @@ class _FakeResponse:
     def __init__(self, status: int, body: dict[str, Any]) -> None:
         self.status = status
         self._body = body
+        self.headers = {HTTP_HEADER_CONTENT_TYPE: HTTP_CONTENT_TYPE_JSON}
+        self.content = object()
 
     async def json(self, content_type: str | None = None) -> dict[str, Any]:
         return self._body
@@ -253,6 +257,8 @@ class _ConcurrentFakeResponse:
     def __init__(self, status: int, body: dict[str, Any]) -> None:
         self.status = status
         self._body = body
+        self.headers = {HTTP_HEADER_CONTENT_TYPE: HTTP_CONTENT_TYPE_JSON}
+        self.content = object()
 
     async def json(self, content_type: str | None = None) -> dict[str, Any]:
         await asyncio.sleep(0)

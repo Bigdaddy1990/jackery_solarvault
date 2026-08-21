@@ -1,7 +1,8 @@
 """Tests for uncovered paths in coordinator.py to increase coverage."""
 
+import asyncio
 from datetime import timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -67,26 +68,48 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
     """Test JackerySolarVaultCoordinator class."""
 
-    def _create_coordinator(self, hass=None):  # noqa: PLR6301
+    @staticmethod
+    def _closed_background_task(*args, **_kwargs):
+        """Consume scheduled coroutines when hass is a MagicMock."""
+        for arg in args:
+            if asyncio.iscoroutine(arg):
+                arg.close()
+        task = MagicMock()
+        task.done.return_value = False
+        return task
+
+    def _create_coordinator(self, hass=None):
         """Create a basic coordinator for testing."""
         if hass is None:
             hass = MagicMock()
             hass.data = {}
             hass.config = MagicMock()
             hass.config.path = MagicMock(return_value="/config")
+        hass.async_create_background_task = MagicMock(
+            side_effect=self._closed_background_task
+        )
+        hass.async_create_task = MagicMock(side_effect=self._closed_background_task)
 
         config_entry = MagicMock()
         config_entry.entry_id = "test_entry"
         config_entry.runtime_data = MagicMock()
         config_entry.data = {"username": "test", "password": "test"}
         config_entry.options = {}
+        config_entry.async_create_background_task = MagicMock(
+            side_effect=self._closed_background_task
+        )
 
-        return JackerySolarVaultCoordinator(
+        coordinator = JackerySolarVaultCoordinator(
             hass=hass,
             entry=config_entry,
             api=MagicMock(),
             update_interval=timedelta(seconds=300),
         )
+        poll_unsub = getattr(coordinator, "_poll_watchdog_unsub", None)
+        if poll_unsub is not None:
+            poll_unsub()
+            coordinator._poll_watchdog_unsub = None
+        return coordinator
 
     def test_creation(self) -> None:
         """Test coordinator creation."""
@@ -170,16 +193,28 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         assert isinstance(timeout, float)
         assert timeout > 0
 
-    def test_set_next_poll_delay(self) -> None:
-        """Test _set_next_poll_delay method."""
-        import time
-
+    @pytest.mark.asyncio
+    async def test_update_data_records_next_poll_delay(self) -> None:
+        """Test _async_update_data records elapsed and configured next delay."""
         coordinator = self._create_coordinator()
-        started = time.monotonic()
-        completed = started + 5.0
-        coordinator._set_next_poll_delay(started, completed)
-        # Should have updated the update_interval
-        assert coordinator.update_interval.total_seconds() > 0
+        coordinator._async_update_data_guarded = AsyncMock(return_value={})
+
+        with patch(
+            "custom_components.jackery_solarvault.coordinator.time.monotonic",
+            side_effect=[
+                100.0,
+                100.0,
+                100.0,
+                105.0,
+                105.0,
+                105.0,
+            ],
+        ):
+            await coordinator._async_update_data()
+
+        diagnostics = coordinator.polling_diagnostics
+        assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(5.0)
+        assert diagnostics["next_poll_delay_sec"] == pytest.approx(300.0)
 
     def test_schedule_background_once(self) -> None:
         """Test _schedule_background_once method."""
@@ -432,20 +467,33 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         diag = coordinator.polling_diagnostics
         assert isinstance(diag, dict)
 
-    def test_poll_cycle_and_delay(self) -> None:
-        """Test _poll_cycle_timeout_seconds and _set_next_poll_delay."""
+    @pytest.mark.asyncio
+    async def test_poll_cycle_timeout_and_delay_diagnostics(self) -> None:
+        """Test _poll_cycle_timeout_seconds and cycle delay diagnostics."""
         coordinator = self._create_coordinator()
 
         timeout = coordinator._poll_cycle_timeout_seconds()
         assert isinstance(timeout, float)
         assert timeout > 0
 
-        import time
+        coordinator._async_update_data_guarded = AsyncMock(return_value={})
 
-        started = time.monotonic()
-        completed = started + 5.0
-        coordinator._set_next_poll_delay(started, completed)
-        assert coordinator.update_interval.total_seconds() > 0
+        with patch(
+            "custom_components.jackery_solarvault.coordinator.time.monotonic",
+            side_effect=[
+                200.0,
+                200.0,
+                200.0,
+                205.0,
+                205.0,
+                205.0,
+            ],
+        ):
+            await coordinator._async_update_data()
+
+        diagnostics = coordinator.polling_diagnostics
+        assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(5.0)
+        assert diagnostics["next_poll_delay_sec"] == pytest.approx(300.0)
 
     def test_schedule_background_once(self) -> None:  # noqa: F811
         """Test _schedule_background_once method."""

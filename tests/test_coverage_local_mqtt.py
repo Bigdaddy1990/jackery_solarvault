@@ -91,18 +91,18 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert len(forwarded) == 2
     assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
 
-    # Oversized frames are counted for diagnostics but never filtered from the
-    # broker-selected stream; semantic validation belongs to shared ingest.
+    # Oversized frames are rejected at the transport boundary before JSON
+    # decoding so a broker cannot force unbounded memory/CPU work.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
     await client._handle_message(
         "jackery/device1",
         large_payload,
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_dropped"] == 0
+    assert diag["messages_dropped"] == 1
     assert diag["messages_oversized"] == 1
-    assert diag["messages_forwarded"] == 3
-    assert forwarded[2][2] == large_payload
+    assert diag["messages_forwarded"] == 2
+    assert len(forwarded) == 2
 
 
 @pytest.mark.asyncio

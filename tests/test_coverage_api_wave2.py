@@ -29,6 +29,8 @@ class _Response:
         json_error: Exception | None = None,
     ) -> None:
         self.status = status
+        self.headers = {"Content-Type": "application/json"}
+        self.content = object()
         self._body = body
         self._raw_text = raw_text
         self._json_error = json_error
@@ -125,7 +127,7 @@ async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> No
         ),
     )
 
-    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(response redacted\)"):
         await JackeryApi._decode_login_response(response)
 
 
@@ -170,7 +172,7 @@ async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> Non
             raw_text="broken",
         )
     ])
-    with pytest.raises(JackeryApiError, match="GET /broken returned invalid JSON"):
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(redacted\)"):
         await invalid._get_json("/broken")
 
     timed_out = _api([TimeoutError()])
@@ -211,9 +213,7 @@ async def test_json_write_helpers_reject_invalid_success_json(
         getattr(client, method_name),
     )
 
-    with pytest.raises(
-        JackeryApiError, match=f"{http_method} /write returned invalid JSON"
-    ):
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(redacted\)"):
         await writer("/write", {"value": 1})
 
 
