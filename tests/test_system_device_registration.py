@@ -133,7 +133,7 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         mock_coordinator.async_apply_local_mqtt_config_to_devices = (
             mock_apply_mqtt_config  # noqa: E501, RUF100
         )
-        mock_coordinator.async_start_statistics_imports = AsyncMock(return_value=None)
+        mock_coordinator.async_start_statistics_imports = MagicMock(return_value=None)
 
         assert await integration.async_setup_entry(hass, entry)
 

@@ -11,7 +11,7 @@ This test matrix verifies that each transport operates independently:
 """
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, Mock
@@ -296,7 +296,7 @@ class TestProvenanceIsolation:
                 device_id="device-1",
                 section=PAYLOAD_PROPERTIES,
                 payload={"pvPw": 1},
-                observed_at=BASE_TIME + timedelta(minutes=1),  # noqa: F821
+                observed_at=BASE_TIME + timedelta(minutes=1),
             ),
             current={},
             provenance={},
