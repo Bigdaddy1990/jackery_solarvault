@@ -86,18 +86,6 @@ def test_smart_meter_non_reset_counter_regression_keeps_last_state() -> None:
     assert sensor.native_value == pytest.approx(10.0)
 
 
-def test_smart_meter_genuine_counter_reset_remains_visible() -> None:
-    """A sufficiently deep drop stays visible as Home Assistant's new cycle."""
-    sensor = _smart_meter_sensor("lifetime_import_energy")
-    _set_ct_counter(sensor, 10_000)
-    sensor._refresh_cache()
-
-    _set_ct_counter(sensor, 8_990)
-    sensor._refresh_cache()
-
-    assert sensor.native_value == pytest.approx(8.99)
-
-
 def test_missing_smart_meter_sample_keeps_jitter_anchor() -> None:
     """A missing CT frame cannot erase the previous total-increasing anchor."""
     sensor = _smart_meter_sensor("lifetime_import_energy")

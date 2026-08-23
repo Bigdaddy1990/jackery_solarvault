@@ -16,9 +16,10 @@ from custom_components.jackery_solarvault.sensor import (
 )
 
 _DEVICE_ID = "dev-1"
-_HIGH_WATT_HOURS = 108_550
-_LOWER_WATT_HOURS = 99_380
-_HIGH_KWH = 108.55
+_HIGH_WATT_HOURS = 10_000
+_LOWER_WATT_HOURS = 9_000
+_HIGH_KWH = 10.0
+_LOWER_KWH = 9.0
 
 
 def _lifetime_import_sensor() -> JackerySmartMeterSensor:
@@ -71,7 +72,6 @@ def _sensor_by_key(key: str) -> JackerySmartMeterSensor:
     )
     mutable._cached_native_value = None
     mutable._cached_attrs = {}
-    mutable._restored_lifetime_value = None
     return sensor
 
 
@@ -190,40 +190,3 @@ def test_total_power_exposes_signed_ct_phase_t_attribute() -> None:
 
     assert sensor.native_value == pytest.approx(75.0)
     assert sensor.extra_state_attributes["phase_t_signed_power"] == pytest.approx(75.0)
-
-
-@pytest.mark.parametrize(
-    ["key", "fields", "expected"],
-    [
-        ["reactive_power", {"ap": 500, "power": 300}, 400.0],
-        ["phase_1_reactive_power", {"ap1": 13, "power1": 5}, 12.0],
-        ["phase_2_reactive_power", {"ap2": 25, "power2": -7}, 24.0],
-        ["phase_3_reactive_power", {"ap3": 29, "power3": 21}, 20.0],
-    ],
-)
-def test_reactive_power_derives_from_apparent_and_active_when_rep_absent(
-    key: str,
-    fields: dict[str, float],
-    expected: float,
-) -> None:
-    """Derive reactive magnitude when the meter omits the rep field."""
-    sensor = _sensor_by_key(key)
-    cast("Any", sensor).coordinator.data = {_DEVICE_ID: {PAYLOAD_CT_METER: fields}}
-
-    sensor._refresh_cache()
-
-    assert sensor.native_value == pytest.approx(expected)
-    assert sensor.extra_state_attributes["source"] == "derived_apparent_minus_active"
-
-
-def test_reactive_power_prefers_reported_rep_over_derived_value() -> None:
-    """Keep a direct reactive-power reading authoritative."""
-    sensor = _sensor_by_key("reactive_power")
-    cast("Any", sensor).coordinator.data = {
-        _DEVICE_ID: {PAYLOAD_CT_METER: {"rep": 123, "ap": 500, "power": 300}}
-    }
-
-    sensor._refresh_cache()
-
-    assert sensor.native_value == pytest.approx(123.0)
-    assert sensor.extra_state_attributes["source"] == "raw_field"

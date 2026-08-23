@@ -23,7 +23,11 @@ _TODAY_ISO = "2024-05-20"
 
 def test_daily_delta_returns_difference_from_anchor() -> None:
     """A same-day snapshot yields current minus the midnight anchor."""
-    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+    snap = {
+        "day": _TODAY_ISO,
+        "values": {"pvEgy": 1000},
+        "full_day_metrics": ["pvEgy"],
+    }
 
     assert cache.daily_delta(snap, "pvEgy", 1250, today=_TODAY) == 250
 
@@ -37,6 +41,7 @@ def test_daily_delta_returns_difference_from_anchor() -> None:
         {"day": _TODAY_ISO, "values": "bad"},  # non-dict values
         {"day": _TODAY_ISO, "values": {}},  # missing anchor
         {"day": _TODAY_ISO, "values": {"pvEgy": "x"}},  # non-int anchor
+        {"day": _TODAY_ISO, "values": {"pvEgy": 1000}},  # partial legacy row
     ],
 )
 def test_daily_delta_returns_none_for_unusable_snapshot(snapshot: Any) -> None:
@@ -46,7 +51,11 @@ def test_daily_delta_returns_none_for_unusable_snapshot(snapshot: Any) -> None:
 
 def test_daily_delta_none_when_current_missing_or_non_numeric() -> None:
     """A missing or non-numeric current counter disables the delta."""
-    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+    snap = {
+        "day": _TODAY_ISO,
+        "values": {"pvEgy": 1000},
+        "full_day_metrics": ["pvEgy"],
+    }
 
     assert cache.daily_delta(snap, "pvEgy", None, today=_TODAY) is None
     assert cache.daily_delta(
@@ -59,7 +68,11 @@ def test_daily_delta_none_when_current_missing_or_non_numeric() -> None:
 
 def test_daily_delta_none_when_counter_below_anchor() -> None:
     """A counter below the anchor (reset) does not produce a negative delta."""
-    snap = {"day": _TODAY_ISO, "values": {"pvEgy": 1000}}
+    snap = {
+        "day": _TODAY_ISO,
+        "values": {"pvEgy": 1000},
+        "full_day_metrics": ["pvEgy"],
+    }
 
     assert cache.daily_delta(snap, "pvEgy", 900, today=_TODAY) is None
 
@@ -128,6 +141,7 @@ def test_refresh_snapshot_archives_latest_delta_on_day_rollover() -> None:
     previous = {
         "day": "2024-05-20",
         "values": {"pvEgy": 1000},
+        "full_day_metrics": ["pvEgy"],
         "complete_days": ["2024-05-20"],
         "last_deltas": {"pvEgy": 250},
     }
@@ -142,6 +156,7 @@ def test_refresh_snapshot_archives_latest_delta_on_day_rollover() -> None:
     assert result == {
         "day": "2024-05-21",
         "values": {"pvEgy": 1300},
+        "full_day_metrics": ["pvEgy"],
         "completed_days": {"2024-05-20": {"pvEgy": 250}},
         "complete_days": ["2024-05-20", "2024-05-21"],
     }
@@ -166,6 +181,7 @@ def test_refresh_snapshot_does_not_archive_partial_cold_start_day() -> None:
     assert result == {
         "day": "2024-05-21",
         "values": {"pvEgy": 1300},
+        "full_day_metrics": ["pvEgy"],
         "complete_days": ["2024-05-21"],
     }
     assert (
@@ -238,12 +254,91 @@ def test_record_latest_deltas_preserves_temporarily_missing_metrics() -> None:
     snapshot = {
         "day": _TODAY_ISO,
         "values": {"pvEgy": 1000, "batChgEgy": 200},
+        "full_day_metrics": ["pvEgy", "batChgEgy"],
         "last_deltas": {"pvEgy": 250, "batChgEgy": 50},
     }
 
     result = cache.record_latest_deltas(snapshot, {"pvEgy": 300})
 
     assert result["last_deltas"] == {"pvEgy": 300, "batChgEgy": 50}
+
+
+def test_late_metric_stays_partial_until_next_observed_rollover() -> None:
+    """A same-day late counter cannot fabricate energy before first sighting."""
+    partial = cache.refresh_snapshot(
+        None,
+        today=_TODAY,
+        current_values={"pvEgy": 1000},
+    )
+    partial = cache.refresh_snapshot(
+        partial,
+        today=_TODAY,
+        current_values={"pvEgy": 1100, "batChgEgy": 50},
+    )
+
+    assert partial == {
+        "day": _TODAY_ISO,
+        "values": {"pvEgy": 1000, "batChgEgy": 50},
+    }
+    assert cache.daily_delta(partial, "pvEgy", 1100, today=_TODAY) is None
+    assert cache.daily_delta(partial, "batChgEgy", 70, today=_TODAY) is None
+
+    rollover = cache.refresh_snapshot(
+        partial,
+        today=date(2024, 5, 21),
+        current_values={"pvEgy": 1100, "batChgEgy": 70},
+        baseline_covers_full_day=True,
+    )
+
+    assert rollover["full_day_metrics"] == ["batChgEgy", "pvEgy"]
+    assert cache.daily_delta(
+        rollover,
+        "batChgEgy",
+        95,
+        today=date(2024, 5, 21),
+    ) == 25
+
+
+def test_same_day_late_metric_is_not_added_to_full_day_coverage() -> None:
+    """Only counters present at rollover receive full-day coverage."""
+    rollover = cache.refresh_snapshot(
+        {"day": "2024-05-20", "values": {"pvEgy": 900}},
+        today=date(2024, 5, 21),
+        current_values={"pvEgy": 1000},
+        baseline_covers_full_day=True,
+    )
+    with_late_metric = cache.refresh_snapshot(
+        rollover,
+        today=date(2024, 5, 21),
+        current_values={"pvEgy": 1100, "batChgEgy": 50},
+        baseline_covers_full_day=True,
+    )
+
+    assert with_late_metric["full_day_metrics"] == ["pvEgy"]
+    assert cache.daily_delta(
+        with_late_metric,
+        "batChgEgy",
+        70,
+        today=date(2024, 5, 21),
+    ) is None
+
+
+def test_reauth_merge_never_invents_full_day_metric_coverage() -> None:
+    """Only explicit markers survive a same-day reauth merge."""
+    merged = cache._merge_snapshots(
+        {
+            "day": _TODAY_ISO,
+            "values": {"pvEgy": 1000},
+            "full_day_metrics": ["pvEgy"],
+        },
+        {
+            "day": _TODAY_ISO,
+            "values": {"pvEgy": 1100, "batChgEgy": 50},
+        },
+    )
+
+    assert merged["values"] == {"pvEgy": 1000, "batChgEgy": 50}
+    assert merged["full_day_metrics"] == ["pvEgy"]
 
 
 # --- is_new_day / snapshot_day / signature -------------------------------
@@ -353,6 +448,7 @@ async def test_async_save_daily_cache_persists_cleaned_snapshots(
         "dev-a": {
             "day": _TODAY_ISO,
             "values": {"pvEgy": 1000, "bad": "x"},
+            "full_day_metrics": ["pvEgy", "pvEgy", "missing", 7],
             "completed_days": {"2024-05-19": {"pvEgy": "250", "bad": "x"}},
             "complete_days": ["2024-05-19", "bad", 7],
             "last_deltas": {"pvEgy": "300", "bad": "x"},
@@ -367,6 +463,7 @@ async def test_async_save_daily_cache_persists_cleaned_snapshots(
         "dev-a": {
             "day": _TODAY_ISO,
             "values": {"pvEgy": 1000},
+            "full_day_metrics": ["pvEgy"],
             "completed_days": {"2024-05-19": {"pvEgy": 250}},
             "complete_days": ["2024-05-19"],
             "last_deltas": {"pvEgy": 300},

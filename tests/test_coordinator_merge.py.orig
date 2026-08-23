@@ -58,6 +58,7 @@ def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:
     shell._price_overrides = {}
     shell._listeners = {}
     shell._device_index = {}
+    shell._ble_pending_updates = {}
     shell._device_registry_observer = None
     return shell
 
@@ -379,11 +380,13 @@ def test_local_system_patch_updates_http_rebuild_index() -> None:
     )
 
 
-def test_ble_next_frame_uses_the_committed_snapshot_as_its_base() -> None:
-    """Immediate BLE commits make the latest coordinator state the next base."""
+def test_ble_coalescer_uses_pending_snapshot_as_next_frame_base() -> None:
+    """Two BLE frames in one coalescing window must accumulate."""
     coordinator = _coordinator({"dev-1": {PAYLOAD_PROPERTIES: {"pvPw": 100}}})
+    pending = {PAYLOAD_PROPERTIES: {"pvPw": 200, "soc": 50}}
+    coordinator._ble_pending_updates["dev-1"] = pending
 
-    assert coordinator._ble_partial_update_base("dev-1") is coordinator.data["dev-1"]
+    assert coordinator._ble_partial_update_base("dev-1") is pending
 
 
 def test_subdevice_merge_appends_new_identified_serial() -> None:

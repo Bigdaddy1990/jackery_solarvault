@@ -123,8 +123,8 @@ async def coordinator(hass):
 
 
 @pytest.mark.asyncio
-async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> None:
-    """A BLE-only enrichment pass dispatches without Cloud-MQTT startup."""
+async def test_ble_background_getters_do_not_issue_automatic_writes(coordinator) -> None:
+    """A BLE-only runtime never turns the MQTT poller into a GATT poller."""
     coordinator._ble_listener = MagicMock()
     coordinator._mqtt = None
     coordinator._mqtt_session_generation = 1
@@ -137,22 +137,36 @@ async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> Non
 
     await coordinator._async_mqtt_poll_queries(snapshot)
 
-    coordinator._async_query_subdevices_for_missing.assert_awaited_once_with(
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
-    coordinator._async_query_system_info_for_missing.assert_awaited_once_with(
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
-    coordinator._async_query_weather_plan_for_missing.assert_awaited_once_with(
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
+    coordinator._async_query_subdevices_for_missing.assert_not_awaited()
+    coordinator._async_query_system_info_for_missing.assert_not_awaited()
+    coordinator._async_query_weather_plan_for_missing.assert_not_awaited()
     coordinator.async_start_mqtt.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cloud_background_getters_explicitly_disable_ble(coordinator) -> None:
+    """Connected Cloud MQTT polling never mirrors its reads over GATT."""
+    coordinator._mqtt = MagicMock(is_connected=True)
+    coordinator._mqtt_session_generation = 1
+    coordinator._mqtt_birth_snapshot_pending = False
+    coordinator._async_query_subdevices_for_missing = AsyncMock()
+    coordinator._async_query_system_info_for_missing = AsyncMock()
+    coordinator._async_query_weather_plan_for_missing = AsyncMock()
+    snapshot = {DEVICE_ID: _device_payload()}
+
+    await coordinator._async_mqtt_poll_queries(snapshot)
+
+    for query in (
+        coordinator._async_query_subdevices_for_missing,
+        coordinator._async_query_system_info_for_missing,
+        coordinator._async_query_weather_plan_for_missing,
+    ):
+        query.assert_awaited_once_with(
+            force=False,
+            snapshot=snapshot,
+            ensure_mqtt=False,
+            allow_ble=False,
+        )
 
 
 # ---------------------------------------------------------------------------

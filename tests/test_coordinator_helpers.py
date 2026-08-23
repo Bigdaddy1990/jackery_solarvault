@@ -5,11 +5,15 @@ control coercion, transport command parsing, and dict merging helpers
 without any Home Assistant recorder dependency.
 """
 
+from collections import deque
 from datetime import date
-from unittest.mock import AsyncMock
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.jackery_solarvault import coordinator as coordinator_module
 from custom_components.jackery_solarvault.client import JackeryAuthError, JackeryError
 from custom_components.jackery_solarvault.const import (
     DATE_TYPE_DAY,
@@ -20,6 +24,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     _SYSTEM_BUSY_API_CODE,
     BackfillStatus,
+    JackerySolarVaultCoordinator,
     _backfill_period_is_closed,
     _is_system_busy_error,
     _merge_identified_dict_lists,
@@ -652,3 +657,84 @@ def test_is_system_busy_error_non_jackery_error() -> None:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.asyncio
+async def test_mqtt_payload_debug_is_enqueued_without_waiting_for_disk() -> None:
+    """A live MQTT frame must enqueue diagnostics instead of awaiting disk I/O."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    schedule = MagicMock()
+    direct_writer = AsyncMock()
+    coordinator._schedule_payload_debug_event = schedule
+    coordinator._async_payload_debug_event = direct_writer
+    coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=None)
+
+    raw_handler = JackerySolarVaultCoordinator._async_handle_mqtt_message.__wrapped__
+    await raw_handler(coordinator, "hb/app/test", {})
+
+    schedule.assert_called_once()
+    direct_writer.assert_not_awaited()
+    event = schedule.call_args.args[0]()
+    assert event["kind"] == "cloud_mqtt"
+    assert event["topic"] == "hb/app/test"
+
+
+@pytest.mark.asyncio
+async def test_payload_debug_shutdown_flush_writes_pending_events(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Shutdown must flush queued debug diagnostics before other tasks stop."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    executor_job = AsyncMock()
+    coordinator.hass = SimpleNamespace(
+        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+        async_add_executor_job=executor_job,
+    )
+    coordinator.entry = SimpleNamespace(entry_id="test-entry")
+    coordinator._background_tasks = {}
+    coordinator._payload_debug_pending_events = deque([{"sequence": 1}])
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "_payload_debug_capture_enabled",
+        lambda _entry: True,
+    )
+
+    await coordinator._async_flush_payload_debug_events()
+
+    executor_job.assert_awaited_once()
+    assert not coordinator._payload_debug_pending_events
+
+
+@pytest.mark.asyncio
+async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A burst must retain all debug events without one disk job per frame."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    executor_job = AsyncMock()
+    coordinator.hass = SimpleNamespace(
+        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+        async_add_executor_job=executor_job,
+    )
+    coordinator.entry = SimpleNamespace(entry_id="test-entry")
+    coordinator._payload_debug_pending_events = deque([
+        {"sequence": 1},
+        {"sequence": 2},
+    ])
+
+    monkeypatch.setattr(
+        coordinator_module,
+        "_payload_debug_capture_enabled",
+        lambda _entry: True,
+    )
+
+    await coordinator._async_drain_payload_debug_events()
+
+    executor_job.assert_awaited_once()
+    writer, _path, events = executor_job.await_args.args
+    assert writer.__name__ == "append_payload_debug_lines"
+    assert [event["sequence"] for event in events] == [1, 2]
+    assert all(event["entry_id"] == "test-entry" for event in events)

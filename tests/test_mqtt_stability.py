@@ -68,7 +68,7 @@ def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
     credentials.
     """
     src = _read("mqtt_push.py")
-    assert "from ..credentials import credential_fingerprint" in src, src
+    assert "from .credentials import credential_fingerprint" in src, src
     assert "self._fingerprint: str | None = None" in src, src
     assert "def _credential_fingerprint(" in src, src
     assert "return credential_fingerprint({" in src, src

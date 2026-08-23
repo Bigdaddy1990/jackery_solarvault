@@ -3,6 +3,8 @@
 from datetime import UTC, date, datetime
 from typing import Any, cast
 
+import pytest
+
 from custom_components.jackery_solarvault.const import (
     APP_CHART_LABELS,
     APP_CHART_SERIES_Y,
@@ -23,8 +25,8 @@ _DEVICE_ID = "dev-1"
 _DAY_SECTION = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}"
 
 
-def test_day_chart_recorder_import_rejects_lagging_cloud_total() -> None:
-    """A smaller cloud day chart cannot create external Recorder buckets."""
+def test_day_chart_recorder_import_reconciles_lagging_cloud_total() -> None:
+    """A local day total rescales instead of discarding the cloud curve."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     mutable = cast("Any", coordinator)
     mutable.data = {
@@ -58,4 +60,5 @@ def test_day_chart_recorder_import_rejects_lagging_cloud_total() -> None:
         now=datetime(2026, 8, 13, 13, 0, tzinfo=UTC),
     )
 
-    assert points == []
+    assert len(points) == 1
+    assert points[0].value == pytest.approx(20.62)

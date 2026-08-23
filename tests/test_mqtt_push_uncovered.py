@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Coroutine
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -33,6 +34,7 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         hass = MagicMock()
         hass.data = {}
         hass.async_create_background_task = self._background_task_mock()
+        hass.async_create_task = self._background_task_mock()
         hass.async_add_executor_job = AsyncMock(return_value=MagicMock())
         hass.config = MagicMock()
         hass.config.path = MagicMock(return_value="/config")
@@ -52,6 +54,7 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         hass = MagicMock()
         hass.data = {}
         hass.async_create_background_task = self._background_task_mock()
+        hass.async_create_task = self._background_task_mock()
         hass.async_add_executor_job = AsyncMock(return_value=MagicMock())
         hass.config = MagicMock()
         hass.config.path = MagicMock(return_value="/config")
@@ -217,10 +220,14 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         # Message should be ignored due to wrong generation
         assert client._messages_seen == 0
 
-    def test_handle_message_no_body_field_fallback(self) -> None:
+    @pytest.mark.asyncio
+    async def test_handle_message_no_body_field_fallback(  # noqa: PLR6301
+        self, hass
+    ) -> None:
         """Test _handle_message without body field (falls back to data)."""
-        client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()
+        callback = AsyncMock()
+        client = JackeryMqttPushClient(hass, callback)
+        client._session_generation = 0
 
         client._handle_message(
             "jackery/device/123/status",
@@ -228,7 +235,12 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
             generation=0,
             runner_task=None,
         )
+        await client.async_wait_message_queue_idle()
         assert client._messages_seen == 1
+        callback.assert_awaited_once()
+        callback_call = callback.await_args
+        assert callback_call is not None
+        assert callback_call.args[1]["body"] == {"soc": 80}
 
     def test_handle_message_invalid_json(self) -> None:
         """Test _handle_message with invalid JSON."""
@@ -249,11 +261,11 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
     async def test_schedule_coroutine(self) -> None:
         """Test _schedule_coroutine method."""
         client = self._create_client()
-        scheduled: list[asyncio.Task[None]] = []
+        scheduled: list[asyncio.Task[Any]] = []
 
         def _create_task(
-            coro: Coroutine[object, object, object], **_kwargs: object
-        ) -> asyncio.Task[None]:
+            coro: Coroutine[Any, Any, Any], **_kwargs: object
+        ) -> asyncio.Task[Any]:
             task = asyncio.create_task(coro)
             scheduled.append(task)
             return task
@@ -350,12 +362,14 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
         """Test _redact_topic static method."""
         topic = f"{MQTT_TOPIC_PREFIX}/user123/status"
         redacted = JackeryMqttPushClient._redact_topic(topic)
+        assert redacted is not None
         assert REDACTED_VALUE in redacted
         assert "user123" not in redacted
 
         # Non-matching topic
         topic2 = "other/prefix/user123/status"
         redacted2 = JackeryMqttPushClient._redact_topic(topic2)
+        assert redacted2 is not None
         assert redacted2 == topic2
 
         # None

@@ -15,8 +15,13 @@ statistics.
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
 from custom_components.jackery_solarvault.const import (
+    APP_SECTION_PV_STAT,
+    APP_SECTION_PV_TRENDS,
     APP_STAT_TOTAL_GENERATION,
+    APP_STAT_TOTAL_SOLAR_ENERGY,
     PAYLOAD_STATISTIC,
 )
 from custom_components.jackery_solarvault.sensor import (
@@ -123,3 +128,21 @@ def test_guard_leaves_generation_unchanged_when_dip_is_within_tolerance() -> Non
         payload[PAYLOAD_STATISTIC][APP_STAT_TOTAL_GENERATION]
         == _RAW_GENERATION_SMALL_DIP
     )
+
+
+def test_guard_prefers_app_system_pv_year_total_over_device_pv_total() -> None:
+    """The lifetime floor follows the system PV chart shown by the app."""
+    payload = {
+        PAYLOAD_STATISTIC: {APP_STAT_TOTAL_GENERATION: 960.0},
+        f"{APP_SECTION_PV_STAT}_year": {APP_STAT_TOTAL_SOLAR_ENERGY: 957.8},
+        f"{APP_SECTION_PV_TRENDS}_year": {APP_STAT_TOTAL_SOLAR_ENERGY: 967.89},
+    }
+
+    guard_statistic_totals_from_year(payload)
+
+    assert payload[PAYLOAD_STATISTIC][APP_STAT_TOTAL_GENERATION] == pytest.approx(
+        967.89
+    )
+    assert payload[PAYLOAD_STATISTIC]["_total_lower_bound_guard"]["corrected"][
+        APP_STAT_TOTAL_GENERATION
+    ]["current_year_total"] == pytest.approx(967.89)

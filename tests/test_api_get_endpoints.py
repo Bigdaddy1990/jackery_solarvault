@@ -91,7 +91,10 @@ async def test_get_device_property_uses_device_id_param() -> None:
 
     assert result == props
     get_json.assert_awaited_once_with(
-        DEVICE_PROPERTY_PATH, params={FIELD_DEVICE_ID: "42"}, profile=HttpProfile.FAST
+        DEVICE_PROPERTY_PATH,
+        params={FIELD_DEVICE_ID: "42"},
+        profile=HttpProfile.FAST,
+        retry_transport_once=True,
     )
 
 

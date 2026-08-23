@@ -218,7 +218,7 @@ def test_total_increasing_jitter_guard_preserves_only_tiny_regressions(
     [
         [None, None],
         [SimpleNamespace(native_value=True, native_unit_of_measurement="kWh"), None],
-        [SimpleNamespace(native_value="4", native_unit_of_measurement="Wh"), None],
+        [SimpleNamespace(native_value="4", native_unit_of_measurement="Wh"), 0.004],
         [SimpleNamespace(native_value="bad", native_unit_of_measurement="kWh"), None],
         [
             SimpleNamespace(
@@ -279,6 +279,27 @@ def test_jackery_sensor_value_mapping_and_source_attributes() -> None:
         "merged_raw_value": None,
         "http_raw_value": None,
     }
+
+
+def test_battery_stack_source_reports_resolved_live_properties() -> None:
+    """The stack sensor must not label a live-over-HTTP value as HTTP-primary."""
+    coordinator = MagicMock(name="coordinator")
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {"stackOutPw": 8, "stackInPw": 0},
+            "http_properties": {"stackOutPw": 4, "stackInPw": 0},
+            "battery_packs": [{"outPw": 21, "inPw": 0}],
+        }
+    }
+    coordinator.last_update_success = True
+    sensor = sensor_module.JackeryBatteryStackNetPowerSensor(coordinator, "dev-1")
+
+    assert sensor.native_value == 8
+    assert sensor.extra_state_attributes["source"] == (
+        "coordinator_resolved_main_device_stack_bus"
+    )
+    assert sensor.extra_state_attributes["http_stackOutPw"] == 4
+    assert sensor.extra_state_attributes["battery_pack_outPw_sum"] == 21
 
 
 async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> None:

@@ -11,8 +11,13 @@ tests run on every supported platform without bleak or BlueZ.
 
 import asyncio
 import base64
+from collections import deque
+from collections.abc import Coroutine
+import contextlib
+from datetime import UTC, datetime
 import json
 from typing import Any, cast
+from unittest.mock import patch
 
 import pytest
 
@@ -53,8 +58,12 @@ from custom_components.jackery_solarvault.client.ble import (
     split_payload_into_frames,
 )
 from custom_components.jackery_solarvault.client.ble_transport import (
+    BleFrameObservation,
     JackeryBleListener,
     _GattSession,
+)
+from custom_components.jackery_solarvault.client.ble_notification_spool_models import (
+    BleProcessDisposition,
 )
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_BLE_TRANSPORT,
@@ -691,6 +700,256 @@ def test_ble_transport_module_exports_listener() -> None:
         assert hasattr(ble_transport, symbol), symbol
 
 
+def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
+    """A transport retry cannot repeat a committed coordinator mutation."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator._ble_delivery_results = {}
+        coordinator._ble_delivery_result_order = deque()
+        calls = 0
+
+        async def _once(  # ruff: ignore[unused-async]
+            _self: JackerySolarVaultCoordinator,
+            _device_id: str,
+            _observation: BleFrameObservation,
+        ) -> BleProcessDisposition:
+            nonlocal calls
+            calls += 1
+            return BleProcessDisposition.CONFIRMED
+
+        observation = BleFrameObservation(
+            received_at=datetime.now(UTC),
+            raw_bytes=b"frame",
+            base64_encoded="ZnJhbWU=",
+            parsed=None,
+            delivery_id="listener:dev:1:1",
+        )
+        with patch.object(
+            JackerySolarVaultCoordinator,
+            "_async_ingest_ble_observation_once",
+            new=_once,
+        ):
+            first = await coordinator._async_ingest_ble_observation(
+                "dev", observation
+            )
+            retry = await coordinator._async_ingest_ble_observation(
+                "dev", observation
+            )
+
+        assert first is BleProcessDisposition.CONFIRMED
+        assert retry is BleProcessDisposition.CONFIRMED
+        assert calls == 1
+
+    asyncio.run(_run())
+
+
+def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
+    """A decoded frame is not acknowledged when its coordinator commit is rejected."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator._ble_listener = None
+        observation = BleFrameObservation(
+            received_at=datetime.now(UTC),
+            raw_bytes=b"frame",
+            base64_encoded="ZnJhbWU=",
+            parsed=BleBinaryFrame(
+                frame_index=1,
+                chunk_count=1,
+                flags=0,
+                cmd=107,
+                body=b'{"outPw":596}',
+                trailer=b"\x00\x00\x00\x00",
+            ),
+        )
+
+        with (
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_schedule_payload_debug_event",
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_ble_partial_update_base",
+                return_value={"properties": {}},
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_is_subdevice_payload",
+                return_value=False,
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_normalize_live_property_payload",
+                return_value={"outPw": 596},
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_merge_main_properties_for_device",
+                return_value={"outPw": 596},
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_schedule_ble_partial_update",
+                return_value=False,
+            ),
+        ):
+            committed = await coordinator._async_ingest_ble_observation_once(
+                "dev",
+                observation,
+            )
+
+        assert committed is BleProcessDisposition.RETRY
+
+    asyncio.run(_run())
+
+
+def test_coordinator_ble_retry_result_is_not_cached() -> None:
+    """A temporary rejection with one delivery ID remains recoverable in-process."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator._ble_delivery_results = {}
+        coordinator._ble_delivery_result_order = deque()
+        results = deque(
+            (
+                BleProcessDisposition.RETRY,
+                BleProcessDisposition.CONFIRMED,
+            )
+        )
+        calls = 0
+
+        async def _once(
+            _self: JackerySolarVaultCoordinator,
+            _device_id: str,
+            _observation: BleFrameObservation,
+        ) -> BleProcessDisposition:
+            nonlocal calls
+            calls += 1
+            return results.popleft()
+
+        observation = BleFrameObservation(
+            received_at=datetime.now(UTC),
+            raw_bytes=b"frame",
+            base64_encoded="ZnJhbWU=",
+            parsed=None,
+            delivery_id="listener:dev:1:retry",
+        )
+        with patch.object(
+            JackerySolarVaultCoordinator,
+            "_async_ingest_ble_observation_once",
+            new=_once,
+        ):
+            first = await coordinator._async_ingest_ble_observation(
+                "dev",
+                observation,
+            )
+            second = await coordinator._async_ingest_ble_observation(
+                "dev",
+                observation,
+            )
+
+        assert first is BleProcessDisposition.RETRY
+        assert second is BleProcessDisposition.CONFIRMED
+        assert calls == 2
+
+    asyncio.run(_run())
+
+
+def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
+    """A valid idempotent replay is acknowledged without another state write."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator._ble_listener = None
+        observation = BleFrameObservation(
+            received_at=datetime.now(UTC),
+            raw_bytes=b"frame",
+            base64_encoded="ZnJhbWU=",
+            parsed=BleBinaryFrame(
+                frame_index=1,
+                chunk_count=1,
+                flags=0,
+                cmd=107,
+                body=b'{"outPw":596}',
+                trailer=b"\x00\x00\x00\x00",
+            ),
+        )
+        current = {"properties": {"outPw": 596}}
+
+        with (
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_schedule_payload_debug_event",
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_ble_partial_update_base",
+                return_value=current,
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_is_subdevice_payload",
+                return_value=False,
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_normalize_live_property_payload",
+                return_value={"outPw": 596},
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_merge_main_properties_for_device",
+                return_value={"outPw": 596},
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_schedule_ble_partial_update",
+            ) as schedule,
+        ):
+            disposition = await coordinator._async_ingest_ble_observation_once(
+                "dev",
+                observation,
+            )
+
+        assert disposition is BleProcessDisposition.CONFIRMED
+        schedule.assert_not_called()
+
+    asyncio.run(_run())
+
+
+def test_coordinator_ble_shutdown_drain_allows_accepted_commit() -> None:
+    """Shutdown fencing still commits a frame accepted before the BLE cutoff."""
+    coordinator = object.__new__(JackerySolarVaultCoordinator)
+    coordinator._shutdown_started = True
+    coordinator._ble_shutdown_drain_active = True
+    coordinator.data = {"dev": {"properties": {"outPw": 0}}}
+    pushed: list[dict[str, dict[str, object]]] = []
+
+    def _push(
+        _self: JackerySolarVaultCoordinator,
+        update: dict[str, dict[str, object]],
+        **_kwargs: object,
+    ) -> bool:
+        pushed.append(update)
+        return True
+
+    with patch.object(
+        JackerySolarVaultCoordinator,
+        "_push_partial_update",
+        new=_push,
+    ):
+        committed = coordinator._schedule_ble_partial_update(
+            "dev",
+            {"properties": {"outPw": 596}},
+            observed_at=datetime.now(UTC),
+        )
+
+    assert committed is True
+    assert pushed == [{"dev": {"properties": {"outPw": 596}}}]
+
+
 def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
     """``async_stop()`` cancels stuck runners without blocking shutdown.
 
@@ -1126,6 +1385,17 @@ class _HassStub:
     def loop(self) -> object:
         return asyncio.get_running_loop()
 
+    def async_create_background_task(  # ruff: ignore[no-self-use]
+        self,
+        target: Coroutine[Any, Any, None],
+        *,
+        name: str,
+        eager_start: bool = True,
+    ) -> asyncio.Task[None]:
+        """Create the listener-owned task without a full HA instance."""
+        del eager_start
+        return asyncio.create_task(target, name=name)
+
 
 def _build_bare_listener(key: bytes | None = None) -> JackeryBleListener:
     """Return a real JackeryBleListener wired with inert callbacks.
@@ -1161,6 +1431,679 @@ def _attach_session(
     listener._sessions[device_id] = session
     listener._clients[device_id] = client
     return session
+
+
+def test_listener_install_session_cannot_replace_retained_owner() -> None:
+    """A failed old teardown keeps exclusive ownership until it is retried."""
+    listener = _build_bare_listener()
+    old_client = object()
+    old_session = _attach_session(listener, "dev", old_client)
+    new_client = object()
+
+    with pytest.raises(RuntimeError, match="still owns"):
+        listener._install_session("dev", new_client, generation=2)
+
+    assert listener._sessions["dev"] is old_session
+    assert listener._clients["dev"] is old_client
+    assert old_session.active is True
+
+
+def test_listener_async_start_propagates_previous_stop_failure() -> None:
+    """Restart cannot erase a failed stop while its sessions remain owned."""
+
+    async def _run() -> None:
+        listener = _build_bare_listener()
+
+        async def _failed_stop() -> None:  # ruff: ignore[unused-async]
+            raise RuntimeError("prior stop failed")
+
+        stop_task = asyncio.create_task(_failed_stop())
+        await asyncio.sleep(0)
+        listener._stop_task = stop_task
+        bluetooth_module = type(
+            "_BluetoothModule",
+            (),
+            {
+                "BluetoothScanningMode": type(
+                    "_ScanningMode",
+                    (),
+                    {"ACTIVE": object()},
+                ),
+                "async_register_callback": staticmethod(
+                    lambda *_args, **_kwargs: lambda: None
+                ),
+            },
+        )()
+
+        try:
+            with (
+                patch.dict(
+                    "sys.modules",
+                    {"homeassistant.components.bluetooth": bluetooth_module},
+                ),
+                pytest.raises(RuntimeError, match="prior stop failed"),
+            ):
+                await listener.async_start(["dev"])
+        finally:
+            with contextlib.suppress(RuntimeError):
+                stop_task.result()
+            for unregister in listener._unregister_callbacks:
+                unregister()
+            listener._unregister_callbacks.clear()
+
+        assert listener._stop_task is stop_task
+
+    asyncio.run(_run())
+
+
+def test_connection_runner_retries_retained_teardown_before_connect() -> None:
+    """Advertisements cannot connect a replacement over retained GATT ownership."""
+
+    async def _run() -> None:
+        listener = _build_bare_listener()
+        retained = _attach_session(listener, "dev", object())
+        teardown_calls = 0
+        lookup_calls = 0
+
+        async def _retry_teardown(  # ruff: ignore[unused-async]
+            device_id: str,
+            session: _GattSession,
+        ) -> None:
+            nonlocal teardown_calls
+            assert device_id == "dev"
+            assert session is retained
+            teardown_calls += 1
+            listener._stop_event.set()
+            raise RuntimeError("disconnect still failed")
+
+        class _BluetoothModule:
+            @staticmethod
+            def async_ble_device_from_address(
+                _hass: object,
+                _address: str,
+                *,
+                connectable: bool,
+            ) -> None:
+                nonlocal lookup_calls
+                assert connectable is True
+                lookup_calls += 1
+
+        listener._teardown_session = _retry_teardown  # type: ignore[method-assign]
+        listener._ha_bluetooth = _BluetoothModule()
+
+        await asyncio.wait_for(
+            listener._async_run_connection("dev", "AA:BB:CC:DD:EE:FF"),
+            timeout=0.2,
+        )
+
+        assert teardown_calls == 1
+        assert lookup_calls == 0
+        assert listener._sessions["dev"] is retained
+
+    asyncio.run(_run())
+
+
+def test_keepalive_invalidation_accepts_callbacks_until_physical_cutoff() -> None:
+    """Logical reconnect fencing cannot drop callbacks before stop_notify returns."""
+
+    async def _run() -> None:
+        delivered: list[bytes] = []
+
+        async def _sink(  # ruff: ignore[unused-async]
+            _device_id: str,
+            observation: BleFrameObservation,
+        ) -> bool:
+            delivered.append(observation.raw_bytes)
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+
+        listener._invalidate_session("dev")
+        listener._schedule_notification("dev", session, b"before-cutoff")
+        await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
+
+        assert delivered == [b"before-cutoff"]
+        assert session.accepting_notifications is True
+        assert listener._sessions["dev"] is session
+
+    asyncio.run(_run())
+
+
+def test_listener_notification_queue_preserves_every_burst_frame() -> None:
+    """A burst larger than the legacy queue bound must remain lossless and ordered."""
+
+    async def _run() -> None:
+        delivered: list[bytes] = []
+
+        async def _sink(  # ruff: ignore[unused-async]
+            _device_id: str, observation: object
+        ) -> bool:
+            delivered.append(cast("Any", observation).raw_bytes)
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        frames = [index.to_bytes(2, "big") for index in range(130)]
+
+        for frame in frames:
+            listener._schedule_notification("dev", session, frame)
+
+        await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
+        notify_task = session.notify_task
+        if notify_task is not None:
+            await notify_task
+
+        assert delivered == frames
+        assert listener.stats_for("dev").notify_frames_dropped == 0
+
+    asyncio.run(_run())
+
+
+def test_listener_notification_queue_exposes_pending_bytes_and_oldest_age() -> None:
+    """Lossless backlog pressure is observable in bytes, depth, and age."""
+
+    async def _run() -> None:
+        sink_started = asyncio.Event()
+        release_sink = asyncio.Event()
+
+        async def _sink(_device_id: str, _observation: object) -> bool:
+            sink_started.set()
+            await release_sink.wait()
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        listener._schedule_notification("dev", session, b"first")
+        listener._schedule_notification("dev", session, b"second-longer")
+        await asyncio.wait_for(sink_started.wait(), timeout=1.0)
+        await asyncio.sleep(0.01)
+
+        stats = listener.stats_for("dev")
+        try:
+            pending_depth = stats.notify_queue_depth
+            pending_bytes = stats.notify_queue_bytes
+            high_watermark_bytes = stats.notify_queue_high_watermark_bytes
+            oldest_age = stats.notify_queue_oldest_age_sec
+        finally:
+            release_sink.set()
+            await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
+
+        assert pending_depth == 2
+        assert pending_bytes == len(b"firstsecond-longer")
+        assert high_watermark_bytes >= pending_bytes
+        assert oldest_age > 0
+        stats = listener.stats_for("dev")
+        assert stats.notify_queue_depth == 0
+        assert stats.notify_queue_bytes == 0
+        assert stats.notify_queue_oldest_age_sec == 0
+
+    asyncio.run(_run())
+
+
+def test_listener_notification_preserves_callback_arrival_timestamp() -> None:
+    """A queued BLE value keeps its callback time across a blocked FIFO sink."""
+
+    async def _run() -> None:
+        observations: list[Any] = []
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def _sink(_device_id: str, observation: object) -> bool:
+            observations.append(observation)
+            if len(observations) == 1:
+                first_started.set()
+                await release_first.wait()
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        listener._schedule_notification("dev", session, b"first")
+        await asyncio.wait_for(first_started.wait(), timeout=1.0)
+        listener._schedule_notification("dev", session, b"queued")
+        callback_deadline = datetime.now(UTC)
+        await asyncio.sleep(0.01)
+        release_first.set()
+        await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
+
+        assert [item.raw_bytes for item in observations] == [b"first", b"queued"]
+        assert observations[1].received_at <= callback_deadline
+
+    asyncio.run(_run())
+
+
+def test_listener_forwards_incomplete_decoded_fragment_to_sink() -> None:
+    """Every accepted raw callback reaches the sink even before reassembly completes."""
+
+    async def _run() -> None:
+        key = b"k" * 16
+        observations: list[BleFrameObservation] = []
+
+        async def _sink(  # ruff: ignore[unused-async]
+            _device_id: str,
+            observation: BleFrameObservation,
+        ) -> bool:
+            observations.append(observation)
+            return False
+
+        listener = _build_bare_listener(key)
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        raw = encrypt_binary_notify(
+            build_binary_frame(
+                cmd=120,
+                flags=3022,
+                body=b'{"outPw":',
+                frame_index=1,
+                chunk_count=2,
+                security=1,
+            ),
+            key,
+            iv=b"1" * BLE_AES_IV_LEN,
+        )
+
+        await listener._handle_notification(
+            "dev",
+            raw,
+            session=session,
+            notify_sequence=1,
+            received_at=datetime.now(UTC),
+            accepted=True,
+        )
+
+        assert len(observations) == 1
+        assert observations[0].raw_bytes == raw
+        assert observations[0].parsed is not None
+        assert observations[0].parsed.frame_index == 1
+        assert observations[0].parsed.chunk_count == 2
+        assert observations[0].delivery_id is not None
+        listener._clear_frame_assemblies("dev", session)
+
+    asyncio.run(_run())
+
+
+def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> None:
+    """Disconnect metadata cannot invalidate fragments already queued by Bleak."""
+
+    async def _run() -> None:
+        key = b"k" * 16
+        sink_started = asyncio.Event()
+        release_sink = asyncio.Event()
+        observations: list[BleFrameObservation] = []
+
+        async def _sink(
+            _device_id: str,
+            observation: BleFrameObservation,
+        ) -> bool:
+            observations.append(observation)
+            if observation.raw_bytes == b"block":
+                sink_started.set()
+                await release_sink.wait()
+            return True
+
+        listener = _build_bare_listener(key)
+        listener._sink = _sink
+        client = object()
+        session = _attach_session(listener, "dev", client)
+        body = b'{"outPw":596}'
+        first = encrypt_binary_notify(
+            build_binary_frame(
+                cmd=120,
+                flags=3022,
+                body=body[:9],
+                frame_index=1,
+                chunk_count=2,
+                security=1,
+            ),
+            key,
+            iv=b"1" * BLE_AES_IV_LEN,
+        )
+        second = encrypt_binary_notify(
+            build_binary_frame(
+                cmd=120,
+                flags=3022,
+                body=body[9:],
+                frame_index=2,
+                chunk_count=2,
+                security=2,
+            ),
+            key,
+            iv=b"2" * BLE_AES_IV_LEN,
+        )
+
+        listener._schedule_notification("dev", session, b"block")
+        await asyncio.wait_for(sink_started.wait(), timeout=1.0)
+        listener._schedule_notification("dev", session, first)
+        listener._schedule_notification("dev", session, second)
+        listener._on_disconnect(
+            "dev",
+            generation=session.generation,
+            client=client,
+        )
+        release_sink.set()
+        await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
+
+        complete = [
+            item
+            for item in observations
+            if item.parsed is not None and item.parsed.body == body
+        ]
+        assert len(complete) == 1
+        assert session.accepting_notifications is False
+        await listener._teardown_session("dev", session)
+
+    asyncio.run(_run())
+
+
+def test_listener_teardown_accepts_notifications_until_stop_notify_cutoff() -> None:
+    """Frames arriving while stop_notify is pending remain accepted and ordered."""
+
+    class _Client:
+        is_connected = True
+
+        def __init__(self) -> None:
+            self.stop_notify_started = asyncio.Event()
+            self.release_stop_notify = asyncio.Event()
+
+        async def stop_notify(self, _uuid: str) -> None:
+            self.stop_notify_started.set()
+            await self.release_stop_notify.wait()
+
+        async def disconnect(self) -> None:
+            self.is_connected = False
+
+    async def _run() -> None:
+        delivered: list[bytes] = []
+
+        async def _sink(  # ruff: ignore[unused-async]
+            _device_id: str, observation: object
+        ) -> bool:
+            delivered.append(cast("Any", observation).raw_bytes)
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        client = _Client()
+        session = _attach_session(listener, "dev", client)
+        session.notify_started = True
+        teardown = asyncio.create_task(listener._teardown_session("dev", session))
+        await asyncio.wait_for(client.stop_notify_started.wait(), timeout=1.0)
+
+        listener._schedule_notification("dev", session, b"during-cutoff")
+        client.release_stop_notify.set()
+        await asyncio.wait_for(teardown, timeout=1.0)
+
+        assert delivered == [b"during-cutoff"]
+        assert session.notify_queue.empty()
+
+    asyncio.run(_run())
+
+
+def test_listener_teardown_retains_ownership_while_accepted_sink_is_blocked() -> None:
+    """A drain deadline cannot orphan a session that still owns accepted data."""
+
+    async def _run() -> None:
+        release_sink = asyncio.Event()
+        sink_started = asyncio.Event()
+
+        async def _sink(_device_id: str, _observation: object) -> bool:
+            sink_started.set()
+            await release_sink.wait()
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        listener._schedule_notification("dev", session, b"accepted")
+        await asyncio.wait_for(sink_started.wait(), timeout=1.0)
+
+        with patch(
+            "custom_components.jackery_solarvault.client.ble_transport._STOP_TIMEOUT_SEC",
+            0.01,
+        ):
+            teardown = asyncio.create_task(listener._teardown_session("dev", session))
+            try:
+                await asyncio.sleep(0.03)
+                assert not teardown.done()
+                assert listener._sessions["dev"] is session
+            finally:
+                release_sink.set()
+                with contextlib.suppress(Exception, asyncio.CancelledError):
+                    await asyncio.wait_for(teardown, timeout=1.0)
+
+        assert listener._sessions == {}
+
+    asyncio.run(_run())
+
+
+def test_listener_teardown_retains_failed_disconnect_ownership() -> None:
+    """A connected client that cannot disconnect is not reported as stopped."""
+
+    class _Client:
+        is_connected = True
+
+        async def stop_notify(  # ruff: ignore[no-self-use]
+            self, _uuid: str
+        ) -> None:
+            return
+
+        async def disconnect(self) -> None:  # ruff: ignore[no-self-use]
+            raise RuntimeError("disconnect failed")
+
+    async def _run() -> None:
+        listener = _build_bare_listener()
+        client = _Client()
+        session = _attach_session(listener, "dev", client)
+        session.notify_started = True
+
+        with pytest.raises(RuntimeError, match="disconnect failed"):
+            await listener._teardown_session("dev", session)
+
+        assert listener._sessions["dev"] is session
+        assert listener._clients["dev"] is client
+
+    asyncio.run(_run())
+
+
+def test_listener_async_stop_drains_every_accepted_notification() -> None:
+    """Shutdown fences new BLE ingress but delivers every already accepted frame."""
+
+    async def _run() -> None:
+        delivered: list[bytes] = []
+        sink_started = asyncio.Event()
+        release_sink = asyncio.Event()
+
+        async def _sink(_device_id: str, observation: object) -> bool:
+            sink_started.set()
+            await release_sink.wait()
+            delivered.append(cast("Any", observation).raw_bytes)
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        listener._schedule_notification("dev", session, b"first")
+        listener._schedule_notification("dev", session, b"second")
+        await asyncio.wait_for(sink_started.wait(), timeout=1.0)
+
+        stop_task = asyncio.create_task(listener.async_stop())
+        await asyncio.sleep(0)
+        release_sink.set()
+        await asyncio.wait_for(stop_task, timeout=1.0)
+
+        assert delivered == [b"first", b"second"]
+        assert session.notify_queue.empty()
+
+    asyncio.run(_run())
+
+
+def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
+    """One failed device teardown cannot orphan a still-running sibling."""
+
+    async def _run() -> None:
+        second_started = asyncio.Event()
+        release_second = asyncio.Event()
+        second_finished = asyncio.Event()
+        listener = _build_bare_listener()
+        _attach_session(listener, "dev-a", object())
+        _attach_session(listener, "dev-b", object())
+
+        async def _teardown(
+            device_id: str,
+            _session: _GattSession,
+        ) -> None:
+            if device_id == "dev-a":
+                raise RuntimeError("first teardown failed")
+            second_started.set()
+            await release_second.wait()
+            second_finished.set()
+
+        listener._teardown_session = _teardown  # type: ignore[method-assign]
+        stop_task = asyncio.create_task(listener._async_stop_impl())
+        await asyncio.wait_for(second_started.wait(), timeout=1.0)
+        await asyncio.sleep(0)
+        completed_before_sibling = stop_task.done()
+        release_second.set()
+        with pytest.raises(RuntimeError, match="first teardown failed"):
+            await asyncio.wait_for(stop_task, timeout=1.0)
+        assert not completed_before_sibling
+        assert second_finished.is_set()
+
+    asyncio.run(_run())
+
+
+def test_listener_stop_task_is_homeassistant_owned() -> None:
+    """Cancellation-safe listener stop work is visible to Home Assistant."""
+
+    async def _run() -> None:
+        task_names: list[str] = []
+
+        class _OwnedHass(_HassStub):
+            def async_create_background_task(  # ruff: ignore[no-self-use]
+                self,
+                target: Coroutine[Any, Any, None],
+                *,
+                name: str,
+                eager_start: bool = True,
+            ) -> asyncio.Task[None]:
+                del eager_start
+                task_names.append(name)
+                return asyncio.create_task(target, name=name)
+
+        async def _sink(  # ruff: ignore[unused-async]
+            _device_id: str,
+            _observation: object,
+        ) -> bool:
+            return True
+
+        listener = JackeryBleListener(
+            cast("Any", _OwnedHass()),
+            _sink,
+            key_resolver=lambda _device_id: None,
+            ble_address_resolver=lambda _device_id: None,
+            connect_backoff_remaining=lambda _device_id, _horizon: 0.0,
+            connect_backoff_note_failure=lambda _device_id, _horizon: 0.0,
+            connect_backoff_note_success=lambda _device_id: None,
+            keep_alive_msg_id=None,
+            keep_alive_ble_msg_type=None,
+        )
+
+        await listener.async_stop()
+
+        assert "jackery_ble_listener_stop" in task_names
+
+    asyncio.run(_run())
+
+
+def test_listener_outer_consumer_cancellation_delivers_accepted_frame_once() -> None:
+    """Cancelling the FIFO owner cannot cancel or duplicate its in-flight sink call."""
+
+    async def _run() -> None:
+        sink_calls = 0
+        delivered: list[bytes] = []
+        sink_started = asyncio.Event()
+        release_sink = asyncio.Event()
+
+        async def _sink(_device_id: str, observation: object) -> bool:
+            nonlocal sink_calls
+            sink_calls += 1
+            sink_started.set()
+            await release_sink.wait()
+            delivered.append(cast("Any", observation).raw_bytes)
+            return True
+
+        listener = _build_bare_listener()
+        listener._sink = _sink
+        session = _attach_session(listener, "dev", object())
+        listener._schedule_notification("dev", session, b"accepted")
+        await asyncio.wait_for(sink_started.wait(), timeout=1.0)
+        notify_task = session.notify_task
+        assert notify_task is not None
+
+        notify_task.cancel()
+        await asyncio.sleep(0)
+        release_sink.set()
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.wait_for(notify_task, timeout=1.0)
+
+        assert sink_calls == 1
+        assert delivered == [b"accepted"]
+        assert session.notify_queue.empty()
+
+    asyncio.run(_run())
+
+
+def test_listener_stop_does_not_cancel_disconnect_already_in_progress() -> None:
+    """A cooperative stop lets the connection runner finish GATT teardown once."""
+
+    class _Client:
+        is_connected = True
+
+        def __init__(self) -> None:
+            self.disconnect_calls = 0
+            self.disconnect_started = asyncio.Event()
+            self.disconnect_cancelled = asyncio.Event()
+            self.release_disconnect = asyncio.Event()
+
+        async def disconnect(self) -> None:
+            self.disconnect_calls += 1
+            self.disconnect_started.set()
+            try:
+                await self.release_disconnect.wait()
+            except asyncio.CancelledError:
+                self.disconnect_cancelled.set()
+                raise
+            self.is_connected = False
+
+    async def _run() -> None:
+        listener = _build_bare_listener()
+        client = _Client()
+        session = _attach_session(listener, "dev", client)
+        runner = asyncio.create_task(
+            listener._teardown_session("dev", session),
+            name="test_ble_teardown_runner",
+        )
+        listener._connections["dev"] = runner
+        await asyncio.wait_for(client.disconnect_started.wait(), timeout=1.0)
+
+        stop_task = asyncio.create_task(listener.async_stop())
+        await asyncio.sleep(0)
+        was_cancelled = client.disconnect_cancelled.is_set()
+        client.release_disconnect.set()
+        await asyncio.wait_for(stop_task, timeout=1.0)
+
+        assert was_cancelled is False
+        assert client.disconnect_calls == 1
+        assert runner.done() and not runner.cancelled()
+        assert listener._sessions == {}
+        assert listener._clients == {}
+        assert listener._connections == {}
+
+    asyncio.run(_run())
 
 
 def test_listener_resolves_pending_ack_on_matching_cmd() -> None:

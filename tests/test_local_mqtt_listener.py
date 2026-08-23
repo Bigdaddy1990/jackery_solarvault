@@ -3,7 +3,7 @@
 import asyncio
 import json
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -15,6 +15,8 @@ from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     DOMAIN,
+    LOCAL_MQTT_DEFAULT_TOPIC,
+    SHELLY_RPC_EVENT_TOPIC,
 )
 
 if TYPE_CHECKING:
@@ -47,7 +49,7 @@ async def test_local_mqtt_listener_disabled_by_option(
 async def test_local_mqtt_listener_uses_home_assistant_adapter(
     hass: HomeAssistant,
 ) -> None:
-    """An enabled entry starts one HA-owned adapter and schedules device config."""
+    """An enabled entry starts one HA-owned adapter without duplicate config work."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={},
@@ -74,18 +76,28 @@ async def test_local_mqtt_listener_uses_home_assistant_adapter(
     assert "port" not in client_cls.call_args.kwargs
     client.async_start.assert_awaited_once()
     coordinator.set_local_mqtt_client.assert_called_once_with(client)
-    coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
+    coordinator.async_schedule_local_mqtt_device_config.assert_not_called()
 
 
-async def test_listener_subscribes_once_to_configured_filter(
+async def test_listener_subscribes_to_jackery_and_exact_shelly_rpc_topics(
     hass: HomeAssistant,
     monkeypatch,
 ) -> None:
-    """The adapter registers one binary HA MQTT subscription."""
-    unsubscribe = MagicMock()
+    """The custom filter supplements both official trees and exact Shelly RPC."""
+    unsubscribe_jackery = MagicMock()
+    unsubscribe_singular = MagicMock()
+    unsubscribe_plural = MagicMock()
+    unsubscribe_shelly = MagicMock()
     unsubscribe_status = MagicMock()
     wait_for_client = AsyncMock(return_value=True)
-    subscribe = AsyncMock(return_value=unsubscribe)
+    subscribe = AsyncMock(
+        side_effect=(
+            unsubscribe_jackery,
+            unsubscribe_singular,
+            unsubscribe_plural,
+            unsubscribe_shelly,
+        )
+    )
     subscribe_status = MagicMock(return_value=unsubscribe_status)
     monkeypatch.setattr(
         "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_wait_for_mqtt_client",
@@ -113,13 +125,36 @@ async def test_listener_subscribes_once_to_configured_filter(
     await client.async_start()
 
     wait_for_client.assert_awaited_once_with(hass)
-    subscribe.assert_awaited_once_with(
-        hass,
-        "jackery/device/#",
-        client._async_message_received,
-        qos=1,
-        encoding=None,
-    )
+    assert subscribe.await_args_list == [
+        call(
+            hass,
+            "jackery/device/#",
+            client._async_message_received,
+            qos=1,
+            encoding=None,
+        ),
+        call(
+            hass,
+            LOCAL_MQTT_DEFAULT_TOPIC,
+            client._async_message_received,
+            qos=1,
+            encoding=None,
+        ),
+        call(
+            hass,
+            "hb/devices/#",
+            client._async_message_received,
+            qos=1,
+            encoding=None,
+        ),
+        call(
+            hass,
+            SHELLY_RPC_EVENT_TOPIC,
+            client._async_message_received,
+            qos=1,
+            encoding=None,
+        ),
+    ]
     subscribe_status.assert_called_once_with(
         hass,
         client._async_connection_status_changed,
@@ -128,7 +163,55 @@ async def test_listener_subscribes_once_to_configured_filter(
     assert client.is_connected is True
 
     await client.async_stop()
-    unsubscribe.assert_called_once_with()
+    unsubscribe_jackery.assert_called_once_with()
+    unsubscribe_singular.assert_called_once_with()
+    unsubscribe_plural.assert_called_once_with()
+    unsubscribe_shelly.assert_called_once_with()
+    unsubscribe_status.assert_called_once_with()
+
+
+async def test_listener_subscribes_to_both_official_topic_families(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """The built-in filter receives singular and plural Jackery firmware trees."""
+    unsubscribe_singular = MagicMock()
+    unsubscribe_plural = MagicMock()
+    unsubscribe_shelly = MagicMock()
+    unsubscribe_status = MagicMock()
+    subscribe = AsyncMock(
+        side_effect=(unsubscribe_singular, unsubscribe_plural, unsubscribe_shelly)
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_wait_for_mqtt_client",
+        AsyncMock(return_value=True),
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe",
+        subscribe,
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe_connection_status",
+        MagicMock(return_value=unsubscribe_status),
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.is_connected",
+        MagicMock(return_value=True),
+    )
+    client = JackeryLocalMqttClient(hass)
+
+    await client.async_start()
+
+    assert [item.args[1] for item in subscribe.await_args_list] == [
+        LOCAL_MQTT_DEFAULT_TOPIC,
+        "hb/devices/#",
+        SHELLY_RPC_EVENT_TOPIC,
+    ]
+
+    await client.async_stop()
+    unsubscribe_singular.assert_called_once_with()
+    unsubscribe_plural.assert_called_once_with()
+    unsubscribe_shelly.assert_called_once_with()
     unsubscribe_status.assert_called_once_with()
 
 
@@ -159,6 +242,89 @@ async def test_listener_cleans_status_subscription_when_message_subscribe_fails(
     assert client.diagnostics_snapshot(redact=False)["last_error"] == (
         "RuntimeError: broker down"
     )
+
+
+async def test_listener_cleans_primary_subscription_when_shelly_subscribe_fails(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """A failed supplemental topic cannot leak the primary Jackery callback."""
+    unsubscribe_status = MagicMock()
+    unsubscribe_jackery = MagicMock()
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_wait_for_mqtt_client",
+        AsyncMock(return_value=True),
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe_connection_status",
+        MagicMock(return_value=unsubscribe_status),
+    )
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe",
+        AsyncMock(
+            side_effect=(unsubscribe_jackery, RuntimeError("Shelly topic unavailable"))
+        ),
+    )
+    client = JackeryLocalMqttClient(hass, topic_filter="jackery/device/#")
+
+    assert await client._async_subscribe_once() is False
+
+    unsubscribe_jackery.assert_called_once_with()
+    unsubscribe_status.assert_called_once_with()
+    assert client.is_started is False
+
+
+async def test_listener_forwards_only_shelly_status_rpc_events(
+    hass: HomeAssistant,
+) -> None:
+    """High-rate Shelly BLE scan events never enter Jackery shared ingest."""
+    sink = AsyncMock(return_value=True)
+    client = JackeryLocalMqttClient(hass, sink=sink)
+    notify_event = {
+        "body": {
+            "src": "shellypro3em-5c013b048e3c",
+            "method": "NotifyEvent",
+            "params": {"events": [{"event": "ble.scan_result"}]},
+        },
+    }
+    notify_status = {
+        "body": {
+            "src": "shellypro3em-5c013b048e3c",
+            "method": "NotifyStatus",
+            "params": {"em:0": {"total_act_power": 42.0}},
+        },
+    }
+    lnm_status = {
+        "body": {
+            "src": "shellypro3em-5c013b048e3c",
+            "method": "NotifyStatus",
+            "params": {"lnm:200": {"stats": {"rx_msgs": 0, "tx_msgs": 39755}}},
+        },
+    }
+    foreign_status = {
+        "body": {
+            "src": "other-device-123",
+            "method": "NotifyStatus",
+            "params": {"power": 999},
+        },
+    }
+
+    await client._handle_message(SHELLY_RPC_EVENT_TOPIC, json.dumps(notify_event))
+    await client._handle_message(SHELLY_RPC_EVENT_TOPIC, json.dumps(foreign_status))
+    await client._handle_message(SHELLY_RPC_EVENT_TOPIC, json.dumps(lnm_status))
+    await client._handle_message(SHELLY_RPC_EVENT_TOPIC, json.dumps(notify_status))
+
+    sink.assert_awaited_once()
+    assert sink.await_args.args[0] == SHELLY_RPC_EVENT_TOPIC
+    assert sink.await_args.args[1] == notify_status
+
+    direct_status = notify_status["body"]
+    await client._handle_message(SHELLY_RPC_EVENT_TOPIC, json.dumps(direct_status))
+    assert sink.await_count == 2
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["messages_filtered"] == 3
+    assert diagnostics["messages_rejected_by_sink"] == 0
+    assert diagnostics["messages_dropped"] == 0
 
 
 async def test_listener_forwards_json_and_raw_payloads(
@@ -243,25 +409,92 @@ async def test_listener_ignores_its_own_action_requests(
     assert diagnostics["messages_dropped"] == 0
 
 
-async def test_periodic_protocol_requests_are_cancelled_on_stop(
+async def test_snapshot_request_runs_once_without_periodic_repeats(
     hass: HomeAssistant,
 ) -> None:
-    """The entry-owned request loop cannot survive adapter unload."""
+    """Connected startup requests one snapshot and never starts a timer loop."""
     called = asyncio.Event()
+    call_count = 0
 
-    async def poller() -> int:
+    async def requester() -> int:
+        nonlocal call_count
+        call_count += 1
         await asyncio.sleep(0)
         called.set()
         return 5
 
     client = JackeryLocalMqttClient(hass)
     client._connected = True
-    client.start_periodic_requests(poller)
+    client.set_snapshot_requester(requester)
     await called.wait()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert call_count == 1
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["snapshot_request_active"] is False
+    assert diagnostics["periodic_requests_active"] is False
 
     await client.async_stop()
 
-    assert client._poll_task is None
-    assert (
-        client.diagnostics_snapshot(redact=False)["periodic_requests_active"] is False
-    )
+
+async def test_snapshot_request_runs_once_per_real_reconnect(
+    hass: HomeAssistant,
+) -> None:
+    """Only a disconnected-to-connected edge requests another snapshot."""
+    requested = asyncio.Event()
+    call_count = 0
+
+    async def requester() -> int:
+        nonlocal call_count
+        call_count += 1
+        await asyncio.sleep(0)
+        requested.set()
+        return 5
+
+    client = JackeryLocalMqttClient(hass)
+    client.set_snapshot_requester(requester)
+    await asyncio.sleep(0)
+    assert call_count == 0
+
+    client._async_connection_status_changed(True)
+    await requested.wait()
+    await asyncio.sleep(0)
+    assert call_count == 1
+
+    requested.clear()
+    client._async_connection_status_changed(True)
+    await asyncio.sleep(0)
+    assert call_count == 1
+
+    client._async_connection_status_changed(False)
+    client._async_connection_status_changed(True)
+    await requested.wait()
+    await asyncio.sleep(0)
+    assert call_count == 2
+
+    await client.async_stop()
+
+
+async def test_inflight_snapshot_request_is_cancelled_on_stop(
+    hass: HomeAssistant,
+) -> None:
+    """The one-shot request cannot survive adapter unload."""
+    started = asyncio.Event()
+
+    async def requester() -> int:
+        started.set()
+        await asyncio.Event().wait()
+        return 0
+
+    client = JackeryLocalMqttClient(hass)
+    client._connected = True
+    client.set_snapshot_requester(requester)
+    await started.wait()
+
+    await client.async_stop()
+
+    assert client._snapshot_task is None
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["snapshot_request_active"] is False
+    assert diagnostics["periodic_requests_active"] is False

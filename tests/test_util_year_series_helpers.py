@@ -1,5 +1,7 @@
 """Characterisation tests for the year-series total/tolerance helpers."""
 
+from typing import Any
+
 import pytest
 
 from custom_components.jackery_solarvault.const import (
@@ -13,6 +15,7 @@ from custom_components.jackery_solarvault.util import (
     _period_section,
     _pv_revenue_value,
     _tolerance_for_values,
+    attach_calculated_savings_metadata,
     effective_period_total_value,
     year_payload_appears_current_month_only,
 )
@@ -46,6 +49,77 @@ def test_pv_revenue_prefers_direct_then_scales_profit() -> None:
     assert _pv_revenue_value({APP_STAT_TOTAL_SOLAR_REVENUE: "3.5"}) == _REVENUE
     assert _pv_revenue_value({APP_STAT_PV_PROFIT: _PROFIT_RAW}) == _PROFIT_SCALED
     assert _pv_revenue_value({}) is None
+
+
+def test_savings_metadata_uses_app_system_pv_year_totals() -> None:
+    """Savings diagnostics must use the same SysPvStatApi totals as the App."""
+    payload: dict[str, Any] = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "967.89",
+            "totalRevenue": "228.13",
+        },
+        "pv_trends_year": {
+            "totalSolarEnergy": "967.89",
+            "totalSolarRevenue": "270.78",
+        },
+        "device_pv_stat_year": {
+            "totalSolarEnergy": "957.80",
+            "totalSolarRevenue": "168.11",
+        },
+        "device_home_stat_year": {
+            "totalInGridEnergy": "2.41",
+            "totalOutGridEnergy": "695.04",
+        },
+        "home_trends_year": {"totalHomeEgy": "702.50"},
+        "device_ct_stat_year": {"totalOutCtEnergy": "0.00"},
+        "device_battery_stat_year": {
+            "totalCharge": "233.44",
+            "totalDischarge": "225.84",
+        },
+    }
+
+    attach_calculated_savings_metadata(payload)
+
+    calculation = payload["statistic"]["_savings_calculation"]
+    assert calculation["source_energy"]["pv_year_kwh"] == pytest.approx(967.89)
+    assert calculation["source_energy"][
+        "battery_charge_discharge_balance_year_kwh"
+    ] == pytest.approx(7.60)
+    assert calculation["pv_revenue_candidates"][0] == pytest.approx(270.78)
+
+
+def test_savings_metadata_exposes_signed_battery_energy_balance() -> None:
+    """Discharge above charge is a negative balance, never a battery loss."""
+    payload: dict[str, Any] = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {
+            "totalGeneration": "100.00",
+            "totalRevenue": "28.00",
+        },
+        "pv_trends_year": {
+            "totalSolarEnergy": "100.00",
+            "totalSolarRevenue": "28.00",
+        },
+        "device_home_stat_year": {
+            "totalInGridEnergy": "0.00",
+            "totalOutGridEnergy": "50.00",
+        },
+        "home_trends_year": {"totalHomeEgy": "50.00"},
+        "device_ct_stat_year": {"totalOutCtEnergy": "0.00"},
+        "device_battery_stat_year": {
+            "totalCharge": "225.84",
+            "totalDischarge": "233.44",
+        },
+    }
+
+    attach_calculated_savings_metadata(payload)
+
+    source_energy = payload["statistic"]["_savings_calculation"]["source_energy"]
+    assert source_energy["battery_charge_discharge_balance_year_kwh"] == (
+        pytest.approx(-7.60)
+    )
+    assert "battery_charge_discharge_gap_kwh" not in source_energy
 
 
 def test_effective_period_total_scalar_for_non_year_section() -> None:

@@ -18,13 +18,13 @@ from custom_components.jackery_solarvault.const import (
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
     FIELD_CHARGE_PLAN_PW,
+    FIELD_CT_POWER,
     FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_A_PHASE_ENERGY,
     FIELD_CT_B_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_B_PHASE_ENERGY,
     FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_C_PHASE_ENERGY,
-    FIELD_CT_POWER,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
     FIELD_CT_VOLT,
@@ -40,7 +40,6 @@ from custom_components.jackery_solarvault.const import (
     FIELD_PV_PW,
     FIELD_SW_EPS,
     FIELD_SW_EPS_STATE,
-    FIELD_TIMESTAMP,
     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -55,13 +54,11 @@ from custom_components.jackery_solarvault.const import (
     SUBDEVICE_DEV_TYPE_METER_HEAD,
     SUBDEVICE_DEV_TYPE_SMOKE,
     SUBDEVICE_DEV_TYPE_SOCKET,
-    SUBDEVICE_FIELD_LAST_SEEN_AT,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     _serialize_mqtt_messages_by_device,  # regression-tests callback ordering wrapper
     merge_shelly_cloud_item,
-    mqtt_payload_observed_at,
     normalize_local_mqtt_payload,
     normalize_shelly_cloud_payload,
 )
@@ -305,63 +302,6 @@ def _source_priority_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
-    """Every accepted BLE frame reaches HA instead of replacing a pending frame."""
-    coordinator = _source_priority_coordinator()
-    coordinator.data = {
-        "dev-1": {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 0}},
-    }
-    coordinator._device_registry_observer = None
-    observed: list[int] = []
-
-    def _capture_committed_value() -> None:
-        observed.append(
-            coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW],
-        )
-
-    coordinator._listeners = {"test-listener": (_capture_committed_value, None)}
-
-    coordinator._schedule_ble_partial_update(
-        "dev-1",
-        {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 596}},
-    )
-    coordinator._schedule_ble_partial_update(
-        "dev-1",
-        {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 609}},
-    )
-
-    assert observed == [596, 609]
-    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == 609
-
-
-def test_ble_freshness_metadata_alone_does_not_wake_all_entities() -> None:
-    """An unchanged CT sample updates transport freshness without a HA state storm."""
-    coordinator = _source_priority_coordinator()
-    coordinator.data = {
-        "dev-1": {
-            PAYLOAD_CT_METER: {
-                FIELD_CT_VOLT: _CT_VOLTAGE_V,
-                SUBDEVICE_FIELD_LAST_SEEN_AT: "2026-08-23T00:00:00+00:00",
-            },
-        },
-    }
-    coordinator._device_registry_observer = None
-    listener = MagicMock()
-    coordinator._listeners = {"test-listener": (listener, None)}
-
-    coordinator._schedule_ble_partial_update(
-        "dev-1",
-        {
-            PAYLOAD_CT_METER: {
-                FIELD_CT_VOLT: _CT_VOLTAGE_V,
-                SUBDEVICE_FIELD_LAST_SEEN_AT: "2026-08-23T00:00:01+00:00",
-            },
-        },
-    )
-
-    listener.assert_not_called()
-
-
 def _command_coordinator() -> JackerySolarVaultCoordinator:
     """Return a minimal coordinator shell for independent command tests."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -525,9 +465,7 @@ def test_ble_ct_energy_is_normalized_to_shelly_wh_scale(
         source_transport=TransportSource.BLE,
     )
 
-    for field, value in cloud_energy.items():
-        assert updated[PAYLOAD_CT_METER][field] == value
-
+    assert updated[PAYLOAD_CT_METER] == cloud_energy
 
 async def test_cloud_subdevice_frame_is_ingested_once(
     caplog: pytest.LogCaptureFixture,
@@ -696,46 +634,6 @@ def test_local_metadata_does_not_hide_top_level_live_body() -> None:
 
     assert normalized[FIELD_DEVICE_ID] == "dev-1"
     assert normalized["body"][FIELD_PV_PW] == _LIVE_PV_W
-
-
-def test_local_ts_is_promoted_to_protocol_observation_time() -> None:
-    """LAN ``ts`` orders body-only and enveloped frames in shared ingest."""
-    raw_ts = 1_787_424_795
-    body_only = normalize_local_mqtt_payload({
-        "ts": raw_ts,
-        FIELD_DEVICE_ID: "dev-1",
-        FIELD_PV_PW: _LIVE_PV_W,
-    })
-    enveloped = normalize_local_mqtt_payload({
-        "ts": raw_ts,
-        FIELD_DEVICE_ID: "dev-1",
-        "body": {FIELD_PV_PW: _LIVE_PV_W},
-    })
-
-    assert body_only[FIELD_TIMESTAMP] == raw_ts
-    assert enveloped[FIELD_TIMESTAMP] == raw_ts
-    assert mqtt_payload_observed_at(body_only) is not None
-    assert mqtt_payload_observed_at(enveloped) is not None
-
-
-def test_invalid_local_ts_never_blocks_live_payload_normalization() -> None:
-    """Malformed JSON timestamp containers cannot discard the live body."""
-    for invalid_ts in ({}, []):
-        body_only = normalize_local_mqtt_payload({
-            "ts": invalid_ts,
-            FIELD_DEVICE_ID: "dev-1",
-            FIELD_PV_PW: _LIVE_PV_W,
-        })
-        enveloped = normalize_local_mqtt_payload({
-            "ts": invalid_ts,
-            FIELD_DEVICE_ID: "dev-1",
-            "body": {FIELD_PV_PW: _LIVE_PV_W},
-        })
-
-        assert FIELD_TIMESTAMP not in body_only
-        assert FIELD_TIMESTAMP not in enveloped
-        assert body_only["body"][FIELD_PV_PW] == _LIVE_PV_W
-        assert enveloped["body"][FIELD_PV_PW] == _LIVE_PV_W
 
 
 async def test_body_only_local_mqtt_routes_each_live_control_and_pv_field() -> None:

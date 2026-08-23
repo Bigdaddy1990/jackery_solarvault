@@ -12,6 +12,8 @@ from custom_components.jackery_solarvault import coordinator as coordinator_modu
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
+    CT_STAT_TYPE_L1,
+    CT_STAT_TYPE_L2,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -180,6 +182,47 @@ async def test_ct_day_uses_cloud_response_directly() -> None:
 
     assert status == "fetched"
     assert source == cloud_source
+
+
+@pytest.mark.asyncio
+async def test_ct_day_retries_l2_when_l1_chart_is_empty() -> None:
+    """A placeholder L1 CT chart does not hide the App's L2 CT path."""
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}
+    l1_placeholder = {
+        "unit": "kWh",
+        "x": [],
+        "y1": [],
+        "y2": [],
+        "totalInCtEnergy": 0,
+        "totalOutCtEnergy": 0,
+    }
+    l2_source = {
+        "unit": "kWh",
+        "x": ["00:00"],
+        "y1": [2.0],
+        "y2": [0.25],
+        "totalInCtEnergy": 2.0,
+        "totalOutCtEnergy": 0.25,
+    }
+    api = SimpleNamespace(
+        async_get_device_ct_stat=AsyncMock(side_effect=[l1_placeholder, l2_source]),
+    )
+    cast("Any", coordinator).api = api
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(
+        device_id=_DEVICE_ID,
+        payload={},
+        target_day=date(2026, 4, 15),
+        section_prefix=APP_SECTION_CT_STAT,
+    )
+
+    assert status == "fetched"
+    assert source == l2_source
+    assert [
+        call.kwargs["stat_type"]
+        for call in api.async_get_device_ct_stat.await_args_list
+    ] == [CT_STAT_TYPE_L1, CT_STAT_TYPE_L2]
 
 
 @pytest.mark.asyncio

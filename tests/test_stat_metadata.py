@@ -515,20 +515,33 @@ def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
     }
     assert energy_keys == {
         "savings_energy",
-        "savings_battery_loss_year_energy",
         "savings_conversion_loss_year_energy",
         "savings_pv_residual_year_energy",
     }
-    # All four year-energy savings details carry TOTAL uniformly:
-    # conversion-loss and PV-residual are the same derived year-period
-    # energies as battery-loss, and TOTAL (unlike TOTAL_INCREASING)
-    # tolerates downward corrections of the derived values.
+    # The charge/discharge gap is a balance that can move in either direction;
+    # only the actual year-period totals carry TOTAL.
     assert found["savings_energy"][1] == "TOTAL"
-    assert found["savings_battery_loss_year_energy"][1] == "TOTAL"
+    assert found["savings_battery_loss_year_energy"][1] == "MEASUREMENT"
     assert found["savings_conversion_loss_year_energy"][1] == "TOTAL"
     assert found["savings_pv_residual_year_energy"][1] == "TOTAL"
     assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
     assert found["savings_price"] == (None, "MEASUREMENT")
+
+
+def test_battery_charge_discharge_balance_is_not_published_as_cumulative_loss() -> None:
+    """The live charge/discharge balance uses explicit non-loss metadata."""
+    description = next(
+        call
+        for call in _savings_detail_description_calls()
+        if _const_keyword(call, "key") == "savings_battery_loss_year_energy"
+    )
+
+    assert _const_keyword(description, "translation_key") == (
+        "savings_battery_balance_year_energy"
+    )
+    assert _state_class_keyword(description) == "MEASUREMENT"
+    assert _device_class_keyword(description) == "ENERGY_STORAGE"
+    assert _const_keyword(description, "reset_period") is None
 
 
 def test_conversion_loss_required_component_check_uses_components_values() -> None:
@@ -712,7 +725,7 @@ def test_statistics_import_adds_http_backfill_then_current_payload() -> None:
 
     day_backfill = backfill_source.index("_async_http_backfill_recent_day_statistics(")
     period_backfill = backfill_source.index("_async_http_backfill_period_statistics(")
-    assert day_backfill < period_backfill
+    assert period_backfill < day_backfill
 
     assert "period_pending = period_backfill_result.get(" in backfill_source
     assert "day_pending = backfill_result.get(" in backfill_source
@@ -916,8 +929,8 @@ def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None
     assert "_async_http_backfill_recent_day_statistics(" not in import_job
     assert "_async_http_backfill_period_statistics(" in backfill_job
     assert "_async_http_backfill_recent_day_statistics(" in backfill_job
-    assert backfill_job.index("_async_http_backfill_recent_day_statistics(") < (
-        backfill_job.index("_async_http_backfill_period_statistics(")
+    assert backfill_job.index("_async_http_backfill_period_statistics(") < (
+        backfill_job.index("_async_http_backfill_recent_day_statistics(")
     )
 
 

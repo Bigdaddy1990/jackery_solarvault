@@ -332,13 +332,22 @@ async def test_mqtt_connected_records_success_and_queries_missing(
     assert coordinator._mqtt_mgr.fingerprint == fingerprint
     schedule_config.assert_called_once()
     query_system.assert_awaited_once_with(
-        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+        force=True,
+        ensure_mqtt=False,
+        allow_ble=False,
+        snapshot={"device-1": {}},
     )
     query_weather.assert_awaited_once_with(
-        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+        force=True,
+        ensure_mqtt=False,
+        allow_ble=False,
+        snapshot={"device-1": {}},
     )
     query_sub.assert_awaited_once_with(
-        force=True, ensure_mqtt=False, snapshot={"device-1": {}}
+        force=True,
+        ensure_mqtt=False,
+        allow_ble=False,
+        snapshot={"device-1": {}},
     )
 
 

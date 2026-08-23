@@ -21,6 +21,7 @@ from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
     FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
@@ -166,6 +167,8 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
             CONF_PASSWORD: "secret",
             CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "10.0.0.5",
+            CONF_THIRD_PARTY_MQTT_QOS: "2",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/device/+/status",
         },
     )
 
@@ -173,6 +176,8 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
     assert entry.options[CONF_LOCAL_MQTT_HOST] == "10.0.0.5"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == 2
+    assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/status"
 
 
 async def test_reconfigure_replaces_obsolete_raw_diagnostics_option(

@@ -223,6 +223,13 @@ class TestCoordinatorUpdateCycle:
         )  # noqa: E501, RUF100
 
     @pytest.mark.asyncio
+    async def test_main_live_queries_follow_configured_poll_interval(self) -> None:  # noqa: PLR6301
+        """Main-device MQTT/BLE getters must not use a hidden 180-second cadence."""
+        coordinator = _make_coordinator()
+
+        assert coordinator._system_info_query_interval_sec == DEFAULT_SCAN_INTERVAL_SEC
+
+    @pytest.mark.asyncio
     async def test_multiple_updates(self) -> None:  # noqa: PLR6301
         """Multiple updates work correctly."""
         coordinator = _make_coordinator()

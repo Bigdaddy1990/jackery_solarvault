@@ -15,6 +15,9 @@ from custom_components.jackery_solarvault.const import (
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     REDACTED_VALUE,
 )
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -40,6 +43,25 @@ def test_constructor_and_diagnostics_use_ha_owned_transport(
     assert redacted["topic_filter"] == REDACTED_VALUE
     assert plain["topic_filter"] == "jackery/device/#"
     assert plain["qos"] == 2
+    assert plain["broker_connected"] is plain["connected"]
+
+
+def test_coordinator_reports_consistent_local_mqtt_connection(
+    hass: HomeAssistant,
+) -> None:
+    """Coordinator diagnostics preserve connection and filtered-message counters."""
+    client = JackeryLocalMqttClient(hass)
+    client._connected = True
+    client._messages_filtered = 7
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_mqtt_client = client
+    coordinator._local_mqtt_device_traffic_observed = False
+
+    observations = coordinator.local_mqtt_observations()
+
+    assert observations["connected"] is True
+    assert observations["broker_connected"] is True
+    assert observations["messages_filtered"] == 7
 
 
 @pytest.mark.parametrize("qos", [-1, 3])
@@ -102,7 +124,7 @@ async def test_oversized_and_retained_payloads_are_dropped_before_sink(
         topic="jackery/retained",
         payload=b"{}",
     )
-    await client._async_message_received(retained)
+    client._async_message_received(retained)
 
     sink.assert_not_awaited()
     diagnostics = client.diagnostics_snapshot(redact=False)

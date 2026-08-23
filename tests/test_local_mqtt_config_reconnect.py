@@ -376,8 +376,8 @@ async def test_automatic_bridge_generates_and_persists_missing_app_token() -> No
 
 
 @pytest.mark.asyncio
-async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
-    """The App-compatible automatic path reuses 3047 before sending 3046."""
+async def test_automatic_bridge_skips_write_when_3047_matches() -> None:
+    """A matching authoritative readback causes no 3046/BLE-113 write."""
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
@@ -416,8 +416,70 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
             FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
         }
 
-    def _set_config(_device_id: str, **kwargs: Any) -> None:
+    obj._async_query_third_party_mqtt_config_readback = AsyncMock(
+        side_effect=_readback,
+    )
+    obj.async_set_third_party_mqtt_config = AsyncMock()
+
+    assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
+    assert call_order == ["3047"]
+    obj.async_set_third_party_mqtt_config.assert_not_awaited()
+    assert obj._local_mqtt_config_diagnostics["last_status"] == "already_configured"
+    obj.hass.config_entries.async_update_entry.assert_not_called()
+
+    client = JackeryLocalMqttClient.__new__(JackeryLocalMqttClient)
+    client._connected = True
+    client.async_publish = AsyncMock()  # type: ignore[method-assign]
+    obj._local_mqtt_client = client
+
+    assert await coordinator.async_poll_local_mqtt_devices("hb") == 6
+    assert {
+        call.args[1]["token"] for call in client.async_publish.await_args_list
+    } == {"123456789"}
+
+
+@pytest.mark.asyncio
+async def test_automatic_bridge_writes_only_after_verified_3047_mismatch() -> None:
+    """A real field mismatch still performs one ordered corrective write."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    obj = cast("Any", coordinator)
+    obj.entry = SimpleNamespace(
+        data={},
+        options={
+            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
+            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
+            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+        },
+    )
+    obj.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(async_update_entry=MagicMock()),
+    )
+    obj._local_mqtt_config_applied_signature = None
+    obj._local_mqtt_config_diagnostics = {}
+    obj._local_mqtt_no_host_warned = False
+    obj._generated_third_party_mqtt_token = None
+    obj._device_index = {"device-1": {}}
+    obj.data = {"device-1": {}}
+    call_order: list[str] = []
+
+    async def _readback(_device_id: str) -> dict[str, Any]:
+        await asyncio.sleep(0)
+        call_order.append("3047")
+        return {
+            FIELD_THIRD_PARTY_MQTT_ENABLE: 1,
+            FIELD_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            FIELD_THIRD_PARTY_MQTT_PORT: 1884,
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
+            FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
+        }
+
+    async def _set_config(_device_id: str, **kwargs: Any) -> None:
+        await asyncio.sleep(0)
         call_order.append("3046")
+        assert kwargs["port"] == _LOCAL_MQTT_PORT
         assert kwargs["token"] == "123456789"
 
     obj._async_query_third_party_mqtt_config_readback = AsyncMock(
@@ -427,17 +489,7 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
 
     assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
     assert call_order == ["3047", "3046"]
-    obj.hass.config_entries.async_update_entry.assert_not_called()
-
-    client = JackeryLocalMqttClient.__new__(JackeryLocalMqttClient)
-    client._connected = True
-    client.async_publish = AsyncMock()  # type: ignore[method-assign]
-    obj._local_mqtt_client = client
-
-    assert await coordinator.async_poll_local_mqtt_devices("hb") == 5
-    assert {
-        call.args[1]["token"] for call in client.async_publish.await_args_list
-    } == {"123456789"}
+    assert obj._local_mqtt_config_diagnostics["write_count"] == 1
 
 
 def _rediscovery_coordinator(*, connected: bool) -> tuple[Any, MagicMock]:

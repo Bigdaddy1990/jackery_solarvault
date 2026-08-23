@@ -10,11 +10,14 @@ import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
 from custom_components.jackery_solarvault.const import (
+    APP_SECTION_CT_STAT,
     APP_SECTION_PV_STAT,
     APP_STAT_TOTAL_SOLAR_ENERGY,
     CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
+    CT_STAT_TYPE_L1,
+    CT_STAT_TYPE_L2,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
@@ -135,6 +138,50 @@ def _source(period_start: date) -> dict[str, object]:
             "endDate": period_start.isoformat(),
         },
     }
+
+
+@pytest.mark.asyncio
+async def test_ct_period_retries_l2_when_l1_chart_is_empty() -> None:
+    """Closed CT backfill periods follow the App's L2 path if L1 is empty."""
+    coordinator = _coordinator()
+    raw = cast("Any", coordinator)
+    raw.api = SimpleNamespace(
+        async_get_device_ct_stat=AsyncMock(
+            side_effect=[
+                {
+                    "unit": "kWh",
+                    "x": [],
+                    "y1": [],
+                    "y2": [],
+                    "totalInCtEnergy": 0,
+                    "totalOutCtEnergy": 0,
+                },
+                {
+                    "unit": "kWh",
+                    "x": ["2026-04-15"],
+                    "y1": [4.0],
+                    "y2": [0.5],
+                    "totalInCtEnergy": 4.0,
+                    "totalOutCtEnergy": 0.5,
+                },
+            ],
+        ),
+    )
+
+    source = await coordinator._async_fetch_historical_app_chart_source(
+        device_id=_DEVICE_ID,
+        system_id=SYSTEM_ID,
+        ct_device_id="ct-device-1",
+        section_prefix=APP_SECTION_CT_STAT,
+        date_type=DATE_TYPE_MONTH,
+        period_start=date(2026, 4, 1),
+    )
+
+    assert source["totalInCtEnergy"] == pytest.approx(4.0)
+    assert [
+        call.kwargs["stat_type"]
+        for call in raw.api.async_get_device_ct_stat.await_args_list
+    ] == [CT_STAT_TYPE_L1, CT_STAT_TYPE_L2]
 
 
 @pytest.mark.asyncio

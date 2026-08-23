@@ -310,6 +310,34 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
         assert result is not None
         assert len(result) == 1
 
+    def test_main_device_snapshot_is_not_a_battery_pack(self) -> None:  # noqa: PLR6301
+        """Aggregate stack/PV fields must never contaminate an add-on pack."""
+        from custom_components.jackery_solarvault.const import (
+            BATTERY_PACK_HINT_KEYS,
+            CT_METER_KEYS,
+        )
+
+        source = {
+            "deviceSn": "HEAD-UNIT",
+            "batSoc": 100,
+            "cellTemp": 333,
+            "batInPw": 0,
+            "batOutPw": 27,
+            "stackInPw": 738,
+            "stackOutPw": 0,
+            "pvPw": 1236,
+            "outOngridPw": 1125,
+        }
+
+        assert (
+            battery_packs_from_source(
+                source,
+                CT_METER_KEYS,
+                BATTERY_PACK_HINT_KEYS,
+            )
+            is None
+        )
+
     def test_shelly_cloud_api_device_id(self) -> None:  # noqa: PLR6301
         """Test shelly_cloud_api_device_id."""
         # Item needs to match Shelly Cloud criteria (scan_name starts with "shelly" or is_cloud)

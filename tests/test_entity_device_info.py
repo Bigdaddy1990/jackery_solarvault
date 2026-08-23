@@ -15,7 +15,10 @@ from custom_components.jackery_solarvault.binary_sensor import (
 from custom_components.jackery_solarvault.const import (
     DEFAULT_DEVICE_MODEL_FALLBACK,
     FIELD_DEV_MODEL,
+    FIELD_MAC,
+    PAYLOAD_CT_METER,
     PAYLOAD_DISCOVERY,
+    PAYLOAD_PROPERTIES,
 )
 from custom_components.jackery_solarvault.entity import JackeryEntity
 from custom_components.jackery_solarvault.sensor import (
@@ -27,6 +30,7 @@ from custom_components.jackery_solarvault.sensor import (
 )
 from custom_components.jackery_solarvault.switch import JackeryBreakerSwitch
 from custom_components.jackery_solarvault.util import stable_subdevice_key
+from homeassistant.helpers import device_registry as dr
 
 _DEVICE_ID = "home-power-3002"
 
@@ -79,6 +83,15 @@ def test_device_info_model_uses_reported_model_when_present() -> None:
     assert _entity(payload).device_info["model"] == "HTH0132500A"
 
 
+def test_parent_device_info_exposes_normalized_mac_connection() -> None:
+    """The native and MQTT registry entries share the parent device MAC."""
+    payload = {PAYLOAD_PROPERTIES: {FIELD_MAC: "AA-BB-CC-11-22-33"}}
+
+    assert _entity(payload).device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
+    }
+
+
 def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     """Blank name fields yield a "Jackery {device_id}" prefix, not "SolarVault"."""
     info = _entity({})._build_smart_plug_device_info(1, {})
@@ -87,6 +100,18 @@ def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     assert name is not None
     assert name.startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in name
+
+
+def test_smart_plug_device_info_exposes_mac_connection() -> None:
+    """Accessory MACs are HA device-registry connections, not just names."""
+    info = _entity({})._build_smart_plug_device_info(
+        1,
+        {FIELD_MAC: "AA-BB-CC-11-22-33"},
+    )
+
+    assert info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
+    }
 
 
 def test_breaker_switch_falls_back_to_jackery() -> None:
@@ -172,3 +197,15 @@ def test_smart_meter_sensor_base_name_falls_back_to_jackery() -> None:
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in info["name"]
+
+
+def test_smart_meter_device_info_exposes_mac_connection() -> None:
+    """A Shelly/CT MAC lets HA merge the Jackery accessory device entry."""
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_MAC: "AABBCC445566"}},
+    )
+
+    assert entity.device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:44:55:66")
+    }

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
-from custom_components.jackery_solarvault.transport_supervisor import (
+from custom_components.jackery_solarvault.client.transport_supervisor import (
     SupervisorState,
     TransportSupervisor,
     TransportSupervisorManager,

@@ -111,26 +111,6 @@ def test_payload_debug_writer_emits_one_redacted_json_line(tmp_path: Path) -> No
     }
 
 
-def test_payload_debug_batch_writer_preserves_every_redacted_event(
-    tmp_path: Path,
-) -> None:
-    """One batched disk write retains every ordered payload-debug event."""
-    debug_path = tmp_path / "nested" / "payload.jsonl"
-
-    util.append_payload_debug_lines(
-        debug_path,
-        [
-            {"sequence": 1, "token": "first-secret"},
-            {"sequence": 2, "password": "second-secret"},
-        ],
-    )
-
-    assert [json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()] == [
-        {"sequence": 1, "token": REDACTED_VALUE},
-        {"password": REDACTED_VALUE, "sequence": 2},
-    ]
-
-
 def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
     """Chart diagnostics preserve raw shapes while parsing usable numbers."""
     request = {APP_REQUEST_DATE_TYPE_ALT: DATE_TYPE_WEEK}
@@ -153,7 +133,6 @@ def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
 def test_payload_debug_rotation_ignores_file_removed_during_replace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A concurrent rotation cannot turn a debug write into a warning."""
     debug_path = tmp_path / "payload.jsonl"
@@ -167,8 +146,8 @@ def test_payload_debug_rotation_ignores_file_removed_during_replace(
     monkeypatch.setattr(Path, "replace", _remove_then_fail)
     util.append_payload_debug_line(debug_path, {"event": "current"})
 
-    assert "could not rotate payload debug log" not in caplog.text
     assert [
+    assert "could not rotate payload debug log" not in caplog.text
         json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()
     ] == [{"event": "current"}]
 

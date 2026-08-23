@@ -91,8 +91,7 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     async def mock_start_ble_transport() -> None:  # noqa: RUF029
         return None
 
-    async def mock_apply_mqtt_config() -> None:  # noqa: RUF029
-        return None
+    direct_mqtt_config = AsyncMock()
 
     with (
         patch.object(integration, "JackeryApi", return_value=api),
@@ -114,6 +113,11 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         ),
         patch.object(
             integration,
+            "_async_start_local_mqtt",
+            side_effect=mock_start_local_mqtt_listener,
+        ) as start_local_mqtt,
+        patch.object(
+            integration,
             "JackerySolarVaultCoordinator",
             autospec=True,
         ) as mock_coordinator_class,
@@ -126,15 +130,23 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         # Configure the mock coordinator to track Layer-5 startup
         mock_coordinator = mock_coordinator_class.return_value
         mock_coordinator.async_start_mqtt = mock_start_mqtt
-        mock_coordinator.async_start_local_mqtt_listener = (
-            mock_start_local_mqtt_listener  # noqa: E501, RUF100
-        )
         mock_coordinator.async_start_ble_transport = mock_start_ble_transport
-        mock_coordinator.async_apply_local_mqtt_config_to_devices = (
-            mock_apply_mqtt_config  # noqa: E501, RUF100
-        )
+        mock_coordinator.async_apply_local_mqtt_config_to_devices = direct_mqtt_config
         mock_coordinator.async_start_statistics_imports = MagicMock(return_value=None)
 
         assert await integration.async_setup_entry(hass, entry)
+        assert events == ["platforms"]
+        direct_mqtt_config.assert_not_awaited()
+
+        layer5_task = integration._entry_runtime_task(
+            hass,
+            entry,
+            integration._LAYER5_TASK_RUNTIME_KEY,
+        )
+        assert layer5_task is not None
+        await layer5_task
 
     assert events == ["platforms", "layer5"]
+    start_local_mqtt.assert_awaited_once_with(hass, entry, mock_coordinator)
+    direct_mqtt_config.assert_not_awaited()
+    mock_coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()

@@ -64,6 +64,23 @@ async def test_restore_validator_accepts_nonnegative_kwh_lifetime_value() -> Non
     assert restored == pytest.approx(54.25)
 
 
+@pytest.mark.asyncio
+async def test_restore_validator_converts_legacy_wh_lifetime_value() -> None:
+    """A prior Wh state becomes the equivalent native kWh lifetime anchor."""
+    entity = SimpleNamespace(
+        async_get_last_sensor_data=lambda: _async_value(
+            SensorExtraStoredData(108_550, UnitOfEnergy.WATT_HOUR)
+        )
+    )
+
+    restored = await _async_restored_lifetime_energy_value(
+        cast("Any", entity),
+        UnitOfEnergy.KILO_WATT_HOUR,
+    )
+
+    assert restored == pytest.approx(108.55)
+
+
 async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]
     """Return one value through the same await boundary as RestoreSensor."""
     return value

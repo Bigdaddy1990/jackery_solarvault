@@ -81,6 +81,28 @@ async def test_ble_first_ensures_connection_before_write() -> None:
 
 
 @pytest.mark.asyncio
+async def test_mqtt_only_command_never_opens_or_writes_ble() -> None:
+    """Automatic cloud queries can opt out of the independent BLE leg."""
+    coordinator = _ble_first_coordinator()
+    send_ble = AsyncMock(return_value=True)
+    cast("Any", coordinator).async_send_ble_command = send_ble
+    publish_mqtt = AsyncMock()
+    cast("Any", coordinator)._async_publish_command = publish_mqtt
+
+    await coordinator._async_publish_command_ble_first(
+        _DEVICE_ID,
+        message_type="QueryDeviceProperty",
+        action_id=_ACTION_ID,
+        cmd=_CMD,
+        body_fields={},
+        allow_ble=False,
+    )
+
+    send_ble.assert_not_awaited()
+    publish_mqtt.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_ble_write_unavailable_does_not_block_mqtt() -> None:
     """A BLE write that reports "not sent" (False) does not block MQTT.
 

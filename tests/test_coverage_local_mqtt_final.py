@@ -180,6 +180,7 @@ async def test_retry_once_stops_when_client_is_stopping_or_subscribed(
 
     client._stopping = False
     client._unsubscribe = MagicMock()
+    client._subscription_active = True
     assert await client._async_retry_subscription_once()
 
 
@@ -209,16 +210,17 @@ async def test_message_wrapper_handles_text_and_bytearray_payloads(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="jackery/#")
-    await client._async_message_received(
+    client._async_message_received(
         MagicMock(topic="jackery/device", payload='{"soc":80}', retain=False),
     )
-    await client._async_message_received(
+    client._async_message_received(
         MagicMock(
             topic="jackery/device",
             payload=bytearray(b"not-json"),
             retain=False,
         ),
     )
+    await client.async_wait_message_queue_idle()
 
     assert received == [({"soc": 80}, b'{"soc":80}'), (None, b"not-json")]
 
@@ -232,7 +234,7 @@ async def test_stopping_message_wrapper_and_handler_are_noops(
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
     client._stopping = True
 
-    await client._async_message_received(
+    client._async_message_received(
         MagicMock(topic="jackery/device", payload=b"{}"),
     )
     await client._handle_message("jackery/device", b"{}")

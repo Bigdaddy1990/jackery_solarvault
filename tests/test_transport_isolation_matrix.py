@@ -24,7 +24,7 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from custom_components.jackery_solarvault.ingest import ingest_observation
 from custom_components.jackery_solarvault.models import DataSource, Observation
-from custom_components.jackery_solarvault.transport_supervisor import (
+from custom_components.jackery_solarvault.client.transport_supervisor import (
     SupervisorConfig,
     SupervisorState,
     TransportSupervisorManager,

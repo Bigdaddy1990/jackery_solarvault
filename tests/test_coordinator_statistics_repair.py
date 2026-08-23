@@ -181,9 +181,25 @@ async def test_current_import_job_imports_without_advancing_history() -> None:
     coordinator = _coordinator()
     coordinator._statistics_startup_sync_pending = False
     coordinator._statistics_import_diagnostics = {}
-    day_import = AsyncMock(return_value={"day-device"})
-    period_import = AsyncMock(return_value={"period-device"})
+    call_order: list[str] = []
+
+    def _day_import(_snapshot: object) -> set[str]:
+        call_order.append("day")
+        return {"day-device"}
+
+    def _recorder_fence() -> bool:
+        call_order.append("fence")
+        return True
+
+    def _period_import(_snapshot: object) -> set[str]:
+        call_order.append("period")
+        return {"period-device"}
+
+    day_import = AsyncMock(side_effect=_day_import)
+    recorder_fence = AsyncMock(side_effect=_recorder_fence)
+    period_import = AsyncMock(side_effect=_period_import)
     coordinator._async_import_day_chart_statistics = day_import
+    coordinator._async_wait_for_statistics_recorder_fifo = recorder_fence
     coordinator._async_import_app_chart_statistics = period_import
     snapshot = {
         _DEV: {
@@ -197,13 +213,49 @@ async def test_current_import_job_imports_without_advancing_history() -> None:
     )
 
     day_import.assert_awaited_once_with(snapshot)
+    recorder_fence.assert_awaited_once_with()
     period_import.assert_awaited_once_with(snapshot)
+    assert call_order == ["day", "fence", "period"]
     assert result == {"day-device", "period-device"}
     assert (
         coordinator._statistics_import_diagnostics[
             "last_external_successful_device_count"
         ]
         == 2
+    )
+
+
+async def test_current_import_job_skips_period_when_recorder_fence_times_out() -> None:
+    """A stalled day-import FIFO leaves period rows retryable next cycle."""
+    coordinator = _coordinator()
+    coordinator._statistics_startup_sync_pending = False
+    coordinator._statistics_import_diagnostics = {}
+    day_import = AsyncMock(return_value={"day-device"})
+    recorder_fence = AsyncMock(return_value=False)
+    period_import = AsyncMock(return_value={"period-device"})
+    coordinator._async_import_day_chart_statistics = day_import
+    coordinator._async_wait_for_statistics_recorder_fifo = recorder_fence
+    coordinator._async_import_app_chart_statistics = period_import
+    snapshot = {
+        _DEV: {
+            "device_pv_stat_day": {"totalSolarEnergy": 1.0},
+            "properties": {"batSoc": 50},
+        },
+    }
+
+    result = await coordinator._async_import_current_app_chart_statistics_job(
+        snapshot,
+    )
+
+    day_import.assert_awaited_once_with(snapshot)
+    recorder_fence.assert_awaited_once_with()
+    period_import.assert_not_awaited()
+    assert result == {"day-device"}
+    assert (
+        coordinator._statistics_import_diagnostics[
+            "last_external_successful_device_count"
+        ]
+        == 1
     )
 
 
@@ -252,6 +304,102 @@ async def test_startup_sync_completes_only_after_both_queues_are_terminal() -> N
     assert day_backfill.await_args is not None
     assert day_backfill.await_args.kwargs["include_current_year"] is True
     period_backfill.assert_awaited_once_with(snapshot)
+
+
+async def test_period_backfill_keeps_reserved_budget_when_day_queue_is_busy() -> None:
+    """Empty day endpoints cannot starve Cloud period history indefinitely."""
+    coordinator = _coordinator()
+    coordinator._statistics_startup_sync_pending = True
+    coordinator._statistics_import_diagnostics = {}
+    coordinator._shutdown_started = False
+    call_order: list[str] = []
+    period_budgets: list[int] = []
+    day_budgets: list[int] = []
+
+    async def period_backfill(
+        _snapshot: dict[str, dict[str, object]],
+        *,
+        request_budget: int = co._STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET,
+    ) -> dict[str, int]:
+        call_order.append("period")
+        period_budgets.append(request_budget)
+        await asyncio.sleep(0)
+        return {"requests": request_budget, "actionable_sources": 1}
+
+    async def day_backfill(
+        _snapshot: dict[str, dict[str, object]],
+        **kwargs: object,
+    ) -> dict[str, int]:
+        call_order.append("day")
+        budget = int(kwargs["request_budget"])
+        day_budgets.append(budget)
+        await asyncio.sleep(0)
+        return {"requests": budget, "actionable_sources": 1}
+
+    coordinator._async_http_backfill_period_statistics = period_backfill
+    coordinator._async_http_backfill_recent_day_statistics = day_backfill
+
+    await coordinator._async_advance_statistics_backfill({_DEV: {}})
+
+    assert call_order == ["period", "day"]
+    assert period_budgets == [co._STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET]
+    assert day_budgets == [
+        co._STATISTICS_HTTP_CYCLE_REQUEST_BUDGET
+        - co._STATISTICS_HTTP_PERIOD_BACKFILL_REQUEST_BUDGET
+    ]
+
+
+def test_period_metric_contract_upgrade_reopens_imported_buckets() -> None:
+    """A new period metric set must revisit buckets completed by older code."""
+    type_state: dict[str, object] = {
+        "sum_chain_version": co._STATISTICS_HTTP_SUM_CHAIN_VERSION,
+        "2026-04-01": {
+            "status": "imported",
+            "attempts": 2,
+            "completed_at": "2026-08-20T12:00:00+00:00",
+            "imported_rows": 30,
+        },
+    }
+
+    changed = JackerySolarVaultCoordinator._ensure_http_period_sum_chain_version(
+        type_state,
+    )
+
+    assert changed is True
+    assert type_state["sum_chain_version"] == co._STATISTICS_HTTP_PERIOD_IMPORT_VERSION
+    bucket = cast("dict[str, object]", type_state["2026-04-01"])
+    assert bucket["status"] == "pending"
+    assert bucket["attempts"] == 0
+    assert "completed_at" not in bucket
+    assert "imported_rows" not in bucket
+
+
+def test_day_sum_chain_contract_upgrade_reopens_imported_buckets() -> None:
+    """Recorder-timeout contract upgrades must replay finished day buckets."""
+    source_state: dict[str, object] = {
+        "sum_chain_version": co._STATISTICS_HTTP_SUM_CHAIN_VERSION - 1,
+    }
+    days_state: dict[str, object] = {
+        "2026-04-01": {
+            "status": "imported",
+            "attempts": 2,
+            "completed_at": "2026-08-20T12:00:00+00:00",
+            "imported_rows": 30,
+        },
+    }
+
+    changed = JackerySolarVaultCoordinator._ensure_http_day_sum_chain_version(
+        source_state,
+        days_state,
+    )
+
+    assert changed is True
+    assert source_state["sum_chain_version"] == co._STATISTICS_HTTP_SUM_CHAIN_VERSION
+    bucket = cast("dict[str, object]", days_state["2026-04-01"])
+    assert bucket["status"] == "pending"
+    assert bucket["attempts"] == 0
+    assert "completed_at" not in bucket
+    assert "imported_rows" not in bucket
 
 
 async def test_backfill_runs_independent_devices_with_one_shared_budget() -> None:

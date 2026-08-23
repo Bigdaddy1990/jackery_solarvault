@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from custom_components.jackery_solarvault.const import (
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
@@ -308,3 +309,43 @@ async def test_options_flow_accepts_local_mqtt_topic_filter_value(
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert entry.options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER) == "hb/app/+/device"
+
+
+async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
+    hass: HomeAssistant,
+) -> None:
+    """Submitted Local-MQTT topic and QoS remain the next form defaults."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff:ignore[unsorted-imports]
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="mqtt-options@example.com",
+        data={
+            CONF_USERNAME: "mqtt-options@example.com",
+            CONF_PASSWORD: "secret",
+        },
+        options={},
+    )
+    entry.add_to_hass(hass)
+
+    flow = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        flow["flow_id"],
+        {
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/device/+/event",
+            CONF_THIRD_PARTY_MQTT_QOS: "2",
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/event"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == 2
+
+    reopened = await hass.config_entries.options.async_init(entry.entry_id)
+    assert reopened["type"] is FlowResultType.FORM
+    defaults = {
+        marker.schema: marker.default()
+        for marker in reopened["data_schema"].schema
+        if hasattr(marker, "default")
+    }
+    assert defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/event"

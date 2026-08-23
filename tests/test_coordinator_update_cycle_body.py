@@ -18,10 +18,11 @@ result / diagnostics), never call order:
 * an HTTP auth rejection escalates to ``ConfigEntryAuthFailed``.
 """
 
+import asyncio
 from datetime import date
 from time import monotonic
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -231,6 +232,87 @@ async def test_historical_home_months_refresh_off_the_http_hot_path(
     repaired_year = repaired_result[DEVICE_ID][year_section]
     assert repaired_year[APP_STAT_TOTAL_HOME_ENERGY] == 10
     await _teardown(hass, entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_historical_home_months_acquire_shared_http_gate_once(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A configured one-request HTTP gate must not self-deadlock backfill."""
+
+    def _home_trends(
+        _system_id: str,
+        **_request_kwargs: str,
+    ) -> dict[str, Any]:
+        return {APP_STAT_TOTAL_HOME_ENERGY: 2}
+
+    api = make_update_cycle_api(
+        async_get_home_trends=AsyncMock(side_effect=_home_trends),
+    )
+    coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
+    slow_refresh_task: asyncio.Task[None] | None = None
+    try:
+        coordinator._slow_http_request_semaphore = asyncio.Semaphore(1)
+        today = date(2026, 5, 15)
+        monkeypatch.setattr(coordinator, "_local_today", lambda: today)
+        year_section = f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}"
+        month_section = f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}"
+        coordinator._slow_cache[SYSTEM_ID] = {
+            year_section: (
+                monotonic(),
+                {APP_CHART_SERIES_Y: [0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0]},
+            ),
+            month_section: (
+                monotonic(),
+                {APP_STAT_TOTAL_HOME_ENERGY: 2},
+            ),
+        }
+
+        first_result = await coordinator._async_update_data_guarded()
+
+        assert DEVICE_ID in first_result
+        slow_refresh_task = coordinator._slow_metrics_bg_task
+        assert slow_refresh_task is not None
+        await asyncio.wait_for(slow_refresh_task, timeout=2)
+
+        repaired_result = await coordinator._async_update_data_guarded()
+        assert (
+            repaired_result[DEVICE_ID][year_section][APP_STAT_TOTAL_HOME_ENERGY] == 10
+        )
+    finally:
+        if slow_refresh_task is not None and not slow_refresh_task.done():
+            slow_refresh_task.cancel()
+            await asyncio.gather(slow_refresh_task, return_exceptions=True)
+        await _teardown(hass, entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_update_cycle_does_not_spawn_unowned_enrichment_tasks(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Slow accessory enrichments use only the tracked refresh worker."""
+    coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
+    real_create_background_task = hass.async_create_background_task
+    create_background_task = MagicMock(wraps=real_create_background_task)
+    monkeypatch.setattr(
+        hass,
+        "async_create_background_task",
+        create_background_task,
+    )
+    try:
+        await coordinator._async_update_data_guarded()
+        names = [
+            str(call.kwargs.get("name") or (call.args[1] if len(call.args) > 1 else ""))
+            for call in create_background_task.call_args_list
+        ]
+
+        assert not [name for name in names if name.startswith("jackery_enrich_")]
+        assert coordinator._slow_metrics_bg_task is not None
+        await coordinator._slow_metrics_bg_task
+    finally:
+        await _teardown(hass, entry.entry_id)
 
 
 @pytest.mark.asyncio

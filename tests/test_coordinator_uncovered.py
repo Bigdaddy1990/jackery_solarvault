@@ -185,6 +185,8 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         coordinator.async_set_scan_interval(new_interval)
         assert coordinator.configured_update_interval == new_interval
         assert coordinator.update_interval == new_interval
+        assert coordinator._system_info_query_interval_sec == 600
+        assert coordinator._subdevice_query_interval_sec == 600
 
     def test_poll_cycle_timeout_seconds(self) -> None:
         """Test _poll_cycle_timeout_seconds method."""

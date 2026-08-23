@@ -15,7 +15,14 @@ from custom_components.jackery_solarvault.const import (
     APP_CHART_SERIES_Y,
     APP_CHART_SERIES_Y1,
     APP_CHART_SERIES_Y2,
+    APP_CHART_SERIES_Y3,
+    APP_CHART_SERIES_Y4,
+    APP_CHART_SERIES_Y5,
+    APP_CHART_STAT_METRICS,
     APP_CHART_STAT_PERIODS,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_DATE_TYPE_ALT,
     APP_REQUEST_END_DATE_ALT,
@@ -1039,6 +1046,27 @@ def test_chart_series_key_for_stat_all_sections() -> None:
         )
         == APP_CHART_SERIES_Y2
     )
+
+
+def test_battery_flow_period_series_are_registered_for_recorder() -> None:
+    """Every non-total battery curve delivered by Cloud has a Recorder metric."""
+    expected = {
+        APP_DEVICE_STAT_ONGRID_TO_BATTERY: APP_CHART_SERIES_Y3,
+        APP_DEVICE_STAT_BATTERY_TO_AC: APP_CHART_SERIES_Y4,
+        APP_DEVICE_STAT_BATTERY_TO_GRID: APP_CHART_SERIES_Y5,
+    }
+    registered = {
+        stat_key
+        for section, stat_key, _metric_key, _label in APP_CHART_STAT_METRICS
+        if section == APP_SECTION_BATTERY_STAT
+    }
+
+    assert expected.keys() <= registered
+    for stat_key, series_key in expected.items():
+        assert (
+            util._chart_series_key_for_stat(APP_SECTION_BATTERY_STAT, stat_key)
+            == series_key
+        )
 
 
 def test_day_power_series_key_signed_battery_discharge() -> None:

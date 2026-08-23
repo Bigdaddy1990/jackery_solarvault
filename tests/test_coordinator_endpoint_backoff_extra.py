@@ -9,6 +9,7 @@ freshness only — a merely-connected broker with no frames must not pause the
 cloud channel.
 """
 
+import inspect
 import time
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -40,6 +41,15 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._endpoint_backoff = {}
     coordinator._local_mqtt_last_message_monotonic = float("-inf")
+    return coordinator
+
+
+def _due_coordinator() -> JackerySolarVaultCoordinator:
+    """Create a coordinator shell for slow-cache due-policy helpers."""
+    coordinator = _bare_coordinator()
+    coordinator._slow_metrics_interval_sec = 120
+    coordinator._price_config_interval_sec = 600
+    coordinator._slow_cache = {}
     return coordinator
 
 
@@ -116,6 +126,99 @@ def test_active_count_excludes_energy_and_expired(
 
     assert coordinator._endpoint_backoff_active_count(_NOW) == 1
     assert coordinator._endpoint_backoff_active_count(_NOW + 10_000.0) == 0
+
+
+def test_slow_cache_slot_due_respects_its_own_ttl() -> None:
+    """Slow and price slots become due only at their individual deadline."""
+    coordinator = _due_coordinator()
+    cache = {
+        "slow": (_NOW - 119, {}),
+        "price": (_NOW - 599, {}),
+    }
+
+    assert not coordinator._slow_cache_slot_refresh_due(
+        cache,
+        "slow",
+        120,
+        now=_NOW,
+    )
+    assert coordinator._slow_cache_slot_refresh_due(
+        cache,
+        "slow",
+        120,
+        now=_NOW + 1,
+    )
+    assert not coordinator._slow_cache_slot_refresh_due(
+        cache,
+        "price",
+        600,
+        now=_NOW,
+    )
+    assert coordinator._slow_cache_slot_refresh_due(
+        cache,
+        "price",
+        600,
+        now=_NOW + 1,
+    )
+
+
+def test_system_due_ignores_cold_dynamic_price_during_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unsupported cold price slot cannot launch a no-op system worker."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _due_coordinator()
+    specs = coordinator._system_slow_cache_refresh_specs(SYSTEM_ID)
+    cache = {key: (_NOW, {}) for key, _ttl, _backoff in specs}
+    dynamic_spec = next(spec for spec in specs if spec[0] == PAYLOAD_DYNAMIC_PRICE)
+    cache[dynamic_spec[0]] = (0.0, {})
+    coordinator._slow_cache[SYSTEM_ID] = cache
+    assert dynamic_spec[2] is not None
+    coordinator._endpoint_backoff_note_failure(
+        dynamic_spec[2],
+        JackeryApiError("cloud says code=10600"),
+    )
+
+    assert not coordinator._system_slow_cache_refresh_due(
+        SYSTEM_ID,
+        now=_NOW,
+    )
+
+
+def test_device_due_ignores_backed_off_symmetry_and_foreign_cache_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unsupported symmetry and separately-owned cache rows launch no worker."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _due_coordinator()
+    device_id = "device-1"
+    specs = coordinator._device_slow_cache_refresh_specs(
+        device_id,
+        device_sn="serial-1",
+        system_id=SYSTEM_ID,
+    )
+    cache = {key: (_NOW, {}) for key, _ttl, _backoff in specs}
+    symmetry_specs = [
+        spec for spec in specs if spec[2] is not None and ":symmetry_stat:" in spec[2]
+    ]
+    assert len(symmetry_specs) == 4
+    for cache_key, _ttl, backoff_key in symmetry_specs:
+        cache[cache_key] = (0.0, {})
+        assert backoff_key is not None
+        coordinator._endpoint_backoff_note_failure(
+            backoff_key,
+            JackeryApiError("cloud says code=10600"),
+        )
+    cache["home_trends_month_2026_04"] = (0.0, {})
+    cache["pack_ota:pack-1"] = (0.0, {})
+    coordinator._slow_cache[f"dev:{device_id}"] = cache
+
+    assert not coordinator._device_slow_cache_refresh_due(
+        device_id,
+        device_sn="serial-1",
+        system_id=SYSTEM_ID,
+        now=_NOW,
+    )
 
 
 # --- endpoint backoff note failure / success -------------------------------
@@ -391,6 +494,14 @@ def test_shelly_realtime_timeout_is_backoffable() -> None:
         )
         is True
     )
+
+
+def test_update_cycle_never_polls_shelly_realtime_power() -> None:
+    """Shelly live power is push-driven and has no coordinator cadence."""
+    source = inspect.getsource(JackerySolarVaultCoordinator._async_update_data_guarded)
+
+    assert "async_get_shelly_realtime_power" not in source
+    assert "_enrich_shelly_cloud_realtime" not in source
 
 
 def test_non_shelly_timeout_is_not_backoffable() -> None:

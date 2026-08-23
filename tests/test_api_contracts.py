@@ -130,6 +130,7 @@ async def test_async_get_device_property_uses_get_with_device_id_query() -> None
         DEVICE_PROPERTY_PATH,
         params={FIELD_DEVICE_ID: "573702884982521856"},
         profile=HttpProfile.FAST,
+        retry_transport_once=True,
     )
     post_json.assert_not_awaited()
     assert result == payload

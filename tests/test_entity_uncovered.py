@@ -6,6 +6,7 @@ import pytest
 
 from custom_components.jackery_solarvault.entity import JackeryEntity
 from homeassistant.helpers.entity import EntityDescription
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 
 class TestJackeryEntity:
@@ -67,6 +68,39 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator({"test_device": {}})
         entity = self._create_entity(coordinator)
         assert entity.available is True
+
+    def test_available_uses_prepared_cache_during_state_write(self) -> None:
+        """Prepared availability must not repeat descriptor/source work on read."""
+        coordinator = self._create_coordinator({"test_device": {}})
+        entity = self._create_entity(coordinator)
+
+        entity._availability_cache_active = True
+        entity._refresh_availability_cache()
+        coordinator.is_device_reachable.reset_mock()
+
+        assert entity.available is True
+        coordinator.is_device_reachable.assert_not_called()
+
+    def test_prepared_state_write_does_not_recalculate_availability(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A prepared write must bypass JackeryEntity's update hook."""
+        coordinator = self._create_coordinator({"test_device": {}})
+        entity = self._create_entity(coordinator)
+        entity._availability_cache_active = True
+        entity._refresh_availability_cache()
+        coordinator.is_device_reachable.reset_mock()
+        write_state = MagicMock()
+        monkeypatch.setattr(
+            CoordinatorEntity,
+            "_handle_coordinator_update",
+            write_state,
+        )
+
+        entity._write_prepared_state()
+
+        write_state.assert_called_once_with()
+        coordinator.is_device_reachable.assert_not_called()
 
     def test_available_property_no_data(self) -> None:
         """Test available property when no data."""

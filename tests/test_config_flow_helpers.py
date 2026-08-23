@@ -121,6 +121,16 @@ def test_local_mqtt_port_coercion_falls_back_to_default() -> None:
     assert config_flow._coerce_local_mqtt_port("not-a-port") == DEFAULT_LOCAL_MQTT_PORT
 
 
+def test_local_mqtt_qos_coercion_accepts_levels_and_rejects_invalid_values() -> None:
+    """Stored or submitted QoS is normalized to one of MQTT's three levels."""
+    assert config_flow._coerce_local_mqtt_qos(0) == 0
+    assert config_flow._coerce_local_mqtt_qos("1") == 1
+    assert config_flow._coerce_local_mqtt_qos(2) == 2
+    assert config_flow._coerce_local_mqtt_qos(None) == 0
+    assert config_flow._coerce_local_mqtt_qos("invalid") == 0
+    assert config_flow._coerce_local_mqtt_qos(3) == 0
+
+
 def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
     """Stored Local-MQTT options accept the current keys and legacy UI keys."""
     entry = MockConfigEntry(

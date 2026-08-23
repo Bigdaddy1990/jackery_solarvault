@@ -1,5 +1,12 @@
 """Unit tests for local_mqtt_opt_in function."""
 
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
+
+import custom_components.jackery_solarvault as integration
+from custom_components.jackery_solarvault.config_flow import _current_local_mqtt_options
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_ENABLE,
@@ -55,17 +62,30 @@ def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  #
     assert local_mqtt_opt_in(entry) is False
 
 
-def test_local_mqtt_opt_in_defaults_match_123_baseline() -> None:
-    """Default constants: local_mqtt enabled by default, third_party_mqtt opt-in (disabled)."""
-    assert DEFAULT_LOCAL_MQTT_ENABLE is True
-    assert DEFAULT_THIRD_PARTY_MQTT_ENABLE is False
+def test_local_mqtt_defaults_have_one_canonical_value() -> None:
+    """Runtime and OptionsFlow cannot disagree for an unconfigured entry."""
+    assert DEFAULT_LOCAL_MQTT_ENABLE is DEFAULT_THIRD_PARTY_MQTT_ENABLE
 
 
-def test_local_mqtt_opt_in_empty_entry_defaults_to_enabled() -> None:
-    """Empty entry should default to enabled (via DEFAULT_LOCAL_MQTT_ENABLE=True)."""
+def test_local_mqtt_opt_in_empty_entry_matches_options_flow() -> None:
+    """An empty entry remains disabled in both UI state and runtime."""
     entry = MockConfigEntry(options={}, data={})
-    # Falls back to DEFAULT_LOCAL_MQTT_ENABLE which is True
-    assert local_mqtt_opt_in(entry) is True
+    flow_options = _current_local_mqtt_options(entry)  # type: ignore[arg-type]
+
+    assert local_mqtt_opt_in(entry) is False
+    assert local_mqtt_opt_in(entry) is flow_options[CONF_THIRD_PARTY_MQTT_ENABLE]
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_local_mqtt_explicit_canonical_option_matches_options_flow(
+    enabled: bool,
+) -> None:
+    """Explicit canonical choices have identical Flow and runtime semantics."""
+    entry = MockConfigEntry(options={CONF_THIRD_PARTY_MQTT_ENABLE: enabled})
+    flow_options = _current_local_mqtt_options(entry)  # type: ignore[arg-type]
+
+    assert local_mqtt_opt_in(entry) is enabled
+    assert flow_options[CONF_THIRD_PARTY_MQTT_ENABLE] is enabled
 
 
 def test_local_mqtt_opt_in_legacy_missing_fallbacks_to_third_party() -> None:
@@ -77,14 +97,13 @@ def test_local_mqtt_opt_in_legacy_missing_fallbacks_to_third_party() -> None:
     assert local_mqtt_opt_in(entry) is True
 
 
-def test_local_mqtt_opt_in_data_takes_precedence_when_no_options() -> None:
-    """When no options, data should be used for both keys."""
+def test_canonical_data_overrides_stale_legacy_data() -> None:
+    """Within entry data, the current canonical key beats its retired alias."""
     entry = MockConfigEntry(
         options={},
         data={"local_mqtt_enable": True, CONF_THIRD_PARTY_MQTT_ENABLE: False},
     )
-    # Legacy in data wins
-    assert local_mqtt_opt_in(entry) is True
+    assert local_mqtt_opt_in(entry) is False
 
 
 def test_local_mqtt_opt_in_options_override_data() -> None:
@@ -95,3 +114,42 @@ def test_local_mqtt_opt_in_options_override_data() -> None:
     )
     # Options win
     assert local_mqtt_opt_in(entry) is False
+
+
+def test_canonical_option_overrides_stale_legacy_data() -> None:
+    """A current options-flow choice wins over obsolete config-entry data."""
+    entry = MockConfigEntry(
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: False},
+        data={"local_mqtt_enable": True},
+    )
+
+    assert local_mqtt_opt_in(entry) is False
+
+
+def test_canonical_option_overrides_stale_legacy_option() -> None:
+    """The current option must beat a conflicting key from the retired form."""
+    entry = MockConfigEntry(
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: False,
+            "local_mqtt_enable": True,
+        },
+    )
+
+    assert local_mqtt_opt_in(entry) is False
+
+
+def test_legacy_migration_preserves_existing_canonical_disable() -> None:
+    """Migration removes the legacy key without re-enabling Local MQTT."""
+    hass = MagicMock()
+    entry = SimpleNamespace(
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: False,
+            "local_mqtt_enable": True,
+        }
+    )
+
+    integration._async_migrate_legacy_local_mqtt_options(hass, entry)
+
+    migrated = hass.config_entries.async_update_entry.call_args.kwargs["options"]
+    assert migrated[CONF_THIRD_PARTY_MQTT_ENABLE] is False
+    assert "local_mqtt_enable" not in migrated

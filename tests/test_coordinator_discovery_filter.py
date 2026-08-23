@@ -8,6 +8,7 @@ native id (``5c...``) with cloud ``code=10600`` on every poll cycle. The
 on the legacy path.
 """
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
@@ -135,3 +136,34 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     await coordinator.async_discover()
 
     assert list(coordinator._device_index) == ["explorer-9"]
+
+
+@pytest.mark.asyncio
+async def test_system_and_legacy_discovery_requests_start_concurrently() -> None:
+    """A cold poll must not serialize its two independent discovery endpoints."""
+    system_started = asyncio.Event()
+    legacy_started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def system_list() -> list[dict[str, Any]]:
+        system_started.set()
+        await release.wait()
+        return []
+
+    async def legacy_list() -> list[dict[str, Any]]:
+        legacy_started.set()
+        await release.wait()
+        return []
+
+    coordinator = _discovery_coordinator(systems=[], legacy=[])
+    mutable = cast("Any", coordinator)
+    mutable.api.async_get_system_list = system_list
+    mutable.api.async_list_devices_legacy = legacy_list
+
+    task = asyncio.create_task(coordinator.async_discover())
+    await asyncio.wait_for(system_started.wait(), timeout=0.1)
+    try:
+        await asyncio.wait_for(legacy_started.wait(), timeout=0.1)
+    finally:
+        release.set()
+        await task

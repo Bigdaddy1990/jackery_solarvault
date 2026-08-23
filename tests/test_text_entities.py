@@ -295,6 +295,14 @@ def _pv_name(data: dict[str, Any], index: int) -> JackeryPvNameText:
     mutable._index = index
     mutable._field = _PV_FIELDS[index]
     mutable._attr_translation_key = f"pv{index + 1}_name"
+    channel = (
+        data.get(_DEVICE_ID, {}).get(PAYLOAD_PROPERTIES, {}).get(_PV_FIELDS[index])
+    )
+    mutable._cached_native_value = (
+        str(channel[FIELD_PV_NAME])
+        if isinstance(channel, dict) and channel.get(FIELD_PV_NAME) is not None
+        else None
+    )
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -316,6 +324,19 @@ def test_pv_name_native_value_absent_returns_none() -> None:
     assert entity.native_value is None
 
 
+def test_pv_name_state_calculation_uses_cached_value() -> None:
+    """HA state serialization must not traverse the coordinator payload."""
+    entity = _pv_name(
+        {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_PV1: {FIELD_PV_NAME: "Roof"}}}},
+        0,
+    )
+    entity.coordinator.data[_DEVICE_ID][PAYLOAD_PROPERTIES][FIELD_PV1][
+        FIELD_PV_NAME
+    ] = "Changed behind cache"
+
+    assert entity.native_value == "Roof"
+
+
 async def test_pv_name_set_trims_and_forwards_index_and_name() -> None:
     """Setting a PV name trims whitespace and forwards the channel index + name."""
     entity = _pv_name(
@@ -330,6 +351,7 @@ async def test_pv_name_set_trims_and_forwards_index_and_name() -> None:
         index=2,
         name="Carport",
     )
+    assert entity.native_value == "Carport"
     cast("MagicMock", entity.async_write_ha_state).assert_called_once()
 
 

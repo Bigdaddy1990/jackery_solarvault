@@ -717,7 +717,6 @@ class TestDeviceEndpoints:
             DEVICE_PROPERTY_PATH,
             params={FIELD_DEVICE_ID: "device123"},
             profile=HttpProfile.FAST,
-            retry_transport_once=True,
         )  # noqa: E501, RUF100, SLF001
 
     @pytest.mark.asyncio
@@ -1163,69 +1162,6 @@ class TestAuthFailurePaths:
         except Exception as e:  # noqa: BLE001
             assert "JackeryApiError" in type(e).__name__  # noqa: PT017
             assert "timed out" in str(e)  # noqa: PT017
-
-    @pytest.mark.asyncio
-    async def test_perform_authenticated_json_request_retries_one_timeout(self) -> None:
-        """An opted-in idempotent read gets one immediate timeout retry."""
-        client = self._create_client()
-        client._token = "test_token"
-        attempts = 0
-
-        async def transient_timeout() -> tuple[int, object]:
-            nonlocal attempts
-            attempts += 1
-            await asyncio.sleep(0)
-            if attempts == 1:
-                raise TimeoutError("temporary timeout")
-            return 200, {"code": 0, "data": {"result": "fresh"}}
-
-        result = await client._perform_authenticated_json_request(
-            method="GET",
-            path=DEVICE_PROPERTY_PATH,
-            request=transient_timeout,
-            token_used="test_token",
-            retry_transport_once=True,
-        )
-
-        assert result == (200, {"code": 0, "data": {"result": "fresh"}})
-        assert attempts == 2
-
-    @pytest.mark.asyncio
-    async def test_property_retry_survives_auth_refresh_timeout(self) -> None:
-        """An opted-in property read retries a transient failure after re-login."""
-        client = self._create_client()
-        client._token = "old-token"
-        client._lock = asyncio.Lock()
-
-        async def refreshed_login() -> None:
-            client._token = "fresh-token"
-            await asyncio.sleep(0)
-
-        client.async_login = AsyncMock(side_effect=refreshed_login)
-        attempts = 0
-
-        async def auth_then_timeout() -> tuple[int, object]:
-            nonlocal attempts
-            attempts += 1
-            await asyncio.sleep(0)
-            if attempts == 1:
-                return 401, {"code": 10402, "msg": "token expired"}
-            if attempts == 2:
-                raise TimeoutError("temporary timeout after re-login")
-            return 200, {"code": 0, "data": {"result": "fresh"}}
-
-        result = await client._perform_authenticated_json_request(
-            method="GET",
-            path=DEVICE_PROPERTY_PATH,
-            request=auth_then_timeout,
-            token_used="old-token",
-            retry_transport_once=True,
-        )
-
-        assert result == (200, {"code": 0, "data": {"result": "fresh"}})
-        assert attempts == 3
-        assert client._timeouts_total == 1
-        assert client._requests_failed == 1
 
 
 class TestHttpErrorPaths:

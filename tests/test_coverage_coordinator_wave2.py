@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coord_mod
+from custom_components.jackery_solarvault.client import JackeryApiError
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
@@ -279,7 +280,7 @@ async def test_historical_http_sources_route_independently(
     ["failure", "expected_status"],
     [
         [coord_mod.JackeryAuthError("rejected"), "auth_error"],
-        [coord_mod.JackeryApiError("code=10426 busy"), "rate_limited"],
+        [JackeryApiError("code=10426 busy"), "rate_limited"],
         [TimeoutError(), "transport_error"],
         [RuntimeError("unexpected"), "transport_error"],
     ],

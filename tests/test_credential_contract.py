@@ -5,7 +5,7 @@ import logging
 import pytest
 import voluptuous as vol
 
-from custom_components.jackery_solarvault.credentials import (
+from custom_components.jackery_solarvault.client.credentials import (
     MAX_TOKEN_LENGTH,
     credential_fingerprint,
     credential_text,

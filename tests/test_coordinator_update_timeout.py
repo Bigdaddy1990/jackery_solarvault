@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.jackery_solarvault.const import COORDINATOR_UPDATE_TIMEOUT_SEC
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
@@ -22,7 +23,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 _MODULE = "custom_components.jackery_solarvault.coordinator"
 _POLL_INTERVAL_SEC = 15.0
-_BOOTSTRAP_TIMEOUT_SEC = 90.0
+_COLD_DISCOVERY_TIMEOUT_CAP_SEC = float(COORDINATOR_UPDATE_TIMEOUT_SEC)
 _SHORT_CYCLE_ELAPSED_SEC = 2.0
 
 
@@ -128,10 +129,21 @@ async def test_completed_cycle_records_configured_followup_delay() -> None:
     assert diagnostics["next_poll_delay_sec"] == pytest.approx(_POLL_INTERVAL_SEC)
 
 
-def test_cold_first_refresh_keeps_bootstrap_timeout() -> None:
-    """Initial login/discovery may use the bootstrap ceiling before cadence exists."""
+def test_cold_first_refresh_keeps_the_hard_timeout_cap() -> None:
+    """Unknown devices cannot be budgeted before discovery completes."""
     coordinator = _bare_coordinator()
 
     assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(
-        _BOOTSTRAP_TIMEOUT_SEC
+        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
+    )
+
+
+def test_warm_poll_keeps_hard_cap_when_rediscovery_can_replace_the_index() -> None:
+    """An invalid known device can be rediscovered as an unknown-sized set."""
+    coordinator = _bare_coordinator()
+    coordinator.data = {"previous": {}}
+    coordinator._device_index = {"stale-device": {}}
+
+    assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(
+        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
     )

@@ -422,27 +422,46 @@ async def test_birth_once_per_generation_and_rebirth_next_generation(
     assert client.diagnostics_snapshot()["session_state"] == "online"
 
 
-async def test_stop_cancels_owned_callbacks_and_clears_cloud_state(
+async def test_stop_cancels_lifecycle_but_drains_messages_and_clears_cloud_state(
     hass: HomeAssistant,
 ) -> None:
-    """Stopping Cloud MQTT quiesces its tasks without touching other transports."""
-    client = _client(hass)
+    """Stopping Cloud MQTT cancels lifecycle work but drains accepted frames."""
+    message_started = asyncio.Event()
+    release_message = asyncio.Event()
+    delivered: list[int] = []
+
+    async def _message_callback(_topic: str, data: dict[str, Any]) -> None:
+        message_started.set()
+        await release_message.wait()
+        delivered.append(int(data[FIELD_BODY]["seq"]))
+
+    client = _client(hass, AsyncMock(side_effect=_message_callback))
     runner = asyncio.create_task(asyncio.sleep(60))
-    message_task = asyncio.create_task(asyncio.sleep(60))
     lifecycle_task = asyncio.create_task(asyncio.sleep(60))
     client._runner_task = runner
     client._client = cast("Any", _BrokerClient())
     client._connected = True
     client._fingerprint = "secret-free-hash"
-    client._message_tasks.add(message_task)
     client._lifecycle_tasks[lifecycle_task] = object()
+    client._handle_message("device/property", b'{"body":{"seq":1}}')
+    message_task = client._message_consumer_task
+    assert message_task is not None
+    await message_started.wait()
 
-    await client.async_stop()
+    stop_task = asyncio.create_task(client.async_stop())
+    await asyncio.sleep(0)
+    assert not stop_task.done()
+    assert not message_task.cancelled()
+
+    release_message.set()
+    await stop_task
 
     await asyncio.sleep(0)
     assert runner.cancelled()
-    assert message_task.cancelled()
+    assert message_task.done()
+    assert not message_task.cancelled()
     assert lifecycle_task.cancelled()
+    assert delivered == [1]
     assert client.is_started is False
     assert client.is_connected is False
     snapshot = client.diagnostics_snapshot()

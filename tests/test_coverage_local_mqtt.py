@@ -9,6 +9,7 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
     _local_mqtt_client,
 )
+from custom_components.jackery_solarvault.const import SHELLY_RPC_EVENT_TOPIC
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -113,6 +114,9 @@ async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
         topic_filter="jackery/device/#",
     )
     unsubscribe = MagicMock()
+    unsubscribe_singular = MagicMock()
+    unsubscribe_plural = MagicMock()
+    unsubscribe_shelly = MagicMock()
     unsubscribe_status = MagicMock()
 
     with (
@@ -122,7 +126,14 @@ async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
         ),
         patch(
             "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe",
-            new=AsyncMock(return_value=unsubscribe),
+            new=AsyncMock(
+                side_effect=(
+                    unsubscribe,
+                    unsubscribe_singular,
+                    unsubscribe_plural,
+                    unsubscribe_shelly,
+                )
+            ),
         ) as async_subscribe,
         patch(
             "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe_connection_status",
@@ -135,17 +146,25 @@ async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
     ):
         await client.async_start()
 
-    async_subscribe.assert_awaited_once()
-    subscribe_call = async_subscribe.await_args
-    assert subscribe_call is not None
-    assert subscribe_call.args[1] == "jackery/device/#"
-    assert subscribe_call.kwargs == {"qos": 0, "encoding": None}
+    assert [call.args[1] for call in async_subscribe.await_args_list] == [
+        "jackery/device/#",
+        "hb/device/#",
+        "hb/devices/#",
+        SHELLY_RPC_EVENT_TOPIC,
+    ]
+    assert all(
+        call.kwargs == {"qos": 0, "encoding": None}
+        for call in async_subscribe.await_args_list
+    )
     assert client.is_started is True
     assert client.is_connected is True
 
     await client.async_stop()
 
     unsubscribe.assert_called_once_with()
+    unsubscribe_singular.assert_called_once_with()
+    unsubscribe_plural.assert_called_once_with()
+    unsubscribe_shelly.assert_called_once_with()
     unsubscribe_status.assert_called_once_with()
     assert client.is_started is False
     assert client.is_connected is False

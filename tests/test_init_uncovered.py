@@ -201,15 +201,22 @@ class TestInitModule:
                                 result = await async_unload_entry(hass, config_entry)
                                 assert result is True
 
-    def test_async_migrate_entry(self) -> None:
-        """Test async_migrate_entry."""
+    @pytest.mark.asyncio
+    async def test_async_migrate_entry(self) -> None:
+        """Migration is awaitable and advances the stored entry version."""
         hass = self._create_hass()
         config_entry = self._create_config_entry()
-        config_entry.version = 1
+        config_entry.version = 0
         config_entry.minor_version = 0
 
-        result = async_migrate_entry(hass, config_entry)
+        result = await async_migrate_entry(hass, config_entry)
+
         assert result is True
+        hass.config_entries.async_update_entry.assert_called_once_with(
+            config_entry,
+            version=1,
+            minor_version=1,
+        )
 
     @pytest.mark.asyncio
     async def test_async_remove_config_entry_device(self) -> None:
