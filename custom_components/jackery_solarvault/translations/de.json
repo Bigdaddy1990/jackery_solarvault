@@ -56,14 +56,15 @@
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",
           "third_party_mqtt_password": "Third-Party-MQTT-Passwort",
           "third_party_mqtt_port": "Third-Party-MQTT-Broker-Port",
+          "third_party_mqtt_qos": "QoS des lokalen MQTT-Abonnements",
           "third_party_mqtt_token": "Third-Party-MQTT-Token",
-          "third_party_mqtt_topic_filter": "Third-Party-MQTT-Topic-Filter",
+          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter für lokales MQTT",
           "third_party_mqtt_username": "Third-Party-MQTT-Benutzername",
           "username": "E-Mail"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verf\u00fcgbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
@@ -75,8 +76,9 @@
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
+          "third_party_mqtt_qos": "QoS für das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert ändert weder MQTT-Discovery noch die Veröffentlichung der gemappten Zustände.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "MQTT-Subscription-Filter fuer lokale Bridge-Telemetrie. Standard ist `homeassistant/#`; ein gespeicherter Legacy-Wert `homeassistant` wird auf diesen Child-Topic-Wildcard normalisiert. Wenn bekannt, kann ein engeres Jackery-Topic verwendet werden. Fremde Payloads werden durch die geraetebezogene Verarbeitung abgewiesen.",
+          "third_party_mqtt_topic_filter": "Abonnementfilter für rohe SolarVault-Bridge-Telemetrie, welche die Integration empfängt. Standard ist `hb/device/#`; jeder gültige konfigurierte Wert wird unverändert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` veröffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum urspr\u00fcnglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. F\u00fcr einen Kontowechsel zuerst den Eintrag entfernen.",
@@ -93,7 +95,7 @@
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
         },
@@ -1161,8 +1163,8 @@
       "remaining_runtime": {
         "name": "Verbleibende Laufzeit"
       },
-      "savings_battery_loss_year_energy": {
-        "name": "Batteriesystem Verlustenergie Jahr"
+      "savings_battery_balance_year_energy": {
+        "name": "Batterie Lade-/Entladebilanz Jahr"
       },
       "savings_calculated_total": {
         "name": "Berechnete Ersparnis"
@@ -1896,13 +1898,14 @@
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",
           "third_party_mqtt_password": "Third-Party-MQTT-Passwort",
           "third_party_mqtt_port": "Third-Party-MQTT-Broker-Port",
+          "third_party_mqtt_qos": "QoS des lokalen MQTT-Abonnements",
           "third_party_mqtt_token": "Third-Party-MQTT-Token",
-          "third_party_mqtt_topic_filter": "Third-Party-MQTT-Topic-Filter",
+          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter für lokales MQTT",
           "third_party_mqtt_username": "Third-Party-MQTT-Benutzername"
         },
         "data_description": {
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur f\u00fcr Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zus\u00e4tzlichen App-Rohwerte. Standardm\u00e4\u00dfig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
-          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batteriesystem-Verlustenergie, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
+          "create_savings_detail_sensors": "Erstellt optionale Sensoren f\u00fcr die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardm\u00e4\u00dfig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zus\u00e4tzliche saldierte Sensoren, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gew\u00fcnscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verf\u00fcgbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
@@ -1915,8 +1918,9 @@
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
+          "third_party_mqtt_qos": "QoS für das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert ändert weder MQTT-Discovery noch die Veröffentlichung der gemappten Zustände.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "MQTT-Subscription-Filter fuer lokale Bridge-Telemetrie. Standard ist `homeassistant/#`; ein gespeicherter Legacy-Wert `homeassistant` wird auf diesen Child-Topic-Wildcard normalisiert. Wenn bekannt, kann ein engeres Jackery-Topic verwendet werden. Fremde Payloads werden durch die geraetebezogene Verarbeitung abgewiesen.",
+          "third_party_mqtt_topic_filter": "Abonnementfilter für rohe SolarVault-Bridge-Telemetrie, welche die Integration empfängt. Standard ist `hb/device/#`; jeder gültige konfigurierte Wert wird unverändert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` veröffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",

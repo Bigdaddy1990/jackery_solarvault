@@ -56,14 +56,15 @@
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
           "third_party_mqtt_password": "Third-Party MQTT password",
           "third_party_mqtt_port": "Third-Party MQTT broker port",
+          "third_party_mqtt_qos": "Local MQTT subscription QoS",
           "third_party_mqtt_token": "Third-Party MQTT token",
-          "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter",
+          "third_party_mqtt_topic_filter": "Local MQTT input topic filter",
           "third_party_mqtt_username": "Third-Party MQTT username",
           "username": "Email"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
-          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery charge/discharge balance, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
@@ -75,8 +76,9 @@
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2). It does not change MQTT discovery or mapped-state publication.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT subscription filter for local bridge telemetry. The default is `homeassistant/#`; a legacy exact `homeassistant` value is normalized to that child-topic wildcard. Use a narrower proven Jackery topic when available. Foreign payloads are rejected by device-aware ingest.",
+          "third_party_mqtt_topic_filter": "Subscription filter for raw SolarVault bridge telemetry received by the integration. The default is `hb/device/#`, and every valid configured value is used verbatim. MQTT discovery documents are published separately below `homeassistant/sensor/jackery_solarvault/.../config`; mapped values use `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Update the password and optional sensor toggles for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
@@ -93,7 +95,7 @@
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
-          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery charge/discharge balance, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
         },
@@ -1161,8 +1163,8 @@
       "remaining_runtime": {
         "name": "Remaining runtime"
       },
-      "savings_battery_loss_year_energy": {
-        "name": "Battery system loss yearly energy"
+      "savings_battery_balance_year_energy": {
+        "name": "Battery charge/discharge balance yearly energy"
       },
       "savings_calculated_total": {
         "name": "Calculated savings"
@@ -1896,13 +1898,14 @@
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
           "third_party_mqtt_password": "Third-Party MQTT password",
           "third_party_mqtt_port": "Third-Party MQTT broker port",
+          "third_party_mqtt_qos": "Local MQTT subscription QoS",
           "third_party_mqtt_token": "Third-Party MQTT token",
-          "third_party_mqtt_topic_filter": "Third-Party MQTT topic filter",
+          "third_party_mqtt_topic_filter": "Local MQTT input topic filter",
           "third_party_mqtt_username": "Third-Party MQTT username"
         },
         "data_description": {
           "create_calculated_power_sensors": "Creates optional local net-power sensors from values already delivered by Jackery: main battery charge minus discharge, battery-system/stack charge minus discharge, and grid-side input minus output. These sensors are useful for dashboards that need a signed net value, but they are not separate app values. Disabled by default so raw Jackery values stay unambiguous.",
-          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery system loss energy, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
+          "create_savings_detail_sensors": "Creates optional sensors for the savings calculation: calculated savings, self-consumed AC energy, price, battery charge/discharge balance, inverter/conversion loss energy, PV residual after self-consumption and calculated live inverter/conversion loss power. Disabled by default because these are diagnostic intermediate values.",
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
@@ -1915,8 +1918,9 @@
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
+          "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2). It does not change MQTT discovery or mapped-state publication.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT subscription filter for local bridge telemetry. The default is `homeassistant/#`; a legacy exact `homeassistant` value is normalized to that child-topic wildcard. Use a narrower proven Jackery topic when available. Foreign payloads are rejected by device-aware ingest.",
+          "third_party_mqtt_topic_filter": "Subscription filter for raw SolarVault bridge telemetry received by the integration. The default is `hb/device/#`, and every valid configured value is used verbatim. MQTT discovery documents are published separately below `homeassistant/sensor/jackery_solarvault/.../config`; mapped values use `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values.",

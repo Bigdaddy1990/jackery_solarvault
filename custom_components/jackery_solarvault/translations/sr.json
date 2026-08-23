@@ -1168,7 +1168,7 @@
       "remaining_runtime": {
         "name": "Remaining runtime"
       },
-      "savings_battery_loss_year_energy": {
+      "savings_battery_balance_year_energy": {
         "name": "Battery system loss yearly energy"
       },
       "savings_calculated_total": {

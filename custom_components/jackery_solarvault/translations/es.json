@@ -56,8 +56,9 @@
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
           "third_party_mqtt_password": "Contrase\u00f1a MQTT de terceros",
           "third_party_mqtt_port": "Puerto del broker MQTT de terceros",
+          "third_party_mqtt_qos": "QoS de la suscripci\u00f3n MQTT local",
           "third_party_mqtt_token": "Token MQTT de terceros",
-          "third_party_mqtt_topic_filter": "Filtro de temas MQTT de terceros",
+          "third_party_mqtt_topic_filter": "Filtro de entrada MQTT local",
           "third_party_mqtt_username": "Usuario MQTT de terceros",
           "username": "Correo electr\u00f3nico"
         },
@@ -75,8 +76,9 @@
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",
           "third_party_mqtt_password": "Contrase\u00f1a opcional del broker MQTT.",
           "third_party_mqtt_port": "Puerto TCP de tu broker MQTT. El valor predeterminado es 1883.",
+          "third_party_mqtt_qos": "QoS de la suscripci\u00f3n de Home Assistant a los mensajes brutos del puente SolarVault (0, 1 o 2). No cambia MQTT Discovery ni la publicaci\u00f3n de estados mapeados.",
           "third_party_mqtt_token": "Token del puente MQTT. Si se deja en blanco, la integraci\u00f3n genera autom\u00e1ticamente un token de reserva estable de 9 d\u00edgitos al estilo de la app.",
-          "third_party_mqtt_topic_filter": "Filtro de temas MQTT para el fallback directo del broker local. D\u00e9jalo vac\u00edo salvo que conozcas el tema exacto del puente Jackery. `homeassistant` suele ser incorrecto porque solo coincide con el flujo de eventos propio de Home Assistant.",
+          "third_party_mqtt_topic_filter": "Filtro de suscripci\u00f3n para la telemetr\u00eda bruta del puente SolarVault recibida por la integraci\u00f3n. El valor predeterminado es `hb/device/#` y cada valor v\u00e1lido configurado se usa literalmente. Los documentos MQTT Discovery se publican por separado en `homeassistant/sensor/jackery_solarvault/.../config`; los valores mapeados usan `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Usuario opcional del broker MQTT. D\u00e9jalo en blanco para brokers an\u00f3nimos."
         },
         "description": "Actualiza la contrase\u00f1a y los interruptores de sensores opcionales de la cuenta de Jackery {username}. El correo debe coincidir con la cuenta configurada originalmente para que el ID \u00fanico de la entrada se mantenga estable. Para cambiar de cuenta, elimina primero la entrada.",
@@ -1161,8 +1163,8 @@
       "remaining_runtime": {
         "name": "Autonom\u00eda restante"
       },
-      "savings_battery_loss_year_energy": {
-        "name": "Energ\u00eda anual perdida del sistema de bater\u00edas"
+      "savings_battery_balance_year_energy": {
+        "name": "Balance anual de carga/descarga de la bater\u00eda"
       },
       "savings_calculated_total": {
         "name": "Ahorro calculado"
@@ -1896,8 +1898,9 @@
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
           "third_party_mqtt_password": "Contrase\u00f1a MQTT de terceros",
           "third_party_mqtt_port": "Puerto del broker MQTT de terceros",
+          "third_party_mqtt_qos": "QoS de la suscripci\u00f3n MQTT local",
           "third_party_mqtt_token": "Token MQTT de terceros",
-          "third_party_mqtt_topic_filter": "Filtro de temas MQTT de terceros",
+          "third_party_mqtt_topic_filter": "Filtro de entrada MQTT local",
           "third_party_mqtt_username": "Usuario MQTT de terceros"
         },
         "data_description": {
@@ -1915,8 +1918,9 @@
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",
           "third_party_mqtt_password": "Contrase\u00f1a opcional del broker MQTT.",
           "third_party_mqtt_port": "Puerto TCP de tu broker MQTT. El valor predeterminado es 1883.",
+          "third_party_mqtt_qos": "QoS de la suscripci\u00f3n de Home Assistant a los mensajes brutos del puente SolarVault (0, 1 o 2). No cambia MQTT Discovery ni la publicaci\u00f3n de estados mapeados.",
           "third_party_mqtt_token": "Token del puente MQTT. Si se deja en blanco, la integraci\u00f3n genera autom\u00e1ticamente un token de reserva estable de 9 d\u00edgitos al estilo de la app.",
-          "third_party_mqtt_topic_filter": "Filtro de temas MQTT para el fallback directo del broker local. D\u00e9jalo vac\u00edo salvo que conozcas el tema exacto del puente Jackery. `homeassistant` suele ser incorrecto porque solo coincide con el flujo de eventos propio de Home Assistant.",
+          "third_party_mqtt_topic_filter": "Filtro de suscripci\u00f3n para la telemetr\u00eda bruta del puente SolarVault recibida por la integraci\u00f3n. El valor predeterminado es `hb/device/#` y cada valor v\u00e1lido configurado se usa literalmente. Los documentos MQTT Discovery se publican por separado en `homeassistant/sensor/jackery_solarvault/.../config`; los valores mapeados usan `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Usuario opcional del broker MQTT. D\u00e9jalo en blanco para brokers an\u00f3nimos."
         },
         "description": "Los sensores calculados son derivaciones locales opcionales. Los sensores del Smart Meter calculan valores netos, valores brutos de flujo por fase y consumo del hogar a partir de la carga dom\u00e9stica instant\u00e1nea indicada por Jackery cuando est\u00e9 disponible; de lo contrario, usan la potencia neta del Smart Meter m\u00e1s la entrada/salida de red de Jackery. No son valores brutos adicionales de la app de Jackery.",

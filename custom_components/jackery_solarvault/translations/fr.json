@@ -56,8 +56,9 @@
           "third_party_mqtt_ip": "IP / nom d'h\u00f4te du broker MQTT tiers",
           "third_party_mqtt_password": "Mot de passe MQTT tiers",
           "third_party_mqtt_port": "Port du broker MQTT tiers",
+          "third_party_mqtt_qos": "QoS de l'abonnement MQTT local",
           "third_party_mqtt_token": "Jeton MQTT tiers",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT tiers",
+          "third_party_mqtt_topic_filter": "Filtre de topic d'entr\u00e9e MQTT local",
           "third_party_mqtt_username": "Nom d'utilisateur MQTT tiers",
           "username": "Adresse e-mail"
         },
@@ -75,8 +76,9 @@
           "third_party_mqtt_ip": "IP ou nom d'h\u00f4te de votre broker MQTT local, par exemple 192.168.x.x.",
           "third_party_mqtt_password": "Mot de passe facultatif du broker MQTT.",
           "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par d\u00e9faut est 1883.",
+          "third_party_mqtt_qos": "QoS de l'abonnement Home Assistant aux messages bruts du pont SolarVault (0, 1 ou 2). Cette valeur ne modifie ni MQTT Discovery ni la publication des \u00e9tats mapp\u00e9s.",
           "third_party_mqtt_token": "Jeton du pont MQTT. Si laiss\u00e9 vide, l'int\u00e9gration g\u00e9n\u00e8re automatiquement un jeton de secours stable \u00e0 9 chiffres de style application.",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour le fallback direct du broker local. Laissez vide sauf si vous connaissez le topic exact du pont Jackery. `homeassistant` est g\u00e9n\u00e9ralement incorrect, car il ne correspond qu'au flux d'\u00e9v\u00e9nements de Home Assistant.",
+          "third_party_mqtt_topic_filter": "Filtre d'abonnement pour la t\u00e9l\u00e9m\u00e9trie brute du pont SolarVault re\u00e7ue par l'int\u00e9gration. La valeur par d\u00e9faut est `hb/device/#` et chaque valeur valide configur\u00e9e est utilis\u00e9e telle quelle. Les documents MQTT Discovery sont publi\u00e9s s\u00e9par\u00e9ment sous `homeassistant/sensor/jackery_solarvault/.../config` ; les valeurs mapp\u00e9es utilisent `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Nom d'utilisateur facultatif du broker MQTT. Laissez vide pour les brokers anonymes."
         },
         "description": "Mettez \u00e0 jour le mot de passe et les interrupteurs de capteurs facultatifs du compte Jackery {username}. L'adresse e-mail doit correspondre au compte configur\u00e9 \u00e0 l'origine afin que l'ID unique de l'entr\u00e9e reste stable. Pour changer de compte, supprimez d'abord l'entr\u00e9e.",
@@ -1161,8 +1163,8 @@
       "remaining_runtime": {
         "name": "Autonomie restante"
       },
-      "savings_battery_loss_year_energy": {
-        "name": "\u00c9nergie annuelle perdue du syst\u00e8me de batteries"
+      "savings_battery_balance_year_energy": {
+        "name": "Bilan annuel de charge/d\u00e9charge de la batterie"
       },
       "savings_calculated_total": {
         "name": "\u00c9conomies calcul\u00e9es"
@@ -1896,8 +1898,9 @@
           "third_party_mqtt_ip": "IP / nom d'h\u00f4te du broker MQTT tiers",
           "third_party_mqtt_password": "Mot de passe MQTT tiers",
           "third_party_mqtt_port": "Port du broker MQTT tiers",
+          "third_party_mqtt_qos": "QoS de l'abonnement MQTT local",
           "third_party_mqtt_token": "Jeton MQTT tiers",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT tiers",
+          "third_party_mqtt_topic_filter": "Filtre de topic d'entr\u00e9e MQTT local",
           "third_party_mqtt_username": "Nom d'utilisateur MQTT tiers"
         },
         "data_description": {
@@ -1915,8 +1918,9 @@
           "third_party_mqtt_ip": "IP ou nom d'h\u00f4te de votre broker MQTT local, par exemple 192.168.x.x.",
           "third_party_mqtt_password": "Mot de passe facultatif du broker MQTT.",
           "third_party_mqtt_port": "Port TCP de votre broker MQTT. La valeur par d\u00e9faut est 1883.",
+          "third_party_mqtt_qos": "QoS de l'abonnement Home Assistant aux messages bruts du pont SolarVault (0, 1 ou 2). Cette valeur ne modifie ni MQTT Discovery ni la publication des \u00e9tats mapp\u00e9s.",
           "third_party_mqtt_token": "Jeton du pont MQTT. Si laiss\u00e9 vide, l'int\u00e9gration g\u00e9n\u00e8re automatiquement un jeton de secours stable \u00e0 9 chiffres de style application.",
-          "third_party_mqtt_topic_filter": "Filtre de topics MQTT pour le fallback direct du broker local. Laissez vide sauf si vous connaissez le topic exact du pont Jackery. `homeassistant` est g\u00e9n\u00e9ralement incorrect, car il ne correspond qu'au flux d'\u00e9v\u00e9nements de Home Assistant.",
+          "third_party_mqtt_topic_filter": "Filtre d'abonnement pour la t\u00e9l\u00e9m\u00e9trie brute du pont SolarVault re\u00e7ue par l'int\u00e9gration. La valeur par d\u00e9faut est `hb/device/#` et chaque valeur valide configur\u00e9e est utilis\u00e9e telle quelle. Les documents MQTT Discovery sont publi\u00e9s s\u00e9par\u00e9ment sous `homeassistant/sensor/jackery_solarvault/.../config` ; les valeurs mapp\u00e9es utilisent `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Nom d'utilisateur facultatif du broker MQTT. Laissez vide pour les brokers anonymes."
         },
         "description": "Les capteurs calcul\u00e9s sont des d\u00e9rivations locales facultatives. Les capteurs Smart Meter calculent des valeurs nettes, des valeurs de flux brut par phase et la consommation domestique \u00e0 partir de la charge domestique instantan\u00e9e signal\u00e9e par Jackery lorsqu'elle est disponible ; sinon, ils utilisent la puissance nette du Smart Meter plus l'entr\u00e9e/sortie c\u00f4t\u00e9 r\u00e9seau Jackery. Ce ne sont pas des valeurs brutes suppl\u00e9mentaires de l'application Jackery.",
