@@ -6,7 +6,7 @@
 # ruff: file-ignore[non-empty-init-module]
 
 import asyncio
-import contextlib
+from collections.abc import Coroutine
 from datetime import timedelta
 import hashlib
 import logging
@@ -40,6 +40,7 @@ from .client.mqtt_session_cache import (
     async_load_mqtt_session,
     normalize_mqtt_session_snapshot,
 )
+from .config_flow import JackeryConfigFlow
 from .const import (
     CALCULATED_POWER_SENSOR_SUFFIXES,
     CONF_CREATE_CALCULATED_POWER_SENSORS,
@@ -336,6 +337,8 @@ def _local_mqtt_client(
     if not isinstance(bucket, dict):
         return None
     client = bucket.get(_LOCAL_MQTT_RUNTIME_KEY)
+    if client is None:
+        return None
     return client if isinstance(client, JackeryLocalMqttClient) else None
 
 
@@ -344,6 +347,8 @@ _ENTRY_TASK_CANCEL_TIMEOUT_SEC = 5.0
 _LAYER5_TASK_RUNTIME_KEY = "layer5_start_task"
 _OPTIONS_RECONCILE_TASK_RUNTIME_KEY = "options_reconcile_task"
 _OPTIONS_RECONCILE_PENDING_RUNTIME_KEY = "options_reconcile_pending"
+_OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY = "options_device_config_pending"
+_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY = "device_mqtt_adopted_options"
 _OPTIONS_SNAPSHOT_RUNTIME_KEY = "options_snapshot"
 _ENTRY_DATA_SNAPSHOT_RUNTIME_KEY = "entry_data_snapshot"
 _LOCAL_MQTT_OPTION_KEYS = frozenset({
@@ -357,16 +362,24 @@ _LOCAL_MQTT_OPTION_KEYS = frozenset({
     CONF_THIRD_PARTY_MQTT_USERNAME,
 })
 _SUPPLEMENTAL_OPTION_KEYS: Final[frozenset[str]] = frozenset()
-_DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS = frozenset(
-    _LOCAL_MQTT_OPTION_KEYS - {CONF_THIRD_PARTY_MQTT_TOKEN}
-)
+_DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS = frozenset({
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_QOS,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+})
 _UNLOADING_COORDINATOR_RUNTIME_KEY = "unloading_coordinator"
 _PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY = "primary_setup_coordinator"
 _SUPPLEMENTAL_TRANSPORT_COORDINATORS_RUNTIME_KEY = "supplemental_transport_coordinators"
 _SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY = "supplemental_local_mqtt_clients"
 _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY = "supplemental_layer5_tasks"
 _SUPPLEMENTAL_CLEANUP_TASK_RUNTIME_KEY = "supplemental_cleanup_task"
+_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY = "local_mqtt_restart_after_cleanup"
+_LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY = "local_mqtt_stop_tasks"
+_LOCAL_MQTT_RECONCILE_LOCK_RUNTIME_KEY = "local_mqtt_reconcile_lock"
+_COORDINATOR_SHUTDOWN_RUNTIME_KEY = "coordinator_shutdown"
+_COORDINATOR_SHUTDOWN_REAPER_TASK_RUNTIME_KEY = "coordinator_shutdown_reaper_task"
 _SUPPLEMENTAL_CLEANUP_RETRY_SEC = 5.0
+_COORDINATOR_SHUTDOWN_RETRY_SEC = 5.0
 
 
 # The ``local_mqtt_*`` option family duplicated ``third_party_mqtt_*``: the
@@ -395,20 +408,14 @@ def _async_migrate_legacy_local_mqtt_options(
     for legacy_key in sorted(legacy_present):
         canonical_key = _LEGACY_LOCAL_MQTT_OPTION_MAP[legacy_key]
         legacy_value = options.pop(legacy_key)
-        # An explicit legacy value is what the user last saw in the form, so it
-        # wins over a canonical key that was only ever filled by a device
-        # readback default.
-        if legacy_value in {None, ""}:
+        if legacy_value is None:
             continue
-        if options.get(canonical_key) != legacy_value:
+        # A populated canonical option is the current form value. Migration
+        # removes retired aliases but must never overwrite an explicit False,
+        # QoS 0, empty credential, or any other deliberate current value.
+        if canonical_key not in options or options[canonical_key] is None:
             options[canonical_key] = legacy_value
             migrated.append(f"{legacy_key} -> {canonical_key}")
-    configured_topic = str(
-        options.get(CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "") or ""
-    ).strip()
-    if configured_topic in {"homeassistant", "homeassistant/#"}:
-        options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = LOCAL_MQTT_DEFAULT_TOPIC
-        migrated.append(f"{configured_topic} -> {LOCAL_MQTT_DEFAULT_TOPIC}")
     if options == dict(entry.options):
         return
     hass.config_entries.async_update_entry(entry, options=options)
@@ -546,6 +553,13 @@ def _entry_owns_coordinator(
     return entry.runtime_data is coordinator and unloading is not coordinator
 
 
+def _clear_option_reconcile_runtime_state(bucket: dict[str, Any]) -> None:
+    """Remove transition-only option state that cannot cross an unload fence."""
+    bucket.pop(_OPTIONS_RECONCILE_PENDING_RUNTIME_KEY, None)
+    bucket.pop(_OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY, None)
+    bucket.pop(_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY, None)
+
+
 def _store_entry_runtime_task(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -575,32 +589,197 @@ def _store_entry_runtime_task(
     task.add_done_callback(_task_done)
 
 
-def _cancel_layer5_start_task(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def _cancel_layer5_start_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> asyncio.Task[Any] | None:
     """Cancel a still-running Layer-5 start task and drop its reference."""
     task = _entry_runtime_task(hass, entry, _LAYER5_TASK_RUNTIME_KEY)
     if task is None:
-        return
+        return None
     if not task.done():
         task.cancel()
     bucket = _entry_runtime_bucket(hass, entry)
     if bucket.get(_LAYER5_TASK_RUNTIME_KEY) is task:
         bucket.pop(_LAYER5_TASK_RUNTIME_KEY, None)
+    return task
+
+
+async def _async_await_cancelled_runtime_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    task: asyncio.Task[Any] | None,
+    *,
+    label: str,
+) -> None:
+    """Bound shutdown on a cancelled entry task before dependent resources stop."""
+    if not isinstance(task, asyncio.Task):
+        return
+    try:
+        done, pending = await asyncio.wait(
+            {task},
+            timeout=_ENTRY_TASK_CANCEL_TIMEOUT_SEC,
+        )
+    except asyncio.CancelledError:
+        if not task.done():
+            task.cancel()
+        _append_supplemental_runtime_object(
+            hass,
+            entry,
+            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            task,
+        )
+        raise
+    if pending:
+        _LOGGER.warning(
+            "Jackery %s task did not stop within %.0fs; deferring cleanup",
+            label,
+            _ENTRY_TASK_CANCEL_TIMEOUT_SEC,
+        )
+        _append_supplemental_runtime_object(
+            hass,
+            entry,
+            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            task,
+        )
+        return
+    try:
+        next(iter(done)).result()
+    except asyncio.CancelledError:
+        return
+    except Exception as err:  # ruff: ignore[blind-except]
+        _LOGGER.debug("Jackery %s task stopped with an error: %s", label, err)
+
+
+async def _async_cancel_runtime_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    key: str,
+    *,
+    label: str,
+) -> None:
+    """Cancel, remove and reap one stored entry runtime task."""
+    runtime_task = _entry_runtime_task(hass, entry, key)
+    if runtime_task is None:
+        return
+    task: asyncio.Task[Any] = runtime_task
+    bucket = _entry_runtime_bucket(hass, entry)
+    if bucket.get(key) is task:
+        bucket.pop(key, None)
+    if not task.done():
+        task.cancel()
+    await _async_await_cancelled_runtime_task(
+        hass,
+        entry,
+        task,
+        label=label,
+    )
+
+
+async def _async_cancel_layer5_start_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Cancel and reap the Layer-5 startup task before transport teardown."""
+    task = _cancel_layer5_start_task(hass, entry)
+    await _async_await_cancelled_runtime_task(
+        hass,
+        entry,
+        task,
+        label="Layer-5 startup",
+    )
 
 
 async def _async_stop_local_mqtt_client(
     hass: HomeAssistant,
     entry: ConfigEntry,
     client: JackeryLocalMqttClient,
-) -> None:
-    """Stop a local MQTT client and drop its runtime reference."""
+) -> bool:
+    """Stop a local MQTT client and drop its runtime reference on success."""
+    bucket = _entry_runtime_bucket(hass, entry)
+    stop_records = bucket.get(_LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY)
+    if not isinstance(stop_records, dict):
+        stop_records = {}
+        bucket[_LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY] = stop_records
+    record = stop_records.get(id(client))
+    if (
+        isinstance(record, tuple)
+        and len(record) == 2
+        and record[0] is client
+        and isinstance(record[1], asyncio.Task)
+    ):
+        stop_task = record[1]
+    else:
+        stop_task = hass.async_create_background_task(
+            client.async_stop(),
+            f"{DOMAIN}_local_mqtt_stop_{entry.entry_id}",
+            eager_start=False,
+        )
+        stop_records[id(client)] = (client, stop_task)
+
+    def _clear_stop_record() -> None:
+        current_records = bucket.get(_LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY)
+        if not isinstance(current_records, dict):
+            return
+        current = current_records.get(id(client))
+        if (
+            isinstance(current, tuple)
+            and len(current) == 2
+            and current[0] is client
+            and current[1] is stop_task
+        ):
+            current_records.pop(id(client), None)
+        if not current_records:
+            bucket.pop(_LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY, None)
+
     try:
-        async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
-            await client.async_stop()
+        done, pending = await asyncio.wait(
+            {stop_task},
+            timeout=_ENTRY_TASK_CANCEL_TIMEOUT_SEC,
+        )
+    except asyncio.CancelledError:
+        # The stop operation is HA-owned and may have multiple lifecycle
+        # waiters. Cancelling one waiter must not interrupt the shared
+        # unsubscribe halfway through or make a surviving waiter fail.
+        _defer_supplemental_local_mqtt(hass, entry, client)
+        coordinator = getattr(entry, "runtime_data", None)
+        if (
+            isinstance(coordinator, JackerySolarVaultCoordinator)
+            and coordinator.local_mqtt_client is client
+        ):
+            coordinator.set_local_mqtt_client(None)
+        _schedule_supplemental_cleanup(hass, entry)
+        raise
+    if pending:
+        # Keep waiting for this exact task in the supplemental reaper. Starting
+        # a second ``async_stop`` could register/unregister the same callback
+        # concurrently and create duplicate Local-MQTT subscribers.
+        _defer_supplemental_local_mqtt(hass, entry, client)
+        coordinator = getattr(entry, "runtime_data", None)
+        if (
+            isinstance(coordinator, JackerySolarVaultCoordinator)
+            and coordinator.local_mqtt_client is client
+        ):
+            coordinator.set_local_mqtt_client(None)
+        _schedule_supplemental_cleanup(hass, entry)
+        _LOGGER.warning(
+            "Jackery local MQTT client did not stop within %.0fs",
+            _ENTRY_TASK_CANCEL_TIMEOUT_SEC,
+        )
+        return False
+    try:
+        next(iter(done)).result()
+    except asyncio.CancelledError:
+        _clear_stop_record()
+        return False
     except Exception as err:  # ruff: ignore[blind-except]
+        _clear_stop_record()
         _LOGGER.warning("Jackery local MQTT client did not stop cleanly: %s", err)
-    bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if isinstance(bucket, dict) and bucket.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
+        return False
+    _clear_stop_record()
+    if bucket.get(_LOCAL_MQTT_RUNTIME_KEY) is client:
         bucket.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
+    return True
 
 
 def _append_supplemental_runtime_object(
@@ -638,6 +817,30 @@ def _set_supplemental_runtime_items(
         bucket[key] = values
     else:
         bucket.pop(key, None)
+
+
+def _reconcile_supplemental_runtime_items(
+    bucket: dict[str, Any],
+    key: str,
+    *,
+    processed: list[object],
+    retained: list[object],
+) -> None:
+    """Remove only processed objects while preserving concurrent appends."""
+    current = _supplemental_runtime_items(bucket, key)
+
+    def _contains_identity(values: list[object], candidate: object) -> bool:
+        return any(item is candidate for item in values)
+
+    reconciled = [
+        item
+        for item in current
+        if not _contains_identity(processed, item) or _contains_identity(retained, item)
+    ]
+    for item in retained:
+        if not _contains_identity(reconciled, item):
+            reconciled.append(item)
+    _set_supplemental_runtime_items(bucket, key, reconciled)
 
 
 def _supplemental_cleanup_pending(
@@ -712,6 +915,59 @@ def _defer_supplemental_transports(
         )
 
 
+async def _async_run_supplemental_cleanup_call(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    operation: Coroutine[Any, Any, Any],
+    *,
+    name: str,
+) -> bool:
+    """Run one cleanup operation in a separately owned, hard-bounded task."""
+    task = hass.async_create_background_task(
+        operation,
+        name,
+        eager_start=False,
+    )
+    try:
+        done, pending = await asyncio.wait(
+            {task},
+            timeout=_ENTRY_TASK_CANCEL_TIMEOUT_SEC,
+        )
+    except asyncio.CancelledError:
+        if not task.done():
+            task.cancel()
+        _append_supplemental_runtime_object(
+            hass,
+            entry,
+            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            task,
+        )
+        raise
+    if pending:
+        task.cancel()
+        _append_supplemental_runtime_object(
+            hass,
+            entry,
+            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            task,
+        )
+        return False
+    try:
+        next(iter(done)).result()
+    except asyncio.CancelledError:
+        return False
+    except Exception as err:  # ruff: ignore[blind-except]
+        _LOGGER.warning(
+            "Jackery supplemental cleanup %s failed for entry %s: %s: %s",
+            name,
+            entry.entry_id,
+            type(err).__name__,
+            err,
+        )
+        return False
+    return True
+
+
 async def _async_cleanup_stale_supplemental(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -720,12 +976,13 @@ async def _async_cleanup_stale_supplemental(
     while _supplemental_cleanup_pending(hass, entry):
         bucket = _entry_runtime_bucket(hass, entry)
         current_task = asyncio.current_task()
+        layer5_snapshot = _supplemental_runtime_items(
+            bucket,
+            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+        )
         layer5_tasks = [
             item
-            for item in _supplemental_runtime_items(
-                bucket,
-                _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
-            )
+            for item in layer5_snapshot
             if isinstance(item, asyncio.Task) and item is not current_task
         ]
         for task in layer5_tasks:
@@ -738,55 +995,95 @@ async def _async_cleanup_stale_supplemental(
                 timeout=_ENTRY_TASK_CANCEL_TIMEOUT_SEC,
             )
             for task in done_layer5_tasks:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
+                try:
                     task.result()
-        _set_supplemental_runtime_items(
+                except asyncio.CancelledError:
+                    pass
+                except Exception as err:  # ruff: ignore[blind-except]
+                    _LOGGER.warning(
+                        "Jackery supplemental cleanup %s failed late for entry "
+                        "%s: %s: %s",
+                        task.get_name(),
+                        entry.entry_id,
+                        type(err).__name__,
+                        err,
+                    )
+        _reconcile_supplemental_runtime_items(
             bucket,
             _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
-            list(pending_layer5_tasks),
+            processed=[item for item in layer5_snapshot if item is not current_task],
+            retained=list(pending_layer5_tasks),
         )
+        if pending_layer5_tasks:
+            await asyncio.sleep(_SUPPLEMENTAL_CLEANUP_RETRY_SEC)
+            continue
 
-        pending_local_mqtt: list[object] = []
-        for item in _supplemental_runtime_items(
+        local_mqtt_snapshot = _supplemental_runtime_items(
             bucket,
             _SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY,
-        ):
+        )
+        pending_local_mqtt: list[object] = []
+        for item in local_mqtt_snapshot:
             if not isinstance(item, JackeryLocalMqttClient):
                 continue
-            try:
-                async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
-                    await item.async_stop()
-            except Exception:  # ruff: ignore[blind-except]
+            if not await _async_stop_local_mqtt_client(
+                hass,
+                entry,
+                item,
+            ):
                 pending_local_mqtt.append(item)
-        _set_supplemental_runtime_items(
+        _reconcile_supplemental_runtime_items(
             bucket,
             _SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY,
-            pending_local_mqtt,
+            processed=local_mqtt_snapshot,
+            retained=pending_local_mqtt,
         )
 
-        pending_transport_coordinators: list[object] = []
-        for item in _supplemental_runtime_items(
+        transport_snapshot = _supplemental_runtime_items(
             bucket,
             _SUPPLEMENTAL_TRANSPORT_COORDINATORS_RUNTIME_KEY,
-        ):
+        )
+        pending_transport_coordinators: list[object] = []
+        for item in transport_snapshot:
             if not isinstance(item, JackerySolarVaultCoordinator):
                 continue
-            try:
-                async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
-                    await item.async_stop_supplemental_transports()
-            except Exception:  # ruff: ignore[blind-except]
+            if not await _async_run_supplemental_cleanup_call(
+                hass,
+                entry,
+                item.async_stop_supplemental_transports(),
+                name=f"{DOMAIN}_deferred_transport_stop_{entry.entry_id}",
+            ):
                 pending_transport_coordinators.append(item)
                 continue
             if item.has_pending_supplemental_transport_cleanup:
                 pending_transport_coordinators.append(item)
-        _set_supplemental_runtime_items(
+        _reconcile_supplemental_runtime_items(
             bucket,
             _SUPPLEMENTAL_TRANSPORT_COORDINATORS_RUNTIME_KEY,
-            pending_transport_coordinators,
+            processed=transport_snapshot,
+            retained=pending_transport_coordinators,
         )
 
         if _supplemental_cleanup_pending(hass, entry):
             await asyncio.sleep(_SUPPLEMENTAL_CLEANUP_RETRY_SEC)
+
+    bucket = _entry_runtime_bucket(hass, entry)
+    restart_local_mqtt = bool(
+        bucket.pop(_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY, False)
+    )
+    coordinator = entry.runtime_data
+    if (
+        restart_local_mqtt
+        and isinstance(coordinator, JackerySolarVaultCoordinator)
+        and _entry_owns_coordinator(hass, entry, coordinator)
+    ):
+        _schedule_layer5_start_if_ready(
+            hass,
+            entry,
+            coordinator,
+            set(_DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS),
+            device_config_keys=set(),
+        )
 
 
 def _schedule_supplemental_cleanup(
@@ -833,6 +1130,8 @@ async def _async_release_fenced_coordinator(
     if not await _async_shutdown_coordinator_bounded(
         coordinator,
         context="prior entry unload",
+        hass=hass,
+        entry=entry,
     ):
         _LOGGER.warning(
             "Jackery prior HTTP coordinator cleanup is still pending; "
@@ -1041,27 +1340,52 @@ async def _async_start_layer5_transports(
     await asyncio.sleep(0)
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
+
+    # Device-side 3046/3047 configuration is independent of the HA broker
+    # subscription. Schedule it before any transport await so a stuck broker,
+    # DNS lookup or unsubscribe can never suppress the device command path.
+    coordinator.async_schedule_local_mqtt_device_config()
+
     operations = (
         ("cloud MQTT", coordinator.async_start_mqtt()),
         ("local MQTT", _async_start_local_mqtt(hass, entry, coordinator)),
         ("BLE", coordinator.async_start_ble_transport()),
     )
-    results = await asyncio.gather(
-        *(operation for _label, operation in operations),
-        return_exceptions=True,
-    )
-    if not _entry_owns_coordinator(hass, entry, coordinator):
-        return
-    for (label, _operation), result in zip(operations, results, strict=True):
-        _handle_optional_startup_result(
-            coordinator,
-            result,
-            label=label,
-        )
-    # Run the device-side 3046/BLE-113 publish only after every independent
-    # Layer-5 startup attempt has had a chance to expose its own write path.
-    # The scheduler remains non-blocking and retries without gating HTTP.
-    coordinator.async_schedule_local_mqtt_device_config()
+    tasks = {
+        entry.async_create_background_task(
+            hass,
+            operation,
+            name=(f"{DOMAIN}_{label.lower().replace(" ", "_")}_start_{entry.entry_id}"),
+            eager_start=False,
+        ): label
+        for label, operation in operations
+    }
+    try:
+        while tasks:
+            done, _pending = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in done:
+                label = tasks.pop(task)
+                try:
+                    result: BaseException | object = task.result()
+                except asyncio.CancelledError as err:
+                    result = err
+                except Exception as err:  # ruff: ignore[blind-except]
+                    result = err
+                if _entry_owns_coordinator(hass, entry, coordinator):
+                    _handle_optional_startup_result(
+                        coordinator,
+                        result,
+                        label=label,
+                    )
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def _schedule_layer5_start_if_ready(
@@ -1069,13 +1393,57 @@ def _schedule_layer5_start_if_ready(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
     changed_keys: set[str] | None = None,
+    *,
+    device_config_keys: set[str] | None = None,
 ) -> None:
     """Schedule independent Layer-5 clients for the active coordinator."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
+    if changed_keys:
+        bucket = _entry_runtime_bucket(hass, entry)
+        pending = bucket.get(_OPTIONS_RECONCILE_PENDING_RUNTIME_KEY)
+        if not isinstance(pending, set):
+            pending = set()
+            bucket[_OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = pending
+        pending.update(key for key in changed_keys if isinstance(key, str))
+        device_pending = bucket.get(_OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY)
+        if not isinstance(device_pending, set):
+            device_pending = set()
+            bucket[_OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY] = device_pending
+        requested_device_keys = (
+            changed_keys & _LOCAL_MQTT_OPTION_KEYS
+            if device_config_keys is None
+            else device_config_keys & _LOCAL_MQTT_OPTION_KEYS
+        )
+        device_pending.update(requested_device_keys)
+        existing = _entry_runtime_task(
+            hass,
+            entry,
+            _OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+        )
+        if existing is not None and not existing.done():
+            return
+        if existing is not None:
+            current = _entry_runtime_bucket(hass, entry)
+            if current.get(_OPTIONS_RECONCILE_TASK_RUNTIME_KEY) is existing:
+                current.pop(_OPTIONS_RECONCILE_TASK_RUNTIME_KEY, None)
+        task = entry.async_create_background_task(
+            hass,
+            _async_reconcile_entry_options(hass, entry, coordinator),
+            name=f"{DOMAIN}_options_reconcile_{entry.entry_id}",
+            eager_start=False,
+        )
+        _store_entry_runtime_task(
+            hass,
+            entry,
+            _OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            task,
+        )
+        return
     if _entry_runtime_task(hass, entry, _LAYER5_TASK_RUNTIME_KEY) is not None:
         return
-    task = hass.async_create_background_task(
+    task = entry.async_create_background_task(
+        hass,
         _async_start_layer5_transports(hass, entry, coordinator),
         name=f"{DOMAIN}_layer5_{entry.entry_id}",
         eager_start=False,
@@ -1107,6 +1475,17 @@ async def _async_reconcile_entry_options(
         if not isinstance(pending, set) or not pending:
             return
         changed_keys = {key for key in pending if isinstance(key, str)}
+        device_pending = bucket.pop(
+            _OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY,
+            None,
+        )
+        device_config_changed_keys = (
+            {key for key in device_pending if isinstance(key, str)}
+            if isinstance(device_pending, set)
+            else changed_keys
+        )
+        if device_config_changed_keys & _LOCAL_MQTT_OPTION_KEYS:
+            coordinator.async_schedule_local_mqtt_device_config()
         operations: list[tuple[str, Any]] = []
         if changed_keys & _DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS:
             operations.append((
@@ -1131,8 +1510,6 @@ async def _async_reconcile_entry_options(
                 strict=True,
             ):
                 _handle_optional_startup_result(coordinator, result, label=label)
-        if changed_keys & _LOCAL_MQTT_OPTION_KEYS:
-            coordinator.async_schedule_local_mqtt_device_config()
 
 
 async def _async_start_local_mqtt(
@@ -1140,47 +1517,132 @@ async def _async_start_local_mqtt(
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
 ) -> None:
-    """Register an entry-owned subscription on Home Assistant's MQTT client."""
+    """Serialize all entry-level subscriber reconciliation calls."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
-    # ``local_mqtt_enable`` gewinnt, sonst gilt das app-synchronisierte
-    # ``third_party_mqtt_enable`` als Fallback.
-    enabled = local_mqtt_opt_in(entry)
-    # The filter is used for exactly one broker subscription. Historical
-    # generated defaults under ``homeassistant`` are repaired by setup
-    # migration; explicit custom filters remain verbatim.
-    configured_topic_filter = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
-        or LOCAL_MQTT_DEFAULT_TOPIC
+    bucket = _entry_runtime_bucket(hass, entry)
+    lock = bucket.get(_LOCAL_MQTT_RECONCILE_LOCK_RUNTIME_KEY)
+    if not isinstance(lock, asyncio.Lock):
+        lock = asyncio.Lock()
+        bucket[_LOCAL_MQTT_RECONCILE_LOCK_RUNTIME_KEY] = lock
+    async with lock:
+        await _async_start_local_mqtt_locked(hass, entry, coordinator)
+
+
+def _configured_local_mqtt_listener(
+    entry: ConfigEntry,
+) -> tuple[bool, str, Literal[0, 1, 2]]:
+    """Return the canonical HA-broker listener configuration for one entry."""
+    configured_topic_filter = config_entry_str_option(
+        entry,
+        CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+        "",
     ).strip()
-    if configured_topic_filter in {"homeassistant", "homeassistant/#"}:
-        configured_topic_filter = LOCAL_MQTT_DEFAULT_TOPIC
+    configured_topic_filter = configured_topic_filter or LOCAL_MQTT_DEFAULT_TOPIC
+    configured_qos_value = config_entry_int_option(
+        entry,
+        CONF_THIRD_PARTY_MQTT_QOS,
+        DEFAULT_THIRD_PARTY_MQTT_QOS,
+    )
+    if configured_qos_value not in {0, 1, 2}:
+        _LOGGER.warning(
+            "Ignoring invalid Local MQTT QoS %r; using %d",
+            configured_qos_value,
+            DEFAULT_THIRD_PARTY_MQTT_QOS,
+        )
+        configured_qos_value = DEFAULT_THIRD_PARTY_MQTT_QOS
+    return (
+        local_mqtt_opt_in(entry),
+        configured_topic_filter,
+        cast("Literal[0, 1, 2]", configured_qos_value),
+    )
+
+
+def _local_mqtt_snapshot_route(
+    configured_topic_filter: str,
+) -> tuple[str, Literal["device", "devices"]]:
+    """Resolve the official snapshot route represented by a response filter."""
+    topic_marker = next(
+        (
+            marker
+            for marker in ("/device/", "/devices/")
+            if marker in configured_topic_filter
+        ),
+        None,
+    )
+    if topic_marker is None:
+        return "hb", "device"
+    topic_prefix, topic_suffix = configured_topic_filter.split(topic_marker, 1)
+    suffix_parts = topic_suffix.split("/")
+    official_response_filter = topic_suffix == "#" or (
+        len(suffix_parts) == 2
+        and bool(suffix_parts[0])
+        and suffix_parts[1] in {"#", "+", "status", "event"}
+    )
+    if not topic_prefix or not official_response_filter:
+        return "hb", "device"
+    return (
+        topic_prefix,
+        "devices" if topic_marker == "/devices/" else "device",
+    )
+
+
+async def _async_start_local_mqtt_locked(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Reconcile one HA MQTT subscriber while holding the per-entry lock."""
+    if not _entry_owns_coordinator(hass, entry, coordinator):
+        return
+    should_run, configured_topic_filter, configured_qos = (
+        _configured_local_mqtt_listener(entry)
+    )
     # Home Assistant owns broker credentials and connection lifecycle. Device
     # command 3047 remains useful for configuring the Jackery publisher, but it
     # must never create a second MQTT connection inside this integration.
-    should_run = enabled
+    bucket = _entry_runtime_bucket(hass, entry)
+    deferred_local_mqtt = _supplemental_runtime_items(
+        bucket,
+        _SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY,
+    )
+    if deferred_local_mqtt:
+        if should_run:
+            bucket[_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY] = True
+        else:
+            bucket.pop(_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY, None)
+        _schedule_supplemental_cleanup(hass, entry)
+        return
     existing_client = _local_mqtt_client(hass, entry)
     if existing_client is not None:
+        if (
+            should_run
+            and existing_client.is_started is True
+            and existing_client.matches_configuration(
+                (configured_topic_filter,),
+                configured_qos,
+            )
+            is True
+        ):
+            if coordinator.local_mqtt_client is not existing_client:
+                coordinator.set_local_mqtt_client(existing_client)
+            return
+        if not await _async_stop_local_mqtt_client(hass, entry, existing_client):
+            if coordinator.local_mqtt_client is existing_client:
+                coordinator.set_local_mqtt_client(None)
+            _defer_supplemental_local_mqtt(hass, entry, existing_client)
+            if should_run:
+                bucket[_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY] = True
+            else:
+                bucket.pop(_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY, None)
+            _schedule_supplemental_cleanup(hass, entry)
+            return
         if coordinator.local_mqtt_client is existing_client:
             coordinator.set_local_mqtt_client(None)
-        try:
-            async with asyncio.timeout(_ENTRY_TASK_CANCEL_TIMEOUT_SEC):
-                await existing_client.async_stop()
-        except Exception as err:  # ruff: ignore[blind-except]
-            _LOGGER.warning(
-                "Jackery local MQTT client did not stop cleanly before its "
-                "replacement: %s",
-                err,
-            )
-        stashed = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
-        if (
-            isinstance(stashed, dict)
-            and stashed.get(_LOCAL_MQTT_RUNTIME_KEY) is existing_client
-        ):
-            stashed.pop(_LOCAL_MQTT_RUNTIME_KEY, None)
         if not _entry_owns_coordinator(hass, entry, coordinator):
             return
     if not should_run:
+        bucket.pop(_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY, None)
         coordinator.set_local_mqtt_client(None)
         return
 
@@ -1206,17 +1668,12 @@ async def _async_start_local_mqtt(
             raw_bytes,
         )
 
-    configured_qos = cast(
-        "Literal[0, 1, 2]",
-        config_entry_int_option(
-            entry, CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS
-        ),
-    )
     client = JackeryLocalMqttClient(
         hass,
         sink=_handle_local_mqtt_data,
         topic_filter=configured_topic_filter,
         qos=configured_qos,
+        config_entry=entry,
     )
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
@@ -1229,51 +1686,257 @@ async def _async_start_local_mqtt(
     except asyncio.CancelledError, Exception:
         if coordinator.local_mqtt_client is client:
             coordinator.set_local_mqtt_client(None)
-        await _async_stop_local_mqtt_client(hass, entry, client)
+        if not await _async_stop_local_mqtt_client(hass, entry, client):
+            _defer_supplemental_local_mqtt(hass, entry, client)
+            _schedule_supplemental_cleanup(hass, entry)
         raise
     if not _entry_owns_coordinator(hass, entry, coordinator):
         if coordinator.local_mqtt_client is client:
             coordinator.set_local_mqtt_client(None)
-        await _async_stop_local_mqtt_client(hass, entry, client)
+        if not await _async_stop_local_mqtt_client(hass, entry, client):
+            _defer_supplemental_local_mqtt(hass, entry, client)
+            _schedule_supplemental_cleanup(hass, entry)
         return
-    topic_marker = "/device/"
-    if topic_marker in configured_topic_filter:
-        topic_prefix, topic_suffix = configured_topic_filter.split(topic_marker, 1)
-        suffix_parts = topic_suffix.split("/")
-        official_response_filter = topic_suffix == "#" or (
-            len(suffix_parts) == 2
-            and bool(suffix_parts[0])
-            and suffix_parts[1] in {"#", "+", "status", "event"}
+    snapshot_topic_prefix, snapshot_device_topic_segment = _local_mqtt_snapshot_route(
+        configured_topic_filter
+    )
+    client.set_snapshot_requester(
+        lambda: coordinator.async_poll_local_mqtt_devices(
+            snapshot_topic_prefix,
+            device_topic_segment=snapshot_device_topic_segment,
         )
-        if topic_prefix and official_response_filter:
-            client.start_periodic_requests(
-                lambda: coordinator.async_poll_local_mqtt_devices(topic_prefix)
-            )
+    )
     # Device-side publishing is configured separately with the App-proven
     # 3046/BLE-113 command router. This subscriber never publishes it.
-    coordinator.async_schedule_local_mqtt_device_config()
 
 
 async def _async_shutdown_coordinator_bounded(
     coordinator: JackerySolarVaultCoordinator,
     *,
     context: str,
+    hass: HomeAssistant | None = None,
+    entry: ConfigEntry | None = None,
 ) -> bool:
     """Shut down a coordinator without allowing cleanup to hang indefinitely."""
+    ha_task_owner = (
+        hass is not None
+        and entry is not None
+        and isinstance(getattr(hass, "loop", None), asyncio.AbstractEventLoop)
+    )
+    bucket = (
+        _entry_runtime_bucket(hass, entry)
+        if ha_task_owner and hass is not None and entry is not None
+        else None
+    )
+    record = bucket.get(_COORDINATOR_SHUTDOWN_RUNTIME_KEY) if bucket else None
+    shutdown_task: asyncio.Task[Any] | None = None
+    if (
+        isinstance(record, tuple)
+        and len(record) == 2
+        and record[0] is coordinator
+        and isinstance(record[1], asyncio.Task)
+    ):
+        shutdown_task = record[1]
+    elif (
+        isinstance(record, tuple)
+        and len(record) == 2
+        and isinstance(record[1], asyncio.Task)
+        and not record[1].done()
+    ):
+        _LOGGER.warning(
+            "Jackery coordinator shutdown during %s is blocked by another "
+            "owned shutdown task",
+            context,
+        )
+        return False
+    if shutdown_task is None:
+        operation = coordinator.async_shutdown()
+        shutdown_task = (
+            hass.async_create_background_task(
+                operation,
+                f"{DOMAIN}_coordinator_shutdown_{entry.entry_id}",
+                eager_start=False,
+            )
+            if ha_task_owner and hass is not None and entry is not None
+            else asyncio.create_task(operation)
+        )
+        if bucket is not None:
+            bucket[_COORDINATOR_SHUTDOWN_RUNTIME_KEY] = (
+                coordinator,
+                shutdown_task,
+            )
+
+    def _schedule_reaper() -> None:
+        if not ha_task_owner or hass is None or entry is None or bucket is None:
+            return
+        existing_reaper = bucket.get(_COORDINATOR_SHUTDOWN_REAPER_TASK_RUNTIME_KEY)
+        if isinstance(existing_reaper, asyncio.Task) and not existing_reaper.done():
+            return
+        reaper = hass.async_create_background_task(
+            _async_reap_coordinator_shutdown(
+                hass,
+                entry,
+                coordinator,
+                shutdown_task,
+            ),
+            name=f"{DOMAIN}_coordinator_shutdown_reaper_{entry.entry_id}",
+            eager_start=False,
+        )
+        _store_entry_runtime_task(
+            hass,
+            entry,
+            _COORDINATOR_SHUTDOWN_REAPER_TASK_RUNTIME_KEY,
+            reaper,
+        )
+
+    def _clear_shutdown_record() -> None:
+        if bucket is None:
+            return
+        current = bucket.get(_COORDINATOR_SHUTDOWN_RUNTIME_KEY)
+        if (
+            isinstance(current, tuple)
+            and len(current) == 2
+            and current[0] is coordinator
+            and current[1] is shutdown_task
+        ):
+            bucket.pop(_COORDINATOR_SHUTDOWN_RUNTIME_KEY, None)
+
     try:
-        async with asyncio.timeout(COORDINATOR_SHUTDOWN_TIMEOUT_SEC):
-            await coordinator.async_shutdown()
-    except TimeoutError:
+        done, pending = await asyncio.wait(
+            {shutdown_task},
+            timeout=COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
+        )
+    except asyncio.CancelledError:
+        if ha_task_owner:
+            _schedule_reaper()
+        elif not shutdown_task.done():
+            shutdown_task.cancel()
+        raise
+    if pending:
+        if ha_task_owner:
+            _schedule_reaper()
+        else:
+            shutdown_task.cancel()
         _LOGGER.warning(
             "Jackery coordinator shutdown exceeded %.0fs during %s",
             COORDINATOR_SHUTDOWN_TIMEOUT_SEC,
             context,
         )
         return False
-    except Exception as err:  # ruff: ignore[blind-except]
-        _LOGGER.debug("Jackery coordinator shutdown failed during %s: %s", context, err)
+    try:
+        next(iter(done)).result()
+    except asyncio.CancelledError:
+        if ha_task_owner:
+            _schedule_reaper()
+        else:
+            _clear_shutdown_record()
         return False
+    except Exception as err:  # ruff: ignore[blind-except]
+        if ha_task_owner:
+            _schedule_reaper()
+        else:
+            _clear_shutdown_record()
+        _LOGGER.warning(
+            "Jackery coordinator shutdown failed during %s: %s: %s",
+            context,
+            type(err).__name__,
+            err,
+        )
+        return False
+    _clear_shutdown_record()
     return True
+
+
+async def _async_reap_coordinator_shutdown(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+    shutdown_task: asyncio.Task[Any],
+) -> None:
+    """Retry an owned shutdown until success, then release its runtime fence."""
+    current_task = shutdown_task
+    while True:
+        try:
+            await asyncio.shield(current_task)
+        except asyncio.CancelledError:
+            # Reaper cancellation must never cancel a separately owned shutdown.
+            # A child that was itself cancelled is retryable once it is done.
+            if not current_task.done():
+                return
+            _LOGGER.warning(
+                "Jackery deferred coordinator shutdown task was cancelled for "
+                "entry %s; retrying",
+                entry.entry_id,
+            )
+        except Exception as err:  # ruff: ignore[blind-except]
+            _LOGGER.warning(
+                "Jackery deferred coordinator shutdown failed for entry %s: %s: %s",
+                entry.entry_id,
+                type(err).__name__,
+                err,
+            )
+        else:
+            bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+            if not isinstance(bucket, dict):
+                return
+            record = bucket.get(_COORDINATOR_SHUTDOWN_RUNTIME_KEY)
+            if (
+                isinstance(record, tuple)
+                and len(record) == 2
+                and record[0] is coordinator
+                and record[1] is current_task
+            ):
+                bucket.pop(_COORDINATOR_SHUTDOWN_RUNTIME_KEY, None)
+            _defer_supplemental_transports(hass, entry, coordinator)
+            if bucket.get(_UNLOADING_COORDINATOR_RUNTIME_KEY) is coordinator:
+                bucket.pop(_UNLOADING_COORDINATOR_RUNTIME_KEY, None)
+            if bucket.get(_PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY) is coordinator:
+                bucket.pop(_PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY, None)
+            if entry.runtime_data is coordinator:
+                entry.runtime_data = cast("Any", None)
+            _schedule_supplemental_cleanup(hass, cast("JackeryConfigEntry", entry))
+            return
+
+        bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        if not isinstance(bucket, dict):
+            return
+        if (
+            bucket.get(_UNLOADING_COORDINATOR_RUNTIME_KEY) is not coordinator
+            and entry.runtime_data is not coordinator
+        ):
+            record = bucket.get(_COORDINATOR_SHUTDOWN_RUNTIME_KEY)
+            if (
+                isinstance(record, tuple)
+                and len(record) == 2
+                and record[0] is coordinator
+                and record[1] is current_task
+            ):
+                bucket.pop(_COORDINATOR_SHUTDOWN_RUNTIME_KEY, None)
+            return
+        await asyncio.sleep(_COORDINATOR_SHUTDOWN_RETRY_SEC)
+        record = bucket.get(_COORDINATOR_SHUTDOWN_RUNTIME_KEY)
+        if (
+            isinstance(record, tuple)
+            and len(record) == 2
+            and record[0] is coordinator
+            and isinstance(record[1], asyncio.Task)
+            and record[1] is not current_task
+        ):
+            current_task = record[1]
+            continue
+        if (
+            not isinstance(record, tuple)
+            or len(record) != 2
+            or record[0] is not coordinator
+            or record[1] is not current_task
+        ):
+            return
+        current_task = hass.async_create_background_task(
+            coordinator.async_shutdown(),
+            f"{DOMAIN}_coordinator_shutdown_retry_{entry.entry_id}",
+            eager_start=False,
+        )
+        bucket[_COORDINATOR_SHUTDOWN_RUNTIME_KEY] = (coordinator, current_task)
 
 
 async def _async_entry_updated(
@@ -1282,6 +1945,8 @@ async def _async_entry_updated(
 ) -> None:
     """Reload credential changes; apply ordinary options in place."""
     coordinator = entry.runtime_data
+    if coordinator is None or not _entry_owns_coordinator(hass, entry, coordinator):
+        return
     bucket = _entry_runtime_bucket(hass, entry)
     previous_options = bucket.get(_OPTIONS_SNAPSHOT_RUNTIME_KEY)
     previous_data = bucket.get(_ENTRY_DATA_SNAPSHOT_RUNTIME_KEY)
@@ -1301,6 +1966,16 @@ async def _async_entry_updated(
     }
     if not changed_keys:
         return
+    adopted_values = bucket.pop(_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY, None)
+    adopted_keys = (
+        {
+            key
+            for key, value in adopted_values.items()
+            if isinstance(key, str) and current_options.get(key) == value
+        }
+        if isinstance(adopted_values, dict)
+        else set()
+    )
     if CONF_SCAN_INTERVAL in changed_keys:
         # Applied in place: the coordinator schedules each next cycle from its
         # own ``update_interval``, so no reload is needed and every running
@@ -1311,7 +1986,8 @@ async def _async_entry_updated(
             "Jackery: coordinator polling interval changed to %ss",
             interval_sec,
         )
-    if CONF_ENABLE_BLE_TRANSPORT in changed_keys:
+    local_mqtt_changed = bool(changed_keys & _LOCAL_MQTT_OPTION_KEYS)
+    if CONF_ENABLE_BLE_TRANSPORT in changed_keys and not local_mqtt_changed:
         # Applied in place: the BLE transport is reconciled through the
         # layer-5 start task without tearing down the entry.
         _LOGGER.info("Jackery: BLE transport option changed, reconciling")
@@ -1319,21 +1995,17 @@ async def _async_entry_updated(
     if changed_keys & _ENTITY_CREATING_OPTION_KEYS:
         _async_clean_legacy_entities(hass, entry)
         coordinator.async_update_listeners()
-    if changed_keys & _DIRECT_LOCAL_MQTT_LISTENER_OPTION_KEYS:
-        # Local MQTT listener options (host, port, user, pass, topic) can be
-        # reconciled in-place via the layer-5 start task. Token changes
-        # require the device-side 3046/3047 cycle and are handled there.
-        _LOGGER.info("Jackery: local MQTT listener options changed, reconciling")
-        _schedule_layer5_start_if_ready(hass, entry, coordinator, changed_keys)
-    if CONF_THIRD_PARTY_MQTT_ENABLE in changed_keys:
-        # Third-party MQTT enable is the master opt-in for both cloud and local
-        # MQTT. Changing it may start or stop Layer-5 transports but does not
-        # require a full entry reload — the coordinator's layer-5 start task
-        # handles reconciliation independently of the HTTP path.
-        _LOGGER.info(
-            "Jackery: third-party MQTT enable option changed, reconciling Layer 5"
+    if local_mqtt_changed:
+        # Listener-facing keys are applied in place; token-only changes still
+        # require the independent device-side 3046/3047 reconciliation.
+        _LOGGER.info("Jackery: local MQTT options changed, reconciling Layer 5")
+        _schedule_layer5_start_if_ready(
+            hass,
+            entry,
+            coordinator,
+            changed_keys,
+            device_config_keys=(changed_keys & _LOCAL_MQTT_OPTION_KEYS) - adopted_keys,
         )
-        _schedule_layer5_start_if_ready(hass, entry, coordinator, changed_keys)
 
 
 async def _async_rollback_entry_setup(
@@ -1349,11 +2021,22 @@ async def _async_rollback_entry_setup(
     platforms_rolled_back = not platforms_started
     shutdown_ok = False
     rollback_ok = True
+    cleanup_scheduled = False
     try:  # ruff: ignore[too-many-statements-in-try-clause]
-        _cancel_layer5_start_task(hass, entry)
+        await _async_cancel_layer5_start_task(hass, entry)
+        await _async_cancel_runtime_task(
+            hass,
+            entry,
+            _OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            label="options reconcile",
+        )
+        _clear_option_reconcile_runtime_state(bucket)
         local_mqtt = _local_mqtt_client(hass, entry)
         if local_mqtt is not None:
-            await _async_stop_local_mqtt_client(hass, entry, local_mqtt)
+            if not await _async_stop_local_mqtt_client(hass, entry, local_mqtt):
+                if coordinator.local_mqtt_client is local_mqtt:
+                    coordinator.set_local_mqtt_client(None)
+                _defer_supplemental_local_mqtt(hass, entry, local_mqtt)
         if platforms_started:
             try:
                 async with asyncio.timeout(COORDINATOR_SHUTDOWN_TIMEOUT_SEC):
@@ -1377,6 +2060,8 @@ async def _async_rollback_entry_setup(
         shutdown_ok = await _async_shutdown_coordinator_bounded(
             coordinator,
             context="setup rollback",
+            hass=hass,
+            entry=entry,
         )
         if not shutdown_ok:
             _LOGGER.warning(
@@ -1384,10 +2069,15 @@ async def _async_rollback_entry_setup(
                 "preserving the runtime fence",
             )
             return False
+        _defer_supplemental_transports(hass, entry, coordinator)
+        _schedule_supplemental_cleanup(hass, entry)
+        cleanup_scheduled = True
     except Exception as err:  # ruff: ignore[blind-except]
         rollback_ok = False
         _LOGGER.warning("Jackery setup rollback cleanup failed: %s", err)
     finally:
+        if not cleanup_scheduled and _supplemental_cleanup_pending(hass, entry):
+            _schedule_supplemental_cleanup(hass, entry)
         current_bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
         if rollback_ok and platforms_rolled_back and shutdown_ok:
             if (
@@ -1432,7 +2122,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
     # pruning legacy fields here cannot reload or pause HTTP/L5 transports.
     _async_migrate_legacy_local_mqtt_options(hass, entry)
     _async_prune_removed_local_mqtt_tls_options(hass, entry)
-    _cancel_layer5_start_task(hass, entry)
+    await _async_cancel_layer5_start_task(hass, entry)
 
     session = async_get_clientsession(hass)
     api = JackeryApi(
@@ -1465,6 +2155,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         was ever created.  Updating options invokes the existing in-place
         listener reconcile and never reloads the HTTP coordinator.
         """
+        if not _entry_owns_coordinator(hass, entry, coordinator):
+            return
         enabled = safe_bool(config.get("enable"))
         if enabled is None:
             return
@@ -1487,12 +2179,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
                 CONF_THIRD_PARTY_MQTT_TOKEN: token,
             })
         options = dict(entry.options)
-        if all(options.get(key) == value for key, value in updates.items()):
+        changed_updates = {
+            key: value for key, value in updates.items() if options.get(key) != value
+        }
+        if not changed_updates:
             return
-        options.update(updates)
-        # Writing the options fires the entry-update listener, which reloads
-        # the entry when Layer-5 keys changed. The write is idempotent, so a
-        # 3047 readback that confirms the current state cannot loop.
+        options.update(changed_updates)
+        bucket = _entry_runtime_bucket(hass, entry)
+        adopted = bucket.get(_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY)
+        if not isinstance(adopted, dict):
+            adopted = {}
+            bucket[_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY] = adopted
+        adopted.update(changed_updates)
+        # The update listener still reconfigures Home Assistant's direct
+        # subscriber. The origin marker prevents a confirmed 3047 readback from
+        # scheduling the just-completed device-side 3046/BLE-113 write again.
         hass.config_entries.async_update_entry(entry, options=options)
 
     coordinator.set_local_mqtt_config_observer(_adopt_device_local_mqtt_config)
@@ -1516,43 +2217,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             if not cache_ready:
                 raise ConfigEntryNotReady("Jackery HTTP setup timeout") from err
             _LOGGER.warning("Jackery HTTP setup timeout; continuing from cache")
-        except BaseException as err:  # ruff: ignore[blind-except]
-            _LOGGER.warning("Jackery HTTP refresh failed: %s", err)
+        except asyncio.CancelledError:
+            raise
+        except ConfigEntryAuthFailed:
+            raise
+        except Exception as err:
+            if not cache_ready:
+                raise
+            _LOGGER.warning(
+                "Jackery HTTP refresh failed; continuing from cache: %s",
+                err,
+            )
 
         _async_clean_legacy_entities(hass, entry)
         _async_remove_legacy_system_parent_devices(hass, entry)
+        platforms_started = True
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-        # --- 123/-Pattern: Layer-5 parallel start ---
-        async def _start_local_mqtt() -> None:
-            await _async_start_local_mqtt(hass, entry, coordinator)
-
-        async def _apply_mqtt_config() -> None:
-            await coordinator.async_apply_local_mqtt_config_to_devices()
-
-        startup_tasks: list[tuple[str, Any]] = [
-            ("cloud MQTT", coordinator.async_start_mqtt()),
-            ("local MQTT", _start_local_mqtt()),
-            ("BLE transport", coordinator.async_start_ble_transport()),
-            ("device MQTT config", _apply_mqtt_config()),
-        ]
-
-        results = await asyncio.gather(
-            *[t for _, t in startup_tasks], return_exceptions=True
-        )
-
-        for (label, _), result in zip(startup_tasks, results, strict=True):
-            if isinstance(result, ConfigEntryAuthFailed):
-                coordinator.defer_background_auth_failure(result)
-            elif isinstance(result, BaseException):
-                _LOGGER.warning(
-                    "Jackery %s failed during background startup: %s", label, result
-                )
 
         # Statistics imports starten (non-blocking)
         coordinator.async_start_statistics_imports()
 
-        # Update listener NACH Layer-5 (verhindert Reload-Cycling)
+        # Store the setup baseline before Layer 5 can reconcile any confirmed
+        # device-side MQTT options through the update listener.
         entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
 
         _entry_runtime_bucket(hass, entry)[_PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY] = (
@@ -1561,6 +2247,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         runtime_bucket = _entry_runtime_bucket(hass, entry)
         runtime_bucket[_OPTIONS_SNAPSHOT_RUNTIME_KEY] = dict(entry.options)
         runtime_bucket[_ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)
+        _schedule_layer5_start_if_ready(hass, entry, coordinator)
 
         setup_complete = True
         return True
@@ -2431,39 +3118,58 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
     """
     coordinator: JackerySolarVaultCoordinator | None = entry.runtime_data
     unload_ok = False
-    coordinator_cleanup_ok = True
+    teardown_complete = False
+    cleanup_scheduled = False
     bucket = _entry_runtime_bucket(hass, entry)
-    if isinstance(coordinator, JackerySolarVaultCoordinator):
-        # Invalidate deferred callbacks before the first await. A started-event
-        # racing with reload must not launch transports for the old coordinator.
-        bucket[_UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
     try:
-        layer5_task = _entry_runtime_task(hass, entry, _LAYER5_TASK_RUNTIME_KEY)
-        if layer5_task is not None:
-            if bucket.get(_LAYER5_TASK_RUNTIME_KEY) is layer5_task:
-                bucket.pop(_LAYER5_TASK_RUNTIME_KEY, None)
-            if not layer5_task.done():
-                layer5_task.cancel()
-        local_mqtt = _local_mqtt_client(hass, entry)
-        if local_mqtt is not None:
-            await _async_stop_local_mqtt_client(hass, entry, local_mqtt)
         unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         if not unload_ok:
             return False
         if isinstance(coordinator, JackerySolarVaultCoordinator):
+            # The entry remains fully operational until HA confirms that every
+            # platform was unloaded. Once confirmed, fence callbacks before the
+            # next await and reap supplementary tasks before their resources.
+            bucket[_UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
+        await _async_cancel_layer5_start_task(hass, entry)
+        await _async_cancel_runtime_task(
+            hass,
+            entry,
+            _OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            label="options reconcile",
+        )
+        _clear_option_reconcile_runtime_state(bucket)
+        local_mqtt = _local_mqtt_client(hass, entry)
+        if local_mqtt is not None:
+            if not await _async_stop_local_mqtt_client(hass, entry, local_mqtt):
+                if (
+                    isinstance(coordinator, JackerySolarVaultCoordinator)
+                    and coordinator.local_mqtt_client is local_mqtt
+                ):
+                    coordinator.set_local_mqtt_client(None)
+                _defer_supplemental_local_mqtt(hass, entry, local_mqtt)
+        if isinstance(coordinator, JackerySolarVaultCoordinator):
             coordinator_cleanup_ok = await _async_shutdown_coordinator_bounded(
                 coordinator,
                 context="entry unload",
+                hass=hass,
+                entry=entry,
             )
             if not coordinator_cleanup_ok:
                 _LOGGER.error(
                     "Jackery HTTP coordinator cleanup failed after platforms were "
                     "unloaded; keeping the old runtime fenced for the next setup",
                 )
+                return True
+            _defer_supplemental_transports(hass, entry, coordinator)
+        _schedule_supplemental_cleanup(hass, entry)
+        cleanup_scheduled = True
+        teardown_complete = True
         return True
     finally:
+        if not cleanup_scheduled and _supplemental_cleanup_pending(hass, entry):
+            _schedule_supplemental_cleanup(hass, entry)
         current_bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-        if unload_ok and coordinator_cleanup_ok:
+        if unload_ok and teardown_complete:
             if (
                 isinstance(coordinator, JackerySolarVaultCoordinator)
                 and isinstance(current_bucket, dict)
@@ -2498,7 +3204,7 @@ async def async_remove_config_entry_device(  # ruff: ignore[unused-async]
     return True
 
 
-def async_migrate_entry(
+async def async_migrate_entry(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> bool:
@@ -2507,5 +3213,9 @@ def async_migrate_entry(
     Returns:
         True if migration was successful.
     """
-    # Config entry version 1 is the current version; no migration needed.
+    hass.config_entries.async_update_entry(
+        entry,
+        version=JackeryConfigFlow.VERSION,
+        minor_version=JackeryConfigFlow.MINOR_VERSION,
+    )
     return True

@@ -22,6 +22,9 @@ from .const import (
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
     APP_CHART_STAT_PERIODS,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_HOME_GRID_SERIES_KEYS,
     APP_PERIOD_DATE_TYPES,
     APP_REQUEST_BEGIN_DATE,
@@ -73,7 +76,6 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     FIELD_ACCESSORIES,
     FIELD_CURRENT_VERSION,
@@ -164,14 +166,13 @@ def local_mqtt_opt_in(entry: object) -> bool:
 
     Single source for the opt-in so the options flow and the runtime start path
     cannot disagree. ``config_flow._current_local_mqtt_options`` documents the
-    same precedence: an explicit ``local_mqtt_enable=True`` wins, an explicit
-    ``local_mqtt_enable=False`` wins (user choice respected), otherwise the
-    app-synchronised ``third_party_mqtt_enable`` acts as the fallback opt-in.
-    Reading only ``local_mqtt_enable`` at runtime made entries that carry just
-    the third-party keys look disabled, so the receiver never started and its
-    message counter stayed at zero.
+    same precedence. The canonical ``third_party_mqtt_enable`` option is the
+    current form value and therefore wins over every retired
+    ``local_mqtt_enable`` copy. Legacy keys remain read-only fallbacks until
+    setup migration removes them.
 
-    Default is True to match 123/ baseline (DEFAULT_LOCAL_MQTT_ENABLE = True).
+    With no explicit choice, the receiver stays disabled exactly like the
+    options flow's canonical third-party MQTT switch.
     """
     # Kein ``isinstance(..., Mapping)``: ``Mapping`` ist hier nur ein
     # TYPE_CHECKING-Import. ``in`` funktioniert fuer jedes Mapping, auch fuer
@@ -179,39 +180,29 @@ def local_mqtt_opt_in(entry: object) -> bool:
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
 
-    # Check legacy local_mqtt_enable first - explicit True enables, explicit False disables,
-    # missing falls through to third_party_mqtt_enable
+    # Current options are authoritative. In particular, a canonical False may
+    # never be overturned by a stale legacy True left in the same mapping.
+    if CONF_THIRD_PARTY_MQTT_ENABLE in options:
+        parsed = safe_bool(options[CONF_THIRD_PARTY_MQTT_ENABLE])
+        if parsed is not None:
+            return parsed
     if "local_mqtt_enable" in options:
-        value = options["local_mqtt_enable"]
-        parsed = safe_bool(value)
-        if parsed is True:
-            return True
-        if parsed is False:
-            return False
-        # parsed is None -> fall through to third_party_mqtt_enable
-    elif "local_mqtt_enable" in data:
-        value = data["local_mqtt_enable"]
-        parsed = safe_bool(value)
-        if parsed is True:
-            return True
-        if parsed is False:
-            return False
-        # parsed is None -> fall through to third_party_mqtt_enable
+        parsed = safe_bool(options["local_mqtt_enable"])
+        if parsed is not None:
+            return parsed
 
-    # No explicit local_mqtt_enable (True or False) - check if third_party_mqtt_enable
-    # is explicitly set. If explicitly True -> opt in. If explicitly False -> opt out
-    # (user choice respected). If not set at all -> fall back to DEFAULT_LOCAL_MQTT_ENABLE.
-    options = getattr(entry, "options", {}) or {}
-    data = getattr(entry, "data", {}) or {}
-    if CONF_THIRD_PARTY_MQTT_ENABLE in options or CONF_THIRD_PARTY_MQTT_ENABLE in data:
-        return config_entry_bool_option(
-            entry,
-            CONF_THIRD_PARTY_MQTT_ENABLE,
-            DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-        )
+    # Config-entry data is older than options, but its canonical key still wins
+    # over the retired alias within that storage layer.
+    if CONF_THIRD_PARTY_MQTT_ENABLE in data:
+        parsed = safe_bool(data[CONF_THIRD_PARTY_MQTT_ENABLE])
+        if parsed is not None:
+            return parsed
+    if "local_mqtt_enable" in data:
+        parsed = safe_bool(data["local_mqtt_enable"])
+        if parsed is not None:
+            return parsed
 
-    # third_party_mqtt_enable not set anywhere - fall back to DEFAULT_LOCAL_MQTT_ENABLE
-    return DEFAULT_LOCAL_MQTT_ENABLE
+    return DEFAULT_THIRD_PARTY_MQTT_ENABLE
 
 
 def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
@@ -1195,20 +1186,20 @@ def chart_series_debug(source: object) -> dict[str, Any]:
     return result
 
 
-def append_payload_debug_line(
+def append_payload_debug_lines(
     path: str | Path,
-    event: dict[str, Any],
+    events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
 ) -> None:
-    """Write one mandatorily redacted JSONL event and rotate oversized output.
-
-    Parameters:
-        path (str | Path): Path to the JSONL file to append. Parent directories will be
-            created if missing.
-        event (dict[str, Any]): Event payload to redact and serialize.
-    """
+    """Write every redacted JSONL event using one file open and rotation check."""
+    if not events:
+        return
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
-    if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
+    try:
+        rotate_needed = debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES
+    except FileNotFoundError:
+        rotate_needed = False
+    if rotate_needed:
         backup = debug_path.with_name(debug_path.name + PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX)
         try:
             backup.unlink(missing_ok=True)
@@ -1220,18 +1211,33 @@ def append_payload_debug_line(
             )
         try:
             debug_path.replace(backup)
+        except FileNotFoundError:
+            pass
         except OSError as err:
             _LOGGER.warning(
                 "Jackery: could not rotate payload debug log %s: %s",
                 debug_path,
                 err,
             )
-    redacted = redacted_json_safe_payload(event)
     with debug_path.open("a", encoding="utf-8") as file:
-        file.write(
-            json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
-        )
-        file.write("\n")
+        for event in events:
+            file.write(
+                json.dumps(
+                    redacted_json_safe_payload(event),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                )
+            )
+            file.write("\n")
+
+
+def append_payload_debug_line(
+    path: str | Path,
+    event: dict[str, Any],
+) -> None:
+    """Write one mandatorily redacted JSONL event for compatibility."""
+    append_payload_debug_lines(path, (event,))
 
 
 def safe_bool(
@@ -1289,6 +1295,19 @@ def smart_plug_serial(plug: object) -> str | None:
         plug.get(FIELD_ID),
         plug.get(FIELD_DEV_ID),
     )
+
+
+def normalize_mac_address(value: object) -> str | None:
+    """Return a lowercase colon-separated MAC address, if the value is one."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    compact = re.sub(r"[^0-9a-f]", "", text)
+    if len(compact) != 12:
+        return None
+    return ":".join(compact[index : index + 2] for index in range(0, 12, 2))
 
 
 def sorted_smart_plugs(plugs: object) -> list[dict[str, Any]]:
@@ -2075,9 +2094,9 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
         APP_SECTION_BATTERY_STAT,
         APP_STAT_TOTAL_DISCHARGE,
     )
-    battery_gap = None
+    battery_balance = None
     if battery_charge is not None and battery_discharge is not None:
-        battery_gap = max(0.0, battery_charge - battery_discharge)
+        battery_balance = battery_charge - battery_discharge
 
     conversion_loss_energy = None
     conversion_loss_energy_signed = None
@@ -2121,7 +2140,9 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
             "ct_public_export_year_kwh_present": public_export_present,
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
-            "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
+            "battery_charge_discharge_balance_year_kwh": _round_stat_value(
+                battery_balance
+            ),
             "conversion_loss_year_kwh": _round_stat_value(conversion_loss_energy),
             "conversion_loss_year_kwh_signed": _round_stat_value(
                 conversion_loss_energy_signed,
@@ -2402,12 +2423,19 @@ def attach_calculated_savings_metadata(payload: dict[str, Any]) -> None:
     if not isinstance(statistic, dict):
         return
     raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
+    pv_year_section = _period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR)
+    pv_year = payload.get(pv_year_section)
+    if not isinstance(pv_year, dict):
+        # Older/non-system devices may only expose PvStatApi. Keep that endpoint
+        # as a compatibility fallback, but SysPvStatApi is the value rendered by
+        # the current App's PV chart and therefore the primary savings basis.
+        pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+        pv_year = payload.get(pv_year_section)
     if not isinstance(pv_year, dict):
         return
     year_generation = effective_period_total_value(
         pv_year,
-        _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+        pv_year_section,
         APP_STAT_TOTAL_SOLAR_ENERGY,
     )
     year_revenue = _pv_revenue_value(pv_year)
@@ -2453,8 +2481,11 @@ def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetim
     if not isinstance(statistic, dict):
         return
 
-    pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+    pv_year_section = _period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR)
     pv_year = payload.get(pv_year_section)
+    if not isinstance(pv_year, dict):
+        pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+        pv_year = payload.get(pv_year_section)
     year_generation = (
         effective_period_total_value(
             pv_year,
@@ -3646,6 +3677,12 @@ def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mappin
             return APP_CHART_SERIES_Y1
         if stat_key == APP_STAT_TOTAL_DISCHARGE:
             return APP_CHART_SERIES_Y2
+        if stat_key == APP_DEVICE_STAT_ONGRID_TO_BATTERY:
+            return APP_CHART_SERIES_Y3
+        if stat_key == APP_DEVICE_STAT_BATTERY_TO_AC:
+            return APP_CHART_SERIES_Y4
+        if stat_key == APP_DEVICE_STAT_BATTERY_TO_GRID:
+            return APP_CHART_SERIES_Y5
 
     return None
 

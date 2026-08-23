@@ -41,6 +41,7 @@ from ..const import (
     LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY,
     LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY,
     LOCAL_DAILY_CACHE_DAY_KEY,
+    LOCAL_DAILY_CACHE_FULL_DAY_METRICS_KEY,
     LOCAL_DAILY_CACHE_HISTORY_DAYS,
     LOCAL_DAILY_CACHE_LAST_DELTAS_KEY,
     LOCAL_DAILY_CACHE_STORAGE_KEY,
@@ -57,6 +58,7 @@ _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
 _KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
 _KEY_DAY: Final = LOCAL_DAILY_CACHE_DAY_KEY
 _KEY_VALUES: Final = LOCAL_DAILY_CACHE_VALUES_KEY
+_KEY_FULL_DAY_METRICS: Final = LOCAL_DAILY_CACHE_FULL_DAY_METRICS_KEY
 _KEY_COMPLETED_DAYS: Final = LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY
 _KEY_COMPLETE_DAYS: Final = LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY
 _KEY_LAST_DELTAS: Final = LOCAL_DAILY_CACHE_LAST_DELTAS_KEY
@@ -152,6 +154,31 @@ def _clean_complete_days(value: object) -> set[str]:
     return cleaned
 
 
+def _clean_full_day_metrics(
+    value: object,
+    values: Mapping[str, int],
+) -> set[str]:
+    """Return explicitly covered metrics that have a usable stored anchor."""
+    if not isinstance(value, list):
+        return set()
+    cleaned: set[str] = set()
+    for metric in value:
+        if not isinstance(metric, str):
+            _LOGGER.warning(
+                "Jackery daily cache: dropping non-string full-day metric %r",
+                metric,
+            )
+            continue
+        if metric not in values:
+            _LOGGER.warning(
+                "Jackery daily cache: dropping full-day metric %s without anchor",
+                metric,
+            )
+            continue
+        cleaned.add(metric)
+    return cleaned
+
+
 def _merge_completed_days(
     first: dict[str, dict[str, int]],
     second: dict[str, dict[str, int]],
@@ -185,6 +212,12 @@ def _normalize_snapshot(payload: object) -> dict[str, Any] | None:
         _KEY_DAY: day,
         _KEY_VALUES: clean_values,
     }
+    full_day_metrics = _clean_full_day_metrics(
+        payload.get(_KEY_FULL_DAY_METRICS),
+        clean_values,
+    )
+    if full_day_metrics:
+        normalized[_KEY_FULL_DAY_METRICS] = sorted(full_day_metrics)
     completed_days = _clean_completed_days(payload.get(_KEY_COMPLETED_DAYS))
     if completed_days:
         normalized[_KEY_COMPLETED_DAYS] = completed_days
@@ -221,6 +254,14 @@ def _merge_snapshots(
     else:
         existing_values = _clean_metric_values(existing.get(_KEY_VALUES))
         incoming_values = _clean_metric_values(incoming.get(_KEY_VALUES))
+        existing_full_day_metrics = _clean_full_day_metrics(
+            existing.get(_KEY_FULL_DAY_METRICS),
+            existing_values,
+        )
+        incoming_full_day_metrics = _clean_full_day_metrics(
+            incoming.get(_KEY_FULL_DAY_METRICS),
+            incoming_values,
+        )
         merged = {
             _KEY_DAY: incoming_day,
             _KEY_VALUES: {
@@ -233,6 +274,11 @@ def _merge_snapshots(
                 if metric not in existing_values
             },
         }
+        merged_full_day_metrics = (
+            existing_full_day_metrics | incoming_full_day_metrics
+        ) & merged[_KEY_VALUES].keys()
+        if merged_full_day_metrics:
+            merged[_KEY_FULL_DAY_METRICS] = sorted(merged_full_day_metrics)
         merged_last_deltas = _clean_metric_values(existing.get(_KEY_LAST_DELTAS))
         for metric, value in _clean_metric_values(
             incoming.get(_KEY_LAST_DELTAS)
@@ -367,6 +413,12 @@ async def async_save_daily_cache(
             _KEY_DAY: day,
             _KEY_VALUES: clean_values,
         }
+        full_day_metrics = _clean_full_day_metrics(
+            payload.get(_KEY_FULL_DAY_METRICS),
+            clean_values,
+        )
+        if full_day_metrics:
+            clean_snapshot[_KEY_FULL_DAY_METRICS] = sorted(full_day_metrics)
         completed_days = _clean_completed_days(payload.get(_KEY_COMPLETED_DAYS))
         if completed_days:
             clean_snapshot[_KEY_COMPLETED_DAYS] = completed_days
@@ -435,6 +487,12 @@ def daily_delta(
     values = snapshot.get(_KEY_VALUES)
     if not isinstance(values, dict):
         return None
+    full_day_metrics = _clean_full_day_metrics(
+        snapshot.get(_KEY_FULL_DAY_METRICS),
+        _clean_metric_values(values),
+    )
+    if metric_key not in full_day_metrics:
+        return None
     anchor = values.get(metric_key)
     if anchor is None or isinstance(anchor, bool):
         return None
@@ -483,9 +541,24 @@ def refresh_snapshot(
     )
     if not isinstance(snapshot, dict) or snapshot.get(_KEY_DAY) != today_iso:
         previous_day = snapshot.get(_KEY_DAY) if isinstance(snapshot, dict) else None
-        last_deltas = _clean_metric_values(
-            snapshot.get(_KEY_LAST_DELTAS) if isinstance(snapshot, dict) else None
+        previous_values = _clean_metric_values(
+            snapshot.get(_KEY_VALUES) if isinstance(snapshot, dict) else None
         )
+        previous_full_day_metrics = _clean_full_day_metrics(
+            (
+                snapshot.get(_KEY_FULL_DAY_METRICS)
+                if isinstance(snapshot, dict)
+                else None
+            ),
+            previous_values,
+        )
+        last_deltas = {
+            metric: value
+            for metric, value in _clean_metric_values(
+            snapshot.get(_KEY_LAST_DELTAS) if isinstance(snapshot, dict) else None
+            ).items()
+            if metric in previous_full_day_metrics
+        }
         if (
             baseline_covers_full_day
             and isinstance(previous_day, str)
@@ -526,6 +599,8 @@ def refresh_snapshot(
             _KEY_DAY: today_iso,
             _KEY_VALUES: clean_values,
         }
+        if baseline_covers_full_day and clean_values:
+            refreshed[_KEY_FULL_DAY_METRICS] = sorted(clean_values)
         if completed_days:
             refreshed[_KEY_COMPLETED_DAYS] = completed_days
         if complete_days:
@@ -567,9 +642,15 @@ def refresh_snapshot(
             )
             continue
     refreshed = {_KEY_DAY: today_iso, _KEY_VALUES: merged}
+    full_day_metrics = _clean_full_day_metrics(
+        snapshot.get(_KEY_FULL_DAY_METRICS),
+        merged,
+    )
+    if full_day_metrics:
+        refreshed[_KEY_FULL_DAY_METRICS] = sorted(full_day_metrics)
     if completed_days:
         refreshed[_KEY_COMPLETED_DAYS] = completed_days
-    if baseline_covers_full_day:
+    if baseline_covers_full_day and full_day_metrics:
         complete_days.add(today_iso)
     if complete_days:
         refreshed[_KEY_COMPLETE_DAYS] = sorted(complete_days)
@@ -584,12 +665,30 @@ def record_latest_deltas(
 ) -> dict[str, Any]:
     """Return a snapshot carrying the latest observed delta for each metric."""
     recorded = dict(snapshot)
-    clean_deltas = _clean_metric_values(dict(deltas))
+    values = _clean_metric_values(recorded.get(_KEY_VALUES))
+    full_day_metrics = _clean_full_day_metrics(
+        recorded.get(_KEY_FULL_DAY_METRICS),
+        values,
+    )
+    clean_deltas = {
+        metric: value
+        for metric, value in _clean_metric_values(dict(deltas)).items()
+        if metric in full_day_metrics
+    }
+    latest = {
+        metric: value
+        for metric, value in _clean_metric_values(
+            recorded.get(_KEY_LAST_DELTAS)
+        ).items()
+        if metric in full_day_metrics
+    }
     if clean_deltas:
-        latest = _clean_metric_values(recorded.get(_KEY_LAST_DELTAS))
         for metric, value in clean_deltas.items():
             latest[metric] = max(latest.get(metric, value), value)
+    if latest:
         recorded[_KEY_LAST_DELTAS] = latest
+    else:
+        recorded.pop(_KEY_LAST_DELTAS, None)
     return recorded
 
 

@@ -258,17 +258,17 @@ from ..const import (
     VERIFY_CODE_PATH,
     ZONE_LIST_PATH,
 )
-from ..credentials import (
-    MAX_TOKEN_LENGTH,
-    credential_fingerprint,
-    credential_text,
-    redacted_error,
-)
 from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
     safe_float,
+)
+from .credentials import (
+    MAX_TOKEN_LENGTH,
+    credential_fingerprint,
+    credential_text,
+    redacted_error,
 )
 
 if TYPE_CHECKING:
@@ -1180,6 +1180,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         path: str,
         request: JsonRequestAttempt,
         token_used: str,
+        retry_transport_once: bool = False,
     ) -> tuple[int, object] | None:
         """Run exactly one rate-limited full re-login plus request retry.
 
@@ -1229,17 +1230,28 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 except asyncio.CancelledError:
                     self._last_auto_relogin_monotonic = previous_relogin_monotonic
                     raise
-        try:
-            return await request()
-        except (TimeoutError, aiohttp.ClientError) as err:
-            self._requests_failed += 1
-            if isinstance(err, TimeoutError):
-                self._timeouts_total += 1
-            msg = (
-                f"{method} {path} request failed after re-login: "
-                f"{type(err).__name__}: {err or "(no message)"}"
-            )
-            raise JackeryApiError(msg) from err
+        retry_pending = retry_transport_once
+        while True:
+            try:
+                return await request()
+            except (TimeoutError, aiohttp.ClientError) as err:
+                self._requests_failed += 1
+                if isinstance(err, TimeoutError):
+                    self._timeouts_total += 1
+                if retry_pending:
+                    retry_pending = False
+                    _LOGGER.debug(
+                        "Jackery %s %s post-login transport failure; retrying once: %s",
+                        method,
+                        path,
+                        type(err).__name__,
+                    )
+                    continue
+                msg = (
+                    f"{method} {path} request failed after re-login: "
+                    f"{type(err).__name__}: {err or "(no message)"}"
+                )
+                raise JackeryApiError(msg) from err
 
     async def _recover_auth_failure_or_raise(
         self,
@@ -1249,6 +1261,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         token_used: str,
         status: int,
         data: object,
+        retry_transport_once: bool = False,
     ) -> tuple[int, object]:
         """Recover a rejected session once or raise :class:`JackeryAuthError`.
 
@@ -1273,6 +1286,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path,
             request,
             token_used,
+            retry_transport_once=retry_transport_once,
         )
         if retried is not None:
             status, data = retried
@@ -1290,20 +1304,36 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         path: str,
         request: JsonRequestAttempt,
         token_used: str,
+        retry_transport_once: bool = False,
     ) -> tuple[int, dict[str, Any]]:
         """Run one authenticated request through the shared retry/validation path."""
         self._requests_total += 1
-        try:
-            status, data = await request()
-        except (TimeoutError, aiohttp.ClientError) as err:
-            self._requests_failed += 1
-            if isinstance(err, TimeoutError):
-                self._timeouts_total += 1
-            msg = (
-                f"{method} {path} request failed: "
-                f"{type(err).__name__}: {err or "(no message)"}"
-            )
-            raise JackeryApiError(msg) from err
+        retry_pending = retry_transport_once
+        response: tuple[int, object] | None = None
+        while True:
+            try:
+                response = await request()
+            except (TimeoutError, aiohttp.ClientError) as err:
+                self._requests_failed += 1
+                if isinstance(err, TimeoutError):
+                    self._timeouts_total += 1
+                if retry_pending:
+                    retry_pending = False
+                    _LOGGER.debug(
+                        "Jackery %s %s transient transport failure; retrying once: %s",
+                        method,
+                        path,
+                        type(err).__name__,
+                    )
+                    continue
+                msg = (
+                    f"{method} {path} request failed: "
+                    f"{type(err).__name__}: {err or "(no message)"}"
+                )
+                raise JackeryApiError(msg) from err
+            break
+
+        status, data = response
 
         if self._is_auth_failure_response(status, data):
             status, data = await self._recover_auth_failure_or_raise(
@@ -1313,6 +1343,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 token_used,
                 status,
                 data,
+                retry_transport_once=retry_transport_once,
             )
         if status != HTTPStatus.OK:
             msg = f"{method} {path} HTTP {status}"
@@ -1717,6 +1748,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             DEVICE_PROPERTY_PATH,
             params={FIELD_DEVICE_ID: str(device_id)},
             profile=HttpProfile.FAST,
+            retry_transport_once=True,
         )
         self.last_property_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_PROPERTY_PATH)
@@ -4056,6 +4088,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         *,
         request_timeout: int | None = None,
         profile: HttpProfile = HttpProfile.DEFAULT,
+        retry_transport_once: bool = False,
     ) -> dict[str, Any]:
         """Perform an authenticated GET and return its parsed response.
 
@@ -4104,6 +4137,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path=path,
             request=_do,
             token_used=token_used,
+            retry_transport_once=retry_transport_once,
         )
         code = self._extract_code(data)
         body = data.get(FIELD_DATA)

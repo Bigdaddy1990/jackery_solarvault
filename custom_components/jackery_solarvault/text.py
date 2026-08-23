@@ -535,6 +535,15 @@ class JackeryPvNameText(JackeryEntity, TextEntity):
         self._index = index
         self._field = _PV_FIELDS[index]
         self._attr_translation_key = f"pv{index + 1}_name"
+        self._cached_native_value = self._read_native_value()
+
+    def _read_native_value(self) -> str | None:
+        """Read one PV label from the latest coordinator snapshot."""
+        channel = self._merged_properties.get(self._field)
+        if not isinstance(channel, dict):
+            return None
+        value = channel.get(FIELD_PV_NAME)
+        return str(value) if value is not None else None
 
     @property
     def native_value(self) -> str | None:
@@ -546,11 +555,13 @@ class JackeryPvNameText(JackeryEntity, TextEntity):
         Returns:
             The stored PV-input name, or None when the channel or name is absent.
         """
-        channel = self._merged_properties.get(self._field)
-        if not isinstance(channel, dict):
-            return None
-        value = channel.get(FIELD_PV_NAME)
-        return str(value) if value is not None else None
+        return self._cached_native_value
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh the cached label before Home Assistant calculates state."""
+        self._cached_native_value = self._read_native_value()
+        super()._handle_coordinator_update()
 
     async def async_set_value(self, value: str) -> None:
         """Rename the PV input and update local state so the change appears in the.
@@ -606,6 +617,7 @@ class JackeryPvNameText(JackeryEntity, TextEntity):
                 },
             ) from err
 
+        self._cached_native_value = new_name
         self.async_write_ha_state()
 
 

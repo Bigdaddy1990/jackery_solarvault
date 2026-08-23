@@ -76,7 +76,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 import logging
-from math import isclose, isfinite
+from math import isclose, isfinite, sqrt
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
 from weakref import WeakKeyDictionary
 
@@ -104,9 +104,13 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import EnergyConverter
 
+from .client.mqtt_discovery import JackeryMqttSensorPublisher
 from .const import (
     APP_CHART_BUCKET_BY_DATE_TYPE,
     APP_CHART_METRIC_KEY_BY_SECTION_PREFIX,
@@ -132,6 +136,7 @@ from .const import (
     APP_SECTION_HOME_STAT,
     APP_SECTION_HOME_TRENDS,
     APP_SECTION_PV_STAT,
+    APP_SECTION_PV_TRENDS,
     APP_SECTION_SYMMETRY_STAT,
     APP_SECTION_TODAY_ENERGY,
     APP_STAT_PV1_ENERGY,
@@ -357,6 +362,7 @@ from .const import (
     FIELD_REBOOT,
     FIELD_SCAN_NAME,
     FIELD_SFC,
+    FIELD_SINGLE_CURRENCY,
     FIELD_SINGLE_PRICE,
     FIELD_SLTB,
     FIELD_SN,
@@ -476,7 +482,6 @@ from .entity import (
     property_data_sources,
 )
 from .ingest import local_period_total_supersedes_cloud
-from .mqtt_discovery import JackeryMqttSensorPublisher
 from .util import (
     app_energy_unit_scale,
     append_unique_entity,
@@ -496,9 +501,9 @@ from .util import (
     jackery_grid_side_output_power,
     jackery_inverter_ac_input_power,
     jackery_inverter_ac_output_power,
-    local_mqtt_opt_in,
     meter_head_serial,
     nonblank_text,
+    normalize_mac_address,
     redacted_json_safe_payload,
     safe_bool,
     safe_float,
@@ -1778,6 +1783,36 @@ def _battery_pack_description_value(
     return value
 
 
+_REACTIVE_POWER_INPUT_FIELDS: Final[dict[str, tuple[str, str]]] = {
+    FIELD_CT_REACTIVE_POWER: (FIELD_CT_APPARENT_POWER, FIELD_CT_POWER),
+    FIELD_CT_REACTIVE_POWER1: (FIELD_CT_APPARENT_POWER1, FIELD_CT_POWER1),
+    FIELD_CT_REACTIVE_POWER2: (FIELD_CT_APPARENT_POWER2, FIELD_CT_POWER2),
+    FIELD_CT_REACTIVE_POWER3: (FIELD_CT_APPARENT_POWER3, FIELD_CT_POWER3),
+}
+
+
+def _derived_reactive_power(
+    ct: dict[str, Any],
+    reactive_field: str,
+) -> float | None:
+    """Derive reactive-power magnitude from apparent and active power."""
+    input_fields = _REACTIVE_POWER_INPUT_FIELDS.get(reactive_field)
+    if input_fields is None:
+        return None
+    apparent = safe_float(ct.get(input_fields[0]))
+    active = safe_float(ct.get(input_fields[1]))
+    if (
+        apparent is None
+        or active is None
+        or not isfinite(apparent)
+        or not isfinite(active)
+    ):
+        return None
+    # The stream provides no inductive/capacitive sign without rep. Publish
+    # the non-negative magnitude only, preserving a direct rep when present.
+    return sqrt(max(0.0, apparent * apparent - active * active))
+
+
 def _smart_meter_description_value(
     ct: dict[str, Any],
     description: JackerySmartMeterSensorDescription,
@@ -1805,6 +1840,8 @@ def _smart_meter_description_value(
             raw = ct.get(fallback)
             if raw is not None:
                 break
+    if raw is None:
+        raw = _derived_reactive_power(ct, description.field)
     if raw is None:
         return None
     value = description.transform(raw)
@@ -2143,11 +2180,11 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         reset_period=DATE_TYPE_YEAR,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
-    # --- PROTOCOL.md §2.2: /v1/device/stat/pv period PV revenue --------
-    # Source: /v1/device/stat/sys/pv (dateType=week|month|year), field
-    # APP_STAT_TOTAL_SOLAR_REVENUE (PvStatApi$Bean.totalSolarRevenue). These
-    # surface the same period total the cloud reports for the energy charts,
-    # but valued in the device's own currency (PvStatApi$Bean.currency, read
+    # --- App SysChartVM: /v1/device/stat/sys/pv/trends PV revenue -------
+    # Source: SysPvStatApi (dateType=day|week|month|year), field
+    # APP_STAT_TOTAL_SOLAR_REVENUE. These surface the exact period total the App
+    # renders beside the PV chart; PvStatApi is a distinct per-input endpoint,
+    # but valued in the device's own currency (SysPvStatApi$Bean.currency, read
     # at runtime by JackeryStatSensor.native_unit_of_measurement — see there).
     # state_class=TOTAL (NOT TOTAL_INCREASING): like the period-energy
     # sensors these are per-period totals (week = Mon-Sun, month/year =
@@ -2161,7 +2198,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_day",
         translation_key="pv_revenue_day",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
-        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
+        section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_DAY}",
         transform=safe_float,
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
@@ -2172,7 +2209,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_week",
         translation_key="pv_revenue_week",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
-        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
+        section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
         transform=safe_float,
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
@@ -2183,7 +2220,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_month",
         translation_key="pv_revenue_month",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
-        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
+        section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
         transform=safe_float,
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
@@ -2194,7 +2231,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_year",
         translation_key="pv_revenue_year",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
-        section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
+        section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
         transform=safe_float,
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
@@ -2532,6 +2569,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_input_day_energy",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
+                APP_STAT_TOTAL_IN_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2543,6 +2586,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_input_week_energy",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_WEEK}",
+                APP_STAT_TOTAL_IN_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2554,6 +2603,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_input_month_energy",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_MONTH}",
+                APP_STAT_TOTAL_IN_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2565,6 +2620,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_input_year_energy",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_YEAR}",
+                APP_STAT_TOTAL_IN_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2576,6 +2637,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_output_day_energy",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
+                APP_STAT_TOTAL_OUT_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2587,6 +2654,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_output_week_energy",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_WEEK}",
+                APP_STAT_TOTAL_OUT_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2598,6 +2671,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_output_month_energy",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_MONTH}",
+                APP_STAT_TOTAL_OUT_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2609,6 +2688,12 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         translation_key="ct_output_year_energy",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_YEAR}",
+                APP_STAT_TOTAL_OUT_GRID_ENERGY,
+            ),
+        ),
         transform=safe_float,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL,
@@ -2928,6 +3013,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_DEVICE_STAT_ONGRID_TO_BATTERY,
         section=PAYLOAD_LOCAL_DAILY_ENERGY,
         fallback_sources=(
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_ONGRID_TO_BATTERY),
             (
                 f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
                 APP_DEVICE_STAT_ONGRID_TO_BATTERY,
@@ -2946,6 +3032,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_DEVICE_STAT_PV_TO_BATTERY,
         section=PAYLOAD_LOCAL_DAILY_ENERGY,
         fallback_sources=(
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_PV_TO_BATTERY),
             (
                 f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
                 APP_DEVICE_STAT_PV_TO_BATTERY,
@@ -2964,6 +3051,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_DEVICE_STAT_BATTERY_TO_GRID,
         section=PAYLOAD_LOCAL_DAILY_ENERGY,
         fallback_sources=(
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_TO_GRID),
             (
                 f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
                 APP_DEVICE_STAT_BATTERY_TO_GRID,
@@ -3808,11 +3896,10 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
     ),
     JackerySavingsDetailSensorDescription(
         key="savings_battery_loss_year_energy",
-        translation_key="savings_battery_loss_year_energy",
-        path=("source_energy", "battery_charge_discharge_gap_kwh"),
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL,
-        reset_period=DATE_TYPE_YEAR,
+        translation_key="savings_battery_balance_year_energy",
+        path=("source_energy", "battery_charge_discharge_balance_year_kwh"),
+        device_class=SensorDeviceClass.ENERGY_STORAGE,
+        state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
     JackerySavingsDetailSensorDescription(
@@ -4638,6 +4725,9 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         self._attr_state_class = description.state_class
         self._attr_native_unit_of_measurement = description.native_unit_of_measurement
         self._reset_period = description.reset_period
+        self._cache_refresh_active = False
+        self._cached_native_value: float | int | str | None = None
+        self._cached_attrs: dict[str, Any] = {}
 
     @property
     def last_reset(self) -> datetime | None:
@@ -4656,10 +4746,11 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
         savings = (self._statistic or {}).get(APP_SAVINGS_CALC_META)
         return savings if isinstance(savings, dict) else {}
 
-    @property
-    def native_value(self) -> float | int | str | None:
-        """The selected calculated value."""
-        raw: object = self._calculation
+    def _native_value_from_calculation(
+        self, calculation: dict[str, Any]
+    ) -> float | int | str | None:
+        """Resolve the described value from a calculation snapshot."""
+        raw: object = calculation
         for key in self.entity_description.path:
             if not isinstance(raw, dict):
                 return None
@@ -4671,19 +4762,63 @@ class JackerySavingsDetailSensor(JackeryEntity, SensorEntity):
             return round(value, SAVINGS_PRICE_PRECISION)
         return cast("float | int | str | None", value)
 
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Calculation context for diagnostics."""
-        calculation = self._calculation
+    @staticmethod
+    def _attrs_from_calculation(calculation: dict[str, Any]) -> dict[str, Any]:
+        """Return cached diagnostic fields for a calculation snapshot."""
         return {
-            "source_section": PAYLOAD_STATISTIC,
-            "source_key": APP_SAVINGS_CALC_META,
-            "source_path": ".".join(self.entity_description.path),
             "method": calculation.get("method"),
             "price_source": calculation.get("price_source"),
             "published_value_source": calculation.get("published_value_source"),
             "decision": calculation.get("decision"),
         }
+
+    @callback
+    def _refresh_cache(self) -> None:
+        """Compute value and diagnostics before the HA state write."""
+        calculation = self._calculation
+        self._cached_native_value = self._native_value_from_calculation(calculation)
+        self._cached_attrs = self._attrs_from_calculation(calculation)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh cached calculation values before Home Assistant writes state."""
+        if self._cache_refresh_active:
+            self._refresh_cache()
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """Prime the cached calculation before the initial state write."""
+        self._cache_refresh_active = True
+        self._refresh_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception, asyncio.CancelledError:
+            self._cache_refresh_active = False
+            raise
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Disable the platform cache during teardown."""
+        self._cache_refresh_active = False
+        await super().async_will_remove_from_hass()
+
+    @property
+    def native_value(self) -> float | int | str | None:
+        """The selected calculated value."""
+        if self._cache_refresh_active:
+            return self._cached_native_value
+        return self._native_value_from_calculation(self._calculation)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Calculation context for diagnostics."""
+        attrs = {
+            "source_section": PAYLOAD_STATISTIC,
+            "source_key": APP_SAVINGS_CALC_META,
+            "source_path": ".".join(self.entity_description.path),
+        }
+        if self._cache_refresh_active:
+            return {**attrs, **self._cached_attrs}
+        return {**attrs, **self._attrs_from_calculation(self._calculation)}
 
 
 class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
@@ -4827,11 +4962,12 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
     battery_pack_identities: dict[tuple[str, int], tuple[str | None, str]] = {}
+    # The HA MQTT discovery publisher mirrors already-created native entities.
+    # It is independent from the optional raw Local MQTT receiver: the bridge
+    # may publish raw layer topics while mapped sensors must still be exported.
     mqtt_publisher = (
         JackeryMqttSensorPublisher(hass, entry_id=entry.entry_id)
-        if hass is not None
-        and "mqtt" in hass.config.components
-        and local_mqtt_opt_in(entry)
+        if hass is not None and "mqtt" in hass.config.components
         else None
     )
 
@@ -5354,6 +5490,8 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
         entities = _collect_entities(option_signature)
         if entities:
             async_add_entities(entities)
+            if mqtt_publisher is not None:
+                mqtt_publisher.async_schedule_initial_publish()
         last_signature = sig
         last_option_signature = option_signature
         known_registration_eligibility.update(registration_eligibility)
@@ -5361,10 +5499,6 @@ async def async_setup_entry(  # ruff: ignore[complex-structure, unused-async]  #
     _add_new_entities()
     entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
     if mqtt_publisher is not None:
-        mqtt_publisher.async_schedule_publish()
-        entry.async_on_unload(
-            coordinator.async_add_listener(mqtt_publisher.async_schedule_publish)
-        )
         entry.async_on_unload(mqtt_publisher.async_shutdown)
 
 
@@ -5390,10 +5524,14 @@ class JackerySensor(JackeryEntity, SensorEntity):
             description.entity_registry_enabled_default
             and description.entity_category != EntityCategory.DIAGNOSTIC
         )
+        # State calculation is synchronous in Home Assistant. After setup,
+        # source resolution must finish before that critical write path.
+        self._cache_refresh_active = False
+        self._cached_native_value: Any = None
+        self._cached_attrs: dict[str, Any] = {}
 
-    @property
-    def native_value(self) -> Any:  # dynamically computed HA sensor state value
-        """The entity's current value."""
+    def _native_value_from_payload(self) -> Any:
+        """Resolve the current value from the coordinator payload."""
         source_payload = self._payload_for_sources(self.entity_description.data_sources)
         props = source_payload.get(PAYLOAD_PROPERTIES) or {}
         raw = self.entity_description.getter(props)
@@ -5410,6 +5548,55 @@ class JackerySensor(JackeryEntity, SensorEntity):
             if mapped is not None:
                 return mapped
         return value
+
+    def _attrs_from_payload(self) -> dict[str, Any]:
+        """Build source diagnostics while refreshing the entity cache."""
+        merged_raw = self.entity_description.getter(self._merged_properties)
+        http_raw = self.entity_description.getter(self._http_properties)
+        attrs: dict[str, Any] = {
+            "merged_raw_value": merged_raw,
+            "http_raw_value": http_raw,
+        }
+        if merged_raw is not None and http_raw is not None and merged_raw != http_raw:
+            attrs["live_source_overrides_http"] = True
+        return attrs
+
+    @callback
+    def _refresh_cache(self) -> None:
+        """Resolve source data before Home Assistant calculates state."""
+        self._cached_native_value = self._native_value_from_payload()
+        self._cached_attrs = self._attrs_from_payload()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh cached state before Home Assistant writes it."""
+        if self._cache_refresh_active:
+            self._refresh_cache()
+        if self._availability_cache_active:
+            self._refresh_availability_cache()
+        self._write_prepared_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Prime cached state before Home Assistant performs its first write."""
+        self._cache_refresh_active = True
+        self._refresh_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception, asyncio.CancelledError:
+            self._cache_refresh_active = False
+            raise
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop serving a cache once the entity leaves Home Assistant."""
+        self._cache_refresh_active = False
+        await super().async_will_remove_from_hass()
+
+    @property
+    def native_value(self) -> Any:  # dynamically computed HA sensor state value
+        """The entity's current value."""
+        if getattr(self, "_cache_refresh_active", False):
+            return self._cached_native_value
+        return self._native_value_from_payload()
 
     @property
     def last_reset(self) -> datetime | None:
@@ -5449,16 +5636,9 @@ class JackerySensor(JackeryEntity, SensorEntity):
         instead (one record per channel per minute) cannot answer "did this
         value move between polls?" for second-rate telemetry.
         """
-        merged_raw = self.entity_description.getter(self._merged_properties)
-        http_raw = self.entity_description.getter(self._http_properties)
-        attrs: dict[str, Any] = {
-            "merged_raw_value": merged_raw,
-            "http_raw_value": http_raw,
-        }
-        if merged_raw is not None and http_raw is not None and merged_raw != http_raw:
-            # A live transport is overriding the cloud value right now.
-            attrs["live_source_overrides_http"] = True
-        return attrs
+        if self._cache_refresh_active:
+            return self._cached_attrs
+        return self._attrs_from_payload()
 
 
 _PeriodResolution = tuple[
@@ -5488,6 +5668,7 @@ class _StatCacheSnapshot:
     native_value: Any
     attrs: dict[str, Any]
     source_section: str
+    last_reset: datetime | None = None
 
 
 _RESTORABLE_LIFETIME_STAT_SENSOR_KEYS: Final = frozenset({
@@ -5502,6 +5683,7 @@ _TOTAL_INCREASING_JITTER_BY_UNIT: Final[dict[str, float]] = {
     UnitOfEnergy.WATT_HOUR: 20.0,
     UnitOfEnergy.KILO_WATT_HOUR: 0.02,
 }
+_TOTAL_INCREASING_RECORDER_RESET_RATIO: Final = 0.9
 
 
 def _guard_total_increasing_jitter(
@@ -5509,7 +5691,11 @@ def _guard_total_increasing_jitter(
     current: Any,
     description: SensorEntityDescription,
 ) -> Any:
-    """Hold tiny energy-counter regressions until the source catches up."""
+    """Hold non-reset counter regressions until the source catches up.
+
+    Home Assistant records a reset only below 90% of the prior value; smaller
+    dips are invalid for ``total_increasing`` and therefore retained.
+    """
     if (
         description.device_class is not SensorDeviceClass.ENERGY
         or description.state_class is not SensorStateClass.TOTAL_INCREASING
@@ -5527,13 +5713,32 @@ def _guard_total_increasing_jitter(
     if current_value is None:
         return previous
     regression = previous_value - current_value
-    if current_value < previous_value and (
-        regression < threshold
-        or isclose(regression, threshold, rel_tol=0.0, abs_tol=1e-9)
-    ):
-        return previous
-    # A material decrease can be a genuine device counter reset. HA's
-    # TOTAL_INCREASING handling must see it so a new meter cycle can begin.
+    if current_value < previous_value:
+        if regression < threshold or isclose(
+            regression,
+            threshold,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            return previous
+        reset_boundary = (
+            previous_value * _TOTAL_INCREASING_RECORDER_RESET_RATIO
+        )
+        non_reset_counter = (
+            description.key.startswith("lifetime_")
+            or description.key in _RESTORABLE_LIFETIME_STAT_SENSOR_KEYS
+        )
+        if current_value > reset_boundary or (
+            non_reset_counter
+            and isclose(
+                current_value,
+                reset_boundary,
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            )
+        ):
+            return previous
+    # A drop below HA's reset threshold is a genuine new meter cycle.
     return current
 
 
@@ -5545,12 +5750,18 @@ async def _async_restored_lifetime_energy_value(
     stored = await entity.async_get_last_sensor_data()
     if stored is None or isinstance(stored.native_value, bool):
         return None
-    if stored.native_unit_of_measurement not in {None, expected_unit}:
-        return None
     try:
         value = float(cast(Any, stored.native_value))
     except TypeError, ValueError, OverflowError:
         return None
+    stored_unit = stored.native_unit_of_measurement
+    if stored_unit not in {None, expected_unit}:
+        if expected_unit is None:
+            return None
+        try:
+            value = EnergyConverter.convert(value, stored_unit, expected_unit)
+        except HomeAssistantError:
+            return None
     if not isfinite(value) or value < 0:
         return None
     return value
@@ -5615,6 +5826,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             "source_key": description.stat_key,
         }
         self._cached_source_section = description.section
+        self._cached_last_reset: datetime | None = None
         self._cache_generation = 0
         self._cache_refresh_active = False
         self._restored_lifetime_value: float | None = None
@@ -5652,7 +5864,37 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             or self.entity_description.state_class != SensorStateClass.TOTAL
         ):
             return None
-        return self._compute_period_start(self._reset_period)
+        return cast("datetime | None", getattr(self, "_cached_last_reset", None))
+
+    @staticmethod
+    def _period_start_from_source(
+        reset_period: StatResetPeriod | None,
+        source: dict[str, Any],
+        timezone: tzinfo,
+    ) -> datetime | None:
+        """Precompute last_reset from a detached refresh source."""
+        if reset_period is None:
+            return None
+        request = source.get(APP_REQUEST_META)
+        begin_iso = None
+        if isinstance(request, dict):
+            begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
+                APP_REQUEST_BEGIN_DATE_ALT
+            )
+            if isinstance(begin, str) and begin:
+                begin_iso = begin
+        if begin_iso is None:
+            return _period_start(reset_period, timezone)
+        try:
+            begin_date = date.fromisoformat(begin_iso)
+        except ValueError:
+            return _period_start(reset_period, timezone)
+        return datetime(
+            begin_date.year,
+            begin_date.month,
+            begin_date.day,
+            tzinfo=timezone,
+        )
 
     def _compute_period_start(self, reset_period: StatResetPeriod) -> datetime | None:
         """Compute the period start for the given reset period."""
@@ -5792,7 +6034,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 return value, candidate_section, candidate_source
         return None
 
-    def _current_open_week_from_month_chart(
+    def _current_open_week_from_month_chart(  # ruff: ignore[too-many-locals] - period corroboration keeps each source operand explicit
         self,
         section: str,
         stat_key: str,
@@ -5801,13 +6043,13 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         today: date,
         local_daily_raw: tuple[float, str] | None,
     ) -> tuple[float, str, dict[str, Any]] | None:
-        """Build the current open week from covered daily kWh buckets.
+        """Build the current open week from corroborated daily kWh buckets.
 
-        Jackery returns an empty array plus scalar zero for an open week.  The
-        month response from the same endpoint contains dated daily buckets.
-        Only a fully covered Monday-through-today range is accepted.  The
-        same-metric local lifetime delta may replace today's lagging bucket;
-        it is never applied to a closed day.
+        Jackery can return a positive but stale week total, not only an empty
+        placeholder.  Cross-check the week and month views day by day, use a
+        verified historical day where available, and let the same-metric local
+        lifetime delta replace only today's lagging bucket.  A zero needs two
+        distinct period/day observations before it becomes entity data.
         """
         if self._reset_period != DATE_TYPE_WEEK:
             return None
@@ -5815,6 +6057,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         if not section.endswith(suffix):
             return None
         month_section = f"{section[: -len(suffix)]}_{DATE_TYPE_MONTH}"
+        week_source = self._source_for_section(section, payload)
         month_source = self._source_for_section(month_section, payload)
         week_start = today - timedelta(days=today.weekday())
         local_value = local_daily_raw[0] if local_daily_raw is not None else None
@@ -5824,60 +6067,165 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         )
         prefix = section[: -len(suffix)]
         total = 0.0
-        used_verified_day = False
         day = week_start
         while day <= today:
+            week_value = _chart_value_for_day(
+                week_source,
+                section,
+                stat_key,
+                today=day,
+            )
             month_value = _chart_value_for_day(
                 month_source,
                 month_section,
                 stat_key,
                 today=day,
             )
-            value = month_value
-            if day < today and (value is None or value == 0):
-                day_sources = verified_days.get(day.isoformat())
-                prefix_totals = (
-                    day_sources.get(prefix) if isinstance(day_sources, dict) else None
-                )
-                verified_value = (
-                    safe_float(prefix_totals.get(stat_key))
-                    if isinstance(prefix_totals, dict)
-                    else None
-                )
-                if verified_value is None or verified_value < 0:
-                    return None
-                if verified_value == 0 and month_value is None:
-                    # A lone zero curve does not confirm a missing month
-                    # bucket. AGENTS.md §2.2 requires a second source before
-                    # zero becomes entity data.
-                    return None
-                value = verified_value
-                used_verified_day = True
-            elif day == today:
-                if local_value is not None and local_value >= 0:
-                    if value is None or local_value > value:
-                        value = local_value
-                elif value is None or value == 0:
-                    # A current cloud zero without local/day corroboration is
-                    # still the documented Jackery placeholder, not energy.
-                    return None
-            if value is None or value < 0:
+            day_sources = verified_days.get(day.isoformat())
+            prefix_totals = (
+                day_sources.get(prefix) if isinstance(day_sources, dict) else None
+            )
+            verified_value = (
+                safe_float(prefix_totals.get(stat_key))
+                if isinstance(prefix_totals, dict)
+                else None
+            )
+            observations = [
+                value
+                for value in (week_value, month_value, verified_value)
+                if value is not None and value >= 0
+            ]
+            if day == today and local_value is not None and local_value >= 0:
+                observations.append(local_value)
+            if not observations:
+                return None
+            positive_observations = [value for value in observations if value > 0]
+            if positive_observations:
+                value = max(positive_observations)
+            elif len(observations) >= 2:
+                value = 0.0
+            else:
+                # One zero from one request is still Jackery's known no-data
+                # placeholder shape, not proof of a genuine zero-energy day.
                 return None
             total += value
             day += timedelta(days=1)
 
         total = round(total, 5)
-        if total == 0 and local_value is None and not used_verified_day:
+        return total, section, week_source
+
+    def _open_month_total_with_local_day(
+        self,
+        section: str,
+        stat_key: str,
+        *,
+        payload: dict[str, Any],
+        today: date,
+        local_value: float,
+    ) -> tuple[float, dict[str, Any]] | None:
+        """Replace only today's month-chart bucket with a newer local total."""
+        month_source = self._source_for_section(section, payload)
+        month_total = _chart_sum_for_date_range(
+            month_source,
+            section,
+            stat_key,
+            start=today.replace(day=1),
+            end=today,
+        )
+        day_bucket = _chart_value_for_day(
+            month_source,
+            section,
+            stat_key,
+            today=today,
+        )
+        if month_total is None or day_bucket is None:
             return None
-        if used_verified_day:
-            return total, PAYLOAD_VERIFIED_DAY_STATISTICS, verified_days
-        if week_start == today and local_value is not None:
-            return (
-                total,
-                PAYLOAD_LOCAL_DAILY_ENERGY,
-                self._source_for_section(PAYLOAD_LOCAL_DAILY_ENERGY, payload),
+        reconciled = round(
+            month_total - day_bucket + max(day_bucket, local_value),
+            5,
+        )
+        return reconciled, month_source
+
+    def _current_open_month_or_year_with_local_day(
+        self,
+        section: str,
+        stat_key: str,
+        *,
+        payload: dict[str, Any],
+        today: date,
+        local_daily_raw: tuple[float, str] | None,
+        cloud_total: float | None,
+    ) -> tuple[float, str, dict[str, Any], str] | None:
+        """Reconcile only the open month/year bucket with today's local total."""
+        if local_daily_raw is None or cloud_total is None:
+            return None
+        local_value = local_daily_raw[0]
+        if local_value < 0:
+            return None
+
+        if self._reset_period == DATE_TYPE_MONTH:
+            suffix = f"_{DATE_TYPE_MONTH}"
+            if not section.endswith(suffix):
+                return None
+            month = self._open_month_total_with_local_day(
+                section,
+                stat_key,
+                payload=payload,
+                today=today,
+                local_value=local_value,
             )
-        return total, month_section, month_source
+            if month is None:
+                return None
+            reconciled, month_source = month
+            return (
+                max(cloud_total, reconciled),
+                section,
+                month_source,
+                "current_open_month_with_local_day",
+            )
+
+        if self._reset_period != DATE_TYPE_YEAR:
+            return None
+        suffix = f"_{DATE_TYPE_YEAR}"
+        if not section.endswith(suffix):
+            return None
+        prefix = section[: -len(suffix)]
+        month_section = f"{prefix}_{DATE_TYPE_MONTH}"
+        month = self._open_month_total_with_local_day(
+            month_section,
+            stat_key,
+            payload=payload,
+            today=today,
+            local_value=local_value,
+        )
+        year_source = self._source_for_section(section, payload)
+        year_values = effective_trend_series_values(year_source, section, stat_key)
+        unit_scale = app_energy_unit_scale(year_source)
+        month_index = today.month - 1
+        if (
+            month is None
+            or not isinstance(year_values, list)
+            or month_index >= len(year_values)
+            or unit_scale is None
+        ):
+            return None
+        year_month_bucket = safe_float(year_values[month_index])
+        if year_month_bucket is None or year_month_bucket < 0:
+            return None
+        year_month_bucket *= unit_scale
+        reconciled_month, _month_source = month
+        reconciled = round(
+            cloud_total
+            - year_month_bucket
+            + max(year_month_bucket, reconciled_month),
+            5,
+        )
+        return (
+            max(cloud_total, reconciled),
+            section,
+            year_source,
+            "current_open_year_with_local_month",
+        )
 
     @staticmethod
     def _resolve_period_value(
@@ -6042,7 +6390,17 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 cached_source_section = section
                 return True
 
-            if raw is None:
+            empty_ct_zero_needs_fallback = bool(
+                raw is not None
+                and not raw
+                and section.startswith(APP_SECTION_CT_STAT)
+                and not (
+                    isinstance(values, list)
+                    and any(value is not None for value in values)
+                )
+                and self.entity_description.fallback_sources
+            )
+            if raw is None or empty_ct_zero_needs_fallback:
                 # PROTOCOL.md §2 fallback — try documented alternate
                 # source (e.g. deviceStatistic for today_* sensors).
                 for fb_section, fb_stat_key in self.entity_description.fallback_sources:
@@ -6079,6 +6437,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                         server_total = fb_server_total
                         break
             day_bucket_fallback: str | None = None
+            observed_zero_revenue = False
+            revenue_derivation: dict[str, Any] | None = None
             if raw is None:
                 # The cloud answers ``data: null`` for every dateType=day
                 # endpoint at night; derive today's value from the month/
@@ -6108,16 +6468,16 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     day_bucket_fallback = f"current_day_bucket_from_{bucket_section}"
                     break
             open_week_fallback: str | None = None
-            if raw is None:
-                week_value = self._current_open_week_from_month_chart(
-                    section,
-                    stat_key,
-                    payload=payload,
-                    today=context.local_today,
-                    local_daily_raw=context.local_daily_raw,
-                )
-                if week_value is not None:
-                    week_raw, week_section, week_source = week_value
+            week_value = self._current_open_week_from_month_chart(
+                section,
+                stat_key,
+                payload=payload,
+                today=context.local_today,
+                local_daily_raw=context.local_daily_raw,
+            )
+            if week_value is not None:
+                week_raw, week_section, week_source = week_value
+                if local_period_total_supersedes_cloud(safe_float(raw), week_raw):
                     raw = week_raw
                     section = week_section
                     source = week_source
@@ -6126,6 +6486,29 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     chart_series_sum = None
                     server_total = None
                     open_week_fallback = "current_open_week_from_daily_buckets"
+            open_period_fallback: str | None = None
+            open_period_value = self._current_open_month_or_year_with_local_day(
+                section,
+                stat_key,
+                payload=payload,
+                today=context.local_today,
+                local_daily_raw=context.local_daily_raw,
+                cloud_total=safe_float(raw),
+            )
+            if open_period_value is not None:
+                period_raw, period_section, period_source, fallback = open_period_value
+                if local_period_total_supersedes_cloud(
+                    safe_float(raw),
+                    period_raw,
+                ):
+                    raw = period_raw
+                    section = period_section
+                    source = period_source
+                    series_key = _trend_series_key(section, stat_key)
+                    values = None
+                    chart_series_sum = None
+                    server_total = None
+                    open_period_fallback = fallback
             if (
                 self._reset_period in {DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR}
                 and context.local_period_raw is not None
@@ -6144,10 +6527,59 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     _use_local_daily_fallback()
             if raw is None and self._reset_period == DATE_TYPE_DAY:
                 _use_local_daily_fallback()
+            if (
+                raw is None
+                and self._reset_period == DATE_TYPE_DAY
+                and stat_key == APP_STAT_TOTAL_SOLAR_REVENUE
+            ):
+                local_daily = payload.get(PAYLOAD_LOCAL_DAILY_ENERGY)
+                local_pv_units = (
+                    safe_float(local_daily.get(APP_DEVICE_STAT_PV_ENERGY))
+                    if isinstance(local_daily, dict)
+                    else None
+                )
+                if local_pv_units == 0:
+                    # This is a direct local observation, not a cloud zero.
+                    # No solar generation makes the current day revenue zero.
+                    raw = 0.0
+                    observed_zero_revenue = True
+                elif local_pv_units is not None and local_pv_units > 0:
+                    price_source = self._source_for_section(PAYLOAD_PRICE, payload)
+                    price_mode = safe_int(
+                        price_source.get(FIELD_DYNAMIC_OR_SINGLE)
+                    )
+                    single_price = safe_float(price_source.get(FIELD_SINGLE_PRICE))
+                    price_currency = first_nonblank_text(
+                        price_source.get(FIELD_SINGLE_CURRENCY),
+                        price_source.get(FIELD_CURRENCY),
+                    )
+                    if (
+                        price_mode == _SINGLE_TARIFF_MODE
+                        and single_price is not None
+                        and single_price > 0
+                    ):
+                        energy_kwh = round(
+                            local_pv_units / JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
+                            5,
+                        )
+                        raw = round(energy_kwh * single_price, 2)
+                        revenue_derivation = {
+                            "energy_kwh": energy_kwh,
+                            "energy_source": PAYLOAD_LOCAL_DAILY_ENERGY,
+                            "price_per_kwh": single_price,
+                            "price_source": (
+                                f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
+                            ),
+                            "currency": price_currency,
+                        }
 
             cached_source_section = (
                 self.entity_description.section
-                if day_bucket_fallback is not None or open_week_fallback is not None
+                if (
+                    day_bucket_fallback is not None
+                    or open_week_fallback is not None
+                    or open_period_fallback is not None
+                )
                 else section
             )
             cached_native_value = (
@@ -6162,10 +6594,13 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             attrs: dict[str, Any] = {
                 "source_section": section,
                 "source_key": stat_key,
-                "chart_series_key": series_key,
-                "chart_series_sum": chart_series_sum,
-                "server_total": server_total,
             }
+            if series_key is not None:
+                attrs["chart_series_key"] = series_key
+            if chart_series_sum is not None:
+                attrs["chart_series_sum"] = chart_series_sum
+            if server_total is not None:
+                attrs["server_total"] = server_total
             if day_bucket_fallback is not None:
                 attrs["fallback"] = day_bucket_fallback
             if open_week_fallback is not None:
@@ -6174,10 +6609,27 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     context.local_today - timedelta(days=context.local_today.weekday())
                 ).isoformat()
                 attrs["fallback_period_end"] = context.local_today.isoformat()
+            if open_period_fallback is not None:
+                attrs["fallback"] = open_period_fallback
+                attrs["fallback_period_start"] = (
+                    context.local_today.replace(day=1)
+                    if self._reset_period == DATE_TYPE_MONTH
+                    else context.local_today.replace(month=1, day=1)
+                ).isoformat()
+                attrs["fallback_period_end"] = context.local_today.isoformat()
             if local_daily_metric is not None:
                 attrs["fallback"] = "local_lifetime_delta"
                 attrs["fallback_metric"] = local_daily_metric
-            if isinstance(values, list) and len(values) <= _MAX_PERIOD_VALUES:
+            if observed_zero_revenue:
+                attrs["fallback"] = "derived_observed_zero_revenue"
+            if revenue_derivation is not None:
+                attrs["fallback"] = "derived_single_tariff_revenue"
+                attrs["revenue_derivation"] = revenue_derivation
+            if (
+                isinstance(values, list)
+                and len(values) <= _MAX_PERIOD_VALUES
+                and all(value is not None for value in values)
+            ):
                 attrs["period_values"] = values
             year_backfill = source.get(APP_YEAR_BACKFILL_META)
             if isinstance(year_backfill, dict):
@@ -6189,6 +6641,11 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 cached_native_value,
                 attrs,
                 cached_source_section,
+                self._period_start_from_source(
+                    self._reset_period,
+                    source,
+                    context.local_now.tzinfo or UTC,
+                ),
             )
 
         # ---- non-period stat path (totalGeneration, todayLoad, price, ...)
@@ -6197,21 +6654,57 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             section == APP_SECTION_TODAY_ENERGY and self._reset_period == DATE_TYPE_DAY
         )
         compact_today_zero_sources: set[str] = set()
-        compact_today_primary_zero = compact_today_sensor and safe_float(raw) == 0
+        compact_today_provenance_source = source.get(APP_TODAY_ENERGY_SOURCE_META)
+        compact_today_provenance = (
+            compact_today_provenance_source.get(stat_key)
+            if isinstance(compact_today_provenance_source, dict)
+            else None
+        )
+        compact_today_observed_zero = (
+            compact_today_sensor
+            and safe_float(raw) == 0
+            and isinstance(compact_today_provenance, dict)
+            and isinstance(compact_today_provenance.get("source_section"), str)
+        )
+        compact_today_value = safe_float(raw)
+        compact_today_primary_zero = (
+            compact_today_sensor
+            and compact_today_value == 0
+            and not compact_today_observed_zero
+        )
+        compact_today_primary_negative = (
+            compact_today_sensor
+            and compact_today_value is not None
+            and compact_today_value < 0
+        )
         if compact_today_primary_zero:
             compact_today_zero_sources.add(section)
-        local_flow_primary_zero = (
+        local_flow_value = safe_float(raw)
+        local_flow_sensor = (
             self.entity_description.key in _UNCORROBORATED_LOCAL_DAILY_ZERO_KEYS
             and section == PAYLOAD_LOCAL_DAILY_ENERGY
-            and safe_float(raw) == 0
         )
-        if compact_today_primary_zero or local_flow_primary_zero:
+        local_flow_primary_zero = local_flow_sensor and local_flow_value == 0
+        local_flow_primary_negative = (
+            local_flow_sensor
+            and local_flow_value is not None
+            and local_flow_value < 0
+        )
+        local_flow_zero_sources: set[str] = set()
+        if local_flow_primary_zero:
+            local_flow_zero_sources.add(section)
+        if (
+            compact_today_primary_zero
+            or compact_today_primary_negative
+            or local_flow_primary_zero
+            or local_flow_primary_negative
+        ):
             raw = None
         day_bucket_fallback = None
         non_period_local_daily_metric: str | None = None
         normalized_kwh_fallback = False
         reconciled_fallback: str | None = None
-        revenue_derivation: dict[str, Any] | None = None
+        revenue_derivation = None
         for fb_section, fb_stat_key in self.entity_description.fallback_sources:
             fb_source = self._source_for_section(fb_section, payload)
             fb_raw = fb_source.get(fb_stat_key)
@@ -6227,19 +6720,19 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 # the more complete observation.
                 current_value = safe_float(self.entity_description.transform(raw))
             fallback_value = safe_float(fb_raw)
+            if fallback_value is not None and fallback_value < 0:
+                continue
             if compact_today_sensor and raw is None and fallback_value == 0:
                 compact_today_zero_sources.add(fb_section)
                 if len(compact_today_zero_sources) < 2:
                     continue
-            if (
-                self.entity_description.key in _UNCORROBORATED_LOCAL_DAILY_ZERO_KEYS
-                and raw is None
-                and fallback_value == 0
-                and not local_flow_primary_zero
-            ):
+            if local_flow_sensor and raw is None and fallback_value == 0:
                 # A lone HTTP zero is no stronger than a lone local-delta zero.
-                # Publish it only when both independent day sources agree.
-                continue
+                # Retain each distinct documented source so a second source can
+                # corroborate the first without inventing a non-zero reading.
+                local_flow_zero_sources.add(fb_section)
+                if len(local_flow_zero_sources) < 2:
+                    continue
             if fb_raw is None or not (
                 raw is None
                 or (
@@ -6404,6 +6897,20 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 price_mode = safe_int(price_source.get(FIELD_DYNAMIC_OR_SINGLE))
                 single_price = safe_float(price_source.get(FIELD_SINGLE_PRICE))
                 if (
+                    self._reset_period == DATE_TYPE_DAY
+                    and energy == 0
+                    and local_pv is not None
+                ):
+                    # A present local PV counter establishes that the day has
+                    # no solar generation. Revenue is exactly zero regardless
+                    # of whether the price endpoint is awake.
+                    raw = 0.0
+                    revenue_derivation = {
+                        "energy_kwh": 0.0,
+                        "energy_source": energy_source,
+                        "reason": "observed_zero_generation",
+                    }
+                elif (
                     energy is not None
                     and energy > 0
                     and price_mode == _SINGLE_TARIFF_MODE
@@ -6418,9 +6925,9 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                         "price_source": f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}",
                     }
                 else:
-                    # The cloud's zero is a known placeholder when the same
-                    # period has no populated revenue series.  Do not turn
-                    # missing tariff/energy evidence into a false monetary 0.
+                    # The cloud zero is a known placeholder when the same
+                    # period has no populated revenue series. Do not turn
+                    # missing tariff or energy evidence into a false monetary 0.
                     raw = None
         cached_source_section = (
             self.entity_description.section
@@ -6455,7 +6962,11 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         if normalized_kwh_fallback:
             non_period_attrs["fallback"] = "documented_http_day_fallback"
         if revenue_derivation is not None:
-            non_period_attrs["fallback"] = "derived_single_tariff_revenue"
+            non_period_attrs["fallback"] = (
+                "derived_observed_zero_revenue"
+                if revenue_derivation.get("reason") == "observed_zero_generation"
+                else "derived_single_tariff_revenue"
+            )
             non_period_attrs["revenue_derivation"] = revenue_derivation
         savings = source.get(APP_SAVINGS_CALC_META)
         if stat_key == APP_STAT_TOTAL_REVENUE and isinstance(savings, dict):
@@ -6477,6 +6988,11 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             cached_native_value,
             non_period_attrs,
             cached_source_section,
+            self._period_start_from_source(
+                self._reset_period,
+                source,
+                context.local_now.tzinfo or UTC,
+            ),
         )
 
     @callback
@@ -6527,17 +7043,18 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         if snapshot.native_value is not None:
             self._restored_lifetime_value = None
         self._cached_source_section = snapshot.source_section
+        self._cached_last_reset = snapshot.last_reset
 
     @callback
     def _write_cached_state(self) -> None:
         """Write the state after the asynchronous cache refresh completes."""
         if not self._cache_refresh_active:
             return
-        super()._handle_coordinator_update()
+        self._write_prepared_state()
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Refresh the cache before HA writes the new state."""
+        """Queue a statistic refresh; availability follows its final snapshot."""
         if not self._cache_refresh_active:
             return
         _stat_refresh_batch_for(self.coordinator).request(self, write_state=True)
@@ -6594,6 +7111,11 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         """
         if self.entity_description.device_class != SensorDeviceClass.MONETARY:
             return self.entity_description.native_unit_of_measurement
+        derivation = self._cached_attrs.get("revenue_derivation")
+        if isinstance(derivation, dict):
+            currency = derivation.get("currency")
+            if isinstance(currency, str) and currency.strip():
+                return currency
         source = self._source_for_section(self._cached_source_section)
         currency = source.get(FIELD_CURRENCY)
         if isinstance(currency, str) and currency.strip():
@@ -6856,6 +7378,27 @@ class _StatRefreshBatch:
         self._log_failure(entity, stage, error)
 
     @callback
+    def _write_failed_availability(
+        self,
+        entity: JackeryStatSensor,
+        generation: int,
+        stage: str,
+    ) -> None:
+        """Publish current availability when a statistic snapshot cannot be used."""
+        if not self._is_current(entity, generation):
+            return
+        try:
+            entity._refresh_availability_cache()  # ruff: ignore[private-member-access]  # same-module prepared-state lifecycle
+            entity._write_cached_state()  # ruff: ignore[private-member-access]  # same-module guarded HA write
+        except Exception as err:  # ruff: ignore[blind-except]  # failure-reporting boundary must not affect batch peers
+            error_stage = f"{stage} availability"
+            signature = (error_stage, type(err), str(err))
+            if self._failure_signatures.get(entity) == signature:
+                return
+            self._failure_signatures[entity] = signature
+            self._log_failure(entity, error_stage, err)
+
+    @callback
     def _fail_pending(
         self,
         pending: dict[JackeryStatSensor, tuple[int, bool]],
@@ -6865,6 +7408,7 @@ class _StatRefreshBatch:
         """Deterministically fail every current entity in a drained batch."""
         for entity, (generation, _write_state) in pending.items():
             self._fail_entity(entity, generation, error, stage)
+            self._write_failed_availability(entity, generation, stage)
 
     @callback
     def _capture_requests(
@@ -6885,24 +7429,18 @@ class _StatRefreshBatch:
                 except Exception as err:  # ruff: ignore[blind-except]  # mapping protocol boundary; isolate peer devices
                     payload_errors[device_id] = err
             if (error := payload_errors.get(device_id)) is not None:
-                self._fail_entity(
-                    entity,
-                    generation,
-                    error,
-                    "capture statistic device payload",
-                )
+                stage = "capture statistic device payload"
+                self._fail_entity(entity, generation, error, stage)
+                self._write_failed_availability(entity, generation, stage)
                 continue
             try:
                 context = entity._capture_refresh_context(  # ruff: ignore[private-member-access]  # same-module capture hook
                     payloads[device_id]
                 )
             except Exception as err:  # ruff: ignore[blind-except]  # entity capture boundary; isolate peer entities
-                self._fail_entity(
-                    entity,
-                    generation,
-                    err,
-                    "capture statistic refresh context",
-                )
+                stage = "capture statistic refresh context"
+                self._fail_entity(entity, generation, err, stage)
+                self._write_failed_availability(entity, generation, stage)
                 continue
             requests.append(
                 _StatRefreshRequest(
@@ -6920,33 +7458,33 @@ class _StatRefreshBatch:
         request = result.request
         entity = request.entity
         if result.error is not None:
-            self._fail_entity(
-                entity,
-                request.generation,
-                result.error,
-                "compute statistic cache",
-            )
+            stage = "compute statistic cache"
+            self._fail_entity(entity, request.generation, result.error, stage)
+            self._write_failed_availability(entity, request.generation, stage)
             return
         if not self._can_apply(entity, request.generation):
             return
         snapshot = result.snapshot
         if snapshot is None:
+            stage = "compute statistic cache"
             self._fail_entity(
                 entity,
                 request.generation,
                 RuntimeError("Statistic refresh returned no cache snapshot"),
-                "compute statistic cache",
+                stage,
             )
+            self._write_failed_availability(entity, request.generation, stage)
             return
         try:
             entity._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]  # same-module batch application
+            # The cache snapshot can change native_value from None to a value
+            # (or vice versa). Prepare availability from that final snapshot,
+            # before the measured Home Assistant state write.
+            entity._refresh_availability_cache()  # ruff: ignore[private-member-access]  # same-module prepared-state lifecycle
         except Exception as err:  # ruff: ignore[blind-except]  # entity application boundary; isolate peer entities
-            self._fail_entity(
-                entity,
-                request.generation,
-                err,
-                "apply statistic cache",
-            )
+            stage = "apply statistic cache"
+            self._fail_entity(entity, request.generation, err, stage)
+            self._write_failed_availability(entity, request.generation, stage)
             return
         if request.write_state:
             try:
@@ -7008,11 +7546,17 @@ class _StatRefreshBatch:
                     raise
                 except Exception as err:  # ruff: ignore[blind-except]  # executor boundary can propagate arbitrary transform failures
                     for request in requests:
+                        stage = "execute statistic refresh batch"
                         self._fail_entity(
                             request.entity,
                             request.generation,
                             err,
-                            "execute statistic refresh batch",
+                            stage,
+                        )
+                        self._write_failed_availability(
+                            request.entity,
+                            request.generation,
+                            stage,
                         )
                     in_flight = {}
                     continue
@@ -8065,6 +8609,14 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         for key in CT_ATTRIBUTE_FIELDS:
             if key in ct:
                 attrs[key] = ct.get(key)
+        if self.entity_description.field in _REACTIVE_POWER_INPUT_FIELDS:
+            attrs["source"] = (
+                "raw_field"
+                if ct.get(self.entity_description.field) is not None
+                else "derived_apparent_minus_active"
+                if _derived_reactive_power(ct, self.entity_description.field) is not None
+                else "raw_field"
+            )
         phases = self._signed_phase_values(ct)
         if phases is not None:
             attrs["phase_a_signed_power"] = phases[0]
@@ -8138,12 +8690,15 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         if (
             self.entity_description.state_class is SensorStateClass.TOTAL_INCREASING
             and self.entity_description.device_class is SensorDeviceClass.ENERGY
-            and self._cached_native_value is None
         ):
-            self._restored_lifetime_value = await _async_restored_lifetime_energy_value(
+            restored = await _async_restored_lifetime_energy_value(
                 self,
                 self.entity_description.native_unit_of_measurement,
             )
+            if restored is None:
+                return
+            self._cached_native_value = restored
+            self._restored_lifetime_value = restored
             self._refresh_cache()
 
     @property
@@ -8190,7 +8745,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
             "_smart_meter_key",
             stable_subdevice_key("smart_meter", identity, 1),
         )
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_{smart_meter_key}")},
             manufacturer=manufacturer,
             name=f"{base_name} Smart Meter",
@@ -8198,6 +8753,9 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
             serial_number=identity,
             via_device=(DOMAIN, self._device_id),
         )
+        if mac := normalize_mac_address(ct.get(FIELD_MAC)):
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+        return info
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -8345,20 +8903,56 @@ class JackeryHttpApiSensor(JackeryEntity, SensorEntity):
     ) -> None:
         """Create the HTTP API diagnostic entity for the given device."""
         super().__init__(coordinator, device_id, "http_api")
+        self._cache_refresh_active = False
+        self._cached_native_value = 0
+        self._cached_attrs: dict[str, Any] = {}
 
     def _observation(self) -> dict[str, Any]:
         """Retrieve the HTTP API observation record for this device."""
         observations = self.coordinator.http_api_observations()
         return observations if isinstance(observations, dict) else {}
 
+    @callback
+    def _refresh_cache(self) -> None:
+        """Copy the diagnostics snapshot before Home Assistant writes state."""
+        observation = dict(self._observation())
+        self._cached_native_value = int(observation.get("requests_total", 0))
+        self._cached_attrs = observation
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh cached diagnostics before Home Assistant writes state."""
+        if self._cache_refresh_active:
+            self._refresh_cache()
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """Prime diagnostic caches before the initial state write."""
+        self._cache_refresh_active = True
+        self._refresh_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception, asyncio.CancelledError:
+            self._cache_refresh_active = False
+            raise
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Disable the platform cache during teardown."""
+        self._cache_refresh_active = False
+        await super().async_will_remove_from_hass()
+
     @property
     def native_value(self) -> int:
         """Total HTTP requests made since HA setup."""
+        if self._cache_refresh_active:
+            return self._cached_native_value
         return int(self._observation().get("requests_total", 0))
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Provide HTTP API + Cloud MQTT counters."""
+        if self._cache_refresh_active:
+            return self._cached_attrs
         return dict(self._observation())
 
 
@@ -8433,10 +9027,10 @@ class JackeryLocalMqttSensor(JackeryEntity, SensorEntity):
     def native_value(self) -> int:
         """Messages handed to the router since HA setup.
 
-        The client forwards everything the broker delivers for the user's
-        subscription filter — it applies no content filtering. The attribute
-        ``messages_received`` is the broker-side total; the difference to this
-        counter is what arrived with no sink wired.
+        Messages received counts subscribed broker traffic, messages filtered
+        identifies non-telemetry broker messages, and messages forwarded counts
+        frames handed to the shared Jackery parser. Valid no-op telemetry remains
+        forwarded and refreshes liveness.
         """
         return int(self._observation().get("messages_forwarded", 0))
 
@@ -8470,31 +9064,66 @@ class JackeryDeviceActivationSensor(JackeryEntity, SensorEntity):
     ) -> None:
         """Create the device-activation diagnostic entity."""
         super().__init__(coordinator, device_id, "device_activation")
+        self._cache_refresh_active = False
+        self._cached_native_value: int | None = None
+        self._cached_attrs: dict[str, Any] = {}
 
-    @property
-    def native_value(self) -> int | None:
-        """The cloud-activation state (0 = not activated, 1 = active)."""
+    def _state_from_payload(self) -> tuple[int | None, dict[str, Any]]:
+        """Build the activation state and diagnostics from one payload snapshot."""
         device = (
             (self.coordinator.data or {})
             .get(self._device_id, {})
             .get(PAYLOAD_DEVICE, {})
         )
-        return safe_int(device.get("activated"))
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Provide isCloud and raw device payload for diagnostics."""
-        device = (
-            (self.coordinator.data or {})
-            .get(self._device_id, {})
-            .get(PAYLOAD_DEVICE, {})
-        )
-        return {
+        if not isinstance(device, dict):
+            device = {}
+        return safe_int(device.get("activated")), {
             "is_cloud": device.get("isCloud"),
             "activated": device.get("activated"),
             "online_status": device.get("onlineStatus"),
             "device_sn": device.get("sn"),
         }
+
+    @callback
+    def _refresh_cache(self) -> None:
+        """Prepare one activation snapshot before Home Assistant writes state."""
+        self._cached_native_value, self._cached_attrs = self._state_from_payload()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Refresh activation data before the synchronous Home Assistant write."""
+        if self._cache_refresh_active:
+            self._refresh_cache()
+        super()._handle_coordinator_update()
+
+    async def async_added_to_hass(self) -> None:
+        """Prime the activation snapshot before the initial state write."""
+        self._cache_refresh_active = True
+        self._refresh_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception, asyncio.CancelledError:
+            self._cache_refresh_active = False
+            raise
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Disable the state-write snapshot during teardown."""
+        self._cache_refresh_active = False
+        await super().async_will_remove_from_hass()
+
+    @property
+    def native_value(self) -> int | None:
+        """The cloud-activation state (0 = not activated, 1 = active)."""
+        if self._cache_refresh_active:
+            return self._cached_native_value
+        return self._state_from_payload()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Provide isCloud and raw device payload for diagnostics."""
+        if self._cache_refresh_active:
+            return self._cached_attrs
+        return self._state_from_payload()[1]
 
 
 class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
@@ -8656,7 +9285,7 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
         http_props = self._http_properties or {}
         return {
             "formula": "stackOutPw - stackInPw",
-            "source": "http_primary_main_device_stack_bus",
+            "source": "coordinator_resolved_main_device_stack_bus",
             "positive": "complete battery stack discharge",
             "negative": "complete battery stack charge",
             "stackOutPw": props.get(FIELD_STACK_OUT_PW),

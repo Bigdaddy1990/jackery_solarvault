@@ -1,6 +1,7 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -8,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 import ssl
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiomqtt
 from aiomqtt import MqttError
@@ -32,13 +33,14 @@ from ..const import (
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
-from ..credentials import credential_fingerprint, redacted_error
+from .credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Coroutine
 
     from aiomqtt import Client as MQTTClient
 
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
 
@@ -48,7 +50,6 @@ _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 # level; enabling integration DEBUG must expose every aiomqtt connection,
 # subscription, publish and teardown record.
 _MQTT_STOP_TIMEOUT_SEC = 5.0
-_MAX_PENDING_MESSAGE_TASKS = 32
 # Getter response correlation constants
 _MAX_PENDING_RESPONSES = 100
 _MQTT_RESPONSE_TIMEOUT_SEC = 10.0
@@ -116,6 +117,7 @@ class JackeryMqttPushClient:
         message_callback: Callable[[str, dict[str, Any]], Awaitable[object]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
         disconnect_callback: Callable[[], Awaitable[None]] | None = None,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         """Initialize the MQTT push client and its lifecycle callbacks.
 
@@ -132,6 +134,7 @@ class JackeryMqttPushClient:
             disconnects.
         """
         self._hass = hass
+        self._config_entry = config_entry
         self._message_callback = message_callback
         self._connect_callback = connect_callback
         self._disconnect_callback = disconnect_callback
@@ -181,7 +184,15 @@ class JackeryMqttPushClient:
         self._birth_not_connected_logged = False
         self._last_birth_at: str | None = None
         self._birth_generation: int | None = None
+        self._message_queue: deque[tuple[str, dict[str, Any]]] = deque()
+        self._message_consumer_task: asyncio.Task[None] | None = None
+        self._message_delivery_task: asyncio.Task[None] | None = None
+        self._message_delivery_item: tuple[str, dict[str, Any]] | None = None
+        # Compatibility tracking used by diagnostics and bounded shutdown. A
+        # FIFO client owns at most one message-consumer task at a time.
         self._message_tasks: set[asyncio.Task[None]] = set()
+        self._messages_delivered = 0
+        self._message_handler_errors = 0
         self._lifecycle_tasks: dict[asyncio.Task[None], object] = {}
 
     async def async_start(
@@ -442,10 +453,7 @@ class JackeryMqttPushClient:
         lifecycle_tasks = {
             pending for pending in self._lifecycle_tasks if pending is not current_task
         }
-        message_tasks = {
-            pending for pending in self._message_tasks if pending is not current_task
-        }
-        owned_tasks = set(lifecycle_tasks | message_tasks)
+        owned_tasks = set(lifecycle_tasks)
         if runner_task is not None and runner_task is not current_task:
             owned_tasks.add(runner_task)
         self._client = None
@@ -469,12 +477,13 @@ class JackeryMqttPushClient:
                 continue
             if not pending.done():
                 pending.cancel()
-        if not owned_tasks:
-            return
-        done, still_pending = await asyncio.wait(
-            owned_tasks,
-            timeout=_MQTT_STOP_TIMEOUT_SEC,
-        )
+        done: set[asyncio.Task[None]] = set()
+        still_pending: set[asyncio.Task[None]] = set()
+        if owned_tasks:
+            done, still_pending = await asyncio.wait(
+                owned_tasks,
+                timeout=_MQTT_STOP_TIMEOUT_SEC,
+            )
         for completed in done:
             try:
                 completed.result()
@@ -492,18 +501,27 @@ class JackeryMqttPushClient:
             token = self._lifecycle_tasks.get(completed)
             if token is not None and self._lifecycle_tasks.get(completed) is token:
                 self._lifecycle_tasks.pop(completed, None)
-        self._message_tasks.difference_update(done)
         if still_pending:
             runner_count = int(runner_task in still_pending)
             lifecycle_count = len(still_pending & lifecycle_tasks)
-            message_count = len(still_pending & message_tasks)
+            accepted_backlog = len(self._message_queue) + int(
+                self._message_delivery_item is not None
+            )
             msg = (
                 "Jackery MQTT stop timed out after "
                 f"{_MQTT_STOP_TIMEOUT_SEC:.1f}s "
                 f"(runner={runner_count}, lifecycle={lifecycle_count}, "
-                f"messages={message_count})"
+                f"messages={accepted_backlog})"
             )
             raise RuntimeError(msg)
+        try:
+            await self.async_wait_message_queue_idle(timeout=_MQTT_STOP_TIMEOUT_SEC)
+        except TimeoutError as err:
+            msg = (
+                "Jackery MQTT stop timed out after "
+                f"{_MQTT_STOP_TIMEOUT_SEC:.1f}s while draining accepted messages"
+            )
+            raise RuntimeError(msg) from err
 
     async def _async_run_session(
         self,
@@ -722,7 +740,7 @@ class JackeryMqttPushClient:
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", error)
 
     @staticmethod
-    def _extract_mqtt_code(err: MqttCodeError) -> int:
+    def _extract_mqtt_code(err: object) -> int:
         """Extract the integer MQTT return code from a `MqttCodeError`.
 
         Parameters:
@@ -850,6 +868,8 @@ class JackeryMqttPushClient:
                 `_last_message_error`, and schedules the configured message callback
                 with `(topic, data)`.
         """
+        if self._stopping:
+            return
         if generation is not None and not self._session_is_current(
             generation, runner_task
         ):
@@ -902,13 +922,203 @@ class JackeryMqttPushClient:
             sorted(str(key) for key in data)[:24],
             body_keys,
         )
-        self._schedule_coroutine(
-            lambda: self._message_callback(topic, data),
-            "message",
-            generation=generation,
-            runner_task=runner_task,
-            tracked_tasks=self._message_tasks,
+        # The session check above is the acceptance boundary. Once a valid live
+        # frame is accepted, later reconnects or unload must not invalidate it.
+        # A single unbounded FIFO consumer preserves broker order without a
+        # debounce window, coalescing, deduplication, or backlog drop policy.
+        self._message_queue.append((topic, data))
+        self._ensure_message_consumer()
+
+    def _create_message_task(
+        self,
+        operation: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        """Create finite message work owned by the config entry when available."""
+        if self._config_entry is not None:
+            return cast(
+                asyncio.Task[None],
+                self._config_entry.async_create_task(
+                    self._hass,
+                    operation,
+                    name=name,
+                    eager_start=False,
+                ),
+            )
+        return self._hass.async_create_task(operation, name=name, eager_start=False)
+
+    def _ensure_message_consumer(self) -> None:
+        """Start the sole FIFO consumer when accepted frames are waiting."""
+        if not self._message_queue and self._message_delivery_task is None:
+            return
+        current = self._message_consumer_task
+        if current is not None and not current.done():
+            return
+        task = self._create_message_task(
+            self._async_consume_messages(),
+            name="jackery_mqtt_message_fifo",
         )
+        self._message_consumer_task = task
+        self._message_tasks.add(task)
+
+        def _consumer_done(done: asyncio.Task[None]) -> None:
+            self._settle_message_consumer(done)
+            if not self._stopping and (
+                self._message_queue or self._message_delivery_task is not None
+            ):
+                self._ensure_message_consumer()
+
+        task.add_done_callback(_consumer_done)
+
+    async def _async_consume_messages(self) -> None:
+        """Deliver every accepted cloud frame serially in broker order."""
+        while True:
+            delivery_task = self._message_delivery_task
+            if delivery_task is not None:
+                if not delivery_task.done():
+                    try:
+                        await asyncio.shield(delivery_task)
+                    except asyncio.CancelledError:
+                        if not delivery_task.cancelled():
+                            raise
+                self._settle_message_delivery(delivery_task)
+                continue
+            if not self._message_queue:
+                return
+            item = self._message_queue.popleft()
+            self._message_delivery_item = item
+            self._message_delivery_task = self._create_message_task(
+                self._async_deliver_message(item),
+                name="jackery_mqtt_message_delivery",
+            )
+
+    async def _async_deliver_message(
+        self,
+        item: tuple[str, dict[str, Any]],
+    ) -> None:
+        """Deliver one cloud frame exactly once despite owner cancellation."""
+        topic, data = item
+
+        async def _invoke_callback() -> None:
+            await self._message_callback(topic, data)
+
+        callback_task: asyncio.Task[None] = self._hass.async_create_task(
+            _invoke_callback(),
+            name="jackery_mqtt_message_callback",
+            eager_start=False,
+        )
+        if await self._async_wait_delivery_task(callback_task):
+            self._message_handler_errors += 1
+            self._last_message_error = (
+                "message callback cancelled before completing accepted frame"
+            )
+            _LOGGER.error(
+                "Jackery MQTT message callback was cancelled before completing "
+                "an accepted frame"
+            )
+            return
+        try:
+            callback_task.result()
+        except Exception:
+            self._message_handler_errors += 1
+            _LOGGER.exception("Jackery MQTT message handler failed")
+        else:
+            self._messages_delivered += 1
+
+    @staticmethod
+    async def _async_wait_delivery_task(task: asyncio.Task[None]) -> bool:
+        """Await a started callback once while swallowing cancellation of its owner."""
+        while True:
+            try:
+                await asyncio.shield(task)
+                break
+            except asyncio.CancelledError:
+                if task.done():
+                    break
+                current = asyncio.current_task()
+                if current is not None:
+                    while current.cancelling():
+                        current.uncancel()
+            except Exception:
+                break
+        return task.cancelled()
+
+    def _settle_message_delivery(self, task: asyncio.Task[None]) -> None:
+        """Finish one delivery identity and requeue it only if delivery was cancelled."""
+        if self._message_delivery_task is not task:
+            return
+        item = self._message_delivery_item
+        self._message_delivery_task = None
+        self._message_delivery_item = None
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            if item is not None:
+                self._message_queue.appendleft(item)
+        except Exception:
+            _LOGGER.exception("Jackery MQTT delivery task failed")
+
+    def _settle_message_consumer(self, task: asyncio.Task[None]) -> None:
+        """Consume one actor outcome exactly once and clear its identity safely."""
+        if task not in self._message_tasks and self._message_consumer_task is not task:
+            return
+        self._message_tasks.discard(task)
+        if self._message_consumer_task is task:
+            self._message_consumer_task = None
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            if self._message_queue or self._message_delivery_task is not None:
+                _LOGGER.warning(
+                    "Jackery MQTT FIFO actor was cancelled with accepted delivery "
+                    "still pending"
+                )
+        except Exception:
+            _LOGGER.exception("Jackery MQTT FIFO consumer failed")
+
+    async def async_wait_message_queue_idle(
+        self,
+        *,
+        timeout: float | None = None,
+    ) -> None:
+        """Wait until every accepted frame has completed serial delivery."""
+
+        async def _wait_until_idle() -> None:
+            while True:
+                consumer = self._message_consumer_task
+                if consumer is not None and consumer.done():
+                    self._settle_message_consumer(consumer)
+                delivery = self._message_delivery_task
+                if delivery is not None and delivery.done():
+                    self._settle_message_delivery(delivery)
+                if (
+                    not self._message_queue
+                    and self._message_delivery_task is None
+                    and self._message_consumer_task is None
+                ):
+                    return
+                self._ensure_message_consumer()
+                consumer = self._message_consumer_task
+                delivery = self._message_delivery_task
+                current = asyncio.current_task()
+                if consumer is current or delivery is current:
+                    return
+                waiter = consumer or delivery
+                if waiter is None:
+                    await asyncio.sleep(0)
+                    continue
+                try:
+                    await asyncio.shield(waiter)
+                except asyncio.CancelledError:
+                    if not waiter.cancelled():
+                        raise
+
+        if timeout is None:
+            await _wait_until_idle()
+            return
+        async with asyncio.timeout(timeout):
+            await _wait_until_idle()
 
     def _schedule_coroutine(
         self,
@@ -1149,7 +1359,7 @@ class JackeryMqttPushClient:
             return
         try:
             request_id = int(raw_request_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         response_type = self._normalize_response_type(
             data.get("response_type", data.get(FIELD_ACTION_ID))
@@ -1231,7 +1441,21 @@ class JackeryMqttPushClient:
             "messages_seen": self._messages_seen,
             "messages_dropped": self._messages_dropped,
             "pending_message_tasks": len(self._message_tasks),
-            "max_pending_message_tasks": _MAX_PENDING_MESSAGE_TASKS,
+            # Compatibility field: ``None`` explicitly means the old fixed
+            # backlog cap no longer exists.
+            "max_pending_message_tasks": None,
+            "message_queue_unbounded": True,
+            "message_queue_depth": len(self._message_queue),
+            "message_consumer_running": bool(
+                self._message_consumer_task is not None
+                and not self._message_consumer_task.done()
+            ),
+            "message_delivery_running": bool(
+                self._message_delivery_task is not None
+                and not self._message_delivery_task.done()
+            ),
+            "messages_delivered": self._messages_delivered,
+            "message_handler_errors": self._message_handler_errors,
             "topics": subscribed_topics,
             "topic_count": len(self._subscribed_topics),
             "requested_topics": requested_topics,

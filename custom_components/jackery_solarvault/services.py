@@ -199,7 +199,7 @@ from .const import (
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .credentials import (
+from .client.credentials import (
     MAX_PASSWORD_LENGTH,
     MAX_TOKEN_LENGTH,
     MAX_USERNAME_LENGTH,

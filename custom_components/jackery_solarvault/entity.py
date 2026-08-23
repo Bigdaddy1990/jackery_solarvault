@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -14,6 +16,7 @@ from .const import (
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEV_MODEL,
+    FIELD_MAC,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
@@ -47,6 +50,7 @@ from .util import (
     first_nonblank_text,
     jackery_online_state,
     nonblank_text,
+    normalize_mac_address,
     smart_plug_serial,
     stable_subdevice_key,
     subdevice_branding,
@@ -131,6 +135,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{device_id}_{key_suffix}"
+        self._availability_cache_active = False
+        self._cached_available = False
 
     @property
     def _payload(self) -> dict[str, Any]:
@@ -282,7 +288,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             self._discovery.get(FIELD_DEVICE_SN),
         )
 
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             manufacturer=MANUFACTURER,
             name=str(name),
@@ -290,6 +296,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             serial_number=sn,
             sw_version=sw_version,
         )
+        parent_mac = normalize_mac_address(
+            first_nonblank_text(
+                self._properties.get(FIELD_MAC),
+                self._system.get(FIELD_MAC),
+                self._discovery.get(FIELD_MAC),
+                self._device_meta.get(FIELD_MAC),
+            )
+        )
+        if parent_mac is not None:
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
+        return info
 
     def _build_smart_plug_device_info(
         self,
@@ -341,7 +358,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             plug.get(FIELD_VERSION),
             plug.get(FIELD_CURRENT_VERSION),
         )
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_{stable_key}")},
             manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
@@ -350,6 +367,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             sw_version=str(version) if version else None,
             via_device=(DOMAIN, self._device_id),
         )
+        if mac := normalize_mac_address(plug.get(FIELD_MAC)):
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+        return info
 
     def _source_capability_contract(
         self,
@@ -426,15 +446,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             return parsed_online or transport_reachable
         return transport_reachable or self._device_id in (self.coordinator.data or {})
 
-    @property
-    def available(self) -> bool:
-        """Availability for the entity's product, fields and transports.
-
-        Explicit product support and source-specific freshness are checked before
-        the parent device's online marker. A fresh independent transport remains
-        authoritative when a stale cloud marker incorrectly reports the device
-        offline.
-        """
+    def _calculate_available(self) -> bool:
+        """Calculate availability before Home Assistant writes entity state."""
         if self._device_id not in (self.coordinator.data or {}):
             return False
         supported, data_sources, command_sources, fields, supervisor_only = (
@@ -467,16 +480,49 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             return False
         if not self._online_marker_available(transport_reachable):
             return False
-        # Home Assistant renders a sensor whose native value is ``None`` as
-        # ``unknown``. Keep the stable entity identity, but expose the more
-        # accurate ``unavailable`` state until one transport materializes its
-        # value. Other Jackery entity platforms retain their existing rules.
         return not isinstance(self, SensorEntity) or self.native_value is not None
 
+    @callback
+    def _refresh_availability_cache(self) -> None:
+        """Prepare availability outside Home Assistant's synchronous state write."""
+        self._cached_available = self._calculate_available()
+
+    @property
+    def available(self) -> bool:
+        """Availability prepared for the current coordinator snapshot."""
+        if getattr(self, "_availability_cache_active", False):
+            return self._cached_available
+        return self._calculate_available()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Prepare common availability before listeners write entity states."""
+        if self._availability_cache_active:
+            self._refresh_availability_cache()
+        self._write_prepared_state()
+
+    @callback
+    def _write_prepared_state(self) -> None:
+        """Write a state after subclasses have prepared every synchronous value.
+
+        CoordinatorEntity._handle_coordinator_update performs Home Assistant's
+        synchronous state write. Calling the public update hook after an
+        asynchronous/prepared cache would re-enter this class and calculate
+        availability a second time in that measured write path.
+        """
+        super()._handle_coordinator_update()
+
     async def async_added_to_hass(self) -> None:
-        """Run when entity is added to Home Assistant."""
-        await super().async_added_to_hass()
+        """Prime availability before Home Assistant performs the first state write."""
+        self._availability_cache_active = True
+        self._refresh_availability_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception:
+            self._availability_cache_active = False
+            raise
 
     async def async_will_remove_from_hass(self) -> None:
-        """Run when entity is about to be removed from Home Assistant."""
+        """Stop serving the prepared cache after the entity leaves Home Assistant."""
+        self._availability_cache_active = False
         await super().async_will_remove_from_hass()

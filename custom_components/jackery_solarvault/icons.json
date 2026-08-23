@@ -711,8 +711,8 @@
       "reboot_flag": {
         "default": "mdi:restart"
       },
-      "savings_battery_loss_year_energy": {
-        "default": "mdi:battery-alert-variant-outline"
+      "savings_battery_balance_year_energy": {
+        "default": "mdi:battery-sync-outline"
       },
       "savings_calculated_total": {
         "default": "mdi:cash-check"

@@ -68,19 +68,18 @@ LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
 # is the App/official-integration prefix; never point the generated default at
 # Home Assistant's discovery/status tree, which also contains unrelated devices.
 LOCAL_MQTT_DEFAULT_TOPIC: Final = "hb/device/#"
-# The App presents these values as live telemetry. Five seconds made LAN MQTT
-# visibly slower than the cloud push path and contradicted that contract. One
-# second keeps the complete official request family together while removing
-# the avoidable UI/broker lag.
-LOCAL_MQTT_POLL_INTERVAL_SEC: Final = 1.0
-
-# Local MQTT (HA-MQTT listener) config — enabled by default to match 123/ baseline
+# Native Shelly RPC status pushes observed in the shared Home Assistant broker.
+# Subscribe to this exact topic only. The adapter filters high-rate BLE scan
+# events and unrelated RPC sources before they reach shared ingest.
+SHELLY_RPC_EVENT_TOPIC: Final = "homeassistant/events/rpc"
+# Legacy Local-MQTT option names. The receiver is optional and uses the same
+# disabled-by-default contract as the canonical third-party MQTT option.
 CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
 CONF_LOCAL_MQTT_HOST: Final = "local_mqtt_host"
 CONF_LOCAL_MQTT_PORT: Final = "local_mqtt_port"
 CONF_LOCAL_MQTT_USERNAME: Final = "local_mqtt_username"
 CONF_LOCAL_MQTT_PASSWORD: Final = "local_mqtt_password"
-DEFAULT_LOCAL_MQTT_ENABLE: Final = True
+DEFAULT_LOCAL_MQTT_ENABLE: Final = False
 
 # Reconnect-Backoff des lokalen MQTT-Subscribers. Ohne diese Schleife beendete
 # ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
@@ -193,6 +192,7 @@ DISCOVERY_CACHE_DEVICE_INDEX_KEY: Final = "device_index"
 LOCAL_DAILY_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
 LOCAL_DAILY_CACHE_DAY_KEY: Final = "day"
 LOCAL_DAILY_CACHE_VALUES_KEY: Final = "values"
+LOCAL_DAILY_CACHE_FULL_DAY_METRICS_KEY: Final = "full_day_metrics"
 LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY: Final = "completed_days"
 LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY: Final = "complete_days"
 LOCAL_DAILY_CACHE_LAST_DELTAS_KEY: Final = "last_deltas"
@@ -205,13 +205,10 @@ MQTT_SESSION_SEED_LEN: Final = 32
 
 # Third-party MQTT bridge config. Surfaced in the
 # options/reconfigure flow so the device can be told to publish telemetry to
-# a local MQTT broker. The bridge is ENABLED by default to match 123/ baseline
-# (local MQTT is opt-out, not opt-in). Actual broker credentials must come from
-# user input via the config flow, never from hard-coded constants (PII / security).
+# a local MQTT broker. The bridge is opt-in. Actual broker credentials must
+# come from user input via the config flow, never from hard-coded constants.
 CONF_THIRD_PARTY_MQTT_ENABLE: Final = "third_party_mqtt_enable"
-DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = (
-    False  # opt-in by default (third-party MQTT is optional fallback)
-)
+DEFAULT_THIRD_PARTY_MQTT_ENABLE: Final = False
 CONF_THIRD_PARTY_MQTT_IP: Final = "third_party_mqtt_ip"
 DEFAULT_THIRD_PARTY_MQTT_IP: Final = ""
 CONF_THIRD_PARTY_MQTT_PORT: Final = "third_party_mqtt_port"
@@ -1690,6 +1687,24 @@ APP_CHART_STAT_METRICS: Final = (
         "Battery discharge energy",
     ),
     (
+        APP_SECTION_BATTERY_STAT,
+        APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+        "grid_to_battery_energy",
+        "Grid-to-battery energy",
+    ),
+    (
+        APP_SECTION_BATTERY_STAT,
+        APP_DEVICE_STAT_BATTERY_TO_AC,
+        "battery_to_ac_energy",
+        "Battery-to-AC energy",
+    ),
+    (
+        APP_SECTION_BATTERY_STAT,
+        APP_DEVICE_STAT_BATTERY_TO_GRID,
+        "battery_to_grid_energy",
+        "Battery-to-grid energy",
+    ),
+    (
         APP_SECTION_CT_STAT,
         APP_STAT_TOTAL_CT_INPUT_ENERGY,
         "ct_input_energy",
@@ -2859,6 +2874,7 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "subscribed",
     "started",
     "periodic_requests_active",
+    "snapshot_request_active",
     "messages_published",
     "publish_errors",
     "last_publish_at",
@@ -2869,6 +2885,7 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "messages_received",
     "messages_dropped",
     "messages_forwarded",
+    "messages_filtered",
     "last_connect_at",
     "last_disconnect_at",
     "last_message_at",

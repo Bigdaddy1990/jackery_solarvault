@@ -77,7 +77,7 @@ from .const import (
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
 )
-from .credentials import (
+from .client.credentials import (
     MAX_PASSWORD_LENGTH,
     MAX_USERNAME_LENGTH,
     credential_text,
@@ -274,6 +274,28 @@ def _coerce_local_mqtt_port(value: object) -> int:
         return DEFAULT_THIRD_PARTY_MQTT_PORT
 
 
+def _coerce_local_mqtt_qos(value: object) -> int:
+    """Return a supported MQTT QoS level from stored options or form input."""
+    try:
+        qos = int(cast("Any", value))
+    except (TypeError, ValueError) as err:
+        _LOGGER.debug(
+            "Local MQTT QoS %r is invalid; using default %d: %s",
+            value,
+            DEFAULT_THIRD_PARTY_MQTT_QOS,
+            err,
+        )
+        return DEFAULT_THIRD_PARTY_MQTT_QOS
+    if qos not in {0, 1, 2}:
+        _LOGGER.debug(
+            "Local MQTT QoS %r is outside 0..2; using default %d",
+            value,
+            DEFAULT_THIRD_PARTY_MQTT_QOS,
+        )
+        return DEFAULT_THIRD_PARTY_MQTT_QOS
+    return qos
+
+
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     """Normalize and return local MQTT option values from a ConfigEntry.
 
@@ -331,10 +353,10 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
                 default=None,
             ),
         ),
-        CONF_THIRD_PARTY_MQTT_QOS: int(
+        CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
             _first_entry_value(
                 CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS
-            )
+            ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             _first_entry_value(
@@ -427,11 +449,11 @@ def _merge_local_mqtt_options(
                 ),
             ),
         ),
-        CONF_THIRD_PARTY_MQTT_QOS: int(
+        CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_QOS,
                 current[CONF_THIRD_PARTY_MQTT_QOS],
-            )
+            ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
@@ -634,7 +656,7 @@ class JackeryOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_QOS,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
-            ): vol.In((0, 1, 2)),
+            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
@@ -1027,7 +1049,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_QOS,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
-            ): vol.In((0, 1, 2)),
+            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
