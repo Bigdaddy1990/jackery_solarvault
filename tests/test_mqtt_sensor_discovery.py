@@ -317,9 +317,7 @@ async def test_native_state_event_publishes_only_the_changed_sensor() -> None:
         publisher._async_state_changed(_event({"entity_id": "sensor.unrelated"}))
         assert publisher._task is None
         changed.native_value = 63
-        publisher._async_state_changed(
-            _event({"entity_id": "sensor.solarvault_soc"})
-        )
+        publisher._async_state_changed(_event({"entity_id": "sensor.solarvault_soc"}))
         assert publisher._task is not None
         await publisher._task
 
@@ -1568,7 +1566,9 @@ async def test_entity_registry_create_indexes_entity_added_after_track() -> None
 
 
 @pytest.mark.asyncio
-async def test_reconciliation_never_overtakes_live_events_that_race_with_config() -> None:
+async def test_reconciliation_never_overtakes_live_events_that_race_with_config() -> (
+    None
+):
     """A mutable snapshot cannot publish ahead of events queued during config I/O."""
 
     def _create_task(coro: Any, **_kwargs: Any) -> asyncio.Task[Any]:
@@ -1678,7 +1678,9 @@ async def test_connected_transient_publish_error_retries_without_new_event() -> 
 
 
 @pytest.mark.asyncio
-async def test_disconnect_stream_waits_for_one_reconnect_without_publish_hotloop() -> None:
+async def test_disconnect_stream_waits_for_one_reconnect_without_publish_hotloop() -> (
+    None
+):
     """Events accumulate FIFO-exactly without repeated writes while disconnected."""
 
     def _create_task(coro: Any, **_kwargs: Any) -> asyncio.Task[Any]:
@@ -1775,9 +1777,7 @@ async def test_concurrent_public_publish_calls_share_fifo_lock() -> None:
             _Description(key="soc", translation_key="state_of_charge"),
         )
     )
-    publisher._live_state_events.append(
-        _LiveStateSnapshot("device-1_soc", True, "63")
-    )
+    publisher._live_state_events.append(_LiveStateSnapshot("device-1_soc", True, "63"))
     first_state_started = asyncio.Event()
     release_first_state = asyncio.Event()
 
@@ -1817,9 +1817,7 @@ async def test_untracked_handoff_event_waits_until_replacement_tracks_entity() -
     publisher = JackeryMqttSensorPublisher(
         cast(HomeAssistant, hass), entry_id="entry-1"
     )
-    publisher._live_state_events.append(
-        _LiveStateSnapshot("device-1_soc", True, "63")
-    )
+    publisher._live_state_events.append(_LiveStateSnapshot("device-1_soc", True, "63"))
     with patch(
         "custom_components.jackery_solarvault.client.mqtt_discovery.mqtt.async_publish",
         new=AsyncMock(),
@@ -1890,7 +1888,9 @@ async def test_explicit_none_state_event_publishes_offline_tombstone() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fast_shutdown_reload_hands_off_fifo_without_config_delete_burst() -> None:
+async def test_fast_shutdown_reload_hands_off_fifo_without_config_delete_burst() -> (
+    None
+):
     """Normal sequential reload preserves FIFO and retained publication state."""
 
     def _create_task(coro: Any, **_kwargs: Any) -> asyncio.Task[Any]:
@@ -1913,9 +1913,7 @@ async def test_fast_shutdown_reload_hands_off_fifo_without_config_delete_burst()
         new=AsyncMock(),
     ):
         await old.async_publish_pending()
-    old._live_state_events.append(
-        _LiveStateSnapshot("device-1_soc", True, "63")
-    )
+    old._live_state_events.append(_LiveStateSnapshot("device-1_soc", True, "63"))
 
     with (
         patch(

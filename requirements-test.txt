@@ -23,8 +23,8 @@ pytest-asyncio
 pytest-cov
 pytest-github-actions-annotate-failures>=0.4.2
 pytest-homeassistant-custom-component>=0.13.356
-pytest_aiohttp
 pytest-socket
+pytest_aiohttp
 python-dateutil>=2.7
 python_discovery>=1.4.0
 pyyaml

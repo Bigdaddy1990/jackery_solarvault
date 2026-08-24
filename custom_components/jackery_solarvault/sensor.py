@@ -5721,9 +5721,7 @@ def _guard_total_increasing_jitter(
             abs_tol=1e-9,
         ):
             return previous
-        reset_boundary = (
-            previous_value * _TOTAL_INCREASING_RECORDER_RESET_RATIO
-        )
+        reset_boundary = previous_value * _TOTAL_INCREASING_RECORDER_RESET_RATIO
         non_reset_counter = (
             description.key.startswith("lifetime_")
             or description.key in _RESTORABLE_LIFETIME_STAT_SENSOR_KEYS
@@ -6215,9 +6213,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         year_month_bucket *= unit_scale
         reconciled_month, _month_source = month
         reconciled = round(
-            cloud_total
-            - year_month_bucket
-            + max(year_month_bucket, reconciled_month),
+            cloud_total - year_month_bucket + max(year_month_bucket, reconciled_month),
             5,
         )
         return (
@@ -6545,9 +6541,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                     observed_zero_revenue = True
                 elif local_pv_units is not None and local_pv_units > 0:
                     price_source = self._source_for_section(PAYLOAD_PRICE, payload)
-                    price_mode = safe_int(
-                        price_source.get(FIELD_DYNAMIC_OR_SINGLE)
-                    )
+                    price_mode = safe_int(price_source.get(FIELD_DYNAMIC_OR_SINGLE))
                     single_price = safe_float(price_source.get(FIELD_SINGLE_PRICE))
                     price_currency = first_nonblank_text(
                         price_source.get(FIELD_SINGLE_CURRENCY),
@@ -6567,9 +6561,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                             "energy_kwh": energy_kwh,
                             "energy_source": PAYLOAD_LOCAL_DAILY_ENERGY,
                             "price_per_kwh": single_price,
-                            "price_source": (
-                                f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"
-                            ),
+                            "price_source": (f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}"),
                             "currency": price_currency,
                         }
 
@@ -6686,9 +6678,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         )
         local_flow_primary_zero = local_flow_sensor and local_flow_value == 0
         local_flow_primary_negative = (
-            local_flow_sensor
-            and local_flow_value is not None
-            and local_flow_value < 0
+            local_flow_sensor and local_flow_value is not None and local_flow_value < 0
         )
         local_flow_zero_sources: set[str] = set()
         if local_flow_primary_zero:
@@ -8614,7 +8604,8 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
                 "raw_field"
                 if ct.get(self.entity_description.field) is not None
                 else "derived_apparent_minus_active"
-                if _derived_reactive_power(ct, self.entity_description.field) is not None
+                if _derived_reactive_power(ct, self.entity_description.field)
+                is not None
                 else "raw_field"
             )
         phases = self._signed_phase_values(ct)

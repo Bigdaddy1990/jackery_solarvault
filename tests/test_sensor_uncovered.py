@@ -465,9 +465,9 @@ class TestSensorState:
         sensor = JackerySavingsDetailSensor(coordinator, "test_device", description)
         sensor._cache_refresh_active = True
         sensor._refresh_cache()
-        coordinator.data["test_device"]["statistic"]["_savings_calculation"][
-            "detail"
-        ]["value"] = 2.5
+        coordinator.data["test_device"]["statistic"]["_savings_calculation"]["detail"][
+            "value"
+        ] = 2.5
 
         assert sensor.native_value == pytest.approx(1.5)
         assert sensor.extra_state_attributes["method"] == "test_method"

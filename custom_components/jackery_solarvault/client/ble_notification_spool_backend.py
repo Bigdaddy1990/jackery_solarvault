@@ -89,8 +89,7 @@ class _SqliteBleSpoolBackend:
             else:
                 if int(row["schema_version"]) != _SCHEMA_VERSION:
                     msg = (
-                        "Unsupported Jackery BLE spool schema "
-                        f"{row['schema_version']}"
+                        f"Unsupported Jackery BLE spool schema {row["schema_version"]}"
                     )
                     raise RuntimeError(msg)
                 if str(row["entry_id"]) != self._entry_id:

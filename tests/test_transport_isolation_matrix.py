@@ -18,17 +18,17 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from custom_components.jackery_solarvault.client.transport_supervisor import (
+    SupervisorConfig,
+    SupervisorState,
+    TransportSupervisorManager,
+)
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import ingest_observation
 from custom_components.jackery_solarvault.models import DataSource, Observation
-from custom_components.jackery_solarvault.client.transport_supervisor import (
-    SupervisorConfig,
-    SupervisorState,
-    TransportSupervisorManager,
-)
 
 
 def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoordinator:

@@ -236,9 +236,7 @@ class JackeryMqttSensorPublisher:
                 self._live_state_events.extend(handoff.live_events)
                 self._published_configs.update(handoff.published_configs)
                 self._published_states.update(handoff.published_states)
-                self._published_availability.update(
-                    handoff.published_availability
-                )
+                self._published_availability.update(handoff.published_availability)
                 self._cleanup_topics.update(handoff.cleanup_topics)
                 self._pending = handoff.pending
                 self._pending_all = handoff.pending_all
@@ -369,8 +367,7 @@ class JackeryMqttSensorPublisher:
             if isinstance(entity_id, str):
                 self._entity_ids[entity_id] = unique_id
             if any(
-                snapshot.unique_id == unique_id
-                for snapshot in self._live_state_events
+                snapshot.unique_id == unique_id for snapshot in self._live_state_events
             ):
                 if self._waiting_for_entity_unique_id == unique_id:
                     self._waiting_for_entity_unique_id = None
@@ -548,9 +545,7 @@ class JackeryMqttSensorPublisher:
                     available = False
                     value = None
                 payload = (
-                    _state_payload(value)
-                    if available and value is not None
-                    else None
+                    _state_payload(value) if available and value is not None else None
                 )
         self._append_live_state_event(
             _LiveStateSnapshot(
@@ -588,9 +583,7 @@ class JackeryMqttSensorPublisher:
             if live_snapshot is None:
                 self._pending = False
                 publish_all = self._pending_all
-                unique_ids = (
-                    None if publish_all else tuple(self._pending_unique_ids)
-                )
+                unique_ids = None if publish_all else tuple(self._pending_unique_ids)
                 self._pending_all = False
                 self._pending_unique_ids.clear()
             else:
@@ -850,10 +843,7 @@ class JackeryMqttSensorPublisher:
             availability_topic,
             config_topic,
         )
-        if any(
-            snapshot.unique_id == unique_id
-            for snapshot in self._live_state_events
-        ):
+        if any(snapshot.unique_id == unique_id for snapshot in self._live_state_events):
             return
         try:
             available = bool(getattr(entity, "available", True))

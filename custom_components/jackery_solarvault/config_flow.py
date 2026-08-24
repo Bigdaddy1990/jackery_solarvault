@@ -14,6 +14,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
 
 from .client import JackeryApi, JackeryAuthError, JackeryError
+from .client.credentials import (
+    MAX_PASSWORD_LENGTH,
+    MAX_USERNAME_LENGTH,
+    credential_text,
+    redacted_error,
+)
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -76,12 +82,6 @@ from .const import (
     REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
-)
-from .client.credentials import (
-    MAX_PASSWORD_LENGTH,
-    MAX_USERNAME_LENGTH,
-    credential_text,
-    redacted_error,
 )
 from .util import (
     config_entry_bool_option,
