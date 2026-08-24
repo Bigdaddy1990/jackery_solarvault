@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.jackery_solarvault.client import ble
 from custom_components.jackery_solarvault.client import (
+    ble,
     ble_transport as ble_transport_module,
 )
 from custom_components.jackery_solarvault.client.ble_transport import (
@@ -319,7 +319,9 @@ async def test_new_client_is_disconnected_when_session_installation_fails(
 
 
 @pytest.mark.asyncio
-async def test_connection_task_factory_rejection_closes_runner_and_stays_local() -> None:
+async def test_connection_task_factory_rejection_closes_runner_and_stays_local() -> (
+    None
+):
     """A synchronous advertisement callback cannot leak or raise a coroutine."""
     rejected: Coroutine[Any, Any, None] | None = None
 

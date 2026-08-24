@@ -38,8 +38,8 @@ def test_startup_backfill_does_not_slow_current_statistics_imports() -> None:
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         return_value=100.0 + _STATISTICS_IMPORT_THROTTLE_SEC + 0.1,
     ):
-        coordinator._schedule_statistics_import(
-            {"device-1": {"device": {"deviceSn": "SV3PM123456"}}}
-        )
+        coordinator._schedule_statistics_import({
+            "device-1": {"device": {"deviceSn": "SV3PM123456"}}
+        })
 
     assert len(created) == 1

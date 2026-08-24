@@ -41,6 +41,13 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 
 from .client import JackeryAuthError, JackeryError
+from .client.credentials import (
+    MAX_PASSWORD_LENGTH,
+    MAX_TOKEN_LENGTH,
+    MAX_USERNAME_LENGTH,
+    credential_text,
+    redacted_error,
+)
 from .const import (
     APP_PERIOD_DATE_TYPES,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
@@ -199,13 +206,6 @@ from .const import (
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .client.credentials import (
-    MAX_PASSWORD_LENGTH,
-    MAX_TOKEN_LENGTH,
-    MAX_USERNAME_LENGTH,
-    credential_text,
-    redacted_error,
-)
 from .util import safe_bool
 
 if TYPE_CHECKING:

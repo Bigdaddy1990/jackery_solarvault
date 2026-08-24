@@ -123,7 +123,9 @@ async def coordinator(hass):
 
 
 @pytest.mark.asyncio
-async def test_ble_background_getters_do_not_issue_automatic_writes(coordinator) -> None:
+async def test_ble_background_getters_do_not_issue_automatic_writes(
+    coordinator,
+) -> None:
     """A BLE-only runtime never turns the MQTT poller into a GATT poller."""
     coordinator._ble_listener = MagicMock()
     coordinator._mqtt = None

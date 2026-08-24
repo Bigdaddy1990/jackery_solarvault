@@ -57,13 +57,13 @@ from custom_components.jackery_solarvault.client.ble import (
     split_body_for_mtu,
     split_payload_into_frames,
 )
+from custom_components.jackery_solarvault.client.ble_notification_spool_models import (
+    BleProcessDisposition,
+)
 from custom_components.jackery_solarvault.client.ble_transport import (
     BleFrameObservation,
     JackeryBleListener,
     _GattSession,
-)
-from custom_components.jackery_solarvault.client.ble_notification_spool_models import (
-    BleProcessDisposition,
 )
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_BLE_TRANSPORT,
@@ -730,12 +730,8 @@ def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
             "_async_ingest_ble_observation_once",
             new=_once,
         ):
-            first = await coordinator._async_ingest_ble_observation(
-                "dev", observation
-            )
-            retry = await coordinator._async_ingest_ble_observation(
-                "dev", observation
-            )
+            first = await coordinator._async_ingest_ble_observation("dev", observation)
+            retry = await coordinator._async_ingest_ble_observation("dev", observation)
 
         assert first is BleProcessDisposition.CONFIRMED
         assert retry is BleProcessDisposition.CONFIRMED
@@ -812,12 +808,10 @@ def test_coordinator_ble_retry_result_is_not_cached() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
         coordinator._ble_delivery_results = {}
         coordinator._ble_delivery_result_order = deque()
-        results = deque(
-            (
-                BleProcessDisposition.RETRY,
-                BleProcessDisposition.CONFIRMED,
-            )
-        )
+        results = deque((
+            BleProcessDisposition.RETRY,
+            BleProcessDisposition.CONFIRMED,
+        ))
         calls = 0
 
         async def _once(

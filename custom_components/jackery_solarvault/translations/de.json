@@ -58,7 +58,7 @@
           "third_party_mqtt_port": "Third-Party-MQTT-Broker-Port",
           "third_party_mqtt_qos": "QoS des lokalen MQTT-Abonnements",
           "third_party_mqtt_token": "Third-Party-MQTT-Token",
-          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter für lokales MQTT",
+          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter f\u00fcr lokales MQTT",
           "third_party_mqtt_username": "Third-Party-MQTT-Benutzername",
           "username": "E-Mail"
         },
@@ -76,9 +76,9 @@
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
-          "third_party_mqtt_qos": "QoS für das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert ändert weder MQTT-Discovery noch die Veröffentlichung der gemappten Zustände.",
+          "third_party_mqtt_qos": "QoS f\u00fcr das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert \u00e4ndert weder MQTT-Discovery noch die Ver\u00f6ffentlichung der gemappten Zust\u00e4nde.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "Abonnementfilter für rohe SolarVault-Bridge-Telemetrie, welche die Integration empfängt. Standard ist `hb/device/#`; jeder gültige konfigurierte Wert wird unverändert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` veröffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
+          "third_party_mqtt_topic_filter": "Abonnementfilter f\u00fcr rohe SolarVault-Bridge-Telemetrie, welche die Integration empf\u00e4ngt. Standard ist `hb/device/#`; jeder g\u00fcltige konfigurierte Wert wird unver\u00e4ndert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` ver\u00f6ffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Passwort und optionale Sensor-Schalter des Jackery-Kontos {username} aktualisieren. Die E-Mail muss zum urspr\u00fcnglich eingerichteten Konto passen, damit die Unique-ID des Eintrags stabil bleibt. F\u00fcr einen Kontowechsel zuerst den Eintrag entfernen.",
@@ -1900,7 +1900,7 @@
           "third_party_mqtt_port": "Third-Party-MQTT-Broker-Port",
           "third_party_mqtt_qos": "QoS des lokalen MQTT-Abonnements",
           "third_party_mqtt_token": "Third-Party-MQTT-Token",
-          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter für lokales MQTT",
+          "third_party_mqtt_topic_filter": "Eingangs-Topic-Filter f\u00fcr lokales MQTT",
           "third_party_mqtt_username": "Third-Party-MQTT-Benutzername"
         },
         "data_description": {
@@ -1918,9 +1918,9 @@
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
-          "third_party_mqtt_qos": "QoS für das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert ändert weder MQTT-Discovery noch die Veröffentlichung der gemappten Zustände.",
+          "third_party_mqtt_qos": "QoS f\u00fcr das Home-Assistant-Abonnement der rohen SolarVault-Bridge-Nachrichten (0, 1 oder 2). Der Wert \u00e4ndert weder MQTT-Discovery noch die Ver\u00f6ffentlichung der gemappten Zust\u00e4nde.",
           "third_party_mqtt_token": "MQTT-Bridge-Token. Wenn leer, erzeugt die Integration automatisch ein stabiles 9-stelliges Fallback-Token im App-Stil.",
-          "third_party_mqtt_topic_filter": "Abonnementfilter für rohe SolarVault-Bridge-Telemetrie, welche die Integration empfängt. Standard ist `hb/device/#`; jeder gültige konfigurierte Wert wird unverändert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` veröffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
+          "third_party_mqtt_topic_filter": "Abonnementfilter f\u00fcr rohe SolarVault-Bridge-Telemetrie, welche die Integration empf\u00e4ngt. Standard ist `hb/device/#`; jeder g\u00fcltige konfigurierte Wert wird unver\u00e4ndert verwendet. MQTT-Discovery-Dokumente werden separat unter `homeassistant/sensor/jackery_solarvault/.../config` ver\u00f6ffentlicht; gemappte Werte liegen unter `jackery_solarvault/.../state`.",
           "third_party_mqtt_username": "Optionaler MQTT-Broker-Benutzername. Fuer anonyme Broker leer lassen."
         },
         "description": "Berechnete Sensoren sind optionale lokale Ableitungen. Die Smart-Meter-Sensoren berechnen saldierte Werte, Brutto-Phasenfl\u00fcsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Netzleistung plus Jackery-Netzseite Eingang/Ausgang berechnet. Sie sind keine zus\u00e4tzlichen Rohwerte aus der Jackery-App.",

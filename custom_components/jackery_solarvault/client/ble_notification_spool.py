@@ -275,9 +275,7 @@ class BleNotificationSpool:
     async def async_confirm(self, sequences: Sequence[int]) -> None:
         """Delete only rows explicitly confirmed by the downstream sink."""
         durable_sequences = tuple(
-            sequence
-            for sequence in sequences
-            if 0 < sequence < self._next_sequence
+            sequence for sequence in sequences if 0 < sequence < self._next_sequence
         )
         if not durable_sequences:
             return

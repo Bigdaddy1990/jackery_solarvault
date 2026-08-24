@@ -125,7 +125,9 @@ def test_payload_debug_batch_writer_preserves_every_redacted_event(
         ],
     )
 
-    assert [json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()] == [
+    assert [
+        json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()
+    ] == [
         {"sequence": 1, "token": REDACTED_VALUE},
         {"password": REDACTED_VALUE, "sequence": 2},
     ]

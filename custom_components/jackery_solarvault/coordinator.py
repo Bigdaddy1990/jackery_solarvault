@@ -9357,9 +9357,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         observed_at: datetime | None = None,
     ) -> bool:
         """Commit every accepted BLE frame immediately through the coordinator."""
-        allow_shutdown_drain = bool(
-            getattr(self, "_ble_shutdown_drain_active", False)
-        )
+        allow_shutdown_drain = bool(getattr(self, "_ble_shutdown_drain_active", False))
         if self._shutdown_started and not allow_shutdown_drain:
             return False
         current = (self.data or {}).get(device_id)

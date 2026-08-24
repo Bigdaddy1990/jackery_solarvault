@@ -277,7 +277,9 @@ def test_week_period_uses_larger_fully_covered_day_rebuild() -> None:
 def test_battery_week_replaces_stale_today_bucket_with_local_day_total() -> None:
     """The open week can never remain below its verified current-day total."""
     description = next(
-        desc for desc in STAT_DESCRIPTIONS if desc.key == "battery_discharge_week_energy"
+        desc
+        for desc in STAT_DESCRIPTIONS
+        if desc.key == "battery_discharge_week_energy"
     )
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)
@@ -440,9 +442,7 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
     }
 
     for sensor_key, (expected_value, expected_fallback) in expected.items():
-        description = next(
-            desc for desc in STAT_DESCRIPTIONS if desc.key == sensor_key
-        )
+        description = next(desc for desc in STAT_DESCRIPTIONS if desc.key == sensor_key)
         sensor = JackeryStatSensor.__new__(JackeryStatSensor)
         mutable = cast("Any", sensor)
         mutable.coordinator = SimpleNamespace(
@@ -474,7 +474,9 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
 def test_local_day_fallback_omits_non_applicable_null_attributes() -> None:
     """Local day totals expose provenance without JSON null placeholders."""
     description = next(
-        desc for desc in STAT_DESCRIPTIONS if desc.key == "device_today_battery_discharge"
+        desc
+        for desc in STAT_DESCRIPTIONS
+        if desc.key == "device_today_battery_discharge"
     )
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)

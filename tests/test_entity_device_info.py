@@ -109,9 +109,7 @@ def test_smart_plug_device_info_exposes_mac_connection() -> None:
         {FIELD_MAC: "AA-BB-CC-11-22-33"},
     )
 
-    assert info["connections"] == {
-        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
-    }
+    assert info["connections"] == {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")}
 
 
 def test_breaker_switch_falls_back_to_jackery() -> None:

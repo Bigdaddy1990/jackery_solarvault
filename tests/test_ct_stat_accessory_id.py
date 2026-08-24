@@ -138,7 +138,7 @@ async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
     hass: HomeAssistant,
 ) -> None:
     """Current CT sections and month repair pair every empty L1 with App L2."""
-    from custom_components.jackery_solarvault.const import (  # ruff:ignore[unsorted-imports]
+    from custom_components.jackery_solarvault.const import (
         APP_PERIOD_DATE_TYPES,
         APP_REQUEST_META,
         APP_SECTION_CT_STAT,

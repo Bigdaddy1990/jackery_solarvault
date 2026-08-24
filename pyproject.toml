@@ -314,31 +314,31 @@ nested-string-quote-style = "preferred"
 
 [tool.ruff.lint]
 select = [
-  "A001",   # Variable {name} is shadowing a Python builtin
+  "builtin-variable-shadowing",   # Variable {name} is shadowing a Python builtin
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
   "BLE",
   "C",      # complexity
-  "COM818", # Trailing comma on bare tuple prohibited
+  "trailing-comma-on-bare-tuple", # Trailing comma on bare tuple prohibited
   "D",      # docstrings
-  "DTZ003", # Use datetime.now(tz=) instead of datetime.utcnow()
-  "DTZ004", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
-  "DTZ011", # Use datetime.now(tz=).date() instead of date.today()
+  "call-datetime-utcnow", # Use datetime.now(tz=) instead of datetime.utcnow()
+  "call-datetime-utcfromtimestamp", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
+  "call-date-today", # Use datetime.now(tz=).date() instead of date.today()
   "E",      # pycodestyle
   "F",      # pyflakes/autoflake
-  "F541",   # f-string without any placeholders
+  "f-string-missing-placeholders",   # f-string without any placeholders
   "FLY",    # flynt
   "FURB",   # refurb
   "G",      # flake8-logging-format
   "I",      # isort
   "INP",    # flake8-no-pep420
   "ISC",    # flake8-implicit-str-concat
-  "ICN001", # import concentions; {name} should be imported as {asname}
+  "unconventional-import-alias", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
-  "N804",   # First argument of a class method should be named cls
-  "N805",   # First argument of a method should be named self
-  "N806",   # Variable {name} in function should be snake_case
-  "N815",   # Variable {name} in class scope should not be mixedCase
+  "invalid-first-argument-name-for-class-method",   # First argument of a class method should be named cls
+  "invalid-first-argument-name-for-method",   # First argument of a method should be named self
+  "non-lowercase-variable-in-function",   # Variable {name} in function should be snake_case
+  "mixed-case-variable-in-class-scope",   # Variable {name} in class scope should not be mixedCase
   "PERF",   # Perflint
   "PGH",    # pygrep-hooks
   "PIE",    # flake8-pie
@@ -349,115 +349,115 @@ select = [
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules (see `ignore` for exclusions)
-  "S107",   # Possible hardcoded password assigned to function default
-  "S102",   # Use of exec detected
-  "S103",   # bad-file-permissions
-  "S108",   # hardcoded-temp-file
-  "S301",   # suspicious-pickle-usage
-  "S306",   # suspicious-mktemp-usage
-  "S307",   # suspicious-eval-usage
-  "S313",   # suspicious-xmlc-element-tree-usage
-  "S314",   # suspicious-xml-element-tree-usage
-  "S315",   # suspicious-xml-expat-reader-usage
-  "S316",   # suspicious-xml-expat-builder-usage
-  "S317",   # suspicious-xml-sax-usage
-  "S318",   # suspicious-xml-mini-dom-usage
-  "S319",   # suspicious-xml-pull-dom-usage
-  "S601",   # paramiko-call
-  "S602",   # subprocess-popen-with-shell-equals-true
-  "S604",   # call-with-shell-equals-true
-  "S608",   # hardcoded-sql-expression
-  "S609",   # unix-command-wildcard-injection
+  "hardcoded-password-default",   # Possible hardcoded password assigned to function default
+  "exec-builtin",   # Use of exec detected
+  "bad-file-permissions",   # bad-file-permissions
+  "hardcoded-temp-file",   # hardcoded-temp-file
+  "suspicious-pickle-usage",   # suspicious-pickle-usage
+  "suspicious-mktemp-usage",   # suspicious-mktemp-usage
+  "suspicious-eval-usage",   # suspicious-eval-usage
+  "suspicious-xmlc-element-tree-usage",   # suspicious-xmlc-element-tree-usage
+  "suspicious-xml-element-tree-usage",   # suspicious-xml-element-tree-usage
+  "suspicious-xml-expat-reader-usage",   # suspicious-xml-expat-reader-usage
+  "suspicious-xml-expat-builder-usage",   # suspicious-xml-expat-builder-usage
+  "suspicious-xml-sax-usage",   # suspicious-xml-sax-usage
+  "suspicious-xml-mini-dom-usage",   # suspicious-xml-mini-dom-usage
+  "suspicious-xml-pull-dom-usage",   # suspicious-xml-pull-dom-usage
+  "paramiko-call",   # paramiko-call
+  "subprocess-popen-with-shell-equals-true",   # subprocess-popen-with-shell-equals-true
+  "call-with-shell-equals-true",   # call-with-shell-equals-true
+  "hardcoded-sql-expression",   # hardcoded-sql-expression
+  "unix-command-wildcard-injection",   # unix-command-wildcard-injection
   "SIM",    # flake8-simplify
   "SLF",    # flake8-self
   "SLOT",   # flake8-slots
-  "T100",   # Trace found: {name} used
+  "debugger",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
   "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
-  "UP031",  # Use format specifiers instead of percent format
-  "UP032",  # Use f-string instead of `format` call
+  "printf-string-formatting",  # Use format specifiers instead of percent format
+  "f-string",  # Use f-string instead of `format` call
   "W",      # pycodestyle
 ]
 
 ignore = [
-  "ASYNC109", # Async function definition with a `timeout` parameter Use `asyncio.timeout` instead
-  "ASYNC110", # Use `asyncio.Event` instead of awaiting `asyncio.sleep` in a `while` loop
-  "ASYNC240", # Use an async function for entering the file system
-  "B008",     # Do not perform function call in argument defaults; commonly used in Home Assistant (e.g. cv.* validators)
-  "B019",     # Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
-  "D202",     # No blank lines allowed after function docstring
-  "D203",     # 1 blank line required before class docstring
-  "D213",     # Multi-line docstring summary should start at the second line
-  "D406",     # Section name should end with a newline
-  "D407",     # Section name underlining
-  "D417",     # Missing argument descriptions in docstring - to allow documenting only non-obvious parameters
-  "E501",     # line too long
+  "async-function-with-timeout", # Async function definition with a `timeout` parameter Use `asyncio.timeout` instead
+  "async-busy-wait", # Use `asyncio.Event` instead of awaiting `asyncio.sleep` in a `while` loop
+  "blocking-path-method-in-async-function", # Use an async function for entering the file system
+  "function-call-in-default-argument",     # Do not perform function call in argument defaults; commonly used in Home Assistant (e.g. cv.* validators)
+  "cached-instance-method",     # Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
+  "blank-line-after-function",     # No blank lines allowed after function docstring
+  "incorrect-blank-line-before-class",     # 1 blank line required before class docstring
+  "multi-line-summary-second-line",     # Multi-line docstring summary should start at the second line
+  "missing-new-line-after-section-name",     # Section name should end with a newline
+  "missing-dashed-underline-after-section",     # Section name underlining
+  "undocumented-param",     # Missing argument descriptions in docstring - to allow documenting only non-obvious parameters
+  "line-too-long",     # line too long
 
-  "PLC1901", # {existing} can be simplified to {replacement} as an empty string is falsey; too many false positives
-  "PLR0911", # Too many return statements ({returns} > {max_returns})
-  "PLR0912", # Too many branches ({branches} > {max_branches})
-  "PLR0913", # Too many arguments to function call ({c_args} > {max_args})
-  "PLR0915", # Too many statements ({statements} > {max_statements})
-  "PLR0917", # Too many positional arguments defined for a function ({p_args} > {max_args})
-  "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
-  "PLW0108", # Unnecessary lambda wrapping a function call; can often be replaced by the function itself
-  "PLW1641", # __eq__ without __hash__
-  "PLW2901", # Outer {outer_kind} variable {name} overwritten by inner {inner_kind} target
-  "PT011",   # pytest.raises({exception}) is too broad, set the `match` parameter or use a more specific exception
-  "PT018",   # Assertion should be broken down into multiple parts
-  "RUF001",  # String contains ambiguous unicode character.
-  "RUF012",  # Mutable class attributes should be annotated with typing.ClassVar
-  "RUF015",  # Prefer next(...) over single element slice
-  "RUF043",  # Pattern passed to match= contains metacharacters but is neither escaped nor raw
-  "SIM102",  # Use a single if statement instead of nested if statements
-  "SIM103",  # Return the condition {condition} directly
-  "SIM108",  # Use ternary operator {contents} instead of if-else-block
-  "SIM115",  # Use context handler for opening files
+  "compare-to-empty-string", # {existing} can be simplified to {replacement} as an empty string is falsey; too many false positives
+  "too-many-return-statements", # Too many return statements ({returns} > {max_returns})
+  "too-many-branches", # Too many branches ({branches} > {max_branches})
+  "too-many-arguments", # Too many arguments to function call ({c_args} > {max_args})
+  "too-many-statements", # Too many statements ({statements} > {max_statements})
+  "too-many-positional-arguments", # Too many positional arguments defined for a function ({p_args} > {max_args})
+  "magic-value-comparison", # Magic value used in comparison, consider replacing {value} with a constant variable
+  "unnecessary-lambda", # Unnecessary lambda wrapping a function call; can often be replaced by the function itself
+  "eq-without-hash", # __eq__ without __hash__
+  "redefined-loop-name", # Outer {outer_kind} variable {name} overwritten by inner {inner_kind} target
+  "pytest-raises-too-broad",   # pytest.raises({exception}) is too broad, set the `match` parameter or use a more specific exception
+  "pytest-composite-assertion",   # Assertion should be broken down into multiple parts
+  "ambiguous-unicode-character-string",  # String contains ambiguous unicode character.
+  "mutable-class-default",  # Mutable class attributes should be annotated with typing.ClassVar
+  "unnecessary-iterable-allocation-for-first-element",  # Prefer next(...) over single element slice
+  "pytest-raises-ambiguous-pattern",  # Pattern passed to match= contains metacharacters but is neither escaped nor raw
+  "collapsible-if",  # Use a single if statement instead of nested if statements
+  "needless-bool",  # Return the condition {condition} directly
+  "if-else-block-instead-of-if-exp",  # Use ternary operator {contents} instead of if-else-block
+  "open-file-with-context-handler",  # Use context handler for opening files
 
   # Moving imports into type-checking blocks can mess with pytest.patch()
-  "TC001", # Move application import {} into a type-checking block
-  "TC002", # Move third-party import {} into a type-checking block
-  "TC003", # Move standard library import {} into a type-checking block
+  "typing-only-first-party-import", # Move application import {} into a type-checking block
+  "typing-only-third-party-import", # Move third-party import {} into a type-checking block
+  "typing-only-standard-library-import", # Move standard library import {} into a type-checking block
   # Quotes for typing.cast generally not necessary, only for performance critical paths
-  "TC006", # Add quotes to type expression in typing.cast()
+  "runtime-cast-value", # Add quotes to type expression in typing.cast()
   "Tid252",
-  "TRY003", # Avoid specifying long messages outside the exception class
-  "TRY400", # Use `logging.exception` instead of `logging.error`
+  "raise-vanilla-args", # Avoid specifying long messages outside the exception class
+  "error-instead-of-exception", # Use `logging.exception` instead of `logging.error`
 
-  "UP047", # Non PEP 696 generic function
-  "UP049", # Avoid private type parameter names
+  "non-pep695-generic-function", # Non PEP 696 generic function
+  "private-type-parameter", # Avoid private type parameter names
 
   # May conflict with the formatter, https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-  "W191",
-  "E111",
-  "E114",
-  "E117",
-  "D206",
-  "D300",
+  "tab-indentation",
+  "indentation-with-invalid-multiple",
+  "indentation-with-invalid-multiple-comment",
+  "over-indented",
+  "docstring-tab-indentation",
+  "triple-single-quotes",
   "Q",
-  "COM812",
-  "COM819",
+  "missing-trailing-comma",
+  "prohibited-trailing-comma",
 
   # Disabled because ruff does not understand type of __all__ generated by a function
-  "PLE0605",
+  "invalid-all-format",
 
-  "FURB116",
+  "f-string-number-format",
 
   # Disabled to implement in follow up PRs after ruff 0.16 bump
-  "ISC004",
-  "LOG004",
+  "implicit-string-concatenation-in-collection-literal",
+  "log-exception-outside-except-handler",
 ]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
-extend-unsafe-fixes = ["E", "F401", "E501"]
+extend-unsafe-fixes = ["E", "unused-import", "line-too-long"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
 # TID252 (relative-imports) darf NIE automatisch gefixt werden: der Autofix schreibt
 # `from .const import X` in einen absoluten Pfad um und macht die Custom-Integration
 # fuer den HA-Loader unauffindbar (Vorfall 2026-08-13, Integration nicht mehr ladbar).
-unfixable = ["TID252"]
+unfixable = ["relative-imports"]
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]

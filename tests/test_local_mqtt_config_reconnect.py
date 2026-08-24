@@ -433,9 +433,9 @@ async def test_automatic_bridge_skips_write_when_3047_matches() -> None:
     obj._local_mqtt_client = client
 
     assert await coordinator.async_poll_local_mqtt_devices("hb") == 6
-    assert {
-        call.args[1]["token"] for call in client.async_publish.await_args_list
-    } == {"123456789"}
+    assert {call.args[1]["token"] for call in client.async_publish.await_args_list} == {
+        "123456789"
+    }
 
 
 @pytest.mark.asyncio
