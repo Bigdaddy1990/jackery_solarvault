@@ -423,7 +423,7 @@ ignore = [
   "typing-only-standard-library-import", # Move standard library import {} into a type-checking block
   # Quotes for typing.cast generally not necessary, only for performance critical paths
   "runtime-cast-value", # Add quotes to type expression in typing.cast()
-  "Tid252",
+  "TID252",
   "raise-vanilla-args", # Avoid specifying long messages outside the exception class
   "error-instead-of-exception", # Use `logging.exception` instead of `logging.error`
 
