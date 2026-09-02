@@ -7,7 +7,7 @@ attrs>=17.3.0
 autotyping>=24.9.0
 coverage
 coverage[toml]
-hypothesis>=6.165.10
+hypothesis>=6.167.1
 ifaddr>=0.2.0
 iniconfig>=1.0.1
 jinja2>=3.1.6
