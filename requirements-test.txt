@@ -9,7 +9,7 @@ coverage
 coverage[toml]
 hypothesis>=6.167.1
 ifaddr>=0.2.0
-iniconfig>=1.0.1
+iniconfig>=2.3.0
 jinja2>=3.1.6
 multidict>=6.7.1,<7.0
 mypy>=2.3.0
