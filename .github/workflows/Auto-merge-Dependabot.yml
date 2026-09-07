@@ -1,10 +1,13 @@
 name: Auto-merge Dependabot
 on: pull_request
 
-permissions:
+permissions: 
+  contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
-  contents: write
-
+  actions: write
+  checks: write
+  id-token: write # for Trusted Publishing + attest-action
+  
 jobs:
   automerge:
     runs-on: ubuntu-latest
