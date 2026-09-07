@@ -33,6 +33,8 @@ updates:
         patterns:
           - "homeassistant"
           - "pytest-homeassistant-custom-component"
+          - "pytest-homeassistant"
+          - "homeassistant-stubs"
       testing:
         applies-to: "version-updates"
         patterns:
@@ -47,6 +49,8 @@ updates:
           - "mypy"
           - "packaging"
           - "pip"
+          - "pre-commit"
+          - "pyrefly"
           - "pylint"
           - "pyyaml"
           - "ruff"
