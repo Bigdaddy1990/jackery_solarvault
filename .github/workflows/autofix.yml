@@ -6,24 +6,26 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
   actions: write
   checks: write
-  id-token: write
+  id-token: write # for Trusted Publishing + attest-action
 
 concurrency:
   group: autofix-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
+  
+env:
+      PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+      
 jobs:
   autofix:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.1
