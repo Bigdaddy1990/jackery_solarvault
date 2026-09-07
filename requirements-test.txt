@@ -30,7 +30,7 @@ pytest-homeassistant-custom-component>=0.13.363  # follows daily HA version
 pytest-mock
 pytest-socket
 pytest_aiohttp
-python-dateutil>=2.7
+python-dateutil>=2.9.0.post0
 python_discovery>=1.6.0
 pyyaml
 ruff>=0.16.6
