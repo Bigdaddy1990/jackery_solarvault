@@ -31,7 +31,7 @@ field catalog) and the ``FIELD_*`` / ``PAYLOAD_*`` constants.
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry  # type: ignore[import-untyped]
 
 from custom_components.jackery_solarvault.const import (
     CODE_OK,
@@ -127,7 +127,7 @@ def _default_system_list() -> list[dict[str, Any]]:
     ]
 
 
-def make_update_cycle_api(**overrides: Any) -> MagicMock:
+def make_update_cycle_api(**overrides: object) -> MagicMock:
     """Build a mock Jackery ``api`` wired for the guarded update cycle.
 
     Every endpoint the cycle calls is an :class:`AsyncMock` with a

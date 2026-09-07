@@ -4,7 +4,10 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from custom_components.jackery_solarvault.client.api import JackeryApi
+from custom_components.jackery_solarvault.client.api import (
+    DevicePeriodQuery,
+    JackeryApi,
+)
 from custom_components.jackery_solarvault.const import (
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_DATE_TYPE,
@@ -33,7 +36,7 @@ def _api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_device_statistic_unwraps_dict() -> None:
     """Current-day device statistic unwraps the data dict with deviceId."""
     api = _api()
@@ -49,7 +52,7 @@ async def test_device_statistic_unwraps_dict() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_period_stat_builds_params_and_meta() -> None:
     """The period-stat helper sends the full range and annotates request meta."""
     api = _api()
@@ -57,12 +60,14 @@ async def test_period_stat_builds_params_and_meta() -> None:
     get_json = AsyncMock(return_value={FIELD_DATA: dict(series)})
 
     with patch.object(api, "_get_json", get_json):
-        result = await api._async_get_device_period_stat(
+        result = await api._async_get_device_period_stat(  # ruff: ignore[private-member-access]
             DEVICE_PV_STAT_PATH,
             device_id=7,
-            date_type=DATE_TYPE_DAY,
-            begin_date=_BEGIN,
-            end_date=_END,
+            query=DevicePeriodQuery(
+                date_type=DATE_TYPE_DAY,
+                begin_date=_BEGIN,
+                end_date=_END,
+            ),
         )
 
     get_json.assert_awaited_once_with(
@@ -81,20 +86,22 @@ async def test_period_stat_builds_params_and_meta() -> None:
     assert result["y"] == [1.0]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_period_stat_includes_system_id_when_given() -> None:
     """A system_id is added to the query params when provided."""
     api = _api()
     get_json = AsyncMock(return_value={FIELD_DATA: {}})
 
     with patch.object(api, "_get_json", get_json):
-        await api._async_get_device_period_stat(
+        await api._async_get_device_period_stat(  # ruff: ignore[private-member-access]
             DEVICE_PV_STAT_PATH,
             device_id=7,
-            system_id=3,
-            date_type=DATE_TYPE_DAY,
-            begin_date=_BEGIN,
-            end_date=_END,
+            query=DevicePeriodQuery(
+                system_id=3,
+                date_type=DATE_TYPE_DAY,
+                begin_date=_BEGIN,
+                end_date=_END,
+            ),
         )
 
     awaited = get_json.await_args
@@ -103,7 +110,7 @@ async def test_period_stat_includes_system_id_when_given() -> None:
     assert params[FIELD_SYSTEM_ID] == "3"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ct_stat_uses_app_first_chart_type() -> None:
     """The CT-stat request mirrors App 2.4.x ``CtStatApi.type`` selection."""
     api = _api()
@@ -119,7 +126,7 @@ async def test_ct_stat_uses_app_first_chart_type() -> None:
     assert kwargs["params"][APP_REQUEST_STAT_TYPE] == str(CT_STAT_TYPE_L1)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_eps_stat_omits_ct_only_type_parameter() -> None:
     """The App EpsStatApi contract has no ``type`` request field."""
     api = _api()
@@ -135,7 +142,7 @@ async def test_eps_stat_omits_ct_only_type_parameter() -> None:
     assert APP_REQUEST_STAT_TYPE not in kwargs["params"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_pv_stat_wrapper_delegates_with_system_id() -> None:
     """The PV wrapper forwards device_id and system_id to the shared helper."""
     api = _api()
@@ -148,11 +155,11 @@ async def test_pv_stat_wrapper_delegates_with_system_id() -> None:
     assert awaited is not None
     kwargs = awaited.kwargs
     assert kwargs["device_id"] == _DEV
-    assert kwargs["system_id"] == _SYS
+    assert kwargs["query"].system_id == _SYS
     assert awaited.args[0] == DEVICE_PV_STAT_PATH
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_pv_trends_uses_current_app_path() -> None:
     """The current App 2.4.0 system-PV endpoint is the primary request."""
     api = _api()

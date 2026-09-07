@@ -13,7 +13,7 @@ making a hostname impossible to enter.
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry  # type: ignore[import-untyped]
 
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
@@ -24,6 +24,7 @@ from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
+    FLOW_ABORT_REAUTH_SUCCESSFUL,
     FLOW_ABORT_RECONFIGURE_SUCCESSFUL,
     FLOW_STEP_RECONFIGURE_CREDENTIALS,
 )
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _ACCOUNT = "tester@example.com"
+_QOS_EXACTLY_ONCE = 2
 
 
 def _make_api_stub() -> MagicMock:
@@ -176,7 +178,7 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
     assert entry.options[CONF_LOCAL_MQTT_HOST] == "10.0.0.5"
-    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == 2
+    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == _QOS_EXACTLY_ONCE
     assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/status"
 
 
@@ -207,3 +209,91 @@ async def test_reconfigure_replaces_obsolete_raw_diagnostics_option(
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.options[CONF_ENABLE_PAYLOAD_DEBUG_LOG] is True
     assert "enable_unredacted_diagnostics" not in entry.options
+
+
+async def test_reconfigure_credentials_reloads_existing_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Successful reconfigure schedules a reload after updating the entry."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
+        options={CONF_LOCAL_MQTT_ENABLE: True},
+        unique_id=_ACCOUNT,
+        title="Jackery",
+    )
+    entry.add_to_hass(hass)
+    reload_entry = AsyncMock(return_value=True)
+
+    with patch.object(hass.config_entries, "async_reload", reload_entry):
+        result = await _submit_reconfigure_credentials(
+            hass,
+            entry,
+            {CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "new-secret"},
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
+    assert entry.data[CONF_PASSWORD] == "new-secret"
+    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
+    reload_entry.assert_awaited_once_with(entry.entry_id)
+
+
+async def test_reconfigure_credentials_rejects_missing_password(
+    hass: HomeAssistant,
+) -> None:
+    """Incomplete credentials keep the reconfigure form open without login."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
+        options={},
+        unique_id=_ACCOUNT,
+        title="Jackery",
+    )
+    entry.add_to_hass(hass)
+
+    result = await _submit_reconfigure_credentials(
+        hass,
+        entry,
+        {CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: ""},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == FLOW_STEP_RECONFIGURE_CREDENTIALS
+    assert result["errors"] == {"base": "base"}
+
+
+async def test_reauth_reloads_existing_entry(hass: HomeAssistant) -> None:
+    """Successful reauth preserves options and reloads the updated entry."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
+        options={CONF_LOCAL_MQTT_ENABLE: True},
+        unique_id=_ACCOUNT,
+        title="Jackery",
+    )
+    entry.add_to_hass(hass)
+    reload_entry = AsyncMock(return_value=True)
+    api = _make_api_stub()
+
+    with (
+        patch(
+            "custom_components.jackery_solarvault.config_flow.JackeryApi",
+            return_value=api,
+        ),
+        patch.object(hass.config_entries, "async_reload", reload_entry),
+    ):
+        result = await entry.start_reauth_flow(hass)
+        assert result["type"] is FlowResultType.FORM
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "new-secret"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == FLOW_ABORT_REAUTH_SUCCESSFUL
+    assert entry.data[CONF_USERNAME] == _ACCOUNT
+    assert entry.data[CONF_PASSWORD] == "new-secret"
+    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
+    reload_entry.assert_awaited_once_with(entry.entry_id)

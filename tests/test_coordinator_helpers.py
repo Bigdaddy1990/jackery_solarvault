@@ -7,8 +7,8 @@ without any Home Assistant recorder dependency.
 
 from collections import deque
 from datetime import date
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,28 +22,29 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_YEAR,
 )
 from custom_components.jackery_solarvault.coordinator import (
-    _SYSTEM_BUSY_API_CODE,
+    _SYSTEM_BUSY_API_CODE,  # ruff: ignore[import-private-name]
     BackfillStatus,
     JackerySolarVaultCoordinator,
-    _backfill_period_is_closed,
-    _is_system_busy_error,
-    _merge_identified_dict_lists,
-    _normalize_backfill_status,
-    _safe_enrich,
-    _slow_fetch_failure_log_level,
-    _stable_payload_debug_signature,
-    control_int,
+    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
+    _is_system_busy_error,  # ruff: ignore[import-private-name]
+    _merge_identified_dict_lists,  # ruff: ignore[import-private-name]
+    _normalize_backfill_status,  # ruff: ignore[import-private-name]
+    _safe_enrich,  # ruff: ignore[import-private-name]
+    _slow_fetch_failure_log_level,  # ruff: ignore[import-private-name]
+    _stable_payload_debug_signature,  # ruff: ignore[import-private-name]
     merge_missing_dict_values,
     merge_present_dict_values,
-    transport_cmd,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # _safe_enrich
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_safe_enrich_runs_enrichment_on_success() -> None:
     """Successful enrichment function is awaited."""
     mock_enrich = AsyncMock()
@@ -53,7 +54,7 @@ async def test_safe_enrich_runs_enrichment_on_success() -> None:
     mock_enrich.assert_awaited_once_with(dev_id, entry, stale_ok=True)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_safe_enrich_catches_jackery_auth_error() -> None:
     """JackeryAuthError is caught and logged at DEBUG level."""
     auth_err = JackeryAuthError("unauthorized")
@@ -67,7 +68,7 @@ async def test_safe_enrich_catches_jackery_auth_error() -> None:
     mock_enrich.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_safe_enrich_catches_timeout_error() -> None:
     """TimeoutError is caught and logged at DEBUG level."""
     timeout_err = TimeoutError("timeout")
@@ -80,7 +81,7 @@ async def test_safe_enrich_catches_timeout_error() -> None:
     mock_enrich.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_safe_enrich_catches_jackery_error() -> None:
     """JackeryError is caught and logged at DEBUG level."""
     jackery_err = JackeryError("api error")
@@ -93,7 +94,7 @@ async def test_safe_enrich_catches_jackery_error() -> None:
     mock_enrich.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_safe_enrich_passes_stale_ok_false() -> None:
     """stale_ok=False is passed through to enrichment function."""
     mock_enrich = AsyncMock()
@@ -213,21 +214,21 @@ def test_slow_fetch_failure_log_level_shelly_realtime_returns_warning() -> None:
     """Shelly realtime fetch errors return WARNING level."""
     err = JackeryError("shelly_realtime fetch failed")
     level = _slow_fetch_failure_log_level(err, suppressed=True)
-    assert level == 30  # logging.WARNING
+    assert level == 30  # logging.WARNING  # ruff: ignore[magic-value-comparison]
 
 
 def test_slow_fetch_failure_log_level_shelly_realtime_case_insensitive() -> None:
     """Shelly realtime detection is case-insensitive."""
     err = JackeryError("REALTIME-POWER error")
     level = _slow_fetch_failure_log_level(err, suppressed=True)
-    assert level == 30  # logging.WARNING
+    assert level == 30  # logging.WARNING  # ruff: ignore[magic-value-comparison]
 
 
 def test_slow_fetch_failure_log_level_suppressed_returns_debug() -> None:
     """Suppressed non-Shelly errors return DEBUG level."""
     err = JackeryError("some other error")
     level = _slow_fetch_failure_log_level(err, suppressed=True)
-    assert level == 10  # logging.DEBUG
+    assert level == 10  # logging.DEBUG  # ruff: ignore[magic-value-comparison]
 
 
 def test_slow_fetch_failure_log_level_timeout_cause_returns_debug() -> None:
@@ -235,95 +236,14 @@ def test_slow_fetch_failure_log_level_timeout_cause_returns_debug() -> None:
     err = JackeryError("timeout")
     err.__cause__ = TimeoutError("timeout")
     level = _slow_fetch_failure_log_level(err, suppressed=False)
-    assert level == 10  # logging.DEBUG
+    assert level == 10  # logging.DEBUG  # ruff: ignore[magic-value-comparison]
 
 
 def test_slow_fetch_failure_log_level_non_suppressed_returns_warning() -> None:
     """Non-suppressed, non-timeout, non-Shelly errors return WARNING."""
     err = JackeryError("api error")
     level = _slow_fetch_failure_log_level(err, suppressed=False)
-    assert level == 30  # logging.WARNING
-
-
-# ---------------------------------------------------------------------------
-# control_int
-# ---------------------------------------------------------------------------
-
-
-def test_control_int_valid_string() -> None:
-    """Valid integer string returns int."""
-    assert control_int("42", "test_field") == 42
-
-
-def test_control_int_valid_int() -> None:
-    """Valid integer returns same int."""
-    assert control_int(42, "test_field") == 42
-
-
-def test_control_int_valid_integral_float() -> None:
-    """Valid integral float converts to int."""
-    assert control_int(42.0, "test_field") == 42
-
-
-def test_control_int_non_integral_float_raises() -> None:
-    """Non-integral float raises UpdateFailed."""
-    from custom_components.jackery_solarvault.coordinator import UpdateFailed
-
-    with pytest.raises(UpdateFailed, match="Invalid test_field"):
-        control_int(42.7, "test_field")
-
-
-def test_control_int_bool_raises() -> None:
-    """Boolean raises UpdateFailed."""
-    from custom_components.jackery_solarvault.coordinator import UpdateFailed
-
-    with pytest.raises(UpdateFailed, match="Invalid test_field"):
-        control_int(True, "test_field")
-    with pytest.raises(UpdateFailed, match="Invalid test_field"):
-        control_int(False, "test_field")
-
-
-def test_control_int_none_raises() -> None:
-    """None raises UpdateFailed."""
-    from custom_components.jackery_solarvault.coordinator import UpdateFailed
-
-    with pytest.raises(UpdateFailed, match="Invalid test_field"):
-        control_int(None, "test_field")
-
-
-def test_control_int_invalid_string_raises() -> None:
-    """Invalid string raises UpdateFailed."""
-    from custom_components.jackery_solarvault.coordinator import UpdateFailed
-
-    with pytest.raises(UpdateFailed, match="Invalid test_field"):
-        control_int("not-an-int", "test_field")
-
-
-# ---------------------------------------------------------------------------
-# transport_cmd
-# ---------------------------------------------------------------------------
-
-
-def test_transport_cmd_valid_string() -> None:
-    """Valid command string returns int."""
-    assert transport_cmd("113") == 113
-
-
-def test_transport_cmd_valid_int() -> None:
-    """Valid integer returns same int."""
-    assert transport_cmd(113) == 113
-
-
-def test_transport_cmd_invalid_string_raises() -> None:
-    """Invalid string raises ValueError."""
-    with pytest.raises(ValueError, match="cmd must be an integer"):
-        transport_cmd("not-a-cmd")
-
-
-def test_transport_cmd_none_raises() -> None:
-    """None raises ValueError."""
-    with pytest.raises(ValueError, match="cmd must be an integer"):
-        transport_cmd(None)
+    assert level == 30  # logging.WARNING  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -343,15 +263,15 @@ def test_merge_identified_dict_lists_basic() -> None:
     ]
     result = _merge_identified_dict_lists(current, updates)
     assert result is not None
-    assert len(result) == 3
+    assert len(result) == 3  # ruff: ignore[magic-value-comparison]
     # Find updated item
     item1 = next(item for item in result if item["id"] == "1")
-    assert item1["value"] == 15
+    assert item1["value"] == 15  # ruff: ignore[magic-value-comparison]
     assert item1["name"] == "A"  # preserved
     # Find new item
     item3 = next(item for item in result if item["id"] == "3")
     assert item3["name"] == "C"
-    assert item3["value"] == 30
+    assert item3["value"] == 30  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_identified_dict_lists_non_dict_current_returns_none() -> None:
@@ -388,7 +308,7 @@ def test_merge_identified_dict_lists_serial_key() -> None:
     updates = [{"devSn": "sn-1", "value": 20}]
     result = _merge_identified_dict_lists(current, updates)
     assert result is not None
-    assert result[0]["value"] == 20
+    assert result[0]["value"] == 20  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -402,7 +322,7 @@ def test_merge_present_dict_values_nested_dict() -> None:
     update = {"config": {"threshold": 200}}
     merged = merge_present_dict_values(base, update)
     assert merged["config"]["mode"] == "auto"  # preserved
-    assert merged["config"]["threshold"] == 200  # updated
+    assert merged["config"]["threshold"] == 200  # updated  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_present_dict_values_blank_value_preserved() -> None:
@@ -411,7 +331,7 @@ def test_merge_present_dict_values_blank_value_preserved() -> None:
     update = {"value": None, "name": ""}  # blank values
     merged = merge_present_dict_values(base, update)
     assert merged["name"] == "device"
-    assert merged["value"] == 42
+    assert merged["value"] == 42  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_present_dict_values_list_merge() -> None:
@@ -419,9 +339,9 @@ def test_merge_present_dict_values_list_merge() -> None:
     base = {"devices": [{"id": "1", "power": 10}]}
     update = {"devices": [{"id": "1", "power": 20}, {"id": "2", "power": 30}]}
     merged = merge_present_dict_values(base, update)
-    assert len(merged["devices"]) == 2
-    assert merged["devices"][0]["power"] == 20
-    assert merged["devices"][1]["power"] == 30
+    assert len(merged["devices"]) == 2  # ruff: ignore[magic-value-comparison]
+    assert merged["devices"][0]["power"] == 20  # ruff: ignore[magic-value-comparison]
+    assert merged["devices"][1]["power"] == 30  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -436,7 +356,7 @@ def test_merge_missing_dict_values_fills_absent() -> None:
     merged = merge_missing_dict_values(base, update)
     assert merged["existing"] == "value"
     assert merged["new_key"] == "new_value"
-    assert merged["also_new"] == 123
+    assert merged["also_new"] == 123  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_empty_string_filled() -> None:
@@ -445,7 +365,7 @@ def test_merge_missing_dict_values_empty_string_filled() -> None:
     update = {"name": "filled", "value": 100}
     merged = merge_missing_dict_values(base, update)
     assert merged["name"] == "filled"
-    assert merged["value"] == 42  # 42 is not blank, preserved
+    assert merged["value"] == 42  # 42 is not blank, preserved  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_none_filled() -> None:
@@ -454,7 +374,7 @@ def test_merge_missing_dict_values_none_filled() -> None:
     update = {"name": "filled", "value": 100}
     merged = merge_missing_dict_values(base, update)
     assert merged["name"] == "filled"
-    assert merged["value"] == 42
+    assert merged["value"] == 42  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_empty_list_filled() -> None:
@@ -463,7 +383,7 @@ def test_merge_missing_dict_values_empty_list_filled() -> None:
     update = {"items": [1, 2, 3], "value": 100}
     merged = merge_missing_dict_values(base, update)
     assert merged["items"] == [1, 2, 3]
-    assert merged["value"] == 42
+    assert merged["value"] == 42  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_populated_preserved() -> None:
@@ -472,7 +392,7 @@ def test_merge_missing_dict_values_populated_preserved() -> None:
     update = {"name": "update", "value": 200}
     merged = merge_missing_dict_values(base, update)
     assert merged["name"] == "original"
-    assert merged["value"] == 100
+    assert merged["value"] == 100  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_nested_dict() -> None:
@@ -481,7 +401,7 @@ def test_merge_missing_dict_values_nested_dict() -> None:
     update = {"config": {"threshold": 50}}
     merged = merge_missing_dict_values(base, update)
     assert merged["config"]["mode"] == "auto"
-    assert merged["config"]["threshold"] == 50
+    assert merged["config"]["threshold"] == 50  # ruff: ignore[magic-value-comparison]
 
 
 def test_merge_missing_dict_values_deepcopy() -> None:
@@ -659,17 +579,17 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_mqtt_payload_debug_is_enqueued_without_waiting_for_disk() -> None:
     """A live MQTT frame must enqueue diagnostics instead of awaiting disk I/O."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     schedule = MagicMock()
     direct_writer = AsyncMock()
-    coordinator._schedule_payload_debug_event = schedule
-    coordinator._async_payload_debug_event = direct_writer
-    coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=None)
+    coordinator._schedule_payload_debug_event = schedule  # ruff: ignore[private-member-access]
+    coordinator._async_payload_debug_event = direct_writer  # ruff: ignore[private-member-access]
+    coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=None)  # ruff: ignore[private-member-access]
 
-    raw_handler = JackerySolarVaultCoordinator._async_handle_mqtt_message.__wrapped__
+    raw_handler = JackerySolarVaultCoordinator.async_handle_mqtt_message.__wrapped__
     await raw_handler(coordinator, "hb/app/test", {})
 
     schedule.assert_called_once()
@@ -679,7 +599,7 @@ async def test_mqtt_payload_debug_is_enqueued_without_waiting_for_disk() -> None
     assert event["topic"] == "hb/app/test"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_payload_debug_shutdown_flush_writes_pending_events(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -692,8 +612,8 @@ async def test_payload_debug_shutdown_flush_writes_pending_events(
         async_add_executor_job=executor_job,
     )
     coordinator.entry = SimpleNamespace(entry_id="test-entry")
-    coordinator._background_tasks = {}
-    coordinator._payload_debug_pending_events = deque([{"sequence": 1}])
+    coordinator._background_tasks = {}  # ruff: ignore[private-member-access]
+    coordinator._payload_debug_pending_events = deque([{"sequence": 1}])  # ruff: ignore[private-member-access]
 
     monkeypatch.setattr(
         coordinator_module,
@@ -701,13 +621,13 @@ async def test_payload_debug_shutdown_flush_writes_pending_events(
         lambda _entry: True,
     )
 
-    await coordinator._async_flush_payload_debug_events()
+    await coordinator._async_flush_payload_debug_events()  # ruff: ignore[private-member-access]
 
     executor_job.assert_awaited_once()
-    assert not coordinator._payload_debug_pending_events
+    assert not coordinator._payload_debug_pending_events  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -720,7 +640,7 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
         async_add_executor_job=executor_job,
     )
     coordinator.entry = SimpleNamespace(entry_id="test-entry")
-    coordinator._payload_debug_pending_events = deque([
+    coordinator._payload_debug_pending_events = deque([  # ruff: ignore[private-member-access]
         {"sequence": 1},
         {"sequence": 2},
     ])
@@ -731,7 +651,7 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
         lambda _entry: True,
     )
 
-    await coordinator._async_drain_payload_debug_events()
+    await coordinator._async_drain_payload_debug_events()  # ruff: ignore[private-member-access]
 
     executor_job.assert_awaited_once()
     writer, _path, events = executor_job.await_args.args

@@ -322,10 +322,32 @@ async def test_options_reconcile_keeps_ble_running_when_local_mqtt_fails(
     coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()
 
 
+async def test_options_reconcile_restarts_listener_for_broker_endpoint_change(
+    hass: HomeAssistant,
+) -> None:
+    """Broker connection changes are adopted by the running direct listener."""
+    entry = _entry(hass, entry_id="broker-endpoint-reconcile")
+    coordinator = MagicMock(name="coordinator")
+    entry.runtime_data = coordinator
+    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
+        CONF_THIRD_PARTY_MQTT_IP,
+    }
+
+    with patch.object(
+        integration,
+        "_async_start_local_mqtt",
+        AsyncMock(return_value=None),
+    ) as start_local:
+        await integration._async_reconcile_entry_options(hass, entry, coordinator)
+
+    start_local.assert_awaited_once_with(hass, entry, coordinator)
+
+
 async def test_device_originated_reconcile_does_not_rewrite_device_config(
     hass: HomeAssistant,
 ) -> None:
-    """A confirmed device-only 3047 readback leaves the HA listener intact."""
+    """A 3047 readback updates the HA listener without rewriting the device."""
     entry = _entry(hass, entry_id="device-originated-options-reconcile")
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
@@ -342,7 +364,7 @@ async def test_device_originated_reconcile_does_not_rewrite_device_config(
     ) as start_local:
         await integration._async_reconcile_entry_options(hass, entry, coordinator)
 
-    start_local.assert_not_awaited()
+    start_local.assert_awaited_once_with(hass, entry, coordinator)
     coordinator.async_schedule_local_mqtt_device_config.assert_not_called()
 
 

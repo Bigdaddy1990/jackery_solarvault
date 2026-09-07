@@ -36,8 +36,8 @@ def _discovery_coordinator(
 ) -> JackerySolarVaultCoordinator:
     """Build a bare coordinator whose discovery boundaries are mocked."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {}
-    coordinator._pending_discovery_parent_removals = set()
+    coordinator._device_index = {}  # ruff: ignore[private-member-access]
+    coordinator._pending_discovery_parent_removals = set()  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         async_get_system_list=AsyncMock(return_value=systems),
         async_list_devices_legacy=AsyncMock(return_value=legacy),
@@ -47,8 +47,8 @@ def _discovery_coordinator(
         last_legacy_device_list_response={FIELD_CODE: 0, FIELD_DATA: legacy},
     )
     mutable = cast("Any", coordinator)
-    mutable._async_save_discovery_cache = AsyncMock()
-    mutable._schedule_background_once = lambda *_args, **_kwargs: None
+    mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
+    mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -61,7 +61,7 @@ def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() ->
         rejection_callback=rejection_reasons.append,
     )
 
-    assert dev_type == 3
+    assert dev_type == 3  # ruff: ignore[magic-value-comparison]
     assert rejection_reasons == []
 
 
@@ -78,7 +78,7 @@ def test_unknown_textual_device_type_is_not_a_numeric_schema_rejection() -> None
     assert rejection_reasons == []
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_legacy_shelly_is_not_a_property_device() -> None:
     """A bound Shelly (bindKey=0, no model metadata) stays out of the index."""
     shelly = {FIELD_BIND_KEY: 0, FIELD_DEV_SN: "5c013b048e3c"}
@@ -91,11 +91,11 @@ async def test_legacy_shelly_is_not_a_property_device() -> None:
 
     await coordinator.async_discover()
 
-    assert "5c013b048e3c" not in coordinator._device_index
-    assert "portable-1" in coordinator._device_index
+    assert "5c013b048e3c" not in coordinator._device_index  # ruff: ignore[private-member-access]
+    assert "portable-1" in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_legacy_real_portable_still_discovered() -> None:
     """A genuine Jackery portable from bind/list is still indexed as a device."""
     portable = {
@@ -107,10 +107,10 @@ async def test_legacy_real_portable_still_discovered() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     """Explicit empty outer lists are valid fallback, not removal evidence."""
     portable = {
@@ -120,7 +120,7 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     }
     coordinator = _discovery_coordinator(systems=[], legacy=[portable])
     await coordinator.async_discover()
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
     cast("Any", coordinator).api.async_get_system_list = AsyncMock(return_value=[])
     cast("Any", coordinator).api.async_list_devices_legacy = AsyncMock(return_value=[])
@@ -135,10 +135,10 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
 
     await coordinator.async_discover()
 
-    assert list(coordinator._device_index) == ["explorer-9"]
+    assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_and_legacy_discovery_requests_start_concurrently() -> None:
     """A cold poll must not serialize its two independent discovery endpoints."""
     system_started = asyncio.Event()

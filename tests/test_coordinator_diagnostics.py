@@ -33,7 +33,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _Coordinator = JackerySolarVaultCoordinator
 
 
-def _bare() -> Any:
+def _bare() -> Any:  # ruff: ignore[any-type]
     """Return an uninitialised coordinator shell for attribute injection."""
     return cast("Any", _Coordinator.__new__(_Coordinator))
 
@@ -45,9 +45,9 @@ def _bare() -> Any:
 
 def test_endpoint_backoff_is_energy_key_matches_stat_endpoints() -> None:
     """Stat/energy endpoint keys are recognised so they are never suppressed."""
-    assert _Coordinator._endpoint_backoff_is_energy_key("pv_stat") is True
-    assert _Coordinator._endpoint_backoff_is_energy_key("today_energy") is True
-    assert _Coordinator._endpoint_backoff_is_energy_key("device_list") is False
+    assert _Coordinator._endpoint_backoff_is_energy_key("pv_stat") is True  # ruff: ignore[private-member-access]
+    assert _Coordinator._endpoint_backoff_is_energy_key("today_energy") is True  # ruff: ignore[private-member-access]
+    assert _Coordinator._endpoint_backoff_is_energy_key("device_list") is False  # ruff: ignore[private-member-access]
 
 
 def test_endpoint_backoff_diagnostics_reports_only_active_non_energy(
@@ -56,7 +56,7 @@ def test_endpoint_backoff_diagnostics_reports_only_active_non_energy(
     """Active windows exclude energy keys and already-elapsed windows."""
     monkeypatch.setattr(co.time, "monotonic", lambda: 1_000.0)
     coordinator = _bare()
-    coordinator._endpoint_backoff = {
+    coordinator._endpoint_backoff = {  # ruff: ignore[private-member-access]
         "device_list": {"until": 1_030.0, "code": 500, "level": 2},
         "pv_stat": {"until": 1_030.0, "code": 500, "level": 2},
         "expired": {"until": 900.0, "code": 500, "level": 1},
@@ -81,7 +81,7 @@ def test_endpoint_backoff_diagnostics_reports_unsupported_energy_window(
     """A suppressed unsupported PV endpoint remains observable in diagnostics."""
     monkeypatch.setattr(co.time, "monotonic", lambda: 1_000.0)
     coordinator = _bare()
-    coordinator._endpoint_backoff = {
+    coordinator._endpoint_backoff = {  # ruff: ignore[private-member-access]
         "pv_stat": {"until": 1_030.0, "code": 10600, "level": 0, "unsupported": True}
     }
 
@@ -97,22 +97,22 @@ def test_endpoint_backoff_active_count_ignores_energy_keys(
     """Only non-energy keys with a future window count as active."""
     monkeypatch.setattr(co.time, "monotonic", lambda: 500.0)
     coordinator = _bare()
-    coordinator._endpoint_backoff = {
+    coordinator._endpoint_backoff = {  # ruff: ignore[private-member-access]
         "device_list": {"until": 600.0},
         "home_stat": {"until": 600.0},
         "stale": {"until": 400.0},
     }
 
-    assert coordinator._endpoint_backoff_active_count() == 1
+    assert coordinator._endpoint_backoff_active_count() == 1  # ruff: ignore[private-member-access]
 
 
 def test_endpoint_backoff_delays_for_key_uses_energy_ladder() -> None:
     """Energy keys use the short capped ladder; others use the long one."""
-    energy = _Coordinator._endpoint_backoff_delays_for_key("pv_stat")
-    other = _Coordinator._endpoint_backoff_delays_for_key("device_list")
+    energy = _Coordinator._endpoint_backoff_delays_for_key("pv_stat")  # ruff: ignore[private-member-access]
+    other = _Coordinator._endpoint_backoff_delays_for_key("device_list")  # ruff: ignore[private-member-access]
 
-    assert energy == co._ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC
-    assert other == co._ENDPOINT_BACKOFF_DELAYS_SEC
+    assert energy == co._ENDPOINT_BACKOFF_ENERGY_DELAYS_SEC  # ruff: ignore[private-member-access]
+    assert other == co._ENDPOINT_BACKOFF_DELAYS_SEC  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -123,9 +123,9 @@ def test_endpoint_backoff_delays_for_key_uses_energy_ladder() -> None:
 def test_statistics_backfill_diagnostics_redacts_device_ids() -> None:
     """Device ids are replaced by stable ordinal labels in diagnostics."""
     coordinator = _bare()
-    coordinator._statistics_backfill_state_loaded = True
-    coordinator._statistics_backfill_state = {
-        co._STATISTICS_BACKFILL_STORE_DEVICES: {
+    coordinator._statistics_backfill_state_loaded = True  # ruff: ignore[private-member-access]
+    coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
+        co._STATISTICS_BACKFILL_STORE_DEVICES: {  # ruff: ignore[private-member-access]
             "SN-B": {"last_repair_date": "2026-01-02"},
             "SN-A": {"last_repair_date": "2026-01-01"},
         },
@@ -134,7 +134,7 @@ def test_statistics_backfill_diagnostics_redacts_device_ids() -> None:
     diagnostics = coordinator.statistics_backfill_diagnostics
 
     assert diagnostics["loaded"] is True
-    assert diagnostics["tracked_devices"] == 2
+    assert diagnostics["tracked_devices"] == 2  # ruff: ignore[magic-value-comparison]
     # Sorted by device id: SN-A first.
     assert diagnostics["devices"]["device_1"] == {"last_repair_date": "2026-01-01"}
     assert diagnostics["devices"]["device_2"] == {"last_repair_date": "2026-01-02"}
@@ -143,8 +143,8 @@ def test_statistics_backfill_diagnostics_redacts_device_ids() -> None:
 def test_statistics_backfill_diagnostics_tolerates_missing_devices() -> None:
     """A malformed store yields an empty, non-raising diagnostics block."""
     coordinator = _bare()
-    coordinator._statistics_backfill_state_loaded = False
-    coordinator._statistics_backfill_state = {}
+    coordinator._statistics_backfill_state_loaded = False  # ruff: ignore[private-member-access]
+    coordinator._statistics_backfill_state = {}  # ruff: ignore[private-member-access]
 
     diagnostics = coordinator.statistics_backfill_diagnostics
 
@@ -155,18 +155,19 @@ def test_statistics_backfill_diagnostics_tolerates_missing_devices() -> None:
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_statistics_import_job_awaits_repair_wrapper() -> None:
     """The current import job awaits current import and schedules backfill."""
     coordinator = _bare()
-    coordinator._statistics_import_task = None
+    coordinator._statistics_import_task = None  # ruff: ignore[private-member-access]
+    coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
     repair = AsyncMock()
-    coordinator._async_import_and_repair_app_chart_statistics = repair
+    coordinator._async_import_and_repair_app_chart_statistics = repair  # ruff: ignore[private-member-access]
     scheduler = MagicMock()
-    coordinator._schedule_statistics_backfill = scheduler
+    coordinator._schedule_statistics_backfill = scheduler  # ruff: ignore[private-member-access]
 
     snapshot: dict[str, dict[str, Any]] = {"dev-1": {}}
-    await coordinator._async_statistics_import_job(snapshot)
+    await coordinator._async_statistics_import_job(snapshot)  # ruff: ignore[private-member-access]
 
     repair.assert_awaited_once_with(snapshot)
     scheduler.assert_called_once_with(snapshot)
@@ -175,13 +176,13 @@ async def test_statistics_import_job_awaits_repair_wrapper() -> None:
 def test_statistics_backfill_device_state_creates_nested_state() -> None:
     """A first read seeds an empty per-device dict inside the store."""
     coordinator = _bare()
-    coordinator._statistics_backfill_state = {}
+    coordinator._statistics_backfill_state = {}  # ruff: ignore[private-member-access]
 
-    state = coordinator._statistics_backfill_device_state("dev-1")
+    state = coordinator._statistics_backfill_device_state("dev-1")  # ruff: ignore[private-member-access]
     state["marker"] = 1
 
-    store = coordinator._statistics_backfill_state[
-        co._STATISTICS_BACKFILL_STORE_DEVICES
+    store = coordinator._statistics_backfill_state[  # ruff: ignore[private-member-access]
+        co._STATISTICS_BACKFILL_STORE_DEVICES  # ruff: ignore[private-member-access]
     ]
     assert store["dev-1"] == {"marker": 1}
 
@@ -193,7 +194,7 @@ def test_statistics_backfill_device_state_creates_nested_state() -> None:
 
 def test_discovery_source_marker_system_list_when_system_context() -> None:
     """A record carrying system context is marked as a system-list source."""
-    marked = _Coordinator._with_discovery_source_marker({
+    marked = _Coordinator._with_discovery_source_marker({  # ruff: ignore[private-member-access]
         FIELD_SYSTEM_ID: "sys-1",
     })
 
@@ -205,7 +206,7 @@ def test_discovery_source_marker_system_list_when_system_context() -> None:
 
 def test_discovery_source_marker_legacy_when_no_system_context() -> None:
     """A bare record with no system context is marked legacy-bind-list."""
-    marked = _Coordinator._with_discovery_source_marker({})
+    marked = _Coordinator._with_discovery_source_marker({})  # ruff: ignore[private-member-access]
 
     assert (
         marked[PAYLOAD_DEVICE_META][PAYLOAD_DISCOVERY_SOURCE]
@@ -215,7 +216,7 @@ def test_discovery_source_marker_legacy_when_no_system_context() -> None:
 
 def test_discovery_source_marker_preserves_existing_source() -> None:
     """An explicit existing marker is left untouched."""
-    marked = _Coordinator._with_discovery_source_marker({
+    marked = _Coordinator._with_discovery_source_marker({  # ruff: ignore[private-member-access]
         PAYLOAD_DEVICE_META: {PAYLOAD_DISCOVERY_SOURCE: "manual"},
         FIELD_SYSTEM_ID: "sys-1",
     })
@@ -226,7 +227,7 @@ def test_discovery_source_marker_preserves_existing_source() -> None:
 def test_cached_discovery_snapshot_builds_minimal_payload() -> None:
     """Cached discovery yields empty properties plus device/system metadata."""
     coordinator = _bare()
-    coordinator._device_index = {
+    coordinator._device_index = {  # ruff: ignore[private-member-access]
         "dev-1": {
             PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "SN-A"},
             PAYLOAD_SYSTEM_META: {FIELD_SYSTEM_ID: "sys-1"},
@@ -251,24 +252,24 @@ def test_polling_diagnostics_returns_defensive_copy() -> None:
     """The polling diagnostics accessor never leaks the internal dict."""
     coordinator = _bare()
     internal = {"last_cycle_seconds": 12}
-    coordinator._polling_diagnostics = internal
+    coordinator._polling_diagnostics = internal  # ruff: ignore[private-member-access]
 
     exported = coordinator.polling_diagnostics
     exported["last_cycle_seconds"] = 999
 
-    assert internal["last_cycle_seconds"] == 12
+    assert internal["last_cycle_seconds"] == 12  # ruff: ignore[magic-value-comparison]
 
 
 def test_statistics_import_diagnostics_returns_defensive_copy() -> None:
     """The import diagnostics accessor returns an isolated copy."""
     coordinator = _bare()
     internal = {"last_import_device_count": 3}
-    coordinator._statistics_import_diagnostics = internal
+    coordinator._statistics_import_diagnostics = internal  # ruff: ignore[private-member-access]
 
     exported = coordinator.statistics_import_diagnostics
     exported["last_import_device_count"] = 0
 
-    assert internal["last_import_device_count"] == 3
+    assert internal["last_import_device_count"] == 3  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +281,7 @@ def test_day_chart_source_candidates_prefers_device_stat_for_pv() -> None:
     """PV day imports use the complete device-stat curve, not sparse trends."""
     coordinator = _bare()
 
-    candidates = coordinator._day_chart_source_candidates(
+    candidates = coordinator._day_chart_source_candidates(  # ruff: ignore[private-member-access]
         "pv",
         "pvEnergy",
         "pv_energy",
@@ -293,7 +294,7 @@ def test_day_chart_source_candidates_without_trend_source() -> None:
     """A metric with no trend source yields only its day section candidate."""
     coordinator = _bare()
 
-    candidates = coordinator._day_chart_source_candidates(
+    candidates = coordinator._day_chart_source_candidates(  # ruff: ignore[private-member-access]
         "misc",
         "miscStat",
         "unmapped_metric",
@@ -306,7 +307,7 @@ def test_metric_source_candidates_dedupes_and_keeps_primary_first() -> None:
     """The primary section leads and duplicate fallbacks are removed."""
     coordinator = _bare()
 
-    candidates = coordinator._metric_source_candidates(
+    candidates = coordinator._metric_source_candidates(  # ruff: ignore[private-member-access]
         "pv",
         "pvStat",
         "unmapped_metric",

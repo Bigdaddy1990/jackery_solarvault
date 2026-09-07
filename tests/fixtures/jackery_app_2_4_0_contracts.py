@@ -1,9 +1,4 @@
-"""High-risk contracts extracted from the Jackery 2.4.0 App evidence.
-
-These values intentionally do not import integration code.  They are the
-independent side of contract tests and may only be changed when newer
-authoritative App evidence under ``docs/source-of-truth/APP`` proves a change.
-"""
+"""Independent high-risk contracts extracted from the Jackery App evidence."""
 
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -38,12 +33,8 @@ REST_ENDPOINTS: Final = MappingProxyType({
     "dynamic_price": "/v1/device/dynamic/v2/dynamicPrice",
 })
 
-# No App 2.4.0 evidence identifies a Jackery WebSocket or generic REST device
-# control channel.  HTTP setters are limited to the explicit REST operations
-# catalogued separately; live device commands use BLE or cloud MQTT.
 REALTIME_CONTROL_TRANSPORTS: Final = frozenset({"ble", "cloud_mqtt"})
 HTTP_SETTER_FAMILIES: Final = frozenset({"system_name", "dynamic_price", "tariff"})
-
 SYSTEM_BODY_FIELDS: Final = frozenset({"soc", "batState"})
 
 STAT_FIELD_OWNERS: Final = MappingProxyType({
@@ -64,7 +55,6 @@ PORTABLE_COMMANDS: Final = MappingProxyType({
     "setting_energy_saving": CommandContract(20, 4, 4),
     "set_peaks_troughs": CommandContract(42, 130, 130),
 })
-
 
 ALL_LIVE_DATA_SOURCES: Final = frozenset({"http", "cloud_mqtt", "local_mqtt", "ble"})
 
@@ -105,14 +95,6 @@ _CT_ENTITY_KEYS: Final = MappingProxyType({
     "cnPhasePw": "phase_3_power",
     "tPhasePw": "power",
     "tnPhasePw": "power",
-    "aPhaseEgy": "phase_1_lifetime_import_energy",
-    "anPhaseEgy": "phase_1_lifetime_export_energy",
-    "bPhaseEgy": "phase_2_lifetime_import_energy",
-    "bnPhaseEgy": "phase_2_lifetime_export_energy",
-    "cPhaseEgy": "phase_3_lifetime_import_energy",
-    "cnPhaseEgy": "phase_3_lifetime_export_energy",
-    "tPhaseEgy": "lifetime_import_energy",
-    "tnPhaseEgy": "lifetime_export_energy",
     "funForm": "fun_form",
 })
 

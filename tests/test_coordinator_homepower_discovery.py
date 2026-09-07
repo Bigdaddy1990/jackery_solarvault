@@ -11,8 +11,8 @@ the modelCode, the literal integer is) must be:
    presence-only gate with no modelCode/devModel comparison;
 2. discovered into ``_device_index`` with the same shape ``async_discover``
    produces for any system/list device;
-3. classified as a Home (non-portable) payload by ``_has_home_payload_evidence``
-   / ``_is_portable_payload`` (sensor.py);
+3. classified as a Home (non-portable) payload by ``has_home_payload_evidence``
+   (util.py) / ``_is_portable_payload`` (sensor.py);
 4. eligible for the same Home-only sensor description
    (``SMART_MODE_SENSOR_DESCRIPTIONS``) SolarVault gets — proven by
    constructing the real ``JackerySensor`` entity class against it.
@@ -50,6 +50,7 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_DEVICE,
     PAYLOAD_DEVICE_META,
     PAYLOAD_DISCOVERY_SOURCE,
+    PAYLOAD_HTTP_PROPERTIES,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM_META,
 )
@@ -60,12 +61,14 @@ from custom_components.jackery_solarvault.entity import payload_properties_for_s
 from custom_components.jackery_solarvault.sensor import (
     SMART_MODE_SENSOR_DESCRIPTIONS,
     JackerySensor,
-    _has_home_payload_evidence,  # test drives the module-private Home/Portable classifier
-    _is_portable_payload,  # test drives the module-private Home/Portable classifier
+    _is_portable_payload,  # test drives the module-private Home/Portable classifier  # ruff: ignore[import-private-name]
 )
+from custom_components.jackery_solarvault.util import has_home_payload_evidence
 
 if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.sensor import JackerySensorDescription
+    from custom_components.jackery_solarvault.descriptions import (
+        JackerySensorDescription,
+    )
 
 # Home device family SKUs (docs/source-of-truth/APP/smali_classes4/cb/b.smali).
 HOME_MODEL_CODES = (3001, 3002, 3003, 3004)
@@ -131,8 +134,8 @@ def _discovery_coordinator(*, systems: list[Any]) -> JackerySolarVaultCoordinato
     state that only the real ``__init__`` (skipped here) initialises.
     """
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {}
-    coordinator._pending_discovery_parent_removals = set()
+    coordinator._device_index = {}  # ruff: ignore[private-member-access]
+    coordinator._pending_discovery_parent_removals = set()  # ruff: ignore[private-member-access]
     mutable = cast("Any", coordinator)
     mutable.api = SimpleNamespace(
         async_get_system_list=AsyncMock(return_value=systems),
@@ -142,8 +145,8 @@ def _discovery_coordinator(*, systems: list[Any]) -> JackerySolarVaultCoordinato
         last_system_list_response={FIELD_CODE: 0, FIELD_DATA: systems},
         last_legacy_device_list_response={FIELD_CODE: 0, FIELD_DATA: []},
     )
-    mutable._async_save_discovery_cache = AsyncMock()
-    mutable._schedule_background_once = lambda *_args, **_kwargs: None
+    mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
+    mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -162,8 +165,8 @@ def _home_power_sensor(
     sensor = JackerySensor.__new__(JackerySensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(data={dev_id: payload})
-    mutable._device_id = dev_id
-    mutable._attr_unique_id = f"{dev_id}_{description.key}"
+    mutable._device_id = dev_id  # ruff: ignore[private-member-access]
+    mutable._attr_unique_id = f"{dev_id}_{description.key}"  # ruff: ignore[private-member-access]
     mutable.entity_description = description
     return sensor
 
@@ -182,11 +185,11 @@ def test_home_modelcode_is_admitted_as_property_device_candidate(
     """
     dev = _home_power_dev_entry(model_code)
 
-    assert JackerySolarVaultCoordinator._is_property_device_candidate(dev) is True
+    assert JackerySolarVaultCoordinator._is_property_device_candidate(dev) is True  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_home_modelcode_is_discovered_into_device_index(
     model_code: int,
 ) -> None:
@@ -207,8 +210,8 @@ async def test_home_modelcode_is_discovered_into_device_index(
 
     await coordinator.async_discover()
 
-    assert dev_id in coordinator._device_index
-    indexed = coordinator._device_index[dev_id]
+    assert dev_id in coordinator._device_index  # ruff: ignore[private-member-access]
+    indexed = coordinator._device_index[dev_id]  # ruff: ignore[private-member-access]
     assert set(indexed) == {FIELD_SYSTEM_ID, PAYLOAD_SYSTEM_META, PAYLOAD_DEVICE_META}
     assert indexed[FIELD_SYSTEM_ID] == _SYSTEM_ID
     assert indexed[PAYLOAD_DEVICE_META][FIELD_MODEL_CODE] == model_code
@@ -218,7 +221,7 @@ async def test_home_modelcode_is_discovered_into_device_index(
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_empty_outer_system_list_is_not_parent_removal_evidence() -> None:
     """A transient explicit ``data=[]`` keeps a known system parent."""
     system_entry = {
@@ -234,10 +237,10 @@ async def test_empty_outer_system_list_is_not_parent_removal_evidence() -> None:
     mutable.api.last_system_list_response = {FIELD_CODE: 0, FIELD_DATA: []}
     await coordinator.async_discover()
 
-    assert _home_power_dev_id(3002) in coordinator._device_index
+    assert _home_power_dev_id(3002) in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_identified_system_with_empty_devices_confirms_parent_removal() -> None:
     """Two complete system omissions remove the previously indexed parent."""
     populated = {
@@ -260,10 +263,10 @@ async def test_identified_system_with_empty_devices_confirms_parent_removal() ->
         FIELD_DATA: [empty_system],
     }
     await coordinator.async_discover()
-    assert _home_power_dev_id(3002) in coordinator._device_index
+    assert _home_power_dev_id(3002) in coordinator._device_index  # ruff: ignore[private-member-access]
 
     await coordinator.async_discover()
-    assert _home_power_dev_id(3002) not in coordinator._device_index
+    assert _home_power_dev_id(3002) not in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)
@@ -273,8 +276,22 @@ def test_home_modelcode_payload_classified_as_home(model_code: int) -> None:
     payload = _home_power_property_payload(dev_id, model_code)
     props = payload_properties_for_sources(payload)
 
-    assert _has_home_payload_evidence(props) is True
+    assert has_home_payload_evidence(props) is True
     assert _is_portable_payload(payload, props) is False
+
+
+def test_property_resolution_keeps_http_fields_missing_from_live_frame() -> None:
+    """A partial live frame cannot make complete HTTP battery data unavailable."""
+    payload = {
+        PAYLOAD_HTTP_PROPERTIES: {"batInPw": 4, "batOutPw": 27, "pvPw": 100},
+        PAYLOAD_PROPERTIES: {"pvPw": 110},
+    }
+
+    assert payload_properties_for_sources(payload) == {
+        "batInPw": 4,
+        "batOutPw": 27,
+        "pvPw": 110,
+    }
 
 
 @pytest.mark.parametrize("model_code", HOME_MODEL_CODES)

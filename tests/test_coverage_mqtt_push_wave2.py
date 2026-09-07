@@ -193,6 +193,45 @@ async def test_cloud_subscription_failure_is_reported_and_wakes_waiters(
     assert client._connected_event.is_set()
 
 
+async def test_stop_does_not_cancel_pending_cloud_subscription(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unload lets SUBACK settle so aiomqtt keeps its message-id waiter."""
+    subscribe_started = asyncio.Event()
+    release_subscribe = asyncio.Event()
+    subscribe_cancelled = asyncio.Event()
+
+    class _SlowBroker(_BrokerClient):
+        @override
+        async def subscribe(self, topic: str, *, qos: int) -> None:
+            subscribe_started.set()
+            try:
+                await release_subscribe.wait()
+            except asyncio.CancelledError:
+                subscribe_cancelled.set()
+                raise
+            await super().subscribe(topic, qos=qos)
+
+    broker = _SlowBroker()
+    monkeypatch.setattr(mqtt_push.aiomqtt, "Client", lambda **_kwargs: broker)
+    client = _client(hass)
+    session = asyncio.create_task(
+        _run_owned_session(client, topics=("hb/app/user/device",))
+    )
+    await subscribe_started.wait()
+
+    stop = asyncio.create_task(client.async_stop())
+    await asyncio.sleep(0)
+    assert not stop.done()
+    release_subscribe.set()
+    await stop
+    await session
+
+    assert not subscribe_cancelled.is_set()
+    assert client.is_started is False
+
+
 async def test_cloud_connect_failure_is_reported_without_local_retry(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,

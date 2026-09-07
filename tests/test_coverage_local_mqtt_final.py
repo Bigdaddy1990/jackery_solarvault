@@ -1,8 +1,8 @@
-"""Behavioral edge coverage for the Home Assistant Local-MQTT adapter."""
+"""Behavioral edge coverage for the direct Local-MQTT adapter."""
 
 import asyncio
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -16,188 +16,10 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
-async def test_subscribe_failure_removes_status_callback_and_stays_retryable(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A transient HA subscription failure cannot leak its status callback."""
-    unsubscribe_status = MagicMock()
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_wait_for_mqtt_client",
-        AsyncMock(return_value=True),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe",
-        AsyncMock(side_effect=RuntimeError("subscription unavailable")),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe_connection_status",
-        lambda _hass, _callback: unsubscribe_status,
-    )
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-
-    await client.async_start()
-
-    assert not client.is_started
-    assert client.diagnostics_snapshot()["subscription_retry_active"]
-    assert "RuntimeError" in cast_str(client.diagnostics_snapshot()["last_error"])
-    unsubscribe_status.assert_called_once_with()
-    await client.async_stop()
-
-
-@pytest.mark.asyncio
-async def test_cancelled_subscribe_removes_status_callback(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Cancellation propagates after removing the registered status callback."""
-    unsubscribe_status = MagicMock()
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_wait_for_mqtt_client",
-        AsyncMock(return_value=True),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe",
-        AsyncMock(side_effect=asyncio.CancelledError),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe_connection_status",
-        lambda _hass, _callback: unsubscribe_status,
-    )
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-
-    with pytest.raises(asyncio.CancelledError):
-        await client._async_subscribe_once()
-
-    unsubscribe_status.assert_called_once_with()
-
-
-@pytest.mark.asyncio
-async def test_successful_subscription_can_begin_disconnected(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """HA may register the subscription before its broker session is online."""
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_wait_for_mqtt_client",
-        AsyncMock(return_value=True),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe",
-        AsyncMock(return_value=MagicMock()),
-    )
-    monkeypatch.setattr(
-        local_mqtt.mqtt,
-        "async_subscribe_connection_status",
-        lambda _hass, _callback: MagicMock(),
-    )
-    monkeypatch.setattr(local_mqtt.mqtt, "is_connected", lambda _hass: False)
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-
-    await client.async_start()
-
-    assert client.is_started
-    assert not client.is_connected
-    assert client.diagnostics_snapshot()["last_connect_at"] is None
-    await client.async_stop()
-
-
-@pytest.mark.asyncio
-async def test_retry_supervisor_backs_off_and_clears_its_own_task(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Repeated registration failures use capped backoff then terminate cleanly."""
-    sleeps = AsyncMock()
-    retry_once = AsyncMock(side_effect=(False, False, True))
-    monkeypatch.setattr(local_mqtt.asyncio, "sleep", sleeps)
-    monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_RECONNECT_INITIAL_SEC", 1.0)
-    monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_RECONNECT_FACTOR", 2.0)
-    monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_RECONNECT_MAX_SEC", 3.0)
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-    monkeypatch.setattr(client, "_async_retry_subscription_once", retry_once)
-    task = asyncio.create_task(client._async_retry_subscription())
-    client._retry_task = task
-
-    await task
-
-    assert [call.args[0] for call in sleeps.await_args_list] == [1.0, 2.0, 3.0]
-    assert client._retry_task is None
-
-
-@pytest.mark.asyncio
-async def test_stopped_retry_supervisor_exits_without_attempt(
+async def test_handler_accepts_text_and_bytearray_payloads(
     hass: HomeAssistant,
 ) -> None:
-    """A supervisor started during teardown exits through its finalizer."""
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-    client._stopping = True
-
-    await client._async_retry_subscription()
-
-    assert client._retry_task is None
-
-
-@pytest.mark.asyncio
-async def test_start_ignores_an_active_subscription_retry(
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Repeated starts do not create competing retry supervisors."""
-    subscribe_once = AsyncMock(return_value=True)
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-
-    async def _wait_forever() -> None:
-        await asyncio.Event().wait()
-
-    blocker = asyncio.create_task(_wait_forever())
-    client._retry_task = blocker
-    monkeypatch.setattr(client, "_async_subscribe_once", subscribe_once)
-
-    await client.async_start()
-
-    subscribe_once.assert_not_awaited()
-    await client.async_stop()
-    assert blocker.cancelled()
-
-
-@pytest.mark.asyncio
-async def test_retry_once_stops_when_client_is_stopping_or_subscribed(
-    hass: HomeAssistant,
-) -> None:
-    """A late retry never creates a ghost subscription after stop/success."""
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-    client._stopping = True
-    assert await client._async_retry_subscription_once()
-
-    client._stopping = False
-    client._unsubscribe = MagicMock()
-    client._subscription_active = True
-    assert await client._async_retry_subscription_once()
-
-
-def test_duplicate_connection_status_is_a_noop(hass: HomeAssistant) -> None:
-    """Repeated broker status callbacks do not rewrite timestamps."""
-    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
-
-    client._async_connection_status_changed(False)
-
-    assert client.diagnostics_snapshot()["last_disconnect_at"] is None
-
-
-@pytest.mark.asyncio
-async def test_message_wrapper_handles_text_and_bytearray_payloads(
-    hass: HomeAssistant,
-) -> None:
-    """HA payload variants are normalized without filtering before the sink."""
+    """Direct calls normalize supported payload variants before the sink."""
     received: list[tuple[dict[str, Any] | None, bytes]] = []
 
     async def _sink(
@@ -210,33 +32,21 @@ async def test_message_wrapper_handles_text_and_bytearray_payloads(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="jackery/#")
-    client._async_message_received(
-        MagicMock(topic="jackery/device", payload='{"soc":80}', retain=False),
-    )
-    client._async_message_received(
-        MagicMock(
-            topic="jackery/device",
-            payload=bytearray(b"not-json"),
-            retain=False,
-        ),
-    )
-    await client.async_wait_message_queue_idle()
+    await client._handle_message("jackery/device", '{"soc":80}')
+    await client._handle_message("jackery/device", bytearray(b"not-json"))
 
     assert received == [({"soc": 80}, b'{"soc":80}'), (None, b"not-json")]
 
 
 @pytest.mark.asyncio
-async def test_stopping_message_wrapper_and_handler_are_noops(
+async def test_stopping_handler_is_a_noop(
     hass: HomeAssistant,
 ) -> None:
-    """Unload barriers prevent queued callbacks from mutating diagnostics."""
+    """The unload barrier prevents direct ingress from mutating diagnostics."""
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
     client._stopping = True
 
-    client._async_message_received(
-        MagicMock(topic="jackery/device", payload=b"{}"),
-    )
     await client._handle_message("jackery/device", b"{}")
 
     sink.assert_not_awaited()

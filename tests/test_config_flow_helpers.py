@@ -44,12 +44,12 @@ _SUBMITTED_PORT = 1886
 
 def test_normalize_account_strips_whitespace() -> None:
     """Account ids are normalized before unique-id and reauth checks."""
-    assert config_flow._normalize_account(" owner@example.com ") == _ACCOUNT
+    assert config_flow._normalize_account(" owner@example.com ") == _ACCOUNT  # ruff: ignore[private-member-access]
 
 
 def test_flow_options_preserves_current_and_third_party_fields() -> None:
     """Option merging includes the full persistable option surface."""
-    result = config_flow._flow_options(
+    result = config_flow._flow_options(  # ruff: ignore[private-member-access]
         {CONF_ENABLE_WEEK_STATISTICS: True},
         {
             CONF_ENABLE_BLE_TRANSPORT: False,
@@ -75,7 +75,7 @@ def test_entry_data_from_api_login_keeps_region_and_mqtt_bootstrap() -> None:
         data={CONF_REGION_CODE: _REGION},
     )
 
-    data = config_flow._entry_data_from_api_login(
+    data = config_flow._entry_data_from_api_login(  # ruff: ignore[private-member-access]
         _ACCOUNT,
         _PASSWORD,
         cast("JackeryApi", api),
@@ -101,7 +101,7 @@ def test_entry_data_from_api_login_prefers_api_region() -> None:
         data={CONF_REGION_CODE: _REGION},
     )
 
-    data = config_flow._entry_data_from_api_login(
+    data = config_flow._entry_data_from_api_login(  # ruff: ignore[private-member-access]
         _ACCOUNT,
         _PASSWORD,
         cast("JackeryApi", api),
@@ -114,21 +114,21 @@ def test_entry_data_from_api_login_prefers_api_region() -> None:
 
 def test_local_mqtt_port_coercion_falls_back_to_default() -> None:
     """Invalid stored Local-MQTT port values cannot poison config options."""
-    assert config_flow._coerce_local_mqtt_port(None) == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port("") == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port(str(_LOCAL_PORT)) == _LOCAL_PORT
-    assert config_flow._coerce_local_mqtt_port(object()) == DEFAULT_LOCAL_MQTT_PORT
-    assert config_flow._coerce_local_mqtt_port("not-a-port") == DEFAULT_LOCAL_MQTT_PORT
+    assert config_flow._coerce_local_mqtt_port(None) == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port("") == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port(str(_LOCAL_PORT)) == _LOCAL_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port(object()) == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_port("not-a-port") == DEFAULT_LOCAL_MQTT_PORT  # ruff: ignore[private-member-access]
 
 
 def test_local_mqtt_qos_coercion_accepts_levels_and_rejects_invalid_values() -> None:
     """Stored or submitted QoS is normalized to one of MQTT's three levels."""
-    assert config_flow._coerce_local_mqtt_qos(0) == 0
-    assert config_flow._coerce_local_mqtt_qos("1") == 1
-    assert config_flow._coerce_local_mqtt_qos(2) == 2
-    assert config_flow._coerce_local_mqtt_qos(None) == 0
-    assert config_flow._coerce_local_mqtt_qos("invalid") == 0
-    assert config_flow._coerce_local_mqtt_qos(3) == 0
+    assert config_flow._coerce_local_mqtt_qos(0) == 0  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_qos("1") == 1  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_qos(2) == 2  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert config_flow._coerce_local_mqtt_qos(None) == 0  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_qos("invalid") == 0  # ruff: ignore[private-member-access]
+    assert config_flow._coerce_local_mqtt_qos(3) == 0  # ruff: ignore[private-member-access]
 
 
 def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
@@ -145,7 +145,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
         },
     )
 
-    result = config_flow._current_local_mqtt_options(entry)
+    result = config_flow._current_local_mqtt_options(entry)  # ruff: ignore[private-member-access]
 
     assert result == {
         CONF_LOCAL_MQTT_ENABLE: True,
@@ -159,7 +159,7 @@ def test_current_local_mqtt_options_reads_new_and_legacy_keys() -> None:
 
 
 def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
-    """Submitted form keys (third_party_mqtt_*) are used with current values as fallback."""
+    """Submitted form keys (third_party_mqtt_*) are used with current values as fallback."""  # ruff: ignore[line-too-long]
     current: dict[str, Any] = {
         CONF_LOCAL_MQTT_ENABLE: False,
         CONF_LOCAL_MQTT_HOST: "old.local",
@@ -170,8 +170,8 @@ def test_merge_local_mqtt_options_prefers_submitted_local_keys() -> None:
         CONF_THIRD_PARTY_MQTT_QOS: 0,
     }
 
-    # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)
-    result = config_flow._merge_local_mqtt_options(
+    # Form submits using third_party_mqtt_* keys (which are aliased to local_mqtt_* in this test)  # ruff: ignore[line-too-long]
+    result = config_flow._merge_local_mqtt_options(  # ruff: ignore[private-member-access]
         {
             CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "local.new",
@@ -210,7 +210,7 @@ def test_reconfigure_options_preserves_unexposed_existing_options() -> None:
         },
     )
 
-    result = config_flow._reconfigure_options(
+    result = config_flow._reconfigure_options(  # ruff: ignore[private-member-access]
         entry,
         {
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: True,
@@ -245,7 +245,7 @@ def test_flow_options_preserves_third_party_mqtt_token() -> None:
         CONF_THIRD_PARTY_MQTT_IP: "new-broker.local",
     }
 
-    result = config_flow._flow_options(user_input, current_options)
+    result = config_flow._flow_options(user_input, current_options)  # ruff: ignore[private-member-access]
 
     # Token should be preserved from current_options
     assert result[CONF_THIRD_PARTY_MQTT_TOKEN] == "existing-token-123"
@@ -258,8 +258,8 @@ def test_flow_options_preserves_third_party_mqtt_token() -> None:
 
 def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
     """Token from current_options flows through merge_local_mqtt_options correctly."""
-    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))
-    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options
+    # The options flow does: merged = _flow_options(...); merged.update(_merge_local_mqtt_options(...))  # ruff: ignore[line-too-long]
+    # The token is not in _merge_local_mqtt_options output, so it must come from _flow_options  # ruff: ignore[line-too-long]
     current_options = {
         CONF_ENABLE_BLE_TRANSPORT: False,
         CONF_THIRD_PARTY_MQTT_TOKEN: "token-from-options",
@@ -277,8 +277,8 @@ def test_merge_local_mqtt_options_preserves_token_via_current_options() -> None:
         CONF_ENABLE_BLE_TRANSPORT: True,
     }
 
-    merged = config_flow._flow_options(user_input, current_options)
-    merged.update(config_flow._merge_local_mqtt_options(user_input, current_local_mqtt))
+    merged = config_flow._flow_options(user_input, current_options)  # ruff: ignore[private-member-access]
+    merged.update(config_flow._merge_local_mqtt_options(user_input, current_local_mqtt))  # ruff: ignore[private-member-access]
 
     # Token must come from _flow_options (which reads current_options)
     assert merged[CONF_THIRD_PARTY_MQTT_TOKEN] == "token-from-options"

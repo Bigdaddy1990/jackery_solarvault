@@ -10,13 +10,27 @@ Locks down the contract:
 4. Pure unit-test coverage of the cleanup helper without HA fixtures.
 """
 
-from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import re
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
-from custom_components.jackery_solarvault.const import FIELD_BAT_NUM, PAYLOAD_PROPERTIES
-from custom_components.jackery_solarvault.coordinator import battery_packs_need_query
+from custom_components.jackery_solarvault.const import (
+    FIELD_BAT_NUM,
+    FIELD_DEVICE_SN,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_PROPERTIES,
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+    TransportSource,
+    battery_packs_need_query,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
@@ -31,7 +45,7 @@ def _read(name: str) -> str:
 
     Returns:
         file_text (str): The file contents decoded as UTF-8.
-    """
+    """  # ruff: ignore[line-too-long]
     return (COMPONENT / name).read_text(encoding="utf-8")
 
 
@@ -50,6 +64,8 @@ def test_stale_threshold_constant_is_a_full_week() -> None:
     assert match is not None
     expr = match.group(1).strip()
     # Evaluate the literal expression (e.g. "7 * 24 * 3600")
+    # ast.literal_eval cannot evaluate arithmetic ("7 * 24 * 3600"), and the
+    # expression is read from our own source with an empty builtins namespace.
     value = eval(expr, {"__builtins__": {}}, {})  # ruff: ignore[suspicious-eval-usage]
     assert isinstance(value, int)
     assert value >= 24 * 3600, f"threshold {value}s is shorter than 24h"
@@ -92,7 +108,7 @@ def test_stale_drop_helper_logic_unit() -> None:
 
         Returns:
             tuple[list[dict], int]: A pair (kept_packs, stale_count) where `kept_packs` is the list of packs retained and `stale_count` is the number of packs considered stale and dropped.
-        """
+        """  # ruff: ignore[line-too-long]
         kept: list[PackRow] = []
         stale = 0
         for pack in packs:
@@ -148,7 +164,7 @@ def test_offline_pack_during_short_blip_is_kept() -> None:
 
         Returns:
             list: The subset of `packs` retained — packs that do not have a string `_last_seen_at`, have an unparsable `_last_seen_at`, or whose parsed `_last_seen_at` is within `threshold_seconds` of `now`.
-        """
+        """  # ruff: ignore[line-too-long]
         kept: list[PackRow] = []
         for p in packs:
             last_seen = p.get("_last_seen_at")
@@ -211,18 +227,31 @@ def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     assert "fetch_missing=False" in update_body, update_body
     assert "_schedule_battery_pack_ota_enrichment(dev_id)" in update_body, update_body
 
-    handler_match = re.search(
-        r"async def _async_handle_mqtt_message\(.*?(?=\n    def _resolve_device_id_from_mqtt)",
-        src,
-        re.DOTALL,
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    call_order: list[str] = []
+    coordinator._push_partial_update = MagicMock(  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
+        side_effect=lambda *_args, **_kwargs: call_order.append("push")
     )
-    assert handler_match is not None
-    handler_body = handler_match.group(0)
-    push_call = "self._push_partial_update("
-    schedule_call = "_schedule_battery_pack_ota_enrichment(device_id)"
-    assert push_call in handler_body, handler_body
-    assert schedule_call in handler_body, handler_body
-    assert handler_body.index(push_call) < handler_body.index(schedule_call)
+    coordinator._schedule_battery_pack_ota_enrichment = MagicMock(  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
+        side_effect=lambda *_args: call_order.append("schedule")
+    )
+    context = SimpleNamespace(
+        current={},
+        device_id="device-1",
+        observed_at=None,
+        payload={},
+        source=TransportSource.LOCAL_MQTT,
+        topic="hb/device/device-1/event",
+    )
+    assert (
+        coordinator._publish_mqtt_route_update(  # ruff: ignore[private-member-access]
+            context,
+            {PAYLOAD_BATTERY_PACKS: [{FIELD_DEVICE_SN: "pack-1"}]},
+            touched=True,
+        )
+        == "device-1"
+    )
+    assert call_order == ["push", "schedule"]
 
     refresh_match = re.search(
         r"async def _async_refresh_battery_pack_ota\(.*?(?=\n    @staticmethod)",

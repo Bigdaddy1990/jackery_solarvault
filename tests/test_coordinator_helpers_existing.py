@@ -15,17 +15,17 @@ from custom_components.jackery_solarvault.const import (
     SUBDEVICE_DEV_TYPE_BATTERY_PACK,
 )
 from custom_components.jackery_solarvault.coordinator import (
-    _backfill_period_is_closed,
-    _clean_dict_list_update,
-    _dict_list_identity_values,
-    _is_blank_value,
-    _is_system_busy_error,
-    _load_mqtt_push_client,
-    _merge_identified_dict_lists,
-    _normalize_backfill_status,
-    _payload_debug_capture_enabled,
-    _slow_fetch_failure_log_level,
-    _stable_payload_debug_signature,
+    _backfill_period_is_closed,  # ruff: ignore[import-private-name]  # isort: skip
+    _clean_dict_list_update,  # ruff: ignore[import-private-name]  # isort: skip
+    _dict_list_identity_values,  # ruff: ignore[import-private-name]  # isort: skip
+    _is_blank_value,  # ruff: ignore[import-private-name]  # isort: skip
+    _is_system_busy_error,  # ruff: ignore[import-private-name]  # isort: skip
+    _load_mqtt_push_client,  # ruff: ignore[import-private-name]  # isort: skip
+    _merge_identified_dict_lists,  # ruff: ignore[import-private-name]  # isort: skip
+    _normalize_backfill_status,  # ruff: ignore[import-private-name]  # isort: skip
+    _payload_debug_capture_enabled,  # ruff: ignore[import-private-name]  # isort: skip
+    _slow_fetch_failure_log_level,  # ruff: ignore[import-private-name]  # isort: skip
+    _stable_payload_debug_signature,  # ruff: ignore[import-private-name]  # isort: skip
     battery_packs_from_source,
     changed_dict_values,
     find_dict_with_any_key,
@@ -58,38 +58,38 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 
 
-class TestCoordinatorHelpersExisting:  # noqa: PLR0904
+class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  # isort: skip
     """Test coordinator helper functions that exist in coordinator.py."""
 
-    def _bare_entry(self) -> Any:  # noqa: PLR6301
+    def _bare_entry(self) -> Any:  # ruff: ignore[any-type, no-self-use]  # isort: skip
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
         return entry
 
-    def test_payload_debug_capture_enabled(self) -> None:  # noqa: PLR6301
+    def test_payload_debug_capture_enabled(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _payload_debug_capture_enabled."""
         result = _payload_debug_capture_enabled(None)
         assert isinstance(result, bool)
 
-    def test_stable_payload_debug_signature(self) -> None:  # noqa: PLR6301
+    def test_stable_payload_debug_signature(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _stable_payload_debug_signature."""
         event = {"key": "value"}
         sig = _stable_payload_debug_signature(event)
         assert isinstance(sig, str)
 
-    def test_slow_fetch_failure_log_level(self) -> None:  # noqa: PLR6301
+    def test_slow_fetch_failure_log_level(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _slow_fetch_failure_log_level."""
         err = JackeryError("test error")
         level = _slow_fetch_failure_log_level(err, suppressed=False)
         assert level in {10, 20, 30, 40}
 
-    def test_load_mqtt_push_client(self) -> None:  # noqa: PLR6301
+    def test_load_mqtt_push_client(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _load_mqtt_push_client."""
         client_class = _load_mqtt_push_client()
         assert client_class is not None
 
-    def test_backfill_period_is_closed(self) -> None:  # noqa: PLR6301
+    def test_backfill_period_is_closed(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _backfill_period_is_closed."""
         today = date(2026, 8, 16)
         assert (
@@ -98,51 +98,51 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
         )
         assert _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today) is False
 
-    def test_normalize_backfill_status(self) -> None:  # noqa: PLR6301
+    def test_normalize_backfill_status(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _normalize_backfill_status."""
-        from custom_components.jackery_solarvault.coordinator import BackfillStatus  # noqa: I001
+        from custom_components.jackery_solarvault.coordinator import BackfillStatus  # ruff: ignore[import-outside-top-level]  # isort: skip
 
         result = _normalize_backfill_status(BackfillStatus.IMPORTED, closed=True)
         assert result == BackfillStatus.IMPORTED
 
-    def test_is_system_busy_error(self) -> None:  # noqa: PLR6301
+    def test_is_system_busy_error(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _is_system_busy_error."""
-        from custom_components.jackery_solarvault.client.api import JackeryError  # noqa: I001
+        from custom_components.jackery_solarvault.client.api import JackeryError  # ruff: ignore[import-outside-top-level]  # isort: skip
 
         err = JackeryError("system busy")
         result = _is_system_busy_error(err)
         assert isinstance(result, bool)
 
-    def test_is_mqtt_auth_failure(self) -> None:  # noqa: PLR6301
+    def test_is_mqtt_auth_failure(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_mqtt_auth_failure."""
         assert is_mqtt_auth_failure("connect rc=5") is True
         assert is_mqtt_auth_failure("bad user name or password") is True
 
-    def test_is_transient_connect_failure(self) -> None:  # noqa: PLR6301
+    def test_is_transient_connect_failure(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_transient_connect_failure."""
         assert is_transient_connect_failure("connection refused") is True
         assert is_transient_connect_failure("server unavailable") is True
 
-    def test_mqtt_connect_failure_signature(self) -> None:  # noqa: PLR6301
+    def test_mqtt_connect_failure_signature(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test mqtt_connect_failure_signature."""
         result = mqtt_connect_failure_signature("connection refused")
         assert result == "connection refused"
 
-    def test_merge_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_dict_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test merge_dict_values."""
         base = {"a": 1, "b": 2}
         updates = {"b": 3, "c": 4}
         result = merge_dict_values(base, updates)
         assert result == {"a": 1, "b": 3, "c": 4}
 
-    def test_changed_dict_values(self) -> None:  # noqa: PLR6301
+    def test_changed_dict_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test changed_dict_values."""
         before = {"a": 1}
         after = {"a": 1, "b": 2}
         result = changed_dict_values(before, after)
         assert result == {"b": 2}
 
-    def test_is_blank_value(self) -> None:  # noqa: PLR6301
+    def test_is_blank_value(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _is_blank_value."""
         assert _is_blank_value(None) is True
         assert _is_blank_value("") is True
@@ -153,140 +153,140 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
         assert _is_blank_value(0) is False
         assert _is_blank_value(False) is False
 
-    def test_dict_list_identity_values(self) -> None:  # noqa: PLR6301
+    def test_dict_list_identity_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _dict_list_identity_values."""
         item = {"deviceSn": "pack-1", "sn": "serial-123"}
         result = _dict_list_identity_values(item)
         assert "serial:pack-1" in result
         assert "serial:serial-123" in result
 
-    def test_clean_dict_list_update(self) -> None:  # noqa: PLR6301
+    def test_clean_dict_list_update(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _clean_dict_list_update."""
         update = {"key1": "value", "key2": None, "key3": "", "key4": []}
         result = _clean_dict_list_update(update)
         assert result == {"key1": "value"}
 
-    def test_merge_identified_dict_lists(self) -> None:  # noqa: PLR6301
+    def test_merge_identified_dict_lists(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _merge_identified_dict_lists."""
         base = [{"deviceSn": "p1", "soc": 50}]
         updates = [{"deviceSn": "p1", "soc": 60}]
         result = _merge_identified_dict_lists(base, updates)
-        assert result[0]["soc"] == 60
+        assert result[0]["soc"] == 60  # ruff: ignore[magic-value-comparison]  # isort: skip
 
-    def test_merge_present_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_present_dict_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test merge_present_dict_values."""
         base = {"key": "value"}
         updates = {"key": None}
         result = merge_present_dict_values(base, updates)
         assert result["key"] == "value"
 
-    def test_merge_missing_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_missing_dict_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test merge_missing_dict_values."""
         base = {"device": {"soc": 50}}
         updates = {"device": {"temp": 25}}
         result = merge_missing_dict_values(base, updates)
-        assert result["device"]["soc"] == 50
-        assert result["device"]["temp"] == 25
+        assert result["device"]["soc"] == 50  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert result["device"]["temp"] == 25  # ruff: ignore[magic-value-comparison]  # isort: skip
 
-    def test_find_dict_with_any_key(self) -> None:  # noqa: PLR6301
+    def test_find_dict_with_any_key(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test find_dict_with_any_key."""
         result = find_dict_with_any_key(None, {"deviceSn"})
         assert result is None
 
-    def test_find_list_for_key(self) -> None:  # noqa: PLR6301
+    def test_find_list_for_key(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test find_list_for_key."""
         result = find_list_for_key(None, "batteryPacks")
         assert result is None
 
-    def test_normalize_live_property_payload(self) -> None:  # noqa: PLR6301
+    def test_normalize_live_property_payload(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test normalize_live_property_payload."""
         source = {"soc": 50, "temp": 25}
         result = normalize_live_property_payload(source)
         assert result == source
         assert result is not source
 
-    def test_normalized_company_id(self) -> None:  # noqa: PLR6301
+    def test_normalized_company_id(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test normalized_company_id."""
         result = normalized_company_id("123")
-        assert result == 123
+        assert result == 123  # ruff: ignore[magic-value-comparison]  # isort: skip
 
-    def test_normalized_region(self) -> None:  # noqa: PLR6301
+    def test_normalized_region(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test normalized_region."""
         result = normalized_region("  de  ")
         assert result == "DE"
 
-    def test_source_regions(self) -> None:  # noqa: PLR6301
+    def test_source_regions(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test source_regions."""
         source = {FIELD_SYSTEM_REGION: "DE"}
         result = source_regions(source)
         assert result == ["DE"]
 
-    def test_normalized_source_regions(self) -> None:  # noqa: PLR6301
+    def test_normalized_source_regions(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test normalized_source_regions."""
         source = {FIELD_SYSTEM_REGION: "de, DE, fr"}
         result = normalized_source_regions(source)
         assert "DE" in result
         assert "FR" in result
 
-    def test_first_nonblank_source_name(self) -> None:  # noqa: PLR6301
+    def test_first_nonblank_source_name(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test first_nonblank_source_name."""
         source = {"key1": "", "key2": "value"}
         result = first_nonblank_source_name(source, "key1", "key2")
         assert result == "value"
 
-    def test_valid_price_sources(self) -> None:  # noqa: PLR6301
+    def test_valid_price_sources(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test valid_price_sources."""
         result = valid_price_sources("string")
         assert result == []
 
-    def test_is_alarm_message(self) -> None:  # noqa: PLR6301
+    def test_is_alarm_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_alarm_message."""
         assert is_alarm_message(None, None, {}) is False
 
-    def test_is_third_party_mqtt_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_third_party_mqtt_config_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_third_party_mqtt_config_message."""
         assert is_third_party_mqtt_config_message(None, None, {}) is False
 
-    def test_is_wifi_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_wifi_config_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_wifi_config_message."""
         assert is_wifi_config_message(None, None, {}) is False
 
-    def test_is_wifi_list_message(self) -> None:  # noqa: PLR6301
+    def test_is_wifi_list_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_wifi_list_message."""
         assert is_wifi_list_message(None, {}) is False
 
-    def test_is_time_zone_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_time_zone_config_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_time_zone_config_message."""
         assert is_time_zone_config_message(None, {}) is False
 
-    def test_is_grid_standard_sync_message(self) -> None:  # noqa: PLR6301
+    def test_is_grid_standard_sync_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_grid_standard_sync_message."""
         assert is_grid_standard_sync_message(None, {}) is False
 
-    def test_is_mqtt_connect_info_message(self) -> None:  # noqa: PLR6301
+    def test_is_mqtt_connect_info_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_mqtt_connect_info_message."""
         assert is_mqtt_connect_info_message(None, {}) is False
 
-    def test_is_device_ota_version_message(self) -> None:  # noqa: PLR6301
+    def test_is_device_ota_version_message(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_device_ota_version_message."""
         assert is_device_ota_version_message(None, {}) is False
 
-    def test_is_subdevice_payload(self) -> None:  # noqa: PLR6301
+    def test_is_subdevice_payload(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test is_subdevice_payload."""
         assert (
             is_subdevice_payload({}, {}, frozenset(), frozenset(), frozenset()) is False
         )
 
-    def test_normalize_battery_pack_payload(self) -> None:  # noqa: PLR6301
+    def test_normalize_battery_pack_payload(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test normalize_battery_pack_payload."""
         item = {"deviceSn": "pack-1", "updates": {"soc": 50}}
         result = normalize_battery_pack_payload(item)
         assert result["deviceSn"] == "pack-1"
-        assert result["soc"] == 50
+        assert result["soc"] == 50  # ruff: ignore[magic-value-comparison]  # isort: skip
 
-    def test_looks_like_battery_pack(self) -> None:  # noqa: PLR6301
+    def test_looks_like_battery_pack(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test looks_like_battery_pack."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
             BATTERY_PACK_HINT_KEYS,
             CT_METER_KEYS,
         )
@@ -295,9 +295,9 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
         result = looks_like_battery_pack(item, CT_METER_KEYS, BATTERY_PACK_HINT_KEYS)
         assert isinstance(result, bool)
 
-    def test_battery_packs_from_source(self) -> None:  # noqa: PLR6301
+    def test_battery_packs_from_source(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test battery_packs_from_source."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
             BATTERY_PACK_HINT_KEYS,
             CT_METER_KEYS,
             FIELD_BATTERY_PACKS,
@@ -310,9 +310,9 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
         assert result is not None
         assert len(result) == 1
 
-    def test_main_device_snapshot_is_not_a_battery_pack(self) -> None:  # noqa: PLR6301
+    def test_main_device_snapshot_is_not_a_battery_pack(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Aggregate stack/PV fields must never contaminate an add-on pack."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
             BATTERY_PACK_HINT_KEYS,
             CT_METER_KEYS,
         )
@@ -338,14 +338,14 @@ class TestCoordinatorHelpersExisting:  # noqa: PLR0904
             is None
         )
 
-    def test_shelly_cloud_api_device_id(self) -> None:  # noqa: PLR6301
+    def test_shelly_cloud_api_device_id(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test shelly_cloud_api_device_id."""
-        # Item needs to match Shelly Cloud criteria (scan_name starts with "shelly" or is_cloud)
+        # Item needs to match Shelly Cloud criteria (scan_name starts with "shelly" or is_cloud)  # ruff: ignore[line-too-long]  # isort: skip
         item = {"scanName": "shelly_plug", "deviceId": "5c:cf:7f:12:34:56"}
         result = shelly_cloud_api_device_id(item)
         assert result == "5c:cf:7f:12:34:56"
 
-    def test_shelly_cloud_api_device_id_returns_none_for_non_shelly(self) -> None:  # noqa: PLR6301
+    def test_shelly_cloud_api_device_id_returns_none_for_non_shelly(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test shelly_cloud_api_device_id returns None for non-Shelly items."""
         item = {"scanName": "jackery_device", "deviceId": "123"}
         result = shelly_cloud_api_device_id(item)

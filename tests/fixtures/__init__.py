@@ -1,1 +1,1 @@
-"""Shared immutable protocol fixtures."""
+"""Shared protocol-contract fixtures."""

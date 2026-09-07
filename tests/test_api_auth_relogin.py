@@ -87,7 +87,7 @@ class _FakeClock:
 def _make_api(session: _FakeSession) -> JackeryApi:
     """Build a logged-in API client whose transport boundary is scripted."""
     api = JackeryApi(cast("Any", session), "tester@example.com", "secret")
-    api._token = "token-1"  # seed an active session without real login IO
+    api._token = "token-1"  # seed an active session without real login IO  # ruff: ignore[private-member-access]
     return api
 
 
@@ -95,13 +95,13 @@ def _login_mock(api: JackeryApi) -> AsyncMock:
     """Successful full re-login boundary mock that rotates the session token."""
 
     def _login() -> str:
-        api._token = "token-2"
+        api._token = "token-2"  # ruff: ignore[private-member-access]
         return "token-2"
 
     return AsyncMock(side_effect=_login)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_401_triggers_one_relogin_then_retry_succeeds() -> None:
     """A rejected session recovers via one automatic re-login + retry."""
     session = _FakeSession([
@@ -119,7 +119,7 @@ async def test_401_triggers_one_relogin_then_retry_succeeds() -> None:
     assert session.request_count == _RETRY_AFTER_RELOGIN_REQUESTS
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_401_then_failed_relogin_propagates_auth_error() -> None:
     """When the one automatic re-login fails, JackeryAuthError propagates."""
     session = _FakeSession([_FakeResponse(401, _UNAUTHORIZED_BODY)])
@@ -136,7 +136,7 @@ async def test_401_then_failed_relogin_propagates_auth_error() -> None:
     assert session.request_count == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_second_401_burst_within_cooldown_does_not_relogin_again(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -162,7 +162,7 @@ async def test_second_401_burst_within_cooldown_does_not_relogin_again(
     assert session.request_count == _BURST_TOTAL_REQUESTS
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_401_relogin_blocked_just_before_cooldown_expires(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -192,7 +192,7 @@ async def test_401_relogin_blocked_just_before_cooldown_expires(
     assert session.request_count == _BURST_TOTAL_REQUESTS
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_cancelled_relogin_restores_cooldown_state() -> None:
     """A cancelled re-login restores the prior cooldown instead of consuming it.
 
@@ -206,7 +206,7 @@ async def test_cancelled_relogin_restores_cooldown_state() -> None:
     api = _make_api(session)
     login = AsyncMock(side_effect=asyncio.CancelledError)
 
-    assert api._last_auto_relogin_monotonic is None
+    assert api._last_auto_relogin_monotonic is None  # ruff: ignore[private-member-access]
 
     with (
         patch.object(api, "async_login", login),
@@ -215,10 +215,10 @@ async def test_cancelled_relogin_restores_cooldown_state() -> None:
         await api.async_get_user_info()
 
     login.assert_awaited_once()
-    assert api._last_auto_relogin_monotonic is None
+    assert api._last_auto_relogin_monotonic is None  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_401_after_cooldown_expiry_allows_new_relogin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -290,11 +290,11 @@ class _ConcurrentFakeSession:
 def _make_concurrent_api(session: _ConcurrentFakeSession) -> JackeryApi:
     """Build a logged-in API client backed by the concurrency-aware fake session."""
     api = JackeryApi(cast("Any", session), "tester@example.com", "secret")
-    api._token = "token-1"  # seed an active session without real login IO
+    api._token = "token-1"  # seed an active session without real login IO  # ruff: ignore[private-member-access]
     return api
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_concurrent_token_expired_requests_relogin_only_once() -> None:
     """Two requests racing an expired shared token re-login exactly once (F-SW2-2).
 

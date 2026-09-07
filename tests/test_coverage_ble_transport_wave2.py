@@ -31,7 +31,7 @@ class _HassStub:
         """The active event loop."""
         return asyncio.get_running_loop()
 
-    def async_create_background_task(  # ruff: ignore[no-self-use]
+    def async_create_background_task(
         self,
         target: Coroutine[Any, Any, None],
         *,
@@ -49,7 +49,7 @@ def _listener(
 ) -> JackeryBleListener:
     """Build a listener with deterministic, in-memory boundaries."""
 
-    async def _accepted_sink(  # ruff: ignore[unused-async]
+    async def _accepted_sink(
         _device_id: str,
         _observation: BleFrameObservation,
     ) -> bool:
@@ -375,7 +375,7 @@ async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     key = b"k" * 16
     observations: list[BleFrameObservation] = []
 
-    async def _sink(  # ruff: ignore[unused-async]
+    async def _sink(
         _device_id: str,
         observation: BleFrameObservation,
     ) -> bool:
@@ -412,7 +412,7 @@ async def test_notification_without_key_records_decode_failure_and_forwards_raw(
     """Missing cached HTTP key is observable but never discards the raw notify."""
     observations: list[BleFrameObservation] = []
 
-    async def _sink(  # ruff: ignore[unused-async]
+    async def _sink(
         _device_id: str,
         observation: BleFrameObservation,
     ) -> bool:
@@ -512,7 +512,7 @@ async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> 
     class _Client:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(
             self,
             _uuid: str,
             _blob: bytes,

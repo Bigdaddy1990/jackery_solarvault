@@ -1,11 +1,11 @@
-"""Behavioral tests for MQTT/BLE connection-state helpers.
+"""White-box tests for MQTT/BLE connection-state helpers.
 
 These cover the pure state machines the coordinator delegates to for MQTT
 reconnect decisions (:class:`MqttConnectionManager`), per-device BLE connect
 spacing (:class:`BleConnectBackoff`), rejection accounting
 (:class:`RejectionMetrics`), and the broker-message classifiers. The governing
-invariant throughout: MQTT/BLE failures adjust local backoff/pause state only —
-they never drive HA reauthentication.
+invariant throughout: transport failures adjust local backoff state; a broker
+credential rejection invalidates cached session material for the HTTP owner.
 """
 
 from types import SimpleNamespace
@@ -28,9 +28,11 @@ from custom_components.jackery_solarvault.coordinator import (
     is_mqtt_auth_failure,
     is_transient_connect_failure,
     mqtt_connect_failure_signature,
+    mqtt_payload_observed_at,
 )
 
 _MODULE = "custom_components.jackery_solarvault.coordinator"
+_MONOTONIC_NOW = 500.0
 
 
 def _freeze_monotonic(monkeypatch: pytest.MonkeyPatch, value: float) -> None:
@@ -214,14 +216,14 @@ def test_manager_auth_failure_opens_pause_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A broker credential rejection opens a fixed app-conflict pause."""
-    _freeze_monotonic(monkeypatch, 500.0)
+    _freeze_monotonic(monkeypatch, _MONOTONIC_NOW)
     mgr = MqttConnectionManager()
 
     mgr.pause_after_auth_failure("rejected", streak=2)
 
     assert mgr.app_conflict_pause_cycles == 1
     assert mgr.paused_until_monotonic == pytest.approx(
-        500.0 + MQTT_APP_CONFLICT_PAUSE_SEC
+        _MONOTONIC_NOW + MQTT_APP_CONFLICT_PAUSE_SEC
     )
 
 
@@ -229,7 +231,7 @@ def test_manager_pause_is_not_reopened_while_active(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A second rejection inside the window does not extend or recount it."""
-    _freeze_monotonic(monkeypatch, 500.0)
+    _freeze_monotonic(monkeypatch, _MONOTONIC_NOW)
     mgr = MqttConnectionManager()
     mgr.pause_after_auth_failure("rejected")
 
@@ -351,7 +353,7 @@ def test_record_connect_success_stores_fingerprint_and_clears_backoff(
 
 
 # ---------------------------------------------------------------------------
-# MqttConnectionManager: error handling never triggers reauth
+# MqttConnectionManager: auth refresh stays owned by HTTP
 # ---------------------------------------------------------------------------
 
 
@@ -359,7 +361,7 @@ def test_handle_connect_error_auth_path_pauses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An auth error routes to a pause, not reauth."""
-    _freeze_monotonic(monkeypatch, 500.0)
+    _freeze_monotonic(monkeypatch, _MONOTONIC_NOW)
     mgr = MqttConnectionManager()
     mqtt = SimpleNamespace(
         diagnostics={"last_error": "connect rc=5"},
@@ -370,33 +372,33 @@ def test_handle_connect_error_auth_path_pauses(
 
     assert mgr.app_conflict_pause_cycles == 1
     assert mgr.backoff_until_monotonic == pytest.approx(0.0)
-    assert mgr.paused_until_monotonic > 500.0
+    assert mgr.paused_until_monotonic > _MONOTONIC_NOW
 
 
-def test_mqtt_auth_pause_never_invalidates_http_session() -> None:
-    """A broker rejection must not clear HTTP auth or force an HTTP login."""
+def test_mqtt_auth_pause_invalidates_cached_session_for_http_owner() -> None:
+    """A broker rejection makes the next normal HTTP cycle refresh credentials."""
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
     api = MagicMock()
     coordinator.api = cast("Any", api)
     coordinator.rejection_metrics = RejectionMetrics()
-    coordinator._mqtt_mgr = MqttConnectionManager()
+    coordinator._mqtt_mgr = MqttConnectionManager()  # ruff: ignore[private-member-access]
 
-    coordinator._pause_mqtt_after_auth_failure(
+    coordinator._pause_mqtt_after_auth_failure(  # ruff: ignore[private-member-access]
         "connect rc=134 (bad user name or password)",
         streak=1,
     )
 
-    api.invalidate_mqtt_session_for_http_refresh.assert_not_called()
-    assert coordinator._mqtt_mgr.app_conflict_pause_cycles == 1
+    api.invalidate_mqtt_session_for_http_refresh.assert_called_once_with()
+    assert coordinator._mqtt_mgr.app_conflict_pause_cycles == 1  # ruff: ignore[private-member-access]
 
 
 def test_handle_connect_error_non_auth_path_backs_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A network error routes to connect backoff."""
-    _freeze_monotonic(monkeypatch, 500.0)
+    _freeze_monotonic(monkeypatch, _MONOTONIC_NOW)
     mgr = MqttConnectionManager()
     mqtt = SimpleNamespace(diagnostics={}, consecutive_auth_failures=0)
 
@@ -410,7 +412,7 @@ def test_defer_background_auth_failure_pauses_on_rejection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A background broker rejection pauses MQTT but leaves reauth untouched."""
-    _freeze_monotonic(monkeypatch, 500.0)
+    _freeze_monotonic(monkeypatch, _MONOTONIC_NOW)
     mgr = MqttConnectionManager()
     mqtt = SimpleNamespace(consecutive_auth_failures=1)
 
@@ -448,14 +450,53 @@ def test_rejection_metrics_counts_first_seen_reason() -> None:
     assert metrics.last_rejection["reason"] == "missing-field"
 
 
-def test_rejection_metrics_dedupes_repeated_reason() -> None:
-    """The same (counter, reason) pair is only counted once."""
+def test_rejection_metrics_counts_every_repeated_reason() -> None:
+    """Repeats of one reason keep counting, so volume stays visible.
+
+    Counting each pair only once capped the counter at the number of distinct
+    reasons, hiding a run that discarded thousands of payloads for one reason.
+    """
+    repeats = 3
     metrics = RejectionMetrics()
 
-    metrics.increment("schema_rejections", "missing-field")
-    metrics.increment("schema_rejections", "missing-field")
+    for _ in range(repeats):
+        metrics.increment("schema_rejections", "missing-field")
 
-    assert metrics.schema_rejections == 1
+    assert metrics.schema_rejections == repeats
+
+
+def test_timestamp_skew_is_counted_not_silently_dropped() -> None:
+    """A discarded device timestamp must surface in the diagnostics counters.
+
+    ``timestamp_skew_rejections`` had no caller at all, so clock drift vanished
+    without a trace while the counter reported 0.
+    """
+    metrics = RejectionMetrics()
+
+    assert (
+        mqtt_payload_observed_at(
+            {"timestamp": "not-a-timestamp"},
+            lambda reason: metrics.increment("timestamp_skew_rejections", reason),
+        )
+        is None
+    )
+
+    assert metrics.timestamp_skew_rejections == 1
+    assert metrics.last_rejection is not None
+    assert metrics.last_rejection["counter"] == "timestamp_skew_rejections"
+
+
+def test_trustworthy_timestamp_is_not_counted_as_skew() -> None:
+    """A usable timestamp passes through without touching the counter."""
+    metrics = RejectionMetrics()
+
+    observed_at = mqtt_payload_observed_at(
+        {"timestamp": 1700000000},
+        lambda reason: metrics.increment("timestamp_skew_rejections", reason),
+    )
+
+    assert observed_at is not None
+    assert metrics.timestamp_skew_rejections == 0
 
 
 def test_rejection_metrics_as_dict_exposes_all_counters() -> None:

@@ -44,9 +44,10 @@ from tests.fixtures.jackery_app_2_4_0_contracts import (  # ruff: ignore[banned-
 )
 
 
-def test_app_240_uses_exact_pv_trends_path() -> None:
-    """The PV-trends constant matches the path used by the current App."""
-    assert REST_ENDPOINTS["pv_trends"] == PV_TRENDS_PATH
+def test_app_241_supersedes_app_240_pv_trends_path() -> None:
+    """The current PV-stat path intentionally supersedes the App 2.4.0 path."""
+    assert REST_ENDPOINTS["pv_trends"] == "/v1/device/stat/sys/pv/trends"
+    assert PV_TRENDS_PATH == "/v1/device/stat/sys/pv/statics"
 
 
 def test_app_240_uses_exact_dynamic_price_path() -> None:
@@ -60,7 +61,8 @@ def test_app_240_does_not_expose_unproven_aiems_endpoint() -> None:
     assert not hasattr(const_module, "AIEMS_ENERGY_PREDICTION_PATH")
     assert not hasattr(const_module, "SERVICE_GET_AIEMS_ENERGY_PREDICTION")
     assert "get_aiems_energy_prediction" not in {
-        registration.name for registration in services_module._service_registrations()
+        registration.name
+        for registration in services_module._service_registrations()  # ruff: ignore[private-member-access]
     }
 
 
@@ -139,7 +141,7 @@ def _hydrated_api(seed_b64: str) -> JackeryApi:
     return api
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_mqtt_credential_alias_is_cache_only() -> None:
     """The compatibility alias never turns a transport read into HTTP login."""
     api = _hydrated_api(base64.b64encode(bytes(range(32))).decode("ascii"))

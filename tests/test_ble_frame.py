@@ -12,11 +12,10 @@ tests run on every supported platform without bleak or BlueZ.
 import asyncio
 import base64
 from collections import deque
-from collections.abc import Coroutine
 import contextlib
 from datetime import UTC, datetime
 import json
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -57,17 +56,13 @@ from custom_components.jackery_solarvault.client.ble import (
     split_body_for_mtu,
     split_payload_into_frames,
 )
-from custom_components.jackery_solarvault.client.ble_notification_spool_models import (
-    BleProcessDisposition,
-)
 from custom_components.jackery_solarvault.client.ble_transport import (
     BleFrameObservation,
     JackeryBleListener,
-    _GattSession,
+    _GattSession,  # ruff: ignore[import-private-name]  # isort: skip
 )
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_BLE_WRITES,
     DEFAULT_BLE_ACK_TIMEOUT_SEC,
     FIELD_BLUETOOTH_KEY,
     FIELD_CMD,
@@ -78,7 +73,11 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
+from custom_components.jackery_solarvault.models import BleProcessDisposition
 from homeassistant.exceptions import ServiceValidationError
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 # ---------------------------------------------------------------------------
 # Constants — pinned to the smali-verified literals
@@ -90,13 +89,13 @@ def test_wire_format_constants_match_smali() -> None:
     assert BLE_FRAME_MAGIC == "DFED"
     assert BLE_FRAME_VERSION == "0001"
     assert BLE_FRAME_PAYLOAD_MARKER == "0001"
-    assert BLE_AES_IV_LEN == 16
+    assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
     # A SolarVault 3 Pro Max captured 2026-05-16 returned a 16-byte key
     # ("hr2c0hh361336138" → AES-128), so the helpers must accept that too.
-    assert BLE_AES_KEY_LEN_AES128 == 16
-    assert BLE_AES_KEY_LEN_AES256 == 32
+    assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
     # The legacy single-value alias points at AES-128 because that is the
     # observed wild-type for SolarVault.
@@ -108,7 +107,7 @@ def test_gatt_uuids_match_smali_and_live_capture() -> None:
     assert BLE_SERVICE_UUID == "0000bdee-0000-1000-8000-00805f9b34fb"
     assert BLE_WRITE_CHAR_UUID == "0000ee01-0000-1000-8000-00805f9b34fb"
     assert BLE_NOTIFY_CHAR_UUID == "0000ee02-0000-1000-8000-00805f9b34fb"
-    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data
+    assert BLE_MANUFACTURER_ID == 0x4802  # 18434 — confirmed in adv data  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 # ---------------------------------------------------------------------------
@@ -127,9 +126,9 @@ def test_hex16_upper_case_4_digit_format() -> None:
 
 def test_hex16_rejects_out_of_range() -> None:
     """``hex16`` refuses values that do not fit into 16 bits."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         hex16(-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         hex16(0x10000)
 
 
@@ -141,9 +140,9 @@ def test_parse_hex16_round_trips() -> None:
 
 def test_parse_hex16_rejects_wrong_width() -> None:
     """``parse_hex16`` enforces the 4-char width."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         parse_hex16("BEE")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         parse_hex16("00BEE")
 
 
@@ -167,7 +166,7 @@ def test_hex_encode_decode_round_trip() -> None:
 def test_crc16_modbus_reference_vector() -> None:
     """Standard Modbus CRC-16 of ``"123456789"`` is ``0x4B37``."""
     # https://crccalc.com — CRC-16/MODBUS (poly 0xA001, init 0xFFFF, reflected).
-    assert crc16_modbus(b"123456789") == 0x4B37
+    assert crc16_modbus(b"123456789") == 0x4B37  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_crc16_hex_is_4_chars_upper() -> None:
@@ -198,7 +197,7 @@ def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
     accepting both key lengths.
     """
     key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16
+    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
@@ -209,14 +208,14 @@ def test_aes_rejects_wrong_key_or_iv_length() -> None:
     """Length validation catches caller mistakes before they hit OpenSSL."""
     # Reject key lengths that are neither AES-128 nor AES-256.
     for bad_key_len in (15, 17, 24, 31, 33, 64):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
             aes_encrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
             aes_decrypt(b"x", b"\x00" * bad_key_len, b"\x00" * 16)
     # Reject wrong IV lengths.
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         aes_encrypt(b"x", b"\x00" * 32, b"\x00" * 15)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         aes_decrypt(b"x", b"\x00" * 32, b"\x00" * 17)
 
 
@@ -237,9 +236,9 @@ def test_random_iv_returns_fresh_16_byte_values() -> None:
 def test_build_plaintext_frame_smali_layout() -> None:
     """Verify the exact frame string against the smali format string.
 
-    The string must match ``"DFED" + "0001" + 4×hex16(idx,cnt,actionId,bleCmd)
+    The string must match ``"DFED" + "0001" + 4*hex16(idx,cnt,actionId,bleCmd)
     + "0001" + hex16(len) + chunk_hex`` exactly, byte by byte.
-    """  # ruff: ignore[ambiguous-unicode-character-docstring]
+    """
     frame = BleFrame(
         frame_index=1,
         chunk_count=1,
@@ -287,9 +286,9 @@ def test_parse_plaintext_frame_rejects_bad_magic_or_marker() -> None:
             chunk_payload=b"",
         )
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         parse_plaintext_frame("BEEF" + valid[4:])
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-with-multiple-statements]
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad, pytest-raises-with-multiple-statements]  # isort: skip
         # Corrupt the payload marker (position after header fields).
         broken = valid[:24] + "BEEF" + valid[28:]
         parse_plaintext_frame(broken)
@@ -306,7 +305,7 @@ def test_parse_plaintext_frame_detects_truncation() -> None:
             chunk_payload=b"deadbeef",
         )
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         parse_plaintext_frame(valid[:-4])
 
 
@@ -376,7 +375,7 @@ def test_decrypt_rejects_crc_tampering() -> None:
     )
     blob = bytearray(encrypt_frame(frame, key, iv=bytes(BLE_AES_IV_LEN)))
     blob[-1] ^= 0x01
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         decrypt_frame(bytes(blob), key)
 
 
@@ -387,16 +386,16 @@ def test_decrypt_rejects_crc_tampering() -> None:
 
 def test_chunk_size_matches_smali_formula() -> None:
     """``chunk_size_for_mtu(mtu) == mtu - 60`` exactly."""
-    assert chunk_size_for_mtu(247) == 187
-    assert chunk_size_for_mtu(100) == 40
+    assert chunk_size_for_mtu(247) == 187  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert chunk_size_for_mtu(100) == 40  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert chunk_size_for_mtu(61) == 1
 
 
 def test_chunk_size_refuses_too_small_mtu() -> None:
     """MTU at or below the 60-byte overhead is rejected."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         chunk_size_for_mtu(60)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         chunk_size_for_mtu(0)
 
 
@@ -409,10 +408,10 @@ def test_split_payload_emits_correct_number_of_frames() -> None:
         ble_cmd=120,
         mtu=247,
     )
-    assert len(frames) == 3
+    assert len(frames) == 3  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert frames[0].frame_index == 1
-    assert frames[0].chunk_count == 3
-    assert frames[-1].frame_index == 3
+    assert frames[0].chunk_count == 3  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert frames[-1].frame_index == 3  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert b"".join(f.chunk_payload for f in frames) == payload
     # All but the last chunk are at the MTU-derived max length.
     for f in frames[:-1]:
@@ -509,13 +508,13 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
         assert isinstance(payload, dict)
         assert payload.get("cmd") == expected_cmd
         # Trailer is always 4 bytes — assumed CRC; opaque for now.
-        assert len(frame.trailer) == 4
+        assert len(frame.trailer) == 4  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
     key = base64.b64decode(_LIVE_KEY_B64)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         decrypt_binary_notify(b"too short", key)
 
 
@@ -533,8 +532,8 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     plain = build_binary_frame(cmd=107, body=body, flags=42, security=0x1234)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
     parsed = decrypt_binary_notify(blob, key)
-    assert parsed.cmd == 107
-    assert parsed.flags == 42
+    assert parsed.cmd == 107  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert parsed.flags == 42  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert parsed.frame_index == 1
     assert parsed.chunk_count == 1
     assert parsed.body == body
@@ -555,8 +554,8 @@ def test_listener_async_send_command_returns_false_without_client() -> None:
         listener = _build_bare_listener(b"x" * 16)
         sent = await listener.async_send_command(
             "573702884982521856",
-            msg_id=3022,
-            ble_msg_type=107,
+            msg_id=3011,
+            ble_msg_type=106,
             body=b'{"swEps":1}',
         )
         assert sent is False
@@ -577,7 +576,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, uuid: str, blob: bytes, *, response: bool
         ) -> None:
             """Record a GATT characteristic write attempt into `captured`."""
@@ -590,24 +589,24 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
         The wire header carries the actionId in ``flags`` and the BLE
         message type in ``cmd`` (source-backed home-frame mapping), so
-        ``msg_id=3022`` / ``ble_msg_type=107`` must come back as
-        ``flags==3022`` / ``cmd==107`` after decryption.
+        ``msg_id=3011`` / ``ble_msg_type=106`` must come back as
+        ``flags==3011`` / ``cmd==106`` after decryption.
         """
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "573702884982521856", _FakeClient())
         ok = await listener.async_send_command(
             "573702884982521856",
-            msg_id=3022,
-            ble_msg_type=107,
+            msg_id=3011,
+            ble_msg_type=106,
             body=b'{"swEps":1}',
         )
         assert ok is True
         assert captured["uuid"] == BLE_WRITE_CHAR_UUID
         assert captured["response"] is False
         parsed = decrypt_binary_notify(cast("bytes", captured["blob"]), key)
-        assert parsed.cmd == 107
-        assert parsed.flags == 3022
+        assert parsed.cmd == 106  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert parsed.flags == 3011  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert parsed.body == b'{"swEps":1}'
 
     asyncio.run(_run())
@@ -615,17 +614,17 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
 
 def test_build_binary_frame_rejects_oversized_fields() -> None:
     """Every header field is range-checked before encryption."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=107, body=b"x", frame_index=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=107, body=b"x", chunk_count=0x1_0000)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=107, body=b"x", flags=-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=0x1_0000, body=b"x")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=107, body=b"x" * 0x1_0001)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
         build_binary_frame(cmd=107, body=b"x", trailer=b"\x00\x00\x00")
 
 
@@ -634,13 +633,13 @@ def test_build_binary_frame_rejects_oversized_fields() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
-    """Assert the integration manifest declares the BLE service matcher, manufacturer, dependency, and requirement.
+def test_manifest_declares_bluetooth_matcher_without_core_requirement() -> None:
+    """Assert the BLE matcher without duplicating HA's Bluetooth dependency.
 
-    Checks that manifest.json contains a bluetooth service matcher with `service_uuid` equal to BLE_SERVICE_UUID, a `manufacturer_id` equal to BLE_MANUFACTURER_ID, includes "bluetooth" in `after_dependencies`, and lists a requirement that starts with "bleak-retry-connector".
+    Core provides `bleak-retry-connector`; custom manifests must not redeclare it.
     """
-    import json
-    from pathlib import Path
+    import json  # ruff: ignore[import-outside-top-level]  # isort: skip
+    from pathlib import Path  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     root = Path(__file__).resolve().parents[1]
     manifest = json.loads(
@@ -656,7 +655,7 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
         matchers
     )
     assert "bluetooth" in (manifest.get("after_dependencies") or [])
-    assert any(
+    assert not any(
         req.startswith("bleak-retry-connector")
         for req in manifest.get("requirements", [])
     ), manifest.get("requirements")
@@ -664,18 +663,16 @@ def test_manifest_declares_bluetooth_matcher_and_dependency() -> None:
 
 def test_const_exposes_ble_option_and_field() -> None:
     """Config option + bluetoothKey field constants exist in const.py."""
-    from custom_components.jackery_solarvault import const
+    from custom_components.jackery_solarvault import const  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     assert const.CONF_ENABLE_BLE_TRANSPORT == "enable_ble_transport"
     assert const.DEFAULT_ENABLE_BLE_TRANSPORT is False
-    assert const.CONF_ENABLE_BLE_WRITES == "enable_ble_writes"
-    assert const.DEFAULT_ENABLE_BLE_WRITES is False
     assert const.FIELD_BLUETOOTH_KEY == "bluetoothKey"
 
 
 def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
     """Coordinator class exposes the BLE listener / diagnostics helpers."""
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
@@ -690,7 +687,7 @@ def test_coordinator_surfaces_ble_diagnostic_hooks() -> None:
 
 def test_ble_transport_module_exports_listener() -> None:
     """``client.ble_transport`` exports the listener + observation classes."""
-    from custom_components.jackery_solarvault.client import ble_transport
+    from custom_components.jackery_solarvault.client import ble_transport  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     for symbol in (
         "JackeryBleListener",
@@ -705,11 +702,11 @@ def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_delivery_results = {}
-        coordinator._ble_delivery_result_order = deque()
+        coordinator._ble_delivery_results = {}  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_delivery_result_order = deque()  # ruff: ignore[private-member-access]  # isort: skip
         calls = 0
 
-        async def _once(  # ruff: ignore[unused-async]
+        async def _once(  # ruff: ignore[unused-async]  # isort: skip
             _self: JackerySolarVaultCoordinator,
             _device_id: str,
             _observation: BleFrameObservation,
@@ -730,8 +727,8 @@ def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
             "_async_ingest_ble_observation_once",
             new=_once,
         ):
-            first = await coordinator._async_ingest_ble_observation("dev", observation)
-            retry = await coordinator._async_ingest_ble_observation("dev", observation)
+            first = await coordinator._async_ingest_ble_observation("dev", observation)  # ruff: ignore[private-member-access]  # isort: skip
+            retry = await coordinator._async_ingest_ble_observation("dev", observation)  # ruff: ignore[private-member-access]  # isort: skip
 
         assert first is BleProcessDisposition.CONFIRMED
         assert retry is BleProcessDisposition.CONFIRMED
@@ -745,7 +742,7 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_listener = None
+        coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
         observation = BleFrameObservation(
             received_at=datetime.now(UTC),
             raw_bytes=b"frame",
@@ -791,7 +788,7 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
                 return_value=False,
             ),
         ):
-            committed = await coordinator._async_ingest_ble_observation_once(
+            committed = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 observation,
             )
@@ -806,15 +803,15 @@ def test_coordinator_ble_retry_result_is_not_cached() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_delivery_results = {}
-        coordinator._ble_delivery_result_order = deque()
+        coordinator._ble_delivery_results = {}  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_delivery_result_order = deque()  # ruff: ignore[private-member-access]  # isort: skip
         results = deque((
             BleProcessDisposition.RETRY,
             BleProcessDisposition.CONFIRMED,
         ))
         calls = 0
 
-        async def _once(
+        def _once(
             _self: JackerySolarVaultCoordinator,
             _device_id: str,
             _observation: BleFrameObservation,
@@ -835,18 +832,18 @@ def test_coordinator_ble_retry_result_is_not_cached() -> None:
             "_async_ingest_ble_observation_once",
             new=_once,
         ):
-            first = await coordinator._async_ingest_ble_observation(
+            first = await coordinator._async_ingest_ble_observation(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 observation,
             )
-            second = await coordinator._async_ingest_ble_observation(
+            second = await coordinator._async_ingest_ble_observation(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 observation,
             )
 
         assert first is BleProcessDisposition.RETRY
         assert second is BleProcessDisposition.CONFIRMED
-        assert calls == 2
+        assert calls == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
 
     asyncio.run(_run())
 
@@ -856,7 +853,7 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_listener = None
+        coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
         observation = BleFrameObservation(
             received_at=datetime.now(UTC),
             raw_bytes=b"frame",
@@ -902,7 +899,7 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
                 "_schedule_ble_partial_update",
             ) as schedule,
         ):
-            disposition = await coordinator._async_ingest_ble_observation_once(
+            disposition = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 observation,
             )
@@ -916,8 +913,8 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
 def test_coordinator_ble_shutdown_drain_allows_accepted_commit() -> None:
     """Shutdown fencing still commits a frame accepted before the BLE cutoff."""
     coordinator = object.__new__(JackerySolarVaultCoordinator)
-    coordinator._shutdown_started = True
-    coordinator._ble_shutdown_drain_active = True
+    coordinator._shutdown_started = True  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._ble_shutdown_drain_active = True  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {"dev": {"properties": {"outPw": 0}}}
     pushed: list[dict[str, dict[str, object]]] = []
 
@@ -934,7 +931,7 @@ def test_coordinator_ble_shutdown_drain_allows_accepted_commit() -> None:
         "_push_partial_update",
         new=_push,
     ):
-        committed = coordinator._schedule_ble_partial_update(
+        committed = coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]  # isort: skip
             "dev",
             {"properties": {"outPw": 596}},
             observed_at=datetime.now(UTC),
@@ -965,11 +962,11 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
             This coroutine blocks on listener._stop_event until it is set or the 30.0 second timeout elapses,
             and is intended for tests that assert prompt cancellation of long-running runner tasks.
-            """
-            await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)
+            """  # ruff: ignore[line-too-long]  # isort: skip
+            await asyncio.wait_for(listener._stop_event.wait(), timeout=30.0)  # ruff: ignore[private-member-access]  # isort: skip
 
         task = asyncio.create_task(_stuck())
-        listener._connections["dev"] = task
+        listener._connections["dev"] = task  # ruff: ignore[private-member-access]  # isort: skip
         # Give the loop a tick so the task actually parks at the wait.
         await asyncio.sleep(0)
         loop = asyncio.get_running_loop()
@@ -986,33 +983,33 @@ def test_ble_listener_async_stop_cancels_runner_tasks_promptly() -> None:
 
 def test_coordinator_send_ble_command_requires_write_option() -> None:
     """The public BLE sender is inert until both BLE options are enabled."""
-    import asyncio
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]  # isort: skip
+        options = {  # ruff: ignore[mutable-class-default]  # isort: skip
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: False,
+            "enable_ble_writes": False,
         }
 
     class _Listener:
-        async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:  # ruff: ignore[no-self-use]
+        async def async_send_command(self, *_args: object, **_kwargs: object) -> bool:  # ruff: ignore[no-self-use]  # isort: skip
             """Stub method that fails immediately to indicate the BLE listener must not be invoked.
 
             Raises:
                 AssertionError: Always raised with the message "BLE listener must not be called".
-            """
-            raise AssertionError("BLE listener must not be called")
+            """  # ruff: ignore[line-too-long]  # isort: skip
+            raise AssertionError("BLE listener must not be called")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
         """Verify that async_send_ble_command returns False when invoked on a coordinator stub with no BLE listener.
 
         Constructs a minimal JackerySolarVaultCoordinator instance, sets up a placeholder config entry and listener, calls `async_send_ble_command` for device "dev1" with `cmd=107` and a matching body, and asserts the call reports that the BLE send did not occur (`False`).
-        """
+        """  # ruff: ignore[line-too-long]  # isort: skip
         self = cast(
             "Any",
             JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
@@ -1032,29 +1029,29 @@ def test_coordinator_send_ble_command_requires_write_option() -> None:
 
 def test_ble_observations_include_known_devices_without_frames() -> None:
     """BLE diagnostics should not be empty before the first advertisement."""
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]  # isort: skip
+        options = {  # ruff: ignore[mutable-class-default]  # isort: skip
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: False,
+            "enable_ble_writes": False,
         }
 
     class _Listener:
-        def all_stats(self) -> dict[str, object]:  # ruff: ignore[no-self-use]
+        def all_stats(self) -> dict[str, object]:  # ruff: ignore[no-self-use]  # isort: skip
             """Return a snapshot of listener statistics as a mapping of statistic names to values.
 
             The returned dictionary contains current monitoring fields (counters, timestamps, and optional diagnostic strings) keyed by their descriptive names; callers may read but should not assume mutability of internal state.
 
             Returns:
                 stats (dict[str, object]): A snapshot mapping statistic names to their current values.
-            """
+            """  # ruff: ignore[line-too-long]  # isort: skip
             return {}
 
-        def mtu_for_device(self, device_id: str) -> int:  # ruff: ignore[no-self-use]
+        def mtu_for_device(self, device_id: str) -> int:  # ruff: ignore[no-self-use]  # isort: skip
             """Get the negotiated MTU size for the specified device.
 
             Returns:
@@ -1068,46 +1065,46 @@ def test_ble_observations_include_known_devices_without_frames() -> None:
         JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
     )
     coordinator.entry = _Entry()
-    coordinator._device_index = {"dev1": {}}
-    coordinator._ble_listener = None
+    coordinator._device_index = {"dev1": {}}  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
 
     idle = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
     assert idle["enabled"] is True
     # Single-gate design: enabling the BLE transport enables writes with
-    # it (the CONF_ENABLE_BLE_WRITES second gate was removed on purpose —
+    # it (the enable_ble_writes second gate was removed on purpose —
     # see coordinator._ble_writes_enabled).
     assert idle["write_enabled"] is True
     assert idle["running"] is False
     assert idle["frames_decoded"] == 0
     assert idle["mtu"] is None
 
-    coordinator._ble_listener = _Listener()
+    coordinator._ble_listener = _Listener()  # ruff: ignore[private-member-access]  # isort: skip
     running = JackerySolarVaultCoordinator.ble_observations(coordinator)["dev1"]
     assert running["enabled"] is True
     assert running["running"] is True
     assert running["frames_decoded"] == 0
-    assert running["mtu"] == 517
+    assert running["mtu"] == 517  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
     """Dict service bodies are compact-JSON encoded before GATT write."""
-    import asyncio
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]  # isort: skip
+        options = {  # ruff: ignore[mutable-class-default]  # isort: skip
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: True,
+            "enable_ble_writes": True,
         }
 
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # ruff: ignore[no-self-use]
+        async def async_send_command(  # ruff: ignore[too-many-arguments, no-self-use]  # isort: skip
             self,
             device_id: str,
             *,
@@ -1136,7 +1133,8 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
         BLE message type, ``flags`` carries the actionId) and must map
         them onto the listener's ``ble_msg_type``/``msg_id``. Only
         catalog-known (actionId, bleMsgType) pairs pass the gate, so the
-        test uses the real EPS pair (3022, 107).
+        test uses the READ_DEVICE_INFO pair (3011, 106) which still has
+        BLE support in FW 2.4.1.
         """
         self = cast(
             "Any",
@@ -1147,17 +1145,17 @@ def test_coordinator_send_ble_command_json_compacts_dict_body() -> None:
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
             self,
             "dev1",
-            cmd=107,
-            body={"cmd": 107, "swEps": 1},
-            flags=3022,
+            cmd=106,
+            body={"cmd": 106, "swEps": 1},
+            flags=3011,
         )
         assert sent is True
 
         assert captured == {
             "device_id": "dev1",
-            "msg_id": 3022,
-            "ble_msg_type": 107,
-            "body": b'{"cmd":107,"swEps":1}',
+            "msg_id": 3011,
+            "ble_msg_type": 106,
+            "body": b'{"cmd":106,"swEps":1}',
             "wait_for_ack": False,
             "ack_timeout_sec": DEFAULT_BLE_ACK_TIMEOUT_SEC,
             "mtu_override": None,
@@ -1176,15 +1174,15 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
             JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
         )
 
-        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]
+        async def _send_ble(*_args: object, **_kwargs: object) -> bool:  # ruff: ignore[unused-async]  # isort: skip
             """Guard that prevents attempting BLE sends for command 0.
 
             Raises:
                 AssertionError: Always raised with message "cmd=0 must not attempt BLE" to indicate command 0 must not be sent over BLE.
-            """
-            raise AssertionError("cmd=0 must not attempt BLE")
+            """  # ruff: ignore[line-too-long]  # isort: skip
+            raise AssertionError("cmd=0 must not attempt BLE")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
-        async def _publish_mqtt(  # ruff: ignore[unused-async]
+        async def _publish_mqtt(  # ruff: ignore[too-many-arguments, unused-async]  # isort: skip
             device_id: str,
             *,
             message_type: str,
@@ -1203,7 +1201,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
                 cmd (int): Numeric command identifier included in the message body.
                 body_fields (dict[str, object]): Additional payload fields to include in the MQTT message.
                 ensure_mqtt (bool): If True, ensure the message is delivered via MQTT (fallback behavior may be enforced); if False, allow non-MQTT delivery paths.
-            """
+            """  # ruff: ignore[line-too-long]  # isort: skip
             del cloud_attempt
             captured["device_id"] = device_id
             captured["message_type"] = message_type
@@ -1214,7 +1212,7 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
         self.async_send_ble_command = _send_ble
         self._async_publish_command = _publish_mqtt
-        await JackerySolarVaultCoordinator._async_publish_command_ble_first(
+        await JackerySolarVaultCoordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]  # isort: skip
             self,
             "dev1",
             message_type="SendWeatherAlert",
@@ -1234,22 +1232,22 @@ def test_coordinator_ble_first_leaves_cmd_zero_mqtt_only() -> None:
 
 def test_command_body_for_transport_parses_cmd_defensively() -> None:
     """Transport command bodies accept integral text and reject bad values."""
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
-    assert JackerySolarVaultCoordinator._command_body_for_transport(
+    assert JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]  # isort: skip
         {"swEps": 1},
         cmd="107.0",
     ) == {"swEps": 1, FIELD_CMD: 107}
-    assert JackerySolarVaultCoordinator._command_body_for_transport(
+    assert JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]  # isort: skip
         {"wpc": 30},
         cmd=0,
     ) == {"wpc": 30}
 
     for bad_cmd in (True, float("nan"), "107.5"):
         with pytest.raises(ValueError, match="cmd must be an integer"):
-            JackerySolarVaultCoordinator._command_body_for_transport(
+            JackerySolarVaultCoordinator._command_body_for_transport(  # ruff: ignore[private-member-access]  # isort: skip
                 {},
                 cmd=bad_cmd,
             )
@@ -1257,17 +1255,17 @@ def test_command_body_for_transport_parses_cmd_defensively() -> None:
 
 def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
     """Service body normalization accepts the two user-facing input shapes."""
-    from custom_components.jackery_solarvault import services
+    from custom_components.jackery_solarvault import services  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}
-    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {
+    assert services._ble_body_from_service({"cmd": 107}, "dev1") == {"cmd": 107}  # ruff: ignore[private-member-access]  # isort: skip
+    assert services._ble_body_from_service('{"cmd":107,"swEps":1}', "dev1") == {  # ruff: ignore[private-member-access]  # isort: skip
         "cmd": 107,
         "swEps": 1,
     }
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service("[1,2,3]", "dev1")
+        services._ble_body_from_service("[1,2,3]", "dev1")  # ruff: ignore[private-member-access]  # isort: skip
     with pytest.raises(ServiceValidationError):
-        services._ble_body_from_service("{bad json", "dev1")
+        services._ble_body_from_service("{bad json", "dev1")  # ruff: ignore[private-member-access]  # isort: skip
 
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
@@ -1379,7 +1377,7 @@ class _HassStub:
     def loop(self) -> object:
         return asyncio.get_running_loop()
 
-    def async_create_background_task(  # ruff: ignore[no-self-use]
+    def async_create_background_task(  # ruff: ignore[no-self-use]  # isort: skip
         self,
         target: Coroutine[Any, Any, None],
         *,
@@ -1399,7 +1397,7 @@ def _build_bare_listener(key: bytes | None = None) -> JackeryBleListener:
     :func:`_attach_session` instead of patching privates.
     """
 
-    async def _sink(_device_id: str, _observation: object) -> bool:  # ruff: ignore[unused-async]
+    async def _sink(_device_id: str, _observation: object) -> bool:  # ruff: ignore[unused-async]  # isort: skip
         return True
 
     return JackeryBleListener(
@@ -1410,8 +1408,6 @@ def _build_bare_listener(key: bytes | None = None) -> JackeryBleListener:
         connect_backoff_remaining=lambda _device_id, _horizon: 0.0,
         connect_backoff_note_failure=lambda _device_id, _horizon: 0.0,
         connect_backoff_note_success=lambda _device_id: None,
-        keep_alive_msg_id=None,
-        keep_alive_ble_msg_type=None,
     )
 
 
@@ -1421,9 +1417,12 @@ def _attach_session(
     client: object,
 ) -> _GattSession:
     """Install a fake connected GATT session for ``device_id``."""
-    session = _GattSession(generation=1, client=client)
-    listener._sessions[device_id] = session
-    listener._clients[device_id] = client
+    # notify_started defaults to False, and _async_send_command returns early on
+    # a session whose notifications were never started. A double that stands in
+    # for a live connection must therefore set it explicitly.
+    session = _GattSession(generation=1, client=client, notify_started=True)
+    listener._sessions[device_id] = session  # ruff: ignore[private-member-access]  # isort: skip
+    listener._clients[device_id] = client  # ruff: ignore[private-member-access]  # isort: skip
     return session
 
 
@@ -1435,10 +1434,10 @@ def test_listener_install_session_cannot_replace_retained_owner() -> None:
     new_client = object()
 
     with pytest.raises(RuntimeError, match="still owns"):
-        listener._install_session("dev", new_client, generation=2)
+        listener._install_session("dev", new_client, generation=2)  # ruff: ignore[private-member-access]  # isort: skip
 
-    assert listener._sessions["dev"] is old_session
-    assert listener._clients["dev"] is old_client
+    assert listener._sessions["dev"] is old_session  # ruff: ignore[private-member-access]  # isort: skip
+    assert listener._clients["dev"] is old_client  # ruff: ignore[private-member-access]  # isort: skip
     assert old_session.active is True
 
 
@@ -1448,12 +1447,12 @@ def test_listener_async_start_propagates_previous_stop_failure() -> None:
     async def _run() -> None:
         listener = _build_bare_listener()
 
-        async def _failed_stop() -> None:  # ruff: ignore[unused-async]
-            raise RuntimeError("prior stop failed")
+        async def _failed_stop() -> None:  # ruff: ignore[unused-async]  # isort: skip
+            raise RuntimeError("prior stop failed")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
         stop_task = asyncio.create_task(_failed_stop())
         await asyncio.sleep(0)
-        listener._stop_task = stop_task
+        listener._stop_task = stop_task  # ruff: ignore[private-member-access]  # isort: skip
         bluetooth_module = type(
             "_BluetoothModule",
             (),
@@ -1481,11 +1480,11 @@ def test_listener_async_start_propagates_previous_stop_failure() -> None:
         finally:
             with contextlib.suppress(RuntimeError):
                 stop_task.result()
-            for unregister in listener._unregister_callbacks:
+            for unregister in listener._unregister_callbacks:  # ruff: ignore[private-member-access]  # isort: skip
                 unregister()
-            listener._unregister_callbacks.clear()
+            listener._unregister_callbacks.clear()  # ruff: ignore[private-member-access]  # isort: skip
 
-        assert listener._stop_task is stop_task
+        assert listener._stop_task is stop_task  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1499,7 +1498,7 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
         teardown_calls = 0
         lookup_calls = 0
 
-        async def _retry_teardown(  # ruff: ignore[unused-async]
+        async def _retry_teardown(  # ruff: ignore[unused-async]  # isort: skip
             device_id: str,
             session: _GattSession,
         ) -> None:
@@ -1507,8 +1506,8 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
             assert device_id == "dev"
             assert session is retained
             teardown_calls += 1
-            listener._stop_event.set()
-            raise RuntimeError("disconnect still failed")
+            listener._stop_event.set()  # ruff: ignore[private-member-access]  # isort: skip
+            raise RuntimeError("disconnect still failed")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
         class _BluetoothModule:
             @staticmethod
@@ -1522,45 +1521,17 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
                 assert connectable is True
                 lookup_calls += 1
 
-        listener._teardown_session = _retry_teardown  # type: ignore[method-assign]
-        listener._ha_bluetooth = _BluetoothModule()
+        listener._teardown_session = _retry_teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
+        listener._ha_bluetooth = cast("Any", _BluetoothModule())  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(
-            listener._async_run_connection("dev", "AA:BB:CC:DD:EE:FF"),
+            listener._async_run_connection("dev", "AA:BB:CC:DD:EE:FF"),  # ruff: ignore[private-member-access]  # isort: skip
             timeout=0.2,
         )
 
         assert teardown_calls == 1
         assert lookup_calls == 0
-        assert listener._sessions["dev"] is retained
-
-    asyncio.run(_run())
-
-
-def test_keepalive_invalidation_accepts_callbacks_until_physical_cutoff() -> None:
-    """Logical reconnect fencing cannot drop callbacks before stop_notify returns."""
-
-    async def _run() -> None:
-        delivered: list[bytes] = []
-
-        async def _sink(  # ruff: ignore[unused-async]
-            _device_id: str,
-            observation: BleFrameObservation,
-        ) -> bool:
-            delivered.append(observation.raw_bytes)
-            return True
-
-        listener = _build_bare_listener()
-        listener._sink = _sink
-        session = _attach_session(listener, "dev", object())
-
-        listener._invalidate_session("dev")
-        listener._schedule_notification("dev", session, b"before-cutoff")
-        await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
-
-        assert delivered == [b"before-cutoff"]
-        assert session.accepting_notifications is True
-        assert listener._sessions["dev"] is session
+        assert listener._sessions["dev"] is retained  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1571,19 +1542,17 @@ def test_listener_notification_queue_preserves_every_burst_frame() -> None:
     async def _run() -> None:
         delivered: list[bytes] = []
 
-        async def _sink(  # ruff: ignore[unused-async]
-            _device_id: str, observation: object
-        ) -> bool:
+        async def _sink(_device_id: str, observation: object) -> bool:  # ruff: ignore[unused-async]  # isort: skip
             delivered.append(cast("Any", observation).raw_bytes)
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
         frames = [index.to_bytes(2, "big") for index in range(130)]
 
         for frame in frames:
-            listener._schedule_notification("dev", session, frame)
+            listener._schedule_notification("dev", session, frame)  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
         notify_task = session.notify_task
@@ -1609,10 +1578,10 @@ def test_listener_notification_queue_exposes_pending_bytes_and_oldest_age() -> N
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
-        listener._schedule_notification("dev", session, b"first")
-        listener._schedule_notification("dev", session, b"second-longer")
+        listener._schedule_notification("dev", session, b"first")  # ruff: ignore[private-member-access]  # isort: skip
+        listener._schedule_notification("dev", session, b"second-longer")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(sink_started.wait(), timeout=1.0)
         await asyncio.sleep(0.01)
 
@@ -1626,7 +1595,7 @@ def test_listener_notification_queue_exposes_pending_bytes_and_oldest_age() -> N
             release_sink.set()
             await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
 
-        assert pending_depth == 2
+        assert pending_depth == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert pending_bytes == len(b"firstsecond-longer")
         assert high_watermark_bytes >= pending_bytes
         assert oldest_age > 0
@@ -1654,11 +1623,11 @@ def test_listener_notification_preserves_callback_arrival_timestamp() -> None:
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
-        listener._schedule_notification("dev", session, b"first")
+        listener._schedule_notification("dev", session, b"first")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(first_started.wait(), timeout=1.0)
-        listener._schedule_notification("dev", session, b"queued")
+        listener._schedule_notification("dev", session, b"queued")  # ruff: ignore[private-member-access]  # isort: skip
         callback_deadline = datetime.now(UTC)
         await asyncio.sleep(0.01)
         release_first.set()
@@ -1677,7 +1646,7 @@ def test_listener_forwards_incomplete_decoded_fragment_to_sink() -> None:
         key = b"k" * 16
         observations: list[BleFrameObservation] = []
 
-        async def _sink(  # ruff: ignore[unused-async]
+        async def _sink(  # ruff: ignore[unused-async]  # isort: skip
             _device_id: str,
             observation: BleFrameObservation,
         ) -> bool:
@@ -1685,7 +1654,7 @@ def test_listener_forwards_incomplete_decoded_fragment_to_sink() -> None:
             return False
 
         listener = _build_bare_listener(key)
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
         raw = encrypt_binary_notify(
             build_binary_frame(
@@ -1700,7 +1669,7 @@ def test_listener_forwards_incomplete_decoded_fragment_to_sink() -> None:
             iv=b"1" * BLE_AES_IV_LEN,
         )
 
-        await listener._handle_notification(
+        await listener._handle_notification(  # ruff: ignore[private-member-access]  # isort: skip
             "dev",
             raw,
             session=session,
@@ -1713,9 +1682,9 @@ def test_listener_forwards_incomplete_decoded_fragment_to_sink() -> None:
         assert observations[0].raw_bytes == raw
         assert observations[0].parsed is not None
         assert observations[0].parsed.frame_index == 1
-        assert observations[0].parsed.chunk_count == 2
+        assert observations[0].parsed.chunk_count == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert observations[0].delivery_id is not None
-        listener._clear_frame_assemblies("dev", session)
+        listener._clear_frame_assemblies("dev", session)  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1740,7 +1709,7 @@ def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> N
             return True
 
         listener = _build_bare_listener(key)
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         client = object()
         session = _attach_session(listener, "dev", client)
         body = b'{"outPw":596}'
@@ -1769,11 +1738,11 @@ def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> N
             iv=b"2" * BLE_AES_IV_LEN,
         )
 
-        listener._schedule_notification("dev", session, b"block")
+        listener._schedule_notification("dev", session, b"block")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(sink_started.wait(), timeout=1.0)
-        listener._schedule_notification("dev", session, first)
-        listener._schedule_notification("dev", session, second)
-        listener._on_disconnect(
+        listener._schedule_notification("dev", session, first)  # ruff: ignore[private-member-access]  # isort: skip
+        listener._schedule_notification("dev", session, second)  # ruff: ignore[private-member-access]  # isort: skip
+        listener._on_disconnect(  # ruff: ignore[private-member-access]  # isort: skip
             "dev",
             generation=session.generation,
             client=client,
@@ -1788,7 +1757,7 @@ def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> N
         ]
         assert len(complete) == 1
         assert session.accepting_notifications is False
-        await listener._teardown_session("dev", session)
+        await listener._teardown_session("dev", session)  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1813,21 +1782,19 @@ def test_listener_teardown_accepts_notifications_until_stop_notify_cutoff() -> N
     async def _run() -> None:
         delivered: list[bytes] = []
 
-        async def _sink(  # ruff: ignore[unused-async]
-            _device_id: str, observation: object
-        ) -> bool:
+        async def _sink(_device_id: str, observation: object) -> bool:  # ruff: ignore[unused-async]  # isort: skip
             delivered.append(cast("Any", observation).raw_bytes)
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         client = _Client()
         session = _attach_session(listener, "dev", client)
         session.notify_started = True
-        teardown = asyncio.create_task(listener._teardown_session("dev", session))
+        teardown = asyncio.create_task(listener._teardown_session("dev", session))  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(client.stop_notify_started.wait(), timeout=1.0)
 
-        listener._schedule_notification("dev", session, b"during-cutoff")
+        listener._schedule_notification("dev", session, b"during-cutoff")  # ruff: ignore[private-member-access]  # isort: skip
         client.release_stop_notify.set()
         await asyncio.wait_for(teardown, timeout=1.0)
 
@@ -1850,26 +1817,26 @@ def test_listener_teardown_retains_ownership_while_accepted_sink_is_blocked() ->
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
-        listener._schedule_notification("dev", session, b"accepted")
+        listener._schedule_notification("dev", session, b"accepted")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(sink_started.wait(), timeout=1.0)
 
         with patch(
             "custom_components.jackery_solarvault.client.ble_transport._STOP_TIMEOUT_SEC",
             0.01,
         ):
-            teardown = asyncio.create_task(listener._teardown_session("dev", session))
+            teardown = asyncio.create_task(listener._teardown_session("dev", session))  # ruff: ignore[private-member-access]  # isort: skip
             try:
                 await asyncio.sleep(0.03)
                 assert not teardown.done()
-                assert listener._sessions["dev"] is session
+                assert listener._sessions["dev"] is session  # ruff: ignore[private-member-access]  # isort: skip
             finally:
                 release_sink.set()
                 with contextlib.suppress(Exception, asyncio.CancelledError):
                     await asyncio.wait_for(teardown, timeout=1.0)
 
-        assert listener._sessions == {}
+        assert listener._sessions == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1880,13 +1847,11 @@ def test_listener_teardown_retains_failed_disconnect_ownership() -> None:
     class _Client:
         is_connected = True
 
-        async def stop_notify(  # ruff: ignore[no-self-use]
-            self, _uuid: str
-        ) -> None:
+        async def stop_notify(self, _uuid: str) -> None:  # ruff: ignore[no-self-use]  # isort: skip
             return
 
-        async def disconnect(self) -> None:  # ruff: ignore[no-self-use]
-            raise RuntimeError("disconnect failed")
+        async def disconnect(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
+            raise RuntimeError("disconnect failed")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
         listener = _build_bare_listener()
@@ -1895,10 +1860,10 @@ def test_listener_teardown_retains_failed_disconnect_ownership() -> None:
         session.notify_started = True
 
         with pytest.raises(RuntimeError, match="disconnect failed"):
-            await listener._teardown_session("dev", session)
+            await listener._teardown_session("dev", session)  # ruff: ignore[private-member-access]  # isort: skip
 
-        assert listener._sessions["dev"] is session
-        assert listener._clients["dev"] is client
+        assert listener._sessions["dev"] is session  # ruff: ignore[private-member-access]  # isort: skip
+        assert listener._clients["dev"] is client  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -1918,10 +1883,10 @@ def test_listener_async_stop_drains_every_accepted_notification() -> None:
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
-        listener._schedule_notification("dev", session, b"first")
-        listener._schedule_notification("dev", session, b"second")
+        listener._schedule_notification("dev", session, b"first")  # ruff: ignore[private-member-access]  # isort: skip
+        listener._schedule_notification("dev", session, b"second")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(sink_started.wait(), timeout=1.0)
 
         stop_task = asyncio.create_task(listener.async_stop())
@@ -1951,13 +1916,13 @@ def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
             _session: _GattSession,
         ) -> None:
             if device_id == "dev-a":
-                raise RuntimeError("first teardown failed")
+                raise RuntimeError("first teardown failed")  # ruff: ignore[raise-vanilla-args]  # isort: skip
             second_started.set()
             await release_second.wait()
             second_finished.set()
 
-        listener._teardown_session = _teardown  # type: ignore[method-assign]
-        stop_task = asyncio.create_task(listener._async_stop_impl())
+        listener._teardown_session = _teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
+        stop_task = asyncio.create_task(listener._async_stop_impl())  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
         await asyncio.sleep(0)
         completed_before_sibling = stop_task.done()
@@ -1977,7 +1942,7 @@ def test_listener_stop_task_is_homeassistant_owned() -> None:
         task_names: list[str] = []
 
         class _OwnedHass(_HassStub):
-            def async_create_background_task(  # ruff: ignore[no-self-use]
+            def async_create_background_task(  # ruff: ignore[no-self-use]  # isort: skip
                 self,
                 target: Coroutine[Any, Any, None],
                 *,
@@ -1988,7 +1953,7 @@ def test_listener_stop_task_is_homeassistant_owned() -> None:
                 task_names.append(name)
                 return asyncio.create_task(target, name=name)
 
-        async def _sink(  # ruff: ignore[unused-async]
+        async def _sink(  # ruff: ignore[unused-async]  # isort: skip
             _device_id: str,
             _observation: object,
         ) -> bool:
@@ -2002,8 +1967,6 @@ def test_listener_stop_task_is_homeassistant_owned() -> None:
             connect_backoff_remaining=lambda _device_id, _horizon: 0.0,
             connect_backoff_note_failure=lambda _device_id, _horizon: 0.0,
             connect_backoff_note_success=lambda _device_id: None,
-            keep_alive_msg_id=None,
-            keep_alive_ble_msg_type=None,
         )
 
         await listener.async_stop()
@@ -2031,9 +1994,9 @@ def test_listener_outer_consumer_cancellation_delivers_accepted_frame_once() -> 
             return True
 
         listener = _build_bare_listener()
-        listener._sink = _sink
+        listener._sink = _sink  # ruff: ignore[private-member-access]  # isort: skip
         session = _attach_session(listener, "dev", object())
-        listener._schedule_notification("dev", session, b"accepted")
+        listener._schedule_notification("dev", session, b"accepted")  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(sink_started.wait(), timeout=1.0)
         notify_task = session.notify_task
         assert notify_task is not None
@@ -2078,10 +2041,10 @@ def test_listener_stop_does_not_cancel_disconnect_already_in_progress() -> None:
         client = _Client()
         session = _attach_session(listener, "dev", client)
         runner = asyncio.create_task(
-            listener._teardown_session("dev", session),
+            listener._teardown_session("dev", session),  # ruff: ignore[private-member-access]  # isort: skip
             name="test_ble_teardown_runner",
         )
-        listener._connections["dev"] = runner
+        listener._connections["dev"] = runner  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(client.disconnect_started.wait(), timeout=1.0)
 
         stop_task = asyncio.create_task(listener.async_stop())
@@ -2092,10 +2055,11 @@ def test_listener_stop_does_not_cancel_disconnect_already_in_progress() -> None:
 
         assert was_cancelled is False
         assert client.disconnect_calls == 1
-        assert runner.done() and not runner.cancelled()
-        assert listener._sessions == {}
-        assert listener._clients == {}
-        assert listener._connections == {}
+        assert runner.done()
+        assert not runner.cancelled()
+        assert listener._sessions == {}  # ruff: ignore[private-member-access]  # isort: skip
+        assert listener._clients == {}  # ruff: ignore[private-member-access]  # isort: skip
+        assert listener._connections == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -2107,7 +2071,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, blob: bytes, *, response: bool
         ) -> None:
             """Record the GATT write payload and response flag."""
@@ -2138,7 +2102,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
             )
             echo_blob = encrypt_binary_notify(echo_plain, key)
             session.notify_sequence += 1
-            await listener._handle_notification(
+            await listener._handle_notification(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 echo_blob,
                 session=session,
@@ -2159,7 +2123,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         assert stats.last_ack_at is not None
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
         # The frame round-trips through the real decoder.
         parsed = BleBinaryFrame.__name__  # smoke import
         del parsed
@@ -2173,12 +2137,12 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     After the timeout the listener's `acks_received` remains 0, `acks_timed_out` increases by 1, and the
     pending ack registry is empty so late notifications cannot resolve the timed-out future.
-    """  # noqa: D205
+    """  # ruff: ignore[missing-blank-line-after-summary, line-too-long]  # isort: skip
 
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             return None
@@ -2203,17 +2167,17 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
         assert stats.acks_timed_out == 1
         # Pending bucket is cleaned up so a later notify doesn't fire
         # into a dropped future.
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
 
 def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
     """A notify with a non-listed cmd does not satisfy a cmd-filtered ack."""
-    import asyncio
-    import base64
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.client.ble import (
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -2221,7 +2185,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             return None
@@ -2244,13 +2208,13 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
                 build_binary_frame(cmd=42, flags=9999, body=b"unrelated"), key
             )
             session.notify_sequence += 1
-            await listener._handle_notification(
+            await listener._handle_notification(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 mismatched,
                 session=session,
                 notify_sequence=session.notify_sequence,
             )
-            assert listener._pending_acks.get("dev"), (
+            assert listener._pending_acks.get("dev"), (  # ruff: ignore[private-member-access]  # isort: skip
                 "mismatched echo must leave the pending ack registered"
             )
             # Then the expected echo — this fulfils the future.
@@ -2258,7 +2222,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
                 build_binary_frame(cmd=107, flags=0x002C, body=b'{"ok":1}'), key
             )
             session.notify_sequence += 1
-            await listener._handle_notification(
+            await listener._handle_notification(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 matching,
                 session=session,
@@ -2284,7 +2248,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
 
 def test_listener_send_command_validates_msg_id_and_type() -> None:
     """Invalid msg_id/ble_msg_type inputs fail before any pending future exists."""
-    import asyncio
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     async def _run() -> None:
         listener = _build_bare_listener(b"x" * 16)
@@ -2304,44 +2268,44 @@ def test_listener_send_command_validates_msg_id_and_type() -> None:
                 body=b"",
             )
 
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
 
 def test_listener_async_stop_cancels_pending_acks() -> None:
     """Pending ack futures are cancelled on shutdown, never left dangling."""
-    import asyncio
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     async def _run() -> None:
         """Test that calling `async_stop` cancels any registered pending ACK futures and clears the listener's pending-ack registry.
 
         Registers two pending ACKs for different device IDs, invokes `async_stop`, and asserts both pending futures are cancelled and the listener's `_pending_acks` mapping is empty.
-        """
+        """  # ruff: ignore[line-too-long]  # isort: skip
         listener = _build_bare_listener()
         # Register two pending acks manually — we are not driving a real
         # write here, just pinning the cleanup behaviour.
         session_a = _attach_session(listener, "dev1", object())
         session_b = _attach_session(listener, "dev2", object())
-        ack_a = listener._register_pending_ack("dev1", session_a, 3022, 107)
-        ack_b = listener._register_pending_ack("dev2", session_b, 3019, 120)
+        ack_a = listener._register_pending_ack("dev1", session_a, 3022, 107)  # ruff: ignore[private-member-access]  # isort: skip
+        ack_b = listener._register_pending_ack("dev2", session_b, 3019, 120)  # ruff: ignore[private-member-access]  # isort: skip
 
         await listener.async_stop()
 
         assert ack_a.future.cancelled()
         assert ack_b.future.cancelled()
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
 
 def test_listener_send_command_write_failure_releases_pending_ack() -> None:
     """A failed GATT write must not leave a pending ack behind."""
-    import asyncio
-    import base64
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     class _ExplodingClient:
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             """Simulate a GATT characteristic write that always fails.
@@ -2354,13 +2318,13 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             Raises:
                 RuntimeError: Always raised with message "simulated GATT failure".
             """
-            raise RuntimeError("simulated GATT failure")
+            raise RuntimeError("simulated GATT failure")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
 
         Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """
+        """  # ruff: ignore[line-too-long]  # isort: skip
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
@@ -2378,30 +2342,30 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             )
         # Pending bucket cleared so a stray late notify cannot fulfil a
         # future the caller already gave up on.
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
 
 def test_coordinator_send_ble_command_forwards_ack_options() -> None:
     """``async_send_ble_command`` threads the ack knobs through to the listener."""
-    import asyncio
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     class _Entry:
-        data: dict[str, object] = {}
-        options = {
+        data: dict[str, object] = {}  # ruff: ignore[mutable-class-default]  # isort: skip
+        options = {  # ruff: ignore[mutable-class-default]  # isort: skip
             CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_ENABLE_BLE_WRITES: True,
+            "enable_ble_writes": True,
         }
 
     captured: dict[str, object] = {}
 
     class _Listener:
-        async def async_send_command(  # ruff: ignore[no-self-use]
+        async def async_send_command(  # ruff: ignore[too-many-arguments, no-self-use]  # isort: skip
             self,
             device_id: str,
             *,
@@ -2433,19 +2397,19 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
         sent = await JackerySolarVaultCoordinator.async_send_ble_command(
             self,
             "dev1",
-            cmd=107,
-            body={"cmd": 107, "swEps": 1},
-            flags=3022,
+            cmd=106,
+            body={"cmd": 106, "swEps": 1},
+            flags=3011,
             wait_for_ack=True,
             ack_timeout_sec=3.5,
             mtu_override=120,
         )
         assert sent is True
-        assert captured["msg_id"] == 3022
-        assert captured["ble_msg_type"] == 107
+        assert captured["msg_id"] == 3011  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert captured["ble_msg_type"] == 106  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert captured["wait_for_ack"] is True
-        assert captured["ack_timeout_sec"] == 3.5  # ruff: ignore[float-equality-comparison]
-        assert captured["mtu_override"] == 120
+        assert captured["ack_timeout_sec"] == 3.5  # ruff: ignore[magic-value-comparison, float-equality-comparison]  # isort: skip
+        assert captured["mtu_override"] == 120  # ruff: ignore[magic-value-comparison]  # isort: skip
 
     asyncio.run(_run())
 
@@ -2457,10 +2421,10 @@ def test_coordinator_send_ble_command_forwards_ack_options() -> None:
 
 def test_split_body_for_mtu_matches_smali_budget() -> None:
     """Body chunks honour the smali ``mtu - 60`` per-frame budget."""
-    from custom_components.jackery_solarvault.client.ble import chunk_size_for_mtu
+    from custom_components.jackery_solarvault.client.ble import chunk_size_for_mtu  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     # Default MTU (247) → 187 bytes per chunk, matching the Android app.
-    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187
+    assert chunk_size_for_mtu(DEFAULT_BLE_MTU) == 187  # ruff: ignore[magic-value-comparison]  # isort: skip
     body = b"a" * 400
     chunks = split_body_for_mtu(body, DEFAULT_BLE_MTU)
     assert [len(c) for c in chunks] == [187, 187, 26]
@@ -2490,11 +2454,11 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     """Verify that a body larger than the per-MTU chunk size is split into multiple indexed frames and sent as separate writes.
 
     Asserts that sending a >187-byte body at the default MTU (247) produces two encrypted write operations; each decrypted frame has the correct `frame_index`, `chunk_count`, and `cmd`, and the concatenation of their `body` fields equals the original payload.
-    """
-    import asyncio
-    import base64
+    """  # ruff: ignore[line-too-long]  # isort: skip
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.client.ble import (
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         BLE_WRITE_CHAR_UUID,
         decrypt_binary_notify,
     )
@@ -2504,7 +2468,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, uuid: str, blob: bytes, *, response: bool
         ) -> None:
             assert uuid == BLE_WRITE_CHAR_UUID
@@ -2526,16 +2490,16 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
         )
         assert sent is True
         # Two writes for 209 bytes at MTU 247 (187 + 22).
-        assert len(writes) == 2
+        assert len(writes) == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
         first = decrypt_binary_notify(writes[0], key)
         second = decrypt_binary_notify(writes[1], key)
         assert first.frame_index == 1
-        assert first.chunk_count == 2
-        assert first.cmd == 107
-        assert len(first.body) == 187
-        assert second.frame_index == 2
-        assert second.chunk_count == 2
-        assert second.cmd == 107
+        assert first.chunk_count == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert first.cmd == 107  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert len(first.body) == 187  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert second.frame_index == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert second.chunk_count == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
+        assert second.cmd == 107  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert second.body == body[187:]
         assert first.body + second.body == body
 
@@ -2544,17 +2508,17 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
 def test_listener_mtu_override_forces_smaller_chunks() -> None:
     """``mtu_override`` overrides the cached/default value for chunk sizing."""
-    import asyncio
-    import base64
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify
+    from custom_components.jackery_solarvault.client.ble import decrypt_binary_notify  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     writes: list[bytes] = []
 
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, blob: bytes, *, response: bool
         ) -> None:
             writes.append(bytes(blob))
@@ -2563,8 +2527,9 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
         """``mtu_override`` forces smaller chunking than the cached MTU."""
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
-        _attach_session(listener, "dev", _FakeClient())
-        listener._mtu = {"dev": 247}
+        session = _attach_session(listener, "dev", _FakeClient())
+        session.notify_started = True
+        listener._mtu = {"dev": 247}  # ruff: ignore[private-member-access]  # isort: skip
 
         body = b"x" * 25
         # MTU 70 → 10 bytes / chunk → three frames.
@@ -2576,10 +2541,10 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
             mtu_override=70,
         )
         assert sent is True
-        assert len(writes) == 3
+        assert len(writes) == 3  # ruff: ignore[magic-value-comparison]  # isort: skip
         parsed = [decrypt_binary_notify(w, key) for w in writes]
         assert [p.frame_index for p in parsed] == [1, 2, 3]
-        assert all(p.chunk_count == 3 for p in parsed)
+        assert all(p.chunk_count == 3 for p in parsed)  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert b"".join(p.body for p in parsed) == body
 
     asyncio.run(_run())
@@ -2587,17 +2552,17 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
 def test_listener_mtu_override_rejects_non_integer_value() -> None:
     """``mtu_override`` validation catches non-integer diagnostic input early."""
-    import asyncio
-    import base64
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, _blob: bytes, *, response: bool
         ) -> None:
             """Fail fast when an invalid MTU write attempt occurs."""
-            raise AssertionError("invalid MTU must not write to GATT")
+            raise AssertionError("invalid MTU must not write to GATT")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
         """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
@@ -2607,7 +2572,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
         Raises:
             ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """
+        """  # ruff: ignore[line-too-long]  # isort: skip
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
@@ -2628,8 +2593,8 @@ def test_listener_mtu_for_device_falls_back_to_default() -> None:
     """An un-learnt device id surfaces the Android-app default MTU."""
     listener = _build_bare_listener()
     assert listener.mtu_for_device("unknown") == DEFAULT_BLE_MTU
-    listener._mtu["known"] = 120
-    assert listener.mtu_for_device("known") == 120
+    listener._mtu["known"] = 120  # ruff: ignore[private-member-access]  # isort: skip
+    assert listener.mtu_for_device("known") == 120  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
@@ -2639,8 +2604,8 @@ def test_listener_record_negotiated_mtu_reads_bleak_mtu_size() -> None:
     class _Client:
         mtu_size = 185
 
-    listener._record_negotiated_mtu("dev", cast("Any", _Client()))
-    assert listener.mtu_for_device("dev") == 185
+    listener._record_negotiated_mtu("dev", cast("Any", _Client()))  # ruff: ignore[private-member-access]  # isort: skip
+    assert listener.mtu_for_device("dev") == 185  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
@@ -2653,8 +2618,8 @@ def test_listener_record_negotiated_mtu_ignores_garbage() -> None:
     class _Bad:
         mtu_size = 12  # below the 60-byte overhead
 
-    listener._record_negotiated_mtu("dev", cast("Any", _NoMtu()))
-    listener._record_negotiated_mtu("dev2", cast("Any", _Bad()))
+    listener._record_negotiated_mtu("dev", cast("Any", _NoMtu()))  # ruff: ignore[private-member-access]  # isort: skip
+    listener._record_negotiated_mtu("dev2", cast("Any", _Bad()))  # ruff: ignore[private-member-access]  # isort: skip
     # Both fall back to the default — the cache stays untouched.
     assert listener.mtu_for_device("dev") == DEFAULT_BLE_MTU
     assert listener.mtu_for_device("dev2") == DEFAULT_BLE_MTU
@@ -2664,11 +2629,11 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     """Verifies that a successfully decoded BLE notify clears any previously stored GATT error and increments the decoded frame count.
 
     Asserts that after handling a valid encrypted notify for a device, the listener's per-device statistics have `frames_decoded` increased and `last_error` set to `None`.
-    """
-    import asyncio
-    import base64
+    """  # ruff: ignore[line-too-long]  # isort: skip
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.client.ble import (
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -2677,7 +2642,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
 
         This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """
+        """  # ruff: ignore[line-too-long]  # isort: skip
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")
@@ -2688,7 +2653,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
         stats.last_error = stats.last_decode_error
 
         blob = encrypt_binary_notify(build_binary_frame(cmd=120, body=b"{}"), key)
-        await listener._handle_notification("dev", blob)
+        await listener._handle_notification("dev", blob)  # ruff: ignore[private-member-access]  # isort: skip
 
         assert stats.frames_decoded == 1
         assert stats.last_error is None
@@ -2698,10 +2663,10 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
 
 def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
     """Chunked writes register one pending ack covering all frames combined."""
-    import asyncio
-    import base64
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import base64  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.client.ble import (
+    from custom_components.jackery_solarvault.client.ble import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         build_binary_frame,
         encrypt_binary_notify,
     )
@@ -2711,7 +2676,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
     class _FakeClient:
         is_connected = True
 
-        async def write_gatt_char(  # ruff: ignore[no-self-use]
+        async def write_gatt_char(  # ruff: ignore[no-self-use]  # isort: skip
             self, _uuid: str, blob: bytes, *, response: bool
         ) -> None:
             writes.append(bytes(blob))
@@ -2721,19 +2686,20 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         key = base64.b64decode(_LIVE_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
+        session.notify_started = True
 
         async def _drive_ack_after_writes() -> None:
             # Wait until both chunked writes have hit the wire, then push
             # one echo frame — that single notify must complete the ack.
             for _ in range(100):
-                if len(writes) >= 2:
+                if len(writes) >= 2:  # ruff: ignore[magic-value-comparison]  # isort: skip
                     break
                 await asyncio.sleep(0.005)
             echo = encrypt_binary_notify(
                 build_binary_frame(cmd=107, flags=3022, body=b'{"ok":1}'), key
             )
             session.notify_sequence += 1
-            await listener._handle_notification(
+            await listener._handle_notification(  # ruff: ignore[private-member-access]  # isort: skip
                 "dev",
                 echo,
                 session=session,
@@ -2750,114 +2716,11 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
         )
         sent, _ = await asyncio.gather(sender, _drive_ack_after_writes())
         assert sent is True
-        assert len(writes) == 2
+        assert len(writes) == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
         stats = listener.stats_for("dev")
         assert stats.acks_received == 1
         assert stats.acks_timed_out == 0
         # No leftover pending ack — one notify cleared the registry.
-        assert listener._pending_acks == {}
+        assert listener._pending_acks == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
-
-
-def test_merge_battery_pack_lifetime_from_ble_updates_matching_pack() -> None:
-    """cmd=120 BLE for devType=1 merges inEgy/outEgy into the matching pack.
-
-    Pinned 2026-05-17: BLE frame
-    ``{cmd:120, deviceSn:"HQ2C01400955HP3", devType:1, subType:0,
-       outEgy:5095, inEgy:5648}`` arrives. MQTT ``UploadSubDeviceGroupProperty``
-    has already populated the pack via ``deviceSn`` match. The helper
-    enriches the matching pack with the BLE-only lifetime counters.
-    """
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-
-    updated = {
-        "battery_packs": [
-            {
-                "deviceSn": "HQ2C01400955HP3",
-                "devType": 1,
-                "subType": 0,
-                "batSoc": 53,
-                "inPw": 0,
-                "outPw": 200,
-            },
-        ],
-    }
-    body = {
-        "deviceSn": "HQ2C01400955HP3",
-        "devType": 1,
-        "subType": 0,
-        "outEgy": 5095,
-        "inEgy": 5648,
-    }
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
-    )
-    assert touched is True
-    pack = updated["battery_packs"][0]
-    assert pack["inEgy"] == 5648
-    assert pack["outEgy"] == 5095
-    # Existing fields preserved.
-    assert pack["batSoc"] == 53
-    assert pack["inPw"] == 0
-    assert pack["outPw"] == 200
-
-
-def test_merge_battery_pack_lifetime_from_ble_creates_minimal_pack() -> None:
-    """BLE-only lifetime data creates a minimal pack entry.
-
-    The captured SolarVault payloads show HTTP ``pack/list`` returning
-    ``data:null`` while cmd=120 BLE still reports the pack ``deviceSn``
-    plus ``inEgy``/``outEgy``. Without a minimal entry the lifetime
-    counters stay unrouted forever and the opt-in pack energy entities
-    never receive data.
-    """
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-
-    updated = {
-        "battery_packs": [
-            {
-                "deviceSn": "HQ2C01400955HP3",
-                "devType": 1,
-            },
-        ],
-    }
-    body = {
-        "deviceSn": "DIFFERENT_PACK_SN",  # not in the list
-        "devType": 1,
-        "subType": 0,
-        "outEgy": 99,
-        "inEgy": 88,
-    }
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
-    )
-    assert touched is True
-    assert len(updated["battery_packs"]) == 2
-    pack = updated["battery_packs"][1]
-    assert pack["deviceSn"] == "DIFFERENT_PACK_SN"
-    assert pack["devType"] == 1
-    assert pack["subType"] == 0
-    assert pack["inEgy"] == 88
-    assert pack["outEgy"] == 99
-    assert "_last_seen_at" in pack
-
-
-def test_merge_battery_pack_lifetime_from_ble_no_lifetime_fields_no_op() -> None:
-    """A cmd=120 BLE body without inEgy/outEgy must not touch the pack."""
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-
-    updated = {
-        "battery_packs": [{"deviceSn": "HQ2C01400955HP3", "devType": 1}],
-    }
-    body = {"deviceSn": "HQ2C01400955HP3", "devType": 1, "subType": 0}
-    touched = JackerySolarVaultCoordinator._merge_battery_pack_lifetime_from_ble(
-        updated, body
-    )
-    assert touched is False

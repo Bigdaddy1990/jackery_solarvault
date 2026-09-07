@@ -24,7 +24,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from tests._update_cycle_fixture import SYSTEM_ID  # ruff:ignore[banned-api]
+from tests._update_cycle_fixture import SYSTEM_ID  # ruff: ignore[banned-api]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -39,17 +39,17 @@ _OTHER_CODE_ERROR = JackeryApiError("cloud says code=200 ok-ish")
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for backoff/liveness policy helpers."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._endpoint_backoff = {}
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")
+    coordinator._endpoint_backoff = {}  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     return coordinator
 
 
 def _due_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for slow-cache due-policy helpers."""
     coordinator = _bare_coordinator()
-    coordinator._slow_metrics_interval_sec = 120
-    coordinator._price_config_interval_sec = 600
-    coordinator._slow_cache = {}
+    coordinator._slow_metrics_interval_sec = 120  # ruff: ignore[private-member-access]
+    coordinator._price_config_interval_sec = 600  # ruff: ignore[private-member-access]
+    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -69,9 +69,9 @@ def test_energy_key_is_never_suppressed_even_while_windowed(
     """An energy key with a live window must still report not-active."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
-    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is False
+    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is False  # ruff: ignore[private-member-access]
 
 
 def test_unsupported_energy_endpoint_is_suppressed_while_windowed(
@@ -80,17 +80,17 @@ def test_unsupported_energy_endpoint_is_suppressed_while_windowed(
     """A cloud 10600 verdict prevents repeated unsupported PV trend calls."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(
+    coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
         _ENERGY_KEY,
         JackeryApiError("cloud says code=10600"),
     )
 
-    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is True
+    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is True  # ruff: ignore[private-member-access]
 
 
 def test_unsupported_energy_endpoint_uses_terminal_retry_window() -> None:
     """A 10600 verdict does not use the normal short energy retry ladder."""
-    assert JackerySolarVaultCoordinator._endpoint_backoff_delays_for_key(
+    assert JackerySolarVaultCoordinator._endpoint_backoff_delays_for_key(  # ruff: ignore[private-member-access]
         _ENERGY_KEY,
         10600,
     ) == (21600,)
@@ -102,17 +102,17 @@ def test_diagnostic_key_suppressed_only_inside_window(
     """A diagnostic key is active while windowed and clears once elapsed."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
-    assert coordinator._endpoint_backoff_active(_DIAG_KEY, _NOW) is True
-    assert coordinator._endpoint_backoff_active(_DIAG_KEY, _NOW + 10_000.0) is False
+    assert coordinator._endpoint_backoff_active(_DIAG_KEY, _NOW) is True  # ruff: ignore[private-member-access]
+    assert coordinator._endpoint_backoff_active(_DIAG_KEY, _NOW + 10_000.0) is False  # ruff: ignore[private-member-access]
 
 
 def test_active_returns_false_for_unknown_key() -> None:
     """A key with no recorded window is not active."""
     coordinator = _bare_coordinator()
 
-    assert coordinator._endpoint_backoff_active("never-seen", _NOW) is False
+    assert coordinator._endpoint_backoff_active("never-seen", _NOW) is False  # ruff: ignore[private-member-access]
 
 
 def test_active_count_excludes_energy_and_expired(
@@ -121,11 +121,11 @@ def test_active_count_excludes_energy_and_expired(
     """Only in-window diagnostic keys are counted as active."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
-    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
+    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
-    assert coordinator._endpoint_backoff_active_count(_NOW) == 1
-    assert coordinator._endpoint_backoff_active_count(_NOW + 10_000.0) == 0
+    assert coordinator._endpoint_backoff_active_count(_NOW) == 1  # ruff: ignore[private-member-access]
+    assert coordinator._endpoint_backoff_active_count(_NOW + 10_000.0) == 0  # ruff: ignore[private-member-access]
 
 
 def test_slow_cache_slot_due_respects_its_own_ttl() -> None:
@@ -136,25 +136,25 @@ def test_slow_cache_slot_due_respects_its_own_ttl() -> None:
         "price": (_NOW - 599, {}),
     }
 
-    assert not coordinator._slow_cache_slot_refresh_due(
+    assert not coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
         cache,
         "slow",
         120,
         now=_NOW,
     )
-    assert coordinator._slow_cache_slot_refresh_due(
+    assert coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
         cache,
         "slow",
         120,
         now=_NOW + 1,
     )
-    assert not coordinator._slow_cache_slot_refresh_due(
+    assert not coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
         cache,
         "price",
         600,
         now=_NOW,
     )
-    assert coordinator._slow_cache_slot_refresh_due(
+    assert coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
         cache,
         "price",
         600,
@@ -168,18 +168,18 @@ def test_system_due_ignores_cold_dynamic_price_during_backoff(
     """An unsupported cold price slot cannot launch a no-op system worker."""
     _freeze(monkeypatch, _NOW)
     coordinator = _due_coordinator()
-    specs = coordinator._system_slow_cache_refresh_specs(SYSTEM_ID)
+    specs = coordinator._system_slow_cache_refresh_specs(SYSTEM_ID)  # ruff: ignore[private-member-access]
     cache = {key: (_NOW, {}) for key, _ttl, _backoff in specs}
     dynamic_spec = next(spec for spec in specs if spec[0] == PAYLOAD_DYNAMIC_PRICE)
     cache[dynamic_spec[0]] = (0.0, {})
-    coordinator._slow_cache[SYSTEM_ID] = cache
+    coordinator._slow_cache[SYSTEM_ID] = cache  # ruff: ignore[private-member-access]
     assert dynamic_spec[2] is not None
-    coordinator._endpoint_backoff_note_failure(
+    coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
         dynamic_spec[2],
         JackeryApiError("cloud says code=10600"),
     )
 
-    assert not coordinator._system_slow_cache_refresh_due(
+    assert not coordinator._system_slow_cache_refresh_due(  # ruff: ignore[private-member-access]
         SYSTEM_ID,
         now=_NOW,
     )
@@ -192,7 +192,7 @@ def test_device_due_ignores_backed_off_symmetry_and_foreign_cache_keys(
     _freeze(monkeypatch, _NOW)
     coordinator = _due_coordinator()
     device_id = "device-1"
-    specs = coordinator._device_slow_cache_refresh_specs(
+    specs = coordinator._device_slow_cache_refresh_specs(  # ruff: ignore[private-member-access]
         device_id,
         device_sn="serial-1",
         system_id=SYSTEM_ID,
@@ -201,19 +201,19 @@ def test_device_due_ignores_backed_off_symmetry_and_foreign_cache_keys(
     symmetry_specs = [
         spec for spec in specs if spec[2] is not None and ":symmetry_stat:" in spec[2]
     ]
-    assert len(symmetry_specs) == 4
+    assert len(symmetry_specs) == 4  # ruff: ignore[magic-value-comparison]
     for cache_key, _ttl, backoff_key in symmetry_specs:
         cache[cache_key] = (0.0, {})
         assert backoff_key is not None
-        coordinator._endpoint_backoff_note_failure(
+        coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
             backoff_key,
             JackeryApiError("cloud says code=10600"),
         )
     cache["home_trends_month_2026_04"] = (0.0, {})
     cache["pack_ota:pack-1"] = (0.0, {})
-    coordinator._slow_cache[f"dev:{device_id}"] = cache
+    coordinator._slow_cache[f"dev:{device_id}"] = cache  # ruff: ignore[private-member-access]
 
-    assert not coordinator._device_slow_cache_refresh_due(
+    assert not coordinator._device_slow_cache_refresh_due(  # ruff: ignore[private-member-access]
         device_id,
         device_sn="serial-1",
         system_id=SYSTEM_ID,
@@ -229,10 +229,10 @@ def test_non_backoff_code_is_not_recorded() -> None:
     coordinator = _bare_coordinator()
 
     assert (
-        coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _OTHER_CODE_ERROR)
+        coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _OTHER_CODE_ERROR)  # ruff: ignore[private-member-access]
         is False
     )
-    assert _DIAG_KEY not in coordinator._endpoint_backoff
+    assert _DIAG_KEY not in coordinator._endpoint_backoff  # ruff: ignore[private-member-access]
 
 
 def test_new_failure_signature_resets_ladder(
@@ -241,15 +241,15 @@ def test_new_failure_signature_resets_ladder(
     """A different failure code restarts the diagnostic ladder at level zero."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
-    coordinator._endpoint_backoff_note_failure(
+    coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
         _DIAG_KEY,
         JackeryApiError("cloud says code=10432"),
     )
 
-    assert coordinator._endpoint_backoff[_DIAG_KEY]["level"] == 0
+    assert coordinator._endpoint_backoff[_DIAG_KEY]["level"] == 0  # ruff: ignore[private-member-access]
 
 
 def test_note_success_clears_recorded_window(
@@ -258,11 +258,11 @@ def test_note_success_clears_recorded_window(
     """A successful fetch drops the recorded backoff window."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
-    coordinator._endpoint_backoff_note_success(_DIAG_KEY)
+    coordinator._endpoint_backoff_note_success(_DIAG_KEY)  # ruff: ignore[private-member-access]
 
-    assert _DIAG_KEY not in coordinator._endpoint_backoff
+    assert _DIAG_KEY not in coordinator._endpoint_backoff  # ruff: ignore[private-member-access]
 
 
 def test_diagnostics_reports_only_live_diagnostic_windows(
@@ -271,15 +271,15 @@ def test_diagnostics_reports_only_live_diagnostic_windows(
     """The diagnostics payload omits energy keys and expired windows."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)
-    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)
+    coordinator._endpoint_backoff_note_failure(_DIAG_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
+    coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
     payload = coordinator.endpoint_backoff_diagnostics()
 
     assert payload["active_count"] == 1
     assert _DIAG_KEY in payload["active"]
     assert _ENERGY_KEY not in payload["active"]
-    assert payload["active"][_DIAG_KEY]["code"] == 10422
+    assert payload["active"][_DIAG_KEY]["code"] == 10422  # ruff: ignore[magic-value-comparison]
 
 
 # --- local MQTT liveness ---------------------------------------------------
@@ -291,11 +291,11 @@ def test_local_mqtt_active_on_fresh_message(
     """A message inside the live threshold marks local MQTT active."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = _NOW - (
+    coordinator._local_mqtt_last_message_monotonic = _NOW - (  # ruff: ignore[private-member-access]
         MQTT_LIVE_THRESHOLD_SEC - 1
     )
 
-    assert coordinator._local_mqtt_is_active() is True
+    assert coordinator._local_mqtt_is_active() is True  # ruff: ignore[private-member-access]
 
 
 def test_local_mqtt_inactive_on_stale_message(
@@ -304,25 +304,25 @@ def test_local_mqtt_inactive_on_stale_message(
     """A message older than the live threshold is not active."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._local_mqtt_last_message_monotonic = _NOW - (
+    coordinator._local_mqtt_last_message_monotonic = _NOW - (  # ruff: ignore[private-member-access]
         MQTT_LIVE_THRESHOLD_SEC + 5
     )
 
-    assert coordinator._local_mqtt_is_active() is False
+    assert coordinator._local_mqtt_is_active() is False  # ruff: ignore[private-member-access]
 
 
 def test_local_mqtt_inactive_without_any_message() -> None:
     """The default (-inf) freshness reads as inactive."""
     coordinator = _bare_coordinator()
 
-    assert coordinator._local_mqtt_is_active(time.monotonic()) is False
+    assert coordinator._local_mqtt_is_active(time.monotonic()) is False  # ruff: ignore[private-member-access]
 
 
 def test_direct_client_connected_false_without_runtime() -> None:
     """Missing hass/entry runtime means no direct local client session."""
     coordinator = _bare_coordinator()
 
-    assert cast("Any", coordinator)._local_mqtt_direct_client_connected() is False
+    assert cast("Any", coordinator)._local_mqtt_direct_client_connected() is False  # ruff: ignore[private-member-access]
 
 
 # --- unsupported endpoints (code=10600) back off instead of spamming ---------
@@ -339,7 +339,7 @@ def test_symmetry_key_is_not_treated_as_energy() -> None:
     so it must be eligible for real backoff rather than re-fetched forever.
     """
     assert (
-        JackerySolarVaultCoordinator._endpoint_backoff_is_energy_key(_SYMMETRY_KEY)
+        JackerySolarVaultCoordinator._endpoint_backoff_is_energy_key(_SYMMETRY_KEY)  # ruff: ignore[private-member-access]
         is False
     )
 
@@ -351,13 +351,13 @@ def test_symmetry_backs_off_on_unsupported_code(
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
 
-    recorded = coordinator._endpoint_backoff_note_failure(
+    recorded = coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
         _SYMMETRY_KEY,
         _UNSUPPORTED_ERROR,
     )
 
     assert recorded is True
-    assert coordinator._endpoint_backoff_active(_SYMMETRY_KEY, _NOW) is True
+    assert coordinator._endpoint_backoff_active(_SYMMETRY_KEY, _NOW) is True  # ruff: ignore[private-member-access]
 
 
 def test_dynamic_price_backs_off_on_unsupported_code(
@@ -367,13 +367,13 @@ def test_dynamic_price_backs_off_on_unsupported_code(
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
 
-    recorded = coordinator._endpoint_backoff_note_failure(
+    recorded = coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
         _DYNAMIC_PRICE_KEY,
         _UNSUPPORTED_ERROR,
     )
 
     assert recorded is True
-    assert coordinator._endpoint_backoff_active(_DYNAMIC_PRICE_KEY, _NOW) is True
+    assert coordinator._endpoint_backoff_active(_DYNAMIC_PRICE_KEY, _NOW) is True  # ruff: ignore[private-member-access]
 
 
 # --- dynamic_price backoff must also gate the background slow-metric refresh ---
@@ -390,21 +390,21 @@ def test_dynamic_price_backs_off_on_unsupported_code(
 # cycle.
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
     hass: HomeAssistant,
 ) -> None:
     """A cold post-boot dynamic-price failure backs off in the background."""
     coordinator = _bare_coordinator()
     coordinator.hass = hass
-    coordinator._shutdown_started = False
-    coordinator._slow_metrics_bg_task = None
-    coordinator._slow_metrics_interval_sec = 120
-    coordinator._price_config_interval_sec = 600
-    coordinator._slow_cache = {}
-    coordinator._last_stat_import_monotonic = 0.0
-    coordinator._trend_query_kwargs = MagicMock(return_value={})
-    coordinator._app_period_section = MagicMock(
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]
+    coordinator._slow_metrics_interval_sec = 120  # ruff: ignore[private-member-access]
+    coordinator._price_config_interval_sec = 600  # ruff: ignore[private-member-access]
+    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
+    coordinator._last_stat_import_monotonic = 0.0  # ruff: ignore[private-member-access]
+    coordinator._trend_query_kwargs = MagicMock(return_value={})  # ruff: ignore[private-member-access]
+    coordinator._app_period_section = MagicMock(  # ruff: ignore[private-member-access]
         side_effect=lambda section, period: f"{section}:{period}"
     )
     coordinator.api = MagicMock()
@@ -415,19 +415,19 @@ async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
     )
     coordinator.api.async_get_dynamic_price = dynamic_price
 
-    async def get_with_ttl(
+    async def get_with_ttl(  # ruff: ignore[missing-return-type-private-function]
         system_id: str,
         cache_key: str,
         _ttl: int,
-        fetcher,
-        default,
+        fetcher,  # ruff: ignore[missing-type-function-argument]
+        default,  # ruff: ignore[missing-type-function-argument]
         *,
         backoff_key: str | None = None,
     ):
         """Model the guarded fetch seam used by the background launcher."""
         if cache_key != PAYLOAD_DYNAMIC_PRICE:
             return default
-        if backoff_key and coordinator._endpoint_backoff_active(
+        if backoff_key and coordinator._endpoint_backoff_active(  # ruff: ignore[private-member-access]
             backoff_key,
             time.monotonic(),
         ):
@@ -436,23 +436,23 @@ async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
             return await fetcher(system_id)
         except JackeryApiError as err:
             assert backoff_key is not None
-            coordinator._endpoint_backoff_note_failure(backoff_key, err)
+            coordinator._endpoint_backoff_note_failure(backoff_key, err)  # ruff: ignore[private-member-access]
             return default
 
-    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)
-    first_task = coordinator._slow_metrics_bg_task
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)  # ruff: ignore[private-member-access]
+    first_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
     assert first_task is not None
     await first_task
 
     # The cold slow-metric cache is served stale_ok on the foreground path
     # (no fetch attempted there), so the failure above only came from the
     # background refresh — proving its call now carries the backoff key too.
-    assert f"dynamic_price:{SYSTEM_ID}" in coordinator._endpoint_backoff
+    assert f"dynamic_price:{SYSTEM_ID}" in coordinator._endpoint_backoff  # ruff: ignore[private-member-access]
     calls_after_first_cycle = dynamic_price.call_count
     assert calls_after_first_cycle >= 1
 
-    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)
-    second_task = coordinator._slow_metrics_bg_task
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)  # ruff: ignore[private-member-access]
+    second_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
     assert second_task is not None
     assert second_task is not first_task
     await second_task
@@ -488,7 +488,7 @@ def _shelly_timeout_error() -> JackeryApiError:
 def test_shelly_realtime_timeout_is_backoffable() -> None:
     """A Shelly realtime key that timed out is eligible for timeout backoff."""
     assert (
-        JackerySolarVaultCoordinator._is_backoffable_timeout(
+        JackerySolarVaultCoordinator._is_backoffable_timeout(  # ruff: ignore[private-member-access]
             _SHELLY_REALTIME_KEY,
             _shelly_timeout_error(),
         )
@@ -498,7 +498,7 @@ def test_shelly_realtime_timeout_is_backoffable() -> None:
 
 def test_update_cycle_never_polls_shelly_realtime_power() -> None:
     """Shelly live power is push-driven and has no coordinator cadence."""
-    source = inspect.getsource(JackerySolarVaultCoordinator._async_update_data_guarded)
+    source = inspect.getsource(JackerySolarVaultCoordinator._async_update_data_guarded)  # ruff: ignore[private-member-access]
 
     assert "async_get_shelly_realtime_power" not in source
     assert "_enrich_shelly_cloud_realtime" not in source
@@ -507,7 +507,7 @@ def test_update_cycle_never_polls_shelly_realtime_power() -> None:
 def test_non_shelly_timeout_is_not_backoffable() -> None:
     """A non-Shelly key that timed out keeps its normal retry cadence."""
     assert (
-        JackerySolarVaultCoordinator._is_backoffable_timeout(
+        JackerySolarVaultCoordinator._is_backoffable_timeout(  # ruff: ignore[private-member-access]
             _DIAG_KEY,
             _shelly_timeout_error(),
         )
@@ -518,7 +518,7 @@ def test_non_shelly_timeout_is_not_backoffable() -> None:
 def test_shelly_non_timeout_error_is_not_backoffable() -> None:
     """A Shelly failure without a TimeoutError cause is not timeout-backed-off."""
     assert (
-        JackerySolarVaultCoordinator._is_backoffable_timeout(
+        JackerySolarVaultCoordinator._is_backoffable_timeout(  # ruff: ignore[private-member-access]
             _SHELLY_REALTIME_KEY,
             _BACKOFF_ERROR,
         )
@@ -529,7 +529,7 @@ def test_shelly_non_timeout_error_is_not_backoffable() -> None:
 def test_missing_backoff_key_is_not_backoffable() -> None:
     """A ``None`` backoff key is never timeout-backed-off."""
     assert (
-        JackerySolarVaultCoordinator._is_backoffable_timeout(
+        JackerySolarVaultCoordinator._is_backoffable_timeout(  # ruff: ignore[private-member-access]
             None,
             _shelly_timeout_error(),
         )
@@ -544,14 +544,14 @@ def test_shelly_timeout_opens_suppressing_window_and_escalates(
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
 
-    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)
+    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)  # ruff: ignore[private-member-access]
 
-    assert coordinator._endpoint_backoff_active(_SHELLY_REALTIME_KEY, _NOW) is True
-    first_until = coordinator._endpoint_backoff[_SHELLY_REALTIME_KEY]["until"]
+    assert coordinator._endpoint_backoff_active(_SHELLY_REALTIME_KEY, _NOW) is True  # ruff: ignore[private-member-access]
+    first_until = coordinator._endpoint_backoff[_SHELLY_REALTIME_KEY]["until"]  # ruff: ignore[private-member-access]
 
-    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)
+    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)  # ruff: ignore[private-member-access]
 
-    assert coordinator._endpoint_backoff[_SHELLY_REALTIME_KEY]["until"] > first_until
+    assert coordinator._endpoint_backoff[_SHELLY_REALTIME_KEY]["until"] > first_until  # ruff: ignore[private-member-access]
 
 
 def test_shelly_timeout_window_clears_on_success(
@@ -560,8 +560,8 @@ def test_shelly_timeout_window_clears_on_success(
     """A recovered fetch drops the timeout backoff window."""
     _freeze(monkeypatch, _NOW)
     coordinator = _bare_coordinator()
-    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)
+    coordinator._endpoint_backoff_note_timeout(_SHELLY_REALTIME_KEY)  # ruff: ignore[private-member-access]
 
-    coordinator._endpoint_backoff_note_success(_SHELLY_REALTIME_KEY)
+    coordinator._endpoint_backoff_note_success(_SHELLY_REALTIME_KEY)  # ruff: ignore[private-member-access]
 
-    assert _SHELLY_REALTIME_KEY not in coordinator._endpoint_backoff
+    assert _SHELLY_REALTIME_KEY not in coordinator._endpoint_backoff  # ruff: ignore[private-member-access]

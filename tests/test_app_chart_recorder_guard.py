@@ -50,12 +50,12 @@ def test_day_chart_recorder_import_reconciles_lagging_cloud_total() -> None:
         },
     }
 
-    points = coordinator._day_chart_points_for_metric(
-        _DEVICE_ID,
-        payload,
-        APP_SECTION_PV_STAT,
-        APP_STAT_TOTAL_SOLAR_ENERGY,
-        "pv_energy",
+    points = coordinator._day_chart_points_for_metric(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload=payload,
+        section_prefix=APP_SECTION_PV_STAT,
+        stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
+        metric_key="pv_energy",
         bucket_minutes=60,
         now=datetime(2026, 8, 13, 13, 0, tzinfo=UTC),
     )

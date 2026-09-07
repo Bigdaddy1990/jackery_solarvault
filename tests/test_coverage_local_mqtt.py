@@ -1,7 +1,8 @@
 """Tests for local MQTT client helpers, markers, topic matching, and message handling."""
 
+import asyncio
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -9,7 +10,6 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
     _local_mqtt_client,
 )
-from custom_components.jackery_solarvault.const import SHELLY_RPC_EVENT_TOPIC
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -29,10 +29,10 @@ async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore
     assert client.is_started is False
 
     diagnostics = client.diagnostics_snapshot()
-    assert diagnostics["transport"] == "homeassistant.components.mqtt"
-    assert diagnostics["library"] == "homeassistant.components.mqtt"
+    assert diagnostics["transport"] == "direct_mqtt"
+    assert diagnostics["library"] == "aiomqtt"
     assert diagnostics["topic_filter"] == "**REDACTED**"
-    assert diagnostics["mqtt_integration_available"] is False
+    assert diagnostics["configured_target"]["host"] == "**REDACTED**"
     assert diagnostics["subscribed"] is False
     assert diagnostics["connected"] is False
     rendered = repr(diagnostics)
@@ -43,11 +43,30 @@ def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:
     """The broker-selected topic is the receiver's complete configuration."""
     client = JackeryLocalMqttClient(
         hass,
+        host="broker.local",
+        port=1884,
+        username="user",
+        password="secret",
         topic_filter="jackery/+/telemetry",
+        qos=1,
     )
 
-    assert client.matches_configuration(("jackery/+/telemetry",))
-    assert not client.matches_configuration(("jackery/#",))
+    assert client.matches_configuration(
+        host="broker.local",
+        port=1884,
+        username="user",
+        password="secret",
+        topic_filter="jackery/+/telemetry",
+        qos=1,
+    )
+    assert not client.matches_configuration(
+        host="other.local",
+        port=1884,
+        username="user",
+        password="secret",
+        topic_filter="jackery/+/telemetry",
+        qos=1,
+    )
 
 
 @pytest.mark.asyncio
@@ -108,64 +127,25 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
 
 @pytest.mark.asyncio
 async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
-    """Start and stop own only HA MQTT subscriptions, never a broker client."""
+    """Start and stop the direct broker reconnect supervisor."""
     client = JackeryLocalMqttClient(
         hass,
+        host="broker.local",
         topic_filter="jackery/device/#",
     )
-    unsubscribe = MagicMock()
-    unsubscribe_singular = MagicMock()
-    unsubscribe_plural = MagicMock()
-    unsubscribe_shelly = MagicMock()
-    unsubscribe_status = MagicMock()
 
-    with (
-        patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_wait_for_mqtt_client",
-            new=AsyncMock(return_value=True),
-        ),
-        patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe",
-            new=AsyncMock(
-                side_effect=(
-                    unsubscribe,
-                    unsubscribe_singular,
-                    unsubscribe_plural,
-                    unsubscribe_shelly,
-                )
-            ),
-        ) as async_subscribe,
-        patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.async_subscribe_connection_status",
-            return_value=unsubscribe_status,
-        ),
-        patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.mqtt.is_connected",
-            return_value=True,
-        ),
-    ):
+    async def _wait_until_cancelled() -> None:
+        client._connected_event.set()
+        await asyncio.Event().wait()
+
+    with patch.object(client, "_async_run_forever", _wait_until_cancelled):
         await client.async_start()
 
-    assert [call.args[1] for call in async_subscribe.await_args_list] == [
-        "jackery/device/#",
-        "hb/device/#",
-        "hb/devices/#",
-        SHELLY_RPC_EVENT_TOPIC,
-    ]
-    assert all(
-        call.kwargs == {"qos": 0, "encoding": None}
-        for call in async_subscribe.await_args_list
-    )
     assert client.is_started is True
-    assert client.is_connected is True
+    assert client.diagnostics_snapshot()["reconnect_supervisor_active"] is True
 
     await client.async_stop()
 
-    unsubscribe.assert_called_once_with()
-    unsubscribe_singular.assert_called_once_with()
-    unsubscribe_plural.assert_called_once_with()
-    unsubscribe_shelly.assert_called_once_with()
-    unsubscribe_status.assert_called_once_with()
     assert client.is_started is False
     assert client.is_connected is False
 

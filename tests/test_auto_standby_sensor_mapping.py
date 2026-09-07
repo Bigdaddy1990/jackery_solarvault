@@ -21,4 +21,4 @@ def test_auto_standby_diagnostic_reads_the_mode_field() -> None:
         FIELD_IS_AUTO_STANDBY: 1,
     }
 
-    assert description.getter(payload) == 2
+    assert description.getter(payload) == 2  # ruff: ignore[magic-value-comparison]
