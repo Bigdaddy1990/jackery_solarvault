@@ -1,6 +1,10 @@
 name: Auto-merge Dependabot
 on: pull_request
 
+concurrency:
+  group: auto-mergen-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions: 
   contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
