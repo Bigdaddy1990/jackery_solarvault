@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
   actions: write
   checks: write
-  id-token: write
+  id-token: write # for Trusted Publishing + attest-action
 
 concurrency:
   group: autofix-${{ github.workflow }}-${{ github.ref }}
