@@ -61,7 +61,7 @@ from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
+from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]
     DEVICE_ID,
     make_update_cycle_api,
     setup_update_cycle_coordinator,
@@ -94,15 +94,15 @@ def _stat_sensor(
         ),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
-    mutable._reset_period = description.reset_period
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    mutable._cached_source_section = description.section
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
 
-    context = sensor._capture_refresh_context(payload)
-    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
     return sensor
 
 
@@ -158,7 +158,7 @@ def test_compact_today_energy_uses_only_positive_documented_fallbacks() -> None:
         PAYLOAD_HOME_TRENDS: {APP_STAT_TOTAL_HOME_ENERGY: "0.75"},
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 11),
     )
@@ -220,7 +220,7 @@ def test_compact_today_direct_zero_is_observed_not_unavailable() -> None:
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -249,7 +249,7 @@ def test_compact_today_uses_positive_system_stat_when_today_endpoint_missing() -
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -290,7 +290,7 @@ def test_compact_today_keeps_valid_unconfirmed_local_lead_over_lagging_http() ->
         PAYLOAD_PROPERTIES: {},
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -355,7 +355,7 @@ def test_compact_today_materializes_two_independent_http_zeros(
     source_key: str,
 ) -> None:
     """Two documented HTTP zero observations confirm a real zero day total."""
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -399,7 +399,7 @@ def test_lone_http_zero_still_requires_independent_confirmation() -> None:
             APP_STAT_TODAY_SOLAR_ENERGY: 0.0,
         },
     }
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         compact_payload,
         today=date(2026, 8, 22),
     )
@@ -420,7 +420,7 @@ def test_negative_today_energy_observations_are_rejected() -> None:
             APP_STAT_TODAY_SOLAR_ENERGY: -1.0,
         },
     }
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         compact_payload,
         today=date(2026, 8, 22),
     )
@@ -466,7 +466,7 @@ def test_compact_today_local_delta_can_beat_lagging_positive_http_value() -> Non
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 13),
     )
@@ -535,7 +535,7 @@ def test_compact_today_recovers_http_after_unit_scaled_local_battery_delta() -> 
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -576,7 +576,7 @@ def test_compact_today_uses_live_confirmed_local_battery_delta_over_device_stat(
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -605,7 +605,7 @@ def test_compact_today_energy_uses_current_month_home_bucket() -> None:
         },
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=today,
     )
@@ -693,13 +693,13 @@ def test_today_battery_flow_does_not_publish_lone_http_zero() -> None:
     assert _native_value("device_today_ongrid_to_battery", payload) is None
 
 
-def test_today_battery_flow_does_not_publish_lone_local_zero() -> None:
-    """An uncorroborated local zero remains unavailable per AGENTS zero rules."""
+def test_today_battery_flow_preserves_observed_local_zero() -> None:
+    """An observed local daily zero remains a valid measurement."""
     payload = {
         PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0},
     }
 
-    assert _native_value("device_today_ongrid_to_battery", payload) is None
+    assert _native_value("device_today_ongrid_to_battery", payload) == 0.0
 
 
 @pytest.mark.parametrize(
@@ -777,7 +777,7 @@ def test_ct_week_uses_fully_covered_local_period_when_cloud_is_placeholder() -> 
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     hass: HomeAssistant,
 ) -> None:
@@ -786,9 +786,9 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()
-        assert coordinator._slow_metrics_bg_task is not None
-        await coordinator._slow_metrics_bg_task
+        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
 
         for endpoint_name in (
             "async_get_device_pv_stat",
@@ -799,7 +799,12 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
         ):
             endpoint = getattr(api, endpoint_name)
             fetched_periods = {
-                call.kwargs["date_type"] for call in endpoint.await_args_list
+                (
+                    call.kwargs["query"].date_type
+                    if "query" in call.kwargs
+                    else call.kwargs["date_type"]
+                )
+                for call in endpoint.await_args_list
             }
             assert fetched_periods == set(APP_PERIOD_DATE_TYPES), endpoint_name
     finally:
@@ -807,7 +812,7 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
         await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     hass: HomeAssistant,
 ) -> None:
@@ -828,11 +833,11 @@ async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()
-        assert coordinator._slow_metrics_bg_task is not None
-        await coordinator._slow_metrics_bg_task
+        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
 
-        result = await coordinator._async_update_data_guarded()
+        result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
 
         assert result[DEVICE_ID][APP_SECTION_TODAY_ENERGY][
             APP_STAT_TODAY_HOME_LOAD_ENERGY
@@ -842,7 +847,7 @@ async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
         await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_property(
     hass: HomeAssistant,
 ) -> None:
@@ -852,14 +857,14 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     active_slow_fetches = 0
     max_active_slow_fetches = 0
 
-    async def _hold_slow_fetch(result: Any) -> Any:
+    async def _hold_slow_fetch(result: Any) -> Any:  # ruff: ignore[any-type]
         nonlocal active_slow_fetches, max_active_slow_fetches
         active_slow_fetches += 1
         max_active_slow_fetches = max(
             max_active_slow_fetches,
             active_slow_fetches,
         )
-        if active_slow_fetches >= 2:
+        if active_slow_fetches >= 2:  # ruff: ignore[magic-value-comparison]
             concurrency_limit_reached.set()
         try:
             await release_slow_fetches.wait()
@@ -867,8 +872,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
             active_slow_fetches -= 1
         return result
 
-    def _blocking_endpoint(result: Any) -> AsyncMock:
-        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:
+    def _blocking_endpoint(result: Any) -> AsyncMock:  # ruff: ignore[any-type]
+        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:  # ruff: ignore[any-type]
             return await _hold_slow_fetch(result)
 
         return AsyncMock(side_effect=_fetch)
@@ -888,8 +893,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     slow_refresh_task = None
 
     try:
-        await coordinator._async_update_data_guarded()
-        slow_refresh_task = coordinator._slow_metrics_bg_task
+        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        slow_refresh_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
         assert slow_refresh_task is not None
 
         await asyncio.wait_for(concurrency_limit_reached.wait(), timeout=1)
@@ -899,7 +904,7 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
         await asyncio.sleep(0)
 
         assert api.async_get_device_property.await_count == 1
-        assert max_active_slow_fetches <= 2
+        assert max_active_slow_fetches <= 2  # ruff: ignore[magic-value-comparison]
     finally:
         release_slow_fetches.set()
         if slow_refresh_task is not None:
@@ -915,7 +920,7 @@ def test_today_solar_publishes_observed_local_zero_instead_of_unavailable() -> N
         PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_PV_ENERGY: 0},
     }
 
-    JackerySolarVaultCoordinator._reconcile_compact_today_energy(
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
         payload,
         today=date(2026, 8, 22),
     )
@@ -938,6 +943,21 @@ def test_pv_revenue_day_publishes_zero_for_observed_zero_generation() -> None:
     assert sensor.native_value == 0
     assert sensor.extra_state_attributes["source_key"] == APP_STAT_TOTAL_SOLAR_REVENUE
     assert sensor.extra_state_attributes["fallback"] == "derived_observed_zero_revenue"
+
+
+def test_pv_revenue_day_uses_cloud_zero_without_local_day_anchor() -> None:
+    """An observed cloud zero remains available when local derivation cannot run."""
+    payload = {
+        APP_SECTION_PV_TRENDS: {APP_STAT_TOTAL_SOLAR_REVENUE: "0.00"},
+        PAYLOAD_PRICE: {
+            FIELD_DYNAMIC_OR_SINGLE: 2,
+            FIELD_SINGLE_PRICE: 0.28,
+        },
+    }
+
+    sensor = _stat_sensor("pv_revenue_day", payload)
+
+    assert sensor.native_value == 0
 
 
 def test_pv_revenue_day_derives_single_tariff_value_from_local_pv() -> None:

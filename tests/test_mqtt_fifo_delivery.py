@@ -5,8 +5,7 @@ import contextlib
 import inspect
 import json
 import logging
-from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -45,7 +44,7 @@ async def test_cloud_mqtt_uses_one_fifo_consumer_for_a_b_a(
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
     for sequence in ("A1", "B", "A2"):
-        client._handle_message(
+        client._handle_message(  # ruff: ignore[private-member-access]
             "device/property",
             json.dumps({"body": {"seq": sequence}}),
         )
@@ -72,13 +71,13 @@ async def test_cloud_mqtt_accepted_frame_survives_generation_change(
         delivered.append(int(data["body"]["seq"]))
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    client._session_generation = 7
-    client._handle_message(
+    client._session_generation = 7  # ruff: ignore[private-member-access]
+    client._handle_message(  # ruff: ignore[private-member-access]
         "device/property",
         b'{"body":{"seq":1}}',
         generation=7,
     )
-    client._session_generation = 8
+    client._session_generation = 8  # ruff: ignore[private-member-access]
 
     await client.async_wait_message_queue_idle()
 
@@ -101,8 +100,8 @@ async def test_cloud_mqtt_stop_drains_accepted_frames_without_cancelling(
         delivered.append(sequence)
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
-    client._handle_message("device/property", b'{"body":{"seq":2}}')
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":2}}')  # ruff: ignore[private-member-access]
     await first_started.wait()
 
     stop_task = asyncio.create_task(client.async_stop())
@@ -117,7 +116,7 @@ async def test_cloud_mqtt_stop_drains_accepted_frames_without_cancelling(
 
 async def test_cloud_mqtt_callback_error_is_visible_and_fifo_continues(
     hass: HomeAssistant,
-    caplog: Any,
+    caplog: Any,  # ruff: ignore[any-type]
 ) -> None:
     """One bad callback is logged and cannot strand later accepted frames."""
     invoked: list[int] = []
@@ -126,8 +125,8 @@ async def test_cloud_mqtt_callback_error_is_visible_and_fifo_continues(
         await asyncio.sleep(0)
         sequence = int(data["body"]["seq"])
         invoked.append(sequence)
-        if sequence == 2:
-            raise RuntimeError("broken frame handler")
+        if sequence == 2:  # ruff: ignore[magic-value-comparison]
+            raise RuntimeError("broken frame handler")  # ruff: ignore[raise-vanilla-args]
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
     with caplog.at_level(
@@ -135,7 +134,7 @@ async def test_cloud_mqtt_callback_error_is_visible_and_fifo_continues(
         logger="custom_components.jackery_solarvault.client.mqtt_push",
     ):
         for sequence in (1, 2, 3):
-            client._handle_message(
+            client._handle_message(  # ruff: ignore[private-member-access]
                 "device/property",
                 json.dumps({"body": {"seq": sequence}}),
             )
@@ -165,7 +164,7 @@ async def test_cloud_mqtt_burst_has_one_consumer_and_unbounded_fifo(
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
     for sequence in range(50):
-        client._handle_message(
+        client._handle_message(  # ruff: ignore[private-member-access]
             "device/property",
             json.dumps({"body": {"seq": sequence}}),
         )
@@ -174,7 +173,7 @@ async def test_cloud_mqtt_burst_has_one_consumer_and_unbounded_fifo(
     await asyncio.sleep(0)
     snapshot = client.diagnostics_snapshot()
     assert snapshot["pending_message_tasks"] == 1
-    assert snapshot["message_queue_depth"] == 49
+    assert snapshot["message_queue_depth"] == 49  # ruff: ignore[magic-value-comparison]
     assert snapshot["message_consumer_running"] is True
     assert snapshot["messages_dropped"] == 0
 
@@ -213,14 +212,11 @@ async def test_local_mqtt_stop_drains_fifo_without_cancelling_sink(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="hb/device/#")
-    assert not inspect.iscoroutinefunction(client._async_message_received)
+    assert not inspect.iscoroutinefunction(client._enqueue_message)  # ruff: ignore[private-member-access]
     for sequence in (1, 2, 3):
-        client._async_message_received(
-            MagicMock(
-                topic="hb/device/example/event",
-                payload=json.dumps({"seq": sequence}).encode(),
-                retain=False,
-            )
+        client._enqueue_message(  # ruff: ignore[private-member-access]
+            "hb/device/example/event",
+            json.dumps({"seq": sequence}).encode(),
         )
     await first_started.wait()
 
@@ -235,10 +231,49 @@ async def test_local_mqtt_stop_drains_fifo_without_cancelling_sink(
 
     assert completed == [1, 2, 3]
     snapshot = client.diagnostics_snapshot()
-    assert snapshot["messages_forwarded"] == 3
+    assert snapshot["messages_forwarded"] == 3  # ruff: ignore[magic-value-comparison]
     assert snapshot["messages_dropped"] == 0
     assert snapshot["message_queue_depth"] == 0
     assert snapshot["message_consumer_running"] is False
+
+
+async def test_local_mqtt_entry_stop_releases_listener_before_fifo_drain(
+    hass: HomeAssistant,
+) -> None:
+    """Entry lifecycle stop leaves accepted frames draining without a subscriber."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+    completed: list[int] = []
+
+    async def _sink(
+        _topic: str,
+        data: dict[str, Any] | None,
+        _raw: bytes,
+    ) -> bool:
+        assert data is not None
+        sequence = int(data["seq"])
+        if sequence == 1:
+            started.set()
+            await release.wait()
+        completed.append(sequence)
+        return True
+
+    client = JackeryLocalMqttClient(hass, sink=_sink)
+    for sequence in (1, 2):
+        client._enqueue_message(  # ruff: ignore[private-member-access]
+            "hb/device/example/event",
+            json.dumps({"seq": sequence}).encode(),
+        )
+    await started.wait()
+
+    await asyncio.wait_for(client.async_stop(wait_for_drain=False), timeout=1.0)
+    assert not client.is_started
+    assert completed == []
+
+    release.set()
+    await asyncio.wait_for(client.async_wait_message_queue_idle(), timeout=1.0)
+    assert completed == [1, 2]
+    assert client.diagnostics_snapshot()["messages_dropped"] == 0
 
 
 async def test_cloud_mqtt_stop_follows_replacement_consumer_after_cancellation(
@@ -259,10 +294,10 @@ async def test_cloud_mqtt_stop_follows_replacement_consumer_after_cancellation(
         completed.append(sequence)
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
-    client._handle_message("device/property", b'{"body":{"seq":2}}')
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":2}}')  # ruff: ignore[private-member-access]
     await first_started.wait()
-    original_consumer = client._message_consumer_task
+    original_consumer = client._message_consumer_task  # ruff: ignore[private-member-access]
     assert original_consumer is not None
 
     stop_task = asyncio.create_task(client.async_stop())
@@ -277,7 +312,7 @@ async def test_cloud_mqtt_stop_follows_replacement_consumer_after_cancellation(
     assert entered == [1, 2]
     assert completed == [1, 2]
     assert client.diagnostics_snapshot()["message_queue_depth"] == 0
-    assert not client._message_tasks
+    assert not client._message_tasks  # ruff: ignore[private-member-access]
 
 
 async def test_local_mqtt_stop_follows_replacement_consumer_after_cancellation(
@@ -304,17 +339,14 @@ async def test_local_mqtt_stop_follows_replacement_consumer_after_cancellation(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink)
-    assert not inspect.iscoroutinefunction(client._async_message_received)
+    assert not inspect.iscoroutinefunction(client._enqueue_message)  # ruff: ignore[private-member-access]
     for sequence in (1, 2):
-        client._async_message_received(
-            MagicMock(
-                topic="hb/device/example/event",
-                payload=json.dumps({"seq": sequence}).encode(),
-                retain=False,
-            )
+        client._enqueue_message(  # ruff: ignore[private-member-access]
+            "hb/device/example/event",
+            json.dumps({"seq": sequence}).encode(),
         )
     await first_started.wait()
-    original_consumer = client._message_consumer_task
+    original_consumer = client._message_consumer_task  # ruff: ignore[private-member-access]
     assert original_consumer is not None
 
     stop_task = asyncio.create_task(client.async_stop())
@@ -329,7 +361,7 @@ async def test_local_mqtt_stop_follows_replacement_consumer_after_cancellation(
     assert entered == [1, 2]
     assert completed == [1, 2]
     assert client.diagnostics_snapshot()["message_queue_depth"] == 0
-    assert not client._message_tasks
+    assert not client._message_tasks  # ruff: ignore[private-member-access]
 
 
 async def test_cloud_mqtt_delivery_cancellation_does_not_repeat_callback(
@@ -349,9 +381,9 @@ async def test_cloud_mqtt_delivery_cancellation_does_not_repeat_callback(
         completed.append(sequence)
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
     await callback_started.wait()
-    delivery = client._message_delivery_task
+    delivery = client._message_delivery_task  # ruff: ignore[private-member-access]
     assert delivery is not None
 
     delivery.cancel()
@@ -386,15 +418,12 @@ async def test_local_mqtt_delivery_cancellation_does_not_repeat_sink(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink)
-    client._async_message_received(
-        MagicMock(
-            topic="hb/device/example/event",
-            payload=b'{"seq":1}',
-            retain=False,
-        )
+    client._enqueue_message(  # ruff: ignore[private-member-access]
+        "hb/device/example/event",
+        b'{"seq":1}',
     )
     await sink_started.wait()
-    delivery = client._message_delivery_task
+    delivery = client._message_delivery_task  # ruff: ignore[private-member-access]
     assert delivery is not None
 
     delivery.cancel()
@@ -420,7 +449,7 @@ async def test_cloud_callback_cancelled_error_is_not_retried(
             raise asyncio.CancelledError
 
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
     await asyncio.wait_for(client.async_wait_message_queue_idle(), timeout=1.0)
 
     assert calls == 1
@@ -446,9 +475,7 @@ async def test_local_sink_cancelled_error_is_not_retried(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink)
-    client._async_message_received(
-        MagicMock(topic="hb/device/example/event", payload=b"{}", retain=False)
-    )
+    client._enqueue_message("hb/device/example/event", b"{}")  # ruff: ignore[private-member-access]
     await asyncio.wait_for(client.async_wait_message_queue_idle(), timeout=1.0)
 
     assert calls == 1
@@ -459,7 +486,7 @@ async def test_local_sink_cancelled_error_is_not_retried(
 
 async def test_cloud_stop_timeout_reports_real_accepted_backlog(
     hass: HomeAssistant,
-    monkeypatch: Any,
+    monkeypatch: Any,  # ruff: ignore[any-type]
 ) -> None:
     """A runner timeout reports queued plus in-flight accepted frames."""
     callback_started = asyncio.Event()
@@ -472,10 +499,10 @@ async def test_cloud_stop_timeout_reports_real_accepted_backlog(
 
     monkeypatch.setattr(mqtt_push_module, "_MQTT_STOP_TIMEOUT_SEC", 0.01)
     client = JackeryMqttPushClient(hass, message_callback=_callback)
-    runner = asyncio.create_task(never_connected.wait())
-    client._runner_task = runner
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
-    client._handle_message("device/property", b'{"body":{"seq":2}}')
+    runner = cast("asyncio.Task[None]", asyncio.create_task(never_connected.wait()))
+    client._runner_task = runner  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":2}}')  # ruff: ignore[private-member-access]
     await callback_started.wait()
 
     try:
@@ -486,7 +513,7 @@ async def test_cloud_stop_timeout_reports_real_accepted_backlog(
         runner.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await runner
-        client._runner_task = None
+        client._runner_task = None  # ruff: ignore[private-member-access]
         await client.async_wait_message_queue_idle()
 
 
@@ -504,7 +531,7 @@ async def test_cloud_mqtt_rejects_new_ingress_after_stop(
     await client.async_stop()
     before = client.diagnostics_snapshot()
 
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
     await asyncio.sleep(0)
 
     after = client.diagnostics_snapshot()

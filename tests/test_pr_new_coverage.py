@@ -38,7 +38,7 @@ def test_init_imports_jackery_local_mqtt_client() -> None:
     __init__.py. This test verifies the import works without error.
     """
     try:
-        from custom_components.jackery_solarvault.client.local_mqtt import (
+        from custom_components.jackery_solarvault.client.local_mqtt import (  # ruff: ignore[import-outside-top-level]  # isort: skip
             JackeryLocalMqttClient,
         )
 
@@ -57,14 +57,14 @@ def test_client_init_imports_jackery_api_from_client_package() -> None:
 
 def test_client_init_imports_jackery_auth_error() -> None:
     """JackeryAuthError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryAuthError
+    from custom_components.jackery_solarvault.client import JackeryAuthError  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     assert JackeryAuthError is not None
 
 
 def test_client_init_imports_jackery_error() -> None:
     """JackeryError must be importable directly from the client sub-package."""
-    from custom_components.jackery_solarvault.client import JackeryError
+    from custom_components.jackery_solarvault.client import JackeryError  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     assert JackeryError is not None
 
@@ -79,7 +79,9 @@ def test_client_init_imports_jackery_error() -> None:
 
 def _legacy_suffix_matches(uid: str, key_suffix: str) -> bool:
     """Thin wrapper that imports and calls the production function."""
-    from custom_components.jackery_solarvault import _legacy_suffix_matches as _fn
+    from custom_components.jackery_solarvault import (  # ruff: ignore[import-outside-top-level]  # isort: skip
+        _legacy_suffix_matches as _fn,  # ruff: ignore[import-private-name]  # isort: skip
+    )
 
     return _fn(uid, key_suffix)
 
@@ -174,7 +176,7 @@ def test_legacy_suffix_matches_current_entity_not_matched() -> None:
 
 
 def test_legacy_suffix_matches_head_cannot_have_trailing_underscore() -> None:
-    """A digits head with a trailing underscore before the suffix is fine if suffix starts with underscore."""
+    """A digits head with a trailing underscore before the suffix is fine if suffix starts with underscore."""  # ruff: ignore[line-too-long]  # isort: skip
     # "12345_battery_soc": head="12345", suffix="_battery_soc" → head matches \d+
     assert _legacy_suffix_matches("12345_battery_soc", "_battery_soc") is True
     # But "12345__double_underscore": head="12345_", does NOT match \d+ (has trailing _)
@@ -194,7 +196,7 @@ def test_legacy_suffix_matches_head_cannot_have_trailing_underscore() -> None:
 
 
 def test_local_mqtt_result_warning_condition_fires_for_runtime_error() -> None:
-    """The isinstance(local_mqtt_result, BaseException) condition must be True for RuntimeError."""
+    """The isinstance(local_mqtt_result, BaseException) condition must be True for RuntimeError."""  # ruff: ignore[line-too-long]  # isort: skip
     result: Any = RuntimeError("broker refused connection")
     assert isinstance(result, BaseException)
 

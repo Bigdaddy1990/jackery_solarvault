@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
+from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]  # isort: skip
     DEVICE_ID,
     make_update_cycle_api,
     setup_update_cycle_coordinator,
@@ -39,12 +39,12 @@ _CT_DEVICE_ID = "2057219036232777730"
 
 def test_accessory_id_resolved_from_system_accessories() -> None:
     """A devType=3 accessory's deviceId is returned for the CT-stat call."""
-    from custom_components.jackery_solarvault.const import (
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_ACCESSORIES,
         FIELD_SYSTEM_ID,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
@@ -64,45 +64,45 @@ def test_accessory_id_resolved_from_system_accessories() -> None:
     }
 
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx)  # ruff: ignore[private-member-access]  # isort: skip
         == _CT_DEVICE_ID
     )
 
 
 def test_accessory_id_none_without_smart_meter() -> None:
     """Return ``None`` when neither discovery nor live data has a CT accessory."""
-    from custom_components.jackery_solarvault.const import (
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_ACCESSORIES,
         PAYLOAD_SYSTEM_META,
     )
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     idx: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_ACCESSORIES: []}}
-    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None
+    assert JackerySolarVaultCoordinator._smart_meter_accessory_device_id(idx) is None  # ruff: ignore[private-member-access]  # isort: skip
 
 
 def test_accessory_id_falls_back_to_ct_meter_block() -> None:
     """When no accessory metadata exists, the live ct_meter id is used."""
-    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # ruff:ignore[unsorted-imports]
-    from custom_components.jackery_solarvault.coordinator import (
+    from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # ruff: ignore[import-outside-top-level]  # isort: skip
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
     source = {PAYLOAD_CT_METER: {"devType": 3, "deviceId": 2057219036232777730}}
     assert (
-        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)
+        JackerySolarVaultCoordinator._smart_meter_accessory_device_id(source)  # ruff: ignore[private-member-access]  # isort: skip
         == _CT_DEVICE_ID
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_update_cycle_uses_accessory_id_for_ct_stats(
     hass: HomeAssistant,
 ) -> None:
     """Pass the discovered CT accessory id to every CT-stat request."""
-    from custom_components.jackery_solarvault.const import FIELD_DEVICES  # ruff:ignore[unsorted-imports]
+    from custom_components.jackery_solarvault.const import FIELD_DEVICES  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     api = make_update_cycle_api()
     systems = await api.async_get_system_list()
@@ -116,8 +116,8 @@ async def test_update_cycle_uses_accessory_id_for_ct_stats(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()
-        slow_metrics_task = coordinator._slow_metrics_bg_task
+        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
+        slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]  # isort: skip
         assert slow_metrics_task is not None
         await slow_metrics_task
         await hass.async_block_till_done()
@@ -133,12 +133,12 @@ async def test_update_cycle_uses_accessory_id_for_ct_stats(
         await hass.async_block_till_done()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
     hass: HomeAssistant,
 ) -> None:
     """Current CT sections and month repair pair every empty L1 with App L2."""
-    from custom_components.jackery_solarvault.const import (
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         APP_PERIOD_DATE_TYPES,
         APP_REQUEST_META,
         APP_SECTION_CT_STAT,
@@ -150,13 +150,19 @@ async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
         FIELD_DEVICES,
     )
 
-    async def _ct_stat(
+    def _ct_stat(
         _device_id: str,
         *,
-        date_type: str,
-        stat_type: int,
-        **_kwargs: Any,
+        query: Any | None = None,  # ruff: ignore[any-type]  # isort: skip
+        date_type: str | None = None,
+        stat_type: int | None = None,
+        **_kwargs: Any,  # ruff: ignore[any-type]  # isort: skip
     ) -> dict[str, Any]:
+        if query is not None:
+            date_type = query.date_type
+            stat_type = query.stat_type
+        assert date_type is not None
+        assert stat_type is not None
         if stat_type == CT_STAT_TYPE_L1 or date_type == DATE_TYPE_YEAR:
             return {
                 "unit": "kWh",
@@ -192,17 +198,21 @@ async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        result = await coordinator._async_update_data_guarded()
-        slow_metrics_task = coordinator._slow_metrics_bg_task
+        result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
+        slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]  # isort: skip
         assert slow_metrics_task is not None
         await slow_metrics_task
         await hass.async_block_till_done()
-        result = await coordinator._async_update_data_guarded()
+        result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
 
         calls = api.async_get_device_ct_stat.await_args_list
         assert calls
-        l1_calls = [call for call in calls if call.kwargs["stat_type"] == 0]
-        l2_calls = [call for call in calls if call.kwargs["stat_type"] == 1]
+        l1_calls = [
+            call for call in calls if call.kwargs["query"].stat_type == CT_STAT_TYPE_L1
+        ]
+        l2_calls = [
+            call for call in calls if call.kwargs["query"].stat_type == CT_STAT_TYPE_L2
+        ]
         assert len(l1_calls) == len(l2_calls)
         payload = result[DEVICE_ID]
         for date_type in APP_PERIOD_DATE_TYPES:

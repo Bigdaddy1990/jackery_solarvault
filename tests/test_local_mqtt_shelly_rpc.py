@@ -86,7 +86,7 @@ def test_shelly_rpc_power_maps_signed_phases_and_electrical_fields() -> None:
     assert mac == _SHELLY_MAC
     assert update[FIELD_DEVICE_SN] == _SHELLY_MAC
     assert update[FIELD_SCAN_NAME] == "shellypro3em"
-    assert update[FIELD_DEV_TYPE] == 3
+    assert update[FIELD_DEV_TYPE] == 3  # ruff: ignore[magic-value-comparison]
     assert update[FIELD_CT_POWER1] == pytest.approx(2.7)
     assert update[FIELD_CT_POWER2] == pytest.approx(-273.2)
     assert update[FIELD_CT_POWER3] == pytest.approx(254.6)
@@ -153,7 +153,7 @@ def test_direct_shelly_rpc_payload_is_supported() -> None:
     assert parsed[1][FIELD_CT_POWER] == pytest.approx(10.5)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_shelly_rpc_frame_pushes_coordinator_update_immediately() -> None:
     """A broker callback updates the matching CT without a refresh request."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -166,17 +166,17 @@ async def test_shelly_rpc_frame_pushes_coordinator_update_immediately() -> None:
             },
         },
     }
-    cast("Any", coordinator)._shutdown_started = False
-    cast("Any", coordinator)._listeners = set()
-    cast("Any", coordinator)._device_registry_observer = None
-    cast("Any", coordinator)._live_ct_received_monotonic = {}
-    cast("Any", coordinator)._local_mqtt_last_device_message_monotonic = {}
-    cast("Any", coordinator)._local_mqtt_device_traffic_observed_ids = set()
-    cast("Any", coordinator)._local_mqtt_device_traffic_observed = False
-    cast("Any", coordinator)._local_mqtt_any_traffic_observed_ids = set()
-    cast("Any", coordinator)._local_mqtt_head_traffic_observed_ids = set()
-    cast("Any", coordinator)._local_mqtt_lifetime_traffic_observed_ids = set()
-    cast("Any", coordinator)._local_mqtt_last_message_monotonic = float("-inf")
+    cast("Any", coordinator)._shutdown_started = False  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._listeners = set()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._device_registry_observer = None  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._live_ct_received_monotonic = {}  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_any_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_head_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_lifetime_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
 
     accepted = await coordinator.async_handle_local_mqtt_message(
         "homeassistant/events/rpc",
@@ -187,8 +187,8 @@ async def test_shelly_rpc_frame_pushes_coordinator_update_immediately() -> None:
     ct = cast("dict[str, Any]", coordinator.data[_DEVICE_ID][PAYLOAD_CT_METER])
     assert ct[FIELD_CT_POWER] == pytest.approx(42.5)
     assert ct[FIELD_CT_TOTAL_PHASE_POWER] == pytest.approx(42.5)
-    assert coordinator._live_ct_received_monotonic[_DEVICE_ID] > 0
-    assert coordinator._local_mqtt_any_traffic_observed_ids == {_DEVICE_ID}
-    assert coordinator._local_mqtt_head_traffic_observed_ids == set()
-    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == set()
-    assert coordinator._local_mqtt_device_traffic_observed is False
+    assert coordinator._live_ct_received_monotonic[_DEVICE_ID] > 0  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_any_traffic_observed_ids == {_DEVICE_ID}  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_head_traffic_observed_ids == set()  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == set()  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_device_traffic_observed is False  # ruff: ignore[private-member-access]

@@ -110,7 +110,7 @@ def _night_payload(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 async def night_setup(
     hass: HomeAssistant,
 ) -> AsyncGenerator[MockConfigEntry]:
@@ -228,7 +228,7 @@ async def test_day_period_sensor_prefers_scalar_total_over_power_curve_sum(
     assert state.state == "3.58"
 
 
-async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_is_higher(
+async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_is_higher(  # ruff: ignore[line-too-long]
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:

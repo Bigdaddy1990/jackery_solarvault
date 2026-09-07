@@ -19,31 +19,31 @@ _TOKEN = "123456789012"
 
 def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._device_index = {_DEVICE_ID: {"device_meta": {"deviceSn": _DEVICE_SN}}}
+    coordinator._device_index = {_DEVICE_ID: {"device_meta": {"deviceSn": _DEVICE_SN}}}  # ruff: ignore[private-member-access]
     coordinator.data = {
         _DEVICE_ID: {
             "device": {"deviceSn": _DEVICE_SN},
             "properties": {"batSoc": 40},
         }
     }
-    coordinator._local_mqtt_last_message_monotonic = float("-inf")
-    coordinator._local_mqtt_last_device_message_monotonic = {}
-    coordinator._local_mqtt_any_traffic_observed_ids = set()
-    coordinator._local_mqtt_head_traffic_observed_ids = set()
-    coordinator._local_mqtt_lifetime_traffic_observed_ids = set()
-    coordinator._local_mqtt_device_traffic_observed = False
-    coordinator._local_mqtt_device_traffic_observed_ids = set()
-    coordinator._shutdown_started = False
-    cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN
+    coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_any_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_head_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_lifetime_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
     return coordinator
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_topic_serial_is_injected_before_shared_ingest() -> None:
     """Flat status frames are bound to the host serial carried by the topic."""
     coordinator = _coordinator_shell()
     handler = AsyncMock(return_value=_DEVICE_ID)
-    cast("Any", coordinator)._async_handle_mqtt_message = handler
+    coordinator.async_handle_mqtt_message = handler
 
     assert await coordinator.async_handle_local_mqtt_message(
         f"hb/device/{_DEVICE_SN}/status",
@@ -53,15 +53,15 @@ async def test_topic_serial_is_injected_before_shared_ingest() -> None:
     assert handler.await_args is not None
     normalized = handler.await_args.args[1]
     assert normalized["deviceSn"] == _DEVICE_SN
-    assert normalized["body"]["batSoc"] == 55
+    assert normalized["body"]["batSoc"] == 55  # ruff: ignore[magic-value-comparison]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_plural_topic_serial_is_injected_before_shared_ingest() -> None:
     """Plural broker topics bind the same host serial before shared ingest."""
     coordinator = _coordinator_shell()
     handler = AsyncMock(return_value=_DEVICE_ID)
-    cast("Any", coordinator)._async_handle_mqtt_message = handler
+    coordinator.async_handle_mqtt_message = handler
 
     assert await coordinator.async_handle_local_mqtt_message(
         f"hb/devices/{_DEVICE_SN}/event",
@@ -71,25 +71,25 @@ async def test_plural_topic_serial_is_injected_before_shared_ingest() -> None:
     assert handler.await_args is not None
     normalized = handler.await_args.args[1]
     assert normalized["deviceSn"] == _DEVICE_SN
-    assert normalized["body"]["batSoc"] == 55
+    assert normalized["body"]["batSoc"] == 55  # ruff: ignore[magic-value-comparison]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_official_type_2_status_reaches_shared_live_ingest() -> None:
     """The status snapshots seen in the live log are accepted as telemetry."""
     coordinator = _coordinator_shell()
     raw_coordinator = cast("Any", coordinator)
-    raw_coordinator._async_payload_debug_event = AsyncMock()
-    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)
-    raw_coordinator._transport_partial_update_base = MagicMock(
+    raw_coordinator._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
+    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)  # ruff: ignore[private-member-access]
+    raw_coordinator._transport_partial_update_base = MagicMock(  # ruff: ignore[private-member-access]
         return_value=coordinator.data[_DEVICE_ID]
     )
-    raw_coordinator._merge_main_properties_for_device = MagicMock(
+    raw_coordinator._merge_main_properties_for_device = MagicMock(  # ruff: ignore[private-member-access]
         return_value={"batSoc": 55, "pvPw": 1234}
     )
     push_partial_update = MagicMock()
-    raw_coordinator._push_partial_update = push_partial_update
-    raw_coordinator._schedule_battery_pack_ota_enrichment = MagicMock()
+    raw_coordinator._push_partial_update = push_partial_update  # ruff: ignore[private-member-access]
+    raw_coordinator._schedule_battery_pack_ota_enrichment = MagicMock()  # ruff: ignore[private-member-access]
 
     assert await coordinator.async_handle_local_mqtt_message(
         f"hb/device/{_DEVICE_SN}/status",
@@ -102,14 +102,14 @@ async def test_official_type_2_status_reaches_shared_live_ingest() -> None:
     push_partial_update.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_unchanged_official_response_refreshes_local_mqtt_liveness() -> None:
     """A valid no-op response is accepted even when no entity value changed."""
     coordinator = _coordinator_shell()
     raw_coordinator = cast("Any", coordinator)
-    raw_coordinator._async_payload_debug_event = AsyncMock()
-    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)
-    raw_coordinator._transport_partial_update_base = MagicMock(
+    raw_coordinator._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
+    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)  # ruff: ignore[private-member-access]
+    raw_coordinator._transport_partial_update_base = MagicMock(  # ruff: ignore[private-member-access]
         return_value=coordinator.data[_DEVICE_ID]
     )
 
@@ -121,14 +121,14 @@ async def test_unchanged_official_response_refreshes_local_mqtt_liveness() -> No
             "body": {"cmd": 110, "devType": 6, "plugs": []},
         },
     )
-    assert coordinator._local_mqtt_device_traffic_observed is True
-    assert coordinator._local_mqtt_head_traffic_observed_ids == {_DEVICE_ID}
-    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == set()
-    assert coordinator._local_mqtt_last_message_monotonic > 0
-    assert coordinator._local_mqtt_last_device_message_monotonic[_DEVICE_ID] > 0
+    assert coordinator._local_mqtt_device_traffic_observed is True  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_head_traffic_observed_ids == {_DEVICE_ID}  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == set()  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_last_message_monotonic > 0  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_last_device_message_monotonic[_DEVICE_ID] > 0  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize("dev_type", [1, 2, 6])
 async def test_unchanged_type_23_lifetime_snapshot_is_accepted(
     dev_type: int,
@@ -136,12 +136,12 @@ async def test_unchanged_type_23_lifetime_snapshot_is_accepted(
     """Valid lifetime snapshots remain accepted when values did not change."""
     coordinator = _coordinator_shell()
     raw_coordinator = cast("Any", coordinator)
-    raw_coordinator._async_payload_debug_event = AsyncMock()
-    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)
-    raw_coordinator._transport_partial_update_base = MagicMock(
+    raw_coordinator._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
+    raw_coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=_DEVICE_ID)  # ruff: ignore[private-member-access]
+    raw_coordinator._transport_partial_update_base = MagicMock(  # ruff: ignore[private-member-access]
         return_value=coordinator.data[_DEVICE_ID]
     )
-    raw_coordinator._async_handle_mqtt_message = AsyncMock(return_value=None)
+    raw_coordinator.async_handle_mqtt_message = AsyncMock(return_value=None)
 
     assert await coordinator.async_handle_local_mqtt_message(
         f"hb/device/{_DEVICE_SN}/event",
@@ -156,43 +156,46 @@ async def test_unchanged_type_23_lifetime_snapshot_is_accepted(
             },
         },
     )
-    assert coordinator._local_mqtt_device_traffic_observed is True
-    assert coordinator._local_mqtt_head_traffic_observed_ids == {_DEVICE_ID}
-    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == {_DEVICE_ID}
-    assert coordinator._local_mqtt_last_device_message_monotonic[_DEVICE_ID] > 0
+    assert coordinator._local_mqtt_device_traffic_observed is True  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_head_traffic_observed_ids == {_DEVICE_ID}  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_lifetime_traffic_observed_ids == {_DEVICE_ID}  # ruff: ignore[private-member-access]
+    assert coordinator._local_mqtt_last_device_message_monotonic[_DEVICE_ID] > 0  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
-async def test_foreign_topic_serial_is_rejected() -> None:
-    """A broad broker subscription cannot mix another Jackery host into this entry."""
+@pytest.mark.asyncio()
+async def test_topic_serial_is_not_used_as_broker_filter() -> None:
+    """A broad subscription forwards every payload to shared device routing."""
     coordinator = _coordinator_shell()
     handler = AsyncMock(return_value=_DEVICE_ID)
-    cast("Any", coordinator)._async_handle_mqtt_message = handler
+    coordinator.async_handle_mqtt_message = handler
 
-    assert not await coordinator.async_handle_local_mqtt_message(
+    assert await coordinator.async_handle_local_mqtt_message(
         "hb/device/OTHER-SERIAL/event",
         {"type": 107, "body": {"soc": 10}},
     )
-    handler.assert_not_awaited()
+    handler.assert_awaited_once()
+    assert getattr(coordinator, "_local_mqtt_rejection_reasons", {}) == {}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_local_poll_publishes_official_request_family() -> None:
     """The listener actively requests host, system, settings and child data."""
     coordinator = _coordinator_shell()
     client = JackeryLocalMqttClient.__new__(JackeryLocalMqttClient)
-    client._connected = True
+    client._connected = True  # ruff: ignore[private-member-access]
     publish = AsyncMock()
     cast("Any", client).async_publish = publish
-    coordinator._local_mqtt_client = client
+    coordinator._local_mqtt_client = client  # ruff: ignore[private-member-access]
 
     sent = await coordinator.async_poll_local_mqtt_devices("hb")
 
-    assert sent == 6
+    assert sent == 6  # ruff: ignore[magic-value-comparison]
     calls = publish.await_args_list
     assert {call.args[1]["type"] for call in calls} == {2, 25, 100, 105}
     assert [
-        call.args[1]["body"]["devType"] for call in calls if call.args[1]["type"] == 100
+        call.args[1]["body"]["devType"]
+        for call in calls
+        if call.args[1]["type"] == 100  # ruff: ignore[magic-value-comparison]
     ] == [1, 2, 6]
     assert all(call.args[0] == f"hb/device/{_DEVICE_SN}/action" for call in calls)
     assert all(call.args[1]["token"] == _TOKEN for call in calls)

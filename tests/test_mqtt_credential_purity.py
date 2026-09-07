@@ -90,30 +90,30 @@ def test_cached_credentials_none_without_session() -> None:
     login.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ensure_mqtt_without_creds_does_not_reauth() -> None:
     """Missing cached creds must not raise ConfigEntryAuthFailed or connect."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     mqtt = MagicMock(name="mqtt")
     mqtt.is_connected = False
-    coordinator._mqtt = mqtt
-    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=False,
     )
     mgr = MagicMock(name="mqtt_mgr")
     mgr.should_skip_reconnect = MagicMock(return_value=False)
-    coordinator._mqtt_mgr = mgr
+    coordinator._mqtt_mgr = mgr  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = SimpleNamespace(
         mqtt_fingerprint=(_USER_ID, _MAC_ID, _SEED_B64),
         get_cached_mqtt_credentials=MagicMock(return_value=None),
     )
 
-    await coordinator._async_ensure_mqtt(force=True)
+    await coordinator._async_ensure_mqtt(force=True)  # ruff: ignore[private-member-access]
 
     mqtt.async_start.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_connected_mqtt_clears_backoff_after_client_verifies_credentials() -> (
     None
 ):
@@ -123,19 +123,19 @@ async def test_connected_mqtt_clears_backoff_after_client_verifies_credentials()
     mqtt.is_started = True
     mqtt.is_connected = True
     mqtt.async_start = AsyncMock(return_value=None)
-    coordinator._mqtt = mqtt
-    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=False,
     )
     mgr = MqttConnectionManager()
     mgr.note_connect_failure("permanent boom")
-    coordinator._mqtt_mgr = mgr
+    coordinator._mqtt_mgr = mgr  # ruff: ignore[private-member-access]
     api = _hydrated_api()
     cast("Any", coordinator).api = api
     creds = api.get_cached_mqtt_credentials()
     assert creds is not None
 
-    await coordinator._async_ensure_mqtt()
+    await coordinator._async_ensure_mqtt()  # ruff: ignore[private-member-access]
 
     mqtt.async_start.assert_awaited_once_with(
         client_id=creds[MQTT_CREDENTIAL_CLIENT_ID],
@@ -148,7 +148,7 @@ async def test_connected_mqtt_clears_backoff_after_client_verifies_credentials()
     assert mgr.backoff_remaining() == pytest.approx(0.0)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_rotated_mqtt_session_waits_for_new_connection_success() -> None:
     """A credential-triggered restart is not marked successful before CONNACK."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -160,22 +160,22 @@ async def test_rotated_mqtt_session_waits_for_new_connection_success() -> None:
         mqtt.is_connected = False
 
     mqtt.async_start = AsyncMock(side_effect=_restart_for_rotated_credentials)
-    coordinator._mqtt = mqtt
-    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_local_first_blocks_reconnect = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=False,
     )
     mgr = MqttConnectionManager()
     mgr.note_connect_failure("permanent boom")
-    coordinator._mqtt_mgr = mgr
+    coordinator._mqtt_mgr = mgr  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = _hydrated_api()
 
-    await coordinator._async_ensure_mqtt()
+    await coordinator._async_ensure_mqtt()  # ruff: ignore[private-member-access]
 
     assert mgr.fingerprint is None
     assert mgr.backoff_remaining() > 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_publish_command_without_creds_raises_non_auth() -> None:
     """Missing cached creds fail the publish as a plain HomeAssistantError."""
     login = AsyncMock(
@@ -189,17 +189,17 @@ async def test_publish_command_without_creds_raises_non_auth() -> None:
     mqtt.is_connected = True
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._mqtt = mqtt
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = api
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).data = {
         "dev-1": {PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "SN-1"}}
     }
-    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()
+    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator).device_bluetooth_key = MagicMock(return_value=None)
 
     with pytest.raises(HomeAssistantError) as excinfo:
-        await coordinator._async_publish_command(
+        await coordinator._async_publish_command(  # ruff: ignore[private-member-access]
             "dev-1",
             message_type="QueryCombineData",
             action_id=3000,
@@ -212,7 +212,7 @@ async def test_publish_command_without_creds_raises_non_auth() -> None:
     login.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     """A foreground switch command must not depend on deferred Layer-5 startup."""
     creds = {
@@ -231,28 +231,28 @@ async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     mqtt.diagnostics = {}
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._mqtt = None
-    coordinator._mqtt_session_generation = 0
-    coordinator._mqtt_session_actions_seen = set()
-    coordinator._mqtt_birth_snapshot_pending = False
-    coordinator._cloud_mqtt_command_failures = {}
-    coordinator._cloud_mqtt_command_attempts = {}
-    coordinator._cloud_mqtt_command_attempt_sequence = 0
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._mqtt_session_generation = 0  # ruff: ignore[private-member-access]
+    coordinator._mqtt_session_actions_seen = set()  # ruff: ignore[private-member-access]
+    coordinator._mqtt_birth_snapshot_pending = False  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_failures = {}  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_attempts = {}  # ruff: ignore[private-member-access]
+    coordinator._cloud_mqtt_command_attempt_sequence = 0  # ruff: ignore[private-member-access]
     cast("Any", coordinator).api = api
-    cast("Any", coordinator)._device_index = {}
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).data = {
         "dev-1": {PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "SN-1"}}
     }
-    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()
-    cast("Any", coordinator)._async_payload_debug_event = AsyncMock()
+    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_payload_debug_event = AsyncMock()  # ruff: ignore[private-member-access]
 
     def _start_mqtt() -> None:
-        coordinator._mqtt = mqtt
+        coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
 
     start_mqtt = AsyncMock(side_effect=_start_mqtt)
     cast("Any", coordinator).async_start_mqtt = start_mqtt
 
-    await coordinator._async_publish_command(
+    await coordinator._async_publish_command(  # ruff: ignore[private-member-access]
         "dev-1",
         message_type="ControlDeviceProperty",
         action_id=3022,
@@ -264,7 +264,7 @@ async def test_publish_command_lazily_starts_missing_cloud_client() -> None:
     mqtt.async_publish_json.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_concurrent_cloud_mqtt_start_constructs_one_runtime() -> None:
     """Deferred startup and a command must not orphan a duplicate MQTT client."""
 
@@ -292,9 +292,9 @@ async def test_concurrent_cloud_mqtt_start_constructs_one_runtime() -> None:
             return _FakeMqtt
 
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._mqtt = None
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
     cast("Any", coordinator).hass = _BarrierHass()
-    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()
+    cast("Any", coordinator)._async_ensure_mqtt = AsyncMock()  # ruff: ignore[private-member-access]
 
     await asyncio.gather(
         coordinator.async_start_mqtt(),
@@ -302,4 +302,4 @@ async def test_concurrent_cloud_mqtt_start_constructs_one_runtime() -> None:
     )
 
     assert _FakeMqtt.constructed == 1
-    assert isinstance(coordinator._mqtt, _FakeMqtt)
+    assert isinstance(coordinator._mqtt, _FakeMqtt)  # ruff: ignore[private-member-access]

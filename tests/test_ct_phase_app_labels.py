@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 from custom_components.jackery_solarvault.select import (
-    _CT_PHASE_TO_OPTION,
-    _OPTION_TO_CT_PHASE,
+    _CT_PHASE_TO_OPTION,  # ruff: ignore[import-private-name]
+    _OPTION_TO_CT_PHASE,  # ruff: ignore[import-private-name]
 )
 
 _COMPONENT = Path(__file__).parents[1] / "custom_components" / "jackery_solarvault"
@@ -24,10 +24,10 @@ def test_ct_phase_select_keeps_stable_options_and_accepts_app_aliases() -> None:
         4: "combined_phases",
     }
     assert _OPTION_TO_CT_PHASE["phase_a"] == 1
-    assert _OPTION_TO_CT_PHASE["phase_b"] == 2
-    assert _OPTION_TO_CT_PHASE["phase_c"] == 3
-    assert _OPTION_TO_CT_PHASE["combined_phase"] == 4
-    assert _OPTION_TO_CT_PHASE["phase_t"] == 4
+    assert _OPTION_TO_CT_PHASE["phase_b"] == 2  # ruff: ignore[magic-value-comparison]
+    assert _OPTION_TO_CT_PHASE["phase_c"] == 3  # ruff: ignore[magic-value-comparison]
+    assert _OPTION_TO_CT_PHASE["combined_phase"] == 4  # ruff: ignore[magic-value-comparison]
+    assert _OPTION_TO_CT_PHASE["phase_t"] == 4  # ruff: ignore[magic-value-comparison]
 
 
 def test_ct_phase_ui_uses_app_a_b_c_and_total_t_labels() -> None:

@@ -14,6 +14,7 @@ from custom_components.jackery_solarvault.client.credentials import (
 from custom_components.jackery_solarvault.util import redacted_json_safe_payload
 
 SECRET = "embedded-secret-do-not-leak"
+_SHA256_HEX_LENGTH = 64
 
 
 def test_error_detail_never_exposes_embedded_secret(
@@ -36,13 +37,19 @@ def test_credential_validation_does_not_echo_secret() -> None:
     assert secret not in str(caught.value)
 
 
+def test_credential_validation_rejects_non_string_values() -> None:
+    """Credential boundaries reject non-text values without echoing them."""
+    with pytest.raises(vol.Invalid, match="username must be a string"):
+        credential_text(1234, field="username", max_length=MAX_TOKEN_LENGTH)
+
+
 def test_fingerprint_is_opaque_and_field_separated() -> None:
     """Digest cannot disclose credentials and ambiguous field sets differ."""
     first = credential_fingerprint({"username": "ab", "password": "c"})
     second = credential_fingerprint({"username": "a", "password": "bc"})
     assert first != second
     assert SECRET not in credential_fingerprint({"token": SECRET})
-    assert len(first) == 64
+    assert len(first) == _SHA256_HEX_LENGTH
 
 
 def test_diagnostic_payload_redacts_embedded_secret() -> None:

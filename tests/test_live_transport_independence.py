@@ -1,7 +1,7 @@
 """Regression tests for transport-independent entities and ordered live merges."""
 
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 import logging
 from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -17,6 +17,7 @@ from custom_components.jackery_solarvault.const import (
     ACTION_ID_PORTABLE_OUTPUT_AC,
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
+    FIELD_BODY,
     FIELD_CHARGE_PLAN_PW,
     FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_A_PHASE_ENERGY,
@@ -59,7 +60,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
-    _serialize_mqtt_messages_by_device,  # regression-tests callback ordering wrapper
+    _serialize_mqtt_messages_by_device,  # regression-tests callback ordering wrapper  # ruff: ignore[import-private-name]
     merge_shelly_cloud_item,
     mqtt_payload_observed_at,
     normalize_local_mqtt_payload,
@@ -100,7 +101,7 @@ class _ImmediateBackgroundEntry:
         return asyncio.create_task(coro, name=name)
 
 
-def _set_test_attr(target: object, name: str, value: Any) -> None:
+def _set_test_attr(target: object, name: str, value: Any) -> None:  # ruff: ignore[any-type]
     """Set private coordinator seams used by narrow regression test doubles."""
     setattr(target, name, value)
 
@@ -147,7 +148,7 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
         for entity in added
         if entity.unique_id == "dev-1_smart_meter_phase_1_voltage"
     )
-    unsupported_voltage._refresh_cache()
+    unsupported_voltage._refresh_cache()  # ruff: ignore[private-member-access]
     assert unsupported_voltage.native_value is None
     assert unsupported_voltage.available is False
 
@@ -277,9 +278,9 @@ def test_successful_recent_http_fetch_proves_device_reachability(
 ) -> None:
     """HTTP keeps entities usable when BLE and local MQTT are disabled."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._configured_update_interval = timedelta(seconds=15)
-    coordinator._shutdown_started = False
-    coordinator._last_http_device_refresh_monotonic = {"dev-1": 100.0}
+    coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._last_http_device_refresh_monotonic = {"dev-1": 100.0}  # ruff: ignore[private-member-access]
     coordinator.data = {"dev-1": {}}
     coordinator_any = cast("Any", coordinator)
     coordinator_any.is_device_locally_reachable = MethodType(
@@ -294,14 +295,14 @@ def test_successful_recent_http_fetch_proves_device_reachability(
 def _source_priority_coordinator() -> JackerySolarVaultCoordinator:
     """Return a minimal coordinator shell for source-priority merge tests."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._configured_update_interval = timedelta(seconds=15)
-    coordinator._shutdown_started = False
-    coordinator._property_source_state = {}
-    coordinator._accessory_source_state = {}
-    coordinator._property_overrides = {}
+    coordinator._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._property_source_state = {}  # ruff: ignore[private-member-access]
+    coordinator._accessory_source_state = {}  # ruff: ignore[private-member-access]
+    coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
     _set_test_attr(coordinator, "_live_property_received_monotonic", {})
     _set_test_attr(coordinator, "_live_ct_received_monotonic", {})
-    coordinator._last_property_push_monotonic = float("-inf")
+    coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -311,7 +312,7 @@ def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
     coordinator.data = {
         "dev-1": {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 0}},
     }
-    coordinator._device_registry_observer = None
+    coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
     observed: list[int] = []
 
     def _capture_committed_value() -> None:
@@ -319,19 +320,19 @@ def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
             coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW],
         )
 
-    coordinator._listeners = {"test-listener": (_capture_committed_value, None)}
+    coordinator._listeners = {"test-listener": (_capture_committed_value, None)}  # ruff: ignore[private-member-access]
 
-    coordinator._schedule_ble_partial_update(
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
         "dev-1",
         {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 596}},
     )
-    coordinator._schedule_ble_partial_update(
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
         "dev-1",
         {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 609}},
     )
 
     assert observed == [596, 609]
-    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == 609
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == 609  # ruff: ignore[magic-value-comparison]
 
 
 def test_ble_freshness_metadata_alone_does_not_wake_all_entities() -> None:
@@ -345,11 +346,11 @@ def test_ble_freshness_metadata_alone_does_not_wake_all_entities() -> None:
             },
         },
     }
-    coordinator._device_registry_observer = None
+    coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
     listener = MagicMock()
-    coordinator._listeners = {"test-listener": (listener, None)}
+    coordinator._listeners = {"test-listener": (listener, None)}  # ruff: ignore[private-member-access]
 
-    coordinator._schedule_ble_partial_update(
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
         "dev-1",
         {
             PAYLOAD_CT_METER: {
@@ -396,13 +397,13 @@ def test_layer5_property_arrival_order_beats_same_tier_then_expires(
     )
     coordinator = _source_priority_coordinator()
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         {},
         {FIELD_PV_PW: _LIVE_PV_W},
         source=TransportSource.LOCAL_MQTT,
     )
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
         {
@@ -415,7 +416,7 @@ def test_layer5_property_arrival_order_beats_same_tier_then_expires(
     assert merged[FIELD_PV_PW] == _CLOUD_PV_W
     assert merged[FIELD_CHARGE_PLAN_PW] == _PLAN_POWER_W
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
         {FIELD_PV_PW: _LIVE_PV_W},
@@ -424,7 +425,7 @@ def test_layer5_property_arrival_order_beats_same_tier_then_expires(
     assert merged[FIELD_PV_PW] == _LIVE_PV_W
 
     clock["now"] = 161.0
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
         {FIELD_PV_PW: _CLOUD_PV_W},
@@ -441,13 +442,13 @@ def test_fresh_ble_property_beats_http_while_http_fills_missing_fields(
     monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: 100.0)
     coordinator = _source_priority_coordinator()
 
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         {},
         {FIELD_ENERGY_PLAN_PW: _LIVE_CT_POWER_W},
         source=TransportSource.BLE,
     )
-    merged = coordinator._merge_main_properties_for_device(
+    merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
         {FIELD_ENERGY_PLAN_PW: 0, FIELD_PV_PW: _HTTP_PV_W},
@@ -466,13 +467,13 @@ def test_layer5_ct_arrival_order_while_cloud_fills_missing_fields(
     coordinator = _source_priority_coordinator()
     updated: dict[str, Any] = {}
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {FIELD_CT_POWER: _LIVE_CT_POWER_W},
         device_id="dev-1",
         source_transport=TransportSource.LOCAL_MQTT,
     )
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {
             FIELD_CT_POWER: _SHELLY_CT_POWER_W,
@@ -485,7 +486,7 @@ def test_layer5_ct_arrival_order_while_cloud_fills_missing_fields(
     assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _SHELLY_CT_POWER_W
     assert updated[PAYLOAD_CT_METER][FIELD_CT_VOLT] == _CT_VOLTAGE_V
 
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {FIELD_CT_POWER: _LIVE_CT_POWER_W},
         device_id="dev-1",
@@ -512,13 +513,13 @@ def test_ble_ct_energy_is_normalized_to_shelly_wh_scale(
         FIELD_CT_C_NEGATIVE_PHASE_ENERGY: 3_000,
         FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 6_000,
     }
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         cloud_energy,
         device_id="dev-1",
         source_transport=TransportSource.CLOUD_MQTT,
     )
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         updated,
         {field: value / 10 for field, value in cloud_energy.items()},
         device_id="dev-1",
@@ -538,19 +539,20 @@ async def test_cloud_subdevice_frame_is_ingested_once(
         PAYLOAD_PROPERTIES: {},
         PAYLOAD_DEVICE: {},
     }
-    coordinator._merge_subdevice_data(
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
         current,
         {FIELD_CT_POWER: _LIVE_CT_POWER_W},
         device_id="dev-1",
         source_transport=TransportSource.LOCAL_MQTT,
     )
     coordinator.data = {"dev-1": current}
-    coordinator._device_index = {"dev-1": {}}
+    _set_test_attr(coordinator, "_device_index", {"dev-1": {}})
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
 
     def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
-        coordinator.data = new_data
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
 
     _set_test_attr(coordinator, "_push_partial_update", _capture)
 
@@ -558,7 +560,7 @@ async def test_cloud_subdevice_frame_is_ingested_once(
         logging.DEBUG,
         logger="custom_components.jackery_solarvault.coordinator",
     ):
-        accepted = await coordinator._async_handle_mqtt_message(
+        accepted = await coordinator.async_handle_mqtt_message(
             "hb/app/user/device",
             {
                 FIELD_DEVICE_ID: "dev-1",
@@ -579,6 +581,38 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     )
 
 
+async def test_stale_first_cloud_mqtt_snapshot_preserves_cached_state() -> None:
+    """A six-hour-old retained cloud frame cannot replace cached live state."""
+    coordinator = _source_priority_coordinator()
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {FIELD_PV_PW: _LIVE_PV_W},
+            PAYLOAD_DEVICE: {},
+        }
+    }
+    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
+
+    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
+
+    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    accepted = await coordinator.async_handle_mqtt_message(
+        "hb/app/user/device",
+        {
+            FIELD_DEVICE_ID: "dev-1",
+            FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            FIELD_TIMESTAMP: (datetime.now(UTC) - timedelta(hours=6)).timestamp(),
+            FIELD_BODY: {FIELD_PV_PW: 900},
+        },
+    )
+
+    assert accepted == "dev-1"
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == _LIVE_PV_W
+
+
 async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
     """Portable action IDs dispatch through every supported app transport."""
     coordinator = _command_coordinator()
@@ -588,7 +622,7 @@ async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
     coordinator_any.async_send_ble_command = ble_mock
     _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
-    await coordinator._async_publish_command_ble_first(
+    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "dev-1",
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_OUTPUT_AC,
@@ -609,7 +643,7 @@ async def test_portable_write_falls_back_to_cloud_mqtt_after_ble_failure() -> No
     coordinator_any.async_send_ble_command = ble_mock
     _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
-    await coordinator._async_publish_command_ble_first(
+    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "dev-1",
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_PORTABLE_OUTPUT_AC,
@@ -666,7 +700,7 @@ async def test_ble_proxy_failure_cannot_block_cloud_command_fallback() -> None:
     coordinator_any.async_send_ble_command = ble_mock
     _set_test_attr(coordinator, "_async_publish_command", publish_mock)
 
-    await coordinator._async_publish_command_ble_first(
+    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
         "device-1",
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
         action_id=ACTION_ID_EPS_ENABLED,
@@ -751,12 +785,12 @@ async def test_body_only_local_mqtt_routes_each_live_control_and_pv_field() -> N
     for field, value in field_values:
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         coordinator.data = {"dev-1": {PAYLOAD_PROPERTIES: {}}}
-        coordinator._device_index = {"dev-1": {}}
-        coordinator._property_overrides = {}
-        coordinator._last_property_push_monotonic = float("-inf")
+        coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+        coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
+        coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
         _set_test_attr(coordinator, "_live_property_received_monotonic", {})
-        coordinator._local_mqtt_last_message_monotonic = float("-inf")
-        coordinator._local_mqtt_last_device_message_monotonic = {}
+        coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+        coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
         captured: dict[str, dict[str, Any]] = {}
 
         async def _debug_event(  # ruff: ignore[unused-async]

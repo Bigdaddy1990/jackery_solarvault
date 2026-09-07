@@ -100,13 +100,20 @@ def test_payload_debug_writer_emits_one_redacted_json_line(tmp_path: Path) -> No
 
     util.append_payload_debug_line(
         debug_path,
-        {"password": "mqtt-secret", "when": date(2026, 8, 10)},
+        {
+            "password": "mqtt-secret",
+            "local_key": "legacy-local-secret",
+            "localKey": "camel-local-secret",
+            "when": date(2026, 8, 10),
+        },
     )
 
     lines = debug_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0]) == {
         "password": REDACTED_VALUE,
+        "local_key": REDACTED_VALUE,
+        "localKey": REDACTED_VALUE,
         "when": "2026-08-10",
     }
 

@@ -17,7 +17,6 @@ class TestJackeryMqttPushClient:  # noqa: PLR0904
     @staticmethod
     def _background_task_mock() -> MagicMock:
         """Return an HA task factory mock that consumes scheduled coroutines."""
-
         task = MagicMock()
         task.done.return_value = False
         task.cancelled.return_value = False

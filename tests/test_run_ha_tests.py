@@ -1,6 +1,6 @@
 """Contracts for the Home Assistant pytest wrapper."""
 
-from scripts.run_ha_tests import _pytest_args
+from scripts.run_ha_tests import _pytest_args  # ruff: ignore[import-private-name]
 
 
 def test_default_harness_run_disables_coverage() -> None:

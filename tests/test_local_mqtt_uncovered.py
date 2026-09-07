@@ -23,23 +23,37 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
-def test_constructor_and_diagnostics_use_ha_owned_transport(
+def test_constructor_and_diagnostics_use_direct_broker_transport(
     hass: HomeAssistant,
 ) -> None:
-    """The adapter contains no duplicate broker credentials or connection."""
+    """The direct client matches and redacts its complete broker configuration."""
     client = JackeryLocalMqttClient(
         hass,
+        host="192.0.2.10",
+        port=1884,
+        username="user",
+        password="secret",
         topic_filter="jackery/device/#",
         qos=2,
     )
 
     assert client.is_connected is False
     assert client.is_started is False
-    assert client.matches_configuration(("jackery/device/#",), qos=2)
-    assert not client.matches_configuration(("other/#",), qos=2)
+    configuration = {
+        "host": "192.0.2.10",
+        "port": 1884,
+        "username": "user",
+        "password": "secret",
+        "topic_filter": "jackery/device/#",
+        "qos": 2,
+    }
+    assert client.matches_configuration(**configuration)
+    assert not client.matches_configuration(**(configuration | {"host": "other"}))
     redacted = client.diagnostics_snapshot()
     plain = client.diagnostics_snapshot(redact=False)
-    assert redacted["transport"] == "homeassistant.components.mqtt"
+    assert redacted["transport"] == "direct_mqtt"
+    assert redacted["configured_target"]["host"] == REDACTED_VALUE
+    assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
     assert redacted["topic_filter"] == REDACTED_VALUE
     assert plain["topic_filter"] == "jackery/device/#"
     assert plain["qos"] == 2
@@ -108,10 +122,10 @@ async def test_sink_rejection_and_failure_are_distinguished(
     assert failed_diagnostics["messages_dropped"] == 1
 
 
-async def test_oversized_and_retained_payloads_are_dropped_before_sink(
+async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
     hass: HomeAssistant,
 ) -> None:
-    """Size and retained-state guards run before shared ingest."""
+    """Broker-selected retained telemetry follows the same no-drop FIFO."""
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
@@ -119,43 +133,44 @@ async def test_oversized_and_retained_payloads_are_dropped_before_sink(
         "jackery/oversized",
         b"x" * (LOCAL_MQTT_MAX_PAYLOAD_BYTES + 1),
     )
-    retained = MagicMock(
-        retain=True,
-        topic="jackery/retained",
-        payload=b"{}",
-    )
-    client._async_message_received(retained)
+    retained = MagicMock(retain=True, topic="jackery/retained", payload=b"{}")
 
-    sink.assert_not_awaited()
+    async def messages():
+        await asyncio.sleep(0)
+        yield retained
+
+    broker = MagicMock(messages=messages())
+    broker.subscribe = AsyncMock()
+    await client._async_consume_session(broker, ["#"])
+    await client.async_wait_message_queue_idle()
+
+    sink.assert_awaited_once_with("jackery/retained", {}, b"{}")
     diagnostics = client.diagnostics_snapshot(redact=False)
     assert diagnostics["payload_too_large_count"] == 1
-    assert diagnostics["retained_messages_dropped"] == 1
-    assert diagnostics["messages_dropped"] == 2
+    assert diagnostics["retained_messages_dropped"] == 0
+    assert diagnostics["messages_dropped"] == 1
+    assert diagnostics["messages_forwarded"] == 1
 
 
-async def test_stop_cancels_retry_and_releases_subscriptions(
+async def test_stop_cancels_direct_broker_reconnect_supervisor(
     hass: HomeAssistant,
 ) -> None:
-    """Entry unload cancels retry supervision and both HA callbacks."""
+    """Entry unload cancels the sole direct-broker reconnect supervisor."""
     client = JackeryLocalMqttClient(hass)
-    unsubscribe = MagicMock()
-    unsubscribe_status = MagicMock()
-    client._unsubscribe = unsubscribe
-    client._unsubscribe_status = unsubscribe_status
-    retry_started = asyncio.Event()
+    runner_started = asyncio.Event()
 
-    async def retry() -> None:
-        retry_started.set()
+    async def runner() -> None:
+        runner_started.set()
         await asyncio.Event().wait()
 
-    client._retry_task = asyncio.create_task(retry())
-    await retry_started.wait()
+    runner_task = asyncio.create_task(runner())
+    client._runner_task = runner_task
+    await runner_started.wait()
 
     await client.async_stop()
 
-    assert client._retry_task is None
-    unsubscribe.assert_called_once_with()
-    unsubscribe_status.assert_called_once_with()
+    assert runner_task.cancelled()
+    assert client._runner_task is None
     assert client.is_connected is False
 
 

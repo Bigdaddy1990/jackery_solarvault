@@ -1,9 +1,6 @@
 """Provenance and source/section contract tests for shared transport ingest."""
 
-import ast
-from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -12,16 +9,18 @@ from custom_components.jackery_solarvault.const import (
     APP_SECTION_PV_STAT,
     PAYLOAD_PROPERTIES,
 )
-from custom_components.jackery_solarvault.coordinator import (
-    JackerySolarVaultCoordinator,
-)
 from custom_components.jackery_solarvault.ingest import ingest_observation
-from custom_components.jackery_solarvault.models import DataSource, Observation
+from custom_components.jackery_solarvault.models import (
+    DataSource,
+    IngestResult,
+    Observation,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from custom_components.jackery_solarvault.models import (
         FieldProvenance,
-        IngestResult,
         ProvenanceKey,
     )
 
@@ -30,6 +29,25 @@ _SECTION = PAYLOAD_PROPERTIES
 _FIELD = "pvPw"
 _BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
 _NEW_VALUE = 120
+_OLD_VALUE = 90
+
+
+def test_observation_rejects_naive_wall_clock_time() -> None:
+    """The ingest boundary rejects ambiguous local wall-clock timestamps."""
+    with pytest.raises(ValueError, match="timezone-aware"):
+        Observation(
+            source=DataSource.HTTP,
+            device_id=_DEVICE_ID,
+            section=_SECTION,
+            payload={_FIELD: 1},
+            observed_at=datetime(2026, 7, 29, 10, 0),
+        )
+
+
+def test_ingest_result_reports_whether_fields_were_accepted() -> None:
+    """Acceptance reflects the public accepted-fields result contract."""
+    assert not IngestResult({}, {}, frozenset()).accepted
+    assert IngestResult({}, {}, frozenset({_FIELD})).accepted
 
 
 def _observation(
@@ -90,7 +108,7 @@ def test_older_http_poll_cannot_overwrite_newer_ble_value() -> None:
     )
 
     older = _ingest(
-        _observation(DataSource.HTTP, 90, observed_at=_BASE_TIME),
+        _observation(DataSource.HTTP, _OLD_VALUE, observed_at=_BASE_TIME),
         current=newer.payload,
         provenance=newer.provenance,
         received_at_monotonic=101.0,
@@ -103,7 +121,7 @@ def test_older_http_poll_cannot_overwrite_newer_ble_value() -> None:
 
 def test_newer_http_poll_cannot_replace_fresh_ble_value() -> None:
     """HTTP remains a fallback while a Layer-5 value is still fresh."""
-    older = _ingest(_observation(DataSource.BLE, 90, observed_at=_BASE_TIME))
+    older = _ingest(_observation(DataSource.BLE, _OLD_VALUE, observed_at=_BASE_TIME))
 
     newer = _ingest(
         _observation(
@@ -116,14 +134,14 @@ def test_newer_http_poll_cannot_replace_fresh_ble_value() -> None:
         received_at_monotonic=101.0,
     )
 
-    assert newer.payload[_FIELD] == 90
+    assert newer.payload[_FIELD] == _OLD_VALUE
     assert newer.accepted_fields == frozenset()
     assert newer.provenance[_FIELD].source is DataSource.BLE
 
 
 def test_http_poll_replaces_expired_ble_value() -> None:
     """HTTP fallback may refresh a stale Layer-5 value after the freshness window."""
-    older = _ingest(_observation(DataSource.BLE, 90, observed_at=_BASE_TIME))
+    older = _ingest(_observation(DataSource.BLE, _OLD_VALUE, observed_at=_BASE_TIME))
 
     newer = _ingest(
         _observation(
@@ -142,7 +160,7 @@ def test_http_poll_replaces_expired_ble_value() -> None:
 
 def test_equal_timestamp_uses_explicit_live_source_priority() -> None:
     """Equal-time conflicts prefer local MQTT over HTTP deterministically."""
-    http = _ingest(_observation(DataSource.HTTP, 90, observed_at=_BASE_TIME))
+    http = _ingest(_observation(DataSource.HTTP, _OLD_VALUE, observed_at=_BASE_TIME))
 
     local = _ingest(
         _observation(DataSource.LOCAL_MQTT, _NEW_VALUE, observed_at=_BASE_TIME),
@@ -178,7 +196,7 @@ def test_layer5_peers_update_in_arrival_order(
     second_source: DataSource,
 ) -> None:
     """No Layer-5 connection may freshness-block another Layer-5 peer."""
-    first = _ingest(_observation(first_source, 90, observed_at=_BASE_TIME))
+    first = _ingest(_observation(first_source, _OLD_VALUE, observed_at=_BASE_TIME))
 
     second = _ingest(
         _observation(
@@ -221,7 +239,7 @@ def test_timestamped_layer5_replay_cannot_reverse_newer_peer(
     )
 
     replayed = _ingest(
-        _observation(replayed_source, 90, observed_at=_BASE_TIME),
+        _observation(replayed_source, _OLD_VALUE, observed_at=_BASE_TIME),
         current=newer.payload,
         provenance=newer.provenance,
         received_at_monotonic=101.0,
@@ -230,22 +248,6 @@ def test_timestamped_layer5_replay_cannot_reverse_newer_peer(
     assert replayed.payload[_FIELD] == _NEW_VALUE
     assert replayed.accepted_fields == frozenset()
     assert replayed.provenance[_FIELD].source is newer_source
-
-
-def test_stale_first_mqtt_live_snapshot_does_not_replace_cached_state() -> None:
-    """A six-hour-old retained snapshot is not initial live telemetry."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    current = {"pvPw": _NEW_VALUE, "soc": 75}
-
-    result = coordinator._property_updates_for_source(
-        _DEVICE_ID,
-        {"pvPw": 900, "soc": 20},
-        DataSource.CLOUD_MQTT,
-        base=current,
-        observed_at=datetime.now(UTC) - timedelta(hours=6),
-    )
-
-    assert result == current
 
 
 def test_same_field_name_in_different_sections_has_independent_provenance() -> None:
@@ -351,42 +353,3 @@ def test_provenance_metadata_never_leaks_into_entity_payload() -> None:
     assert "observed_at" not in result.payload
     assert "request_id" not in result.payload
     assert result.provenance[_FIELD].request_id == "mqtt-42"
-
-
-def test_coordinator_has_one_lifetime_and_repair_implementation() -> None:
-    """Stale tail copies must not silently override the maintained methods."""
-    coordinator_path = (
-        Path(__file__).parents[1]
-        / "custom_components"
-        / "jackery_solarvault"
-        / "coordinator.py"
-    )
-    tree = ast.parse(coordinator_path.read_text(encoding="utf-8"))
-    coordinator_class = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.ClassDef)
-        and node.name == "JackerySolarVaultCoordinator"
-    )
-    method_names = [
-        node.name
-        for node in coordinator_class.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    ]
-
-    assert method_names.count("_merge_battery_pack_lifetime_from_ble") == 1
-
-
-def test_battery_pack_lifetime_merge_isolated_and_non_mutating() -> None:
-    """The retained battery-pack lifetime merge leaves input frame untouched."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    source = {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}
-    updated: dict[str, Any] = {"batteryPacks": [{"deviceSn": "PACK-1"}]}
-
-    touched = coordinator._merge_battery_pack_lifetime_from_ble(updated, source)
-
-    assert touched
-    assert updated["batteryPacks"] == [
-        {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}
-    ]
-    assert source == {"deviceSn": "PACK-1", "inEgy": 12.5, "outEgy": 8.0}

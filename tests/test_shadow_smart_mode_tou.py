@@ -37,7 +37,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     return JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_smart_mode_bucket_filled_from_http() -> None:
     """A resolvable system id fills the smart-mode bucket from getSmartMode."""
     coordinator = _bare_coordinator()
@@ -48,7 +48,7 @@ async def test_smart_mode_bucket_filled_from_http() -> None:
     )
     working: dict[str, Any] = {PAYLOAD_SYSTEM_META: {FIELD_SYSTEM_ID: _SYSTEM_ID}}
 
-    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)
+    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # ruff: ignore[private-member-access]
 
     assert filled is True
     assert working[PAYLOAD_SMART_MODE]["isActive"] == 1
@@ -56,7 +56,7 @@ async def test_smart_mode_bucket_filled_from_http() -> None:
     get_smart_mode.assert_awaited_once_with(_SYSTEM_ID)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_smart_mode_skipped_without_system_id() -> None:
     """No system id means no fetch and no bucket write."""
     coordinator = _bare_coordinator()
@@ -66,14 +66,14 @@ async def test_smart_mode_skipped_without_system_id() -> None:
     )
     working: dict[str, Any] = {}
 
-    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)
+    filled = await coordinator._async_apply_smart_mode(_DEVICE_ID, working)  # ruff: ignore[private-member-access]
 
     assert filled is False
     assert PAYLOAD_SMART_MODE not in working
     get_smart_mode.assert_not_awaited()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tou_bucket_filled_from_http() -> None:
     """A resolvable numeric device id fills the TOU bucket from queryTouPlan."""
     coordinator = _bare_coordinator()
@@ -90,7 +90,7 @@ async def test_tou_bucket_filled_from_http() -> None:
         PAYLOAD_DEVICE: {FIELD_DEVICE_ID: _NUMERIC_DEVICE_ID},
     }
 
-    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)
+    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # ruff: ignore[private-member-access]
 
     assert filled is True
     assert working[PAYLOAD_TOU_SCHEDULE]["tasks"] == body["tasks"]
@@ -99,7 +99,7 @@ async def test_tou_bucket_filled_from_http() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_tou_skipped_without_device_id() -> None:
     """No numeric device id means no fetch and no bucket write."""
     coordinator = _bare_coordinator()
@@ -107,7 +107,7 @@ async def test_tou_skipped_without_device_id() -> None:
     cast("Any", coordinator).api = SimpleNamespace(async_query_tou_plan=query_tou)
     working: dict[str, Any] = {}
 
-    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)
+    filled = await coordinator._async_apply_tou_plan(_DEVICE_ID, working)  # ruff: ignore[private-member-access]
 
     assert filled is False
     assert PAYLOAD_TOU_SCHEDULE not in working

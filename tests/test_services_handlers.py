@@ -2,7 +2,7 @@
 
 Each domain-scoped action shares one routing contract: resolve the device to its
 owning coordinator, reject portable devices for Home-family commands, forward to a
-coordinator method, and surface failures as ``ServiceValidationError`` (or
+coordinator method, and surface backend failures as ``HomeAssistantError`` (or
 ``ConfigEntryAuthFailed`` when credentials are rejected). These tests drive that
 contract for every registered action through Home Assistant's real service call
 path, asserting the business outcome (the coordinator boundary is invoked and the
@@ -11,9 +11,10 @@ documented response envelope is returned) rather than internal call order.
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+import voluptuous as vol
 
 from custom_components.jackery_solarvault import services
 from custom_components.jackery_solarvault.client.api import (
@@ -90,7 +91,6 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_GET_ALARM_DETAIL,
     SERVICE_GET_DEVICE_CURRENCY,
     SERVICE_GET_DYNAMIC_PRICE_LOGIN_URL,
-    SERVICE_GET_OFFLINE_STATISTICS,
     SERVICE_GET_PRODUCT_INSTRUCTION,
     SERVICE_GET_PUSH_CONFIG,
     SERVICE_GET_SHARE_QR_CODE,
@@ -143,6 +143,7 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
     SERVICE_SUBMIT_FEEDBACK,
     SERVICE_SYNC_ALERTS,
+    SERVICE_SYNC_OFFLINE_STATISTICS,
     SERVICE_UNBIND_ACCESSORIES,
     SERVICE_UNBIND_DEVICE,
     SERVICE_UNBIND_SHELLY_ACCOUNT,
@@ -151,7 +152,11 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_UPDATE_ELECTRICITY_STRATEGY,
 )
 from custom_components.jackery_solarvault.services import async_setup_services
-from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -176,7 +181,7 @@ class _HandlerCase(SimpleNamespace):
     backend_error: BaseException
 
 
-def _case(
+def _case(  # ruff: ignore[too-many-arguments]
     name: str,
     method: str,
     *,
@@ -395,8 +400,9 @@ _CASES: tuple[_HandlerCase, ...] = (
         portable=True,
     ),
     _case(
-        SERVICE_GET_OFFLINE_STATISTICS,
-        "async_get_offline_statistics",
+        SERVICE_SYNC_OFFLINE_STATISTICS,
+        "async_sync_offline_statistics",
+        extra={SERVICE_FIELD_BODY: {"offline": [_NUM_ID]}},
         is_response=True,
         portable=True,
     ),
@@ -609,11 +615,18 @@ def _coordinator(
         if portable
         else {}
     )
-    coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
+    coordinator = SimpleNamespace(
+        data={_DEVICE_ID: payload},
+        config_entry=SimpleNamespace(async_start_reauth=Mock()),
+    )
     method_mock = (
         AsyncMock(side_effect=error)
         if error is not None
-        else AsyncMock(return_value=result)
+        else AsyncMock(
+            return_value=True
+            if method == "async_sync_offline_statistics" and result is _SENTINEL
+            else result
+        )
     )
     setattr(coordinator, method, method_mock)
     return coordinator
@@ -644,8 +657,39 @@ async def _call(
         )
 
 
+@pytest.mark.parametrize("body", [None, {}, [], ""])
+async def test_offline_sync_requires_original_packet(
+    hass: HomeAssistant, body: object
+) -> None:
+    """Missing, empty and non-object packets are rejected before any upload."""
+    case = _case(
+        SERVICE_SYNC_OFFLINE_STATISTICS,
+        "async_sync_offline_statistics",
+        extra={SERVICE_FIELD_BODY: body} if body is not None else {},
+        is_response=True,
+    )
+    coordinator = _coordinator(case.method)
+    with pytest.raises((vol.Invalid, ServiceValidationError)):
+        await _call(hass, case, coordinator)
+    coordinator.async_sync_offline_statistics.assert_not_awaited()
+
+
+async def test_offline_sync_surfaces_rejected_upload(hass: HomeAssistant) -> None:
+    """A false backend acknowledgement is an action error, never success."""
+    case = _case(
+        SERVICE_SYNC_OFFLINE_STATISTICS,
+        "async_sync_offline_statistics",
+        extra={SERVICE_FIELD_BODY: {"records": []}},
+        is_response=True,
+    )
+    coordinator = _coordinator(case.method, result=False)
+    with pytest.raises(HomeAssistantError):
+        await _call(hass, case, coordinator)
+    coordinator.async_sync_offline_statistics.assert_awaited_once()
+
+
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_service_forwards_to_owning_coordinator(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -656,7 +700,12 @@ async def test_service_forwards_to_owning_coordinator(
     response = await _call(hass, case, coordinator)
 
     getattr(coordinator, case.method).assert_awaited_once()
-    if case.is_response:
+    if case.name == SERVICE_SYNC_OFFLINE_STATISTICS:
+        assert response == {"synced": True}
+        getattr(coordinator, case.method).assert_awaited_once_with(
+            case.extra[SERVICE_FIELD_BODY], context_device_id=_DEVICE_ID
+        )
+    elif case.is_response:
         assert isinstance(response, dict)
         assert _SENTINEL in response.values()
     else:
@@ -664,7 +713,7 @@ async def test_service_forwards_to_owning_coordinator(
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_service_rejects_unowned_device(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -692,20 +741,20 @@ async def test_service_rejects_unowned_device(
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
-async def test_service_maps_backend_error_to_validation_error(
+@pytest.mark.asyncio()
+async def test_service_maps_backend_error_to_home_assistant_error(
     hass: HomeAssistant,
     case: _HandlerCase,
 ) -> None:
-    """A backend ``JackeryError`` becomes a translated ServiceValidationError."""
+    """A backend ``JackeryError`` becomes a translated HomeAssistantError."""
     coordinator = _coordinator(case.method, error=case.backend_error)
 
-    with pytest.raises(ServiceValidationError):
+    with pytest.raises(HomeAssistantError):
         await _call(hass, case, coordinator)
 
 
 @pytest.mark.parametrize("case", _AUTH_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_service_maps_auth_error_to_reauth(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -715,6 +764,7 @@ async def test_service_maps_auth_error_to_reauth(
 
     with pytest.raises(ConfigEntryAuthFailed):
         await _call(hass, case, coordinator)
+    coordinator.config_entry.async_start_reauth.assert_called_once_with(hass)
 
 
 _RERAISE_NAMES = frozenset({
@@ -732,7 +782,7 @@ _RERAISE_CASES = tuple(case for case in _CASES if case.name in _RERAISE_NAMES)
 
 
 @pytest.mark.parametrize("case", _RERAISE_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_service_reraises_config_entry_auth_failed(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -745,7 +795,7 @@ async def test_service_reraises_config_entry_auth_failed(
 
 
 @pytest.mark.parametrize("case", _PORTABLE_CASES, ids=lambda case: case.name)
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_home_family_service_rejects_portable_device(
     hass: HomeAssistant,
     case: _HandlerCase,
@@ -759,7 +809,7 @@ async def test_home_family_service_rejects_portable_device(
     getattr(coordinator, case.method).assert_not_awaited()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_unbind_shelly_device_rejects_unaccepted_request(
     hass: HomeAssistant,
 ) -> None:
@@ -778,7 +828,7 @@ async def test_unbind_shelly_device_rejects_unaccepted_request(
         await _call(hass, case, coordinator)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_unbind_shelly_account_rejects_unaccepted_request(
     hass: HomeAssistant,
 ) -> None:
@@ -790,7 +840,7 @@ async def test_unbind_shelly_account_rejects_unaccepted_request(
         await _call(hass, case, coordinator)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_send_ble_command_rejects_when_no_session(
     hass: HomeAssistant,
 ) -> None:
@@ -818,6 +868,7 @@ def _rename_coordinator(
     method = AsyncMock(side_effect=error) if error is not None else AsyncMock()
     return SimpleNamespace(
         data={_DEVICE_ID: {PAYLOAD_SYSTEM: {"id": _NUM_ID}}},
+        config_entry=SimpleNamespace(async_start_reauth=Mock()),
         async_set_system_name=method,
     )
 
@@ -843,7 +894,7 @@ async def _call_rename(
         )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_rename_forwards_to_system_owner(hass: HomeAssistant) -> None:
     """Rename resolves the owning coordinator by system id and forwards the name."""
     coordinator = _rename_coordinator()
@@ -853,7 +904,7 @@ async def test_rename_forwards_to_system_owner(hass: HomeAssistant) -> None:
     coordinator.async_set_system_name.assert_awaited_once_with(_NUM_ID, "New Name")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_rename_rejects_unowned_system(hass: HomeAssistant) -> None:
     """A system id no account owns surfaces a translated validation error."""
     async_setup_services(hass)
@@ -872,24 +923,25 @@ async def test_rename_rejects_unowned_system(hass: HomeAssistant) -> None:
         )
 
 
-@pytest.mark.asyncio
-async def test_rename_maps_backend_error_to_validation_error(
+@pytest.mark.asyncio()
+async def test_rename_maps_backend_error_to_home_assistant_error(
     hass: HomeAssistant,
 ) -> None:
-    """A backend rename failure is surfaced as ServiceValidationError."""
+    """A backend rename failure is surfaced as HomeAssistantError."""
     coordinator = _rename_coordinator(error=JackeryError("boom"))
 
-    with pytest.raises(ServiceValidationError):
+    with pytest.raises(HomeAssistantError):
         await _call_rename(hass, coordinator)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_rename_maps_auth_error_to_reauth(hass: HomeAssistant) -> None:
     """Rejected credentials during rename trigger reauth."""
     coordinator = _rename_coordinator(error=JackeryAuthError("nope"))
 
     with pytest.raises(ConfigEntryAuthFailed):
         await _call_rename(hass, coordinator)
+    coordinator.config_entry.async_start_reauth.assert_called_once_with(hass)
 
 
 # ---------------------------------------------------------------------------
@@ -912,7 +964,7 @@ def test_is_portable_device_detects_legacy_bind_list_source() -> None:
         ),
     )
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is True
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is True  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_device_rejects_home_payload_evidence() -> None:
@@ -931,22 +983,22 @@ def test_is_portable_device_rejects_home_payload_evidence() -> None:
         ),
     )
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is False
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is False  # ruff: ignore[private-member-access]
 
 
 def test_is_portable_device_defaults_to_false_without_evidence() -> None:
     """An empty payload is treated as a non-portable Home device."""
     coordinator = cast("Any", SimpleNamespace(data={_DEVICE_ID: {}}))
 
-    assert services._is_portable_device(coordinator, _DEVICE_ID) is False
+    assert services._is_portable_device(coordinator, _DEVICE_ID) is False  # ruff: ignore[private-member-access]
 
 
 def test_payload_home_evidence_recognizes_system_body() -> None:
     """A populated system body is recognized as Home-payload evidence."""
-    assert services._payload_has_home_payload_evidence(
+    assert services._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
         {PAYLOAD_SYSTEM: {"id": "1"}},
     )
-    assert not services._payload_has_home_payload_evidence({})
+    assert not services._payload_has_home_payload_evidence({})  # ruff: ignore[private-member-access]
 
 
 # ---------------------------------------------------------------------------
@@ -954,7 +1006,9 @@ def test_payload_home_evidence_recognizes_system_body() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_notify_share_qr_code_publishes_scannable_image(hass: HomeAssistant) -> None:
+async def test_notify_share_qr_code_publishes_scannable_image(
+    hass: HomeAssistant,
+) -> None:
     """A valid qrCodeId renders a data-URI image into a persistent notification."""
     with (
         patch(
@@ -966,35 +1020,49 @@ def test_notify_share_qr_code_publishes_scannable_image(hass: HomeAssistant) -> 
             "homeassistant.components.persistent_notification.async_create",
         ) as create,
     ):
-        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")
+        await services._notify_share_qr_code(  # ruff: ignore[private-member-access]
+            hass,
+            qr_code_id="qr-1",
+            user_id="user-1",
+        )
 
     create.assert_called_once()
 
 
-def test_notify_share_qr_code_skips_when_qr_code_missing(
+async def test_notify_share_qr_code_skips_when_qr_code_missing(
     hass: HomeAssistant,
 ) -> None:
     """A non-string qrCodeId short-circuits without touching notifications."""
     with patch(
         "homeassistant.components.persistent_notification.async_create",
     ) as create:
-        services._notify_share_qr_code(hass, qr_code_id=None, user_id="user-1")
+        await services._notify_share_qr_code(  # ruff: ignore[private-member-access]
+            hass,
+            qr_code_id=None,
+            user_id="user-1",
+        )
 
     create.assert_not_called()
 
 
-def test_notify_share_qr_code_swallows_render_failure(hass: HomeAssistant) -> None:
+async def test_notify_share_qr_code_swallows_render_failure(
+    hass: HomeAssistant,
+) -> None:
     """A rendering failure never propagates out of the best-effort notifier."""
     with patch(
         "custom_components.jackery_solarvault.services._render_share_qr_png_data_uri",
         side_effect=RuntimeError("render boom"),
     ):
-        services._notify_share_qr_code(hass, qr_code_id="qr-1", user_id="user-1")
+        await services._notify_share_qr_code(  # ruff: ignore[private-member-access]
+            hass,
+            qr_code_id="qr-1",
+            user_id="user-1",
+        )
 
 
 def test_render_share_qr_png_data_uri_encodes_png() -> None:
     """The QR renderer returns a base64 PNG data URI for the qrCodeId."""
-    data_uri = services._render_share_qr_png_data_uri("qr-code-1")
+    data_uri = services._render_share_qr_png_data_uri("qr-code-1")  # ruff: ignore[private-member-access]
 
     assert data_uri.startswith("data:image/png;base64,")
 
@@ -1005,7 +1073,7 @@ def test_render_share_qr_png_data_uri_encodes_png() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_share_qr_code_rejects_unowned_device(
     hass: HomeAssistant,
 ) -> None:
@@ -1031,11 +1099,11 @@ async def test_get_share_qr_code_rejects_unowned_device(
         )
 
 
-@pytest.mark.asyncio
-async def test_get_share_qr_code_maps_backend_error_to_validation_error(
+@pytest.mark.asyncio()
+async def test_get_share_qr_code_maps_backend_error_to_home_assistant_error(
     hass: HomeAssistant,
 ) -> None:
-    """A backend failure while reading the QR payload is a validation error."""
+    """A backend failure while reading the QR payload is an action error."""
     coordinator = SimpleNamespace(
         data={_DEVICE_ID: {}},
         async_get_share_qr_code=AsyncMock(side_effect=JackeryError("boom")),
@@ -1050,7 +1118,7 @@ async def test_get_share_qr_code_maps_backend_error_to_validation_error(
             "custom_components.jackery_solarvault.services._resolve_jackery_device_id",
             return_value=_DEVICE_ID,
         ),
-        pytest.raises(ServiceValidationError),
+        pytest.raises(HomeAssistantError),
     ):
         await hass.services.async_call(
             services.DOMAIN,
@@ -1061,13 +1129,14 @@ async def test_get_share_qr_code_maps_backend_error_to_validation_error(
         )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_share_qr_code_maps_auth_error_to_reauth(
     hass: HomeAssistant,
 ) -> None:
     """Rejected credentials while reading the QR payload trigger reauth."""
     coordinator = SimpleNamespace(
         data={_DEVICE_ID: {}},
+        config_entry=SimpleNamespace(async_start_reauth=Mock()),
         async_get_share_qr_code=AsyncMock(side_effect=JackeryAuthError("nope")),
     )
     async_setup_services(hass)
@@ -1098,21 +1167,21 @@ async def test_get_share_qr_code_maps_auth_error_to_reauth(
 
 def test_tou_tasks_parser_unwraps_object_and_validates_items() -> None:
     """TOU parsing accepts a wrapping object and rejects non-object tasks."""
-    assert services._tou_tasks_from_service(
+    assert services._tou_tasks_from_service(  # ruff: ignore[private-member-access]
         '{"tasks": [{"slot": 1}]}',
         _DEVICE_ID,
     ) == [{"slot": 1}]
-    assert services._tou_tasks_from_service([{"slot": 2}], _DEVICE_ID) == [{"slot": 2}]
+    assert services._tou_tasks_from_service([{"slot": 2}], _DEVICE_ID) == [{"slot": 2}]  # ruff: ignore[private-member-access]
 
     for raw in ('{"tasks": 5}', "{not json", [5]):
         with pytest.raises(ServiceValidationError):
-            services._tou_tasks_from_service(raw, _DEVICE_ID)
+            services._tou_tasks_from_service(raw, _DEVICE_ID)  # ruff: ignore[private-member-access]
 
 
 def test_reject_json_constant_rejects_non_standard_tokens() -> None:
     """Non-standard JSON constants (NaN/Infinity) are rejected during parsing."""
     with pytest.raises(ValueError, match="invalid JSON constant"):
-        services._reject_json_constant("NaN")
+        services._reject_json_constant("NaN")  # ruff: ignore[private-member-access]
 
 
 def test_resolve_jackery_device_id_maps_registry_identifier() -> None:
@@ -1121,12 +1190,12 @@ def test_resolve_jackery_device_id_maps_registry_identifier() -> None:
         via_device_id=None,
         identifiers={(services.DOMAIN, "cloud-42")},
     )
-    registry = SimpleNamespace(async_get=lambda raw: device)
+    registry = SimpleNamespace(async_get=lambda raw, **_kwargs: device)
     with patch(
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1145,7 +1214,7 @@ def test_resolve_jackery_device_id_follows_accessory_via_parent() -> None:
         identifiers={(services.DOMAIN, "accessory-9")},
     )
 
-    def _async_get(raw: str) -> object:
+    def _async_get(raw: str, **_kwargs: object) -> object:
         return accessory if raw == "ha-uuid" else parent
 
     registry = SimpleNamespace(async_get=_async_get)
@@ -1153,7 +1222,7 @@ def test_resolve_jackery_device_id_follows_accessory_via_parent() -> None:
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1168,7 +1237,7 @@ def test_resolve_jackery_device_id_returns_raw_without_matching_identifier() -> 
         identifiers={("other_domain", "x")},
     )
 
-    def _async_get(raw: str) -> object | None:
+    def _async_get(raw: str, **_kwargs: object) -> object | None:
         return device if raw == "ha-uuid" else None
 
     registry = SimpleNamespace(async_get=_async_get)
@@ -1176,7 +1245,7 @@ def test_resolve_jackery_device_id_returns_raw_without_matching_identifier() -> 
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "ha-uuid",
         )
@@ -1186,29 +1255,29 @@ def test_resolve_jackery_device_id_returns_raw_without_matching_identifier() -> 
 
 def test_payload_home_evidence_recognizes_http_properties() -> None:
     """Home-body fields inside the http_properties section count as evidence."""
-    assert services._payload_has_home_payload_evidence(
+    assert services._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
         {"http_properties": {"pvPw": 120}},
     )
 
 
 def test_json_native_value_normalizes_nested_containers() -> None:
     """JSON-native normalization passes finite scalars and nested containers."""
-    assert services._json_native_value({"a": [1, 2.5, "x", None, True]}) == {
+    assert services._json_native_value({"a": [1, 2.5, "x", None, True]}) == {  # ruff: ignore[private-member-access]
         "a": [1, 2.5, "x", None, True]
     }
 
     with pytest.raises(ValueError, match="finite"):
-        services._json_native_value(float("inf"))
+        services._json_native_value(float("inf"))  # ruff: ignore[private-member-access]
 
 
 def test_resolve_jackery_device_id_returns_raw_when_unknown() -> None:
     """An id absent from the registry passes through unchanged (legacy path)."""
-    registry = SimpleNamespace(async_get=lambda raw: None)
+    registry = SimpleNamespace(async_get=lambda raw, **_kwargs: None)
     with patch(
         "custom_components.jackery_solarvault.services.dr.async_get",
         return_value=registry,
     ):
-        resolved = services._resolve_jackery_device_id(
+        resolved = services._resolve_jackery_device_id(  # ruff: ignore[private-member-access]
             cast("HomeAssistant", object()),
             "legacy-123",
         )

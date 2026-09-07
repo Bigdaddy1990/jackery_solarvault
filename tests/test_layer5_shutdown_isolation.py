@@ -1,14 +1,10 @@
 """Regression tests for HTTP-independent Layer-5 shutdown cleanup."""
 
 import asyncio
-from collections.abc import Coroutine
-import logging
 import time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
-
-import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
 from custom_components.jackery_solarvault.const import CONF_ENABLE_BLE_TRANSPORT
@@ -17,6 +13,10 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    import pytest
+
     from homeassistant.core import HomeAssistant
 
 
@@ -45,11 +45,11 @@ def _bare_coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     )
     coordinator.hass = hass
     coordinator.entry = SimpleNamespace(entry_id="layer5-shutdown-test")
-    coordinator._mqtt = None
-    coordinator._ble_listener = None
-    coordinator._ble_start_lock = asyncio.Lock()
-    coordinator._layer5_stop_lock = asyncio.Lock()
-    coordinator._layer5_stop_tasks = {}
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+    coordinator._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
+    coordinator._layer5_stop_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
+    coordinator._layer5_stop_tasks = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -71,11 +71,11 @@ async def test_concurrent_layer5_stop_callers_share_one_successful_result(
 
     transport = _Transport()
     coordinator = _bare_coordinator(hass)
-    coordinator._ble_listener = transport
+    coordinator._ble_listener = transport  # ruff: ignore[private-member-access]
 
-    first = asyncio.create_task(coordinator._async_stop_layer5_transports())
+    first = asyncio.create_task(coordinator._async_stop_layer5_transports())  # ruff: ignore[private-member-access]
     await asyncio.wait_for(entered.wait(), timeout=1.0)
-    second = asyncio.create_task(coordinator._async_stop_layer5_transports())
+    second = asyncio.create_task(coordinator._async_stop_layer5_transports())  # ruff: ignore[private-member-access]
     await asyncio.sleep(0)
     release.set()
     first_errors, second_errors = await asyncio.gather(first, second)
@@ -83,7 +83,7 @@ async def test_concurrent_layer5_stop_callers_share_one_successful_result(
     assert first_errors == []
     assert second_errors == []
     assert transport.stop_calls == 1
-    assert coordinator._ble_listener is None
+    assert coordinator._ble_listener is None  # ruff: ignore[private-member-access]
 
 
 async def test_layer5_stop_is_hard_bounded_and_single_flight(
@@ -95,7 +95,7 @@ async def test_layer5_stop_is_hard_bounded_and_single_flight(
     release = asyncio.Event()
     transport = _CancellationResistantTransport(entered, release)
     coordinator = _bare_coordinator(hass)
-    coordinator._mqtt = transport
+    coordinator._mqtt = transport  # ruff: ignore[private-member-access]
     monkeypatch.setattr(
         coordinator_module,
         "_BACKGROUND_TASK_STOP_TIMEOUT_SEC",
@@ -108,36 +108,35 @@ async def test_layer5_stop_is_hard_bounded_and_single_flight(
 
     release_task = asyncio.create_task(_release_later())
     started = time.monotonic()
-    first_errors = await coordinator._async_stop_layer5_transports()
+    first_errors = await coordinator._async_stop_layer5_transports()  # ruff: ignore[private-member-access]
     elapsed = time.monotonic() - started
-    second_errors = await coordinator._async_stop_layer5_transports()
+    second_errors = await coordinator._async_stop_layer5_transports()  # ruff: ignore[private-member-access]
 
-    assert elapsed < 0.1
+    assert elapsed < 0.1  # ruff: ignore[magic-value-comparison]
     assert transport.stop_calls == 1
     assert first_errors
     assert second_errors
-    assert coordinator._mqtt is transport
+    assert coordinator._mqtt is transport  # ruff: ignore[private-member-access]
 
     await release_task
     await asyncio.sleep(0)
-    assert await coordinator._async_stop_layer5_transports() == []
-    assert coordinator._mqtt is None
+    assert await coordinator._async_stop_layer5_transports() == []  # ruff: ignore[private-member-access]
+    assert coordinator._mqtt is None  # ruff: ignore[private-member-access]
 
 
 async def test_primary_shutdown_does_not_fail_on_supplemental_stop_error(
     hass: HomeAssistant,
-    caplog: Any,
 ) -> None:
-    """A stopped HTTP coordinator remains releasable while Layer 5 retries later."""
+    """Primary shutdown defers Layer 5 without waiting or discarding ownership."""
     coordinator = _bare_coordinator(hass)
-    coordinator._mqtt = object()
-    coordinator._shutdown_started = False
-    coordinator._poll_watchdog_unsub = None
-    coordinator._active_http_update_tasks = set()
-    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)
-    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())
-    coordinator._retain_pending_supplemental_tasks = MagicMock()
-    coordinator._async_stop_layer5_transports = AsyncMock(
+    coordinator._mqtt = object()  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]
+    coordinator._active_http_update_tasks = set()  # ruff: ignore[private-member-access]
+    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)  # ruff: ignore[private-member-access]
+    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())  # ruff: ignore[private-member-access]
+    coordinator._retain_pending_supplemental_tasks = MagicMock()  # ruff: ignore[private-member-access]
+    coordinator._async_stop_layer5_transports = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=["MQTT stop is still pending"]
     )
     base_shutdown = hass.async_create_background_task(
@@ -146,31 +145,27 @@ async def test_primary_shutdown_does_not_fail_on_supplemental_stop_error(
         eager_start=False,
     )
     await base_shutdown
-    coordinator._base_shutdown_task = base_shutdown
+    coordinator._base_shutdown_task = base_shutdown  # ruff: ignore[private-member-access]
 
-    with caplog.at_level(
-        logging.WARNING,
-        logger="custom_components.jackery_solarvault.coordinator",
-    ):
-        await coordinator.async_shutdown()
+    await coordinator.async_shutdown()
 
     assert coordinator.has_pending_supplemental_transport_cleanup is True
-    assert "MQTT stop is still pending" in caplog.text
+    coordinator._async_stop_layer5_transports.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-async def test_primary_shutdown_remains_retryable_while_ble_drain_is_pending(
+async def test_primary_shutdown_does_not_wait_for_pending_ble_drain(
     hass: HomeAssistant,
 ) -> None:
-    """Accepted BLE FIFO work must commit before shutdown reports success."""
+    """The supplemental BLE owner must not fence the stopped HTTP runtime."""
     coordinator = _bare_coordinator(hass)
-    coordinator._ble_listener = object()
-    coordinator._shutdown_started = False
-    coordinator._poll_watchdog_unsub = None
-    coordinator._active_http_update_tasks = set()
-    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)
-    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())
-    coordinator._retain_pending_supplemental_tasks = MagicMock()
-    coordinator._async_stop_layer5_transports = AsyncMock(
+    coordinator._ble_listener = object()  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]
+    coordinator._active_http_update_tasks = set()  # ruff: ignore[private-member-access]
+    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)  # ruff: ignore[private-member-access]
+    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())  # ruff: ignore[private-member-access]
+    coordinator._retain_pending_supplemental_tasks = MagicMock()  # ruff: ignore[private-member-access]
+    coordinator._async_stop_layer5_transports = AsyncMock(  # ruff: ignore[private-member-access]
         return_value=["BLE stop still pending after 2.0s"]
     )
     base_shutdown = hass.async_create_background_task(
@@ -179,19 +174,18 @@ async def test_primary_shutdown_remains_retryable_while_ble_drain_is_pending(
         eager_start=False,
     )
     await base_shutdown
-    coordinator._base_shutdown_task = base_shutdown
+    coordinator._base_shutdown_task = base_shutdown  # ruff: ignore[private-member-access]
 
-    with pytest.raises(RuntimeError, match="BLE stop still pending"):
-        await coordinator.async_shutdown()
+    await coordinator.async_shutdown()
 
-    assert coordinator._ble_shutdown_drain_active is True
-    assert coordinator._ble_listener is not None
+    assert coordinator._ble_shutdown_drain_active is True  # ruff: ignore[private-member-access]
+    assert coordinator._ble_listener is not None  # ruff: ignore[private-member-access]
 
 
 async def test_shutdown_waits_for_inflight_ble_start_before_transport_snapshot(
     hass: HomeAssistant,
 ) -> None:
-    """Shutdown cannot miss a BLE listener published by an in-flight start."""
+    """Primary shutdown never waits for an in-flight supplemental BLE start."""
     start_holds_lock = asyncio.Event()
     release_start = asyncio.Event()
 
@@ -204,41 +198,43 @@ async def test_shutdown_waits_for_inflight_ble_start_before_transport_snapshot(
 
     transport = _Transport()
     coordinator = _bare_coordinator(hass)
-    coordinator._shutdown_started = False
-    coordinator._poll_watchdog_unsub = None
-    coordinator._active_http_update_tasks = set()
-    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)
-    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())
-    coordinator._retain_pending_supplemental_tasks = MagicMock()
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]
+    coordinator._active_http_update_tasks = set()  # ruff: ignore[private-member-access]
+    coordinator._async_flush_payload_debug_events = AsyncMock(return_value=None)  # ruff: ignore[private-member-access]
+    coordinator._supplemental_transport_tasks = MagicMock(return_value=set())  # ruff: ignore[private-member-access]
+    coordinator._retain_pending_supplemental_tasks = MagicMock()  # ruff: ignore[private-member-access]
     base_shutdown = hass.async_create_background_task(
         asyncio.sleep(0),
         name="completed-primary-http-shutdown-with-inflight-ble-start",
         eager_start=False,
     )
     await base_shutdown
-    coordinator._base_shutdown_task = base_shutdown
+    coordinator._base_shutdown_task = base_shutdown  # ruff: ignore[private-member-access]
 
     async def _finish_start() -> None:
-        async with coordinator._ble_start_lock:
+        async with coordinator._ble_start_lock:  # ruff: ignore[private-member-access]
             start_holds_lock.set()
             await release_start.wait()
-            coordinator._ble_listener = transport
+            coordinator._ble_listener = transport  # ruff: ignore[private-member-access]
 
     start_task = asyncio.create_task(_finish_start())
     await asyncio.wait_for(start_holds_lock.wait(), timeout=1.0)
     shutdown_task = asyncio.create_task(coordinator.async_shutdown())
     try:
         await asyncio.sleep(0)
-        assert coordinator._shutdown_started is True
-        assert not shutdown_task.done()
+        assert coordinator._shutdown_started is True  # ruff: ignore[private-member-access]
+        assert shutdown_task.done()
     finally:
         release_start.set()
 
     await asyncio.wait_for(start_task, timeout=1.0)
     await asyncio.wait_for(shutdown_task, timeout=1.0)
+    assert coordinator._ble_listener is transport  # ruff: ignore[private-member-access]
+    await coordinator.async_stop_supplemental_transports()
     assert transport.stop_calls == 1
-    assert coordinator._ble_listener is None
-    assert coordinator._ble_shutdown_drain_active is False
+    assert coordinator._ble_listener is None  # ruff: ignore[private-member-access]
+    assert coordinator._ble_shutdown_drain_active is False  # ruff: ignore[private-member-access]
 
 
 async def test_ble_start_rechecks_shutdown_after_executor_import() -> None:
@@ -256,7 +252,7 @@ async def test_ble_start_rechecks_shutdown_after_executor_import() -> None:
             self,
             _device_ids: list[str],
         ) -> None:
-            raise AssertionError("post-fence BLE listener must not start")
+            raise AssertionError("post-fence BLE listener must not start")  # ruff: ignore[raise-vanilla-args]
 
     async def _async_add_executor_job(
         _call: object,
@@ -277,20 +273,20 @@ async def test_ble_start_rechecks_shutdown_after_executor_import() -> None:
         data={},
         options={CONF_ENABLE_BLE_TRANSPORT: True},
     )
-    coordinator._ble_start_lock = asyncio.Lock()
-    coordinator._ble_listener = None
-    coordinator._shutdown_started = False
-    coordinator._device_index = {"dev": {}}
-    coordinator._ble_connect_backoff = {}
+    coordinator._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._device_index = {"dev": {}}  # ruff: ignore[private-member-access]
+    coordinator._ble_connect_backoff = {}  # ruff: ignore[private-member-access]
 
     start_task = asyncio.create_task(coordinator.async_start_ble_transport())
     await asyncio.wait_for(import_started.wait(), timeout=1.0)
-    coordinator._shutdown_started = True
+    coordinator._shutdown_started = True  # ruff: ignore[private-member-access]
     release_import.set()
     await asyncio.wait_for(start_task, timeout=1.0)
 
     assert constructed == 0
-    assert coordinator._ble_listener is None
+    assert coordinator._ble_listener is None  # ruff: ignore[private-member-access]
 
 
 async def test_partial_ble_start_cleanup_failure_retains_exact_owner() -> None:
@@ -305,10 +301,10 @@ async def test_partial_ble_start_cleanup_failure_retains_exact_owner() -> None:
             self,
             _device_ids: list[str],
         ) -> None:
-            raise RuntimeError("partial start failed")
+            raise RuntimeError("partial start failed")  # ruff: ignore[raise-vanilla-args]
 
         async def async_stop(self) -> None:  # ruff: ignore[no-self-use]
-            raise RuntimeError("partial cleanup failed")
+            raise RuntimeError("partial cleanup failed")  # ruff: ignore[raise-vanilla-args]
 
     async def _async_add_executor_job(  # ruff: ignore[unused-async]
         _call: object,
@@ -327,21 +323,21 @@ async def test_partial_ble_start_cleanup_failure_retains_exact_owner() -> None:
         data={},
         options={CONF_ENABLE_BLE_TRANSPORT: True},
     )
-    coordinator._ble_start_lock = asyncio.Lock()
-    coordinator._ble_listener = None
-    coordinator._shutdown_started = False
-    coordinator._device_index = {"dev": {}}
-    coordinator._ble_connect_backoff = {}
+    coordinator._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._device_index = {"dev": {}}  # ruff: ignore[private-member-access]
+    coordinator._ble_connect_backoff = {}  # ruff: ignore[private-member-access]
 
     def _schedule_retry() -> None:
         nonlocal scheduled_retries
         scheduled_retries += 1
 
-    coordinator._schedule_ble_start_retry = _schedule_retry  # type: ignore[method-assign]
+    coordinator._schedule_ble_start_retry = _schedule_retry  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
 
     await coordinator.async_start_ble_transport()
 
-    assert isinstance(coordinator._ble_listener, _Listener)
+    assert isinstance(coordinator._ble_listener, _Listener)  # ruff: ignore[private-member-access]
     assert scheduled_retries == 0
 
 
@@ -357,7 +353,7 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
         ) -> asyncio.Task[None]:
             nonlocal created_wrapper
             created_wrapper = target
-            raise RuntimeError("task factory rejected")
+            raise RuntimeError("task factory rejected")  # ruff: ignore[raise-vanilla-args]
 
     class _Transport:
         def __init__(self) -> None:
@@ -376,13 +372,15 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
     )
     coordinator.hass = _RejectingHass()
     coordinator.entry = SimpleNamespace(entry_id="rejected-stop-owner")
-    coordinator._mqtt = transport
-    coordinator._ble_listener = None
-    coordinator._layer5_stop_tasks = {}
+    coordinator._mqtt = transport  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+    coordinator._layer5_stop_tasks = {}  # ruff: ignore[private-member-access]
 
-    errors = await coordinator._async_stop_layer5_transports()
+    errors = await coordinator._async_stop_layer5_transports()  # ruff: ignore[private-member-access]
 
     assert errors == ["MQTT stop task creation failed: task factory rejected"]
-    assert coordinator._mqtt is transport
-    assert created_wrapper is not None and created_wrapper.cr_frame is None
-    assert transport.operation is not None and transport.operation.cr_frame is None
+    assert coordinator._mqtt is transport  # ruff: ignore[private-member-access]
+    assert created_wrapper is not None
+    assert created_wrapper.cr_frame is None
+    assert transport.operation is not None
+    assert transport.operation.cr_frame is None

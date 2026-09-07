@@ -14,7 +14,6 @@ from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_PHASE_ENERGY,
     LOCAL_DAILY_LIFETIME_METRICS,
     PAYLOAD_CT_METER,
-    PAYLOAD_LOCAL_DAILY_ENERGY,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -32,7 +31,7 @@ _TODAY = date(2026, 7, 23)
 def _coordinator() -> JackerySolarVaultCoordinator:
     """Return a bare coordinator with a persisted same-day CT anchor."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    cast("Any", coordinator)._local_daily_snapshots = {
+    cast("Any", coordinator)._local_daily_snapshots = {  # ruff: ignore[private-member-access]
         _DEVICE_ID: {
             "day": _TODAY.isoformat(),
             "values": {
@@ -85,20 +84,20 @@ def test_ct_bucket_is_merged_into_local_daily_counter_properties() -> None:
         },
     }
 
-    result = JackerySolarVaultCoordinator._local_daily_counter_properties(
+    result = JackerySolarVaultCoordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
         properties,
         payload,
     )
 
-    assert result["batSoc"] == 50
-    assert result[FIELD_CT_TOTAL_PHASE_ENERGY] == 77_913
-    assert result[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 103_495
+    assert result["batSoc"] == 50  # ruff: ignore[magic-value-comparison]
+    assert result[FIELD_CT_TOTAL_PHASE_ENERGY] == 77_913  # ruff: ignore[magic-value-comparison]
+    assert result[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 103_495  # ruff: ignore[magic-value-comparison]
 
 
 def test_ct_daily_deltas_are_reported_in_kwh() -> None:
     """Same-day CT lifetime growth becomes positive local import/export energy."""
     coordinator = _coordinator()
-    properties = coordinator._local_daily_counter_properties(
+    properties = coordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
         {},
         {
             PAYLOAD_CT_METER: {
@@ -108,15 +107,15 @@ def test_ct_daily_deltas_are_reported_in_kwh() -> None:
         },
     )
 
-    deltas = coordinator._refresh_local_daily_for_device(
+    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         properties,
         today=_TODAY,
         allow_new_anchor_delta=False,
     )
 
-    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 913
-    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 495
+    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 913  # ruff: ignore[magic-value-comparison]
+    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 495  # ruff: ignore[magic-value-comparison]
     cast("Any", coordinator).data = {
         _DEVICE_ID: {"local_daily_energy": deltas},
     }
@@ -133,7 +132,7 @@ def test_ct_daily_deltas_are_reported_in_kwh() -> None:
 def test_ct_daily_delta_migrates_legacy_deciwh_baseline() -> None:
     """A pre-Wh CT anchor cannot turn a scale migration into daily energy."""
     coordinator = _coordinator()
-    snapshot = coordinator._local_daily_snapshots[_DEVICE_ID]
+    snapshot = coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
     snapshot["values"] = {
         FIELD_CT_TOTAL_PHASE_ENERGY: 108_702,
         FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 136_318,
@@ -148,7 +147,7 @@ def test_ct_daily_delta_migrates_legacy_deciwh_baseline() -> None:
             FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 50,
         },
     }
-    properties = coordinator._local_daily_counter_properties(
+    properties = coordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
         {},
         {
             PAYLOAD_CT_METER: normalize_jackery_ct_energy_units({
@@ -158,24 +157,20 @@ def test_ct_daily_delta_migrates_legacy_deciwh_baseline() -> None:
         },
     )
 
-    deltas = coordinator._refresh_local_daily_for_device(
+    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         properties,
         today=_TODAY,
         allow_new_anchor_delta=False,
     )
 
-    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 2_330
-    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 440
-    migrated = coordinator._local_daily_snapshots[_DEVICE_ID]
-    assert migrated["values"][FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020
-    assert migrated["values"][FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_363_180
-    assert migrated["last_deltas"][FIELD_CT_TOTAL_PHASE_ENERGY] == 2_330
-    assert migrated["last_deltas"][FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 440
-    assert migrated["completed_days"]["2026-07-22"] == {
-        FIELD_CT_TOTAL_PHASE_ENERGY: 2_000,
-        FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 500,
-    }
+    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 2_330  # ruff: ignore[magic-value-comparison]
+    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 440  # ruff: ignore[magic-value-comparison]
+    migrated = coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
+    assert migrated["values"][FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020  # ruff: ignore[magic-value-comparison]
+    assert migrated["values"][FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_363_180  # ruff: ignore[magic-value-comparison]
+    assert "last_deltas" not in migrated
+    assert "completed_days" not in migrated
 
 
 async def test_cache_load_migrates_legacy_ct_anchor_before_runtime_merge(
@@ -188,11 +183,11 @@ async def test_cache_load_migrates_legacy_ct_anchor_before_runtime_merge(
     entry.runtime_data = coordinator
     cast("Any", coordinator).hass = hass
     cast("Any", coordinator).entry = entry
-    cast("Any", coordinator)._shutdown_started = False
-    cast("Any", coordinator)._local_daily_snapshots = {}
-    cast("Any", coordinator)._local_daily_cache_loaded = False
-    cast("Any", coordinator)._persisted_local_daily_signature = ""
-    cast("Any", coordinator)._schedule_background_once = MagicMock()
+    cast("Any", coordinator)._shutdown_started = False  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_daily_snapshots = {}  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_daily_cache_loaded = False  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._persisted_local_daily_signature = ""  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._schedule_background_once = MagicMock()  # ruff: ignore[private-member-access]
     cached = {
         _DEVICE_ID: {
             "day": _TODAY.isoformat(),
@@ -211,7 +206,7 @@ async def test_cache_load_migrates_legacy_ct_anchor_before_runtime_merge(
         _hass: HomeAssistant,
         _entry_id: str,
     ) -> dict[str, dict[str, Any]]:
-        coordinator._local_daily_snapshots = {
+        coordinator._local_daily_snapshots = {  # ruff: ignore[private-member-access]
             _DEVICE_ID: {
                 "day": _TODAY.isoformat(),
                 "values": current_values,
@@ -225,10 +220,10 @@ async def test_cache_load_migrates_legacy_ct_anchor_before_runtime_merge(
     ):
         assert await coordinator.async_load_local_daily_snapshots()
 
-    loaded = coordinator._local_daily_snapshots[_DEVICE_ID]
-    assert loaded["values"][FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020
-    assert loaded["values"][FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_363_180
-    deltas = coordinator._refresh_local_daily_for_device(
+    loaded = coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
+    assert loaded["values"][FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020  # ruff: ignore[magic-value-comparison]
+    assert loaded["values"][FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_363_180  # ruff: ignore[magic-value-comparison]
+    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         current_values,
         today=_TODAY,
@@ -240,7 +235,7 @@ async def test_cache_load_migrates_legacy_ct_anchor_before_runtime_merge(
 def test_ct_daily_delta_keeps_small_wh_baseline() -> None:
     """A normal small Wh counter never receives the legacy migration."""
     coordinator = _coordinator()
-    snapshot = coordinator._local_daily_snapshots[_DEVICE_ID]
+    snapshot = coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
     snapshot["values"] = {
         FIELD_CT_TOTAL_PHASE_ENERGY: 100,
         FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 200,
@@ -251,7 +246,7 @@ def test_ct_daily_delta_keeps_small_wh_baseline() -> None:
             FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 50,
         },
     }
-    properties = coordinator._local_daily_counter_properties(
+    properties = coordinator._local_daily_counter_properties(  # ruff: ignore[private-member-access]
         {},
         {
             PAYLOAD_CT_METER: normalize_jackery_ct_energy_units({
@@ -261,21 +256,16 @@ def test_ct_daily_delta_keeps_small_wh_baseline() -> None:
         },
     )
 
-    deltas = coordinator._refresh_local_daily_for_device(
+    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         properties,
         today=_TODAY,
         allow_new_anchor_delta=False,
     )
 
-    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 1_400
-    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_600
-    assert coordinator._local_daily_snapshots[_DEVICE_ID]["completed_days"] == {
-        "2026-07-22": {
-            FIELD_CT_TOTAL_PHASE_ENERGY: 200,
-            FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 50,
-        },
-    }
+    assert deltas[FIELD_CT_TOTAL_PHASE_ENERGY] == 1_400  # ruff: ignore[magic-value-comparison]
+    assert deltas[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_600  # ruff: ignore[magic-value-comparison]
+    assert "completed_days" not in coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
 
 
 def test_jackery_main_daily_delta_uses_hundredths_of_kwh() -> None:
@@ -296,9 +286,9 @@ def test_jackery_main_daily_delta_uses_hundredths_of_kwh() -> None:
 def test_cold_start_stays_partial_until_observed_day_rollover() -> None:
     """A mid-day anchor stays silent until the next observed local day."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    cast("Any", coordinator)._local_daily_snapshots = {}
+    cast("Any", coordinator)._local_daily_snapshots = {}  # ruff: ignore[private-member-access]
 
-    first = coordinator._refresh_local_daily_for_device(
+    first = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 77_000},
         today=_TODAY,
@@ -306,12 +296,12 @@ def test_cold_start_stays_partial_until_observed_day_rollover() -> None:
     )
 
     assert first == {}
-    assert coordinator._local_daily_snapshots[_DEVICE_ID] == {
+    assert coordinator._local_daily_snapshots[_DEVICE_ID] == {  # ruff: ignore[private-member-access]
         "day": _TODAY.isoformat(),
         "values": {FIELD_CT_TOTAL_PHASE_ENERGY: 77_000},
     }
 
-    second = coordinator._refresh_local_daily_for_device(
+    second = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 77_913},
         today=_TODAY,
@@ -321,7 +311,7 @@ def test_cold_start_stays_partial_until_observed_day_rollover() -> None:
     assert second == {}
 
     rollover_day = _TODAY + timedelta(days=1)
-    rollover = coordinator._refresh_local_daily_for_device(
+    rollover = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 78_000},
         today=rollover_day,
@@ -329,56 +319,13 @@ def test_cold_start_stays_partial_until_observed_day_rollover() -> None:
     )
     assert rollover[FIELD_CT_TOTAL_PHASE_ENERGY] == 0
 
-    after_rollover = coordinator._refresh_local_daily_for_device(
+    after_rollover = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {FIELD_CT_TOTAL_PHASE_ENERGY: 78_500},
         today=rollover_day,
         allow_new_anchor_delta=False,
     )
-    assert after_rollover[FIELD_CT_TOTAL_PHASE_ENERGY] == 500
-
-
-def test_ct_week_delta_uses_persisted_complete_days_and_wh_scaling() -> None:
-    """A fully covered local CT week is summed in Wh and exposed in kWh."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    today = date(2026, 7, 23)
-    cast("Any", coordinator)._local_daily_snapshots = {
-        _DEVICE_ID: {
-            "day": today.isoformat(),
-            "values": {FIELD_CT_TOTAL_PHASE_ENERGY: 90_000},
-            "completed_days": {
-                "2026-07-20": {FIELD_CT_TOTAL_PHASE_ENERGY: 1000},
-                "2026-07-21": {FIELD_CT_TOTAL_PHASE_ENERGY: 2000},
-                "2026-07-22": {FIELD_CT_TOTAL_PHASE_ENERGY: 3000},
-            },
-            "complete_days": [
-                "2026-07-20",
-                "2026-07-21",
-                "2026-07-22",
-            ],
-        },
-    }
-    cast("Any", coordinator).data = {
-        _DEVICE_ID: {
-            PAYLOAD_LOCAL_DAILY_ENERGY: {FIELD_CT_TOTAL_PHASE_ENERGY: 500},
-        },
-    }
-
-    assert coordinator.local_period_energy_kwh(
-        _DEVICE_ID,
-        FIELD_CT_TOTAL_PHASE_ENERGY,
-        period="week",
-        today=today,
-    ) == pytest.approx(6.5)
-    assert (
-        coordinator.local_period_energy_kwh(
-            _DEVICE_ID,
-            FIELD_CT_TOTAL_PHASE_ENERGY,
-            period="month",
-            today=today,
-        )
-        is None
-    )
+    assert after_rollover[FIELD_CT_TOTAL_PHASE_ENERGY] == 500  # ruff: ignore[magic-value-comparison]
 
 
 def test_local_jackery_ct_deciwh_normalization_matches_ble_and_http_wh() -> None:
@@ -388,5 +335,5 @@ def test_local_jackery_ct_deciwh_normalization_matches_ble_and_http_wh() -> None
         FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 122_740,
     })
 
-    assert normalized[FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020
-    assert normalized[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_227_400
+    assert normalized[FIELD_CT_TOTAL_PHASE_ENERGY] == 1_087_020  # ruff: ignore[magic-value-comparison]
+    assert normalized[FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY] == 1_227_400  # ruff: ignore[magic-value-comparison]

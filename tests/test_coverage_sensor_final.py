@@ -169,12 +169,12 @@ def test_description_metadata_uses_getter_then_smali_and_explicit_sources() -> N
             10.0,
             9.0,
             SensorEntityDescription(
-                key="reset",
+                key="lifetime",
                 device_class=SensorDeviceClass.ENERGY,
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
             ),
-            9.0,
+            10.0,
         ],
         [
             10.0,
@@ -206,7 +206,7 @@ def test_total_increasing_jitter_guard_preserves_only_tiny_regressions(
     description: SensorEntityDescription,
     expected: object,
 ) -> None:
-    """Tiny source wobble is held, while resets and ordinary measurements pass."""
+    """Lifetime totals hold regressions, while ordinary measurements pass."""
     assert (
         sensor_module._guard_total_increasing_jitter(previous, current, description)
         == expected

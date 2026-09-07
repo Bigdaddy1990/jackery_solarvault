@@ -7,11 +7,11 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components import jackery_solarvault as integration
 from custom_components.jackery_solarvault import (
-    _LOCAL_MQTT_RUNTIME_KEY,
+    _LOCAL_MQTT_RUNTIME_KEY,  # ruff: ignore[import-private-name]
     JackeryLocalMqttClient,
     async_unload_entry,
 )
-from custom_components.jackery_solarvault.const import DOMAIN
+from custom_components.jackery_solarvault.const import CONF_THIRD_PARTY_MQTT_IP, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -75,7 +75,7 @@ async def test_unload_defers_local_mqtt_when_unsubscribe_fails(
         assert await async_unload_entry(hass, entry) is True
 
     assert _LOCAL_MQTT_RUNTIME_KEY not in bucket
-    assert client in bucket[integration._SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY]
+    assert client in bucket[integration._SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY]  # ruff: ignore[private-member-access]
     cleanup.assert_called_once_with(hass, entry)
 
     # A fast reload must not create a second subscription before the deferred
@@ -84,15 +84,18 @@ async def test_unload_defers_local_mqtt_when_unsubscribe_fails(
     entry.runtime_data = coordinator
     hass.config_entries.async_update_entry(
         entry,
-        options={"local_mqtt_enable": True},
+        options={
+            "local_mqtt_enable": True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.0.2.10",
+        },
     )
     with (
         patch.object(integration, "JackeryLocalMqttClient") as client_cls,
         patch.object(integration, "_schedule_supplemental_cleanup") as retry_cleanup,
     ):
-        await integration._async_start_local_mqtt(hass, entry, coordinator)
+        await integration._async_start_local_mqtt(hass, entry, coordinator)  # ruff: ignore[private-member-access]
 
     client_cls.assert_not_called()
     assert client.async_stop.await_count == 1
-    assert bucket[integration._LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY] is True
+    assert bucket[integration._LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY] is True  # ruff: ignore[private-member-access]
     retry_cleanup.assert_called_once_with(hass, entry)

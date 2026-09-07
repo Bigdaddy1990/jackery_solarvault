@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import custom_components.jackery_solarvault as integration
-from custom_components.jackery_solarvault.config_flow import _current_local_mqtt_options
+from custom_components.jackery_solarvault.config_flow import _current_local_mqtt_options  # ruff: ignore[import-private-name]
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_LOCAL_MQTT_ENABLE,
@@ -18,14 +18,14 @@ from custom_components.jackery_solarvault.util import local_mqtt_opt_in
 class MockConfigEntry:
     """Mock ConfigEntry with options and data dicts."""
 
-    def __init__(self, options: dict | None = None, data: dict | None = None) -> None:  # noqa: D107
+    def __init__(self, options: dict | None = None, data: dict | None = None) -> None:  # ruff: ignore[undocumented-public-init]
         self.options = options or {}
         self.data = data or {}
 
-    def __contains__(self, key) -> bool:  # noqa: D105
+    def __contains__(self, key) -> bool:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         return key in self.options or key in self.data
 
-    def get(self, key, default=None):  # noqa: D102
+    def get(self, key, default=None):  # ruff: ignore[missing-type-function-argument, missing-return-type-undocumented-public-function, undocumented-public-method]
         return self.options.get(key, self.data.get(key, default))
 
 
@@ -36,7 +36,7 @@ def test_local_mqtt_opt_in_legacy_true() -> None:
 
 
 def test_local_mqtt_opt_in_explicit_false_respected() -> None:
-    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""
+    """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""  # ruff: ignore[line-too-long]
     entry = MockConfigEntry(
         options={"local_mqtt_enable": False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
     )
@@ -52,12 +52,12 @@ def test_local_mqtt_opt_in_legacy_false_third_party_false() -> None:
     assert local_mqtt_opt_in(entry) is False
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:  # noqa: D103
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_true() -> None:  # ruff: ignore[undocumented-public-function]
     entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True})
     assert local_mqtt_opt_in(entry) is True
 
 
-def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  # noqa: D103
+def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  # ruff: ignore[undocumented-public-function]
     entry = MockConfigEntry(options={}, data={CONF_THIRD_PARTY_MQTT_ENABLE: False})
     assert local_mqtt_opt_in(entry) is False
 
@@ -148,7 +148,7 @@ def test_legacy_migration_preserves_existing_canonical_disable() -> None:
         }
     )
 
-    integration._async_migrate_legacy_local_mqtt_options(hass, entry)
+    integration._async_migrate_legacy_local_mqtt_options(hass, entry)  # ruff: ignore[private-member-access]
 
     migrated = hass.config_entries.async_update_entry.call_args.kwargs["options"]
     assert migrated[CONF_THIRD_PARTY_MQTT_ENABLE] is False

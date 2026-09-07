@@ -11,7 +11,7 @@ remain unmodified by the transport-neutral ingest layer.
 
 from datetime import date
 
-from custom_components.jackery_solarvault.client.local_daily_cache import daily_delta
+from custom_components.jackery_solarvault.client.daily_energy import daily_delta
 from custom_components.jackery_solarvault.const import APP_DEVICE_STAT_PV_ENERGY
 
 _TODAY = date(2026, 7, 9)
@@ -41,6 +41,7 @@ def test_local_daily_pv_delta_is_nonnegative_when_valid() -> None:
     snapshot = {
         "day": _TODAY.isoformat(),
         "values": {APP_DEVICE_STAT_PV_ENERGY: 18_000},
+        "full_day_metrics": [APP_DEVICE_STAT_PV_ENERGY],
     }
 
     delta = daily_delta(

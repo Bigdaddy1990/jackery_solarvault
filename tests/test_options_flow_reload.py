@@ -21,10 +21,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.jackery_solarvault.const import DOMAIN
+from custom_components.jackery_solarvault.const import (
+    CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_SCAN_INTERVAL,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DEFAULT_SCAN_INTERVAL_SEC,
+    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    DOMAIN,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.data_entry_flow import FlowResultType
 
 if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigFlowResult
     from homeassistant.core import HomeAssistant
 
 _ACCOUNT = "tester@example.com"
@@ -91,5 +100,107 @@ async def _async_setup_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 async def _async_unload_entry(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     """Unload the entry so no runtime resources linger past the test."""
+    registered_services = dict(hass.services.async_services()[DOMAIN])
+    assert registered_services
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
+    assert hass.services.async_services()[DOMAIN] == registered_services
+
+
+async def _async_submit_options(
+    hass: HomeAssistant,
+    entry: MockConfigEntry,
+    user_input: dict[str, object],
+) -> ConfigFlowResult:
+    """Submit one real options flow and return its terminal result."""
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    return await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        user_input=user_input,
+    )
+
+
+async def test_setup_registers_no_config_entry_update_listener(
+    hass: HomeAssistant,
+) -> None:
+    """Flow-managed reloads must not race a config-entry update listener."""
+    entry = await _async_setup_entry(hass)
+    try:
+        assert not entry.update_listeners
+    finally:
+        await _async_unload_entry(hass, entry)
+
+
+async def test_scan_interval_option_is_applied_without_reload(
+    hass: HomeAssistant,
+) -> None:
+    """Ordinary options update the running coordinator without pausing it."""
+    entry = await _async_setup_entry(hass)
+    try:
+        with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+            result = await _async_submit_options(
+                hass,
+                entry,
+                {
+                    CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SEC + 1,
+                    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: (
+                        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+                    ),
+                },
+            )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        reload.assert_not_called()
+        assert entry.options[CONF_SCAN_INTERVAL] == DEFAULT_SCAN_INTERVAL_SEC + 1
+        assert (
+            entry.runtime_data.configured_update_interval.total_seconds()
+            == DEFAULT_SCAN_INTERVAL_SEC + 1
+        )
+    finally:
+        await _async_unload_entry(hass, entry)
+
+
+async def test_entity_creating_option_schedules_exactly_one_reload(
+    hass: HomeAssistant,
+) -> None:
+    """Options requiring new entities use Core's single automatic reload."""
+    entry = await _async_setup_entry(hass)
+    try:
+        with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+            result = await _async_submit_options(
+                hass,
+                entry,
+                {
+                    CONF_CREATE_CALCULATED_POWER_SENSORS: True,
+                    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: (
+                        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+                    ),
+                },
+            )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        reload.assert_called_once_with(entry.entry_id)
+    finally:
+        await _async_unload_entry(hass, entry)
+
+
+async def test_identical_semantic_options_do_not_reload(
+    hass: HomeAssistant,
+) -> None:
+    """Persisting implicit defaults must not pause an already running entry."""
+    entry = await _async_setup_entry(hass)
+    try:
+        with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+            result = await _async_submit_options(
+                hass,
+                entry,
+                {
+                    CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL_SEC,
+                    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: (
+                        DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+                    ),
+                },
+            )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        reload.assert_not_called()
+    finally:
+        await _async_unload_entry(hass, entry)

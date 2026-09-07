@@ -35,7 +35,7 @@ async def _setup_entry(
     http_data: dict | None = None,
 ) -> None:
     """Helper to set up a config entry with patched I/O."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -83,7 +83,7 @@ async def _setup_entry(
     return entry
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_integration_setup_creates_expected_entities(
     hass: HomeAssistant,
     mock_jackery_login: None,
@@ -96,7 +96,7 @@ async def test_integration_setup_creates_expected_entities(
     assert coordinator is not None
 
     # Verify entities are registered in entity registry
-    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -131,13 +131,13 @@ async def test_integration_setup_creates_expected_entities(
     assert len(text_entities) > 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_coordinator_poll_updates_entity_states(
     hass: HomeAssistant,
     mock_jackery_login: None,
 ) -> None:
     """Coordinator polling must update entity states correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -192,7 +192,7 @@ async def test_coordinator_poll_updates_entity_states(
         assert coordinator is not None
 
     # Get the battery state sensor entity ID
-    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -201,7 +201,7 @@ async def test_coordinator_poll_updates_entity_states(
             e
             for e in entities
             if "battery" in e.entity_id.lower() and e.domain == "sensor"
-        ),  # noqa: E501, RUF100
+        ),
         None,
     )
     assert battery_sensor is not None
@@ -211,7 +211,7 @@ async def test_coordinator_poll_updates_entity_states(
     assert state is not None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_integration_unload_removes_entities(
     hass: HomeAssistant,
     mock_jackery_login: None,
@@ -220,7 +220,7 @@ async def test_integration_unload_removes_entities(
     entry = await _setup_entry(hass, mock_jackery_login)
 
     # Verify entities exist before unload
-    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -242,7 +242,7 @@ async def test_integration_unload_removes_entities(
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reload_integration_preserves_entities(
     hass: HomeAssistant,
     mock_jackery_login: None,
@@ -250,7 +250,7 @@ async def test_reload_integration_preserves_entities(
     """Reloading integration must preserve entities."""
     entry = await _setup_entry(hass, mock_jackery_login)
 
-    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -295,7 +295,7 @@ async def test_reload_integration_preserves_entities(
     assert entity_ids_after == entity_ids_before
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_integration_with_multiple_devices(
     hass: HomeAssistant,
     mock_jackery_login: None,
@@ -318,7 +318,7 @@ async def test_integration_with_multiple_devices(
 
     entry = await _setup_entry(hass, mock_jackery_login, http_data=multi_device_data)
 
-    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
@@ -333,13 +333,13 @@ async def test_integration_with_multiple_devices(
     assert "device-1" in device_ids or "device-2" in device_ids
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_integration_config_flow_reauth_updates_runtime(
     hass: HomeAssistant,
     mock_jackery_login: None,
 ) -> None:
     """Reauth flow must update runtime data correctly."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: I001
+    from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -386,10 +386,12 @@ async def test_integration_config_flow_reauth_updates_runtime(
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
 
-    result2 = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {CONF_PASSWORD: "new-password"},
-    )
+    with patch.object(hass.config_entries, "async_schedule_reload") as schedule_reload:
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "new-password"},
+        )
+    schedule_reload.assert_called_once_with(entry.entry_id)
     assert result2["type"] == FlowResultType.ABORT
     assert result2["reason"] == "reauth_successful"
 

@@ -4,14 +4,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.hassfest import _validate_manifest, run
+from scripts.hassfest import _validate_manifest, run  # ruff: ignore[import-private-name]  # isort: skip
 
 _INTEGRATION_PATH = (
     Path(__file__).resolve().parents[1] / "custom_components" / "jackery_solarvault"
 )
 
 
-def _manifest(**overrides: Any) -> dict[str, Any]:
+def _manifest(**overrides: Any) -> dict[str, Any]:  # ruff: ignore[any-type]  # isort: skip
     """Return the smallest manifest accepted by the offline validator."""
     manifest: dict[str, Any] = {
         "codeowners": ["@owner"],
@@ -48,7 +48,7 @@ def test_project_manifest_passes_offline_validation() -> None:
 
 def test_hassfest_run_reports_each_validation_error(
     tmp_path: Path,
-    capsys: Any,
+    capsys: Any,  # ruff: ignore[any-type]  # isort: skip
 ) -> None:
     """A failing shim must expose actionable errors instead of exiting silently."""
     integration_path = tmp_path / "missing_integration"
