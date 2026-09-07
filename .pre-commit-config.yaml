@@ -76,7 +76,7 @@ repos:
         args: [--strict, --ignore-missing-imports]
         additional_dependencies: [types-pyyaml, pydantic]
         exclude: ^(manifest.*|docs/|scripts/)
-        
+
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.79
     hooks:

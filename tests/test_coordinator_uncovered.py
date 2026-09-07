@@ -65,7 +65,7 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 
 
-class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
+class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     """Test JackerySolarVaultCoordinator class."""
 
     @staticmethod
@@ -195,7 +195,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         assert isinstance(timeout, float)
         assert timeout > 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_update_data_records_next_poll_delay(self) -> None:
         """Test _async_update_data records elapsed and configured next delay."""
         coordinator = self._create_coordinator()
@@ -232,7 +232,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         if task:
             task.cancel()
 
-    def test_async_schedule_local_mqtt_device_config(self) -> None:  # noqa: F811
+    def test_async_schedule_local_mqtt_device_config(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test async_schedule_local_mqtt_device_config method."""
         coordinator = self._create_coordinator()
         task = coordinator.async_schedule_local_mqtt_device_config()
@@ -321,7 +321,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         """Test _ble_backoff_for_device method."""
         coordinator = self._create_coordinator()
         backoff = coordinator._ble_backoff_for_device("test_device")
-        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff  # noqa: I001
+        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
 
         assert isinstance(backoff, BleConnectBackoff)
 
@@ -356,7 +356,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         remaining = coordinator._ble_connect_backoff_remaining(
             "test_device", time.monotonic()
         )  # noqa: E501, RUF100, SLF001
-        assert remaining == 0.0  # noqa: RUF069
+        assert remaining == 0.0  # ruff: ignore[float-equality-comparison]
 
     def test_local_mqtt_config_diagnostics_increment(self) -> None:
         """Test local_mqtt_config_diagnostics tracks scheduled count."""
@@ -432,9 +432,9 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         Skipped: Requires complex MQTT client mocking for many methods.
         """
 
-    def test_ble_connect_backoff_methods(self) -> None:  # noqa: PLR6301
+    def test_ble_connect_backoff_methods(self) -> None:  # ruff: ignore[no-self-use]
         """Test BleConnectBackoff methods."""
-        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff  # noqa: I001
+        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
 
         backoff = BleConnectBackoff()
 
@@ -442,7 +442,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         import time
 
         remaining = backoff.seconds_until_allowed(time.monotonic())
-        assert remaining == 0.0  # noqa: RUF069
+        assert remaining == 0.0  # ruff: ignore[float-equality-comparison]
 
         # Test record_failure
         delay = backoff.record_failure(time.monotonic())
@@ -455,7 +455,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         # Test record_success
         backoff.record_success()
         remaining = backoff.seconds_until_allowed(time.monotonic())
-        assert remaining == 0.0  # noqa: RUF069
+        assert remaining == 0.0  # ruff: ignore[float-equality-comparison]
 
     def test_polling_diagnostics_methods(self) -> None:
         """Test polling diagnostics methods."""
@@ -469,7 +469,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         diag = coordinator.polling_diagnostics
         assert isinstance(diag, dict)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_poll_cycle_timeout_and_delay_diagnostics(self) -> None:
         """Test _poll_cycle_timeout_seconds and cycle delay diagnostics."""
         coordinator = self._create_coordinator()
@@ -497,7 +497,7 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(5.0)
         assert diagnostics["next_poll_delay_sec"] == pytest.approx(300.0)
 
-    def test_schedule_background_once(self) -> None:  # noqa: F811
+    def test_schedule_background_once(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _schedule_background_once method."""
         coordinator = self._create_coordinator()
 
@@ -528,13 +528,13 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
         coordinator._retain_pending_supplemental_tasks(tasks)
         assert coordinator._supplemental_transport_tasks() is not None
 
-    def test_local_mqtt_direct_client_connected(self) -> None:  # noqa: F811
+    def test_local_mqtt_direct_client_connected(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _local_mqtt_direct_client_connected method."""
         coordinator = self._create_coordinator()
         result = coordinator._local_mqtt_direct_client_connected()
         assert isinstance(result, bool)
 
-    def test_local_mqtt_is_active(self) -> None:  # noqa: F811
+    def test_local_mqtt_is_active(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _local_mqtt_is_active method."""
         coordinator = self._create_coordinator()
         import time
@@ -638,10 +638,10 @@ class TestJackerySolarVaultCoordinator:  # noqa: PLR0904
     #     asyncio.run(coordinator.async_shutdown())
 
 
-class TestCoordinatorUtilities:  # noqa: PLR0904
+class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     """Test utility functions in coordinator module."""
 
-    def test_is_system_busy_error(self) -> None:  # noqa: PLR6301
+    def test_is_system_busy_error(self) -> None:  # ruff: ignore[no-self-use]
         """Test _is_system_busy_error function."""
 
         # The function checks for "code=10426" in the error string
@@ -660,7 +660,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         err4 = MockError("code=10427")
         assert _is_system_busy_error(err4) is False
 
-    def test_normalized_region(self) -> None:  # noqa: PLR6301
+    def test_normalized_region(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalized_region function."""
         assert normalized_region("de") == "DE"
         assert normalized_region("us") == "US"
@@ -670,7 +670,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert normalized_region("De") == "DE"
         assert normalized_region("Us") == "US"
 
-    def test_source_regions(self) -> None:  # noqa: PLR6301
+    def test_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test source_regions function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_COUNTRY,
@@ -692,7 +692,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert source_regions({FIELD_SYSTEM_REGION: ""}) == []
         assert source_regions({FIELD_SYSTEM_REGION: None}) == []
 
-    def test_normalized_source_regions(self) -> None:  # noqa: PLR6301
+    def test_normalized_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalized_source_regions function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_COUNTRY,
@@ -709,7 +709,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         result = normalized_source_regions(source)
         assert result == ["DE"]
 
-    def test_first_nonblank_source_name(self) -> None:  # noqa: PLR6301
+    def test_first_nonblank_source_name(self) -> None:  # ruff: ignore[no-self-use]
         """Test first_nonblank_source_name function."""
         source = {"name1": "test", "name2": ""}
         result = first_nonblank_source_name(source, "name1", "name2")
@@ -727,7 +727,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         result = first_nonblank_source_name(source, "name1", "name2")
         assert result == "test"
 
-    def test_is_mqtt_auth_failure(self) -> None:  # noqa: PLR6301
+    def test_is_mqtt_auth_failure(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_mqtt_auth_failure function."""
         # Function checks for MQTT return codes 4, 5, 128-135 in message text
         # and "bad user name or password" or "not authorized"
@@ -744,7 +744,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_mqtt_auth_failure("connect rc=3") is False  # Not an auth failure code
         assert is_mqtt_auth_failure("code:4") is False  # v5 codes only >= 128
 
-    def test_is_transient_connect_failure(self) -> None:  # noqa: PLR6301
+    def test_is_transient_connect_failure(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_transient_connect_failure function."""
         # Function checks for "server unavailable", "connection refused", "connection timed out", or "unknown"
         # but first excludes auth failures via is_mqtt_auth_failure
@@ -759,13 +759,13 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_transient_connect_failure("connection reset") is False
         assert is_transient_connect_failure("broken pipe") is False
 
-    def test_mqtt_connect_failure_signature(self) -> None:  # noqa: PLR6301
+    def test_mqtt_connect_failure_signature(self) -> None:  # ruff: ignore[no-self-use]
         """Test mqtt_connect_failure_signature function."""
         sig = mqtt_connect_failure_signature("auth error")
         assert isinstance(sig, str)
         assert len(sig) > 0
 
-    def test_merge_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_dict_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test merge_dict_values function."""
         base = {"a": 1, "b": 2}
         updates = {"b": 3, "c": 4}
@@ -774,14 +774,14 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # Base should not be mutated
         assert base == {"a": 1, "b": 2}
 
-    def test_changed_dict_values(self) -> None:  # noqa: PLR6301
+    def test_changed_dict_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test changed_dict_values function."""
         old = {"a": 1, "b": 2}
         new = {"a": 1, "b": 3, "c": 4}
         result = changed_dict_values(old, new)
         assert result == {"b": 3, "c": 4}
 
-    def test_is_blank_value(self) -> None:  # noqa: PLR6301
+    def test_is_blank_value(self) -> None:  # ruff: ignore[no-self-use]
         """Test _is_blank_value function."""
         assert _is_blank_value(None) is True
         assert _is_blank_value("") is True
@@ -791,13 +791,13 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert _is_blank_value(False) is False
         assert _is_blank_value("text") is False
 
-    def test_clean_dict_list_update(self) -> None:  # noqa: PLR6301
+    def test_clean_dict_list_update(self) -> None:  # ruff: ignore[no-self-use]
         """Test _clean_dict_list_update function."""
         update = {"a": 1, "b": None, "c": ""}
         result = _clean_dict_list_update(update)
         assert result == {"a": 1}
 
-    def test_merge_identified_dict_lists(self) -> None:  # noqa: PLR6301
+    def test_merge_identified_dict_lists(self) -> None:  # ruff: ignore[no-self-use]
         """Test _merge_identified_dict_lists function."""
         current = [{"id": 1, "value": "a"}, {"id": 2, "value": "b"}]
         value = [{"id": 2, "value": "updated"}, {"id": 3, "value": "c"}]
@@ -807,47 +807,47 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         item2 = next(item for item in result if item["id"] == 2)
         assert item2["value"] == "updated"
 
-    def test_merge_present_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_present_dict_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test merge_present_dict_values function."""
         base = {"a": 1, "b": {"x": 10}}
         updates = {"b": {"y": 20}, "c": 3}
         result = merge_present_dict_values(base, updates)
         assert result == {"a": 1, "b": {"x": 10, "y": 20}, "c": 3}
 
-    def test_merge_missing_dict_values(self) -> None:  # noqa: PLR6301
+    def test_merge_missing_dict_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test merge_missing_dict_values function."""
         base = {"a": 1, "b": None}
         updates = {"b": 2, "c": 3}
         result = merge_missing_dict_values(base, updates)
         assert result == {"a": 1, "b": 2, "c": 3}
 
-    def test_sync_property_aliases(self) -> None:  # noqa: PLR6301
+    def test_sync_property_aliases(self) -> None:  # ruff: ignore[no-self-use]
         """Test sync_property_aliases function."""
         values = {"a": 1, "b": None}
         aliases = (("a", "b"),)
         result = sync_property_aliases(values, aliases)
         assert result == {"a": 1, "b": 1}
 
-    def test_find_dict_with_any_key(self) -> None:  # noqa: PLR6301
+    def test_find_dict_with_any_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test find_dict_with_any_key function."""
         obj = {"a": {"b": 1}, "c": 2}
         keys = frozenset(["b", "d"])
         result = find_dict_with_any_key(obj, keys)
         assert result == {"b": 1}
 
-    def test_find_list_for_key(self) -> None:  # noqa: PLR6301
+    def test_find_list_for_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test find_list_for_key function."""
         obj = {"a": [{"b": 1}]}
         result = find_list_for_key(obj, "a")
         assert result == [{"b": 1}]
 
-    def test_normalize_live_property_payload(self) -> None:  # noqa: PLR6301
+    def test_normalize_live_property_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalize_live_property_payload function."""
         source = {"prop1": "value1"}
         result = normalize_live_property_payload(source)
         assert isinstance(result, dict)
 
-    def test_call_function(self) -> None:  # noqa: PLR6301
+    def test_call_function(self) -> None:  # ruff: ignore[no-self-use]
         """Test call function."""
         # call is an async function that takes a coordinator, method name, and args
         import asyncio
@@ -860,13 +860,13 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert result == "result"
         coordinator.some_method.assert_called_once_with("arg1", kwarg1="value1")
 
-    def test_normalized_company_id(self) -> None:  # noqa: PLR6301
+    def test_normalized_company_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalized_company_id function."""
         assert normalized_company_id(123) == 123
         assert normalized_company_id("456") == 456
         assert normalized_company_id("invalid") is None
 
-    def test_normalized_region(self) -> None:  # noqa: F811, PLR6301
+    def test_normalized_region(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test normalized_region function."""
         # Function takes a single value parameter and normalizes it
         assert normalized_region("de") == "DE"
@@ -875,7 +875,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert normalized_region(None) is None
         assert normalized_region("") is None
 
-    def test_source_regions(self) -> None:  # noqa: F811, PLR6301
+    def test_source_regions(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test source_regions function."""
         # Function looks for FIELD_SYSTEM_REGION or FIELD_COUNTRY
         from custom_components.jackery_solarvault.const import (
@@ -895,7 +895,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert source_regions({}) == []
         assert source_regions({FIELD_SYSTEM_REGION: ""}) == []
 
-    def test_normalized_source_regions(self) -> None:  # noqa: F811, PLR6301
+    def test_normalized_source_regions(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test normalized_source_regions function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_COUNTRY,
@@ -912,13 +912,13 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         result2 = normalized_source_regions(source2)
         assert result2 == ["DE"]
 
-    def test_first_nonblank_source_name(self) -> None:  # noqa: F811, PLR6301
+    def test_first_nonblank_source_name(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test first_nonblank_source_name function."""
         source = {"name1": "test", "name2": ""}
         result = first_nonblank_source_name(source, "name1", "name2")
         assert result == "test"
 
-    def test_valid_price_sources(self) -> None:  # noqa: PLR6301
+    def test_valid_price_sources(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_price_sources function."""
         # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present
         from custom_components.jackery_solarvault.const import (
@@ -942,7 +942,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # Test non-list input
         assert valid_price_sources("not a list") == []
 
-    def test_is_alarm_message(self) -> None:  # noqa: PLR6301
+    def test_is_alarm_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_alarm_message function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_CMD,
@@ -963,7 +963,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # Not an alarm
         assert is_alarm_message("other", 999, {FIELD_CMD: 123}) is False
 
-    def test_is_third_party_mqtt_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_third_party_mqtt_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_third_party_mqtt_config_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -1019,7 +1019,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
             is_third_party_mqtt_config_message("other", 999, {FIELD_CMD: 123}) is False
         )  # noqa: E501, RUF100
 
-    def test_is_wifi_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_wifi_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_wifi_config_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
@@ -1044,7 +1044,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # Not a wifi config
         assert is_wifi_config_message("other", 999, {FIELD_CMD: 123}) is False
 
-    def test_is_wifi_list_message(self) -> None:  # noqa: PLR6301
+    def test_is_wifi_list_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_wifi_list_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_READ_WIFI_LIST,
@@ -1060,7 +1060,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_wifi_list_message(999, {FIELD_CMD: 123}) is False
         assert is_wifi_list_message(None, {}) is False
 
-    def test_is_time_zone_config_message(self) -> None:  # noqa: PLR6301
+    def test_is_time_zone_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_time_zone_config_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_GET_TIME_ZONE,
@@ -1086,7 +1086,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_time_zone_config_message(999, {FIELD_CMD: 123}) is False
         assert is_time_zone_config_message(None, {}) is False
 
-    def test_is_grid_standard_sync_message(self) -> None:  # noqa: PLR6301
+    def test_is_grid_standard_sync_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_grid_standard_sync_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_SYNC_GRID_STANDARD,
@@ -1107,7 +1107,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_grid_standard_sync_message(999, {FIELD_CMD: 123}) is False
         assert is_grid_standard_sync_message(None, {}) is False
 
-    def test_is_mqtt_connect_info_message(self) -> None:  # noqa: PLR6301
+    def test_is_mqtt_connect_info_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_mqtt_connect_info_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_SYNC_MQTT_CONNECT_INFO,
@@ -1130,7 +1130,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_mqtt_connect_info_message(999, {FIELD_CMD: 100}) is False
         assert is_mqtt_connect_info_message(None, {}) is False
 
-    def test_is_device_ota_version_message(self) -> None:  # noqa: PLR6301
+    def test_is_device_ota_version_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_device_ota_version_message function."""
         from custom_components.jackery_solarvault.const import (
             ACTION_ID_GET_DEVICE_OTA_VERSION,
@@ -1153,7 +1153,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_device_ota_version_message(999, {FIELD_CMD: 99}) is False
         assert is_device_ota_version_message(None, {}) is False
 
-    def test_is_subdevice_payload(self) -> None:  # noqa: PLR6301
+    def test_is_subdevice_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_subdevice_payload function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACTION_ID,
@@ -1264,13 +1264,13 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
             is False
         )  # noqa: E501, RUF100
 
-    def test_normalize_battery_pack_payload(self) -> None:  # noqa: PLR6301
+    def test_normalize_battery_pack_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalize_battery_pack_payload function."""
         item = {"sn": "123", "soc": 50}
         result = normalize_battery_pack_payload(item)
         assert isinstance(result, dict)
 
-    def test_looks_like_battery_pack(self) -> None:  # noqa: PLR6301
+    def test_looks_like_battery_pack(self) -> None:  # ruff: ignore[no-self-use]
         """Test looks_like_battery_pack function."""
         ct_meter_keys = frozenset(["ct_power"])
         battery_pack_hint_keys = frozenset(["sn", "soc"])
@@ -1287,7 +1287,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
             is False
         )  # noqa: E501, RUF100
 
-    def test_battery_packs_from_source(self) -> None:  # noqa: PLR6301
+    def test_battery_packs_from_source(self) -> None:  # ruff: ignore[no-self-use]
         """Test battery_packs_from_source function."""
         ct_meter_keys = frozenset(["ct_power"])
         battery_pack_hint_keys = frozenset(["sn", "soc"])
@@ -1297,26 +1297,26 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         )  # noqa: E501, RUF100
         assert isinstance(result, list)
 
-    def test_subdevice_serial(self) -> None:  # noqa: PLR6301
+    def test_subdevice_serial(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_serial function."""
         item = {"deviceSn": "123"}
         result = subdevice_serial(item)
         assert result == "123"
 
-    def test_battery_pack_serial(self) -> None:  # noqa: PLR6301
+    def test_battery_pack_serial(self) -> None:  # ruff: ignore[no-self-use]
         """Test battery_pack_serial function."""
         item = {"sn": "123"}
         result = battery_pack_serial(item)
         assert result == "123"
 
-    def test_sorted_battery_pack_payloads(self) -> None:  # noqa: PLR6301
+    def test_sorted_battery_pack_payloads(self) -> None:  # ruff: ignore[no-self-use]
         """Test sorted_battery_pack_payloads function."""
         items = [{"sn": "2", "soc": 10}, {"sn": "1", "soc": 20}]
         result = sorted_battery_pack_payloads(items)
         assert len(result) == 2
         assert result[0]["sn"] == "1"
 
-    def test_valid_discovery_list_response(self) -> None:  # noqa: PLR6301
+    def test_valid_discovery_list_response(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_discovery_list_response function."""
         # The function expects a mapping with FIELD_DATA key
         from custom_components.jackery_solarvault.const import FIELD_DATA
@@ -1324,42 +1324,42 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert valid_discovery_list_response({FIELD_DATA: [{"sn": "123"}]}) is True
         assert valid_discovery_list_response("invalid") is False
 
-    def test_valid_discovery_device_identity(self) -> None:  # noqa: PLR6301
+    def test_valid_discovery_device_identity(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_discovery_device_identity function."""
         assert (
             valid_discovery_device_identity({"sn": "123", "deviceType": "test"}) is True
         )  # noqa: E501, RUF100
         assert valid_discovery_device_identity({"type": "other"}) is False
 
-    def test_valid_system_parent_identity(self) -> None:  # noqa: PLR6301
+    def test_valid_system_parent_identity(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_parent_identity function."""
         # Function expects FIELD_DEVICE_ID or FIELD_ID
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID  # noqa: I001
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID
 
         assert valid_system_parent_identity({FIELD_DEVICE_ID: "123"}) is True
         assert valid_system_parent_identity({FIELD_ID: 123}) is True
         assert valid_system_parent_identity({}) is False
 
-    def test_valid_system_discovery_identity(self) -> None:  # noqa: PLR6301
+    def test_valid_system_discovery_identity(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_identity function."""
         # Function expects FIELD_ID or FIELD_SYSTEM_ID
-        from custom_components.jackery_solarvault.const import FIELD_ID, FIELD_SYSTEM_ID  # noqa: I001
+        from custom_components.jackery_solarvault.const import FIELD_ID, FIELD_SYSTEM_ID
 
         assert valid_system_discovery_identity({FIELD_ID: "123"}) is True
         assert valid_system_discovery_identity({FIELD_SYSTEM_ID: 123}) is True
         assert valid_system_discovery_identity({}) is False
 
-    def test_valid_system_discovery_entries(self) -> None:  # noqa: PLR6301
+    def test_valid_system_discovery_entries(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_entries function."""
         # Function expects list of systems with valid identities and devices
-        from custom_components.jackery_solarvault.const import FIELD_DEVICES, FIELD_ID  # noqa: I001
+        from custom_components.jackery_solarvault.const import FIELD_DEVICES, FIELD_ID
 
         # Need a system with valid identity and devices
         system = {FIELD_ID: "123", FIELD_DEVICES: [{FIELD_ID: "device1"}]}
         assert valid_system_discovery_entries([system]) is True
         assert valid_system_discovery_entries([]) is False
 
-    def test_valid_system_discovery_response(self) -> None:  # noqa: PLR6301
+    def test_valid_system_discovery_response(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_response function."""
         # Function expects a mapping with FIELD_DATA containing valid entries
         from custom_components.jackery_solarvault.const import (
@@ -1373,7 +1373,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert valid_system_discovery_response({FIELD_DATA: [system]}) is True
         assert valid_system_discovery_response({}) is False
 
-    def test_subdevice_id(self) -> None:  # noqa: PLR6301
+    def test_subdevice_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_id function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_DEVICE_ID,
@@ -1397,25 +1397,25 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # No valid key
         assert subdevice_id({}) is None
 
-    def test_subdevice_identity_values(self) -> None:  # noqa: PLR6301
+    def test_subdevice_identity_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_identity_values function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_SN  # noqa: I001
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_SN
 
         item = {FIELD_DEVICE_ID: "123", FIELD_SN: "456"}
         result = subdevice_identity_values(item)
         assert "123" in result
         assert "456" in result
 
-    def test_subdevice_dev_type(self) -> None:  # noqa: PLR6301
+    def test_subdevice_dev_type(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_dev_type function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE  # noqa: I001
+        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
 
         # Function expects FIELD_DEV_TYPE as integer
         assert subdevice_dev_type({FIELD_DEV_TYPE: 1}) == 1
         assert subdevice_dev_type({FIELD_DEV_TYPE: "2"}) == 2
         assert subdevice_dev_type({}) is None
 
-    def test_is_smart_meter_accessory(self) -> None:  # noqa: PLR6301
+    def test_is_smart_meter_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_smart_meter_accessory function."""
         # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)
         from custom_components.jackery_solarvault.const import (
@@ -1435,7 +1435,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert is_smart_meter_accessory({FIELD_DEV_TYPE: "other"}) is False
         assert is_smart_meter_accessory({}) is False
 
-    def test_smart_meter_accessories(self) -> None:  # noqa: PLR6301
+    def test_smart_meter_accessories(self) -> None:  # ruff: ignore[no-self-use]
         """Test smart_meter_accessories function."""
         # Function looks for accessories in source or in system
         from custom_components.jackery_solarvault.const import (
@@ -1469,7 +1469,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # No accessories
         assert smart_meter_accessories({}) == []
 
-    def test_smart_meter_accessory_device_id(self) -> None:  # noqa: PLR6301
+    def test_smart_meter_accessory_device_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test smart_meter_accessory_device_id function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,
@@ -1506,7 +1506,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         # None case
         assert smart_meter_accessory_device_id({}) is None
 
-    def test_has_smart_meter_accessory(self) -> None:  # noqa: PLR6301
+    def test_has_smart_meter_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_smart_meter_accessory function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,
@@ -1521,7 +1521,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         )  # noqa: E501, RUF100
         assert has_smart_meter_accessory({}) is False
 
-    def test_has_subdevice_accessory_or_bucket(self) -> None:  # noqa: PLR6301
+    def test_has_subdevice_accessory_or_bucket(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_subdevice_accessory_or_bucket function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,
@@ -1593,7 +1593,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
             is False
         )  # noqa: E501, RUF100
 
-    def test_has_meter_head_accessory(self) -> None:  # noqa: PLR6301
+    def test_has_meter_head_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_meter_head_accessory function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,
@@ -1629,7 +1629,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert has_meter_head_accessory({}) is False
         assert has_meter_head_accessory({FIELD_ACCESSORIES: []}) is False
 
-    def test_has_smart_plug_accessory(self) -> None:  # noqa: PLR6301
+    def test_has_smart_plug_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_smart_plug_accessory function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,
@@ -1661,7 +1661,7 @@ class TestCoordinatorUtilities:  # noqa: PLR0904
         assert has_smart_plug_accessory({}) is False
         assert has_smart_plug_accessory({FIELD_ACCESSORIES: []}) is False
 
-    def test_has_breaker_accessory(self) -> None:  # noqa: PLR6301
+    def test_has_breaker_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_breaker_accessory function."""
         from custom_components.jackery_solarvault.const import (
             FIELD_ACCESSORIES,

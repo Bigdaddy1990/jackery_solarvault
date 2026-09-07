@@ -25,22 +25,22 @@ from homeassistant.helpers.entity import EntityCategory
 class TestRoundedInt:
     """Test _rounded_int helper function."""
 
-    def test_int_returns_int(self) -> None:  # noqa: PLR6301
+    def test_int_returns_int(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns integer."""
         assert _rounded_int(5) == 5
 
-    def test_float_rounds(self) -> None:  # noqa: PLR6301
+    def test_float_rounds(self) -> None:  # ruff: ignore[no-self-use]
         """Test float input rounds to nearest int."""
         assert _rounded_int(5.4) == 5
         assert _rounded_int(5.5) == 6
         assert _rounded_int(5.6) == 6
 
-    def test_string_number(self) -> None:  # noqa: PLR6301
+    def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
         assert _rounded_int("5") == 5
         assert _rounded_int("5.5") == 6
 
-    def test_invalid_raises(self) -> None:  # noqa: PLR6301
+    def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
         from homeassistant.exceptions import HomeAssistantError
 
@@ -51,15 +51,15 @@ class TestRoundedInt:
 class TestWireInt:
     """Test _wire_int helper function."""
 
-    def test_int_returns_int(self) -> None:  # noqa: PLR6301
+    def test_int_returns_int(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns integer."""
         assert _wire_int(5) == 5
 
-    def test_string_number(self) -> None:  # noqa: PLR6301
+    def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
         assert _wire_int("5") == 5
 
-    def test_invalid_raises(self) -> None:  # noqa: PLR6301
+    def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
         from homeassistant.exceptions import HomeAssistantError
 
@@ -70,19 +70,19 @@ class TestWireInt:
 class TestWireFloat:
     """Test _wire_float helper function."""
 
-    def test_float_returns_float(self) -> None:  # noqa: PLR6301
+    def test_float_returns_float(self) -> None:  # ruff: ignore[no-self-use]
         """Test float input returns float."""
-        assert _wire_float(5.5) == 5.5  # noqa: RUF069
+        assert _wire_float(5.5) == 5.5  # ruff: ignore[float-equality-comparison]
 
-    def test_int_returns_float(self) -> None:  # noqa: PLR6301
+    def test_int_returns_float(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns float."""
-        assert _wire_float(5) == 5.0  # noqa: RUF069
+        assert _wire_float(5) == 5.0  # ruff: ignore[float-equality-comparison]
 
-    def test_string_number(self) -> None:  # noqa: PLR6301
+    def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
-        assert _wire_float("5.5") == 5.5  # noqa: RUF069
+        assert _wire_float("5.5") == 5.5  # ruff: ignore[float-equality-comparison]
 
-    def test_invalid_raises(self) -> None:  # noqa: PLR6301
+    def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
         from homeassistant.exceptions import HomeAssistantError
 
@@ -93,45 +93,45 @@ class TestWireFloat:
 class TestMaxFeedGridDynamicMax:
     """Test _max_feed_grid_dynamic_max helper function."""
 
-    def test_feed_limit_over_800(self) -> None:  # noqa: PLR6301
+    def test_feed_limit_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test feed limit over 800 returns 2500."""
         payload = {"properties": {"maxFeedGrid": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # noqa: RUF069
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
 
-    def test_max_grid_std_pw_over_800(self) -> None:  # noqa: PLR6301
+    def test_max_grid_std_pw_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test maxGridStdPw over 800 returns 2500."""
         payload = {"properties": {"maxGridStdPw": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # noqa: RUF069
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
 
-    def test_max_out_pw_over_800(self) -> None:  # noqa: PLR6301
+    def test_max_out_pw_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test maxOutPw over 800 returns 2500."""
         payload = {"properties": {"maxOutPw": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # noqa: RUF069
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
 
-    def test_all_under_800(self) -> None:  # noqa: PLR6301
+    def test_all_under_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test all values under 800 returns 800."""
         payload = {
             "properties": {"maxFeedGrid": 600, "maxGridStdPw": 600, "maxOutPw": 600}
         }
-        assert _max_feed_grid_dynamic_max(payload) == 800.0  # noqa: RUF069
+        assert _max_feed_grid_dynamic_max(payload) == 800.0  # ruff: ignore[float-equality-comparison]
 
-    def test_missing_values_defaults(self) -> None:  # noqa: PLR6301
+    def test_missing_values_defaults(self) -> None:  # ruff: ignore[no-self-use]
         """Test missing values use defaults."""
         payload = {"properties": {}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # noqa: RUF069
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
 
 
 class TestMaxFeedGridAllowedValues:
     """Test _max_feed_grid_allowed_values helper function."""
 
-    def test_under_800_returns_single(self) -> None:  # noqa: PLR6301
+    def test_under_800_returns_single(self) -> None:  # ruff: ignore[no-self-use]
         """Test dynamic max under 800 returns single value."""
         payload = {
             "properties": {"maxFeedGrid": 600, "maxGridStdPw": 600, "maxOutPw": 600}
         }  # noqa: E501, RUF100
         assert _max_feed_grid_allowed_values(payload) == (800.0,)
 
-    def test_over_800_returns_both(self) -> None:  # noqa: PLR6301
+    def test_over_800_returns_both(self) -> None:  # ruff: ignore[no-self-use]
         """Test dynamic max over 800 returns both values."""
         payload = {"properties": {"maxFeedGrid": 1000}}
         assert _max_feed_grid_allowed_values(payload) == (800.0, 2500.0)
@@ -140,27 +140,27 @@ class TestMaxFeedGridAllowedValues:
 class TestSingleTariffDynamicUnit:
     """Test _single_tariff_dynamic_unit helper function."""
 
-    def test_single_currency(self) -> None:  # noqa: PLR6301
+    def test_single_currency(self) -> None:  # ruff: ignore[no-self-use]
         """Test single currency from price section."""
         payload = {"price": {"singleCurrency": "$"}}
         assert _single_tariff_dynamic_unit(payload) == "$"
 
-    def test_currency(self) -> None:  # noqa: PLR6301
+    def test_currency(self) -> None:  # ruff: ignore[no-self-use]
         """Test currency from price section."""
         payload = {"price": {"currency": "€"}}
         assert _single_tariff_dynamic_unit(payload) == "€"
 
-    def test_single_currency_code(self) -> None:  # noqa: PLR6301
+    def test_single_currency_code(self) -> None:  # ruff: ignore[no-self-use]
         """Test single currency code from price section."""
         payload = {"price": {"singleCurrencyCode": "USD"}}
         assert _single_tariff_dynamic_unit(payload) == "USD"
 
-    def test_currency_code(self) -> None:  # noqa: PLR6301
+    def test_currency_code(self) -> None:  # ruff: ignore[no-self-use]
         """Test currency code from price section."""
         payload = {"price": {"currencyCode": "EUR"}}
         assert _single_tariff_dynamic_unit(payload) == "EUR"
 
-    def test_default_euro(self) -> None:  # noqa: PLR6301
+    def test_default_euro(self) -> None:  # ruff: ignore[no-self-use]
         """Test default euro when no currency found."""
         payload = {"price": {}}
         assert _single_tariff_dynamic_unit(payload) == "€"
@@ -169,7 +169,7 @@ class TestSingleTariffDynamicUnit:
 class TestJackeryNumber:
     """Test JackeryNumber class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -187,7 +187,7 @@ class TestJackeryNumber:
         coordinator.async_portable_set_custom_use_battery = AsyncMock()
         return coordinator
 
-    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # noqa: PLR6301
+    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # ruff: ignore[no-self-use]
         """Create a number instance for testing."""
         description = JackeryNumberDescription(
             key=key,
@@ -218,7 +218,7 @@ class TestJackeryNumber:
             "test_device": {"properties": {"socChgLimit": 80}}
         })
         sensor = self._create_number(coordinator)
-        assert sensor.native_value == 80.0  # noqa: RUF069
+        assert sensor.native_value == 80.0  # ruff: ignore[float-equality-comparison]
 
     def test_native_value_none_when_missing(self) -> None:
         """Test native_value property when key is missing."""
@@ -248,7 +248,7 @@ class TestJackeryNumber:
         sensor = JackeryNumber(
             coordinator=coordinator, device_id="test_device", description=description
         )
-        assert sensor.native_max_value == 2500.0  # noqa: RUF069
+        assert sensor.native_max_value == 2500.0  # ruff: ignore[float-equality-comparison]
 
     def test_native_unit_of_measurement_dynamic(self) -> None:
         """Test native_unit_of_measurement property with dynamic unit."""
@@ -276,7 +276,7 @@ class TestJackeryNumber:
         )
         assert sensor.native_unit_of_measurement == "$"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_native_value_valid(self) -> None:
         """Test async_set_native_value with valid value."""
         coordinator = self._create_coordinator()
@@ -300,7 +300,7 @@ class TestJackeryNumber:
         await sensor.async_set_native_value(75)
         mock_setter.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_native_value_invalid_range(self) -> None:
         """Test async_set_native_value with invalid range."""
         from homeassistant.exceptions import HomeAssistantError
@@ -315,8 +315,8 @@ class TestJackeryNumber:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry creates number entities."""
         hass = MagicMock()
         config_entry = MagicMock()

@@ -1,9 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/pyrightconfig.json",
-  "include": ["custom_components", "tests", "scripts"],
+  "include": [
+    "custom_components",
+    "tests",
+    "scripts"
+  ],
   "pythonVersion": "3.14",
-  "typeCheckingMode": "basic",
   "reportIncompatibleVariableOverride": false,
   "reportMissingImports": true,
-  "reportMissingTypeStubs": false
+  "reportMissingTypeStubs": false,
+  "typeCheckingMode": "basic"
 }

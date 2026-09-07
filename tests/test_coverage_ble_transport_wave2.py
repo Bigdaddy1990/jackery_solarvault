@@ -2,11 +2,10 @@
 
 import asyncio
 import base64
-from collections.abc import Awaitable, Callable, Coroutine
 import inspect
 import sys
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -16,11 +15,17 @@ from custom_components.jackery_solarvault.client import (
     ble_transport as ble_transport_module,
 )
 from custom_components.jackery_solarvault.client.ble_transport import (
-    BleFrameObservation,
     JackeryBleListener,
     _GattSession,
     _body_is_complete_json_object,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Coroutine
+
+    from custom_components.jackery_solarvault.client.ble_transport import (
+        BleFrameObservation,
+    )
 
 
 class _HassStub:
@@ -116,7 +121,7 @@ def test_complete_json_object_detection(body: bytes, expected: bool) -> None:
     assert _body_is_complete_json_object(body) is expected
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_async_start_registers_matcher_without_eager_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -212,7 +217,7 @@ def test_negotiated_mtu_is_owned_by_current_session() -> None:
     assert listener._mtu_owners["dev"] is current
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence() -> (
     None
 ):
@@ -240,7 +245,7 @@ async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence()
     assert listener.stats_for("dev").multi_chunk_messages_assembled == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reassembly_restarts_after_conflicting_duplicate_chunk() -> None:
     """A replaced fragment can complete a new out-of-order message."""
     await asyncio.sleep(0)
@@ -272,7 +277,7 @@ async def test_reassembly_restarts_after_conflicting_duplicate_chunk() -> None:
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_new_client_is_disconnected_when_session_installation_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -318,7 +323,7 @@ async def test_new_client_is_disconnected_when_session_installation_fails(
     assert client.is_connected is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_connection_task_factory_rejection_closes_runner_and_stays_local() -> (
     None
 ):
@@ -358,7 +363,7 @@ async def test_connection_task_factory_rejection_closes_runner_and_stays_local()
         _frame(index=3, count=2),
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reassembly_rejects_impossible_chunk_headers(
     frame: ble.BleBinaryFrame,
 ) -> None:
@@ -369,7 +374,7 @@ async def test_reassembly_rejects_impossible_chunk_headers(
         listener._reassemble_frame("dev", frame)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     """A proxy's base64-wrapped encrypted notify still reaches the sink decoded."""
     key = b"k" * 16
@@ -405,7 +410,7 @@ async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     assert stats.frames_decode_failed == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_without_key_records_decode_failure_and_forwards_raw() -> (
     None
 ):
@@ -430,7 +435,7 @@ async def test_notification_without_key_records_decode_failure_and_forwards_raw(
     assert stats.last_decode_error == "notify: no bluetoothKey for device"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sink_failure_is_recorded_and_successful_frame_clears_it() -> None:
     """A transient sink error retries the same frame and clears after processing."""
     attempts = 0
@@ -461,7 +466,7 @@ async def test_sink_failure_is_recorded_and_successful_frame_clears_it() -> None
     assert stats.last_error is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sink_originated_cancelled_error_retries_without_spinning() -> None:
     """A callback-originated cancellation retries the observation exactly once."""
     attempts = 0
@@ -484,7 +489,7 @@ async def test_sink_originated_cancelled_error_retries_without_spinning() -> Non
     assert listener.stats_for("dev").last_sink_error is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> None:
     """Late notifications from an replaced GATT generation cannot alter live data."""
     sink = AsyncMock(return_value=True)
@@ -505,7 +510,7 @@ async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> 
     assert listener.stats_for("dev").frames_received == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> None:
     """A timed-out GATT write releases its ACK registration for fallback routing."""
 
@@ -538,7 +543,7 @@ async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> 
     assert "dev" not in listener._pending_acks
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stop_clears_session_owned_state_and_pending_ack() -> None:
     """Unload invalidates sessions, MTU, assemblies, and ACK waiters atomically."""
     listener = _listener()

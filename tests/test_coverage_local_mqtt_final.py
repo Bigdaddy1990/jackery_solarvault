@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_handler_accepts_text_and_bytearray_payloads(
     hass: HomeAssistant,
 ) -> None:
@@ -38,7 +38,7 @@ async def test_handler_accepts_text_and_bytearray_payloads(
     assert received == [({"soc": 80}, b'{"soc":80}'), (None, b"not-json")]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stopping_handler_is_a_noop(
     hass: HomeAssistant,
 ) -> None:
@@ -53,7 +53,7 @@ async def test_stopping_handler_is_a_noop(
     assert client.diagnostics_snapshot()["messages_received"] == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_payload_without_sink_is_counted_as_dropped(
     hass: HomeAssistant,
 ) -> None:
@@ -68,7 +68,7 @@ async def test_payload_without_sink_is_counted_as_dropped(
     assert snapshot["last_topic"] == "jackery/device"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize("sink_result", [False, RuntimeError("decoder failed")])
 async def test_rejected_or_failed_sink_is_diagnosed(
     hass: HomeAssistant,
@@ -92,7 +92,7 @@ async def test_rejected_or_failed_sink_is_diagnosed(
         assert snapshot["messages_rejected_by_sink"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sink_cancellation_propagates(hass: HomeAssistant) -> None:
     """HA cancellation is never converted into a dropped payload."""
     sink = AsyncMock(side_effect=asyncio.CancelledError)
@@ -104,7 +104,7 @@ async def test_sink_cancellation_propagates(hass: HomeAssistant) -> None:
     assert client.diagnostics_snapshot()["messages_dropped"] == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_topic_tracking_truncation_does_not_drop_payload(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -121,7 +121,7 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
     assert snapshot["messages_forwarded"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_oversized_payload_is_rejected_before_decode(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,

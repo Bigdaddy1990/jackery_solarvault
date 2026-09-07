@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.button import (
 class TestJackeryQueryButton:
     """Test JackeryQueryButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -29,7 +29,7 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(self, key="refresh_system_info"):  # noqa: PLR6301
+    def _create_query_description(self, key="refresh_system_info"):  # ruff: ignore[no-self-use]
         """Create a query button description for testing."""
         return JackeryQueryButtonDescription(
             key=key,
@@ -66,7 +66,7 @@ class TestJackeryQueryButton:
 class TestJackeryRebootButton:
     """Test JackeryRebootButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -83,7 +83,7 @@ class TestJackeryRebootButton:
         assert sensor is not None
         assert sensor._attr_translation_key == "reboot_device"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator()
@@ -96,7 +96,7 @@ class TestJackeryRebootButton:
 class TestJackeryRefreshWeatherPlanButton:
     """Test JackeryRefreshWeatherPlanButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {"test_device": {}}
@@ -116,7 +116,7 @@ class TestJackeryRefreshWeatherPlanButton:
         assert sensor is not None
         assert sensor._attr_translation_key == "refresh_weather_plan"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator()
@@ -131,7 +131,7 @@ class TestJackeryRefreshWeatherPlanButton:
 class TestJackeryReadScheduleButton:
     """Test JackeryReadScheduleButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -169,7 +169,7 @@ class TestJackeryReadScheduleButton:
         assert attrs["taskType"] == 1
         assert attrs["deviceSn"] == "plug123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator({"test_device": {}})
@@ -190,7 +190,7 @@ class TestJackeryReadScheduleButton:
 class TestJackeryDeleteStormAlertButton:
     """Test JackeryDeleteStormAlertButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -223,7 +223,7 @@ class TestJackeryDeleteStormAlertButton:
         )
         assert sensor.available is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator({
@@ -244,7 +244,7 @@ class TestJackeryDeleteStormAlertButton:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    def test_async_setup_entry(self) -> None:  # noqa: PLR6301
+    def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry function signature and structure."""
         # This test validates the function signature and basic structure
         # Full integration test is complex due to signature caching logic

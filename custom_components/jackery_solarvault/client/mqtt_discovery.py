@@ -1,7 +1,5 @@
 """Remove obsolete MQTT-discovery mirrors of native Jackery sensors."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import TYPE_CHECKING

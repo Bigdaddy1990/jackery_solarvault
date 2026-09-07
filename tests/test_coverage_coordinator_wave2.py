@@ -66,7 +66,7 @@ def test_polling_timeout_incident_is_counted_once_and_recovers() -> None:
     assert diagnostics["last_timeout_recovery_duration_sec"] == pytest.approx(30.0)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_background_scheduler_reuses_active_task_then_allows_replay() -> None:
     """One logical operation never overlaps, but can run again after completion."""
     coordinator = _bare_coordinator()
@@ -110,7 +110,8 @@ async def test_background_scheduler_reuses_active_task_then_allows_replay() -> N
         operation,
         name="refresh-three",
     )
-    assert replay is not None and replay is not first
+    assert replay is not None
+    assert replay is not first
     assert await replay == 2
 
 
@@ -239,7 +240,7 @@ def test_historical_sources_include_system_routes_only_with_system_id() -> None:
     assert coord_mod.APP_SECTION_HOME_TRENDS in with_system
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["section", "api_method"],
     [
@@ -275,7 +276,7 @@ async def test_historical_http_sources_route_independently(
     method.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["failure", "expected_status"],
     [

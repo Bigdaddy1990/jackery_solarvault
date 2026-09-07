@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
 ) -> None:
@@ -69,7 +69,7 @@ def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     """A bounded device topic forwards known and future payload fields."""
     forwarded: list[tuple[str, dict[str, Any] | None, bytes]] = []
@@ -125,7 +125,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert len(forwarded) == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
     """Start and stop the direct broker reconnect supervisor."""
     client = JackeryLocalMqttClient(

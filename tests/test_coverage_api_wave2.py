@@ -1,11 +1,9 @@
 """Behavioral coverage for Jackery HTTP validation and endpoint wrappers."""
 
-from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from unittest.mock import AsyncMock, call, patch
 
-import aiohttp
 import pytest
 
 from custom_components.jackery_solarvault import const
@@ -15,6 +13,11 @@ from custom_components.jackery_solarvault.client.api import (
     JackeryApiError,
     JackeryAuthError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import aiohttp
 
 
 class _Response:
@@ -95,7 +98,7 @@ def _api(responses: list[_Response | BaseException] | None = None) -> JackeryApi
     return client
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["status", "expected_error"],
     [
@@ -115,7 +118,7 @@ async def test_login_response_rejects_non_ok_statuses(
         await JackeryApi._decode_login_response(response)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> None:
     """A successful login status still rejects malformed response JSON."""
     response = cast(
@@ -131,7 +134,7 @@ async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> No
         await JackeryApi._decode_login_response(response)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> None:
     """GET uses the active token, honors its timeout override, and emits metadata."""
     client = _api([
@@ -162,7 +165,7 @@ async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> Non
     assert client.diagnostics_snapshot()["requests_total"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> None:
     """Malformed success JSON and network timeout remain distinct API failures."""
     invalid = _api([
@@ -187,7 +190,7 @@ async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> Non
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["method_name", "http_method"],
     [
@@ -217,7 +220,7 @@ async def test_json_write_helpers_reject_invalid_success_json(
         await writer("/write", {"value": 1})
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_non_json_error_response_is_classified_without_decoder_leak() -> None:
     """A malformed non-200 response is converted into a normal HTTP API error."""
     client = _api([
@@ -277,7 +280,7 @@ def test_mqtt_session_cache_and_credentials_cover_invalid_and_valid_seeds() -> N
     assert client.get_cached_mqtt_credentials() is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> None:
     """Thin GET wrappers preserve app field names and normalize response shapes."""
     client = _api()
@@ -338,7 +341,7 @@ async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> N
     ]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_write_wrappers_validate_and_preserve_app_payloads() -> None:
     """Public writers reject invalid values and serialize IDs at their boundary."""
     client = _api()

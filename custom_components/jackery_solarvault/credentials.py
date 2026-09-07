@@ -1,12 +1,14 @@
 """Shared credential safety contract for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import hashlib
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import voluptuous as vol
 
 from .const import REDACTED_VALUE
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 MAX_TOKEN_LENGTH: Final = 512
 MAX_USERNAME_LENGTH: Final = 128

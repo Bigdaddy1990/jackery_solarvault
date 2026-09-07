@@ -5,17 +5,20 @@ independent lifecycle, reconnect logic, and credential management.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass
 from enum import StrEnum
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
