@@ -18,7 +18,7 @@ default_install_hook_types:
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.12.9
+    rev: 0.12.10
     hooks:
       - id: uv-sync
 
@@ -78,7 +78,7 @@ repos:
         exclude: ^(manifest.*|docs/|scripts/)
         
   - repo: https://github.com/astral-sh/ty-pre-commit
-    rev: v0.0.78
+    rev: v0.0.79
     hooks:
       - id: ty
         stages: [manual]
