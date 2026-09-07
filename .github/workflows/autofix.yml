@@ -15,11 +15,11 @@ permissions:
 concurrency:
   group: autofix-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 env:
       PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
       HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
-      
+
 jobs:
   autofix:
     if: github.actor != 'github-actions[bot]'

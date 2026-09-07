@@ -18,11 +18,11 @@ permissions:
 
 env:
   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-  
+
 concurrency:
   group: dependency-review-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true 
-  
+  cancel-in-progress: true
+
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
