@@ -22,18 +22,7 @@ _HIGH_KWH = 108.55
 
 
 def _lifetime_import_sensor() -> JackerySmartMeterSensor:
-    sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
-    mutable = cast("Any", sensor)
-    mutable.coordinator = SimpleNamespace(data={})
-    mutable._device_id = _DEVICE_ID
-    mutable.entity_description = next(
-        desc
-        for desc in SMART_METER_SENSOR_DESCRIPTIONS
-        if desc.key == "lifetime_import_energy"
-    )
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    return sensor
+    return _sensor_by_key("lifetime_import_energy")
 
 
 def _set_ct_total(sensor: JackerySmartMeterSensor, watt_hours: int) -> None:
@@ -51,28 +40,23 @@ def test_smart_meter_total_increasing_holds_non_reset_counter_regression() -> No
     sensor = _lifetime_import_sensor()
 
     _set_ct_total(sensor, _HIGH_WATT_HOURS)
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_HIGH_KWH)
 
     _set_ct_total(sensor, _LOWER_WATT_HOURS)
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_HIGH_KWH)
 
 
 def _sensor_by_key(key: str) -> JackerySmartMeterSensor:
-    sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
-    mutable = cast("Any", sensor)
-    mutable.coordinator = SimpleNamespace(data={})
-    mutable._device_id = _DEVICE_ID
-    mutable.entity_description = next(
+    description = next(
         desc for desc in SMART_METER_SENSOR_DESCRIPTIONS if desc.key == key
     )
-    mutable._cached_native_value = None
-    mutable._cached_attrs = {}
-    mutable._restored_lifetime_value = None
-    return sensor
+    return JackerySmartMeterSensor(
+        cast("Any", SimpleNamespace(data={})), _DEVICE_ID, description
+    )
 
 
 def test_import_energy_falls_back_to_per_phase_sum_when_total_absent() -> None:
@@ -88,7 +72,7 @@ def test_import_energy_falls_back_to_per_phase_sum_when_total_absent() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(6.0)
 
@@ -105,7 +89,7 @@ def test_import_energy_prefers_reported_total_over_phase_sum() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     # 62_598 Wh -> 62.598 kWh, rounded to two decimals at the entity layer.
     assert sensor.native_value == pytest.approx(62.6)
@@ -124,7 +108,7 @@ def test_export_energy_falls_back_to_per_phase_negative_sum() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(2.0)
 
@@ -155,7 +139,7 @@ def test_dashboard_grid_energy_falls_back_to_three_phase_sum(
         _DEVICE_ID: {PAYLOAD_CT_METER: fields},
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(expected)
 
@@ -169,7 +153,7 @@ def test_mac_address_falls_back_to_device_sn_when_mac_absent() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == "5c013b048e3c"
 
@@ -186,7 +170,7 @@ def test_total_power_exposes_signed_ct_phase_t_attribute() -> None:
         },
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(75.0)
     assert sensor.extra_state_attributes["phase_t_signed_power"] == pytest.approx(75.0)
@@ -210,7 +194,7 @@ def test_reactive_power_derives_from_apparent_and_active_when_rep_absent(
     sensor = _sensor_by_key(key)
     cast("Any", sensor).coordinator.data = {_DEVICE_ID: {PAYLOAD_CT_METER: fields}}
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(expected)
     assert sensor.extra_state_attributes["source"] == "derived_apparent_minus_active"
@@ -223,7 +207,7 @@ def test_reactive_power_prefers_reported_rep_over_derived_value() -> None:
         _DEVICE_ID: {PAYLOAD_CT_METER: {"rep": 123, "ap": 500, "power": 300}}
     }
 
-    sensor._refresh_cache()
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(123.0)
     assert sensor.extra_state_attributes["source"] == "raw_field"

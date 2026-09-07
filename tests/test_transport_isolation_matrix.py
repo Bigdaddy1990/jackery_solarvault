@@ -50,13 +50,13 @@ def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoor
         get_cached_mqtt_credentials=Mock(return_value=None),
         async_get_mqtt_credentials=AsyncMock(return_value=None),
     )
-    obj._device_index = {"dev-1": {}}
-    obj._mqtt = None
-    obj._ble_listener = None
-    obj._local_mqtt_client = None
-    obj._shutdown_started = False
+    obj._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    obj._mqtt = None  # ruff: ignore[private-member-access]
+    obj._ble_listener = None  # ruff: ignore[private-member-access]
+    obj._local_mqtt_client = None  # ruff: ignore[private-member-access]
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
     obj.data = data or {}
-    obj._ble_start_lock = asyncio.Lock()
+    obj._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -66,10 +66,10 @@ class TestTransportIsolationMatrix:
     # Matrix definition from plan:
     # | Enabled path | Disabled paths must fail if touched | Required proof |
     # |---|---|---|
-    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |
-    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |
-    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |
-    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |
+    # | HTTP | BLE, cloud MQTT, local MQTT | discovery, properties, all REST periods, backfill, REST setters |  # ruff: ignore[line-too-long]
+    # | BLE | live HTTP after cache, cloud MQTT, local MQTT | connect, ingest, BLE getters, BLE setters |  # ruff: ignore[line-too-long]
+    # | cloud MQTT | live HTTP after cache, BLE, local MQTT | connect, ingest, encrypted getters/setters |  # ruff: ignore[line-too-long]
+    # | local MQTT | live HTTP after cache, BLE receive, cloud MQTT receive | connect, subscribe, binary/plain ingest |  # ruff: ignore[line-too-long]
     # | all paths | none | concurrent updates, provenance, reconnect, unload |
 
     @pytest.mark.parametrize(
@@ -103,8 +103,8 @@ class TestTransportIsolationMatrix:
             ],
         ],
     )
-    @pytest.mark.asyncio
-    async def test_transport_isolation(  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_transport_isolation(  # ruff: ignore[no-self-use]
         self,
         enabled_path: str,
         disabled_paths: list[str],
@@ -128,26 +128,26 @@ class TestTransportIsolationMatrix:
         # Mock disabled transports to raise if touched
         for disabled in disabled_paths:
             if disabled == "ble":
-                coordinator._ble_listener = None
+                coordinator._ble_listener = None  # ruff: ignore[private-member-access]
                 # BLE start should not be called
                 coordinator.async_start_ble_transport = AsyncMock(
                     side_effect=AssertionError(
                         f"BLE should not be touched in {enabled_path}-only test"
-                    )  # noqa: E501, RUF100
+                    )
                 )
             elif disabled == "cloud_mqtt":
-                coordinator._mqtt = None
+                coordinator._mqtt = None  # ruff: ignore[private-member-access]
                 coordinator.async_start_mqtt = AsyncMock(
                     side_effect=AssertionError(
                         f"Cloud MQTT should not be touched in {enabled_path}-only test"
-                    )  # noqa: E501, RUF100
+                    )
                 )
             elif disabled == "local_mqtt":
-                coordinator._local_mqtt_client = None
+                coordinator._local_mqtt_client = None  # ruff: ignore[private-member-access]
                 # Local MQTT start is in __init__, not coordinator directly
 
         # Run the required proofs for this transport
-        # This is a structural test - the actual behavior is validated in integration tests
+        # This is a structural test - the actual behavior is validated in integration tests  # ruff: ignore[line-too-long]
         for proof in required_proofs:
             # Verify the proof capability exists in the codebase
             # This is a placeholder - real tests are in specific test files
@@ -166,8 +166,8 @@ class TestTransportIsolationMatrix:
                 "binary_plain_ingest",
             }
 
-    @pytest.mark.asyncio
-    async def test_all_paths_concurrent_updates_provenance_reconnect_unload(  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_all_paths_concurrent_updates_provenance_reconnect_unload(  # ruff: ignore[no-self-use]
         self,
     ) -> None:
         """All paths enabled: concurrent updates, provenance, reconnect, unload."""
@@ -214,7 +214,7 @@ class TestTransportIsolationMatrix:
         assert states["local_mqtt"] == SupervisorState.RUNNING
 
         # Verify they have independent states
-        assert len(manager._supervisors) == 3
+        assert len(manager._supervisors) == 3  # ruff: ignore[magic-value-comparison, private-member-access]
 
         # Stop all
         await manager.async_stop_all()
@@ -229,14 +229,14 @@ class TestProvenanceIsolation:
         "source",
         [DataSource.HTTP, DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT, DataSource.BLE],
     )
-    @pytest.mark.asyncio
-    async def test_first_observation_from_every_transport_accepted(  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_first_observation_from_every_transport_accepted(  # ruff: ignore[no-self-use]
         self, source: DataSource
     ) -> None:
         """Every supported transport can independently populate live properties."""
-        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806
-        DEVICE_ID = "device-1"  # noqa: N806
-        FIELD = "pvPw"  # noqa: N806
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # ruff: ignore[non-lowercase-variable-in-function]
+        DEVICE_ID = "device-1"  # ruff: ignore[non-lowercase-variable-in-function]
+        FIELD = "pvPw"  # ruff: ignore[non-lowercase-variable-in-function]
 
         observation = Observation(
             source=source,
@@ -259,9 +259,9 @@ class TestProvenanceIsolation:
         assert result.accepted_fields == frozenset({FIELD})
         assert result.provenance[FIELD].source is source
 
-    def test_provenance_metadata_never_leaks_into_entity_payload(self) -> None:  # noqa: PLR6301
+    def test_provenance_metadata_never_leaks_into_entity_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Source timestamps stay outside coordinator/entity-visible state."""
-        from datetime import UTC, datetime
+        from datetime import UTC, datetime  # ruff: ignore[import-outside-top-level]
 
         result = ingest_observation(
             Observation(
@@ -284,11 +284,11 @@ class TestProvenanceIsolation:
         assert "request_id" not in result.payload
         assert result.provenance["pvPw"].request_id == "mqtt-42"
 
-    def test_same_field_different_sections_independent_provenance(self) -> None:  # noqa: PLR6301
+    def test_same_field_different_sections_independent_provenance(self) -> None:  # ruff: ignore[no-self-use]
         """One section's timestamp must never block another section."""
-        from datetime import UTC, datetime
+        from datetime import UTC, datetime  # ruff: ignore[import-outside-top-level]
 
-        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # noqa: N806
+        BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)  # ruff: ignore[non-lowercase-variable-in-function]
 
         properties = ingest_observation(
             Observation(
@@ -326,20 +326,20 @@ class TestProvenanceIsolation:
 class TestReconnectIndependence:
     """Test that reconnect loops are bounded and independent."""
 
-    @pytest.mark.asyncio
-    async def test_ble_reconnect_does_not_block_http(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_ble_reconnect_does_not_block_http(self) -> None:  # ruff: ignore[no-self-use]
         """BLE reconnect retry doesn't stall HTTP coordinator."""
         coordinator = _coordinator()
-        coordinator._ble_listener = None
-        coordinator._shutdown_started = False
+        coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+        coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
 
         # Mock BLE start to fail repeatedly
         call_count = 0
 
-        async def failing_ble_start() -> None:  # noqa: RUF029
+        async def failing_ble_start() -> None:  # ruff: ignore[unused-async]
             nonlocal call_count
             call_count += 1
-            raise RuntimeError("BLE unavailable")
+            raise RuntimeError("BLE unavailable")  # ruff: ignore[raise-vanilla-args]
 
         # HTTP should still be able to run
         coordinator.api.async_get_device_property = AsyncMock(
@@ -350,28 +350,28 @@ class TestReconnectIndependence:
         result = await coordinator.api.async_get_device_property("dev-1")
         assert result == {"soc": 73, "batState": 1}
 
-    @pytest.mark.asyncio
-    async def test_mqtt_reconnect_does_not_block_ble(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_mqtt_reconnect_does_not_block_ble(self) -> None:  # ruff: ignore[no-self-use]
         """MQTT reconnect retry doesn't stall BLE."""
         coordinator = _coordinator()
-        coordinator._mqtt = None
-        coordinator._shutdown_started = False
+        coordinator._mqtt = None  # ruff: ignore[private-member-access]
+        coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
 
         # MQTT start fails
-        async def failing_mqtt_start() -> None:  # noqa: RUF029
-            raise RuntimeError("MQTT unavailable")
+        async def failing_mqtt_start() -> None:  # ruff: ignore[unused-async]
+            raise RuntimeError("MQTT unavailable")  # ruff: ignore[raise-vanilla-args]
 
         coordinator.async_start_mqtt = failing_mqtt_start
 
         # BLE should still work
-        coordinator._ble_listener = Mock()
-        coordinator._ble_listener.async_stop = AsyncMock()
-        coordinator._ble_listener.address_for_device_id = Mock(
+        coordinator._ble_listener = Mock()  # ruff: ignore[private-member-access]
+        coordinator._ble_listener.async_stop = AsyncMock()  # ruff: ignore[private-member-access]
+        coordinator._ble_listener.address_for_device_id = Mock(  # ruff: ignore[private-member-access]
             return_value="aa:bb:cc:dd:ee:ff"
-        )  # noqa: E501, RUF100, SLF001
+        )
 
         # Verify BLE listener is available
-        assert coordinator._ble_listener is not None
+        assert coordinator._ble_listener is not None  # ruff: ignore[private-member-access]
 
 
 class TestCommandRoutingIsolation:
@@ -391,25 +391,25 @@ class TestCommandRoutingIsolation:
             ["set_peaks_troughs", "ble"],
         ],
     )
-    def test_command_transport_mapping(  # noqa: PLR6301
+    def test_command_transport_mapping(  # ruff: ignore[no-self-use]
         self, command: str, expected_transport: str
     ) -> None:
         """Commands only route through their proven transport."""
         # This validates the command catalog fixture
-        from tests.fixtures.jackery_app_2_4_0_contracts import (  # noqa: TID251
+        from tests.fixtures.jackery_app_2_4_0_contracts import (  # ruff: ignore[import-outside-top-level, banned-api]
             HOME_COMMANDS,
             PORTABLE_COMMANDS,
         )
 
         if command == "write_wifi_info_home":
-            assert HOME_COMMANDS["write_wifi_info"].ble_message_type == 2
+            assert HOME_COMMANDS["write_wifi_info"].ble_message_type == 2  # ruff: ignore[magic-value-comparison]
         elif command in {"set_third_party_mqtt", "query_third_party_mqtt"}:
             assert HOME_COMMANDS[command].ble_message_type in {113, 114}
         elif command in {
             "write_wifi_info",
             "setting_energy_saving",
             "set_peaks_troughs",
-        }:  # noqa: E501, RUF100
+        }:
             assert PORTABLE_COMMANDS[command].ble_message_type in {2, 4, 130}
 
 

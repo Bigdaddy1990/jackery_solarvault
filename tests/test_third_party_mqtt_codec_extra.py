@@ -17,13 +17,13 @@ from custom_components.jackery_solarvault.client.third_party_mqtt_codec import (
 class TestThirdPartyMqttCodecExtra:
     """Additional tests for third_party_mqtt_codec to increase coverage."""
 
-    def _create_bluetooth_key(self) -> bytes:  # noqa: PLR6301
+    def _create_bluetooth_key(self) -> bytes:  # ruff: ignore[no-self-use]
         """Create a valid 16-byte bluetooth key."""
         return b"0123456789abcdef"
 
-    def test_ble_aes_iv_len_constant(self) -> None:  # noqa: PLR6301
+    def test_ble_aes_iv_len_constant(self) -> None:  # ruff: ignore[no-self-use]
         """Test BLE_AES_IV_LEN constant value."""
-        assert BLE_AES_IV_LEN == 16
+        assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]
 
     def test_encode_decode_edge_cases(self) -> None:
         """Test encode/decode with edge cases."""
@@ -41,14 +41,14 @@ class TestThirdPartyMqttCodecExtra:
         decoded = decode_third_party_mqtt_field(encoded, bluetooth_key)
         assert decoded == value
 
-    def test_generate_token_format(self) -> None:  # noqa: PLR6301
+    def test_generate_token_format(self) -> None:  # ruff: ignore[no-self-use]
         """Test token generation format."""
         for _ in range(100):
             token = generate_third_party_mqtt_token()
-            assert len(token) == 9
+            assert len(token) == 9  # ruff: ignore[magic-value-comparison]
             assert token.isdigit()
 
-    def test_stable_token_all_cases(self) -> None:  # noqa: PLR6301
+    def test_stable_token_all_cases(self) -> None:  # ruff: ignore[no-self-use]
         """Test stable_third_party_mqtt_token all branches."""
         # Case 1: user token provided, valid length
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
@@ -70,7 +70,7 @@ class TestThirdPartyMqttCodecExtra:
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             None, None
         )
-        assert len(result_token) == 9
+        assert len(result_token) == 9  # ruff: ignore[magic-value-comparison]
         assert result_token.isdigit()
         assert use_generated is True
         assert new_generated == result_token
@@ -83,19 +83,19 @@ class TestThirdPartyMqttCodecExtra:
         assert use_generated is True
         assert new_generated is None
 
-    def test_config_from_options_all_defaults(self) -> None:  # noqa: PLR6301
+    def test_config_from_options_all_defaults(self) -> None:  # ruff: ignore[no-self-use]
         """Test config from options with all defaults."""
         options = {}
         generated_token = "123456789"
         config = third_party_mqtt_config_from_options(options, generated_token)
         assert config["enable"] == 0
-        assert config["ip"] == ""
-        assert config["port"] == 1883
-        assert config["userName"] == ""
-        assert config["password"] == ""
+        assert config["ip"] == ""  # ruff: ignore[compare-to-empty-string]
+        assert config["port"] == 1883  # ruff: ignore[magic-value-comparison]
+        assert config["userName"] == ""  # ruff: ignore[compare-to-empty-string]
+        assert config["password"] == ""  # ruff: ignore[compare-to-empty-string]
         assert config["token"] == "123456789"
 
-    def test_config_plaintext_all_paths(self) -> None:  # noqa: PLR6301
+    def test_config_plaintext_all_paths(self) -> None:  # ruff: ignore[no-self-use]
         """Test config plaintext with various scenarios."""
         options = {
             "third_party_mqtt_enable": True,
@@ -143,7 +143,7 @@ class TestThirdPartyMqttCodecExtra:
         assert "_decode_failed_fields" not in result
 
         # Case: valid fields
-        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # noqa: N806
+        userName = encode_third_party_mqtt_field("user", bluetooth_key)  # ruff: ignore[non-lowercase-variable-in-function]
         password = encode_third_party_mqtt_field("pass", bluetooth_key)
         body = {"userName": userName, "password": password}
         result = decode_third_party_mqtt_config_body(body, bluetooth_key)

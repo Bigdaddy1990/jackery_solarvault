@@ -41,7 +41,11 @@ from custom_components.jackery_solarvault.text import (
     JackeryThirdPartyMqttText,
     async_setup_entry,
 )
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 
 _DEVICE_ID = "dev-1"
 
@@ -86,7 +90,7 @@ def _system_name(data: dict[str, Any]) -> JackerySystemNameText:
     entity = JackerySystemNameText.__new__(JackerySystemNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -95,7 +99,7 @@ def _device_name(data: dict[str, Any]) -> JackeryDeviceNameText:
     entity = JackeryDeviceNameText.__new__(JackeryDeviceNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
     return entity
 
@@ -194,7 +198,7 @@ async def test_system_name_empty_value_raises() -> None:
         {_DEVICE_ID: {PAYLOAD_SYSTEM: {FIELD_SYSTEM_NAME: "Old", FIELD_ID: "sys-1"}}},
     )
 
-    with pytest.raises(HomeAssistantError) as err:
+    with pytest.raises(ServiceValidationError) as err:
         await entity.async_set_value("   ")
 
     assert err.value.translation_key == "invalid_text_value"
@@ -217,9 +221,9 @@ def _third_party(field: str, data: dict[str, Any]) -> JackeryThirdPartyMqttText:
     entity = JackeryThirdPartyMqttText.__new__(JackeryThirdPartyMqttText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
-    mutable._field = field
-    mutable._attr_translation_key = "third_party_mqtt_ip"
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._field = field  # ruff: ignore[private-member-access]
+    mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
     return entity
 
 
@@ -291,14 +295,14 @@ def _pv_name(data: dict[str, Any], index: int) -> JackeryPvNameText:
     entity = JackeryPvNameText.__new__(JackeryPvNameText)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
-    mutable._index = index
-    mutable._field = _PV_FIELDS[index]
-    mutable._attr_translation_key = f"pv{index + 1}_name"
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._index = index  # ruff: ignore[private-member-access]
+    mutable._field = _PV_FIELDS[index]  # ruff: ignore[private-member-access]
+    mutable._attr_translation_key = f"pv{index + 1}_name"  # ruff: ignore[private-member-access]
     channel = (
         data.get(_DEVICE_ID, {}).get(PAYLOAD_PROPERTIES, {}).get(_PV_FIELDS[index])
     )
-    mutable._cached_native_value = (
+    mutable._cached_native_value = (  # ruff: ignore[private-member-access]
         str(channel[FIELD_PV_NAME])
         if isinstance(channel, dict) and channel.get(FIELD_PV_NAME) is not None
         else None
@@ -362,7 +366,7 @@ async def test_pv_name_empty_value_raises() -> None:
         0,
     )
 
-    with pytest.raises(HomeAssistantError) as err:
+    with pytest.raises(ServiceValidationError) as err:
         await entity.async_set_value("   ")
 
     assert err.value.translation_key == "invalid_text_value"

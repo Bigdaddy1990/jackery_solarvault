@@ -11,7 +11,7 @@ TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
 LANGUAGES = ("en", "de", "es", "fr")
 
 
-def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
+def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # ruff: ignore[any-type]
     """Return the set of dotted "leaf" key paths from a nested dictionary structure.
 
     Parameters:
@@ -22,7 +22,7 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
     Returns:
         set[str]: A set of dotted key paths representing all leaf nodes found
         (the prefix itself is a leaf when `value` is not a dict).
-    """
+    """  # ruff: ignore[line-too-long]
     if not isinstance(value, dict):
         return {prefix}
 
@@ -127,7 +127,7 @@ def test_max_grid_standard_power_has_a_base_translation() -> None:
 
 
 def _assert_keys_sorted(
-    value: Any,
+    value: Any,  # ruff: ignore[any-type]
     path: str = "",
 ) -> None:
     """Recursively assert every JSON object in ``value`` has alphabetically sorted keys.

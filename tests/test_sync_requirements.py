@@ -1,10 +1,14 @@
 """Tests for the requirements synchronization diagnostics."""
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
 from scripts import sync_requirements
 from scripts.sync_requirements import show_diff
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def test_show_diff_reports_added_and_removed_requirements(
@@ -29,7 +33,7 @@ def test_show_diff_is_silent_when_requirements_match(
     """An in-sync requirements file produces no diagnostic noise."""
     assert not show_diff("requirements.txt", ["package>=1"], ["package>=1"])
 
-    assert capsys.readouterr().out == ""
+    assert capsys.readouterr().out == ""  # ruff: ignore[compare-to-empty-string]
 
 
 def test_show_diff_ignores_indented_comments(
@@ -38,7 +42,7 @@ def test_show_diff_ignores_indented_comments(
     """Whitespace before a comment cannot create an empty requirement diff."""
     assert not show_diff("requirements.txt", ["  # pinned by HA"], [])
 
-    assert capsys.readouterr().out == ""
+    assert capsys.readouterr().out == ""  # ruff: ignore[compare-to-empty-string]
 
 
 def test_main_reports_the_existing_hyphenated_requirements_file(

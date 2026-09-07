@@ -11,6 +11,7 @@ from custom_components.jackery_solarvault.const import (
     CONF_LOCAL_MQTT_PORT,
     CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    DEFAULT_THIRD_PARTY_MQTT_PORT,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_THIRD_PARTY_MQTT_IP,
     FIELD_THIRD_PARTY_MQTT_PASSWORD,
@@ -183,6 +184,16 @@ def test_config_from_options_preserves_existing_token_verbatim() -> None:
     assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == " device-token "
 
 
+def test_config_from_options_uses_default_for_invalid_port() -> None:
+    """Malformed broker ports fall back to the documented MQTT default."""
+    result = codec.third_party_mqtt_config_from_options(
+        {CONF_LOCAL_MQTT_PORT: "not-a-port"},
+        None,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
+
+
 # --- decode body ----------------------------------------------------------
 
 
@@ -247,3 +258,30 @@ def test_plaintext_merges_device_reported_values() -> None:
     assert result[FIELD_THIRD_PARTY_MQTT_IP] == "192.168.1.9"
     assert result[FIELD_THIRD_PARTY_MQTT_PORT] == _DEVICE_PORT
     assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "dev-user"
+
+
+def test_plaintext_merge_keeps_unverified_credential_options() -> None:
+    """Failed or absent credential decodes never replace configured plaintext."""
+    device = {
+        PAYLOAD_THIRD_PARTY_MQTT_CONFIG: {
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "device-user",
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: "device-password",
+            FIELD_THIRD_PARTY_MQTT_TOKEN: "device-token",
+            "_decoded_fields": [FIELD_THIRD_PARTY_MQTT_USERNAME],
+            "_decode_failed_fields": [FIELD_THIRD_PARTY_MQTT_PASSWORD],
+        },
+    }
+
+    result = codec.third_party_mqtt_config_plaintext(
+        {
+            CONF_LOCAL_MQTT_USERNAME: "configured-user",
+            CONF_LOCAL_MQTT_PASSWORD: "configured-password",
+            CONF_THIRD_PARTY_MQTT_TOKEN: "configured-token",
+        },
+        None,
+        device,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "device-user"
+    assert result[FIELD_THIRD_PARTY_MQTT_PASSWORD] == "configured-password"
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "configured-token"

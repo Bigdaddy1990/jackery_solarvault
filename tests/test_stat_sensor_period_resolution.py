@@ -24,11 +24,13 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
 )
+from custom_components.jackery_solarvault.descriptions import (
+    JackeryStatSensorDescription,
+)
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
-    JackeryStatSensorDescription,
-    _StatRefreshContext,
+    _StatRefreshContext,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.util import safe_float
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
@@ -64,7 +66,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
     )
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     sensor.entity_description = description
-    sensor._reset_period = DATE_TYPE_YEAR
+    sensor._reset_period = DATE_TYPE_YEAR  # ruff: ignore[private-member-access]
     context = _StatRefreshContext(
         payload=payload,
         local_now=datetime(2026, 8, 13, 22, 41, tzinfo=UTC),
@@ -73,7 +75,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
         local_period_raw=None,
     )
 
-    snapshot = sensor._refresh_cache(context, {})
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
 
     assert snapshot.native_value == pytest.approx(954.98)
     assert snapshot.attrs["server_total"] == pytest.approx(954.98)
@@ -156,7 +158,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
         ],
     ],
 )
-def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(
+def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(  # ruff: ignore[too-many-arguments, too-many-positional-arguments]
     description_key: str,
     date_type: Literal["day", "week", "month", "year"],
     fallback_stat_key: str,
@@ -197,7 +199,7 @@ def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(
     }
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     sensor.entity_description = description
-    sensor._reset_period = date_type
+    sensor._reset_period = date_type  # ruff: ignore[private-member-access]
     context = _StatRefreshContext(
         payload=payload,
         local_now=datetime(2026, 8, 21, 15, 12, tzinfo=UTC),
@@ -206,7 +208,7 @@ def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(
         local_period_raw=None,
     )
 
-    snapshot = sensor._refresh_cache(context, {})
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
 
     assert snapshot.native_value == pytest.approx(expected)
     assert snapshot.attrs["source_section"] == home_section

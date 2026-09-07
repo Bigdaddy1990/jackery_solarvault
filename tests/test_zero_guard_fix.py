@@ -28,7 +28,7 @@ def test_trend_series_total_ct_day_zero_accepted() -> None:
     source = {APP_STAT_TOTAL_CT_INPUT_ENERGY: "0"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
-    )  # noqa: E501, RUF069, RUF100
+    )
 
 
 def test_trend_series_total_ct_day_negative_dropped() -> None:
@@ -37,14 +37,14 @@ def test_trend_series_total_ct_day_negative_dropped() -> None:
     source = {APP_STAT_TOTAL_CT_INPUT_ENERGY: "-1.5"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY) is None
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_total_eps_day_zero_accepted() -> None:
     """EPS day period with zero total should return 0.0, not None."""
     section = f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}"
     source = {APP_STAT_TOTAL_IN_EPS_ENERGY: "0"}
-    assert util.trend_series_total(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY) == 0.0  # noqa: RUF069
+    assert util.trend_series_total(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
 
 
 def test_trend_series_total_eps_day_negative_dropped() -> None:
@@ -53,7 +53,7 @@ def test_trend_series_total_eps_day_negative_dropped() -> None:
     source = {APP_STAT_TOTAL_IN_EPS_ENERGY: "-0.5"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY) is None
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_total_ct_month_zero_accepted() -> None:
@@ -62,7 +62,7 @@ def test_trend_series_total_ct_month_zero_accepted() -> None:
     source = {APP_STAT_TOTAL_CT_INPUT_ENERGY: "0"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
-    )  # noqa: E501, RUF069, RUF100
+    )
 
 
 def test_trend_series_total_ct_month_negative_dropped() -> None:
@@ -71,7 +71,7 @@ def test_trend_series_total_ct_month_negative_dropped() -> None:
     source = {APP_STAT_TOTAL_CT_INPUT_ENERGY: "-1.5"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY) is None
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_total_eps_week_zero_accepted() -> None:
@@ -80,7 +80,7 @@ def test_trend_series_total_eps_week_zero_accepted() -> None:
     source = {APP_STAT_TOTAL_OUT_EPS_ENERGY: "0"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_OUT_EPS_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
-    )  # noqa: E501, RUF069, RUF100
+    )
 
 
 def test_trend_series_total_eps_year_zero_accepted() -> None:
@@ -89,7 +89,7 @@ def test_trend_series_total_eps_year_zero_accepted() -> None:
     source = {APP_STAT_TOTAL_OUT_EPS_ENERGY: "0"}
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_OUT_EPS_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
-    )  # noqa: E501, RUF069, RUF100
+    )
 
 
 def test_trend_series_has_value_ct_day_zero_accepted() -> None:
@@ -99,7 +99,7 @@ def test_trend_series_has_value_ct_day_zero_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_eps_day_zero_accepted() -> None:
@@ -109,7 +109,7 @@ def test_trend_series_has_value_eps_day_zero_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_IN_EPS_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_ct_month_zero_accepted() -> None:
@@ -119,7 +119,7 @@ def test_trend_series_has_value_ct_month_zero_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_eps_month_zero_accepted() -> None:
@@ -129,7 +129,7 @@ def test_trend_series_has_value_eps_month_zero_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_OUT_EPS_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_ct_no_unit_zero_total_accepted() -> None:
@@ -139,7 +139,7 @@ def test_trend_series_has_value_ct_no_unit_zero_total_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_eps_no_unit_zero_total_accepted() -> None:
@@ -149,7 +149,7 @@ def test_trend_series_has_value_eps_no_unit_zero_total_accepted() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_OUT_EPS_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_ct_no_unit_empty_series_zero_total() -> None:
@@ -159,7 +159,7 @@ def test_trend_series_has_value_ct_no_unit_empty_series_zero_total() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY)
         is True
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_has_value_ct_negative_total_rejected() -> None:
@@ -169,7 +169,7 @@ def test_trend_series_has_value_ct_negative_total_rejected() -> None:
     assert (
         util.trend_series_has_value(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY)
         is False
-    )  # noqa: E501, RUF100
+    )
 
 
 def test_trend_series_total_ct_series_sum_zero() -> None:
@@ -181,4 +181,4 @@ def test_trend_series_total_ct_series_sum_zero() -> None:
     }
     assert (
         util.trend_series_total(source, section, APP_STAT_TOTAL_CT_INPUT_ENERGY) == 0.0  # ruff: ignore[float-equality-comparison]
-    )  # noqa: E501, RUF069, RUF100
+    )

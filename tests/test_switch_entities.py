@@ -60,7 +60,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:
+def _description(key: str) -> Any:  # ruff: ignore[any-type]
     return next(desc for desc in SWITCH_DESCRIPTIONS if desc.key == key)
 
 
@@ -79,7 +79,7 @@ def _switch(key: str, data: dict[str, Any]) -> JackeryDescriptionSwitch:
     entity = JackeryDescriptionSwitch.__new__(JackeryDescriptionSwitch)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(data)
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
     return entity
 
@@ -147,7 +147,7 @@ async def test_portable_switch_routes_through_toggle_output() -> None:
 
     entity.coordinator.async_portable_toggle_output.assert_awaited_once()
     _args, kwargs = entity.coordinator.async_portable_toggle_output.call_args
-    assert kwargs["action_id"] == 10  # ACTION_ID_PORTABLE_OUTPUT_DC
+    assert kwargs["action_id"] == 10  # ACTION_ID_PORTABLE_OUTPUT_DC  # ruff: ignore[magic-value-comparison]
     assert kwargs["field"] == "odc"
     assert kwargs["enabled"] is True
 
@@ -226,10 +226,10 @@ def _smart_plug(plug: dict[str, Any]) -> JackerySmartPlugSwitch:
     mutable.coordinator = _coordinator(
         {_DEVICE_ID: {PAYLOAD_SMART_PLUGS: [plug]}},
     )
-    mutable._device_id = _DEVICE_ID
-    mutable._plug_index = 1
-    mutable._plug_sn = str(plug.get(FIELD_DEVICE_SN))
-    mutable._plug_key = "smart_plug_1"
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._plug_index = 1  # ruff: ignore[private-member-access]
+    mutable._plug_sn = str(plug.get(FIELD_DEVICE_SN))  # ruff: ignore[private-member-access]
+    mutable._plug_key = "smart_plug_1"  # ruff: ignore[private-member-access]
     return entity
 
 
