@@ -31,21 +31,20 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-requires-python = ">=3.14.2"
+requires-python = ">=3.14"
 dependencies = [
     "pip>=26.2.1",
     "pre-commit>=4.6.1",
-    "ruff>=0.16.3",
+    "ruff>=0.16.6",
     "mypy>=2.3.0",
+    "uv>=0.5.1",
+    "ty<=0.0.77",
 ]
 
 [project.urls]
 Homepage = "https://github.com/Bigdaddy1990/jackery_solarvault"
 Documentation = "https://github.com/Bigdaddy1990/jackery_solarvault/blob/main/README.md"
 Issues = "https://github.com/Bigdaddy1990/jackery_solarvault/issues"
-
-[tool.ty.environment]
-python-version = "3.14"
 
 [tool.pytest.ini_options]
 addopts = "-p no:pytest_cov -p pytest_cov.plugin -p pytest_homeassistant_custom_component --cov=custom_components/jackery_solarvault --cov-branch --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov -q -ra --strict-markers --strict-config --tb=short --maxfail=20"
@@ -244,7 +243,7 @@ filterwarnings = [
 
 [tool.ruff]
 target-version = "py314"
-required-version = ">=0.16.3"
+required-version = ">=0.16.6"
 line-length = 88
 src = ["custom_components/jackery_solarvault", "tests"]
 indent-width = 4
@@ -299,7 +298,7 @@ exclude = [
 detect-string-imports = true
 direction = "dependencies"
 string-imports-min-dots = 2
-# Exclude type-checking-only imports from the graph
+preview= true
 type-checking-imports = true
 
 [tool.ruff.format]
@@ -313,8 +312,9 @@ skip-magic-trailing-comma = false
 nested-string-quote-style = "preferred"
 
 [tool.ruff.lint]
+preview = true
 select = [
-  "builtin-variable-shadowing",   # Variable {name} is shadowing a Python builtin
+  "ANN",    # annotations
   "ASYNC",  # flake8-async
   "B",      # flake8-bugbear
   "BLE",
@@ -325,7 +325,9 @@ select = [
   "call-datetime-utcfromtimestamp", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
   "call-date-today", # Use datetime.now(tz=).date() instead of date.today()
   "E",      # pycodestyle
+  "line-too-long",
   "F",      # pyflakes/autoflake
+  "FA",
   "f-string-missing-placeholders",   # f-string without any placeholders
   "FLY",    # flynt
   "FURB",   # refurb
@@ -335,10 +337,12 @@ select = [
   "ISC",    # flake8-implicit-str-concat
   "unconventional-import-alias", # import concentions; {name} should be imported as {asname}
   "LOG",    # flake8-logging
+  "N",
   "invalid-first-argument-name-for-class-method",   # First argument of a class method should be named cls
   "invalid-first-argument-name-for-method",   # First argument of a method should be named self
   "non-lowercase-variable-in-function",   # Variable {name} in function should be snake_case
   "mixed-case-variable-in-class-scope",   # Variable {name} in class scope should not be mixedCase
+  "NPY",
   "PERF",   # Perflint
   "PGH",    # pygrep-hooks
   "PIE",    # flake8-pie
@@ -349,6 +353,7 @@ select = [
   "RET",    # flake8-return
   "RSE",    # flake8-raise
   "RUF",    # Ruff-specific rules (see `ignore` for exclusions)
+  "unused-noqa",
   "hardcoded-password-default",   # Possible hardcoded password assigned to function default
   "exec-builtin",   # Use of exec detected
   "bad-file-permissions",   # bad-file-permissions
@@ -374,90 +379,23 @@ select = [
   "debugger",   # Trace found: {name} used
   "T20",    # flake8-print
   "TC",     # flake8-type-checking
+  "TCH",
   "TID",    # Tidy imports
   "TRY",    # tryceratops
   "UP",     # pyupgrade
   "printf-string-formatting",  # Use format specifiers instead of percent format
   "f-string",  # Use f-string instead of `format` call
   "W",      # pycodestyle
+  "YTT",
+  "Q"
 ]
 
-ignore = [
-  "async-function-with-timeout", # Async function definition with a `timeout` parameter Use `asyncio.timeout` instead
-  "async-busy-wait", # Use `asyncio.Event` instead of awaiting `asyncio.sleep` in a `while` loop
-  "blocking-path-method-in-async-function", # Use an async function for entering the file system
-  "function-call-in-default-argument",     # Do not perform function call in argument defaults; commonly used in Home Assistant (e.g. cv.* validators)
-  "cached-instance-method",     # Use of functools.lru_cache or functools.cache on methods can lead to memory leaks
-  "blank-line-after-function",     # No blank lines allowed after function docstring
-  "incorrect-blank-line-before-class",     # 1 blank line required before class docstring
-  "multi-line-summary-second-line",     # Multi-line docstring summary should start at the second line
-  "missing-new-line-after-section-name",     # Section name should end with a newline
-  "missing-dashed-underline-after-section",     # Section name underlining
-  "undocumented-param",     # Missing argument descriptions in docstring - to allow documenting only non-obvious parameters
-  "line-too-long",     # line too long
-
-  "compare-to-empty-string", # {existing} can be simplified to {replacement} as an empty string is falsey; too many false positives
-  "too-many-return-statements", # Too many return statements ({returns} > {max_returns})
-  "too-many-branches", # Too many branches ({branches} > {max_branches})
-  "too-many-arguments", # Too many arguments to function call ({c_args} > {max_args})
-  "too-many-statements", # Too many statements ({statements} > {max_statements})
-  "too-many-positional-arguments", # Too many positional arguments defined for a function ({p_args} > {max_args})
-  "magic-value-comparison", # Magic value used in comparison, consider replacing {value} with a constant variable
-  "unnecessary-lambda", # Unnecessary lambda wrapping a function call; can often be replaced by the function itself
-  "eq-without-hash", # __eq__ without __hash__
-  "redefined-loop-name", # Outer {outer_kind} variable {name} overwritten by inner {inner_kind} target
-  "pytest-raises-too-broad",   # pytest.raises({exception}) is too broad, set the `match` parameter or use a more specific exception
-  "pytest-composite-assertion",   # Assertion should be broken down into multiple parts
-  "ambiguous-unicode-character-string",  # String contains ambiguous unicode character.
-  "mutable-class-default",  # Mutable class attributes should be annotated with typing.ClassVar
-  "unnecessary-iterable-allocation-for-first-element",  # Prefer next(...) over single element slice
-  "pytest-raises-ambiguous-pattern",  # Pattern passed to match= contains metacharacters but is neither escaped nor raw
-  "collapsible-if",  # Use a single if statement instead of nested if statements
-  "needless-bool",  # Return the condition {condition} directly
-  "if-else-block-instead-of-if-exp",  # Use ternary operator {contents} instead of if-else-block
-  "open-file-with-context-handler",  # Use context handler for opening files
-
-  # Moving imports into type-checking blocks can mess with pytest.patch()
-  "typing-only-first-party-import", # Move application import {} into a type-checking block
-  "typing-only-third-party-import", # Move third-party import {} into a type-checking block
-  "typing-only-standard-library-import", # Move standard library import {} into a type-checking block
-  # Quotes for typing.cast generally not necessary, only for performance critical paths
-  "runtime-cast-value", # Add quotes to type expression in typing.cast()
-  "relative-imports",
-  "raise-vanilla-args", # Avoid specifying long messages outside the exception class
-  "error-instead-of-exception", # Use `logging.exception` instead of `logging.error`
-
-  "non-pep695-generic-function", # Non PEP 696 generic function
-  "private-type-parameter", # Avoid private type parameter names
-
-  # May conflict with the formatter, https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
-  "tab-indentation",
-  "indentation-with-invalid-multiple",
-  "indentation-with-invalid-multiple-comment",
-  "over-indented",
-  "docstring-tab-indentation",
-  "triple-single-quotes",
-  "Q",
-  "missing-trailing-comma",
-  "prohibited-trailing-comma",
-
-  # Disabled because ruff does not understand type of __all__ generated by a function
-  "invalid-all-format",
-
-  "f-string-number-format",
-
-  # Disabled to implement in follow up PRs after ruff 0.16 bump
-  "implicit-string-concatenation-in-collection-literal",
-  "log-exception-outside-except-handler",
-]
 # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
 extend-unsafe-fixes = ["E", "unused-import", "line-too-long"]
 # Relax the convention by _not_ requiring documentation for every function parameter.
 fixable = ["ALL"]
-# TID252 (relative-imports) darf NIE automatisch gefixt werden: der Autofix schreibt
-# `from .const import X` in einen absoluten Pfad um und macht die Custom-Integration
-# fuer den HA-Loader unauffindbar (Vorfall 2026-08-13, Integration nicht mehr ladbar).
 unfixable = ["relative-imports"]
+ignore = ["relative-imports"]
 future-annotations = true # Enable `from __future__ import annotations` imports
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 logger-objects = ["logging_setup.logger"]
@@ -468,28 +406,23 @@ hass = "homeassistant.__main__:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
-    "pytest-cov>=7.1.0",
+    "homeassistant",
+    "homeassistant-stubs",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
     "pytest-homeassistant",
-    "pytest-homeassistant-custom-component",
-    "pytest-mock>=3.15.1",
+    "pytest-homeassistant-custom-component>=0.13.363",
+    "pytest-mock",
     "ruff",
 ]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 25
+max-complexity = 20
 
 [tool.ruff.lint.per-file-ignores]
-# Tests intentionally exercise private implementation details and use local imports
-# to isolate Home Assistant modules. Production code receives the full rule set.
-"tests/**" = [
-  "private-member-access",
-  "import-private-name",
-  "noqa-comments",
-  "import-outside-top-level",
-  "undocumented-public-module",
-]
+"**/__init__.py" = ["module-import-not-at-top-of-file"]
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -499,7 +432,7 @@ property-decorators = ["propcache.api.cached_property"]
 "async_timeout".msg = "use asyncio.timeout instead"
 "pytz".msg = "use zoneinfo instead"
 "tests".msg = "You should not import tests"
-"__future__.annotations".msg = "It should not be needed because Home Assistant requires Python 3.14+"
+#"__future__.annotations".msg = "It should not be needed because Home Assistant requires Python 3.14+"
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -534,11 +467,11 @@ quote-annotations = true
 strict = true
 
 [tool.ruff.lint.flake8-bandit]
-check-typed-exception = false
+check-typed-exception = true
 
 [tool.ruff.lint.flake8-pytest-style]
-fixture-parentheses = false
-mark-parentheses = false
+fixture-parentheses = true
+mark-parentheses = true
 parametrize-names-type = "list"
 parametrize-values-row-type = "list"
 parametrize-values-type = "list"
@@ -546,11 +479,6 @@ parametrize-values-type = "list"
 [tool.ruff.lint.flake8-tidy-imports]
 # Require lazy imports by default, except for modules with import-time side effects.
 require-lazy = { include = "all", exclude = ["sitecustomize"] }
-# Diese Datei stammt urspruenglich aus HA-Core, wo alle Imports absolut sind. Hier liegt
-# aber eine CUSTOM-Integration: paketinterne relative Imports (`from .const import ...`)
-# sind der vorgeschriebene Stil und duerfen nicht als TID252 gemeldet/umgeschrieben
-# werden. "parents" verbietet weiterhin `from ..x import y` ueber Paketgrenzen hinweg.
-ban-relative-imports = "parents"
 
 [tool.ruff.lint.flake8-unused-arguments]
 ignore-variadic-names = true
@@ -624,7 +552,7 @@ omit = ["tests/*", "*/__pycache__/*", "scripts/*", "docs/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 65
+fail_under = 85
 skip_covered = true
 precision = 2
 ignore_errors = false
@@ -651,13 +579,13 @@ output = "coverage.xml"
 class-const-naming-style = "any"
 
 [tool.pylint.REPORTS]
-score = false
+score = true
 
 [tool.pylint.EXCEPTIONS]
 overgeneral-exceptions = [
   "builtins.BaseException",
   "builtins.Exception",
-  # "homeassistant.exceptions.HomeAssistantError",  # too many issues
+  "homeassistant.exceptions.HomeAssistantError",
 ]
 
 [tool.pylint.TYPING]
@@ -681,7 +609,6 @@ baseline = ".smellcheck-baseline.json"  # suppress known findings
 cache = false                           # enable file-level caching (default: true)
 cache-dir = ".smellcheck-cache"        # cache directory (default: .smellcheck-cache)
 
-# per-path overrides
 [tool.smellcheck.per-file-ignores]
 "scripts/**" = []
 "docs/**" = []
@@ -965,7 +892,7 @@ disable = [
   "wrong-exception-operation",
 ]
 enable = [
-  #"useless-suppression",  # temporarily every now and then to clean them up
+  "useless-suppression",
   "use-symbolic-message-instead",
 ]
 per-file-ignores = [
@@ -986,3 +913,32 @@ skips = ["B101", "B102", "B110", "B112", "B307", "B324", "B410", "B603", "B608",
 MinLineCount= 50
 # Paths to ignore for duplication checking
 IgnorePatterns = ["docs/**", "tests/**", "scripts/**"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+enable_error_code = "deprecated"
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_optional = true
+local_partial_types = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+sqlite_cache = false
+
+[[tool.mypy.overrides]]
+module = ["custom_components.jackery_solarvault.*"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+# Strict typing is still in progress; keep these exceptions explicit until
+# they can be removed under the final Home Assistant typing profile.
+warn_return_any = true

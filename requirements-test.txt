@@ -7,6 +7,8 @@ attrs>=26.1.0
 autotyping>=24.9.0
 coverage
 coverage[toml]
+homeassistant
+homeassistant-stubs
 hypothesis>=6.167.1
 ifaddr>=0.2.0
 iniconfig>=1.0.1
@@ -15,22 +17,25 @@ multidict>=6.7.1,<7.0
 mypy>=2.3.0
 numpy>=2.5.2
 packaging>=26.3
-pip>=26.0
+pip>=26.2.1
+pre-commit>=4.6.1
 pydantic
 pylint
 pytest
 pytest-asyncio
 pytest-cov
 pytest-github-actions-annotate-failures>=0.4.2
-pytest-homeassistant-custom-component  # follows daily HA version
+pytest-homeassistant>=0.1.3
+pytest-homeassistant-custom-component>=0.13.363  # follows daily HA version
+pytest-mock
 pytest-socket
 pytest_aiohttp
 python-dateutil>=2.7
 python_discovery>=1.6.0
 pyyaml
-ruff>=0.16.4
+ruff>=0.16.6
 smellcheck>=0.3.10
-ty
+ty<=0.0.77
 types-aiofiles>=25.1.0.20260518
 types-atomicwrites>=1.4.5.1
 types-caldav>=1.3.0.20250516
@@ -49,7 +54,7 @@ types-requests>=2.33.0.20260712
 types-xmltodict>=1.0.1.20260518
 typing-extensions>=4.16.0,<5.0
 typing-inspection>=0.4.2
-uv
+uv>=0.5.1
 uv-pre-commit
 voluptuous>=0.16.0
 voluptuous-serialize>=2.7.0
