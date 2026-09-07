@@ -11,8 +11,16 @@ default_language_version:
 default_install_hook_types:
   - pre-commit
   - pre-push
+  - post-checkout
+  - post-merge
+  - post-rewrite
 
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.12.9
+    hooks:
+      - id: uv-sync
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
@@ -20,24 +28,17 @@ repos:
       - id: pyupgrade
         args:
           - --py314-plus
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.1  # Use the sha / tag you want to point at
-    hooks:
-      - id: mypy
-        # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated
-        # virtualenv so it won't have access to those. To change the arguments, override the args as follows:
-        args: [--strict, --ignore-missing-imports]
-        additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^(manifest.*|docs/|scripts/)
 
   - repo: https://github.com/cdce8p/python-typing-update
     rev: v0.8.1
     hooks:
       - id: python-typing-update
-        stages: [manual]
+        stages: [pre-commit]
         args:
           - --py314-plus
+          - --full-reorder
           - --keep-updates
+          - --ruff
           - --check
           - --force
 
@@ -50,12 +51,14 @@ repos:
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5
+    rev: v0.16.6
     hooks:
       - id: ruff-check
         args:
           - --fix
           - --unsafe-fixes
+          - --exit-non-zero-on-fix
+          - --extend-select=I,E,F,B,UP,D,line-too-long,unused-noqa,ANN,ASYNC,Q,W
         types_or:
           - python
           - pyi
@@ -63,6 +66,24 @@ repos:
         types_or:
           - python
           - pyi
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1  # Use the sha / tag you want to point at
+    hooks:
+      - id: mypy
+        # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated
+        # virtualenv so it won't have access to those. To change the arguments, override the args as follows:
+        args: [--strict, --ignore-missing-imports]
+        additional_dependencies: [types-pyyaml, pydantic]
+        exclude: ^(manifest.*|docs/|scripts/)
+        
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.77
+    hooks:
+      - id: ty
+        stages: [manual]
+        types: [python]
+        args: [--no-sync, --no-python-downloads]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -88,6 +109,7 @@ repos:
       - id: pretty-format-json
         args:
           - --autofix
+          - --no-ensure-ascii
         exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
       - id: fix-byte-order-marker
       - id: destroyed-symlinks
