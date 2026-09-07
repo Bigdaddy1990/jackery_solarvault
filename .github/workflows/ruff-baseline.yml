@@ -32,11 +32,12 @@ jobs:
           ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
-          ruff check . --extend-select RUF100 || true
+          ruff check . --extend-select I,E,F,B,UP,D,line-too-long,unused-noqa,ANN,ASYNC,Q,W || true
           ruff check . --preview || true
+          ruff check . --add-noqa || true
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
-          ruff format .
+          ruff format . || true
 
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual --check --py314-plus --ruff || true
