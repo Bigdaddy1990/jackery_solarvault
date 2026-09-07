@@ -27,14 +27,18 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+          persist-credentials: true
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-test.txt
@@ -46,12 +50,9 @@ jobs:
           #ignore-nothing-to-cache: true
 
       - uses: astral-sh/ruff-action@v4.0.0
-      - uses: actions/setup-python@v7
-        with:
-           python-version: 3.14
       - run: ruff check . --fix
       - run: ruff format .
-      - run: ruff check . --fix --preview --target-version py314 || true
+      - run: ruff check . --fix --preview --unsafe-fixes --target-version py314 || true
       - run: ruff format . || true
       - uses: pre-commit/action@v3.0.1
       - uses: pre-commit-ci/lite-action@v1.1.0

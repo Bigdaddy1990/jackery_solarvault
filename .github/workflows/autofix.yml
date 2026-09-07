@@ -13,7 +13,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: autofix-${{ github.ref }}
+  group: autofix-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
@@ -34,7 +34,7 @@ jobs:
           persist-credentials: true
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -45,11 +45,16 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -r requirements.txt
-          pip install -r requirements-test.txt
-          pip install --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+          pip install -r requirements.txt --upgrade
+          pip install -r requirements-test.txt --upgrade
+          pip install --upgrade uv-pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
 
-      - uses: astral-sh/ruff-action@v3
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+          #enable-cache: true
+          #ignore-nothing-to-cache: true
+
+      - uses: astral-sh/ruff-action@v4.0.0
       - run: ruff check --fix
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
@@ -69,3 +74,6 @@ jobs:
           ruff format . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+
+      - uses: pre-commit/action@v3.0.1
+      - run: uvx pre-commit run --all-files
