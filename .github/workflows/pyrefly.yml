@@ -1,0 +1,42 @@
+name: Pyrefly Type Check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allows manual triggering from the GitHub UI
+
+permissions:
+  contents: write # for actions/checkout, if you're in a private repo
+  pull-requests: write
+  actions: write
+  checks: write
+  id-token: write # for Trusted Publishing + attest-action
+
+concurrency:
+  group: pyrefly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+
+      # Install Python dependencies and create environment
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          # Install your dependencies; adjust the following lines as needed
+          pip install -r requirements-dev.txt
+
+      - name: Install Pyrefly
+        run: pip install pyrefly
+
+      - name: Run Pyrefly Type Checker
+        run: pyrefly check --output-format=github --python-version=3.14
