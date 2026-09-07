@@ -9,12 +9,23 @@ on:
 permissions:
   contents: write
   actions: write
+  checks: write
 
+env:
+  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+  
+concurrency:
+  group: dependency-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true 
+  
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          ref: ${{ github.head_ref }}
       - name: Dependency Review
         uses: actions/dependency-review-action@v5.0.0
