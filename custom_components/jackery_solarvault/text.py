@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 
 from .client import JackeryAuthError, JackeryError
 from .const import (
-    DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DOMAIN,
     FIELD_DEVICE_NAME,
     FIELD_GRID_STANDARD,
@@ -26,9 +29,6 @@ from .const import (
     FIELD_THIRD_PARTY_MQTT_PASSWORD,
     FIELD_THIRD_PARTY_MQTT_TOKEN,
     FIELD_THIRD_PARTY_MQTT_USERNAME,
-    PAYLOAD_DEVICE,
-    PAYLOAD_DISCOVERY,
-    PAYLOAD_DISCOVERY_SOURCE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
 )
@@ -41,7 +41,11 @@ from .entity import (
     LAYER5_DATA_SOURCES,
     JackeryEntity,
 )
-from .util import append_unique_entity, coordinator_entity_signature
+from .util import (
+    append_unique_entity,
+    coordinator_entity_signature,
+    is_portable_payload as _is_portable_payload,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -62,64 +66,10 @@ _LOGGER = logging.getLogger(__name__)
 _PV_FIELDS: tuple[str, ...] = (FIELD_PV1, FIELD_PV2, FIELD_PV3, FIELD_PV4)
 
 
-_HOME_PAYLOAD_EVIDENCE_KEYS = frozenset({
-    "autoStandby",
-    "batInPw",
-    "batOutPw",
-    "batSoc",
-    "defaultPw",
-    "gridInPw",
-    "isAutoStandby",
-    "isFollowMeterPw",
-    "maxGridStdPw",
-    "maxInvStdPw",
-    "maxIotNum",
-    "maxOutPw",
-    "pvPw",
-    "swEps",
-    "tempUnit",
-    "workModel",
-})
-_PAYLOAD_HTTP_PROPERTIES = "http_properties"
-
-
-def _has_home_payload_evidence(props: dict[str, Any]) -> bool:
-    """Return True when props carry Home/System-body-only fields."""
-    return any(key in props for key in _HOME_PAYLOAD_EVIDENCE_KEYS)
-
-
-def _payload_has_home_payload_evidence(
-    payload: dict[str, Any],
-    props: dict[str, Any] | None = None,
-) -> bool:
-    """Return True when merged or raw payload props identify a Home/System body."""
-    if props is not None and _has_home_payload_evidence(props):
-        return True
-    if isinstance(payload.get(PAYLOAD_SYSTEM), dict) and payload[PAYLOAD_SYSTEM]:
-        return True
-    for section in (PAYLOAD_PROPERTIES, _PAYLOAD_HTTP_PROPERTIES):
-        raw = payload.get(section) or {}
-        if isinstance(raw, dict) and _has_home_payload_evidence(raw):
-            return True
-    return False
-
-
-def _is_portable_payload(payload: dict[str, Any]) -> bool:
-    """Return True for Explorer/Portable payloads without Home/System evidence."""
-    if _payload_has_home_payload_evidence(payload):
-        return False
-    for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
-        meta = payload.get(section) or {}
-        if (
-            isinstance(meta, dict)
-            and meta.get(PAYLOAD_DISCOVERY_SOURCE) == DISCOVERY_SOURCE_LEGACY_BIND_LIST
-        ):
-            return True
-    return False
-
+type _ThirdPartyMqttTextConfig = tuple[str, str, str, TextMode, str | None]
 
 _THIRD_PARTY_MQTT_TEXT_FIELDS: tuple[
-    tuple[str, str, str, TextMode, str | None],
+    _ThirdPartyMqttTextConfig,
     ...,
 ] = (
     (
@@ -171,21 +121,8 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
     seen_unique_ids: set[str] = set()
 
     def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """Append a TextEntity when its identifier is new.
-
-        Modifies the `entities` list by appending `entity` when its unique id is new,
-        and records that id to prevent duplicate entities from being added.
-
-        Parameters:
-            entities (list[TextEntity]): Target list to which the entity will be
-            appended if allowed.
-            entity (TextEntity): Candidate text entity to append.
-        """
-        append_unique_entity(
-            entities,
-            seen_unique_ids,
-            entity,
-        )
+        """Append the entity unless its unique ID was already seen."""
+        append_unique_entity(entities, seen_unique_ids, entity)
 
     def _collect_entities() -> list[TextEntity]:
         """Collects text entities for devices that expose a system identifier.
@@ -221,23 +158,13 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 coordinator.device_supports_advanced(dev_id)
                 or coordinator.device_bluetooth_key(dev_id)
             ):
-                for (
-                    key_suffix,
-                    translation_key,
-                    field,
-                    mode,
-                    pattern,
-                ) in _THIRD_PARTY_MQTT_TEXT_FIELDS:
+                for config in _THIRD_PARTY_MQTT_TEXT_FIELDS:
                     _append_unique(
                         entities,
                         JackeryThirdPartyMqttText(
                             coordinator,
                             dev_id,
-                            key_suffix=key_suffix,
-                            translation_key=translation_key,
-                            field=field,
-                            mode=mode,
-                            pattern=pattern,
+                            config=config,
                         ),
                     )
         return entities
@@ -298,7 +225,7 @@ class JackeryDeviceNameText(JackeryEntity, TextEntity):
         """Rename a Home D-I-Y or legacy portable device over HTTP."""
         new_name = (value or "").strip()
         if not new_name:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="invalid_text_value",
                 translation_placeholders={
@@ -386,9 +313,10 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and re-authentication
-            is required.
-            HomeAssistantError: If the system identifier is missing, the trimmed name is
-            empty, or the remote API reports a failure.
+                is required.
+            ServiceValidationError: If the trimmed name is empty.
+            HomeAssistantError: If the system identifier is missing or the remote API
+                reports a failure.
         """
         sys_data = self._system
         system_id = sys_data.get(FIELD_ID) or sys_data.get(FIELD_SYSTEM_ID)
@@ -401,7 +329,7 @@ class JackerySystemNameText(JackeryEntity, TextEntity):
 
         new_name = (value or "").strip()
         if not new_name:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="invalid_text_value",
                 translation_placeholders={
@@ -472,13 +400,13 @@ class JackeryGridStandardText(JackeryEntity, TextEntity):
 
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and
-            re-authentication is required.
-            HomeAssistantError: If the value is not decimal or the remote
-            write fails.
+                re-authentication is required.
+            ServiceValidationError: If the value is not decimal.
+            HomeAssistantError: If the remote write fails.
         """
         new_value = str(value or "").strip()
         if not new_value.isdecimal():
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="invalid_text_value",
                 translation_placeholders={
@@ -577,13 +505,13 @@ class JackeryPvNameText(JackeryEntity, TextEntity):
 
         Raises:
             ConfigEntryAuthFailed: If the API rejects credentials and
-            re-authentication is required.
-            HomeAssistantError: If the trimmed name is empty or the remote API
-            reports a failure.
+                re-authentication is required.
+            ServiceValidationError: If the trimmed name is empty.
+            HomeAssistantError: If the remote API reports a failure.
         """
         new_name = (value or "").strip()
         if not new_name:
-            raise HomeAssistantError(
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="invalid_text_value",
                 translation_placeholders={
@@ -635,13 +563,10 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
         *,
-        key_suffix: str,
-        translation_key: str,
-        field: str,
-        mode: TextMode,
-        pattern: str | None,
+        config: _ThirdPartyMqttTextConfig,
     ) -> None:
         """Initialise the Third-Party MQTT text field."""
+        key_suffix, translation_key, field, mode, pattern = config
         super().__init__(coordinator, device_id, key_suffix)
         self._field = field
         self.app_fields = (field,)

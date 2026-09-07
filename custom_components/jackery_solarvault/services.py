@@ -15,8 +15,8 @@ The actions follow the same routing contract:
    its API client through ``coordinator.async_set_system_name``, which is a
    system-scoped REST call); command/API execution stays in
    ``coordinator.py``.
-3. Surface failures as ``ServiceValidationError`` with the integration's
-   ``translation_domain`` so HA can render a localized error to the user.
+3. Surface invalid input as ``ServiceValidationError`` and external action
+   failures as ``HomeAssistantError`` with localized integration messages.
 """
 
 import base64
@@ -60,7 +60,6 @@ from .const import (
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
     PAYLOAD_DISCOVERY_SOURCE,
-    PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
     SERVICE_ACCEPT_SHARED_DEVICE,
     SERVICE_AGREE_PRIVACY_CONSENT,
@@ -140,7 +139,6 @@ from .const import (
     SERVICE_GET_ALARM_DETAIL,
     SERVICE_GET_DEVICE_CURRENCY,
     SERVICE_GET_DYNAMIC_PRICE_LOGIN_URL,
-    SERVICE_GET_OFFLINE_STATISTICS,
     SERVICE_GET_PRODUCT_INSTRUCTION,
     SERVICE_GET_PUSH_CONFIG,
     SERVICE_GET_SHARE_QR_CODE,
@@ -197,6 +195,7 @@ from .const import (
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
     SERVICE_SUBMIT_FEEDBACK,
     SERVICE_SYNC_ALERTS,
+    SERVICE_SYNC_OFFLINE_STATISTICS,
     SERVICE_UNBIND_ACCESSORIES,
     SERVICE_UNBIND_DEVICE,
     SERVICE_UNBIND_SHELLY_ACCOUNT,
@@ -206,16 +205,20 @@ from .const import (
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
 )
 from .coordinator import JackerySolarVaultCoordinator
-from .util import safe_bool
+from .util import (
+    payload_has_home_payload_evidence as _payload_has_home_payload_evidence,
+    safe_bool,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
     from homeassistant.util.json import JsonValueType
 
 _LOGGER = logging.getLogger(__name__)
+_MAX_SYSTEM_NAME_LENGTH: Final = 64
 
 
-def _coerce_service_int(raw: Any) -> int:
+def _coerce_service_int(raw: object) -> int:
     """Return a whole service integer without truncating fractional numbers."""
     if isinstance(raw, bool):
         msg = "expected integer"
@@ -244,9 +247,12 @@ def _coerce_service_int(raw: Any) -> int:
     raise vol.Invalid(msg)
 
 
-def _coerce_service_float(raw: Any) -> float:
+def _coerce_service_float(raw: object) -> float:
     """Return a finite service float without accepting booleans."""
     if isinstance(raw, bool):
+        msg = "expected finite number"
+        raise vol.Invalid(msg)
+    if not isinstance(raw, str | int | float):
         msg = "expected finite number"
         raise vol.Invalid(msg)
     try:
@@ -630,6 +636,9 @@ ACCOUNT_READ_SCHEMA = vol.Schema({
         cv.string,
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
+})
+SYNC_OFFLINE_STATISTICS_SCHEMA = ACCOUNT_READ_SCHEMA.extend({
+    vol.Required(SERVICE_FIELD_BODY): vol.All(dict, vol.Length(min=1)),
 })
 CHECK_APP_VERSION_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
@@ -1085,12 +1094,17 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
         subdevice suffix removed.
     """
     registry = dr.async_get(hass)
-    device = registry.async_get(raw)
+    # Jackery never registers HA's newer child-device kind; narrow to main
+    # devices so `via_device_id`/`identifiers` stay available without a union.
+    device = registry.async_get(raw, include_child_devices=False)
     if device is not None:
         seen: set[str] = set()
         while device.via_device_id and device.via_device_id not in seen:
             seen.add(device.via_device_id)
-            parent = registry.async_get(device.via_device_id)
+            parent = registry.async_get(
+                device.via_device_id,
+                include_child_devices=False,
+            )
             if parent is None:
                 break
             device = parent
@@ -1114,48 +1128,6 @@ def _coordinator_for_device(
         if device_id in (coordinator.data or {}):
             return coordinator
     return None
-
-
-_HOME_PAYLOAD_EVIDENCE_KEYS = frozenset({
-    "autoStandby",
-    "batInPw",
-    "batOutPw",
-    "batSoc",
-    "defaultPw",
-    "gridInPw",
-    "isAutoStandby",
-    "isFollowMeterPw",
-    "maxGridStdPw",
-    "maxInvStdPw",
-    "maxIotNum",
-    "maxOutPw",
-    "pvPw",
-    "swEps",
-    "tempUnit",
-    "workModel",
-})
-_PAYLOAD_HTTP_PROPERTIES = "http_properties"
-
-
-def _has_home_payload_evidence(props: dict[str, Any]) -> bool:
-    """Return True when props carry Home/System-body-only fields."""
-    return any(key in props for key in _HOME_PAYLOAD_EVIDENCE_KEYS)
-
-
-def _payload_has_home_payload_evidence(
-    payload: dict[str, Any],
-    props: dict[str, Any] | None = None,
-) -> bool:
-    """Return True when merged or raw payload props identify a Home/System body."""
-    if props is not None and _has_home_payload_evidence(props):
-        return True
-    if isinstance(payload.get(PAYLOAD_SYSTEM), dict) and payload[PAYLOAD_SYSTEM]:
-        return True
-    for section in (PAYLOAD_PROPERTIES, _PAYLOAD_HTTP_PROPERTIES):
-        raw = payload.get(section) or {}
-        if isinstance(raw, dict) and _has_home_payload_evidence(raw):
-            return True
-    return False
 
 
 def _is_portable_device(
@@ -1252,9 +1224,30 @@ def _service_validation_error(
     )
 
 
+def _service_action_error(
+    translation_key: str,
+    *,
+    device_id: str,
+    error: object,
+    extra_placeholders: dict[str, str] | None = None,
+) -> HomeAssistantError:
+    """Construct a translated error for an external service action failure."""
+    placeholders = {
+        "device_id": device_id,
+        "error": redacted_error(error),
+    }
+    if extra_placeholders is not None:
+        placeholders.update(extra_placeholders)
+    return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key=translation_key,
+        translation_placeholders=placeholders,
+    )
+
+
 def _device_id_from_service(
     hass: HomeAssistant,
-    raw: Any,
+    raw: object,
     *,
     translation_key: str,
     extra_placeholders: dict[str, str] | None = None,
@@ -1276,7 +1269,7 @@ def _device_id_from_service(
     )
 
 
-def _rename_system_id_from_service(raw: Any) -> str:
+def _rename_system_id_from_service(raw: object) -> str:
     """Return a validated system id from a direct rename service call."""
     system_id = ""
     if isinstance(raw, str):
@@ -1299,7 +1292,7 @@ def _rename_system_id_from_service(raw: Any) -> str:
     )
 
 
-def _rename_name_from_service(raw: Any, system_id: str) -> str:
+def _rename_name_from_service(raw: object, system_id: str) -> str:
     """Return a validated system name from a direct rename service call."""
     if not isinstance(raw, str):
         raise ServiceValidationError(
@@ -1320,19 +1313,22 @@ def _rename_name_from_service(raw: Any, system_id: str) -> str:
                 "error": f"{SERVICE_FIELD_NEW_NAME} must not be empty",
             },
         )
-    if len(parsed) > 64:
+    if len(parsed) > _MAX_SYSTEM_NAME_LENGTH:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="rename_system_failed",
             translation_placeholders={
                 "system_id": system_id,
-                "error": f"{SERVICE_FIELD_NEW_NAME} must be at most 64 characters",
+                "error": (
+                    f"{SERVICE_FIELD_NEW_NAME} must be at most "
+                    f"{_MAX_SYSTEM_NAME_LENGTH} characters"
+                ),
             },
         )
     return parsed
 
 
-def _storm_alert_id_from_service(raw: Any, device_id: str) -> str:
+def _storm_alert_id_from_service(raw: object, device_id: str) -> str:
     """Return a validated storm-alert id from a direct service call."""
     alert_id = ""
     if isinstance(raw, str):
@@ -1359,7 +1355,7 @@ def _reject_json_constant(constant: str) -> object:
     raise ValueError(msg)
 
 
-def _json_native_value(value: Any) -> Any:
+def _json_native_value(value: object) -> JsonValueType:
     """Return a JSON-native value or raise ValueError."""
     if value is None or isinstance(value, str | bool | int):
         return value
@@ -1371,8 +1367,8 @@ def _json_native_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_json_native_value(item) for item in value]
     if isinstance(value, dict):
-        normalized: dict[str, Any] = {}
-        for key, item in value.items():
+        normalized: dict[str, JsonValueType] = {}
+        for key, item in cast("dict[object, object]", value).items():
             if not isinstance(key, str):
                 msg = "body object keys must be strings"
                 raise TypeError(msg)
@@ -1382,7 +1378,10 @@ def _json_native_value(value: Any) -> Any:
     raise ValueError(msg)
 
 
-def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
+def _json_native_body(
+    body: dict[object, object],
+    device_id: str,
+) -> dict[str, JsonValueType]:
     """Return a JSON-native object body or raise a translated service error."""
     try:
         normalized = _json_native_value(body)
@@ -1403,19 +1402,23 @@ def _json_native_body(body: dict[Any, Any], device_id: str) -> dict[str, Any]:
     return normalized
 
 
-def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
+def _ble_body_from_service(
+    raw_body: object,
+    device_id: str,
+) -> dict[str, JsonValueType]:
     """Parse a BLE command `body` value from a service call into a dict.
 
-    Accepts a mapping (returned as a shallow copy) or a JSON-encoded object string. If `raw_body` is a string it must decode to a JSON object; otherwise this function raises ServiceValidationError with translation key "send_ble_command_failed" and translation placeholders that include the provided `device_id` and an error message.
+    Accept a mapping or a JSON-encoded object string. String values must decode
+    to an object; other values raise a translated ``ServiceValidationError``.
 
     Parameters:
-        raw_body (Any): Mapping or JSON string encoding an object to use as the BLE
+        raw_body (object): Mapping or JSON string encoding an object to use as the BLE
         body.
         device_id (str): Jackery device identifier included in validation error
         placeholders.
 
     Returns:
-        dict[str, Any]: Parsed body mapping to send with the BLE command.
+        dict[str, JsonValueType]: Parsed body mapping to send with the BLE command.
 
     Raises:
         ServiceValidationError: If `raw_body` is neither a mapping nor a JSON object
@@ -1452,9 +1455,12 @@ def _ble_body_from_service(raw_body: Any, device_id: str) -> dict[str, Any]:
     )
 
 
-def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any]]:
+def _tou_tasks_from_service(
+    raw_body: object,
+    device_id: str,
+) -> list[dict[str, JsonValueType]]:
     """Return a TOU tasks list from a service object or JSON string."""
-    parsed: Any = raw_body
+    parsed: object = raw_body
     if isinstance(raw_body, str):
         try:
             parsed = json.loads(
@@ -1477,7 +1483,7 @@ def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any
             device_id=device_id,
             error="body must be a tasks list or an object containing tasks",
         )
-    tasks: list[dict[str, Any]] = []
+    tasks: list[dict[str, JsonValueType]] = []
     for item in parsed:
         if not isinstance(item, dict):
             msg = "save_tou_plan_failed"
@@ -1486,19 +1492,23 @@ def _tou_tasks_from_service(raw_body: Any, device_id: str) -> list[dict[str, Any
                 device_id=device_id,
                 error="each TOU task must be a JSON object",
             )
-        tasks.append(_json_native_body(item, device_id))
+        tasks.append(_json_native_body(cast("dict[object, object]", item), device_id))
     return tasks
 
 
 def _service_bool(
-    raw: Any,
+    raw: object,
     *,
     field_name: str,
     translation_key: str,
     device_id: str,
 ) -> bool:
     """Return a parsed service boolean or raise a translated validation error."""
-    parsed = safe_bool(raw)
+    parsed = (
+        safe_bool(raw)
+        if raw is None or isinstance(raw, bool | int | float | str)
+        else None
+    )
     if parsed is None:
         raise _service_validation_error(
             translation_key,
@@ -1509,7 +1519,7 @@ def _service_bool(
 
 
 def _service_required_text(
-    raw: Any,
+    raw: object,
     *,
     field_name: str,
     translation_key: str,
@@ -1540,7 +1550,7 @@ def _service_required_text(
 
 
 def _service_optional_text(
-    raw: Any,
+    raw: object,
     *,
     field_name: str,
     translation_key: str,
@@ -1567,15 +1577,15 @@ def _service_optional_text(
 
 
 def _service_int(
-    raw: Any,
+    raw: object,
     *,
     field_name: str,
     translation_key: str,
     device_id: str,
-    min_value: int,
-    max_value: int,
+    bounds: tuple[int, int],
 ) -> int:
     """Return a parsed service integer within the schema range."""
+    min_value, max_value = bounds
     try:
         parsed = _coerce_service_int(raw)
     except vol.Invalid as err:
@@ -1594,15 +1604,15 @@ def _service_int(
 
 
 def _service_float(
-    raw: Any,
+    raw: object,
     *,
     field_name: str,
     translation_key: str,
     device_id: str,
-    min_value: float,
-    max_value: float,
+    bounds: tuple[float, float],
 ) -> float:
     """Return a parsed service float within the schema range."""
+    min_value, max_value = bounds
     try:
         parsed = _coerce_service_float(raw)
     except vol.Invalid as err:
@@ -1650,7 +1660,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
             msg,
         ) from err
     except JackeryError as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="rename_system_failed",
             translation_placeholders={
@@ -1697,7 +1707,7 @@ async def _async_handle_refresh_weather_plan(
         )
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError, LookupError) as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="refresh_weather_plan_failed",
             translation_placeholders={
@@ -1750,7 +1760,7 @@ async def _async_handle_refresh_subdevices(
         )
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError, LookupError) as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="refresh_subdevices_failed",
             translation_placeholders={
@@ -1809,7 +1819,7 @@ async def _async_handle_delete_storm_alert(
         )
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError, LookupError) as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="delete_storm_alert_failed",
             translation_placeholders={
@@ -1860,7 +1870,7 @@ async def _async_handle_set_storm_alert_location(
         )
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError, LookupError) as err:
-        raise _service_validation_error(
+        raise _service_action_error(
             "set_storm_alert_location_failed",
             device_id=device_id,
             error=err,
@@ -1933,8 +1943,7 @@ async def _async_handle_set_third_party_mqtt_config(
                 field_name=SERVICE_FIELD_PORT,
                 translation_key="set_third_party_mqtt_config_failed",
                 device_id=device_id,
-                min_value=1,
-                max_value=65535,
+                bounds=(1, 65535),
             ),
             username=_service_optional_text(
                 call.data.get(SERVICE_FIELD_USERNAME, ""),
@@ -1975,7 +1984,7 @@ async def _async_handle_set_third_party_mqtt_config(
         RuntimeError,
         ValueError,
     ) as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="set_third_party_mqtt_config_failed",
             translation_placeholders={
@@ -2041,7 +2050,7 @@ async def _async_handle_query_third_party_mqtt_config(
         RuntimeError,
         ValueError,
     ) as err:
-        raise ServiceValidationError(
+        raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="query_third_party_mqtt_config_failed",
             translation_placeholders={
@@ -2060,15 +2069,17 @@ async def _async_handle_send_ble_command(
     Parameters:
         hass (HomeAssistant): Home Assistant core instance.
         call (ServiceCall): Service call containing the following data fields:
-            - SERVICE_FIELD_DEVICE_ID: target device identifier (string). May be a registry device id or a Jackery device id; the handler resolves to the parent Jackery numeric id.
+            - SERVICE_FIELD_DEVICE_ID: registry or Jackery device identifier resolved
+              to the parent Jackery numeric id.
             - SERVICE_FIELD_CMD: numeric command identifier.
-            - SERVICE_FIELD_BODY: either a mapping (dict) or a JSON-encoded object string that decodes to a mapping.
-            - SERVICE_FIELD_FLAGS (optional): integer flags (default 0).
-            - SERVICE_FIELD_WAIT_FOR_ACK (optional): boolean indicating whether to wait for an acknowledgement (default False).
-            - SERVICE_FIELD_ACK_TIMEOUT (optional): float acknowledgement timeout in seconds (default 5.0).
+            - SERVICE_FIELD_BODY: mapping or JSON object string.
+            - SERVICE_FIELD_FLAGS: optional integer flags (default 0).
+            - SERVICE_FIELD_WAIT_FOR_ACK: optional ACK wait flag (default False).
+            - SERVICE_FIELD_ACK_TIMEOUT: optional timeout in seconds (default 5.0).
 
     Raises:
-        ServiceValidationError: with translation key "send_ble_command_failed" when the target coordinator cannot be found, the `BODY` is invalid or not a mapping, the send operation raises an error, or the BLE write was not performed (for example, writes disabled or no active BLE session).
+        ServiceValidationError: If the target or command input is invalid.
+        HomeAssistantError: If the BLE action cannot be completed.
     """
     device_id = _device_id_from_service(
         hass,
@@ -2092,8 +2103,7 @@ async def _async_handle_send_ble_command(
                 field_name=SERVICE_FIELD_CMD,
                 translation_key="send_ble_command_failed",
                 device_id=device_id,
-                min_value=1,
-                max_value=65535,
+                bounds=(1, 65535),
             ),
             body=body,
             flags=_service_int(
@@ -2101,8 +2111,7 @@ async def _async_handle_send_ble_command(
                 field_name=SERVICE_FIELD_FLAGS,
                 translation_key="send_ble_command_failed",
                 device_id=device_id,
-                min_value=0,
-                max_value=65535,
+                bounds=(0, 65535),
             ),
             wait_for_ack=_service_bool(
                 call.data.get(SERVICE_FIELD_WAIT_FOR_ACK, False),
@@ -2115,8 +2124,7 @@ async def _async_handle_send_ble_command(
                 field_name=SERVICE_FIELD_ACK_TIMEOUT,
                 translation_key="send_ble_command_failed",
                 device_id=device_id,
-                min_value=0.5,
-                max_value=60.0,
+                bounds=(0.5, 60.0),
             ),
             connect_timeout_sec=_BLE_SERVICE_CONNECT_TIMEOUT_SEC,
         )
@@ -2126,7 +2134,7 @@ async def _async_handle_send_ble_command(
         raise
     except (HomeAssistantError, RuntimeError, ValueError) as err:
         msg = "send_ble_command_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2178,7 +2186,7 @@ async def _async_handle_set_device_nickname(
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError) as err:
         msg = "set_device_nickname_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2225,7 +2233,7 @@ async def _async_handle_set_account_nickname(
         raise ConfigEntryAuthFailed(msg) from err
     except (HomeAssistantError, JackeryError) as err:
         msg = "set_account_nickname_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2264,7 +2272,7 @@ async def _async_handle_unbind_device(
         raise ConfigEntryAuthFailed(msg) from err
     except JackeryError as err:
         msg = "unbind_device_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2319,7 +2327,7 @@ async def _async_handle_bind_device(
         raise ConfigEntryAuthFailed(msg) from err
     except JackeryError as err:
         msg = "bind_device_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2375,7 +2383,7 @@ async def _async_handle_bind_smart_part(
         ValueError,
     ) as err:
         msg = "bind_smart_part_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2431,7 +2439,7 @@ async def _async_handle_unbind_smart_part(
         ValueError,
     ) as err:
         msg = "unbind_smart_part_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2455,7 +2463,7 @@ def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _notify_share_qr_code(
+async def _notify_share_qr_code(
     hass: HomeAssistant,
     *,
     qr_code_id: object,
@@ -2472,21 +2480,23 @@ def _notify_share_qr_code(
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
     try:
-        data_uri = _render_share_qr_png_data_uri(qr_code_id)
+        data_uri = await hass.async_add_executor_job(
+            _render_share_qr_png_data_uri,
+            qr_code_id,
+        )
         message = (
             f"![Share QR code]({data_uri})\n\n"
-            f"Scan diesen QR-Code mit einem zweiten Jackery-Konto, um den "
-            f"SolarVault zu teilen.\n\n"
+            f"Scan this QR code with a second Jackery account to share the "
+            f"SolarVault.\n\n"
             f"qrCodeId: `{qr_code_id}`\n"
             f"userId: `{user_id}`\n\n"
-            f"Hinweis: Der QR-Code kodiert die `qrCodeId` (Best-Effort, "
-            f"aus der App rekonstruiert). Falls das Scannen fehlschlägt, "
-            f"nutze die `qrCodeId` oben manuell."
+            f"Note: The QR code encodes `qrCodeId` based on the reconstructed "
+            f"app contract. If scanning fails, use the value above manually."
         )
         persistent_notification.async_create(
             hass,
             message,
-            title="Jackery SolarVault - Freigabe-QR-Code",
+            title="Jackery SolarVault share QR code",
         )
     except Exception:
         _LOGGER.debug(
@@ -2523,14 +2533,14 @@ async def _async_handle_get_share_qr_code(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "get_share_qr_code_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
         ) from err
     qr_code_id = data.get(FIELD_QR_CODE_ID)
     user_id = data.get(FIELD_USER_ID)
-    _notify_share_qr_code(hass, qr_code_id=qr_code_id, user_id=user_id)
+    await _notify_share_qr_code(hass, qr_code_id=qr_code_id, user_id=user_id)
     return {
         SERVICE_RESPONSE_QR_CODE_ID: qr_code_id,
         SERVICE_RESPONSE_USER_ID: user_id,
@@ -2571,7 +2581,7 @@ async def _async_handle_get_smart_schedule_prediction(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "get_smart_schedule_prediction_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2608,7 +2618,7 @@ async def _async_handle_unbind_accessories(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "unbind_accessories_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2661,7 +2671,7 @@ async def _async_handle_set_ac_nickname(
         ValueError,
     ) as err:
         msg = "set_ac_nickname_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2700,7 +2710,7 @@ async def _async_handle_report_device_timezone(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "report_device_timezone_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2752,7 +2762,7 @@ async def _async_handle_accept_shared_device(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "accept_shared_device_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2787,7 +2797,7 @@ async def _async_handle_list_shared_devices(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "list_shared_devices_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2827,8 +2837,7 @@ async def _async_handle_list_shared_managers(
         field_name=SERVICE_FIELD_LEVEL,
         translation_key="list_shared_managers_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=65535,
+        bounds=(0, 65535),
     )
     try:
         managers = await coordinator.async_list_shared_managers(
@@ -2843,7 +2852,7 @@ async def _async_handle_list_shared_managers(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "list_shared_managers_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2901,7 +2910,7 @@ async def _async_handle_remove_shared_access(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "remove_shared_access_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2941,8 +2950,7 @@ async def _async_handle_remove_all_shared_access(
         field_name=SERVICE_FIELD_LEVEL,
         translation_key="remove_all_shared_access_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=65535,
+        bounds=(0, 65535),
     )
     try:
         await coordinator.async_remove_all_shared_access(
@@ -2957,7 +2965,7 @@ async def _async_handle_remove_all_shared_access(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "remove_all_shared_access_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -2992,7 +3000,7 @@ async def _async_handle_get_shelly_auth_url(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "get_shelly_auth_url_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3028,7 +3036,7 @@ async def _async_handle_list_shelly_devices(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "list_shelly_devices_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3081,7 +3089,7 @@ async def _async_handle_unbind_shelly_device(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "unbind_shelly_device_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3123,7 +3131,7 @@ async def _async_handle_unbind_shelly_account(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "unbind_shelly_account_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3172,7 +3180,7 @@ async def _async_handle_list_shelly_binding_failures(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError) as err:
         msg = "list_shelly_binding_failures_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3399,9 +3407,9 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
             SYNC_ALERTS_SCHEMA,
         ),
         _ServiceRegistration(
-            SERVICE_GET_OFFLINE_STATISTICS,
-            _async_handle_get_offline_statistics,
-            ACCOUNT_READ_SCHEMA,
+            SERVICE_SYNC_OFFLINE_STATISTICS,
+            _async_handle_sync_offline_statistics,
+            SYNC_OFFLINE_STATISTICS_SCHEMA,
             SupportsResponse.ONLY,
         ),
         _ServiceRegistration(
@@ -3645,7 +3653,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
         handler: _ServiceHandler,
     ) -> Callable[[ServiceCall], Coroutine[Any, Any, ServiceResponse | None]]:
         async def _handle(call: ServiceCall) -> ServiceResponse | None:
-            return await handler(hass, call)
+            try:
+                return await handler(hass, call)
+            except ConfigEntryAuthFailed:
+                coordinator = None
+                if device_id := call.data.get(SERVICE_FIELD_DEVICE_ID):
+                    coordinator = _coordinator_for_device(
+                        hass, _resolve_jackery_device_id(hass, device_id)
+                    )
+                elif system_id := call.data.get(SERVICE_FIELD_SYSTEM_ID):
+                    coordinator = _coordinator_for_system(hass, str(system_id))
+                if coordinator is not None:
+                    coordinator.config_entry.async_start_reauth(hass)
+                raise
 
         return _handle
 
@@ -3674,9 +3694,9 @@ async def _async_handle_send_device_schedule(
 
     Parameters:
         call (ServiceCall): Service call whose `data` must include:
-            - `device_id` (str): device identifier or Home Assistant device registry id to resolve.
-            - `action_id` (int): schedule action identifier (one of 3015, 3016, 3017, 3018).
-            - `body` (dict | str): schedule payload as a mapping or a JSON-encoded object string.
+            - `device_id`: Jackery or Home Assistant registry device identifier.
+            - `action_id`: one of 3015, 3016, 3017 or 3018.
+            - `body`: schedule mapping or JSON object string.
 
     Raises:
         ServiceValidationError: if the device cannot be resolved to a coordinator, if
@@ -3710,8 +3730,7 @@ async def _async_handle_send_device_schedule(
                 field_name=SERVICE_FIELD_ACTION_ID,
                 translation_key="send_device_schedule_failed",
                 device_id=device_id,
-                min_value=1,
-                max_value=65535,
+                bounds=(1, 65535),
             ),
             body=body,
         )
@@ -3729,7 +3748,7 @@ async def _async_handle_send_device_schedule(
         ValueError,
     ) as err:
         msg = "send_device_schedule_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3765,7 +3784,7 @@ async def _async_handle_insert_electricity_strategy(
         ValueError,
     ) as err:
         msg = "insert_electricity_strategy_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3807,7 +3826,7 @@ async def _async_handle_save_tou_plan(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "save_tou_plan_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3848,7 +3867,7 @@ async def _async_handle_query_tou_plan(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_tou_plan_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3884,7 +3903,7 @@ async def _async_handle_list_currencies(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "list_currencies_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3932,7 +3951,7 @@ async def _async_handle_get_device_currency(
         ValueError,
     ) as err:
         msg = "get_device_currency_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -3987,7 +4006,7 @@ async def _async_handle_bind_currency(
         ValueError,
     ) as err:
         msg = "bind_currency_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4034,7 +4053,7 @@ async def _async_handle_list_accessories(
         ValueError,
     ) as err:
         msg = "list_accessories_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4092,7 +4111,7 @@ async def _async_handle_check_accessories_exist(
         ValueError,
     ) as err:
         msg = "check_accessories_exist_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4150,7 +4169,7 @@ async def _async_handle_check_jackery_accessories_exist(
         ValueError,
     ) as err:
         msg = "check_jackery_accessories_exist_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4216,7 +4235,7 @@ async def _async_handle_set_accessory_name(
         ValueError,
     ) as err:
         msg = "set_accessory_name_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4252,8 +4271,7 @@ async def _async_handle_get_dynamic_price_login_url(
         field_name=SERVICE_FIELD_PLATFORM_COMPANY_ID,
         translation_key="get_dynamic_price_login_url_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=2147483647,
+        bounds=(0, 2147483647),
     )
     try:
         login = await coordinator.async_get_dynamic_price_login_url(
@@ -4274,7 +4292,7 @@ async def _async_handle_get_dynamic_price_login_url(
         ValueError,
     ) as err:
         msg = "get_dynamic_price_login_url_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4312,8 +4330,7 @@ async def _async_handle_list_dynamic_price_contracts(
         field_name=SERVICE_FIELD_PLATFORM_COMPANY_ID,
         translation_key="list_dynamic_price_contracts_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=2147483647,
+        bounds=(0, 2147483647),
     )
     try:
         contracts = await coordinator.async_list_dynamic_price_contracts(
@@ -4334,7 +4351,7 @@ async def _async_handle_list_dynamic_price_contracts(
         ValueError,
     ) as err:
         msg = "list_dynamic_price_contracts_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4385,8 +4402,7 @@ async def _async_handle_save_dynamic_price_contract_auth(
         field_name=SERVICE_FIELD_PLATFORM_COMPANY_ID,
         translation_key="save_dynamic_price_contract_auth_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=2147483647,
+        bounds=(0, 2147483647),
     )
     try:
         await coordinator.async_save_dynamic_price_contract_auth(
@@ -4409,7 +4425,7 @@ async def _async_handle_save_dynamic_price_contract_auth(
         ValueError,
     ) as err:
         msg = "save_dynamic_price_contract_auth_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4445,8 +4461,7 @@ async def _async_handle_cancel_dynamic_price_contract_auth(
         field_name=SERVICE_FIELD_PLATFORM_COMPANY_ID,
         translation_key="cancel_dynamic_price_contract_auth_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=2147483647,
+        bounds=(0, 2147483647),
     )
     try:
         await coordinator.async_cancel_dynamic_price_contract_auth(
@@ -4467,7 +4482,7 @@ async def _async_handle_cancel_dynamic_price_contract_auth(
         ValueError,
     ) as err:
         msg = "cancel_dynamic_price_contract_auth_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4517,7 +4532,7 @@ async def _async_handle_save_dynamic_price_location_id(
         ValueError,
     ) as err:
         msg = "save_dynamic_price_location_id_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4591,7 +4606,7 @@ async def _async_handle_query_socket_stat(
         ValueError,
     ) as err:
         msg = "query_socket_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4633,7 +4648,7 @@ async def _async_handle_list_country_zones(
         ValueError,
     ) as err:
         msg = "list_country_zones_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4684,7 +4699,7 @@ async def _async_handle_list_grid_standards(
         ValueError,
     ) as err:
         msg = "list_grid_standards_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4751,7 +4766,7 @@ async def _async_handle_check_system_bound(
         ValueError,
     ) as err:
         msg = "check_system_bound_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4788,8 +4803,7 @@ async def _async_handle_save_device_max_power(
         field_name=SERVICE_FIELD_MAX_POWER,
         translation_key="save_device_max_power_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=1000000,
+        bounds=(0, 1000000),
     )
     try:
         await coordinator.async_save_device_max_power(device_id, max_power)
@@ -4807,7 +4821,7 @@ async def _async_handle_save_device_max_power(
         ValueError,
     ) as err:
         msg = "save_device_max_power_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4864,7 +4878,7 @@ async def _async_handle_get_alarm_detail(
         ValueError,
     ) as err:
         msg = "get_alarm_detail_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4902,24 +4916,21 @@ async def _async_handle_list_notifications(
         field_name=SERVICE_FIELD_CURRENT_TIME,
         translation_key="list_notifications_failed",
         device_id=device_id,
-        min_value=0,
-        max_value=9999999999999,
+        bounds=(0, 9999999999999),
     )
     page_no = _service_int(
         call.data.get(SERVICE_FIELD_PAGE_NO, 1),
         field_name=SERVICE_FIELD_PAGE_NO,
         translation_key="list_notifications_failed",
         device_id=device_id,
-        min_value=1,
-        max_value=10000,
+        bounds=(1, 10000),
     )
     page_size = _service_int(
         call.data.get(SERVICE_FIELD_PAGE_SIZE, 20),
         field_name=SERVICE_FIELD_PAGE_SIZE,
         translation_key="list_notifications_failed",
         device_id=device_id,
-        min_value=1,
-        max_value=100,
+        bounds=(1, 100),
     )
     try:
         notifications = await coordinator.async_list_notifications(
@@ -4936,7 +4947,7 @@ async def _async_handle_list_notifications(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "list_notifications_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -4972,7 +4983,7 @@ async def _async_handle_get_unread_count(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "get_unread_count_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5008,7 +5019,7 @@ async def _async_handle_get_push_config(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "get_push_config_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5045,7 +5056,7 @@ async def _async_handle_set_push_config(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "set_push_config_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5110,26 +5121,26 @@ async def _async_handle_sync_alerts(
         ValueError,
     ) as err:
         msg = "sync_alerts_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
         ) from err
 
 
-async def _async_handle_get_offline_statistics(
+async def _async_handle_sync_offline_statistics(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> ServiceResponse:
-    """Return offline-statistics payload for the selected account."""
+    """Explicitly upload the supplied original offline device body."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
-        translation_key="get_offline_statistics_failed",
+        translation_key="sync_offline_statistics_failed",
     )
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
-        msg = "get_offline_statistics_failed"
+        msg = "sync_offline_statistics_failed"
         raise _service_validation_error(
             msg,
             device_id=device_id,
@@ -5138,16 +5149,17 @@ async def _async_handle_get_offline_statistics(
     _raise_if_portable_home_service(
         coordinator,
         device_id,
-        translation_key="get_offline_statistics_failed",
-        service_name=SERVICE_GET_OFFLINE_STATISTICS,
+        translation_key="sync_offline_statistics_failed",
+        service_name=SERVICE_SYNC_OFFLINE_STATISTICS,
     )
     try:
-        offline = await coordinator.async_get_offline_statistics(
+        accepted = await coordinator.async_sync_offline_statistics(
+            call.data[SERVICE_FIELD_BODY],
             context_device_id=device_id,
         )
     except JackeryAuthError as err:
         msg = (
-            "Jackery credentials were rejected while reading offline statistics. "
+            "Jackery credentials were rejected while uploading offline statistics. "
             "Re-authentication is required."
         )
         raise ConfigEntryAuthFailed(msg) from err
@@ -5158,13 +5170,18 @@ async def _async_handle_get_offline_statistics(
         RuntimeError,
         ValueError,
     ) as err:
-        msg = "get_offline_statistics_failed"
-        raise _service_validation_error(
+        msg = "sync_offline_statistics_failed"
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
         ) from err
-    return {"offline_statistics": cast("JsonValueType", offline)}
+    if not accepted:
+        msg = "sync_offline_statistics_failed"
+        raise _service_action_error(
+            msg, device_id=device_id, error="backend did not acknowledge the upload"
+        )
+    return {"synced": True}
 
 
 async def _async_handle_query_charge_report(
@@ -5197,8 +5214,7 @@ async def _async_handle_query_charge_report(
         field_name=SERVICE_FIELD_PAGE_INDEX,
         translation_key="query_charge_report_failed",
         device_id=device_id,
-        min_value=1,
-        max_value=10000,
+        bounds=(1, 10000),
     )
     try:
         report = await coordinator.async_query_charge_report(
@@ -5213,7 +5229,7 @@ async def _async_handle_query_charge_report(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_charge_report_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5274,7 +5290,7 @@ async def _async_handle_query_cutoff_stat(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_cutoff_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5310,7 +5326,7 @@ async def _async_handle_query_soc_stat(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_soc_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5353,7 +5369,7 @@ async def _async_handle_query_carbon_stat(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_carbon_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5389,7 +5405,7 @@ async def _async_handle_query_profit_stat(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_profit_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5459,7 +5475,7 @@ async def _async_handle_query_box_stat(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "query_box_stat_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5512,7 +5528,7 @@ async def _async_handle_check_app_version(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "check_app_version_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5548,7 +5564,7 @@ async def _async_handle_list_banners(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "list_banners_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5615,7 +5631,7 @@ async def _async_handle_submit_feedback(
         ValueError,
     ) as err:
         msg = "submit_feedback_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5650,7 +5666,7 @@ async def _async_handle_list_faqs(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "list_faqs_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5686,7 +5702,7 @@ async def _async_handle_list_faq_answers(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "list_faq_answers_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5722,7 +5738,7 @@ async def _async_handle_check_privacy_update(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "check_privacy_update_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5770,7 +5786,7 @@ async def _async_handle_agree_privacy_consent(
         ValueError,
     ) as err:
         msg = "agree_privacy_consent_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5822,7 +5838,7 @@ async def _async_handle_get_product_instruction(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "get_product_instruction_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5858,7 +5874,7 @@ async def _async_handle_get_user_info(
         raise ConfigEntryAuthFailed(msg) from err
     except (JackeryError, LookupError, RuntimeError, ValueError) as err:
         msg = "get_user_info_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5895,7 +5911,7 @@ async def _async_handle_update_electricity_strategy(
         ValueError,
     ) as err:
         msg = "update_electricity_strategy_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5931,7 +5947,7 @@ async def _async_handle_delete_electricity_strategy(
         ValueError,
     ) as err:
         msg = "delete_electricity_strategy_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,
@@ -5966,7 +5982,7 @@ async def _async_handle_query_electricity_strategy(
         ValueError,
     ) as err:
         msg = "query_electricity_strategy_failed"
-        raise _service_validation_error(
+        raise _service_action_error(
             msg,
             device_id=device_id,
             error=err,

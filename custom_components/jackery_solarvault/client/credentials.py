@@ -1,24 +1,34 @@
 """Shared credential safety contract for Jackery SolarVault."""
 
-from collections.abc import Mapping
 import hashlib
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import voluptuous as vol
 
 from ..const import REDACTED_VALUE
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 MAX_TOKEN_LENGTH: Final = 512
 MAX_USERNAME_LENGTH: Final = 128
 MAX_PASSWORD_LENGTH: Final = 128
 
 
+class CredentialValidationError(vol.Invalid):
+    """Credential validation failure that never includes the credential value."""
+
+    def __init__(self, field: str, reason: str) -> None:
+        """Build a redacted validation error from field name and failure class."""
+        super().__init__(f"{field} {reason}")
+
+
 def credential_text(value: object, *, field: str, max_length: int) -> str:
     """Validate credential type and length without echoing its value."""
     if not isinstance(value, str):
-        raise vol.Invalid(f"{field} must be a string")
+        raise CredentialValidationError(field, "must be a string")
     if len(value) > max_length:
-        raise vol.Invalid(f"{field} exceeds the permitted length")
+        raise CredentialValidationError(field, "exceeds the permitted length")
     return value
 
 

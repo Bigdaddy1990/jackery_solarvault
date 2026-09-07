@@ -1132,9 +1132,6 @@
     "get_dynamic_price_login_url": {
       "service": "mdi:login-variant"
     },
-    "get_offline_statistics": {
-      "service": "mdi:chart-box-outline"
-    },
     "get_product_instruction": {
       "service": "mdi:book-open-variant"
     },
@@ -1290,6 +1287,9 @@
     },
     "sync_alerts": {
       "service": "mdi:sync-alert"
+    },
+    "sync_offline_statistics": {
+      "service": "mdi:cloud-upload"
     },
     "unbind_accessories": {
       "service": "mdi:link-variant-off"

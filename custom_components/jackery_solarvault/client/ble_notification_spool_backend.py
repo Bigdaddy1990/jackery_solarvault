@@ -1,17 +1,20 @@
 """Synchronous SQLite backend for the BLE notification spool."""
 
-from collections.abc import Sequence
+from contextlib import contextmanager
 from datetime import datetime
-from pathlib import Path
 import secrets
 import sqlite3
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from .ble_notification_spool_models import (
     BleSpoolMetrics,
     BleSpoolRecord,
     BleSpoolStatus,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+    from pathlib import Path
 
 _SCHEMA_VERSION = 1
 
@@ -30,10 +33,20 @@ class _SqliteBleSpoolBackend:
         connection.execute("PRAGMA busy_timeout = 5000")
         return connection
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        """Yield one transactional connection and always close it."""
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def initialize(self) -> tuple[str, int, BleSpoolMetrics]:
         """Create or validate schema and return namespace plus next sequence."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA synchronous = FULL")
             connection.executescript(
@@ -154,9 +167,9 @@ class _SqliteBleSpoolBackend:
     def append_batch(self, records: Sequence[BleSpoolRecord]) -> BleSpoolMetrics:
         """Append a sequence-preserving batch idempotently in one FULL WAL commit."""
         if not records:
-            with self._connect() as connection:
+            with self._connection() as connection:
                 return self._read_metrics(connection)
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA synchronous = FULL")
             connection.execute("BEGIN IMMEDIATE")
             inserted_rows = 0
@@ -236,7 +249,7 @@ class _SqliteBleSpoolBackend:
 
     def load_records(self) -> tuple[BleSpoolRecord, ...]:
         """Return durable rows in global callback order."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 "SELECT * FROM notification ORDER BY sequence"
             ).fetchall()
@@ -244,7 +257,7 @@ class _SqliteBleSpoolBackend:
 
     def load_record(self, sequence: int) -> BleSpoolRecord | None:
         """Return one durable row without materializing the entire journal."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT * FROM notification WHERE sequence = ?",
                 (sequence,),
@@ -271,10 +284,10 @@ class _SqliteBleSpoolBackend:
     def delete_sequences(self, sequences: Sequence[int]) -> BleSpoolMetrics:
         """Delete exactly confirmed rows and update counters atomically."""
         if not sequences:
-            with self._connect() as connection:
+            with self._connection() as connection:
                 return self._read_metrics(connection)
         placeholders = ",".join("?" for _ in sequences)
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA synchronous = FULL")
             connection.execute("BEGIN IMMEDIATE")
             aggregate = connection.execute(
@@ -309,7 +322,7 @@ class _SqliteBleSpoolBackend:
         chunk_count: int | None,
     ) -> bool:
         """Persist one non-confirmed processing disposition."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA synchronous = FULL")
             cursor = connection.execute(
                 """
@@ -323,7 +336,7 @@ class _SqliteBleSpoolBackend:
 
     def checkpoint(self) -> None:
         """Checkpoint committed WAL pages before orderly close."""
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 

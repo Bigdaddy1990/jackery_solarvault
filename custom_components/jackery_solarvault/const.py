@@ -63,11 +63,14 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
-# Command 3046 configures the broker but no topic. Jackery firmware owns the
-# LAN protocol tree: ``<prefix>/device/<serial>/{status,event,action}``. ``hb``
-# is the App/official-integration prefix; never point the generated default at
-# Home Assistant's discovery/status tree, which also contains unrelated devices.
-LOCAL_MQTT_DEFAULT_TOPIC: Final = "hb/device/#"
+# Command 3046 configures the broker but no topic. The firmware owns the LAN
+# protocol tree ``<prefix>/device/<serial>/{status,event,action}``; the prefix
+# is what the user configures on both the device and here. docs/ENV.md pins
+# this default to ``homeassistant/#`` and requires a legacy bare
+# ``homeassistant`` to be normalized to the same child-topic wildcard — a bare
+# prefix matches only the literal topic and never a device frame. Foreign
+# traffic sharing the prefix is dropped by ``payload_has_jackery_marker``.
+LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant/#"
 # Native Shelly RPC status pushes observed in the shared Home Assistant broker.
 # Subscribe to this exact topic only. The adapter filters high-rate BLE scan
 # events and unrelated RPC sources before they reach shared ingest.
@@ -85,7 +88,7 @@ DEFAULT_LOCAL_MQTT_ENABLE: Final = False
 # ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
 # blieb bis zum naechsten Integrations-Reload tot (RX-Zaehler dauerhaft 0).
 LOCAL_MQTT_RECONNECT_INITIAL_SEC: Final = 5.0
-LOCAL_MQTT_RECONNECT_MAX_SEC: Final = 300.0
+LOCAL_MQTT_RECONNECT_MAX_SEC: Final = 60.0
 LOCAL_MQTT_RECONNECT_FACTOR: Final = 2.0
 _HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
 _LOCAL_MQTT_JACKERY_MARKER_KEYS = {
@@ -193,10 +196,14 @@ LOCAL_DAILY_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.local_daily_cache"
 LOCAL_DAILY_CACHE_DAY_KEY: Final = "day"
 LOCAL_DAILY_CACHE_VALUES_KEY: Final = "values"
 LOCAL_DAILY_CACHE_FULL_DAY_METRICS_KEY: Final = "full_day_metrics"
+# Persisted snapshot keys — renaming one silently discards a user's stored
+# day history, so they stay verbatim as written by earlier releases.
 LOCAL_DAILY_CACHE_COMPLETED_DAYS_KEY: Final = "completed_days"
 LOCAL_DAILY_CACHE_COMPLETE_DAYS_KEY: Final = "complete_days"
 LOCAL_DAILY_CACHE_LAST_DELTAS_KEY: Final = "last_deltas"
-LOCAL_DAILY_CACHE_HISTORY_DAYS: Final = 400
+# Retention for the completed-day history: one calendar month plus a few days
+# of slack, so a month period can still be rebuilt from cached daily deltas.
+LOCAL_DAILY_CACHE_HISTORY_DAYS: Final = 35
 MQTT_SESSION_CACHE_STORAGE_KEY: Final = f"{DOMAIN}.mqtt_session_cache"
 MQTT_SESSION_CACHE_CACHED_AT_KEY: Final = "cached_at"
 MQTT_SESSION_CACHE_EXPIRES_AT_KEY: Final = "expires_at"
@@ -281,20 +288,6 @@ BLE_CONNECT_BACKOFF_MAX_SEC: Final[float] = 600.0
 #: ``async_unload_entry``) — keep this well below that so the listener
 #: never becomes the reason a shutdown logs "tasks still pending".
 BLE_STOP_TIMEOUT_SEC: Final[float] = 5.0
-#: How often to write a no-op ``cmd=106`` query frame to keep the GATT
-#: session warm. The SolarVault peripheral closes idle GATT sessions
-#: after roughly 20 s (observed 2026-05-17 production log: BLE
-#: disconnects every 6-20 s without traffic). 15 s sits comfortably
-#: below that and doubles as a property-refresh — the device answers
-#: each ``cmd=106`` with a ``DevicePropertyChange`` notify that the sink
-#: merges into ``coordinator.data`` via the existing cmd=107 path.
-#:
-#: Deliberately NOT raised above 20 s to spare the BT-proxy: a longer
-#: interval lets the peripheral drop the session, which turns one small
-#: keep-alive write per 15 s into a full disconnect + reconnect cycle
-#: every ~20 s — connect churn is what crashes ESPHome proxies, not a
-#: 20-byte write.
-BLE_KEEPALIVE_INTERVAL_SEC: Final[float] = 15.0
 # ---------------------------------------------------------------------------
 # Wire-format constants
 # ---------------------------------------------------------------------------
@@ -319,13 +312,6 @@ BLE_KEEPALIVE_INTERVAL_SEC: Final[float] = 15.0
 # When enabled, the coordinator subscribes to GATT notify on each known
 # SolarVault and surfaces the decoded/raw frames in diagnostics
 # client/ble.py for the wire-format reference.
-# Default off and gated by JACKERY_DEV_MODE=1
-# ("BLE-Schreibbefehle waren als normale UI-Option erreichbar"). The UI
-# toggle was removed; this flag is consumed only by services/code paths
-# that already check the dev-mode env var.
-# Default off — diagnostics with full credentials, serial numbers, MQTT
-# topics and bluetoothKey are off by default for security. User must opt
-# in explicitly for local troubleshooting.
 #: Magic prefix that every plaintext frame starts with.
 BLE_FRAME_MAGIC: str = "DFED"
 #: Protocol version following the magic. Constant in the app's
@@ -429,7 +415,21 @@ DEVICE_PROPERTY_PATH: Final = "/v1/device/property"  # ?deviceId=<id>
 SYSTEM_LIST_PATH: Final = "/v1/device/system/list"  # system/list discovery endpoint
 ALARM_PATH: Final = "/v1/api/alarm"  # ?systemId=<id>
 SYSTEM_STATISTIC_PATH: Final = "/v1/device/stat/systemStatistic"  # ?systemId=<id>
-PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/trends"
+# ``stat/sys/pv/trends`` occurs in NEITHER App 2.4.0 nor 2.4.1 — it never
+# existed. The PV system endpoint is ``statics``, unlike its siblings
+# ``sys/home/trends`` and ``sys/battery/trends``, which really are ``trends``.
+# Verified against the extracted dex of both app versions (2026-08-25).
+#
+# LIVE-VERIFY: the old ``/trends`` spelling still returned data (32/33 diagnostics
+# exports carry a populated ``pv_trends`` section), so the cloud appears to accept
+# both and route them to the same handler — the payload shape is the statics one
+# (``pvSources``/``pvUsage``/``weather``/``showDash``, 42 points), not the 288-point
+# trends shape of its siblings. If ``pv_trends`` comes up EMPTY after this change,
+# revert to "/v1/device/stat/sys/pv/trends" — that spelling was demonstrably working.
+PV_TRENDS_PATH: Final = "/v1/device/stat/sys/pv/statics"
+# Pre-2.4.1 endpoint, still used as the fallback when the current path answers
+# with an unsupported-command code.
+PV_TRENDS_LEGACY_PATH: Final = "/v1/device/stat/sys/pv/trends"
 # ?systemId=<id>&beginDate&endDate&dateType
 POWER_PRICE_PATH: Final = "/v1/device/dynamic/powerPriceConfig"  # ?systemId=<id>
 PRICE_SOURCE_LIST_PATH: Final = "/v1/device/dynamic/priceCompany"  # ?systemId=<id>
@@ -569,6 +569,8 @@ SMART_MODE_START_PATH: Final = "/v1/device/smartMode/startSmartMode"
 SMART_SCHEDULE_PATH: Final = "/v1/device/stat/getSmartSchedulePrediction"
 # 2.4.0 AiEmsEnergyPredictionApi ("api/aiems/report/energy/prediction"):
 # request systemId only; distinct from getSmartSchedulePrediction above.
+# Deliberately NOT exposed as a constant — the endpoint is unproven, and
+# tests/test_app_2_4_0_contracts.py asserts its absence from the API surface.
 
 # --- Miscellaneous endpoints -------------------------------------------------
 APP_VERSION_PATH: Final = "/v1/app/version/getNewVersion"
@@ -613,6 +615,7 @@ PLATFORM_HEADER: Final = "2"
 
 CODE_OK: Final = 0
 CODE_TOKEN_EXPIRED: Final = 10402
+CODE_SESSION_REPLACED: Final = 10403
 
 # --- Config / Options --------------------------------------------------------
 CONF_MQTT_MAC_ID: Final = "mqtt_mac_id"
@@ -627,16 +630,6 @@ CONF_CREATE_SAVINGS_DETAIL_SENSORS: Final = "create_savings_detail_sensors"
 # docs/source-of-truth + client/ble.py for the wire-format reference.
 CONF_ENABLE_BLE_TRANSPORT: Final = "enable_ble_transport"
 DEFAULT_ENABLE_BLE_TRANSPORT: Final = False
-# BLE write commands (setter path), consumed by the send-BLE-command service
-# and the BLE-first command routing. Off by default.
-CONF_ENABLE_BLE_WRITES: Final = "enable_ble_writes"
-DEFAULT_ENABLE_BLE_WRITES: Final = False
-CONF_ENABLE_UNREDACTED_DIAGNOSTICS: Final = "enable_unredacted_diagnostics"
-# Default off — diagnostics with full credentials, serial numbers, MQTT
-# topics and bluetoothKey are off by default for security. User must opt
-# in explicitly for local troubleshooting.
-DEFAULT_ENABLE_UNREDACTED_DIAGNOSTICS: Final = False
-
 # Optional fallback for home-energy when sys/home/trends is empty.
 # Default stays False: device_home_stat is not the same metric family as
 # home_trends and must never silently replace it.
@@ -1583,6 +1576,7 @@ APP_STAT_TOTAL_OUT_EPS_ENERGY: Final = "totalOutEpsEnergy"
 # BoxPanelActivity routes getters g/h/i/j to the corresponding
 # tv_{battery,power,family,solar}_statistics_day binding fields.
 APP_STAT_TODAY_BATTERY_ENERGY: Final = "de"
+APP_STAT_TODAY_FEED_IN_ENERGY: Final = "de"
 APP_STAT_TODAY_GRID_IMPORT_ENERGY: Final = "dg"
 APP_STAT_TODAY_HOME_LOAD_ENERGY: Final = "dh"
 APP_STAT_TODAY_SOLAR_ENERGY: Final = "ds"
@@ -1809,6 +1803,8 @@ REDACT_KEYS: Final = frozenset({
     FIELD_MAC,
     FIELD_WIP,
     FIELD_BLUETOOTH_KEY,
+    "local_key",
+    "localKey",
     FIELD_DEVICE_SECRET,
     FIELD_RANDOM_SALT,
     "phone",
@@ -1857,7 +1853,7 @@ REDACT_KEYS: Final = frozenset({
     CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
-    # Additional keys for comprehensive redaction (tested in test_logging_diagnostics.py)
+    # Additional redaction keys (covered by test_logging_diagnostics.py).
     "access_token",
     "refresh_token",
     "token",
@@ -2064,7 +2060,7 @@ SERVICE_GET_UNREAD_COUNT: Final = "get_unread_count"
 SERVICE_GET_PUSH_CONFIG: Final = "get_push_config"
 SERVICE_SET_PUSH_CONFIG: Final = "set_push_config"
 SERVICE_SYNC_ALERTS: Final = "sync_alerts"
-SERVICE_GET_OFFLINE_STATISTICS: Final = "get_offline_statistics"
+SERVICE_SYNC_OFFLINE_STATISTICS: Final = "sync_offline_statistics"
 SERVICE_QUERY_CHARGE_REPORT: Final = "query_charge_report"
 SERVICE_QUERY_CUTOFF_STAT: Final = "query_cutoff_stat"
 SERVICE_QUERY_SOC_STAT: Final = "query_soc_stat"
@@ -2752,7 +2748,7 @@ SUBDEVICE_SCAN_TYPES: Final[frozenset[str]] = frozenset({
     SUBDEVICE_SCAN_TYPE_MDNS,
 })
 
-# Sets used for MQTT message routing in coordinator._async_handle_mqtt_message:
+# Sets used for MQTT message routing in coordinator.async_handle_mqtt_message:
 MQTT_ACTION_IDS_DEVICE_PROPERTY: Final = frozenset({3011})
 MQTT_ACTION_IDS_ALARM: Final = frozenset({3042})
 MQTT_ACTION_IDS_SCHEDULE: Final = frozenset({
@@ -2802,7 +2798,7 @@ REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS: Final[frozenset[str]] = frozenset({
 })
 
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
-DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = True
+DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = False
 CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
 DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
 CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
@@ -2966,7 +2962,6 @@ DEFAULT_NULL_SEMANTICS: Final = "ignore"
 # writes go to the cloud and to MQTT. Serializing keeps the queue depth on
 # the broker bounded and prevents reordering of `DevicePropertyChange`
 # commands per HA dev guidance for write-heavy platforms.
-PARALLEL_UPDATES: Final = 1
 _STATISTICS_BACKFILL_STORE_VERSION: Final = 1
 _STATISTICS_BACKFILL_STORE_KEY: Final = "statistics_backfill"
 _THIRD_PARTY_MQTT_CONFIG_KEYS: Final = (
@@ -2977,12 +2972,8 @@ _THIRD_PARTY_MQTT_CONFIG_KEYS: Final = (
 _BLE_SERVICE_CONNECT_TIMEOUT_SEC: Final = 35.0
 _JACKERY_MAIN_DEVICE_RE: Final = re.compile(r"^(\d+)(?:_.+)?$")
 SAVINGS_PRICE_PRECISION: Final = 5
-# Options surface in the UI flow. Debug-only toggles
-# (``CONF_ENABLE_UNREDACTED_DIAGNOSTICS`` and ``CONF_ENABLE_PAYLOAD_DEBUG_LOG``)
-# are deliberately NOT listed here — sensitive logging is gated by the
-# ``JACKERY_DEV_MODE=1`` environment variable so it cannot be toggled
-# accidentally by users sharing diagnostics screenshots. See
-# ``util.dev_mode_redactions_disabled``.
+# Options surface in the UI flow. Payload-debug logging is deliberately not
+# listed here because it is not a generic entity-creation default.
 _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_SMART_METER_DERIVED_SENSORS: DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,

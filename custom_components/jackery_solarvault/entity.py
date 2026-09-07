@@ -107,12 +107,12 @@ def payload_properties_for_sources(
     and BLE all contribute to the same non-blank property snapshot.
     """
     del data_sources
-    props = payload.get(PAYLOAD_PROPERTIES) or {}
-    merged_props = props if isinstance(props, dict) else {}
-    if merged_props:
-        return merged_props
     http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
-    return http_props if isinstance(http_props, dict) else {}
+    resolved = dict(http_props) if isinstance(http_props, dict) else {}
+    props = payload.get(PAYLOAD_PROPERTIES) or {}
+    if isinstance(props, dict):
+        resolved.update(props)
+    return resolved
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -138,9 +138,68 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         self._availability_cache_active = False
         self._cached_available = False
 
+    def _apply_via_device(self, info: DeviceInfo) -> None:
+        """Link a subdevice DeviceInfo to its parent main device.
+
+        HA 2026.9 removed ``DeviceInfo["via_device"]`` (an identifier tuple) in
+        favour of ``via_device_id``, which must be a real device-registry id.
+        ``_async_register_main_devices`` registers every main device during
+        setup, before any entity is added, so this lookup resolves. If it ever
+        misses, the link is omitted rather than guessed — an invented id would
+        be rejected by the registry.
+        """
+        # `self.hass` is only bound once the platform adds the entity, while
+        # `device_info` is read earlier, so resolve through the coordinator.
+        # Both attributes are read defensively: `device_info` must stay a pure,
+        # always-callable property, and an unresolvable parent only costs the
+        # hierarchy link, never the device itself.
+        hass = getattr(self.coordinator, "hass", None)
+        config_entry = getattr(self.coordinator, "config_entry", None)
+        if hass is None or config_entry is None:
+            return
+        parent = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, self._device_id),
+            config_entry.entry_id,
+        )
+        if parent is not None:
+            info["via_device_id"] = parent.id
+
     @property
     def _payload(self) -> dict[str, Any]:
         return (self.coordinator.data or {}).get(self._device_id, {}) or {}
+
+    @property
+    def device_id(self) -> str:
+        """The coordinator device identifier for this entity."""
+        return self._device_id
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        """This entity's complete coordinator payload."""
+        return self._payload
+
+    @property
+    def merged_properties(self) -> dict[str, Any]:
+        """The transport-merged device properties."""
+        return self._merged_properties
+
+    @property
+    def http_properties(self) -> dict[str, Any]:
+        """The HTTP-only device properties."""
+        return self._http_properties
+
+    @property
+    def device_meta(self) -> dict[str, Any]:
+        """The device metadata section."""
+        return self._device_meta
+
+    def payload_section_for_sources(
+        self,
+        section: str,
+        data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES,
+    ) -> dict[str, Any]:
+        """Return one payload section resolved for the requested sources."""
+        return self._payload_section_for_sources(section, data_sources)
 
     @property
     def _properties(self) -> dict[str, Any]:
@@ -365,8 +424,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             model=str(model),
             serial_number=str(sn) if sn else None,
             sw_version=str(version) if version else None,
-            via_device=(DOMAIN, self._device_id),
         )
+        self._apply_via_device(info)
         if mac := normalize_mac_address(plug.get(FIELD_MAC)):
             info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
         return info

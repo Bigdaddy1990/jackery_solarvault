@@ -1,0 +1,257 @@
+"""Persistent MQTT session cache for Cloud-Outage tolerance.
+
+The Jackery cloud login returns three fields that fully determine the MQTT
+credentials a coordinator can use to (re-)connect to the broker:
+
+* ``userId``       — drives the MQTT ``clientId`` and ``username``
+* ``macId``        — identifies the session inside the broker
+* ``mqttPassWord`` — 32-byte base64 seed used as AES-256-CBC key + IV
+
+Once these are known and hydrated into ``JackeryApi``,
+``JackeryApi.get_cached_mqtt_credentials`` can build a valid broker password
+locally without any further HTTP call. Persisting them
+allows the integration to start the MQTT push channel during a cloud outage
+or right after a Home Assistant restart, before the first login round-trip
+has succeeded.
+"""
+
+import asyncio
+import base64
+import binascii
+import math
+import time
+from typing import TYPE_CHECKING, Any, Final, TypeGuard
+
+from homeassistant.helpers.storage import Store
+
+from ..const import (
+    CACHE_ENTRIES_KEY,
+    CACHE_STORAGE_VERSION,
+    DOMAIN,
+    MQTT_SESSION_CACHE_CACHED_AT_KEY,
+    MQTT_SESSION_CACHE_CLOCK_SKEW_SEC,
+    MQTT_SESSION_CACHE_EXPIRES_AT_KEY,
+    MQTT_SESSION_CACHE_STORAGE_KEY,
+    MQTT_SESSION_MAC_ID,
+    MQTT_SESSION_MAC_ID_SOURCE,
+    MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_SEED_LEN,
+    MQTT_SESSION_USER_ID,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from homeassistant.core import HomeAssistant
+
+_STORAGE_VERSION: Final = CACHE_STORAGE_VERSION
+_STORAGE_KEY: Final = MQTT_SESSION_CACHE_STORAGE_KEY
+_LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
+_KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
+_KEY_CACHED_AT: Final = MQTT_SESSION_CACHE_CACHED_AT_KEY
+_KEY_EXPIRES_AT: Final = MQTT_SESSION_CACHE_EXPIRES_AT_KEY
+_CACHE_CLOCK_SKEW_SEC: Final = MQTT_SESSION_CACHE_CLOCK_SKEW_SEC
+_MQTT_SEED_LEN: Final = MQTT_SESSION_SEED_LEN
+
+
+def _is_finite_nonnegative_timestamp(value: object) -> TypeGuard[int | float]:
+    """Return whether a value is a finite non-negative UNIX timestamp."""
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, int | float)
+        and math.isfinite(value)
+        and value >= 0
+    )
+
+
+def normalize_mqtt_session_snapshot(
+    raw: object,
+    *,
+    now: float | None = None,
+) -> dict[str, str] | None:
+    """Return a complete App-compatible MQTT session or reject it safely."""
+    if not isinstance(raw, dict):
+        return None
+    current_time = time.time() if now is None else now
+    cached_at = raw.get(_KEY_CACHED_AT)
+    expires_at = raw.get(_KEY_EXPIRES_AT)
+    cached_at_invalid = cached_at is not None and (
+        not _is_finite_nonnegative_timestamp(cached_at)
+        or cached_at > current_time + _CACHE_CLOCK_SKEW_SEC
+    )
+    expires_at_invalid = expires_at is not None and (
+        not _is_finite_nonnegative_timestamp(expires_at) or expires_at <= current_time
+    )
+    if cached_at_invalid or expires_at_invalid:
+        return None
+    user_id = raw.get(MQTT_SESSION_USER_ID)
+    seed_b64 = raw.get(MQTT_SESSION_SEED_B64)
+    mac_id = raw.get(MQTT_SESSION_MAC_ID)
+    if not all(
+        isinstance(value, str) and value.strip()
+        for value in (user_id, seed_b64, mac_id)
+    ):
+        return None
+    assert isinstance(user_id, str)
+    assert isinstance(seed_b64, str)
+    assert isinstance(mac_id, str)
+    try:
+        seed = base64.b64decode(seed_b64, validate=True)
+    except binascii.Error, ValueError:
+        return None
+    if len(seed) != _MQTT_SEED_LEN:
+        return None
+    result = {
+        MQTT_SESSION_USER_ID: user_id.strip(),
+        MQTT_SESSION_SEED_B64: seed_b64,
+        MQTT_SESSION_MAC_ID: mac_id.strip(),
+    }
+    source = raw.get(MQTT_SESSION_MAC_ID_SOURCE)
+    if isinstance(source, str) and source.strip():
+        result[MQTT_SESSION_MAC_ID_SOURCE] = source.strip()
+    return result
+
+
+def _store_lock(hass: HomeAssistant) -> asyncio.Lock:
+    """Return the disposable runtime lock protecting this shared Store file."""
+    lock = hass.data.get(_LOCK_KEY)
+    if not isinstance(lock, asyncio.Lock):
+        lock = asyncio.Lock()
+        hass.data[_LOCK_KEY] = lock
+    return lock
+
+
+def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
+    """Return the persistent Home Assistant store."""
+    return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
+
+
+async def async_load_mqtt_session(
+    hass: HomeAssistant, entry_id: str
+) -> dict[str, str] | None:
+    """Load cached MQTT session credentials for the given config entry.
+
+    The session is read from persistent storage and validated before it is
+    returned.
+
+    Returns:
+        dict[str, str]: Mapping with keys `MQTT_SESSION_USER_ID`,
+        `MQTT_SESSION_SEED_B64`, and `MQTT_SESSION_MAC_ID`. Includes
+        `MQTT_SESSION_MAC_ID_SOURCE` if present.
+        None: If storage is missing or malformed, or any required field is missing or
+        empty.
+    """
+    async with _store_lock(hass):
+        data = await _store(hass).async_load()
+    if not isinstance(data, dict):
+        return None
+    entries = data.get(_KEY_ENTRIES)
+    if not isinstance(entries, dict):
+        return None
+    row = entries.get(entry_id)
+    if not isinstance(row, dict):
+        return None
+    return normalize_mqtt_session_snapshot(row)
+
+
+async def async_save_mqtt_session(
+    hass: HomeAssistant,
+    entry_id: str,
+    snapshot: Mapping[str, object],
+) -> None:
+    """Persist MQTT session fields for a config entry.
+
+    Stores the `userId`, base64 `mqttPassWord` seed, and `macId` for `entry_id` in the
+    integration's Home Assistant storage, overwriting any existing row.
+
+    Parameters:
+        entry_id (str): The config entry identifier to associate the cached session
+        with.
+        snapshot: MQTT session fields from the authenticated API, with optional
+            cache and expiry timestamps.
+    """
+    user_id = snapshot.get(MQTT_SESSION_USER_ID)
+    seed_b64 = snapshot.get(MQTT_SESSION_SEED_B64)
+    mac_id = snapshot.get(MQTT_SESSION_MAC_ID)
+    if not all(isinstance(value, str) for value in (user_id, seed_b64, mac_id)):
+        msg = "MQTT session user_id, seed_b64, and mac_id must be strings"
+        raise ValueError(msg)
+    assert isinstance(user_id, str)
+    assert isinstance(seed_b64, str)
+    assert isinstance(mac_id, str)
+    raw_mac_id_source = snapshot.get(MQTT_SESSION_MAC_ID_SOURCE)
+    mac_id_source = raw_mac_id_source if isinstance(raw_mac_id_source, str) else None
+    cached_at = snapshot.get(_KEY_CACHED_AT)
+    expires_at = snapshot.get(_KEY_EXPIRES_AT)
+    if cached_at is not None and not _is_finite_nonnegative_timestamp(cached_at):
+        msg = "MQTT session cached_at must be a finite current UNIX timestamp"
+        raise ValueError(msg)
+    effective_cached_at = time.time() if cached_at is None else float(cached_at)
+    if effective_cached_at > time.time() + _CACHE_CLOCK_SKEW_SEC:
+        msg = "MQTT session cached_at must be a finite current UNIX timestamp"
+        raise ValueError(msg)
+    if expires_at is not None and not _is_finite_nonnegative_timestamp(expires_at):
+        msg = "MQTT session expires_at must be a finite UNIX timestamp"
+        raise ValueError(msg)
+    normalized_user_id = user_id.strip()
+    normalized_mac_id = mac_id.strip()
+    normalized_mac_id_source = mac_id_source.strip() if mac_id_source else None
+
+    async def _async_persist() -> None:
+        """Finish the serialized Store transaction even if setup is cancelled."""
+        async with _store_lock(hass):
+            store = _store(hass)
+            loaded = await store.async_load()
+            data = dict(loaded) if isinstance(loaded, dict) else {}
+            raw_entries = data.get(_KEY_ENTRIES)
+            entries = dict(raw_entries) if isinstance(raw_entries, dict) else {}
+            row: dict[str, Any] = {
+                MQTT_SESSION_USER_ID: normalized_user_id,
+                MQTT_SESSION_SEED_B64: seed_b64,
+                MQTT_SESSION_MAC_ID: normalized_mac_id,
+            }
+            if normalized_mac_id_source:
+                row[MQTT_SESSION_MAC_ID_SOURCE] = normalized_mac_id_source
+            row[_KEY_CACHED_AT] = effective_cached_at
+            if expires_at is not None:
+                row[_KEY_EXPIRES_AT] = expires_at
+            entries[entry_id] = row
+            data[_KEY_ENTRIES] = entries
+            await store.async_save(data)
+
+    persist_task = hass.async_create_task(
+        _async_persist(),
+        name=f"{DOMAIN}_save_mqtt_session_cache_{entry_id}",
+        eager_start=False,
+    )
+    await asyncio.shield(persist_task)
+
+
+async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
+    """Remove the cached MQTT session row for the given config entry.
+
+    Performs no action if the storage layout or the entry's row does not exist.
+    """
+
+    async def _async_persist() -> None:
+        """Finish the serialized Store transaction even if cleanup is cancelled."""
+        async with _store_lock(hass):
+            store = _store(hass)
+            loaded = await store.async_load()
+            if not isinstance(loaded, dict):
+                return
+            data = dict(loaded)
+            raw_entries = data.get(_KEY_ENTRIES)
+            if not isinstance(raw_entries, dict) or entry_id not in raw_entries:
+                return
+            entries = dict(raw_entries)
+            entries.pop(entry_id, None)
+            data[_KEY_ENTRIES] = entries
+            await store.async_save(data)
+
+    persist_task = hass.async_create_task(
+        _async_persist(),
+        name=f"{DOMAIN}_clear_mqtt_session_cache_{entry_id}",
+        eager_start=False,
+    )
+    await asyncio.shield(persist_task)

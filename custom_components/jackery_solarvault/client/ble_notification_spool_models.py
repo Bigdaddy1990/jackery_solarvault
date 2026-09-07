@@ -1,8 +1,11 @@
 """Value objects shared by the BLE notification spool layers."""
 
 from dataclasses import dataclass
-from datetime import datetime
 from enum import IntEnum, StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class BleProcessDisposition(StrEnum):

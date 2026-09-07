@@ -584,7 +584,7 @@ sync_alerts:
       example: '573702884982521856'
       selector:
         text: null
-get_offline_statistics:
+sync_offline_statistics:
   fields:
     device_id:
       required: true
@@ -592,6 +592,10 @@ get_offline_statistics:
       selector:
         device:
           integration: jackery_solarvault
+    body:
+      required: true
+      selector:
+        object:
 query_charge_report:
   fields:
     device_id:

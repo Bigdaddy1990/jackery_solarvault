@@ -1,6 +1,5 @@
 """Diagnostics support for Jackery SolarVault."""
 
-import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -34,8 +33,6 @@ if TYPE_CHECKING:
     from . import JackeryConfigEntry
     from .client.local_mqtt import JackeryLocalMqttClient
 
-_LOGGER = logging.getLogger(__name__)
-
 
 def _redacted_payload_map(
     payloads: Mapping[Any, Any],
@@ -46,12 +43,15 @@ def _redacted_payload_map(
 
     Replace original mapping keys with stable generated labels.
 
-    Payloads are processed in a stable order (sorted by the string form of the original keys). Each value is redacted using the provided `redact_keys`; values that are not mappings are wrapped as `{"value": payload}` before redaction.
+    Payloads are processed in a stable order, sorted by the string form of each
+    original key. Every value is redacted with ``redact_keys``; non-mappings are
+    wrapped as ``{"value": payload}`` before redaction.
 
     Parameters:
         payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated
         labels; values are payloads to redact.
-        prefix (str): Prefix for generated labels; labels are formatted as "<prefix>_<index>" with index starting at 1.
+        prefix (str): Prefix for generated ``<prefix>_<index>`` labels, starting
+            at index 1.
         redact_keys (frozenset[str]): Field names to redact from each payload.
 
     Returns:
@@ -82,8 +82,9 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
         dict[str, Any]: Diagnostics export with keys:
             - `entry_data`: redacted copy of the config entry's stored data.
             - `options`: redacted copy of the config entry's options.
-            - `devices`: mapping of stable local device labels to redacted device payloads.
-            - `raw_api`: redacted diagnostics including coordinator metadata, API response snapshots, MQTT/local MQTT/BLE diagnostics, and statistics backfill.
+            - `devices`: stable local labels mapped to redacted device payloads.
+            - `raw_api`: redacted coordinator, API, transport, and statistics
+              diagnostics.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     redact_keys = active_redact_keys()
@@ -205,28 +206,8 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
     }
     return cast(
         "dict[str, Any]",
-        _diagnostic_json_null_free(
-            redacted_json_safe_payload(
-                export,
-                sensitive_sources=sensitive_sources,
-            )
-        ),
+        redacted_json_safe_payload(export, sensitive_sources=sensitive_sources),
     )
-
-
-def _diagnostic_json_null_free(value: object) -> object:
-    """Return diagnostics JSON without raw null leaves."""
-    if value is None:
-        return ""
-    if isinstance(value, dict):
-        return {
-            str(key): _diagnostic_json_null_free(item) for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_diagnostic_json_null_free(item) for item in value]
-    if isinstance(value, tuple):
-        return [_diagnostic_json_null_free(item) for item in value]
-    return value
 
 
 def _local_mqtt_diagnostics(

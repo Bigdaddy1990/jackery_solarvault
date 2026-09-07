@@ -2,8 +2,6 @@
 
 import asyncio
 from collections import deque
-from collections.abc import Callable, Coroutine, Sequence
-from datetime import datetime
 from hashlib import sha256
 from itertools import islice
 from pathlib import Path
@@ -21,6 +19,9 @@ from .ble_notification_spool_models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Sequence
+    from datetime import datetime
+
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 

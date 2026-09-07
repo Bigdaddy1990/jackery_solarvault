@@ -1,31 +1,24 @@
 """Binary sensor platform for Jackery SolarVault."""
 
-from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
-    BinarySensorEntityDescription,
 )
-from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     DOMAIN,
-    FIELD_ALERT_COUNT,
     FIELD_COMM_MODE,
     FIELD_COMM_STATE,
     FIELD_DEVICE_NAME,
     FIELD_DEV_TYPE,
-    FIELD_ETH_PORT,
     FIELD_MODEL,
-    FIELD_ONLINE_STATUS,
     FIELD_SCAN_NAME,
     FIELD_SWITCH_STATE,
-    FIELD_SW_EPS_STATE,
     FIELD_SYS_SWITCH,
     FIELD_TYPE_NAME,
     FIELD_VERSION,
@@ -39,12 +32,12 @@ from .const import (
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
 )
 from .coordinator import subdevice_accessories
-from .entity import (
-    ALL_LIVE_DATA_SOURCES,
-    HTTP_DATA_SOURCES,
-    JackeryEntity,
-    property_data_sources,
+from .descriptions import (
+    BINARY_SENSOR_DESCRIPTIONS,
+    JackeryBinaryDescription,
+    JackerySubdeviceAlarmBinarySensorDescription,
 )
+from .entity import ALL_LIVE_DATA_SOURCES, JackeryEntity
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
@@ -58,8 +51,6 @@ from .util import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -73,81 +64,23 @@ PARALLEL_UPDATES = 0
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, kw_only=True)
-class JackeryBinaryDescription(BinarySensorEntityDescription):
-    """Jackery binary description for the Jackery SolarVault entity description."""
-
-    getter: Callable[[dict[str, Any], dict[str, Any]], Any]
-    required_property_keys: tuple[str, ...] = ()
-    app_fields: tuple[str, ...] = ()
-    data_sources: tuple[str, ...] = ()
-
-    def __post_init__(self) -> None:
-        """Resolve property-field and source metadata."""
-        app_fields = self.app_fields or self.required_property_keys
-        object.__setattr__(self, "app_fields", app_fields)
-        if not self.data_sources:
-            object.__setattr__(
-                self,
-                "data_sources",
-                property_data_sources(
-                    *app_fields,
-                    layer5_proven=bool(app_fields),
-                )
-                if app_fields
-                else HTTP_DATA_SOURCES,
-            )
-
-
-@dataclass(frozen=True, kw_only=True)
-class JackerySubdeviceAlarmBinarySensorDescription(BinarySensorEntityDescription):
-    """Describes a Jackery subdevice alarm binary sensor."""
-
-    field: str
-    data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES
-
-
-# Getter receives (properties, device_meta). Field constants mirror the app/API
-# payload names documented in PROTOCOL.md §2.
-BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
-    JackeryBinaryDescription(
-        key="online",
-        translation_key="online",
-        device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        getter=lambda p, d: d.get(FIELD_ONLINE_STATUS),
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-    ),
-    JackeryBinaryDescription(
-        key="eps_active",
-        translation_key="eps_active",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        getter=lambda p, d: p.get(FIELD_SW_EPS_STATE),
-        required_property_keys=(FIELD_SW_EPS_STATE,),
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-    ),
-    JackeryBinaryDescription(
-        key="eth_connected",
-        translation_key="eth_connected",
-        device_class=BinarySensorDeviceClass.CONNECTIVITY,
-        getter=lambda p, d: p.get(FIELD_ETH_PORT),
-        required_property_keys=(FIELD_ETH_PORT,),
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-    ),
+# Descriptions live in the central `descriptions/` package. The package bundles
+# both binary-sensor kinds in one registry; split them here so the two entity
+# families keep their own iteration.
+BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = tuple(
+    description
+    for description in BINARY_SENSOR_DESCRIPTIONS
+    if isinstance(description, JackeryBinaryDescription)
 )
 
 SUBDEVICE_ALARM_DESCRIPTIONS: tuple[
     JackerySubdeviceAlarmBinarySensorDescription, ...
-] = (
-    JackerySubdeviceAlarmBinarySensorDescription(
-        key="alarm",
-        translation_key="subdevice_alarm",
-        device_class=BinarySensorDeviceClass.SAFETY,
-        field=FIELD_ALERT_COUNT,
-    ),
+] = tuple(
+    description
+    for description in BINARY_SENSOR_DESCRIPTIONS
+    if isinstance(description, JackerySubdeviceAlarmBinarySensorDescription)
 )
+
 
 # Per-accessory device_class overrides for the subdevice alarm sensor above.
 # HA has no direction-neutral class for a temp/humidity alert, so that
@@ -158,6 +91,8 @@ SUBDEVICE_ALARM_DEVICE_CLASSES: dict[int, BinarySensorDeviceClass] = {
     SUBDEVICE_DEV_TYPE_WATER_LEAK: BinarySensorDeviceClass.MOISTURE,
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY: BinarySensorDeviceClass.PROBLEM,
 }
+
+type _SubdeviceAlarmIdentity = tuple[int, str, str]
 
 
 async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an async platform hook.
@@ -181,21 +116,8 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
         entities: list[BinarySensorEntity],
         entity: BinarySensorEntity,
     ) -> None:
-        """Add a previously unseen entity to the provided list.
-
-        Record the entity's unique ID so it is not added again.
-
-        Parameters:
-            entities (list[BinarySensorEntity]): List to append the entity to when its
-            unique ID is new.
-            entity (BinarySensorEntity): Binary sensor entity whose unique ID will be
-            checked and recorded.
-        """
-        append_unique_entity(
-            entities,
-            seen_unique_ids,
-            entity,
-        )
+        """Append the entity unless its unique ID was already seen."""
+        append_unique_entity(entities, seen_unique_ids, entity)
 
     def _collect_entities() -> list[BinarySensorEntity]:
         """Collect binary sensor entities for every device in the coordinator payload.
@@ -267,9 +189,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                         JackerySubdeviceAlarmBinarySensor(
                             coordinator,
                             dev_id,
-                            sub_device_index=index,
-                            sub_device_sn=sub_device_sn,
-                            sub_device_key=sub_device_key,
+                            identity=(index, sub_device_sn, sub_device_key),
                             description=alarm_desc,
                         ),
                     )
@@ -304,6 +224,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
 class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
     """Jackery binary sensor for the Jackery SolarVault integration."""
 
+    _attr_has_entity_name = True
     entity_description: JackeryBinaryDescription
 
     def __init__(
@@ -327,9 +248,7 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
             bool | None: `True` if the sensor is on, `False` if the sensor is off,
             `None` if the state is unknown.
         """
-        return safe_bool(
-            self.entity_description.getter(self._properties, self._device_meta),
-        )
+        return safe_bool(self.entity_description.value_fn(self))
 
 
 class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
@@ -451,12 +370,11 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
         coordinator: JackerySolarVaultCoordinator,
         device_id: str,
         *,
-        sub_device_index: int,
-        sub_device_sn: str,
-        sub_device_key: str,
+        identity: _SubdeviceAlarmIdentity,
         description: JackerySubdeviceAlarmBinarySensorDescription,
     ) -> None:
         """Initialize a subdevice alarm binary sensor."""
+        sub_device_index, sub_device_sn, sub_device_key = identity
         super().__init__(coordinator, device_id, f"{sub_device_key}_{description.key}")
         self.entity_description = description
         self._sub_device_index = sub_device_index
@@ -467,6 +385,11 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
             self._sub_device,
             sub_device_key,
         )
+
+    @property
+    def sub_device(self) -> dict[str, Any]:
+        """The subdevice payload associated with this alarm."""
+        return self._sub_device
 
     @property
     def _sub_device(self) -> dict[str, Any]:
@@ -513,20 +436,23 @@ class JackerySubdeviceAlarmBinarySensor(JackeryEntity, BinarySensorEntity):
             or f"Jackery {self._device_id}"
         )
         dev_type = safe_int(item.get(FIELD_DEV_TYPE))
-        type_name = "Zubehör"
+        type_name = "Accessory"
         if dev_type == SUBDEVICE_DEV_TYPE_SMOKE:
-            type_name = "Rauchmelder"
+            type_name = "Smoke alarm"
         elif dev_type == SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY:
-            type_name = "Temperatursensor"
+            type_name = "Temperature sensor"
         elif dev_type == SUBDEVICE_DEV_TYPE_WATER_LEAK:
-            type_name = "Wassersensor"
+            type_name = "Water leak sensor"
 
-        model = item.get(FIELD_MODEL) or item.get(FIELD_TYPE_NAME) or "Jackery Zubehör"
-        return DeviceInfo(
+        model = (
+            item.get(FIELD_MODEL) or item.get(FIELD_TYPE_NAME) or "Jackery accessory"
+        )
+        info = DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_{item_key}")},
             manufacturer=MANUFACTURER,
             name=f"{base_name} {type_name} {index}",
             model=str(model),
             serial_number=self._sub_device_sn,
-            via_device=(DOMAIN, self._device_id),
         )
+        self._apply_via_device(info)
+        return info

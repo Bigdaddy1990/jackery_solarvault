@@ -1,26 +1,22 @@
-"""Home Assistant MQTT adapter for local Jackery telemetry.
-
-The integration deliberately shares Home Assistant's MQTT connection.  Owning a
-second broker client here duplicates credentials, reconnect handling and network
-resources, and can race Home Assistant during shutdown.
-"""
+"""Direct local-broker MQTT transport for Jackery telemetry."""
 
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable
 import contextlib
+from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict, Unpack, cast
 
-from homeassistant.components import mqtt
+from aiomqtt import Client as MqttClient, MqttError
+
 from homeassistant.components.mqtt.util import valid_subscribe_topic
 
 from ..const import (
     DOMAIN,
-    FIELD_BODY,
     LOCAL_MQTT_DEFAULT_TOPIC,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
     LOCAL_MQTT_MAX_TOPIC_NAMES,
@@ -28,125 +24,225 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_INITIAL_SEC,
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
-    SHELLY_RPC_EVENT_TOPIC,
 )
 
 if TYPE_CHECKING:
-    from homeassistant.components.mqtt.models import ReceiveMessage
+    from collections.abc import Coroutine
+
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+_AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 
 MqttQos = Literal[0, 1, 2]
 LocalMqttSink = Callable[[str, dict[str, Any] | None, bytes], Awaitable[bool | None]]
 LocalMqttSnapshotRequester = Callable[[], Awaitable[int]]
+_DEFAULT_MQTT_PORT = 1883
+_MAX_MQTT_PORT = 65_535
 _SELF_PUBLISH_ECHO_TTL_SEC = 30.0
 _MAX_PENDING_SELF_PUBLISH_ECHOES = 128
+# MQTT 3.1.1 SUBACK: granted QoS 0..2, anything from 0x80 up means the broker
+# refused the subscription (MQTT-3.9.3-2).
+_SUBACK_FAILURE_CODE = 0x80
+
+
+def _subscription_topic(topic_filter: str) -> str:
+    """Normalize only the documented legacy default; preserve user topics."""
+    topic = topic_filter.strip()
+    return "homeassistant/#" if topic == "homeassistant" else topic
+
+
+def subscription_refusals(codes: object) -> list[str]:
+    """Return the SUBACK entries where the broker refused the subscription.
+
+    ``aiomqtt.Client.subscribe`` only raises when the *local* paho call fails;
+    a broker that refuses the filter answers with a failure reason code in the
+    SUBACK and the coroutine returns normally. Ignoring that return value made
+    an ACL-denied subscription look completely healthy: ``connected`` and
+    ``subscribed`` both true, publishes flowing, and not a single frame ever
+    delivered — not even our own, which the broker would otherwise echo back
+    into the subscribed tree.
+
+    MQTT 3.1.1 reports granted QoS as plain ints where ``0x80`` means failure;
+    MQTT 5 returns ``ReasonCode`` objects exposing ``is_failure``.
+    """
+    refused: list[str] = []
+    entries = codes if isinstance(codes, (list, tuple)) else ()
+    for code in entries:
+        is_failure = getattr(code, "is_failure", None)
+        failed = (
+            bool(is_failure)
+            if is_failure is not None
+            else isinstance(code, int) and code >= _SUBACK_FAILURE_CODE
+        )
+        if failed:
+            refused.append(str(code))
+    return refused
+
+
+class _LocalMqttConnectionOptions(TypedDict, total=False):
+    """Backward-compatible keyword form of local broker settings."""
+
+    host: str
+    port: int
+    username: str | None
+    password: str | None
+    client_id: str
+    topic_filter: str
+    qos: MqttQos
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class LocalMqttConnectionSettings:
+    """Immutable direct-broker connection settings."""
+
+    host: str = ""
+    port: int = _DEFAULT_MQTT_PORT
+    username: str | None = None
+    password: str | None = None
+    client_id: str = "ha-jackery-local"
+    topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC
+    qos: MqttQos = 0
+
+
+class LocalMqttConfigurationError(ValueError):
+    """Invalid direct-broker configuration."""
+
+    @classmethod
+    def conflicting_settings(cls) -> Self:
+        """Build the error raised for mixed settings forms."""
+        return cls("Pass either settings or connection keywords, not both")
+
+    @classmethod
+    def invalid_qos(cls) -> Self:
+        """Build the error raised for an unsupported QoS."""
+        return cls("MQTT QoS must be 0, 1, or 2")
+
+    @classmethod
+    def missing_host(cls) -> Self:
+        """Build the error raised for an empty broker host."""
+        return cls("Local MQTT broker host is required")
+
+    @classmethod
+    def invalid_port(cls) -> Self:
+        """Build the error raised for an out-of-range broker port."""
+        return cls("Local MQTT broker port must be between 1 and 65535")
+
+
+class LocalMqttNotConnectedError(RuntimeError):
+    """A publish was requested without an active direct-broker session."""
+
+    def __init__(self) -> None:
+        """Initialize the fixed not-connected error."""
+        super().__init__("Local MQTT broker is not connected")
+
+
+def _connection_settings(
+    settings: LocalMqttConnectionSettings | None,
+    options: _LocalMqttConnectionOptions,
+) -> LocalMqttConnectionSettings:
+    """Normalize the typed and backward-compatible settings forms."""
+    if settings is not None and options:
+        raise LocalMqttConfigurationError.conflicting_settings()
+    return settings or LocalMqttConnectionSettings(**options)
 
 
 class JackeryLocalMqttClient:
-    """Receive local Jackery frames through Home Assistant's MQTT client."""
+    """Receive and request Jackery frames on the configured local broker."""
 
     def __init__(
         self,
         hass: HomeAssistant,
+        settings: LocalMqttConnectionSettings | None = None,
         *,
         sink: LocalMqttSink | None = None,
-        topic_filter: str = LOCAL_MQTT_DEFAULT_TOPIC,
-        qos: MqttQos = 0,
         config_entry: ConfigEntry | None = None,
+        **connection_options: Unpack[_LocalMqttConnectionOptions],
     ) -> None:
-        """Initialize an adapter without opening a network connection."""
+        """Initialize the direct local-broker client."""
+        settings = _connection_settings(settings, connection_options)
         self._hass = hass
         self._config_entry = config_entry
+        self._host = settings.host.strip()
+        self._port = settings.port
+        self._username = settings.username or None
+        self._password = settings.password or None
+        self._client_id = settings.client_id
         self._sink = sink
-        self._topic_filter = topic_filter
-        if qos not in {0, 1, 2}:
-            raise ValueError("MQTT QoS must be 0, 1, or 2")
-        self._qos = qos
+        self._topic_filter = settings.topic_filter
+        self._topic_filters = (_subscription_topic(settings.topic_filter),)
+        if settings.qos not in {0, 1, 2}:
+            raise LocalMqttConfigurationError.invalid_qos()
+        self._qos = settings.qos
         self._lifecycle_lock = asyncio.Lock()
-        self._unsubscribe: Callable[[], None] | None = None
-        self._topic_unsubscribes: list[tuple[str, Callable[[], None]]] = []
-        self._unsubscribe_official_alias: Callable[[], None] | None = None
-        self._unsubscribe_shelly_rpc: Callable[[], None] | None = None
-        self._unsubscribe_status: Callable[[], None] | None = None
-        self._subscription_active = False
-        self._retry_task: asyncio.Task[None] | None = None
+        self._subscription_active = self._snapshot_request_pending = False
+        self._subscribed_topics: set[str] = set()
+        self._client: MqttClient | None = None
+        self._runner_task: asyncio.Task[None] | None = None
+        self._connected_event = asyncio.Event()
         self._snapshot_task: asyncio.Task[None] | None = None
+        self._periodic_snapshot_task: asyncio.Task[None] | None = None
+        self._snapshot_interval_sec = 15.0
         self._snapshot_requester: LocalMqttSnapshotRequester | None = None
-        self._snapshot_request_pending = False
         self._message_queue: deque[tuple[str, bytes | str]] = deque()
         self._message_consumer_task: asyncio.Task[None] | None = None
         self._message_delivery_task: asyncio.Task[None] | None = None
         self._message_delivery_item: tuple[str, bytes | str] | None = None
         self._message_tasks: set[asyncio.Task[None]] = set()
-        self._stopping = False
-        self._mqtt_integration_available = False
-        self._connected = False
-        self._messages_received = 0
-        self._messages_dropped = 0
-        self._messages_forwarded = 0
-        self._messages_filtered = 0
-        self._messages_rejected_by_sink = 0
-        self._sink_errors = 0
-        self._payload_too_large_count = 0
-        self._retained_messages_dropped = 0
+        self._stopping = self._connected = self._topics_seen_truncated = False
+        self._messages_received = self._messages_dropped = 0
+        self._messages_forwarded = self._messages_filtered = 0
+        self._messages_rejected_by_sink = self._sink_errors = 0
+        self._payload_too_large_count = self._retained_messages_dropped = 0
         self._topics_seen: list[str] = []
         self._topics_seen_set: set[str] = set()
-        self._topics_seen_truncated = False
         self._last_topic: str | None = None
         self._last_message_at: str | None = None
         self._last_connect_at: str | None = None
         self._last_disconnect_at: str | None = None
         self._last_error: str | None = None
         self._last_sink_error: str | None = None
-        self._connect_attempts = 0
-        self._messages_published = 0
-        self._publish_errors = 0
+        self._connect_attempts = self._messages_published = self._publish_errors = 0
         self._last_publish_at: str | None = None
         self._pending_self_publish_echoes: deque[tuple[float, str, bytes]] = deque()
         self._self_publish_echoes_ignored = 0
 
     async def async_start(self) -> None:
-        """Register the subscription, retrying transient MQTT startup gaps."""
+        """Start the entry-owned direct-broker reconnect supervisor."""
         async with self._lifecycle_lock:
             self._stopping = False
-            if self._subscription_active or (
-                self._retry_task is not None and not self._retry_task.done()
-            ):
+            if self._runner_task is not None and not self._runner_task.done():
                 return
-            if self._has_subscription_cleanup_pending():
-                cleanup_errors = self._unsubscribe_registered()
-                if cleanup_errors:
-                    self._schedule_subscription_retry()
-                    return
-            if not await self._async_subscribe_once() and not self._stopping:
-                self._schedule_subscription_retry()
+            if not self._host:
+                raise LocalMqttConfigurationError.missing_host()
+            if not 1 <= self._port <= _MAX_MQTT_PORT:
+                raise LocalMqttConfigurationError.invalid_port()
+            valid_subscribe_topic(self._topic_filter)
+            self._connected_event.clear()
+            self._runner_task = self._create_background_task(
+                self._async_run_forever(),
+                name="jackery_local_mqtt_runner",
+            )
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(self._connected_event.wait(), timeout=10.0)
 
-    async def async_stop(self) -> None:
-        """Remove subscriptions and quiesce callbacks during entry unload."""
-        # Fence ingress and cancel a retry that may currently own the lifecycle
-        # lock before waiting for that same lock. This avoids a stop-vs-retry
-        # deadlock while the lock still serializes every subscription mutation.
+    async def async_stop(self, *, wait_for_drain: bool = True) -> None:
+        """Remove subscriptions and optionally await accepted-frame delivery."""
         self._stopping = True
-        retry_task = self._retry_task
-        if retry_task is not None and retry_task is not asyncio.current_task():
-            retry_task.cancel()
         async with self._lifecycle_lock:
-            await self._async_stop_locked()
+            await self._async_stop_locked(wait_for_drain=wait_for_drain)
 
-    async def _async_stop_locked(self) -> None:
+    async def _async_stop_locked(self, *, wait_for_drain: bool) -> None:
         """Stop while holding the shared start/stop lifecycle fence."""
         self._stopping = True
         self._subscription_active = False
-        retry_task = self._retry_task
-        if retry_task is not None and retry_task is not asyncio.current_task():
-            retry_task.cancel()
+        periodic_task = self._periodic_snapshot_task
+        self._periodic_snapshot_task = None
+        if periodic_task is not None and periodic_task is not asyncio.current_task():
+            periodic_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await retry_task
-        if self._retry_task is retry_task:
-            self._retry_task = None
+                await periodic_task
         self._snapshot_request_pending = False
         snapshot_task = self._snapshot_task
         self._snapshot_task = None
@@ -154,261 +250,149 @@ class JackeryLocalMqttClient:
             snapshot_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await snapshot_task
-        stop_errors = self._unsubscribe_registered()
-        await self.async_wait_message_queue_idle()
+        runner_task = self._runner_task
+        self._runner_task = None
+        if runner_task is not None and runner_task is not asyncio.current_task():
+            runner_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, MqttError):
+                await runner_task
+        self._client = None
+        self._subscribed_topics.clear()
+        self._connected_event.clear()
         self._connected = False
-        if stop_errors:
-            self._last_error = (
-                f"{len(stop_errors)} Local MQTT unsubscribe callback(s) failed"
-            )
-            raise RuntimeError(self._last_error) from stop_errors[0]
+        if wait_for_drain:
+            await self.async_wait_message_queue_idle()
+        else:
+            self._ensure_background_message_drain()
 
-    def _schedule_subscription_retry(self) -> None:
-        """Own exactly one retry supervisor for a failed subscription lifecycle."""
-        current = self._retry_task
-        if current is not None and not current.done():
-            return
-        self._retry_task = self._hass.async_create_background_task(
-            self._async_retry_subscription(),
-            name="jackery_local_mqtt_subscription_retry",
+    def _create_background_task(
+        self,
+        operation: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        """Create a long-lived task owned by the config entry when available."""
+        if self._config_entry is not None and not self._stopping:
+            return cast(  # ty: ignore[redundant-cast]
+                "asyncio.Task[None]",
+                self._config_entry.async_create_background_task(
+                    self._hass,
+                    operation,
+                    name=name,
+                    eager_start=False,
+                ),
+            )
+        return self._hass.async_create_background_task(
+            operation,
+            name=name,
             eager_start=False,
         )
 
-    def _has_subscription_cleanup_pending(self) -> bool:
-        """Return whether a failed subscribe/unsubscribe left retryable handles."""
-        return bool(
-            self._topic_unsubscribes
-            or self._unsubscribe is not None
-            or self._unsubscribe_status is not None
-        )
-
-    def _unsubscribe_registered(self) -> list[Exception]:
-        """Run every owned unsubscribe and retain only callbacks that failed."""
-        topic_unsubscribes = list(self._topic_unsubscribes)
-        if self._unsubscribe is not None and not any(
-            unsubscribe is self._unsubscribe
-            for _topic, unsubscribe in topic_unsubscribes
-        ):
-            topic_unsubscribes.insert(0, (self._topic_filter, self._unsubscribe))
-        failed: list[tuple[str, Callable[[], None], Exception]] = []
-        for topic, unsubscribe in reversed(topic_unsubscribes):
-            try:
-                unsubscribe()
-            except Exception as err:  # ruff: ignore[blind-except]
-                failed.append((topic, unsubscribe, err))
-        failed.reverse()
-        self._topic_unsubscribes = [
-            (topic, unsubscribe) for topic, unsubscribe, _err in failed
-        ]
-        self._unsubscribe = (
-            self._topic_unsubscribes[0][1] if self._topic_unsubscribes else None
-        )
-        plural_default_topic = LOCAL_MQTT_DEFAULT_TOPIC.replace(
-            "/device/",
-            "/devices/",
-        )
-        self._unsubscribe_official_alias = next(
-            (
-                unsubscribe
-                for topic, unsubscribe in self._topic_unsubscribes
-                if topic in {LOCAL_MQTT_DEFAULT_TOPIC, plural_default_topic}
-                and topic != self._topic_filter
-            ),
-            None,
-        )
-        self._unsubscribe_shelly_rpc = next(
-            (
-                unsubscribe
-                for topic, unsubscribe in self._topic_unsubscribes
-                if topic == SHELLY_RPC_EVENT_TOPIC and topic != self._topic_filter
-            ),
-            None,
-        )
-        errors = [err for _topic, _unsubscribe, err in failed]
-        unsubscribe_status = self._unsubscribe_status
-        if unsubscribe_status is not None:
-            try:
-                unsubscribe_status()
-            except Exception as err:  # ruff: ignore[blind-except]
-                errors.append(err)
-            else:
-                self._unsubscribe_status = None
-        return errors
-
-    async def _async_subscribe_once(self) -> bool:
-        """Attempt one HA MQTT subscription registration."""
-        self._connect_attempts += 1
-        try:
-            valid_subscribe_topic(self._topic_filter)
-        except ValueError as err:
-            self._last_error = f"Invalid MQTT topic filter: {err}"
-            _LOGGER.error("Invalid local Jackery MQTT topic filter: %s", err)
-            return False
-        self._mqtt_integration_available = await mqtt.async_wait_for_mqtt_client(
-            self._hass
-        )
-        if not self._mqtt_integration_available:
-            self._last_error = "Home Assistant MQTT client unavailable"
-            return False
-        unsubscribe_status: Callable[[], None] | None = None
-        plural_default_topic = LOCAL_MQTT_DEFAULT_TOPIC.replace(
-            "/device/",
-            "/devices/",
-        )
-        subscription_topics = self._minimal_subscription_topics((
-            self._topic_filter,
-            LOCAL_MQTT_DEFAULT_TOPIC,
-            plural_default_topic,
-            SHELLY_RPC_EVENT_TOPIC,
-        ))
-        for topic in subscription_topics:
-            try:
-                valid_subscribe_topic(topic)
-            except ValueError as err:
-                self._last_error = f"Invalid MQTT topic filter: {err}"
-                _LOGGER.error("Invalid local Jackery MQTT topic filter: %s", err)
-                return False
-        topic_unsubscribes: list[tuple[str, Callable[[], None]]] = []
-        try:
-            unsubscribe_status = mqtt.async_subscribe_connection_status(
-                self._hass, self._async_connection_status_changed
-            )
-            for topic in subscription_topics:
-                unsubscribe = await mqtt.async_subscribe(
-                    self._hass,
-                    topic,
-                    self._async_message_received,
-                    qos=self._qos,
-                    encoding=None,
+    async def _async_run_forever(self) -> None:
+        """Reconnect to the configured broker until entry unload."""
+        reconnect_delay = LOCAL_MQTT_RECONNECT_INITIAL_SEC
+        while True:
+            self._connect_attempts += 1
+            connected = await self._async_run_session()
+            if connected:
+                reconnect_delay = LOCAL_MQTT_RECONNECT_INITIAL_SEC
+            await self._async_reconnect_sleep(reconnect_delay)
+            if not connected:
+                reconnect_delay = min(
+                    reconnect_delay * LOCAL_MQTT_RECONNECT_FACTOR,
+                    LOCAL_MQTT_RECONNECT_MAX_SEC,
                 )
-                topic_unsubscribes.append((topic, unsubscribe))
+
+    @staticmethod
+    async def _async_reconnect_sleep(delay: float) -> None:
+        """Wait before retrying a failed direct-broker session."""
+        await asyncio.sleep(delay)
+
+    async def _async_run_session(self) -> bool:
+        """Connect, subscribe and feed broker frames into the ordered FIFO."""
+        connected = False
+        topics = self._minimal_subscription_topics(self._topic_filters)
+        try:
+            async with MqttClient(
+                hostname=self._host,
+                port=self._port,
+                identifier=self._client_id,
+                username=self._username,
+                password=self._password,
+                logger=_AIOMQTT_LOGGER,
+            ) as client:
+                await self._async_consume_session(client, topics)
+                connected = self._subscription_active
         except asyncio.CancelledError:
-            self._subscription_active = False
-            self._topic_unsubscribes = topic_unsubscribes
-            self._unsubscribe = topic_unsubscribes[0][1] if topic_unsubscribes else None
-            self._unsubscribe_status = unsubscribe_status
-            cleanup_errors = self._unsubscribe_registered()
-            if cleanup_errors:
-                _LOGGER.warning(
-                    "Local Jackery MQTT subscription cancellation left %d "
-                    "cleanup callback(s) retryable",
-                    len(cleanup_errors),
-                )
             raise
+        except MqttError as err:
+            connected = self._subscription_active
+            error = f"{type(err).__name__}: {err}"
+            log = _LOGGER.warning if error != self._last_error else _LOGGER.debug
+            self._last_error = error
+            log("Jackery local MQTT connection failed: %s", err)
         except Exception as err:  # ruff: ignore[blind-except]
-            self._subscription_active = False
-            self._topic_unsubscribes = topic_unsubscribes
-            self._unsubscribe = topic_unsubscribes[0][1] if topic_unsubscribes else None
-            self._unsubscribe_status = unsubscribe_status
-            cleanup_errors = self._unsubscribe_registered()
-            cleanup_suffix = (
-                f"; {len(cleanup_errors)} cleanup callback(s) will retry"
-                if cleanup_errors
-                else ""
-            )
-            self._last_error = f"{type(err).__name__}: {err}{cleanup_suffix}"
-            _LOGGER.warning("Unable to subscribe to local Jackery MQTT: %s", err)
-            return False
-        assert topic_unsubscribes
-        assert unsubscribe_status is not None
-        if self._stopping:
-            self._subscription_active = False
-            self._topic_unsubscribes = topic_unsubscribes
-            self._unsubscribe = topic_unsubscribes[0][1]
-            self._unsubscribe_status = unsubscribe_status
-            cleanup_errors = self._unsubscribe_registered()
-            if cleanup_errors:
-                _LOGGER.warning(
-                    "Local Jackery MQTT stop overlapped subscription setup and "
-                    "left %d cleanup callback(s) retryable",
-                    len(cleanup_errors),
-                )
-            return False
-        self._topic_unsubscribes = topic_unsubscribes
-        self._unsubscribe = topic_unsubscribes[0][1]
-        self._unsubscribe_official_alias = next(
-            (
-                unsubscribe
-                for topic, unsubscribe in topic_unsubscribes
-                if topic in {LOCAL_MQTT_DEFAULT_TOPIC, plural_default_topic}
-                and topic != self._topic_filter
-            ),
-            None,
-        )
-        self._unsubscribe_shelly_rpc = next(
-            (
-                unsubscribe
-                for topic, unsubscribe in topic_unsubscribes
-                if topic == SHELLY_RPC_EVENT_TOPIC and topic != self._topic_filter
-            ),
-            None,
-        )
-        self._unsubscribe_status = unsubscribe_status
-        self._subscription_active = True
-        self._connected = mqtt.is_connected(self._hass)
-        if self._connected:
-            self._last_connect_at = self._utc_now_iso()
-            self._schedule_snapshot_request()
-        self._last_error = None
-        return True
-
-    async def _async_retry_subscription(self) -> None:
-        """Retry subscription registration with capped exponential backoff."""
-        delay = float(LOCAL_MQTT_RECONNECT_INITIAL_SEC)
-        try:
-            while not self._stopping:
-                await asyncio.sleep(delay)
-                if await self._async_retry_subscription_once():
-                    return
-                delay = min(
-                    delay * LOCAL_MQTT_RECONNECT_FACTOR,
-                    float(LOCAL_MQTT_RECONNECT_MAX_SEC),
-                )
+            connected = self._subscription_active
+            error = f"{type(err).__name__}: {err}"
+            log = _LOGGER.warning if error != self._last_error else _LOGGER.debug
+            self._last_error = error
+            log("Jackery local MQTT session failed: %s", err)
         finally:
-            current_task = asyncio.current_task()
-            if self._retry_task is current_task:
-                self._retry_task = None
+            self._client = None
+            self._connected = False
+            self._subscription_active = False
+            self._subscribed_topics.clear()
+            self._connected_event.set()
+            if connected:
+                self._last_disconnect_at = self._utc_now_iso()
+            periodic_task = self._periodic_snapshot_task
+            self._periodic_snapshot_task = None
+            if (
+                periodic_task is not None
+                and periodic_task is not asyncio.current_task()
+            ):
+                periodic_task.cancel()
+        return connected
 
-    async def _async_retry_subscription_once(self) -> bool:
-        """Return whether retry supervision should stop."""
-        async with self._lifecycle_lock:
-            if self._stopping or self._subscription_active:
-                return True
-            if self._has_subscription_cleanup_pending():
-                if self._unsubscribe_registered():
-                    return False
-            return await self._async_subscribe_once()
+    async def _async_consume_session(
+        self,
+        client: MqttClient,
+        topics: list[str],
+    ) -> None:
+        """Subscribe and consume one established direct-broker session."""
+        self._client = client
+        for topic in topics:
+            refused = subscription_refusals(
+                await client.subscribe(topic, qos=self._qos)
+            )
+            if refused:
+                msg = (
+                    f"broker refused the subscription to {topic!r} "
+                    f"(SUBACK {", ".join(refused)}) — check the broker ACL for "
+                    f"read access on this topic tree"
+                )
+                raise MqttError(msg)
+        self._subscribed_topics = set(topics)
+        recovered = self._last_error is not None
+        self._connected = True
+        self._subscription_active = True
+        self._last_connect_at = self._utc_now_iso()
+        self._last_error = None
+        self._connected_event.set()
+        if recovered:
+            _LOGGER.info("Jackery local MQTT connection restored")
+        self._schedule_snapshot_request()
+        self._ensure_periodic_snapshot()
+        async for message in client.messages:
+            if self._stopping:
+                break
+            self._enqueue_message(str(message.topic), bytes(message.payload))
 
-    def _async_connection_status_changed(self, connected: bool) -> None:
-        """Observe the shared broker status without controlling it."""
-        if connected == self._connected:
-            return
-        self._connected = connected
-        if connected:
-            self._last_connect_at = self._utc_now_iso()
-            self._schedule_snapshot_request()
-        else:
-            self._last_disconnect_at = self._utc_now_iso()
-            snapshot_task = self._snapshot_task
-            if snapshot_task is not None and not snapshot_task.done():
-                snapshot_task.cancel()
-
-    def _async_message_received(self, message: ReceiveMessage) -> None:
-        """Accept one live HA MQTT frame into the ordered delivery FIFO."""
+    def _enqueue_message(self, topic: str, payload: bytes | str) -> None:
+        """Accept one broker frame into the ordered no-drop FIFO."""
         if self._stopping:
             return
-        if message.retain:
-            # Jackery publishes live telemetry with retain=False. Replayed
-            # retained frames are stale broker state and must not update devices.
-            self._retained_messages_dropped += 1
-            self._messages_dropped += 1
-            return
-        payload = (
-            message.payload
-            if isinstance(message.payload, str)
-            else bytes(message.payload)
-        )
-        self._message_queue.append((str(message.topic), payload))
+        self._message_queue.append((topic, payload))
         self._ensure_message_consumer()
 
     @staticmethod
@@ -455,8 +439,8 @@ class JackeryLocalMqttClient:
     ) -> asyncio.Task[None]:
         """Create finite message work owned by the config entry when available."""
         if self._config_entry is not None:
-            return cast(
-                asyncio.Task[None],
+            return cast(  # ty: ignore[redundant-cast]
+                "asyncio.Task[None]",
                 self._config_entry.async_create_task(
                     self._hass,
                     operation,
@@ -466,6 +450,14 @@ class JackeryLocalMqttClient:
             )
         return self._hass.async_create_task(operation, name=name, eager_start=False)
 
+    def _ensure_background_message_drain(self) -> None:
+        """Keep accepted frames draining after broker ingress has stopped."""
+        self._hass.async_create_background_task(
+            self.async_wait_message_queue_idle(),
+            name="jackery_local_mqtt_message_drain",
+            eager_start=False,
+        )
+
     def _ensure_message_consumer(self) -> None:
         """Start the sole Local-MQTT FIFO consumer when work is queued."""
         if not self._message_queue and self._message_delivery_task is None:
@@ -473,7 +465,7 @@ class JackeryLocalMqttClient:
         current = self._message_consumer_task
         if current is not None and not current.done():
             return
-        task = self._create_message_task(
+        task = self._create_background_task(
             self._async_consume_messages(),
             name="jackery_local_mqtt_message_fifo",
         )
@@ -549,12 +541,13 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except Exception:
+            except TimeoutError, OSError:
+                # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
 
     def _settle_message_delivery(self, task: asyncio.Task[None]) -> None:
-        """Finish one delivery identity and requeue it only if delivery was cancelled."""
+        """Finish one delivery and requeue it only when it was cancelled."""
         if self._message_delivery_task is not task:
             return
         item = self._message_delivery_item
@@ -636,7 +629,6 @@ class JackeryLocalMqttClient:
         )
         if self._consume_self_publish_echo(topic, raw):
             self._self_publish_echoes_ignored += 1
-            return
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
@@ -653,6 +645,10 @@ class JackeryLocalMqttClient:
                 f"MQTT payload exceeds {LOCAL_MQTT_MAX_PAYLOAD_BYTES} byte limit"
             )
             return
+        # No content gate here. docs/AGENTS.md §1.1 Data Integrity First:
+        # "live MQTT/BLE ingress is not filtered or dropped merely because a
+        # field is unknown or incomplete." Scoping is the topic filter's job;
+        # a key-based gate also silently drops any field the firmware adds.
         data: dict[str, Any] | None = None
         try:
             parsed = json.loads(raw.decode())
@@ -660,21 +656,6 @@ class JackeryLocalMqttClient:
                 data = parsed
         except UnicodeDecodeError, json.JSONDecodeError:
             pass
-        if topic == SHELLY_RPC_EVENT_TOPIC:
-            rpc_body: dict[str, Any] | None = None
-            if data is not None:
-                nested = data.get(FIELD_BODY)
-                rpc_body = nested if isinstance(nested, dict) else data
-            params = rpc_body.get("params") if rpc_body is not None else None
-            if (
-                rpc_body is None
-                or rpc_body.get("method") != "NotifyStatus"
-                or not str(rpc_body.get("src", "")).casefold().startswith("shelly")
-                or not isinstance(params, dict)
-                or not any(key in params for key in ("em:0", "emdata:0"))
-            ):
-                self._messages_filtered += 1
-                return
         if self._sink is None:
             self._messages_dropped += 1
             return
@@ -688,32 +669,65 @@ class JackeryLocalMqttClient:
             self._last_sink_error = f"{type(err).__name__}: {err}"
             _LOGGER.exception("Local Jackery MQTT sink failed")
             return
+        self._messages_forwarded += 1
         if accepted is False:
             self._messages_rejected_by_sink += 1
-            self._messages_dropped += 1
-            return
-        self._messages_forwarded += 1
 
     def set_snapshot_requester(
         self,
         requester: LocalMqttSnapshotRequester,
+        *,
+        interval_sec: float,
     ) -> None:
-        """Request one initial snapshot now and after real reconnects."""
+        """Request an initial snapshot and keep live counters on the same cadence."""
         self._snapshot_requester = requester
+        self.set_snapshot_interval(interval_sec)
         self._schedule_snapshot_request()
+        self._ensure_periodic_snapshot()
+
+    def set_snapshot_interval(self, interval_sec: float) -> None:
+        """Update the independent Local MQTT request cadence."""
+        self._snapshot_interval_sec = max(1.0, interval_sec)
+
+    def _ensure_periodic_snapshot(self) -> None:
+        """Start one entry-owned periodic requester while connected."""
+        if (
+            self._stopping
+            or not self._connected
+            or self._snapshot_requester is None
+            or (
+                self._periodic_snapshot_task is not None
+                and not self._periodic_snapshot_task.done()
+            )
+        ):
+            return
+        self._periodic_snapshot_task = self._create_background_task(
+            self._async_request_snapshots_periodically(),
+            name="jackery_local_mqtt_periodic_snapshot",
+        )
+
+    async def _async_request_snapshots_periodically(self) -> None:
+        """Request fresh official-protocol counters independently of HTTP."""
+        try:
+            while self._connected and not self._stopping:
+                await asyncio.sleep(self._snapshot_interval_sec)
+                if self._connected and not self._stopping:
+                    self._schedule_snapshot_request()
+        finally:
+            if self._periodic_snapshot_task is asyncio.current_task():
+                self._periodic_snapshot_task = None
 
     def _schedule_snapshot_request(self) -> None:
-        """Schedule one coalesced snapshot without a recurring timer."""
+        """Schedule one coalesced snapshot request."""
         if self._stopping or not self._connected or self._snapshot_requester is None:
             return
         if self._snapshot_task is not None and not self._snapshot_task.done():
             self._snapshot_request_pending = True
             return
         self._snapshot_request_pending = False
-        self._snapshot_task = self._hass.async_create_background_task(
+        self._snapshot_task = self._create_background_task(
             self._async_request_snapshot(),
             name="jackery_local_mqtt_snapshot_request",
-            eager_start=False,
         )
 
     async def _async_request_snapshot(self) -> None:
@@ -742,12 +756,16 @@ class JackeryLocalMqttClient:
         qos: MqttQos = 0,
         retain: bool = False,
     ) -> None:
-        """Publish one JSON request through Home Assistant's MQTT connection."""
+        """Publish one JSON request through the configured local broker."""
         text = json.dumps(payload, separators=(",", ":"))
         echo_record = self._register_self_publish_echo(topic, text.encode())
+        client = self._client
+        if client is None or not self._connected:
+            self._discard_self_publish_echo(echo_record)
+            self._publish_errors += 1
+            raise LocalMqttNotConnectedError
         try:
-            await mqtt.async_publish(
-                self._hass,
+            await client.publish(
                 topic,
                 text,
                 qos=qos,
@@ -811,42 +829,31 @@ class JackeryLocalMqttClient:
             if redact
             else list(self._topics_seen)
         )
-        subscribed_topics = {topic for topic, _unsubscribe in self._topic_unsubscribes}
-        plural_default_topic = LOCAL_MQTT_DEFAULT_TOPIC.replace(
-            "/device/",
-            "/devices/",
-        )
-        singular_subscription_active = any(
-            self._topic_filter_covers(topic, LOCAL_MQTT_DEFAULT_TOPIC)
-            for topic in subscribed_topics
-        )
-        plural_subscription_active = any(
-            self._topic_filter_covers(topic, plural_default_topic)
-            for topic in subscribed_topics
-        )
         return {
             "enabled": True,
-            "transport": "homeassistant.components.mqtt",
-            "library": "homeassistant.components.mqtt",
-            "mqtt_integration_available": self._mqtt_integration_available,
+            "transport": "direct_mqtt",
+            "library": "aiomqtt",
+            "configured_target": {
+                "host": REDACTED_VALUE if redact else self._host,
+                "port": self._port,
+            },
             "subscribed": self.is_started,
             "connected": self._connected,
-            # Compatibility alias consumed by the coordinator diagnostic
-            # entity. Both describe the HA-owned broker connection.
+            # Compatibility alias consumed by the coordinator diagnostic entity.
             "broker_connected": self._connected,
             "started": self.is_started,
-            "subscription_retry_active": self._retry_task is not None,
-            "subscription_filter_count": len(self._topic_unsubscribes),
-            "official_subscription_active": (
-                singular_subscription_active and plural_subscription_active
+            "reconnect_supervisor_active": bool(
+                self._runner_task is not None and not self._runner_task.done()
             ),
-            "official_singular_subscription_active": singular_subscription_active,
-            "official_plural_subscription_active": plural_subscription_active,
+            "subscription_retry_active": self.is_started and not self._connected,
+            "subscription_filter_count": len(self._subscribed_topics),
             "snapshot_requester_installed": self._snapshot_requester is not None,
-            # Kept as an explicit compatibility diagnostic: recurring writes
-            # are intentionally disabled. ``snapshot_request_active`` is the
-            # only adapter-owned outbound request state.
-            "periodic_requests_active": False,
+            # The direct broker requester follows the configured coordinator
+            # cadence; the one-shot flag remains separate for diagnostics.
+            "periodic_requests_active": bool(
+                self._periodic_snapshot_task is not None
+                and not self._periodic_snapshot_task.done()
+            ),
             "snapshot_request_active": self._snapshot_task is not None,
             "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
             "qos": self._qos,
@@ -890,22 +897,30 @@ class JackeryLocalMqttClient:
         }
 
     def matches_configuration(
-        self, topic_filters: tuple[str, ...], qos: MqttQos | None = None
+        self,
+        settings: LocalMqttConnectionSettings | None = None,
+        **connection_options: Unpack[_LocalMqttConnectionOptions],
     ) -> bool:
-        """Whether the adapter already owns exactly this subscription."""
-        return topic_filters == (self._topic_filter,) and (
-            qos is None or qos == self._qos
+        """Whether the client already owns exactly this broker configuration."""
+        settings = _connection_settings(settings, connection_options)
+        return (
+            settings.host == self._host
+            and settings.port == self._port
+            and settings.username == self._username
+            and settings.password == self._password
+            and settings.topic_filter == self._topic_filter
+            and settings.qos == self._qos
         )
 
     @property
     def is_connected(self) -> bool:
-        """Whether Home Assistant's shared broker is connected."""
+        """Whether the configured local broker is connected."""
         return self._connected
 
     @property
     def is_started(self) -> bool:
-        """Whether the HA MQTT subscription is registered."""
-        return self._subscription_active
+        """Whether the reconnect supervisor is running."""
+        return self._runner_task is not None and not self._runner_task.done()
 
     @staticmethod
     def _utc_now_iso() -> str:
@@ -916,7 +931,7 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant, entry: Any
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """Return the local MQTT adapter stored for a config entry."""
     coordinator = getattr(entry, "runtime_data", None)
