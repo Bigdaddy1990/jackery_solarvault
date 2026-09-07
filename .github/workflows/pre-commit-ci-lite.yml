@@ -49,7 +49,7 @@ jobs:
           #enable-cache: true
           #ignore-nothing-to-cache: true
 
-      - uses: astral-sh/ruff-action@v4.0.0
+      - uses: astral-sh/ruff-action@v4.1.0
       - run: ruff check . --fix
       - run: ruff format .
       - run: ruff check . --fix --preview --unsafe-fixes --target-version py314 || true
