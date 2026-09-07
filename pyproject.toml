@@ -38,7 +38,7 @@ dependencies = [
     "ruff>=0.16.6",
     "mypy>=2.3.0",
     "uv>=0.5.1",
-    "ty<=0.0.77",
+    "ty<=0.0.78",
 ]
 
 [project.urls]

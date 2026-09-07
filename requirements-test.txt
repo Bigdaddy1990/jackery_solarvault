@@ -35,7 +35,7 @@ python_discovery>=1.6.0
 pyyaml
 ruff>=0.16.6
 smellcheck>=0.3.10
-ty<=0.0.77
+ty<=0.0.78
 types-aiofiles>=25.1.0.20260518
 types-atomicwrites>=1.4.5.1
 types-caldav>=1.3.0.20250516
