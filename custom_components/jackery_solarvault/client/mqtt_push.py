@@ -1421,6 +1421,7 @@ class JackeryMqttPushClient:
         future = asyncio.get_running_loop().create_future()
         self._pending_responses[key] = future
         try:
+            # pyrefly: ignore [no-any-return-explicit]
             return await asyncio.wait_for(future, timeout=timeout_sec)
         except TimeoutError:
             self._responses_expired += 1

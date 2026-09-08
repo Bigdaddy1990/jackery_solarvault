@@ -303,7 +303,7 @@ def _source_priority_coordinator() -> JackerySolarVaultCoordinator:
     _set_test_attr(coordinator, "_live_property_received_monotonic", {})
     _set_test_attr(coordinator, "_live_ct_received_monotonic", {})
     coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
@@ -382,6 +382,7 @@ def _command_coordinator() -> JackerySolarVaultCoordinator:
         "_record_independent_cloud_mqtt_result",
         MagicMock(),
     )
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

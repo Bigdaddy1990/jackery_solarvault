@@ -59,6 +59,7 @@ def _coordinator(
     obj.last_update_exception = None
     obj.api = MagicMock()
     obj.async_request_refresh = AsyncMock()
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

@@ -347,47 +347,65 @@ async def _set_portable_discharge_memory(
 
 SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="eps_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="eps_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_SW_EPS,),
         setter_fn=_set_eps,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="auto_standby_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="auto_standby_set",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_IS_AUTO_STANDBY,),
         use_task_plan_fallback=True,
         setter_fn=_set_auto_standby,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="standby",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="standby",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_AUTO_STANDBY,),
         is_on_transform=_standby_is_on,
         setter_fn=_set_standby,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="follow_meter",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="follow_meter",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_IS_FOLLOW_METER_PW, FIELD_FOLLOW_METER),
         use_task_plan_fallback=True,
         setter_fn=_set_follow_meter,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="off_grid_shutdown",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="off_grid_shutdown",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_OFF_GRID_DOWN,),
         use_task_plan_fallback=True,
         setter_fn=_set_off_grid_shutdown,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="storm_warning",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="storm_warning",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         device_registry_role="system",
         source_keys=(FIELD_WPS,),
@@ -396,8 +414,11 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         setter_fn=_set_storm_warning,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="third_party_mqtt_enable",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="third_party_mqtt_enable",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_THIRD_PARTY_MQTT_ENABLE,),
         source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
@@ -405,64 +426,91 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
     ),
     # --- Portable / Explorer powerstation switches ---
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("odc",),
         setter_fn=_set_portable_dc_output,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_usb_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_usb_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("odcu",),
         setter_fn=_set_portable_dc_usb_output,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_car_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_car_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("odcc",),
         setter_fn=_set_portable_dc_car_output,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("oac",),
         setter_fn=_set_portable_ac_output,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac240_output",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac240_output",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("oac2",),
         setter_fn=_set_portable_ac240_output,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_light",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_light",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("lm",),
         setter_fn=_set_portable_light,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_super_charge",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_super_charge",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("sfc",),
         setter_fn=_set_portable_super_charge,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_output_priority_switch",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_output_priority_switch",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("outPrio",),
         setter_fn=_set_portable_output_priority_switch,
     ),
     JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_discharge_memory",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_discharge_memory",
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("dhg_recall",),
         setter_fn=_set_portable_discharge_memory,

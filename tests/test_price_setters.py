@@ -101,7 +101,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         raise AssertionError("rejected writer must not patch local price data")  # ruff: ignore[raise-vanilla-args]
 
     obj._push_partial_update = _fail_push  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 async def test_single_price_rejects_false_api_response() -> None:

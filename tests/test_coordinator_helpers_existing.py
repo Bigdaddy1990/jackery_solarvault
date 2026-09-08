@@ -171,6 +171,7 @@ class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  
         base = [{"deviceSn": "p1", "soc": 50}]
         updates = [{"deviceSn": "p1", "soc": 60}]
         result = _merge_identified_dict_lists(base, updates)
+        # pyrefly: ignore [unsupported-operation]
         assert result[0]["soc"] == 60  # ruff: ignore[magic-value-comparison]  # isort: skip
 
     def test_merge_present_dict_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
@@ -190,6 +191,7 @@ class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  
 
     def test_find_dict_with_any_key(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test find_dict_with_any_key."""
+        # pyrefly: ignore [bad-argument-type]
         result = find_dict_with_any_key(None, {"deviceSn"})
         assert result is None
 

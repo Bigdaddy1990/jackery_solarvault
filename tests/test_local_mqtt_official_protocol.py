@@ -35,7 +35,7 @@ def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 @pytest.mark.asyncio()

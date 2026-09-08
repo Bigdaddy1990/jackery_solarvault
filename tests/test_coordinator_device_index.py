@@ -41,6 +41,7 @@ def _coordinator(
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._device_index = index or {}  # ruff: ignore[private-member-access]
     cast("Any", coordinator).data = data or {}
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

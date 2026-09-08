@@ -52,40 +52,41 @@ def test_payload_family_detection_uses_positive_protocol_evidence(
 ) -> None:
     """Home evidence wins; only legacy-bind metadata identifies portable payloads."""
     assert (
-        sensor_module._payload_has_home_payload_evidence(payload, props)
+        # pyrefly: ignore [missing-attribute]
+        sensor_module._payload_has_home_payload_evidence(payload, props)  # ruff: ignore[private-member-access]
         is expected_home
     )
-    assert sensor_module._is_portable_payload(payload, props) is expected_portable
+    assert sensor_module._is_portable_payload(payload, props) is expected_portable  # ruff: ignore[private-member-access]
 
 
 def test_payload_value_helpers_cover_invalid_and_fallback_shapes() -> None:
     """Getter helpers preserve zeros and reject malformed intermediate containers."""
-    path = sensor_module._path
-    assert path({"outer": {"value": 3}}, "outer", "value") == 3
+    path = sensor_module._path  # ruff: ignore[private-member-access]
+    assert path({"outer": {"value": 3}}, "outer", "value") == 3  # ruff: ignore[magic-value-comparison]
     assert path({"outer": 3}, "outer", "value") is None
 
-    divide = sensor_module._div(10)
+    divide = sensor_module._div(10)  # ruff: ignore[private-member-access]
     assert divide("12.34") == pytest.approx(1.23)
     assert divide(None) is None
-    assert sensor_module._signed_diff("12", 7) == 5
-    assert sensor_module._signed_diff("bad", 7) is None
-    assert sensor_module._flag_int(True) == 1
-    assert sensor_module._flag_int("2") == 2
-    assert sensor_module._system_meta_scalar_value(False) is None
-    assert sensor_module._system_meta_scalar_value("  ") is None
-    assert sensor_module._system_meta_scalar_value(20) == "20"
-    assert sensor_module._temp_unit_label("1") == "F"
-    assert sensor_module._temp_unit_label(0) == "C"
-    assert sensor_module._temp_unit_label("invalid") is None
+    assert sensor_module._signed_diff("12", 7) == 5  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert sensor_module._signed_diff("bad", 7) is None  # ruff: ignore[private-member-access]
+    assert sensor_module._flag_int(True) == 1  # ruff: ignore[private-member-access]
+    assert sensor_module._flag_int("2") == 2  # ruff: ignore[magic-value-comparison, private-member-access]
+    assert sensor_module._system_meta_scalar_value(False) is None  # ruff: ignore[private-member-access]
+    assert sensor_module._system_meta_scalar_value("  ") is None  # ruff: ignore[private-member-access]
+    assert sensor_module._system_meta_scalar_value(20) == "20"  # ruff: ignore[private-member-access]
+    assert sensor_module._temp_unit_label("1") == "F"  # ruff: ignore[private-member-access]
+    assert sensor_module._temp_unit_label(0) == "C"  # ruff: ignore[private-member-access]
+    assert sensor_module._temp_unit_label("invalid") is None  # ruff: ignore[private-member-access]
 
 
 def test_storm_plan_helpers_accept_all_documented_payload_variants() -> None:
     """Lead time may arrive at the root, in a storm row, or as switch-only state."""
-    from_plan = sensor_module._storm_minutes_from_plan
-    fallback = sensor_module._storm_minutes_fallback
+    from_plan = sensor_module._storm_minutes_from_plan  # ruff: ignore[private-member-access]
+    fallback = sensor_module._storm_minutes_fallback  # ruff: ignore[private-member-access]
 
-    assert from_plan({"wpc": "45"}) == 45
-    assert from_plan({"storm": [None, {"minsInterval": 30}]}) == 30
+    assert from_plan({"wpc": "45"}) == 45  # ruff: ignore[magic-value-comparison]
+    assert from_plan({"storm": [None, {"minsInterval": 30}]}) == 30  # ruff: ignore[magic-value-comparison]
     assert from_plan({"storm": [{"wpc": 0}]}) is None
     assert fallback({"wps": "invalid"}, {}, {}) is None
     assert fallback({"wps": 1}, {}, {}) == sensor_module.DEFAULT_STORM_WARNING_MINUTES
@@ -99,44 +100,50 @@ def test_storm_plan_helpers_accept_all_documented_payload_variants() -> None:
 
 def test_getter_factories_preserve_metadata_and_source_semantics() -> None:
     """Generated getters expose their App fields and avoid truthiness data loss."""
-    prop_any = sensor_module._prop_any("first", "second")
+    prop_any = sensor_module._prop_any("first", "second")  # ruff: ignore[private-member-access]
     assert prop_any({"first": 0, "second": 2}) == 0
-    assert prop_any({"first": None, "second": 2}) == 2
+    assert prop_any({"first": None, "second": 2}) == 2  # ruff: ignore[magic-value-comparison]
     assert cast("Any", prop_any).app_fields == ("first", "second")
 
-    power_any = sensor_module._prop_power_any("first", "second")
+    power_any = sensor_module._prop_power_any("first", "second")  # ruff: ignore[private-member-access]
     assert power_any({"first": "bad", "second": 0}) == 0
     assert power_any({"first": 0, "second": "4.5"}) == pytest.approx(4.5)
     assert power_any({}) is None
 
-    section_field = sensor_module._payload_section_field("section", "value")
+    section_field = sensor_module._payload_section_field("section", "value")  # ruff: ignore[private-member-access]
     assert section_field({"section": {"value": 0}}) == 0
     assert section_field({"section": []}) is None
 
-    list_count = sensor_module._payload_section_first_list_count(
+    list_count = sensor_module._payload_section_first_list_count(  # ruff: ignore[private-member-access]
         "section", "primary", "fallback"
     )
-    assert list_count({"section": {"primary": "bad", "fallback": [1, 2]}}) == 2
+    assert list_count({"section": {"primary": "bad", "fallback": [1, 2]}}) == 2  # ruff: ignore[magic-value-comparison]
     assert list_count({"section": []}) is None
     assert list_count({"section": {}}) is None
 
-    http_prop = sensor_module._payload_http_prop("power")
+    http_prop = sensor_module._payload_http_prop("power")  # ruff: ignore[private-member-access]
     assert http_prop({"http_properties": {"power": 0}}) == 0
     assert http_prop({"http_properties": []}) is None
 
-    pv_power = sensor_module._pv_channel_power("pv1")
-    assert pv_power({"pv1": {"pvPw": 123}}) == 123
+    pv_power = sensor_module._pv_channel_power("pv1")  # ruff: ignore[private-member-access]
+    assert pv_power({"pv1": {"pvPw": 123}}) == 123  # ruff: ignore[magic-value-comparison]
     assert pv_power({"pv1": []}) is None
 
 
 def test_description_metadata_uses_getter_then_smali_and_explicit_sources() -> None:
     """Description provenance follows the getter, then the Smali field fallback."""
-    getter = sensor_module._prop("soc")
+    # pyrefly: ignore [missing-attribute]
+    getter = sensor_module._prop("soc")  # ruff: ignore[private-member-access]
+    # pyrefly: ignore [unexpected-keyword]
     from_getter = sensor_module.JackerySensorDescription(key="getter", getter=getter)
     from_smali = sensor_module.JackerySensorDescription(
-        key="smali", getter=lambda _props: None, smali_field="legacyField"
+        # pyrefly: ignore [unexpected-keyword]
+        key="smali",
+        getter=lambda _props: None,
+        smali_field="legacyField",
     )
     explicit = sensor_module.JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="explicit",
         getter=getter,
         app_fields=("chosen",),
@@ -208,7 +215,7 @@ def test_total_increasing_jitter_guard_preserves_only_tiny_regressions(
 ) -> None:
     """Lifetime totals hold regressions, while ordinary measurements pass."""
     assert (
-        sensor_module._guard_total_increasing_jitter(previous, current, description)
+        sensor_module._guard_total_increasing_jitter(previous, current, description)  # ruff: ignore[private-member-access]
         == expected
     )
 
@@ -237,7 +244,7 @@ async def test_restored_lifetime_energy_rejects_invalid_recorder_state(
     """Only finite, non-negative lifetime values in a compatible unit restore."""
     entity = SimpleNamespace(async_get_last_sensor_data=AsyncMock(return_value=stored))
 
-    result = await sensor_module._async_restored_lifetime_energy_value(
+    result = await sensor_module._async_restored_lifetime_energy_value(  # ruff: ignore[private-member-access]
         cast("Any", entity), "kWh"
     )
 
@@ -247,8 +254,10 @@ async def test_restored_lifetime_energy_rejects_invalid_recorder_state(
 def test_jackery_sensor_value_mapping_and_source_attributes() -> None:
     """Fallbacks, value maps, and live-over-HTTP diagnostics share one payload view."""
     description = sensor_module.JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="mode",
-        getter=sensor_module._prop("mode"),
+        # pyrefly: ignore [missing-attribute]
+        getter=sensor_module._prop("mode"),  # ruff: ignore[private-member-access]
         fallbacks=(lambda payload: payload.get("fallback"),),
         value_map={2: "self_consumption"},
     )
@@ -272,9 +281,10 @@ def test_jackery_sensor_value_mapping_and_source_attributes() -> None:
     coordinator.data["dev-1"] = {
         PAYLOAD_PROPERTIES: {},
         "http_properties": {},
+        # pyrefly: ignore [bad-assignment]
         "fallback": 3,
     }
-    assert sensor.native_value == 3
+    assert sensor.native_value == 3  # ruff: ignore[magic-value-comparison]
     assert sensor.extra_state_attributes == {
         "merged_raw_value": None,
         "http_raw_value": None,
@@ -294,12 +304,12 @@ def test_battery_stack_source_reports_resolved_live_properties() -> None:
     coordinator.last_update_success = True
     sensor = sensor_module.JackeryBatteryStackNetPowerSensor(coordinator, "dev-1")
 
-    assert sensor.native_value == 8
+    assert sensor.native_value == 8  # ruff: ignore[magic-value-comparison]
     assert sensor.extra_state_attributes["source"] == (
         "coordinator_resolved_main_device_stack_bus"
     )
-    assert sensor.extra_state_attributes["http_stackOutPw"] == 4
-    assert sensor.extra_state_attributes["battery_pack_outPw_sum"] == 21
+    assert sensor.extra_state_attributes["http_stackOutPw"] == 4  # ruff: ignore[magic-value-comparison]
+    assert sensor.extra_state_attributes["battery_pack_outPw_sum"] == 21  # ruff: ignore[magic-value-comparison]
 
 
 async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> None:
@@ -309,7 +319,7 @@ async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> No
     coordinator.last_update_success = True
     listeners: list[Any] = []
 
-    def _listen(callback: Any) -> Any:
+    def _listen(callback: Any) -> Any:  # ruff: ignore[any-type]
         listeners.append(callback)
         return lambda: None
 
@@ -334,5 +344,5 @@ async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> No
 
     coordinator.data["dev-1"][PAYLOAD_DYNAMIC_PRICE] = {FIELD_IS_CONTRACT_AUTH: True}
     listeners[0]()
-    assert len(batches) == 2
+    assert len(batches) == 2  # ruff: ignore[magic-value-comparison]
     assert any("dynamic" in (entity.unique_id or "") for entity in batches[1])

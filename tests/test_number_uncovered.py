@@ -9,12 +9,12 @@ from custom_components.jackery_solarvault.entity import HTTP_COMMAND_SOURCES
 from custom_components.jackery_solarvault.number import (
     JackeryNumber,
     JackeryNumberDescription,
-    _max_feed_grid_allowed_values,
-    _max_feed_grid_dynamic_max,
-    _rounded_int,
-    _single_tariff_dynamic_unit,
-    _wire_float,
-    _wire_int,
+    _max_feed_grid_allowed_values,  # ruff: ignore[import-private-name]
+    _max_feed_grid_dynamic_max,  # ruff: ignore[import-private-name]
+    _rounded_int,  # ruff: ignore[import-private-name]
+    _single_tariff_dynamic_unit,  # ruff: ignore[import-private-name]
+    _wire_float,  # ruff: ignore[import-private-name]
+    _wire_int,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
 from homeassistant.components.number import NumberDeviceClass, NumberMode
@@ -27,22 +27,22 @@ class TestRoundedInt:
 
     def test_int_returns_int(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns integer."""
-        assert _rounded_int(5) == 5
+        assert _rounded_int(5) == 5  # ruff: ignore[magic-value-comparison]
 
     def test_float_rounds(self) -> None:  # ruff: ignore[no-self-use]
         """Test float input rounds to nearest int."""
-        assert _rounded_int(5.4) == 5
-        assert _rounded_int(5.5) == 6
-        assert _rounded_int(5.6) == 6
+        assert _rounded_int(5.4) == 5  # ruff: ignore[magic-value-comparison]
+        assert _rounded_int(5.5) == 6  # ruff: ignore[magic-value-comparison]
+        assert _rounded_int(5.6) == 6  # ruff: ignore[magic-value-comparison]
 
     def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
-        assert _rounded_int("5") == 5
-        assert _rounded_int("5.5") == 6
+        assert _rounded_int("5") == 5  # ruff: ignore[magic-value-comparison]
+        assert _rounded_int("5.5") == 6  # ruff: ignore[magic-value-comparison]
 
     def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import HomeAssistantError  # ruff: ignore[import-outside-top-level]
 
         with pytest.raises(HomeAssistantError, match="invalid number value"):
             _rounded_int("invalid")
@@ -53,15 +53,15 @@ class TestWireInt:
 
     def test_int_returns_int(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns integer."""
-        assert _wire_int(5) == 5
+        assert _wire_int(5) == 5  # ruff: ignore[magic-value-comparison]
 
     def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
-        assert _wire_int("5") == 5
+        assert _wire_int("5") == 5  # ruff: ignore[magic-value-comparison]
 
     def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import HomeAssistantError  # ruff: ignore[import-outside-top-level]
 
         with pytest.raises(HomeAssistantError, match="invalid number value"):
             _wire_int("invalid")
@@ -72,19 +72,19 @@ class TestWireFloat:
 
     def test_float_returns_float(self) -> None:  # ruff: ignore[no-self-use]
         """Test float input returns float."""
-        assert _wire_float(5.5) == 5.5  # ruff: ignore[float-equality-comparison]
+        assert _wire_float(5.5) == 5.5  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_int_returns_float(self) -> None:  # ruff: ignore[no-self-use]
         """Test integer input returns float."""
-        assert _wire_float(5) == 5.0  # ruff: ignore[float-equality-comparison]
+        assert _wire_float(5) == 5.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_string_number(self) -> None:  # ruff: ignore[no-self-use]
         """Test string number input."""
-        assert _wire_float("5.5") == 5.5  # ruff: ignore[float-equality-comparison]
+        assert _wire_float("5.5") == 5.5  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_invalid_raises(self) -> None:  # ruff: ignore[no-self-use]
         """Test invalid input raises HomeAssistantError."""
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import HomeAssistantError  # ruff: ignore[import-outside-top-level]
 
         with pytest.raises(HomeAssistantError, match="invalid number value"):
             _wire_float("invalid")
@@ -96,29 +96,29 @@ class TestMaxFeedGridDynamicMax:
     def test_feed_limit_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test feed limit over 800 returns 2500."""
         payload = {"properties": {"maxFeedGrid": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_max_grid_std_pw_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test maxGridStdPw over 800 returns 2500."""
         payload = {"properties": {"maxGridStdPw": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_max_out_pw_over_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test maxOutPw over 800 returns 2500."""
         payload = {"properties": {"maxOutPw": 1000}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_all_under_800(self) -> None:  # ruff: ignore[no-self-use]
         """Test all values under 800 returns 800."""
         payload = {
             "properties": {"maxFeedGrid": 600, "maxGridStdPw": 600, "maxOutPw": 600}
         }
-        assert _max_feed_grid_dynamic_max(payload) == 800.0  # ruff: ignore[float-equality-comparison]
+        assert _max_feed_grid_dynamic_max(payload) == 800.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_missing_values_defaults(self) -> None:  # ruff: ignore[no-self-use]
         """Test missing values use defaults."""
         payload = {"properties": {}}
-        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]
+        assert _max_feed_grid_dynamic_max(payload) == 2500.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
 
 class TestMaxFeedGridAllowedValues:
@@ -128,7 +128,7 @@ class TestMaxFeedGridAllowedValues:
         """Test dynamic max under 800 returns single value."""
         payload = {
             "properties": {"maxFeedGrid": 600, "maxGridStdPw": 600, "maxOutPw": 600}
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         assert _max_feed_grid_allowed_values(payload) == (800.0,)
 
     def test_over_800_returns_both(self) -> None:  # ruff: ignore[no-self-use]
@@ -169,7 +169,7 @@ class TestSingleTariffDynamicUnit:
 class TestJackeryNumber:
     """Test JackeryNumber class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -187,7 +187,7 @@ class TestJackeryNumber:
         coordinator.async_portable_set_custom_use_battery = AsyncMock()
         return coordinator
 
-    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # ruff: ignore[no-self-use]
+    def _create_number(self, coordinator, key="soc_charge_limit_set"):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
         """Create a number instance for testing."""
         description = JackeryNumberDescription(
             key=key,
@@ -218,7 +218,7 @@ class TestJackeryNumber:
             "test_device": {"properties": {"socChgLimit": 80}}
         })
         sensor = self._create_number(coordinator)
-        assert sensor.native_value == 80.0  # ruff: ignore[float-equality-comparison]
+        assert sensor.native_value == 80.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_native_value_none_when_missing(self) -> None:
         """Test native_value property when key is missing."""
@@ -232,23 +232,33 @@ class TestJackeryNumber:
             "test_device": {"properties": {"maxFeedGrid": 1000}}
         })
         description = JackeryNumberDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="max_feed_grid",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="max_feed_grid",
+            # pyrefly: ignore [unexpected-keyword]
             device_class=NumberDeviceClass.POWER,
+            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement=UnitOfPower.WATT,
+            # pyrefly: ignore [unexpected-keyword]
             mode=NumberMode.SLIDER,
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
+            # pyrefly: ignore [unexpected-keyword]
             native_min_value=800,
+            # pyrefly: ignore [unexpected-keyword]
             native_max_value=2500,
+            # pyrefly: ignore [unexpected-keyword]
             native_step=1700,
             source_keys=("maxFeedGrid", "maxGridStdPw"),
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
             dynamic_max=_max_feed_grid_dynamic_max,
         )
         sensor = JackeryNumber(
             coordinator=coordinator, device_id="test_device", description=description
         )
-        assert sensor.native_max_value == 2500.0  # ruff: ignore[float-equality-comparison]
+        assert sensor.native_max_value == 2500.0  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     def test_native_unit_of_measurement_dynamic(self) -> None:
         """Test native_unit_of_measurement property with dynamic unit."""
@@ -256,15 +266,23 @@ class TestJackeryNumber:
             "test_device": {"price": {"singleCurrency": "$"}}
         })
         description = JackeryNumberDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="single_tariff_price_set",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="single_tariff_price_set",
+            # pyrefly: ignore [unexpected-keyword]
             mode=NumberMode.BOX,
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
+            # pyrefly: ignore [unexpected-keyword]
             native_min_value=0,
+            # pyrefly: ignore [unexpected-keyword]
             native_max_value=10,
+            # pyrefly: ignore [unexpected-keyword]
             native_step=0.01,
             source_keys=("singlePrice",),
             source_section=PAYLOAD_PRICE,
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
             command_sources=HTTP_COMMAND_SOURCES,
             device_registry_role="system",
@@ -282,13 +300,21 @@ class TestJackeryNumber:
         coordinator = self._create_coordinator()
         mock_setter = AsyncMock()
         description = JackeryNumberDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="soc_charge_limit_set",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="soc_charge_limit_set",
+            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement=PERCENTAGE,
+            # pyrefly: ignore [unexpected-keyword]
             mode=NumberMode.SLIDER,
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
+            # pyrefly: ignore [unexpected-keyword]
             native_min_value=0,
+            # pyrefly: ignore [unexpected-keyword]
             native_max_value=100,
+            # pyrefly: ignore [unexpected-keyword]
             native_step=1,
             source_keys=("socChgLimit", "socChargeLimit"),
             setter=mock_setter,
@@ -303,7 +329,7 @@ class TestJackeryNumber:
     @pytest.mark.asyncio()
     async def test_async_set_native_value_invalid_range(self) -> None:
         """Test async_set_native_value with invalid range."""
-        from homeassistant.exceptions import HomeAssistantError
+        from homeassistant.exceptions import HomeAssistantError  # ruff: ignore[import-outside-top-level]
 
         coordinator = self._create_coordinator()
         sensor = self._create_number(coordinator)

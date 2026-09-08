@@ -23,7 +23,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
 
     def test_ble_aes_iv_len_constant(self) -> None:  # ruff: ignore[no-self-use]
         """Test BLE_AES_IV_LEN constant value."""
-        assert BLE_AES_IV_LEN == 16
+        assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]
 
     def test_encode_decode_basic(self) -> None:
         """Test basic encode/decode roundtrip."""
@@ -76,7 +76,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         """Test token generation format."""
         for _ in range(100):
             token = generate_third_party_mqtt_token()
-            assert len(token) == 9
+            assert len(token) == 9  # ruff: ignore[magic-value-comparison]
             assert token.isdigit()
 
     def test_generate_token_uniqueness(self) -> None:  # ruff: ignore[no-self-use]
@@ -86,7 +86,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
             token = generate_third_party_mqtt_token()
             tokens.add(token)
         # Should have very high uniqueness
-        assert len(tokens) > 950
+        assert len(tokens) > 950  # ruff: ignore[magic-value-comparison]
 
     def test_stable_token_user_provided_valid(self) -> None:  # ruff: ignore[no-self-use]
         """Test stable_third_party_mqtt_token with user token."""
@@ -111,7 +111,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         result_token, use_generated, new_generated = stable_third_party_mqtt_token(
             None, None
         )
-        assert len(result_token) == 9
+        assert len(result_token) == 9  # ruff: ignore[magic-value-comparison]
         assert result_token.isdigit()
         assert use_generated is True
         assert new_generated == result_token
@@ -131,10 +131,10 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         generated_token = "123456789"
         config = third_party_mqtt_config_from_options(options, generated_token)
         assert config["enable"] == 0
-        assert config["ip"] == ""
-        assert config["port"] == 1883
-        assert config["userName"] == ""
-        assert config["password"] == ""
+        assert config["ip"] == ""  # ruff: ignore[compare-to-empty-string]
+        assert config["port"] == 1883  # ruff: ignore[magic-value-comparison]
+        assert config["userName"] == ""  # ruff: ignore[compare-to-empty-string]
+        assert config["password"] == ""  # ruff: ignore[compare-to-empty-string]
         assert config["token"] == "123456789"
 
     def test_config_from_options_custom_values(self) -> None:  # ruff: ignore[no-self-use]
@@ -151,7 +151,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         config = third_party_mqtt_config_from_options(options, generated_token)
         assert config["enable"] == 1
         assert config["ip"] == "192.168.1.100"
-        assert config["port"] == 8883
+        assert config["port"] == 8883  # ruff: ignore[magic-value-comparison]
         assert config["userName"] == "user"
         assert config["password"] == "pass"
         assert config["token"] == "123456789"
@@ -171,7 +171,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         result = third_party_mqtt_config_plaintext(options, generated_token, None)
         assert result["enable"] == 1
         assert result["ip"] == "192.168.1.100"
-        assert result["port"] == 8883
+        assert result["port"] == 8883  # ruff: ignore[magic-value-comparison]
         assert result["userName"] == "user"
         assert result["password"] == "pass"
         assert result["token"] == "123456789"
@@ -197,7 +197,7 @@ class TestThirdPartyMqttCodec:  # ruff: ignore[too-many-public-methods]
         )
         assert result["enable"] == 0  # Device overwrites
         assert result["ip"] == "10.0.0.1"  # Device overwrites
-        assert result["port"] == 8883
+        assert result["port"] == 8883  # ruff: ignore[magic-value-comparison]
 
     def test_decode_config_body_missing_bluetooth_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test decode_config_body with missing bluetooth key."""

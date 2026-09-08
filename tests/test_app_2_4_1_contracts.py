@@ -50,6 +50,7 @@ class TestApp241Endpoints:
 
         # Verify the EXACT path constant is used
         get_json.assert_awaited_once()
+        # pyrefly: ignore [missing-attribute]
         called_path = get_json.await_args.args[0]
         assert called_path == PV_TRENDS_PATH, (
             f"PV trends endpoint mismatch: expected {PV_TRENDS_PATH!r}, "
@@ -67,6 +68,7 @@ class TestApp241Endpoints:
             await api.async_get_dynamic_price(system_id=12345)
 
         get_json.assert_awaited_once()
+        # pyrefly: ignore [missing-attribute]
         called_path = get_json.await_args.args[0]
         assert called_path == DYNAMIC_PRICE_PATH, (
             f"Dynamic price endpoint mismatch: expected {DYNAMIC_PRICE_PATH!r}, "
@@ -84,6 +86,7 @@ class TestApp241Endpoints:
             await api.async_get_portable_ct_stat(device_id=98765)
 
         get_json.assert_awaited_once()
+        # pyrefly: ignore [missing-attribute]
         called_params = get_json.await_args.kwargs.get("params", {})
         assert APP_REQUEST_STAT_TYPE in called_params, (
             f"Missing {APP_REQUEST_STAT_TYPE} parameter. App 2.4.1 CtStatChartVM "

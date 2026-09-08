@@ -243,6 +243,7 @@ def _coordinator(
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]  # behavior test uses private queue API and hand-checked expected values
     coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]  # behavior test uses private queue API and hand-checked expected values
     coordinator.data = {}
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -503,8 +504,9 @@ async def test_complete_period_pass_precedes_complete_day_pass() -> None:
         await asyncio.sleep(0)
         return {"requests": 180, "actionable_sources": 0}
 
+    # pyrefly: ignore [bad-assignment]
     coordinator._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
-    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
+    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]  # pyrefly: ignore [bad-assignment]
 
     await coordinator._async_advance_statistics_backfill({_DEV: {}})  # ruff: ignore[private-member-access]
 
@@ -633,6 +635,7 @@ async def test_backfill_completes_each_device_without_budget_slices() -> None:
         active -= 1
         return {"requests": 100, "actionable_sources": 0}
 
+    # pyrefly: ignore [bad-assignment]
     coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
     coordinator._async_http_backfill_period_statistics = AsyncMock(  # ruff: ignore[private-member-access]
         return_value={"requests": 0, "actionable_sources": 0},

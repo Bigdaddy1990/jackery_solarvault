@@ -593,6 +593,7 @@ class JackeryBleListener:
             if callable(stop_notify):
                 try:
                     await asyncio.wait_for(
+                        # pyrefly: ignore [bad-argument-type]
                         stop_notify(ble.BLE_NOTIFY_CHAR_UUID),
                         timeout=5.0,
                     )

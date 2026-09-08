@@ -236,7 +236,9 @@ async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # ruff: 
     # Verify API is hydrated
     assert api.mqtt_session_snapshot() is not None
     snapshot = api.mqtt_session_snapshot()
+    # pyrefly: ignore [unsupported-operation]
     assert snapshot[MQTT_SESSION_USER_ID] == "user123"
+    # pyrefly: ignore [unsupported-operation]
     assert snapshot[MQTT_SESSION_MAC_ID] == "mac456"
 
     # Verify credentials can be derived

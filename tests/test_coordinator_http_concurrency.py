@@ -14,7 +14,7 @@ from custom_components.jackery_solarvault.coordinator import (
 def _coordinator(limit: int = 2) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator)._http_request_semaphore = asyncio.Semaphore(limit)  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 async def test_http_calls_are_keyed_and_bounded_with_partial_failure() -> None:

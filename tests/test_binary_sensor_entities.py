@@ -48,6 +48,7 @@ def _alarm_sensor_for_dev_type(dev_type: int) -> JackerySubdeviceAlarmBinarySens
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
     mutable._sub_device_sn = _SUB_DEVICE_SN  # ruff: ignore[private-member-access]
     mutable.entity_description = SUBDEVICE_ALARM_DESCRIPTIONS[0]
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 

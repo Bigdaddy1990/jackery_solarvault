@@ -258,6 +258,7 @@ def test_skip_reconnect_when_no_client() -> None:
     """Without a client there is nothing to reconnect."""
     mgr = MqttConnectionManager()
 
+    # pyrefly: ignore [bad-argument-type]
     assert mgr.should_skip_reconnect(None, ("c", "h", "s")) is True
 
 
@@ -268,10 +269,12 @@ def test_skip_reconnect_fast_path_clears_stale_pause(
     _freeze_monotonic(monkeypatch, 10.0)
     mgr = MqttConnectionManager()
     fingerprint = ("c", "h", "s")
+    # pyrefly: ignore [bad-assignment]
     mgr.fingerprint = fingerprint
     mgr.app_conflict_pause_cycles = 3
     mqtt = _mqtt_stub(started=True, connected=True)
 
+    # pyrefly: ignore [bad-argument-type]
     assert mgr.should_skip_reconnect(cast("Any", mqtt), fingerprint) is True
     assert mgr.app_conflict_pause_cycles == 0
     assert mgr.paused_until_monotonic == pytest.approx(0.0)
@@ -287,6 +290,7 @@ def test_connected_client_with_unknown_fingerprint_reaches_credential_check(
     fingerprint = ("c", "h", "s")
     mqtt = _mqtt_stub(started=True, connected=True)
 
+    # pyrefly: ignore [bad-argument-type]
     assert mgr.should_skip_reconnect(cast("Any", mqtt), fingerprint) is False
     assert mgr.fingerprint is None
     assert mgr.backoff_remaining() > 0
@@ -302,6 +306,7 @@ def test_skip_reconnect_during_active_pause(
     mgr.paused_until_monotonic = 200.0
     mqtt = _mqtt_stub(started=False, connected=False)
 
+    # pyrefly: ignore [bad-argument-type]
     assert mgr.should_skip_reconnect(cast("Any", mqtt), ("c", "h", "s")) is True
 
 
@@ -311,10 +316,12 @@ def test_skip_reconnect_throttles_recent_attempt(
     """A fingerprint change reconnect is throttled shortly after an attempt."""
     _freeze_monotonic(monkeypatch, 1_000.0)
     mgr = MqttConnectionManager()
+    # pyrefly: ignore [bad-assignment]
     mgr.fingerprint = ("old", "h", "s")
     mgr.last_connect_attempt = 1_000.0 - (MQTT_RECONNECT_THROTTLE_SEC / 2)
     mqtt = _mqtt_stub(started=True, connected=False)
 
+    # pyrefly: ignore [bad-argument-type]
     assert mgr.should_skip_reconnect(cast("Any", mqtt), ("new", "h", "s")) is True
 
 
@@ -324,6 +331,7 @@ def test_force_bypasses_throttle_and_pause(
     """A forced (command) connect ignores the throttle fast path."""
     _freeze_monotonic(monkeypatch, 1_000.0)
     mgr = MqttConnectionManager()
+    # pyrefly: ignore [bad-assignment]
     mgr.fingerprint = ("old", "h", "s")
     mgr.last_connect_attempt = 1_000.0
     mgr.paused_until_monotonic = 2_000.0
@@ -331,6 +339,7 @@ def test_force_bypasses_throttle_and_pause(
     mqtt = _mqtt_stub(started=True, connected=False)
 
     assert (
+        # pyrefly: ignore [bad-argument-type]
         mgr.should_skip_reconnect(cast("Any", mqtt), ("new", "h", "s"), force=True)
         is False
     )
@@ -346,6 +355,7 @@ def test_record_connect_success_stores_fingerprint_and_clears_backoff(
     fingerprint = ("c", "h", "s")
     mqtt = _mqtt_stub(started=True, connected=True)
 
+    # pyrefly: ignore [bad-argument-type]
     mgr.record_connect_success(cast("Any", mqtt), fingerprint)
 
     assert mgr.fingerprint == fingerprint

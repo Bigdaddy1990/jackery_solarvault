@@ -849,6 +849,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 raise JackeryApiError.invalid_json() from err
         raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
         try:
+            # pyrefly: ignore [no-any-return-explicit]
             return json.loads(raw)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as err:
             raise JackeryApiError.invalid_json() from err
@@ -958,6 +959,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=headers,
                 timeout=_HTTP_POLICY.timeout(LOGIN_TIMEOUT_SEC),
             ) as resp:
+                # pyrefly: ignore [no-any-return-explicit]
                 return await self._decode_login_response(resp)
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1

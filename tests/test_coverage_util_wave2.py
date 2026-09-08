@@ -36,7 +36,7 @@ def test_numeric_normalizers_reject_ambiguous_and_non_finite_values() -> None:
     assert util.safe_float("nan") is None
     assert util.safe_float(float("inf")) is None
     assert util.safe_float(True) is None
-    assert util.safe_int(4.0) == 4
+    assert util.safe_int(4.0) == 4  # ruff: ignore[magic-value-comparison]
     assert util.safe_int(4.5) is None
     assert util.safe_int(False) is None
 
@@ -60,10 +60,10 @@ def test_config_option_helpers_use_defaults_for_missing_or_bad_values() -> None:
     )
 
     assert util.config_entry_bool_option(empty_entry, "enabled", True) is True
-    assert util.config_entry_int_option(empty_entry, "count", 7) == 7
+    assert util.config_entry_int_option(empty_entry, "count", 7) == 7  # ruff: ignore[magic-value-comparison]
     assert util.config_entry_str_option(empty_entry, "name", "fallback") == "fallback"
     assert util.config_entry_bool_option(invalid_entry, "enabled", False) is False
-    assert util.config_entry_int_option(invalid_entry, "count", 7) == 7
+    assert util.config_entry_int_option(invalid_entry, "count", 7) == 7  # ruff: ignore[magic-value-comparison]
     assert util.config_entry_str_option(invalid_entry, "name", "fallback") == "fallback"
 
 
@@ -150,7 +150,7 @@ def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
         APP_REQUEST_META: request,
     })
 
-    assert result[APP_CHART_SERIES_Y]["raw_count"] == 4
+    assert result[APP_CHART_SERIES_Y]["raw_count"] == 4  # ruff: ignore[magic-value-comparison]
     assert result[APP_CHART_SERIES_Y]["parsed_sum"] == pytest.approx(3.5)
     assert result[APP_CHART_SERIES_Y]["items"][1]["parsed_float"] is None
     assert "y1" not in result
@@ -240,7 +240,7 @@ def test_smart_meter_modes_keep_total_and_phase_requirements_separate() -> None:
 
     assert util.smart_meter_net_power(totals_only) == pytest.approx(-150)
     assert util.calculated_smart_meter_power(totals_only, "net_import") == 0
-    assert util.calculated_smart_meter_power(totals_only, "net_export") == 150
+    assert util.calculated_smart_meter_power(totals_only, "net_export") == 150  # ruff: ignore[magic-value-comparison]
     assert util.calculated_smart_meter_power(totals_only, "gross_flow") is None
 
     phases: dict[str, float] = {}
@@ -258,7 +258,7 @@ def test_grid_net_power_requires_both_grid_side_measurements() -> None:
             FIELD_IN_GRID_SIDE_PW: "200",
             FIELD_OUT_GRID_SIDE_PW: "75",
         })
-        == 125
+        == 125  # ruff: ignore[magic-value-comparison]
     )
 
 

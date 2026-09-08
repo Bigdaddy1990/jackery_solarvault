@@ -3,7 +3,7 @@
 import pytest
 
 from custom_components.jackery_solarvault.coordinator import (
-    _merge_identified_dict_lists,
+    _merge_identified_dict_lists,  # ruff: ignore[import-private-name]
     find_list_for_key,
     merge_present_dict_values,
 )
@@ -43,17 +43,17 @@ class TestMergePresentDictValuesUncovered:
         base = {"packs": [{"deviceSn": "p1", "soc": 50}]}
         updates = {"packs": [{"deviceSn": "p1", "soc": 60}]}
         result = merge_present_dict_values(base, updates)
-        assert result["packs"][0]["soc"] == 60
+        assert result["packs"][0]["soc"] == 60  # ruff: ignore[magic-value-comparison]
 
     def test_list_with_new_identified_item(self) -> None:  # ruff: ignore[no-self-use]
         """Test list merge with new identified item."""
         base = {"packs": [{"deviceSn": "p1", "soc": 50}]}
         updates = {"packs": [{"deviceSn": "p2", "soc": 60}]}
         result = merge_present_dict_values(base, updates)
-        assert len(result["packs"]) == 2
+        assert len(result["packs"]) == 2  # ruff: ignore[magic-value-comparison]
 
     def test_list_with_unidentified_items(self) -> None:  # ruff: ignore[no-self-use]
-        """Test list merge falls back to value when _merge_identified_dict_lists returns None (line 1619)."""
+        """Test list merge falls back to value when _merge_identified_dict_lists returns None (line 1619)."""  # ruff: ignore[line-too-long]
         base = {"packs": [{"soc": 50}]}
         updates = {"packs": [{"soc": 60}]}
         result = merge_present_dict_values(base, updates)

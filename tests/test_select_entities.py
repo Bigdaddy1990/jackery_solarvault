@@ -73,7 +73,7 @@ def _select(key: str, data: dict[str, Any]) -> JackerySelect:
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
     mutable._state = _SelectState()  # ruff: ignore[private-member-access]
-    return entity
+    return entity  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_work_mode_current_maps_code_to_option() -> None:

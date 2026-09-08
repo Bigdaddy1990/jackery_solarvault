@@ -18,9 +18,9 @@ MAX_PASSWORD_LENGTH: Final = 128
 def credential_text(value: object, *, field: str, max_length: int) -> str:
     """Validate credential type and length without echoing its value."""
     if not isinstance(value, str):
-        raise vol.Invalid(f"{field} must be a string")
+        raise vol.Invalid(f"{field} must be a string")  # ruff: ignore[raise-vanilla-args]
     if len(value) > max_length:
-        raise vol.Invalid(f"{field} exceeds the permitted length")
+        raise vol.Invalid(f"{field} exceeds the permitted length")  # ruff: ignore[raise-vanilla-args]
     return value
 
 

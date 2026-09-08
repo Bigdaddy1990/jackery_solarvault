@@ -36,7 +36,7 @@ class TestBleBinaryFrame:
             body=b"test",
             trailer=b"0000",
         )
-        assert frame.frame_index == 5
+        assert frame.frame_index == 5  # ruff: ignore[magic-value-comparison]
 
     def test_chunk_count_property(self) -> None:  # ruff: ignore[no-self-use]
         """Test chunk_count property."""
@@ -48,7 +48,7 @@ class TestBleBinaryFrame:
             body=b"test",
             trailer=b"0000",
         )
-        assert frame.chunk_count == 3
+        assert frame.chunk_count == 3  # ruff: ignore[magic-value-comparison]
 
     def test_flags_property(self) -> None:  # ruff: ignore[no-self-use]
         """Test flags property."""
@@ -60,7 +60,7 @@ class TestBleBinaryFrame:
             body=b"test",
             trailer=b"0000",
         )
-        assert frame.flags == 0x1234
+        assert frame.flags == 0x1234  # ruff: ignore[magic-value-comparison]
 
     def test_cmd_property(self) -> None:  # ruff: ignore[no-self-use]
         """Test cmd property."""
@@ -72,7 +72,7 @@ class TestBleBinaryFrame:
             body=b"test",
             trailer=b"0000",
         )
-        assert frame.cmd == 0xEE01
+        assert frame.cmd == 0xEE01  # ruff: ignore[magic-value-comparison]
 
     def test_body_property(self) -> None:  # ruff: ignore[no-self-use]
         """Test body property."""

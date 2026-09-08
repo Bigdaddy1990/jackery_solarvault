@@ -57,6 +57,7 @@ def _gather_docstring_stats() -> DocstringStats:
 def _load_baseline() -> dict[str, float] | None:
     if not BASELINE_PATH.exists():
         return None
+    # pyrefly: ignore [no-any-return-explicit]
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
