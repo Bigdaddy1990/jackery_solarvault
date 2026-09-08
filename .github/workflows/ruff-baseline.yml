@@ -8,8 +8,6 @@ permissions:
   pull-requests: write
   checks: write
 
-env:
-  PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
 jobs:
   baseline:
     if: >-
@@ -24,10 +22,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
           ref: ${{ github.head_ref }}
 
-      - run: python -m pip install --upgrade pip ruff pre-commit
+      - run: python -m pip install --upgrade pip ruff pre-commit, pyrefly
       - run: |
           ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
