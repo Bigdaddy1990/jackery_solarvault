@@ -56,6 +56,5 @@ types-xmltodict>=1.0.1.20260518
 typing-extensions>=4.16.0,<5.0
 typing-inspection>=0.4.2
 uv>=0.5.1
-uv-pre-commit
 voluptuous>=0.16.0
 voluptuous-serialize>=2.7.0
