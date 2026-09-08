@@ -1,7 +1,6 @@
 """Behavioral coverage for the independent Jackery Cloud-MQTT client."""
 
 import asyncio
-from collections.abc import AsyncIterator
 import contextlib
 import ssl
 from types import SimpleNamespace
@@ -28,6 +27,8 @@ from custom_components.jackery_solarvault.const import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from homeassistant.core import HomeAssistant
 
 

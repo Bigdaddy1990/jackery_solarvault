@@ -58,7 +58,7 @@ from custom_components.jackery_solarvault.const import (
 class TestJackeryApi:
     """Test JackeryApi class."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a basic client for testing with mocked dependencies."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -76,7 +76,7 @@ class TestJackeryApi:
         assert client._region_code is None
         assert client._token is None
 
-    def test_creation_with_region_code(self) -> None:  # noqa: PLR6301
+    def test_creation_with_region_code(self) -> None:  # ruff: ignore[no-self-use]
         """Test client creation with custom region code."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -112,7 +112,7 @@ class TestJackeryApi:
         client._maybe_learn_region_code(systems)
         assert client._region_code == "US"
 
-    def test_maybe_learn_region_code_already_set(self) -> None:  # noqa: PLR6301
+    def test_maybe_learn_region_code_already_set(self) -> None:  # ruff: ignore[no-self-use]
         """Test _maybe_learn_region_code when already set."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -136,7 +136,7 @@ class TestJackeryApi:
 class TestCryptoFunctions:
     """Test crypto utility functions."""
 
-    def test_aes_ecb_encrypt(self) -> None:  # noqa: PLR6301
+    def test_aes_ecb_encrypt(self) -> None:  # ruff: ignore[no-self-use]
         """Test _aes_ecb_encrypt function."""
         plaintext = b"test data"
         key = os.urandom(16)  # AES-128
@@ -145,7 +145,7 @@ class TestCryptoFunctions:
         assert len(encrypted) > 0
         assert encrypted != plaintext
 
-    def test_aes_ecb_encrypt_pkcs7_padding(self) -> None:  # noqa: PLR6301
+    def test_aes_ecb_encrypt_pkcs7_padding(self) -> None:  # ruff: ignore[no-self-use]
         """Test PKCS7 padding is applied."""
         # Plaintext not multiple of 16 bytes
         plaintext = b"short"
@@ -154,7 +154,7 @@ class TestCryptoFunctions:
         # Should be padded to 16 bytes (AES block size)
         assert len(encrypted) == 16
 
-    def test_aes_cbc_encrypt(self) -> None:  # noqa: PLR6301
+    def test_aes_cbc_encrypt(self) -> None:  # ruff: ignore[no-self-use]
         """Test _aes_cbc_encrypt function."""
         plaintext = b"test data for cbc"
         key = os.urandom(32)  # AES-256
@@ -164,7 +164,7 @@ class TestCryptoFunctions:
         assert len(encrypted) > 0
         assert encrypted != plaintext
 
-    def test_rsa_pkcs1v15_encrypt(self) -> None:  # noqa: PLR6301
+    def test_rsa_pkcs1v15_encrypt(self) -> None:  # ruff: ignore[no-self-use]
         """Test _rsa_pkcs1v15_encrypt with bundled key."""
         # Generate a test RSA key pair
         from cryptography.hazmat.primitives import serialization
@@ -191,7 +191,7 @@ class TestCryptoFunctions:
         # EC key or other non-RSA should raise TypeError
         # This is tested by the function's internal check
 
-    def test_generate_udid(self) -> None:  # noqa: PLR6301
+    def test_generate_udid(self) -> None:  # ruff: ignore[no-self-use]
         """Test _generate_udid produces deterministic output."""
         seed = "test_account"
         udid1 = _generate_udid(seed)
@@ -200,7 +200,7 @@ class TestCryptoFunctions:
         assert udid1.startswith(MQTT_MAC_ID_PREFIX)
         assert len(udid1) == len(MQTT_MAC_ID_PREFIX) + 32  # prefix + 32 hex chars
 
-    def test_generate_login_aes_key(self) -> None:  # noqa: PLR6301
+    def test_generate_login_aes_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test generate_login_aes_key returns 24-byte Base64 string."""
         key = generate_login_aes_key()
         assert isinstance(key, bytes)
@@ -210,7 +210,7 @@ class TestCryptoFunctions:
         decoded = base64.b64decode(key, validate=True)
         assert len(decoded) == 16
 
-    def test_build_login_crypto_fields(self) -> None:  # noqa: PLR6301
+    def test_build_login_crypto_fields(self) -> None:  # ruff: ignore[no-self-use]
         """Test build_login_crypto_fields produces correct structure."""
         login_bean = {"account": "test", "password": "pass"}
         result = build_login_crypto_fields(login_bean)
@@ -220,7 +220,7 @@ class TestCryptoFunctions:
         base64.b64decode(result["aesEncryptData"], validate=True)
         base64.b64decode(result["rsaForAesKey"], validate=True)
 
-    def test_build_login_crypto_fields_injected_aes_key(self) -> None:  # noqa: PLR6301
+    def test_build_login_crypto_fields_injected_aes_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test build_login_crypto_fields with injected AES key."""
         login_bean = {"account": "test", "password": "pass"}
         aes_key = base64.b64encode(os.urandom(16))
@@ -228,7 +228,7 @@ class TestCryptoFunctions:
         assert "aesEncryptData" in result
         assert "rsaForAesKey" in result
 
-    def test_build_login_crypto_fields_invalid_aes_key(self) -> None:  # noqa: PLR6301
+    def test_build_login_crypto_fields_invalid_aes_key(self) -> None:  # ruff: ignore[no-self-use]
         """Test build_login_crypto_fields raises on wrong AES key length."""
         login_bean = {"account": "test", "password": "pass"}
         aes_key = b"too_short"
@@ -238,7 +238,7 @@ class TestCryptoFunctions:
         except ValueError:
             pass  # Expected
 
-    def test_data_field_accepted(self) -> None:  # noqa: PLR6301
+    def test_data_field_accepted(self) -> None:  # ruff: ignore[no-self-use]
         """Test _data_field_accepted function."""
         assert _data_field_accepted({"data": {"accepted": True}}) is True
         assert _data_field_accepted({"data": {"accepted": "true"}}) is True
@@ -252,7 +252,7 @@ class TestCryptoFunctions:
         assert _data_field_accepted({"data": "ok"}) is True
         assert _data_field_accepted({}) is False
 
-    def test_log_value_shape(self) -> None:  # noqa: PLR6301
+    def test_log_value_shape(self) -> None:  # ruff: ignore[no-self-use]
         """Test _log_value_shape function."""
         assert _log_value_shape("str") == "str"
         assert _log_value_shape(123) == "int"
@@ -262,7 +262,7 @@ class TestCryptoFunctions:
         assert _log_value_shape({"a": 1}) == "dict[1]"
         assert _log_value_shape([1, 2, 3]) == "list[3]"
 
-    def test_log_body(self) -> None:  # noqa: PLR6301
+    def test_log_body(self) -> None:  # ruff: ignore[no-self-use]
         """Test _log_body function."""
         # Dict with few keys
         body = {"a": 1, "b": "text", "c": [1, 2]}
@@ -280,7 +280,7 @@ class TestCryptoFunctions:
         result = _log_body(body)
         assert result == "list[3]"
 
-    def test_day_chart_series_keys(self) -> None:  # noqa: PLR6301
+    def test_day_chart_series_keys(self) -> None:  # ruff: ignore[no-self-use]
         """Test _DAY_CHART_SERIES_KEYS constant."""
         assert len(_DAY_CHART_SERIES_KEYS) == 7
         for key in _DAY_CHART_SERIES_KEYS:
@@ -290,7 +290,7 @@ class TestCryptoFunctions:
 class TestMQTTCredentials:
     """Test MQTT credential derivation."""
 
-    def _create_client_with_session(self):  # noqa: PLR6301
+    def _create_client_with_session(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session and valid login state."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -319,7 +319,7 @@ class TestMQTTCredentials:
         # Password should be valid base64
         base64.b64decode(creds[MQTT_CREDENTIAL_PASSWORD], validate=True)
 
-    def test_derive_mqtt_credentials_no_session(self) -> None:  # noqa: PLR6301
+    def test_derive_mqtt_credentials_no_session(self) -> None:  # ruff: ignore[no-self-use]
         """Test _derive_mqtt_credentials returns None without session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -330,7 +330,7 @@ class TestMQTTCredentials:
         creds = client._derive_mqtt_credentials()
         assert creds is None
 
-    def test_derive_mqtt_credentials_invalid_seed(self) -> None:  # noqa: PLR6301
+    def test_derive_mqtt_credentials_invalid_seed(self) -> None:  # ruff: ignore[no-self-use]
         """Test _derive_mqtt_credentials handles invalid seed."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -345,7 +345,7 @@ class TestMQTTCredentials:
         creds = client._derive_mqtt_credentials()
         assert creds is None
 
-    def test_derive_mqtt_credentials_wrong_seed_length(self) -> None:  # noqa: PLR6301
+    def test_derive_mqtt_credentials_wrong_seed_length(self) -> None:  # ruff: ignore[no-self-use]
         """Test _derive_mqtt_credentials handles wrong seed length."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -383,7 +383,7 @@ class TestMQTTCredentials:
         assert client._token is None
         assert client._mqtt_seed_b64 is None
 
-    def test_mqtt_mac_id_source_configured(self) -> None:  # noqa: PLR6301
+    def test_mqtt_mac_id_source_configured(self) -> None:  # ruff: ignore[no-self-use]
         """Test mqtt_mac_id_source when configured."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -397,7 +397,7 @@ class TestMQTTCredentials:
         assert client.mqtt_mac_id_source == "configured"
         assert mac_id == "271c55f5731fa3d9ba1fe131e088946e0"
 
-    def test_mqtt_mac_id_source_generated(self) -> None:  # noqa: PLR6301
+    def test_mqtt_mac_id_source_generated(self) -> None:  # ruff: ignore[no-self-use]
         """Test mqtt_mac_id_source when generated."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -409,7 +409,7 @@ class TestMQTTCredentials:
         assert client.mqtt_mac_id_source == "generated"
         assert mac_id.startswith(MQTT_MAC_ID_PREFIX)
 
-    def test_mqtt_mac_id_source_fallback(self) -> None:  # noqa: PLR6301
+    def test_mqtt_mac_id_source_fallback(self) -> None:  # ruff: ignore[no-self-use]
         """Test mqtt_mac_id_source when configured but invalid."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         client = JackeryApi(
@@ -439,7 +439,7 @@ class TestMQTTCredentials:
 class TestAuthAndRelogin:
     """Test authentication and re-login logic."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -448,7 +448,7 @@ class TestAuthAndRelogin:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_ensure_token_logs_in(self) -> None:
         """Test _ensure_token triggers login when no token."""
         client = self._create_client()
@@ -468,7 +468,7 @@ class TestAuthAndRelogin:
 
         assert token == "new_token"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_ensure_token_uses_existing(self) -> None:
         """Test _ensure_token uses existing token."""
         client = self._create_client()
@@ -478,7 +478,7 @@ class TestAuthAndRelogin:
 
         assert token == "existing_token"
 
-    def test_extract_code(self) -> None:  # noqa: PLR6301
+    def test_extract_code(self) -> None:  # ruff: ignore[no-self-use]
         """Test _extract_code static method."""
         assert JackeryApi._extract_code({"code": 200}) == 200
         assert JackeryApi._extract_code({"code": "200"}) == 200
@@ -501,7 +501,7 @@ class TestAuthAndRelogin:
         # Non-dict
         assert client.is_token_expired_response(200, "not a dict") is False
 
-    def test_response_has_auth_failure_text(self) -> None:  # noqa: PLR6301
+    def test_response_has_auth_failure_text(self) -> None:  # ruff: ignore[no-self-use]
         """Test _response_has_auth_failure_text static method."""
         assert (
             JackeryApi._response_has_auth_failure_text({"msg": "unauthorized"}) is True
@@ -540,7 +540,7 @@ class TestAuthAndRelogin:
         # OK status
         assert client._is_auth_failure_response(200, {"code": 0}) is False
 
-    def test_auth_failure_message(self) -> None:  # noqa: PLR6301
+    def test_auth_failure_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test _auth_failure_message static method."""
         msg = JackeryApi._auth_failure_message(
             "POST", "/api/login", 401, {"code": 10402, "msg": "expired"}
@@ -571,7 +571,7 @@ class TestAuthAndRelogin:
 class TestRequestMethods:
     """Test HTTP request methods (_get, _post, _get_json, etc.)."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -580,7 +580,7 @@ class TestRequestMethods:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_success(self) -> None:
         """Test _get_json on success."""
         client = self._create_client()
@@ -600,7 +600,7 @@ class TestRequestMethods:
 
         assert result == {"code": 0, "data": {"test": "value"}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_non_ok_code(self) -> None:
         """Test _get_json raises on non-ok code."""
         client = self._create_client()
@@ -608,11 +608,11 @@ class TestRequestMethods:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_non_dict(self) -> None:
         """Test _get_json raises on non-dict response."""
         client = self._create_client()
@@ -620,11 +620,11 @@ class TestRequestMethods:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_json_success(self) -> None:
         """Test _post_json on success."""
         client = self._create_client()
@@ -644,7 +644,7 @@ class TestRequestMethods:
 
         assert result == {"code": 0, "data": {"result": "ok"}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_json_auth_retry(self) -> None:
         """Test _post_json retries on auth failure."""
         client = self._create_client()
@@ -684,7 +684,7 @@ class TestRequestMethods:
 class TestDeviceEndpoints:
     """Test device-related API endpoints."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -693,7 +693,7 @@ class TestDeviceEndpoints:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_system_list(self) -> None:
         """Test async_get_system_list."""
         client = self._create_client()
@@ -704,7 +704,7 @@ class TestDeviceEndpoints:
         assert result == [{"id": 1}]
         client._get_json.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_property(self) -> None:
         """Test async_get_device_property."""
         client = self._create_client()
@@ -720,7 +720,7 @@ class TestDeviceEndpoints:
             retry_transport_once=True,
         )  # noqa: E501, RUF100, SLF001
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_ct_stat(self) -> None:
         """Test async_get_device_ct_stat with stat_type."""
         client = self._create_client()
@@ -737,7 +737,7 @@ class TestDeviceEndpoints:
         params = call_args.kwargs.get("params", {})
         assert params.get(APP_REQUEST_STAT_TYPE) == "1"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_eps_stat(self) -> None:
         """Test async_get_device_eps_stat."""
         client = self._create_client()
@@ -754,7 +754,7 @@ class TestDeviceEndpoints:
         params = call_args.kwargs.get("params", {})
         assert APP_REQUEST_STAT_TYPE not in params
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_battery_stat(self) -> None:
         """Test async_get_device_battery_stat."""
         client = self._create_client()
@@ -771,7 +771,7 @@ class TestDeviceEndpoints:
         params = call_args.kwargs.get("params", {})
         assert "type" in params or "beginDate" in params
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_system_statistic(self) -> None:
         """Test async_get_system_statistic."""
         client = self._create_client()
@@ -784,7 +784,7 @@ class TestDeviceEndpoints:
             SYSTEM_STATISTIC_PATH, params={FIELD_SYSTEM_ID: "system123"}
         )  # noqa: E501, RUF100, SLF001
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_alarm(self) -> None:
         """Test async_get_alarm."""
         client = self._create_client()
@@ -801,7 +801,7 @@ class TestDeviceEndpoints:
 class TestPriceAndEnergyEndpoints:
     """Test price and energy endpoints."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -810,7 +810,7 @@ class TestPriceAndEnergyEndpoints:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_power_price(self) -> None:
         """Test async_get_power_price."""
         client = self._create_client()
@@ -823,7 +823,7 @@ class TestPriceAndEnergyEndpoints:
             POWER_PRICE_PATH, params={FIELD_SYSTEM_ID: "system123"}
         )  # noqa: E501, RUF100, SLF001
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_pv_trends(self) -> None:
         """Test async_get_pv_trends."""
         client = self._create_client()
@@ -844,7 +844,7 @@ class TestPriceAndEnergyEndpoints:
         assert params.get(APP_REQUEST_BEGIN_DATE) == "2024-01-01"
         assert params.get(APP_REQUEST_END_DATE) == "2024-01-31"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_price_sources(self) -> None:
         """Test async_get_price_sources."""
         client = self._create_client()
@@ -857,7 +857,7 @@ class TestPriceAndEnergyEndpoints:
             PRICE_SOURCE_LIST_PATH, params={FIELD_SYSTEM_ID: "system123"}
         )  # noqa: E501, RUF100, SLF001
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_battery_pack_list(self) -> None:
         """Test async_get_battery_pack_list."""
         client = self._create_client()
@@ -874,7 +874,7 @@ class TestPriceAndEnergyEndpoints:
 class TestOTAAndAccessoryEndpoints:
     """Test OTA and accessory endpoints."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -883,7 +883,7 @@ class TestOTAAndAccessoryEndpoints:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_ota_info(self) -> None:
         """Test async_get_ota_info."""
         client = self._create_client()
@@ -901,7 +901,7 @@ class TestOTAAndAccessoryEndpoints:
             OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: "device123"}
         )  # noqa: E501, RUF100, SLF001
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_shared_list(self) -> None:
         """Test async_get_device_shared_list."""
         client = self._create_client()
@@ -912,7 +912,7 @@ class TestOTAAndAccessoryEndpoints:
         assert result == [{"id": 1}]
         client._get_json.assert_called_once_with(DEVICE_SHARED_LIST_PATH)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_bind_accessories(self) -> None:
         """Test async_bind_accessories."""
         client = self._create_client()
@@ -934,7 +934,7 @@ class TestOTAAndAccessoryEndpoints:
         assert payload["parentDeviceSn"] == "system123"
         assert payload["parentModelCode"] == 3002
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_unbind_accessories(self) -> None:
         """Test async_unbind_accessories."""
         client = self._create_client()
@@ -953,7 +953,7 @@ class TestOTAAndAccessoryEndpoints:
 class TestPayloadDebug:
     """Test payload debug callback."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -962,7 +962,7 @@ class TestPayloadDebug:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_emit_payload_debug_calls_callback(self) -> None:
         """Test _emit_payload_debug calls callback when set."""
         client = self._create_client()
@@ -973,7 +973,7 @@ class TestPayloadDebug:
 
         callback.assert_called_once_with({"test": "data"})
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_emit_payload_debug_no_callback(self) -> None:
         """Test _emit_payload_debug does nothing without callback."""
         client = self._create_client()
@@ -982,7 +982,7 @@ class TestPayloadDebug:
         # Should not raise
         await client._emit_payload_debug({"test": "data"})
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_emit_payload_debug_with_callable_body(self) -> None:
         """Test _emit_payload_debug with callable body."""
         client = self._create_client()
@@ -1000,7 +1000,7 @@ class TestPayloadDebug:
 class TestAuthFailurePaths:
     """Test authentication failure and re-login paths."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -1009,7 +1009,7 @@ class TestAuthFailurePaths:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_relogin_and_retry_request_success(self) -> None:
         """Test _relogin_and_retry_request succeeds on second attempt."""
         client = self._create_client()
@@ -1033,7 +1033,7 @@ class TestAuthFailurePaths:
         client.async_login.assert_called_once()
         mock_request.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_relogin_and_retry_request_cooldown_blocks(self) -> None:
         """Test _relogin_and_retry_request returns None when cooldown blocks."""
         client = self._create_client()
@@ -1053,7 +1053,7 @@ class TestAuthFailurePaths:
         assert result is None
         mock_request.assert_not_called()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_relogin_and_retry_request_token_already_refreshed(self) -> None:
         """Test _relogin_and_retry_request reuses token if already refreshed by another caller."""
         client = self._create_client()
@@ -1073,7 +1073,7 @@ class TestAuthFailurePaths:
         # Should not call login since token was already refreshed
         # (mock not set up, would fail if called)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_recover_auth_failure_or_raise_success(self) -> None:
         """Test _recover_auth_failure_or_raise recovers successfully."""
         client = self._create_client()
@@ -1096,7 +1096,7 @@ class TestAuthFailurePaths:
 
         assert result == (200, {"code": 0, "data": {"result": "ok"}})
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_recover_auth_failure_or_raise_persistent_failure(self) -> None:
         """Test _recover_auth_failure_or_raise raises when failure persists."""
         client = self._create_client()
@@ -1118,17 +1118,17 @@ class TestAuthFailurePaths:
                 status=401,
                 data={"code": 10402, "msg": "token expired"},
             )
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in type(e).__name__  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_perform_authenticated_json_request_transport_error(self) -> None:
         """Test _perform_authenticated_json_request wraps transport errors."""
         client = self._create_client()
         client._token = "test_token"
 
-        async def failing_request() -> Never:  # noqa: RUF029
+        async def failing_request() -> Never:  # ruff: ignore[unused-async]
             raise aiohttp.ClientError("connection failed")
 
         try:
@@ -1138,18 +1138,18 @@ class TestAuthFailurePaths:
                 request=failing_request,
                 token_used="test_token",
             )
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "connection failed" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "connection failed" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_perform_authenticated_json_request_timeout(self) -> None:
         """Test _perform_authenticated_json_request wraps timeout errors."""
         client = self._create_client()
         client._token = "test_token"
 
-        async def timeout_request() -> Never:  # noqa: RUF029
+        async def timeout_request() -> Never:  # ruff: ignore[unused-async]
             raise TimeoutError("request timed out")
 
         try:
@@ -1159,12 +1159,12 @@ class TestAuthFailurePaths:
                 request=timeout_request,
                 token_used="test_token",
             )
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "timed out" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "timed out" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_perform_authenticated_json_request_retries_one_timeout(self) -> None:
         """An opted-in idempotent read gets one immediate timeout retry."""
         client = self._create_client()
@@ -1190,7 +1190,7 @@ class TestAuthFailurePaths:
         assert result == (200, {"code": 0, "data": {"result": "fresh"}})
         assert attempts == 2
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_property_retry_survives_auth_refresh_timeout(self) -> None:
         """An opted-in property read retries a transient failure after re-login."""
         client = self._create_client()
@@ -1231,7 +1231,7 @@ class TestAuthFailurePaths:
 class TestHttpErrorPaths:
     """Test HTTP error handling paths in api.py."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -1240,7 +1240,7 @@ class TestHttpErrorPaths:
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_http_401_triggers_auth_error(self) -> None:
         """Test _get_json raises JackeryAuthError on HTTP 401."""
         client = self._create_client()
@@ -1252,11 +1252,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_http_403_triggers_auth_error(self) -> None:
         """Test _get_json raises JackeryAuthError on HTTP 403."""
         client = self._create_client()
@@ -1267,11 +1267,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_http_500_triggers_api_error(self) -> None:
         """Test _get_json raises JackeryApiError on HTTP 500."""
         client = self._create_client()
@@ -1289,11 +1289,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_get_json_invalid_json_raises_api_error(self) -> None:
         """Test _get_json raises JackeryApiError on invalid JSON."""
         client = self._create_client()
@@ -1312,11 +1312,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._get_json("/test/path")
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_json_http_401_triggers_auth_error(self) -> None:
         """Test _post_json raises JackeryAuthError on HTTP 401."""
         client = self._create_client()
@@ -1327,11 +1327,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._post_json("/test/path", {"key": "value"})
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_put_json_http_401_triggers_auth_error(self) -> None:
         """Test _put_json raises JackeryAuthError on HTTP 401."""
         client = self._create_client()
@@ -1342,11 +1342,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._put_json("/test/path", {"key": "value"})
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_delete_json_http_401_triggers_auth_error(self) -> None:
         """Test _delete_json raises JackeryAuthError on HTTP 401."""
         client = self._create_client()
@@ -1357,11 +1357,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._delete_json("/test/path", {"key": "value"})
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_form_http_401_triggers_auth_error(self) -> None:
         """Test _post_form raises JackeryAuthError on HTTP 401."""
         client = self._create_client()
@@ -1372,11 +1372,11 @@ class TestHttpErrorPaths:
 
         try:
             await client._post_form("/test/path", {"key": "value"})
-            raise AssertionError("Should have raised JackeryAuthError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryAuthError" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryAuthError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryAuthError" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_form_multipart(self) -> None:
         """Test _post_form with multipart files."""
         client = self._create_client()
@@ -1399,7 +1399,7 @@ class TestHttpErrorPaths:
 
         assert result == {"code": 0, "data": {"ok": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_post_form_too_many_images(self) -> None:
         """Test _post_form rejects too many feedback images."""
         client = self._create_client()
@@ -1420,16 +1420,16 @@ class TestHttpErrorPaths:
                 device_sn="sn1",
                 images=[b"1", b"2", b"3", b"4"],  # 4 images exceeds limit
             )
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "three feedback images" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "three feedback images" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
 
-class TestAdditionalEndpoints:  # noqa: PLR0904
+class TestAdditionalEndpoints:  # ruff: ignore[too-many-public-methods]
     """Test additional endpoint methods not yet covered."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -1438,7 +1438,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             password="test_password",
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_home_stat(self) -> None:
         """Test async_get_device_home_stat."""
         client = self._create_client()
@@ -1451,7 +1451,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_pv_stat(self) -> None:
         """Test async_get_device_pv_stat."""
         client = self._create_client()
@@ -1466,7 +1466,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_meter_stat(self) -> None:
         """Test async_get_device_meter_stat."""
         client = self._create_client()
@@ -1476,7 +1476,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"total": 100}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_today_energy(self) -> None:
         """Test async_get_today_energy."""
         client = self._create_client()
@@ -1488,7 +1488,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"de": 10, "dg": 20}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_portable_ct_stat(self) -> None:
         """Test async_get_portable_ct_stat."""
         client = self._create_client()
@@ -1498,7 +1498,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"l1": 100}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_socket_statistic(self) -> None:
         """Test async_get_device_socket_statistic."""
         client = self._create_client()
@@ -1508,7 +1508,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"power": 500}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_socket_stat(self) -> None:
         """Test async_get_device_socket_stat."""
         client = self._create_client()
@@ -1521,7 +1521,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_home_trends(self) -> None:
         """Test async_get_home_trends."""
         client = self._create_client()
@@ -1534,7 +1534,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_battery_trends(self) -> None:
         """Test async_get_battery_trends."""
         client = self._create_client()
@@ -1547,7 +1547,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert "y1" in result
         assert result["y1"] == [1, 2, 3]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_symmetry_stat(self) -> None:
         """Test async_get_symmetry_stat."""
         client = self._create_client()
@@ -1561,7 +1561,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"charge": 10, "discharge": 5}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_cutoff_stat(self) -> None:
         """Test async_get_cutoff_stat."""
         client = self._create_client()
@@ -1575,7 +1575,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         parsed_date = date.fromisoformat(request["beginDate"])
         assert parsed_date.isoformat() == request["beginDate"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_soc_stat(self) -> None:
         """Test async_get_soc_stat."""
         client = self._create_client()
@@ -1585,7 +1585,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"soc": 80}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_carbon_stat(self) -> None:
         """Test async_get_carbon_stat."""
         client = self._create_client()
@@ -1595,7 +1595,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"carbon": 100}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_profit_stat(self) -> None:
         """Test async_get_profit_stat."""
         client = self._create_client()
@@ -1605,7 +1605,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"profit": 50}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_box_stat(self) -> None:
         """Test async_get_box_stat."""
         client = self._create_client()
@@ -1619,7 +1619,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"total": 1000, "unit": "kWh"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_smart_schedule_prediction(self) -> None:
         """Test async_get_smart_schedule_prediction."""
         client = self._create_client()
@@ -1631,7 +1631,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"prediction": "data"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_single_mode(self) -> None:
         """Test async_set_single_mode."""
         client = self._create_client()
@@ -1644,7 +1644,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert result is True
         client._post_form.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_single_mode_invalid_price(self) -> None:
         """Test async_set_single_mode rejects negative price."""
         client = self._create_client()
@@ -1653,12 +1653,12 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             await client.async_set_single_mode(
                 system_id="system123", single_price=-0.1, currency="EUR"
             )  # noqa: E501, RUF100
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "single_price must be >= 0" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "single_price must be >= 0" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_single_mode_invalid_currency(self) -> None:
         """Test async_set_single_mode rejects empty currency."""
         client = self._create_client()
@@ -1667,12 +1667,12 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             await client.async_set_single_mode(
                 system_id="system123", single_price=0.15, currency=""
             )  # noqa: E501, RUF100
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "currency must be a non-empty string" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "currency must be a non-empty string" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_dynamic_mode(self) -> None:
         """Test async_set_dynamic_mode."""
         client = self._create_client()
@@ -1685,7 +1685,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert result is True
         client._post_form.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_dynamic_mode_invalid_region(self) -> None:
         """Test async_set_dynamic_mode rejects empty region."""
         client = self._create_client()
@@ -1694,12 +1694,12 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             await client.async_set_dynamic_mode(
                 system_id="system123", platform_company_id=123, system_region=""
             )  # noqa: E501, RUF100
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "system_region must be a non-empty string" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "system_region must be a non-empty string" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_dynamic_price_login_url(self) -> None:
         """Test async_get_dynamic_price_login_url."""
         client = self._create_client()
@@ -1713,7 +1713,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"loginUrl": "https://example.com"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_device_currency(self) -> None:
         """Test async_get_device_currency."""
         client = self._create_client()
@@ -1725,7 +1725,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"currency": "EUR"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_save_contract_auth(self) -> None:
         """Test async_save_contract_auth."""
         client = self._create_client()
@@ -1742,7 +1742,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_contract_list(self) -> None:
         """Test async_get_contract_list."""
         client = self._create_client()
@@ -1754,7 +1754,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": "c1"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_cancel_contract_auth(self) -> None:
         """Test async_cancel_contract_auth."""
         client = self._create_client()
@@ -1768,7 +1768,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_dynamic_price(self) -> None:
         """Test async_get_dynamic_price."""
         client = self._create_client()
@@ -1778,7 +1778,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"price": 0.20}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_save_location_id(self) -> None:
         """Test async_save_location_id."""
         client = self._create_client()
@@ -1790,7 +1790,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_save_tou_plan(self) -> None:
         """Test async_save_tou_plan."""
         client = self._create_client()
@@ -1803,7 +1803,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_query_tou_plan(self) -> None:
         """Test async_query_tou_plan."""
         client = self._create_client()
@@ -1813,7 +1813,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"tasks": []}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_currency_list(self) -> None:
         """Test async_get_currency_list."""
         client = self._create_client()
@@ -1825,7 +1825,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"code": "EUR"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_bind_currency(self) -> None:
         """Test async_bind_currency."""
         client = self._create_client()
@@ -1839,7 +1839,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_shelly_devices(self) -> None:
         """Test async_get_shelly_devices."""
         client = self._create_client()
@@ -1849,7 +1849,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": "s1"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_shelly_realtime_power(self) -> None:
         """Test async_get_shelly_realtime_power."""
         client = self._create_client()
@@ -1859,7 +1859,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"power": 100}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_control_shelly_device(self) -> None:
         """Test async_control_shelly_device."""
         client = self._create_client()
@@ -1871,7 +1871,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_control_shelly_device_not_allowed(self) -> None:
         """Test async_control_shelly_device rejects when not allowed."""
         client = self._create_client()
@@ -1880,12 +1880,12 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             await client.async_control_shelly_device(
                 "device123", action="turn_on", function="switch", control_allowed=False
             )  # noqa: E501, RUF100
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "not allowed" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "not allowed" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_shelly_auth_url(self) -> None:
         """Test async_get_shelly_auth_url."""
         client = self._create_client()
@@ -1900,7 +1900,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"authUrl": "https://auth.example.com", "state": "abc"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_unbind_shelly_device(self) -> None:
         """Test async_unbind_shelly_device."""
         client = self._create_client()
@@ -1912,7 +1912,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_unbind_shelly_account(self) -> None:
         """Test async_unbind_shelly_account."""
         client = self._create_client()
@@ -1924,7 +1924,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_shelly_binding_failures(self) -> None:
         """Test async_get_shelly_binding_failures."""
         client = self._create_client()
@@ -1947,7 +1947,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             "successDeviceSns": ["s1"],
         }  # noqa: E501, RUF100
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_add_accessories(self) -> None:
         """Test async_add_accessories."""
         client = self._create_client()
@@ -1962,7 +1962,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"success": True}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_remove_accessory(self) -> None:
         """Test async_remove_accessory."""
         client = self._create_client()
@@ -1974,7 +1974,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"success": True}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_check_accessories_exist(self) -> None:
         """Test async_check_accessories_exist."""
         client = self._create_client()
@@ -1984,7 +1984,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"acc1": True}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_accessories_list(self) -> None:
         """Test async_get_accessories_list."""
         client = self._create_client()
@@ -1994,7 +1994,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": "acc1"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_accessories_name(self) -> None:
         """Test async_set_accessories_name."""
         client = self._create_client()
@@ -2008,7 +2008,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_check_jackery_accessories_exist(self) -> None:
         """Test async_check_jackery_accessories_exist."""
         client = self._create_client()
@@ -2020,7 +2020,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"exists": True}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_sync_smart_accessories(self) -> None:
         """Test async_sync_smart_accessories."""
         client = self._create_client()
@@ -2035,7 +2035,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_sub_shadow(self) -> None:
         """Test async_get_sub_shadow."""
         client = self._create_client()
@@ -2049,7 +2049,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"shadow": "data"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_system_shadow(self) -> None:
         """Test async_get_system_shadow."""
         client = self._create_client()
@@ -2061,7 +2061,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"shadow": "system"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_notify_list(self) -> None:
         """Test async_get_notify_list."""
         client = self._create_client()
@@ -2073,7 +2073,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": 1}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_unread_count(self) -> None:
         """Test async_get_unread_count."""
         client = self._create_client()
@@ -2083,7 +2083,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"total": 5}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_push_config(self) -> None:
         """Test async_set_push_config."""
         client = self._create_client()
@@ -2095,7 +2095,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_push_config(self) -> None:
         """Test async_get_push_config."""
         client = self._create_client()
@@ -2105,7 +2105,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"set": 1}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_check_smart_mode_set(self) -> None:
         """Test async_check_smart_mode_set."""
         client = self._create_client()
@@ -2119,7 +2119,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"enabled": True}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_smart_mode_info(self) -> None:
         """Test async_get_smart_mode_info."""
         client = self._create_client()
@@ -2129,7 +2129,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"info": "data"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_start_smart_mode(self) -> None:
         """Test async_start_smart_mode."""
         client = self._create_client()
@@ -2141,7 +2141,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"started": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_check_app_version(self) -> None:
         """Test async_check_app_version."""
         client = self._create_client()
@@ -2155,7 +2155,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"version": "2.4.0"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_banner_list(self) -> None:
         """Test async_get_banner_list."""
         client = self._create_client()
@@ -2165,7 +2165,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": 1}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_submit_feedback(self) -> None:
         """Test async_submit_feedback."""
         client = self._create_client()
@@ -2179,7 +2179,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_faq_list(self) -> None:
         """Test async_get_faq_list."""
         client = self._create_client()
@@ -2191,7 +2191,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"question": "Q", "answer": "A"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_faq_answer(self) -> None:
         """Test async_get_faq_answer."""
         client = self._create_client()
@@ -2203,7 +2203,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"answer": "A"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_agree_privacy_consent(self) -> None:
         """Test async_agree_privacy_consent."""
         client = self._create_client()
@@ -2217,7 +2217,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"agreed": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_check_privacy_update(self) -> None:
         """Test async_check_privacy_update."""
         client = self._create_client()
@@ -2229,7 +2229,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"updateRequired": False}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_product_instruction(self) -> None:
         """Test async_get_product_instruction."""
         client = self._create_client()
@@ -2241,7 +2241,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"instruction": "data"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_zone_list(self) -> None:
         """Test async_get_zone_list."""
         client = self._create_client()
@@ -2251,7 +2251,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"zone": "DE"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_gcs_list(self) -> None:
         """Test async_get_gcs_list."""
         client = self._create_client()
@@ -2263,7 +2263,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"standard": "VDE"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_alarm_detail(self) -> None:
         """Test async_get_alarm_detail."""
         client = self._create_client()
@@ -2275,7 +2275,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"detail": "alarm info"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_sync_alerts(self) -> None:
         """Test async_sync_alerts."""
         client = self._create_client()
@@ -2287,7 +2287,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"synced": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_offline_statistics(self) -> None:
         """Test async_get_offline_statistics."""
         client = self._create_client()
@@ -2299,7 +2299,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"offline": "data"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_upload_power_report(self) -> None:
         """Test async_upload_power_report."""
         client = self._create_client()
@@ -2313,8 +2313,8 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"uploaded": True}
 
-    @pytest.mark.asyncio
-    async def test_select_ota_item(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_select_ota_item(self) -> None:  # ruff: ignore[no-self-use]
         """Test _select_ota_item static method."""
         items = [
             {"deviceSn": "sn1", "version": "1.0"},
@@ -2329,7 +2329,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         result = JackeryApi._select_ota_item([], "sn1")  # Empty list
         assert result == {}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_diagnostics_snapshot(self) -> None:
         """Test diagnostics_snapshot."""
         client = self._create_client()
@@ -2347,7 +2347,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
             "auth_retries": 3,
         }
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_hydrate_mqtt_session(self) -> None:
         """Test hydrate_mqtt_session."""
         client = self._create_client()
@@ -2364,7 +2364,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert client._mqtt_mac_id == "271c55f5731fa3d9ba1fe131e088946e0"
         assert client._mqtt_mac_id_source == "test"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_mqtt_session_snapshot(self) -> None:
         """Test mqtt_session_snapshot."""
         client = self._create_client()
@@ -2384,7 +2384,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
         assert result["mac_id"] == "271c55f5731fa3d9ba1fe131e088946e0"
         assert result["mac_id_source"] == "test"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_get_user_info(self) -> None:
         """Test async_get_user_info."""
         client = self._create_client()
@@ -2396,7 +2396,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"nickName": "Test User"}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_update_register_id(self) -> None:
         """Test async_update_register_id."""
         client = self._create_client()
@@ -2408,7 +2408,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_list_devices_legacy(self) -> None:
         """Test async_list_devices_legacy."""
         client = self._create_client()
@@ -2418,7 +2418,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == [{"id": "dev1"}]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_update_user_info(self) -> None:
         """Test async_update_user_info."""
         client = self._create_client()
@@ -2430,7 +2430,7 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result == {"code": 0, "data": {"success": True}}
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_system_name(self) -> None:
         """Test async_set_system_name."""
         client = self._create_client()
@@ -2442,19 +2442,19 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_system_name_empty(self) -> None:
         """Test async_set_system_name rejects empty name."""
         client = self._create_client()
 
         try:
             await client.async_set_system_name(system_id="system123", system_name="")
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "system_name must be a non-empty string" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "system_name must be a non-empty string" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_max_power(self) -> None:
         """Test async_set_max_power."""
         client = self._create_client()
@@ -2464,23 +2464,23 @@ class TestAdditionalEndpoints:  # noqa: PLR0904
 
         assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_set_max_power_invalid(self) -> None:
         """Test async_set_max_power rejects invalid power."""
         client = self._create_client()
 
         try:
             await client.async_set_max_power(device_id="device123", max_power=-100)
-            raise AssertionError("Should have raised JackeryApiError")  # noqa: TRY301
-        except Exception as e:  # noqa: BLE001
-            assert "JackeryApiError" in type(e).__name__  # noqa: PT017
-            assert "non-negative integer" in str(e)  # noqa: PT017
+            raise AssertionError("Should have raised JackeryApiError")  # ruff: ignore[raise-within-try]
+        except Exception as e:  # ruff: ignore[blind-except]
+            assert "JackeryApiError" in type(e).__name__  # ruff: ignore[pytest-assert-in-except]
+            assert "non-negative integer" in str(e)  # ruff: ignore[pytest-assert-in-except]
 
 
 class TestCoalescedDayStat:
     """Test _coalesced_day_stat_copy method."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2571,7 +2571,7 @@ class TestCoalescedDayStat:
 class TestHttpPayloadDebug:
     """Test _http_payload_debug and _log_body integration."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(
@@ -2631,7 +2631,7 @@ class TestHttpPayloadDebug:
 class TestPayloadDictAndList:
     """Test _payload_dict and _payload_list edge cases."""
 
-    def _create_client(self):  # noqa: PLR6301
+    def _create_client(self):  # ruff: ignore[no-self-use]
         """Create a client with mocked session."""
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         return JackeryApi(

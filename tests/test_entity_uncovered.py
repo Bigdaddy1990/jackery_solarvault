@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 class TestJackeryEntity:
     """Test JackeryEntity class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -23,7 +23,7 @@ class TestJackeryEntity:
         coordinator.is_entity_source_available = MagicMock(return_value=True)
         return coordinator
 
-    def _create_entity(self, coordinator, key_suffix="test_key"):  # noqa: PLR6301
+    def _create_entity(self, coordinator, key_suffix="test_key"):  # ruff: ignore[no-self-use]
         """Create an entity instance for testing."""
         # Use a simple EntityDescription for testing
         description = EntityDescription(key=key_suffix, name="Test Entity")

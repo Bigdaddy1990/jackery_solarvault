@@ -32,7 +32,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 class TestSensorCreation:
     """Test sensor creation and basic properties."""
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -41,7 +41,7 @@ class TestSensorCreation:
         coordinator.config_entry.runtime_data = MagicMock()
         return coordinator
 
-    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # noqa: PLR6301
+    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # ruff: ignore[no-self-use]
         """Create a sensor instance for testing."""
         description = JackerySensorDescription(
             key="test_key",
@@ -363,9 +363,9 @@ class TestSensorState:
             coordinator=coordinator, device_id="test_device", description=description
         )  # noqa: E501, RUF100
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # noqa: PLR6301
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES  # noqa: I001
+        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
 
         coordinator = MagicMock()
         # The sensor uses device_id as key in coordinator.data, and the payload
@@ -487,8 +487,8 @@ class TestSensorState:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry creates sensors."""
         hass = MagicMock()
         config_entry = MagicMock()

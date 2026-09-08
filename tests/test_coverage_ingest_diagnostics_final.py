@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -29,8 +29,10 @@ from custom_components.jackery_solarvault.models import (
     DataSource,
     FieldProvenance,
     Observation,
-    ProvenanceKey,
 )
+
+if TYPE_CHECKING:
+    from custom_components.jackery_solarvault.models import ProvenanceKey
 
 _DEVICE = "device-1"
 _NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)

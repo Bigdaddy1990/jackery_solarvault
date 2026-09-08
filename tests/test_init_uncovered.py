@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault import (
 class TestInitModule:
     """Test __init__.py module functions."""
 
-    def _create_hass(self):  # noqa: PLR6301
+    def _create_hass(self):  # ruff: ignore[no-self-use]
         """Create a mock hass."""
         hass = MagicMock()
         hass.data = {}
@@ -27,7 +27,7 @@ class TestInitModule:
         hass.states = MagicMock()
         return hass
 
-    def _create_config_entry(self, data=None, options=None):  # noqa: PLR6301
+    def _create_config_entry(self, data=None, options=None):  # ruff: ignore[no-self-use]
         """Create a mock config entry."""
         entry = MagicMock()
         entry.entry_id = "test_entry"
@@ -37,7 +37,7 @@ class TestInitModule:
         entry.minor_version = 0
         return entry
 
-    def _create_coordinator(self):  # noqa: PLR6301
+    def _create_coordinator(self):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = AsyncMock()
         coordinator.async_setup = AsyncMock()
@@ -92,7 +92,7 @@ class TestInitModule:
         coordinator.mark_mqtt_session_cache_loaded = MagicMock()
         return coordinator
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_setup(self) -> None:
         """Test async_setup function."""
         hass = self._create_hass()
@@ -100,7 +100,7 @@ class TestInitModule:
             result = await async_setup(hass, {})
             assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_setup_entry_success(self) -> None:
         """Test async_setup_entry success."""
         hass = self._create_hass()
@@ -113,7 +113,7 @@ class TestInitModule:
 
         coordinator = self._create_coordinator()
 
-        with patch(  # noqa: PLR1702, SIM117
+        with patch(  # ruff: ignore[too-many-nested-blocks, multiple-with-statements]
             "custom_components.jackery_solarvault.JackerySolarVaultCoordinator",
             return_value=coordinator,
         ):
@@ -162,7 +162,7 @@ class TestInitModule:
                                                             )
                                                             assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_unload_entry(self) -> None:
         """Test async_unload_entry."""
         hass = self._create_hass()
@@ -173,7 +173,7 @@ class TestInitModule:
         # Set up coordinator in hass.data
         hass.data["jackery_solarvault"] = {config_entry.entry_id: coordinator}
 
-        with patch(  # noqa: PLR1702, SIM117
+        with patch(  # ruff: ignore[too-many-nested-blocks, multiple-with-statements]
             "custom_components.jackery_solarvault._entry_runtime_bucket",
             return_value={},
         ):
@@ -201,7 +201,7 @@ class TestInitModule:
                                 result = await async_unload_entry(hass, config_entry)
                                 assert result is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_migrate_entry(self) -> None:
         """Migration is awaitable and advances the stored entry version."""
         hass = self._create_hass()
@@ -218,7 +218,7 @@ class TestInitModule:
             minor_version=1,
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_remove_config_entry_device(self) -> None:
         """Test async_remove_config_entry_device."""
         hass = self._create_hass()

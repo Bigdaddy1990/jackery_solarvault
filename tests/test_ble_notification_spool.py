@@ -1,19 +1,22 @@
 """Tests for the crash-safe BLE notification write-ahead spool."""
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from custom_components.jackery_solarvault.client.ble_notification_spool import (
     BleNotificationSpool,
-    BleSpoolRecord,
     BleSpoolStatus,
     _SqliteBleSpoolBackend,
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    from custom_components.jackery_solarvault.client.ble_notification_spool import (
+        BleSpoolRecord,
+    )
     from homeassistant.core import HomeAssistant
 
 
@@ -33,7 +36,7 @@ def _stage(
     ).sequence
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_committed_rows_reopen_in_fifo_with_same_namespace_and_ids(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -67,7 +70,7 @@ async def test_committed_rows_reopen_in_fifo_with_same_namespace_and_ids(
     await replacement.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ambiguous_append_retry_is_idempotent_only_for_same_ticket(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -107,7 +110,7 @@ async def test_ambiguous_append_retry_is_idempotent_only_for_same_ticket(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_precommit_append_failure_retries_the_same_ticket_without_loss(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -144,7 +147,7 @@ async def test_precommit_append_failure_retries_the_same_ticket_without_loss(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_task_factory_rejection_retains_staging_for_later_flush(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -182,7 +185,7 @@ async def test_task_factory_rejection_retains_staging_for_later_flush(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_confirm_deletes_only_named_rows_and_unconfirmed_rows_survive(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -207,7 +210,7 @@ async def test_confirm_deletes_only_named_rows_and_unconfirmed_rows_survive(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_immediate_confirm_waits_for_append_before_deleting(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -225,7 +228,7 @@ async def test_immediate_confirm_waits_for_append_before_deleting(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_immediate_status_update_waits_for_append_before_mutating(
     hass: HomeAssistant,
     tmp_path: Path,
@@ -253,7 +256,7 @@ async def test_immediate_status_update_waits_for_append_before_mutating(
     await spool.async_close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_load_record_returns_only_the_requested_durable_sequence(
     hass: HomeAssistant,
     tmp_path: Path,

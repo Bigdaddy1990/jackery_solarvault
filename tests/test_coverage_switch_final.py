@@ -1,8 +1,7 @@
 """Additional behavioural branch tests for the Jackery switch platform."""
 
-from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -27,6 +26,9 @@ from custom_components.jackery_solarvault.switch import (
     JackerySwitchDescription,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _DEVICE_ID = "device-1"
 

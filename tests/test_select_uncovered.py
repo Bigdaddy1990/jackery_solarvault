@@ -42,28 +42,28 @@ from custom_components.jackery_solarvault.select import (
 class TestStormMinutesHelpers:
     """Test storm minutes helper functions."""
 
-    def test_storm_minutes_value_from_properties(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_value_from_properties(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes from properties."""
         properties = {"wpc": 60}
         weather_plan = {}
         task_plan = {}
         assert _storm_minutes_value(properties, weather_plan, task_plan) == 60
 
-    def test_storm_minutes_value_from_weather_plan(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_value_from_weather_plan(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes from weather plan."""
         properties = {}
         weather_plan = {"minsInterval": 120}
         task_plan = {}
         assert _storm_minutes_value(properties, weather_plan, task_plan) == 120
 
-    def test_storm_minutes_value_below_min_valid(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_value_below_min_valid(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes below minimum valid returns None."""
         properties = {"wpc": 1}
         weather_plan = {}
         task_plan = {}
         assert _storm_minutes_value(properties, weather_plan, task_plan) is None
 
-    def test_storm_minutes_fallback_with_wps(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_fallback_with_wps(self) -> None:  # ruff: ignore[no-self-use]
         """Test fallback with WPS enabled."""
         properties = {"wps": 1}
         weather_plan = {}
@@ -77,7 +77,7 @@ class TestStormMinutesHelpers:
             == DEFAULT_STORM_WARNING_MINUTES
         )
 
-    def test_storm_minutes_label(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_label(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes label format."""
         assert _storm_minutes_label(10) == "min_10"
         assert _storm_minutes_label(30) == "min_30"
@@ -86,7 +86,7 @@ class TestStormMinutesHelpers:
 class TestPriceSourceHelpers:
     """Test price source helper functions."""
 
-    def test_price_source_label(self) -> None:  # noqa: PLR6301
+    def test_price_source_label(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source label generation."""
         source = {
             "platformCompanyId": "123",
@@ -98,19 +98,19 @@ class TestPriceSourceHelpers:
         assert "DE" in label
         assert "#123" in label
 
-    def test_price_source_regions(self) -> None:  # noqa: PLR6301
+    def test_price_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source regions extraction."""
         source = {"country": "DE,FR"}
         regions = _price_source_regions(source)
         assert "DE" in regions or "FR" in regions
 
-    def test_price_source_matches_current(self) -> None:  # noqa: PLR6301
+    def test_price_source_matches_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source matches current."""
         source = {"platformCompanyId": "123", "country": "DE"}
         assert _price_source_matches_current(source, "123", "DE") is True
         assert _price_source_matches_current(source, "456", "DE") is False
 
-    def test_price_sources_from_payload(self) -> None:  # noqa: PLR6301
+    def test_price_sources_from_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test price sources from payload."""
         payload = {
             "price_sources": [
@@ -129,7 +129,7 @@ class TestPriceSourceHelpers:
         sources = _price_sources_from_payload(payload)
         assert len(sources) == 2
 
-    def test_price_mode_dynamic_available(self) -> None:  # noqa: PLR6301
+    def test_price_mode_dynamic_available(self) -> None:  # ruff: ignore[no-self-use]
         """Test price mode dynamic available."""
         entity = MagicMock()
         entity._price = {"platformCompanyId": "123", "systemRegion": "DE"}
@@ -140,7 +140,7 @@ class TestPriceSourceHelpers:
 class TestWorkModeCurrent:
     """Test work mode current function."""
 
-    def test_work_mode_current_from_properties(self) -> None:  # noqa: PLR6301
+    def test_work_mode_current_from_properties(self) -> None:  # ruff: ignore[no-self-use]
         """Test work mode from properties."""
         entity = MagicMock()
         entity._properties = {"workModel": 7}
@@ -150,7 +150,7 @@ class TestWorkModeCurrent:
         result = _work_mode_current(entity)
         assert result is not None
 
-    def test_work_mode_current_unknown_logs_warning(self) -> None:  # noqa: PLR6301
+    def test_work_mode_current_unknown_logs_warning(self) -> None:  # ruff: ignore[no-self-use]
         """Test unknown work mode logs warning."""
         entity = MagicMock()
         entity._properties = {"workModel": 99}
@@ -164,7 +164,7 @@ class TestWorkModeCurrent:
 class TestTempUnitCurrent:
     """Test temp unit current function."""
 
-    def test_temp_unit_current(self) -> None:  # noqa: PLR6301
+    def test_temp_unit_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test temp unit current."""
         entity = MagicMock()
         entity._properties = {"tempUnit": 0}
@@ -175,7 +175,7 @@ class TestTempUnitCurrent:
 class TestIslandAutoOffCurrent:
     """Test island auto off current function."""
 
-    def test_island_auto_off_current_from_properties(self) -> None:  # noqa: PLR6301
+    def test_island_auto_off_current_from_properties(self) -> None:  # ruff: ignore[no-self-use]
         """Test island auto off from properties."""
         entity = MagicMock()
         entity._properties = {"offGridTime": 2}
@@ -183,7 +183,7 @@ class TestIslandAutoOffCurrent:
         result = _island_auto_off_current(entity)
         assert result == "h_2"
 
-    def test_island_auto_off_current_from_task_plan(self) -> None:  # noqa: PLR6301
+    def test_island_auto_off_current_from_task_plan(self) -> None:  # ruff: ignore[no-self-use]
         """Test island auto off from task plan."""
         entity = MagicMock()
         entity._properties = {}
@@ -195,7 +195,7 @@ class TestIslandAutoOffCurrent:
 class TestStormMinutesCurrent:
     """Test storm minutes current functions."""
 
-    def test_storm_minutes_current_value(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_current_value(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes current value."""
         entity = MagicMock()
         entity._properties = {"wpc": 120}
@@ -204,7 +204,7 @@ class TestStormMinutesCurrent:
         result = _storm_minutes_current_value(entity)
         assert result == 120
 
-    def test_storm_minutes_options(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_options(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes options."""
         entity = MagicMock()
         entity._properties = {"wpc": 120}
@@ -216,7 +216,7 @@ class TestStormMinutesCurrent:
         assert "min_120" in options
         assert "min_1440" in options
 
-    def test_storm_minutes_current(self) -> None:  # noqa: PLR6301
+    def test_storm_minutes_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes current."""
         entity = MagicMock()
         entity._properties = {"wpc": 120}
@@ -229,7 +229,7 @@ class TestStormMinutesCurrent:
 class TestPriceModeCurrent:
     """Test price mode current function."""
 
-    def test_price_mode_current_dynamic(self) -> None:  # noqa: PLR6301
+    def test_price_mode_current_dynamic(self) -> None:  # ruff: ignore[no-self-use]
         """Test price mode current dynamic."""
         entity = MagicMock()
         entity._price = {"dynamicOrSingle": 1}
@@ -243,7 +243,7 @@ class TestPriceModeCurrent:
 class TestPriceProviderHelpers:
     """Test price provider helper functions."""
 
-    def test_price_provider_options(self) -> None:  # noqa: PLR6301
+    def test_price_provider_options(self) -> None:  # ruff: ignore[no-self-use]
         """Test price provider options."""
         entity = MagicMock()
         entity._payload = {
@@ -262,7 +262,7 @@ class TestPriceProviderHelpers:
         assert "DE" in options[0]
         assert "#123" in options[0]
 
-    def test_price_provider_current(self) -> None:  # noqa: PLR6301
+    def test_price_provider_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test price provider current."""
         entity = MagicMock()
         entity._price = {
@@ -286,9 +286,9 @@ class TestPriceProviderHelpers:
 class TestCtPhaseCurrent:
     """Test CT phase current function."""
 
-    def test_ct_phase_current(self) -> None:  # noqa: PLR6301
+    def test_ct_phase_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test CT phase current."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER  # noqa: I001
+        from custom_components.jackery_solarvault.const import PAYLOAD_CT_METER
 
         entity = MagicMock()
         entity._payload = {PAYLOAD_CT_METER: {"schePhase": 1}}
@@ -299,77 +299,77 @@ class TestCtPhaseCurrent:
 class TestPortableSelectCurrent:
     """Test portable select current functions."""
 
-    def test_portable_ups_model_current(self) -> None:  # noqa: PLR6301
+    def test_portable_ups_model_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable UPS model current."""
         entity = MagicMock()
         entity._properties = {"ups": 1}
         result = _portable_ups_model_current(entity)
         assert result == "lifepo4"
 
-    def test_portable_ups_model_current_standard(self) -> None:  # noqa: PLR6301
+    def test_portable_ups_model_current_standard(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable UPS model current standard."""
         entity = MagicMock()
         entity._properties = {"ups": 0}
         result = _portable_ups_model_current(entity)
         assert result == "standard"
 
-    def test_portable_battery_mode_current(self) -> None:  # noqa: PLR6301
+    def test_portable_battery_mode_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable battery mode current."""
         entity = MagicMock()
         entity._properties = {"lps": 0}
         result = _portable_battery_mode_current(entity)
         assert result == "normal"
 
-    def test_portable_charge_mode_current(self) -> None:  # noqa: PLR6301
+    def test_portable_charge_mode_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable charge mode current."""
         entity = MagicMock()
         entity._properties = {"cs": 0}
         result = _portable_charge_mode_current(entity)
         assert result == "fast"
 
-    def test_portable_power_mode_current(self) -> None:  # noqa: PLR6301
+    def test_portable_power_mode_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable power mode current."""
         entity = MagicMock()
         entity._properties = {"pm": 1}
         result = _portable_power_mode_current(entity)
         assert result == "eco"
 
-    def test_portable_screen_current(self) -> None:  # noqa: PLR6301
+    def test_portable_screen_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable screen current."""
         entity = MagicMock()
         entity._properties = {"sltb": 2}
         result = _portable_screen_current(entity)
         assert result == "2min"
 
-    def test_portable_ac_output_mode_current(self) -> None:  # noqa: PLR6301
+    def test_portable_ac_output_mode_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable AC output mode current."""
         entity = MagicMock()
         entity._properties = {"acmode": 1}
         result = _portable_ac_output_mode_current(entity)
         assert result == "quiet"
 
-    def test_portable_output_priority_current(self) -> None:  # noqa: PLR6301
+    def test_portable_output_priority_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable output priority current."""
         entity = MagicMock()
         entity._properties = {"outPrio": 1}
         result = _portable_output_priority_current(entity)
         assert result == "grid-first"
 
-    def test_portable_ac1_priority_current(self) -> None:  # noqa: PLR6301
+    def test_portable_ac1_priority_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable AC1 priority current."""
         entity = MagicMock()
         entity._properties = {"oac1Prio": 1}
         result = _portable_ac1_priority_current(entity)
         assert result == "grid-first"
 
-    def test_portable_ac2_priority_current(self) -> None:  # noqa: PLR6301
+    def test_portable_ac2_priority_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable AC2 priority current."""
         entity = MagicMock()
         entity._properties = {"oac2Prio": 1}
         result = _portable_ac2_priority_current(entity)
         assert result == "grid-first"
 
-    def test_portable_dc_priority_current(self) -> None:  # noqa: PLR6301
+    def test_portable_dc_priority_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test portable DC priority current."""
         entity = MagicMock()
         entity._properties = {"odcPrio": 1}
@@ -380,7 +380,7 @@ class TestPortableSelectCurrent:
 class TestJackerySelect:
     """Test JackerySelect class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301
+    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -400,10 +400,10 @@ class TestJackerySelect:
         coordinator.async_set_storm_warning = AsyncMock()
         return coordinator
 
-    def _create_select(self, coordinator, key="work_mode_select"):  # noqa: PLR6301
+    def _create_select(self, coordinator, key="work_mode_select"):  # ruff: ignore[no-self-use]
         """Create a select instance for testing."""
         # Use an actual description from the module
-        from custom_components.jackery_solarvault.select import SELECT_DESCRIPTIONS  # noqa: I001
+        from custom_components.jackery_solarvault.select import SELECT_DESCRIPTIONS
 
         desc = next((d for d in SELECT_DESCRIPTIONS if d.key == key), None)
         if desc is None:
@@ -440,7 +440,7 @@ class TestJackerySelect:
         result = sensor.current_option
         assert result is not None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_select_option_valid(self) -> None:
         """Test async_select_option with valid option."""
         coordinator = self._create_coordinator()
@@ -449,7 +449,7 @@ class TestJackerySelect:
         await sensor.async_select_option("celsius")
         coordinator.async_set_temp_unit.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_select_option_invalid(self) -> None:
         """Test async_select_option with invalid option."""
         from homeassistant.exceptions import HomeAssistantError
@@ -464,8 +464,8 @@ class TestJackerySelect:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301
+    @pytest.mark.asyncio()
+    async def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry creates select entities."""
         hass = MagicMock()
         config_entry = MagicMock()

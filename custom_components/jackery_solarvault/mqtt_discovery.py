@@ -1,20 +1,25 @@
 """Publish native Jackery sensor values through Home Assistant MQTT discovery."""
 
 import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 import contextlib
 from datetime import date, datetime
 from enum import Enum
 from itertools import starmap
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import mqtt
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.util import slugify
 
 from .const import DOMAIN, MANUFACTURER
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _DISCOVERY_PREFIX = "homeassistant"
