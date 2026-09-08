@@ -26,6 +26,7 @@ jobs:
 
       - run: python -m pip install --upgrade pip ruff pre-commit, pyrefly
       - run: |
+          pyrefly suppress
           ruff check . --fix || true
           ruff check . --fix --unsafe-fixes || true
           ruff check . --target-version py314 || true
@@ -35,7 +36,11 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
-
+          pyrefly suppress --remove-unused || true
+          pyrefly check . --summarize-errors || true
+          pyrefly infer . || true
+          pyrefly coverage check . || true
+          pyrefly stubgen . || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual --check --py314-plus --ruff || true
 
