@@ -1829,6 +1829,7 @@ async def call(
     **kwargs: object,
 ) -> object:
     """Call a characterized coordinator setter by name."""
+    # pyrefly: ignore [no-any-return-implicit]
     return await getattr(coordinator, method)(*args, **kwargs)
 
 

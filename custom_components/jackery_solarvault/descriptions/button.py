@@ -520,7 +520,9 @@ async def _portable_read_sub_ct(
 
 BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_system_info",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_system_info",
         action=_query_system_info,
         message_type=MQTT_MESSAGE_QUERY_COMBINE_DATA,
@@ -530,7 +532,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         device_registry_role="system",
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_device_info",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_device_info",
         action=_query_device_info,
         message_type=MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
@@ -539,7 +543,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_device_property=True,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_wifi_list",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_wifi_list",
         action=_query_wifi_list,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -547,7 +553,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_READ_WIFI_LIST,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_time_zone",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_time_zone",
         action=_get_time_zone,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -555,7 +563,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_GET_TIME_ZONE,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="sync_time_zone",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="sync_time_zone",
         action=_send_time_zone,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -563,7 +573,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_SEND_TIME_ZONE,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="sync_cloud_mqtt_info",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="sync_cloud_mqtt_info",
         action=_sync_mqtt_connect_info,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -571,7 +583,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_device_ota_version",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_device_ota_version",
         action=_query_device_ota_version,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -579,7 +593,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_GET_DEVICE_OTA_VERSION,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_third_party_mqtt_config",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_third_party_mqtt_config",
         action=_query_third_party_mqtt_config,
         message_type=MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -587,7 +603,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_wifi_config",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_wifi_config",
         action=_query_wifi_config,
         message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
@@ -595,7 +613,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=MQTT_CMD_QUERY_WIFI_CONFIG,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_battery_packs",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_battery_packs",
         action=_query_battery_packs,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -605,7 +625,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_battery_packs=True,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_smart_meter",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_smart_meter",
         action=_query_smart_meter,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -615,7 +637,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_subdevice_dev_type=SUBDEVICE_DEV_TYPE_CT,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_meter_heads",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_meter_heads",
         action=_query_meter_heads,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -625,7 +649,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_subdevice_dev_type=SUBDEVICE_DEV_TYPE_METER_HEAD,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_smart_plugs",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_smart_plugs",
         action=_query_smart_plugs,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -635,7 +661,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_subdevice_dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="refresh_subdevice_combo",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="refresh_subdevice_combo",
         action=_query_subdevice_combo,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -646,7 +674,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
     ),
     # --- Portable / Explorer powerstation buttons ---
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_restart",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_restart",
         action=_portable_restart,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -654,7 +684,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_RESTART),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_power_off",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_power_off",
         action=_portable_power_off,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -662,7 +694,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_OFF),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_power_pack_blink",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_power_pack_blink",
         action=_portable_power_pack_blink,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -670,7 +704,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_PACK_BLINK),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_device_info",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_device_info",
         action=_portable_read_device_info,
         message_type=MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
@@ -679,7 +715,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_device_property=True,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_wifi_list",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_wifi_list",
         action=_portable_read_wifi_list,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -687,7 +725,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_READ_WIFI_LIST),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_battery_packs",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_battery_packs",
         action=_portable_get_power_pack_list,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -696,7 +736,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         http_battery_packs=True,
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_electricity_count",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_electricity_count",
         action=_portable_get_electricity_data_count,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -704,7 +746,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_ELECTRICITY_DATA_COUNT),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_sync_time_zone",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_sync_time_zone",
         action=_portable_send_time_zone,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -712,7 +756,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_SEND_TIME_ZONE),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_sync_mqtt_info",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_sync_mqtt_info",
         action=_portable_sync_mqtt_info,
         message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -720,7 +766,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_SYNC_MQTT_INFO),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_wifi_config",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_wifi_config",
         action=_portable_get_wifi_config,
         message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
@@ -728,7 +776,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_WIFI_CONFIG),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_get_charge_plan",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_get_charge_plan",
         action=_portable_get_charge_plan,
         message_type=MQTT_MESSAGE_QUERY_ELECTRICITY_STRATEGY,
@@ -736,7 +786,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_CHARGE_PLAN),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_current_charge_plan",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_current_charge_plan",
         action=_portable_current_charge_plan,
         message_type=MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
@@ -744,7 +796,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_CURRENT_CHARGE_PLAN),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_get_peaks_troughs",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_get_peaks_troughs",
         action=_portable_get_peaks_troughs,
         message_type=MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
@@ -752,7 +806,9 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS),
     ),
     JackeryButtonDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_refresh_sub_ct",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_refresh_sub_ct",
         action=_portable_read_sub_ct,
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,

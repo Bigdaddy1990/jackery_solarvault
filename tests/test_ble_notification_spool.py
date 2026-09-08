@@ -8,7 +8,7 @@ import pytest
 from custom_components.jackery_solarvault.client.ble_notification_spool import (
     BleNotificationSpool,
     BleSpoolStatus,
-    _SqliteBleSpoolBackend,
+    _SqliteBleSpoolBackend,  # ruff: ignore[import-private-name]
 )
 
 if TYPE_CHECKING:
@@ -59,8 +59,8 @@ async def test_committed_rows_reopen_in_fifo_with_same_namespace_and_ids(
     await replacement.async_flush_through(third_sequence)
 
     assert first_sequence == 1
-    assert second_sequence == 2
-    assert third_sequence == 3
+    assert second_sequence == 2  # ruff: ignore[magic-value-comparison]
+    assert third_sequence == 3  # ruff: ignore[magic-value-comparison]
     assert replacement.namespace == first_namespace
     assert [record.raw for record in before_restart] == [b"first", b"second"]
     assert [record.delivery_id for record in after_restart] == [
@@ -84,12 +84,12 @@ async def test_ambiguous_append_retry_is_idempotent_only_for_same_ticket(
     def _commit_then_raise_once(
         backend: _SqliteBleSpoolBackend,
         records: tuple[BleSpoolRecord, ...],
-    ) -> Any:
+    ) -> Any:  # ruff: ignore[any-type]
         nonlocal calls
         calls += 1
         metrics = real_append(backend, records)
         if calls == 1:
-            raise RuntimeError("executor result lost after commit")
+            raise RuntimeError("executor result lost after commit")  # ruff: ignore[raise-vanilla-args]
         return metrics
 
     monkeypatch.setattr(
@@ -103,7 +103,7 @@ async def test_ambiguous_append_retry_is_idempotent_only_for_same_ticket(
     await spool.async_flush_through(sequence)
     records = await spool.async_load_records()
 
-    assert calls == 2
+    assert calls == 2  # ruff: ignore[magic-value-comparison]
     assert len(records) == 1
     assert records[0].raw == b"only-once"
     assert spool.metrics.pending_rows == 1
@@ -124,10 +124,10 @@ async def test_precommit_append_failure_retries_the_same_ticket_without_loss(
     def _fail_before_first_commit(
         backend: _SqliteBleSpoolBackend,
         records: tuple[BleSpoolRecord, ...],
-    ) -> Any:
+    ) -> Any:  # ruff: ignore[any-type]
         attempts.append(tuple(record.delivery_id for record in records))
         if len(attempts) == 1:
-            raise OSError("temporary storage failure")
+            raise OSError("temporary storage failure")  # ruff: ignore[raise-vanilla-args]
         return real_append(backend, records)
 
     monkeypatch.setattr(
@@ -141,7 +141,7 @@ async def test_precommit_append_failure_retries_the_same_ticket_without_loss(
     await spool.async_flush_through(sequence)
     records = await spool.async_load_records()
 
-    assert len(attempts) == 2
+    assert len(attempts) == 2  # ruff: ignore[magic-value-comparison]
     assert attempts[0] == attempts[1]
     assert [record.raw for record in records] == [b"retained"]
     await spool.async_close()
@@ -159,8 +159,8 @@ async def test_task_factory_rejection_retains_staging_for_later_flush(
     await spool.async_open()
     real_create = hass.async_create_background_task
 
-    def _reject_task(*_args: Any, **_kwargs: Any) -> Any:
-        raise RuntimeError("task factory is closing")
+    def _reject_task(*_args: Any, **_kwargs: Any) -> Any:  # ruff: ignore[any-type]
+        raise RuntimeError("task factory is closing")  # ruff: ignore[raise-vanilla-args]
 
     monkeypatch.setattr(hass, "async_create_background_task", _reject_task)
     ticket = spool.stage_notification(
@@ -205,7 +205,7 @@ async def test_confirm_deletes_only_named_rows_and_unconfirmed_rows_survive(
     assert first == 1
     assert [record.sequence for record in records] == [first, third]
     assert [record.raw for record in records] == [b"first", b"third"]
-    assert spool.metrics.pending_rows == 2
+    assert spool.metrics.pending_rows == 2  # ruff: ignore[magic-value-comparison]
     assert spool.metrics.pending_bytes == len(b"first") + len(b"third")
     await spool.async_close()
 
@@ -252,7 +252,7 @@ async def test_immediate_status_update_waits_for_append_before_mutating(
     assert record.status is BleSpoolStatus.FRAGMENT
     assert record.assembly_key == "120:3022"
     assert record.chunk_index == 1
-    assert record.chunk_count == 2
+    assert record.chunk_count == 2  # ruff: ignore[magic-value-comparison]
     await spool.async_close()
 
 

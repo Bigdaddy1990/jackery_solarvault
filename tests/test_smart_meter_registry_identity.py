@@ -36,6 +36,7 @@ def _coordinator(smart_meter: dict[str, Any]) -> JackerySolarVaultCoordinator:
     cast("Any", coordinator).data = {
         _PARENT_ID: {PAYLOAD_CT_METER: dict(smart_meter)},
     }
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

@@ -3691,11 +3691,13 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         (CURRENCY_EURO for revenue), so the unit is never empty.
         """
         if self.entity_description.device_class != SensorDeviceClass.MONETARY:
+            # pyrefly: ignore [no-any-return-implicit]
             return self.entity_description.native_unit_of_measurement
         source = self._source_for_section(self._cached_source_section)
         currency = source.get(FIELD_CURRENCY)
         if isinstance(currency, str) and currency.strip():
             return currency
+        # pyrefly: ignore [no-any-return-implicit]
         return self.entity_description.native_unit_of_measurement
 
     # --- restored from 24.05\24.05\custom_components\jackery_solarvault\sensor.py ---
@@ -3757,6 +3759,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         )
         if value is None:
             return None
+        # pyrefly: ignore [bad-return]
         return value, metric_key
 
 

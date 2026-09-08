@@ -14,6 +14,7 @@ from homeassistant.util.json import load_json
 COMPONENTS_DIR = Path("homeassistant/components")
 
 
+# pyrefly: ignore [bad-specialization]
 def generate_quality_scale_summary() -> list[str, int]:
     """Generate a summary of integration quality scales."""
     quality_scales = {
@@ -37,6 +38,7 @@ def generate_quality_scale_summary() -> list[str, int]:
         else:
             quality_scales["unknown"] += 1
 
+    # pyrefly: ignore [bad-return]
     return quality_scales
 
 
@@ -78,6 +80,7 @@ def output_csv(quality_scales: dict[str, int], print_header: bool) -> None:
 def main() -> None:
     """Run the script."""
     quality_scales = generate_quality_scale_summary()
+    # pyrefly: ignore [bad-argument-type]
     output_csv(quality_scales, "--header" in sys.argv)
 
 

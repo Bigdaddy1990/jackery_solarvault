@@ -100,6 +100,7 @@ def _get_ha_languages() -> set[str]:
     )
     mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    # pyrefly: ignore [no-any-return-explicit]
     return mod.LANGUAGES
 
 

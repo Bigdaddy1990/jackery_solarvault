@@ -113,18 +113,25 @@ async def _run_owned_session(
     topics: tuple[str, ...],
 ) -> None:
     """Run one broker session while making its task the current owner."""
-    generation = client._session_generation
+    generation = client._session_generation  # ruff: ignore[private-member-access]
     task = asyncio.create_task(
-        client._async_run_session(
+        # pyrefly: ignore [missing-argument]
+        client._async_run_session(  # ruff: ignore[private-member-access]
+            # pyrefly: ignore [unexpected-keyword]
             client_id="cloud-client",
+            # pyrefly: ignore [unexpected-keyword]
             username="cloud-user",
+            # pyrefly: ignore [unexpected-keyword]
             password="cloud-password",
+            # pyrefly: ignore [unexpected-keyword]
             ssl_context=ssl.create_default_context(),
+            # pyrefly: ignore [unexpected-keyword]
             topics=topics,
+            # pyrefly: ignore [unexpected-keyword]
             generation=generation,
         )
     )
-    client._runner_task = task
+    client._runner_task = task  # ruff: ignore[private-member-access]
     await task
 
 
@@ -145,7 +152,7 @@ async def test_cloud_session_subscribes_and_delivers_every_payload(
     broker = _BrokerClient([frame], finish_event=finish_event)
     constructor_kwargs: dict[str, Any] = {}
 
-    def _make_broker(**kwargs: Any) -> _BrokerClient:
+    def _make_broker(**kwargs: Any) -> _BrokerClient:  # ruff: ignore[any-type]
         constructor_kwargs.update(kwargs)
         return broker
 
@@ -191,7 +198,7 @@ async def test_cloud_subscription_failure_is_reported_and_wakes_waiters(
         "disconnect: subscribe failed for hb/app/user/device: MqttError: **REDACTED**"
     )
     assert "denied" not in last_error
-    assert client._connected_event.is_set()
+    assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
 
 
 async def test_stop_does_not_cancel_pending_cloud_subscription(
@@ -242,7 +249,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     broker = _BrokerClient(enter_error=MqttError("network down"))
     calls = 0
 
-    def _make_broker(**_kwargs: Any) -> _BrokerClient:
+    def _make_broker(**_kwargs: Any) -> _BrokerClient:  # ruff: ignore[any-type]
         nonlocal calls
         calls += 1
         return broker
@@ -255,7 +262,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     last_error = client.diagnostics_snapshot()["last_error"]
     assert last_error == "connect failed: MqttError: **REDACTED**"
     assert "network down" not in last_error
-    assert client._connected_event.is_set()
+    assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
 
 
 async def test_publish_uses_compact_unicode_json_and_tracks_success(
@@ -264,8 +271,8 @@ async def test_publish_uses_compact_unicode_json_and_tracks_success(
     """Cloud publish preserves Unicode and records only the current session's write."""
     client = _client(hass)
     broker = _BrokerClient()
-    client._client = cast("Any", broker)
-    client._connected = True
+    client._client = cast("Any", broker)  # ruff: ignore[private-member-access]
+    client._connected = True  # ruff: ignore[private-member-access]
 
     await client.async_publish_json(
         "hb/app/user/action",
@@ -292,18 +299,18 @@ async def test_publish_error_invalidates_only_current_cloud_session(
         async def publish(
             self, topic: str, payload: str, *, qos: int, retain: bool
         ) -> None:
-            raise MqttError("socket lost")
+            raise MqttError("socket lost")  # ruff: ignore[raise-vanilla-args]
 
     client = _client(hass)
-    client._client = cast("Any", _FailingPublisher())
-    client._connected = True
-    client._connected_event.set()
+    client._client = cast("Any", _FailingPublisher())  # ruff: ignore[private-member-access]
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._connected_event.set()  # ruff: ignore[private-member-access]
 
     with pytest.raises(RuntimeError, match="MQTT publish failed: socket lost"):
         await client.async_publish_json("hb/app/user/action", {"cmd": 110})
 
     assert client.is_connected is False
-    assert not client._connected_event.is_set()
+    assert not client._connected_event.is_set()  # ruff: ignore[private-member-access]
     assert client.diagnostics_snapshot()["last_error"] == "publish failed: socket lost"
 
 
@@ -317,7 +324,7 @@ async def test_publish_rejects_session_generation_change_while_waiting(
     async def _replace_session(timeout_sec: float) -> None:
         await asyncio.sleep(0)
         assert timeout_sec == pytest.approx(30.0)
-        client._session_generation += 1
+        client._session_generation += 1  # ruff: ignore[private-member-access]
 
     monkeypatch.setattr(client, "_async_wait_connected", _replace_session)
 
@@ -331,10 +338,10 @@ async def test_response_correlation_keeps_normal_ingest_callback(
     """Getter correlation resolves its waiter without consuming the Cloud frame."""
     message_callback = AsyncMock()
     client = _client(hass, message_callback)
-    waiter = asyncio.create_task(client._wait_for_response(42, 1.0))
+    waiter = asyncio.create_task(client._wait_for_response(42, 1.0))  # ruff: ignore[private-member-access]
     await asyncio.sleep(0)
 
-    client._handle_message(
+    client._handle_message(  # ruff: ignore[private-member-access]
         "hb/app/user/action",
         '{"request_id":42,"body":{"soc":88}}',
     )
@@ -352,7 +359,7 @@ async def test_response_correlation_accepts_app_envelope_id(
     """App responses correlate via envelope ``id`` plus ``actionId``."""
     client = _client(hass)
     waiter = asyncio.create_task(
-        client._wait_for_response(1776548805134, 1.0, expected_response_type=3047)
+        client._wait_for_response(1776548805134, 1.0, expected_response_type=3047)  # ruff: ignore[private-member-access]
     )
     await asyncio.sleep(0)
 
@@ -361,7 +368,7 @@ async def test_response_correlation_accepts_app_envelope_id(
         "actionId": 3047,
         "body": {"enable": 1},
     }
-    client._resolve_pending_response(response)
+    client._resolve_pending_response(response)  # ruff: ignore[private-member-access]
 
     assert await waiter == response
     assert client.responses_correlated == 1
@@ -373,12 +380,12 @@ async def test_response_correlation_normalizes_numeric_string_id(
     """A JSON string ID still resolves the integer-keyed RPC waiter."""
     client = _client(hass)
     waiter = asyncio.create_task(
-        client._wait_for_response(42, 1.0, expected_response_type=3047)
+        client._wait_for_response(42, 1.0, expected_response_type=3047)  # ruff: ignore[private-member-access]
     )
     await asyncio.sleep(0)
 
     response = {"id": "42", "actionId": "3047", "body": {"enable": 1}}
-    client._resolve_pending_response(response)
+    client._resolve_pending_response(response)  # ruff: ignore[private-member-access]
 
     assert await asyncio.wait_for(waiter, timeout=0.1) == response
     assert client.responses_correlated == 1
@@ -391,10 +398,10 @@ async def test_response_timeout_expires_and_removes_waiter(
     client = _client(hass)
 
     with pytest.raises(TimeoutError):
-        await client._wait_for_response(7, 0.001)
+        await client._wait_for_response(7, 0.001)  # ruff: ignore[private-member-access]
 
     assert client.responses_expired == 1
-    assert client._pending_responses == {}
+    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
 
 
 async def test_rpc_disconnect_fails_waiter_with_transport_error(
@@ -402,14 +409,14 @@ async def test_rpc_disconnect_fails_waiter_with_transport_error(
 ) -> None:
     """Disconnect completes every open RPC rather than leaking its future."""
     client = _client(hass)
-    waiter = asyncio.create_task(client._wait_for_response(8))
+    waiter = asyncio.create_task(client._wait_for_response(8))  # ruff: ignore[private-member-access]
     await asyncio.sleep(0)
 
-    client._fail_pending_responses("connection lost")
+    client._fail_pending_responses("connection lost")  # ruff: ignore[private-member-access]
 
     with pytest.raises(JackeryMqttTransportError, match="connection lost"):
         await waiter
-    assert client._pending_responses == {}
+    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
 
 
 async def test_late_or_wrong_kind_response_cannot_cross_session(
@@ -418,16 +425,16 @@ async def test_late_or_wrong_kind_response_cannot_cross_session(
     """RPC matching includes generation, request ID and response kind."""
     client = _client(hass)
     waiter = asyncio.create_task(
-        client._wait_for_response(9, expected_response_type=3031)
+        client._wait_for_response(9, expected_response_type=3031)  # ruff: ignore[private-member-access]
     )
     await asyncio.sleep(0)
 
-    client._resolve_pending_response({"request_id": 9, "actionId": 3032})
+    client._resolve_pending_response({"request_id": 9, "actionId": 3032})  # ruff: ignore[private-member-access]
     assert not waiter.done()
-    client._session_generation += 1
-    client._resolve_pending_response({"request_id": 9, "actionId": 3031})
+    client._session_generation += 1  # ruff: ignore[private-member-access]
+    client._resolve_pending_response({"request_id": 9, "actionId": 3031})  # ruff: ignore[private-member-access]
     assert not waiter.done()
-    client._fail_pending_responses("new session")
+    client._fail_pending_responses("new session")  # ruff: ignore[private-member-access]
     with pytest.raises(JackeryMqttTransportError):
         await waiter
 
@@ -446,19 +453,19 @@ async def test_birth_once_per_generation_and_rebirth_next_generation(
     """Birth succeeds once in each fully subscribed broker generation."""
     birth = AsyncMock()
     client = _client(hass)
-    client._connected = True
-    client._session_state = MqttSessionState.SUBSCRIBED
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._session_state = MqttSessionState.SUBSCRIBED  # ruff: ignore[private-member-access]
 
-    client._schedule_birth_snapshot(birth, generation=0)
-    client._schedule_birth_snapshot(birth, generation=0)
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
     assert birth.await_count == 1
     assert client.diagnostics_snapshot()["birth_publishes"] == 1
 
-    client._session_generation = 1
-    client._schedule_birth_snapshot(birth, generation=1)
+    client._session_generation = 1  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=1)  # ruff: ignore[private-member-access]
     await hass.async_block_till_done()
-    assert birth.await_count == 2
+    assert birth.await_count == 2  # ruff: ignore[magic-value-comparison]
     assert client.diagnostics_snapshot()["session_state"] == "online"
 
 
@@ -478,13 +485,13 @@ async def test_stop_cancels_lifecycle_but_drains_messages_and_clears_cloud_state
     client = _client(hass, AsyncMock(side_effect=_message_callback))
     runner = asyncio.create_task(asyncio.sleep(60))
     lifecycle_task = asyncio.create_task(asyncio.sleep(60))
-    client._runner_task = runner
-    client._client = cast("Any", _BrokerClient())
-    client._connected = True
-    client._fingerprint = "secret-free-hash"
-    client._lifecycle_tasks[lifecycle_task] = object()
-    client._handle_message("device/property", b'{"body":{"seq":1}}')
-    message_task = client._message_consumer_task
+    client._runner_task = runner  # ruff: ignore[private-member-access]
+    client._client = cast("Any", _BrokerClient())  # ruff: ignore[private-member-access]
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._fingerprint = "secret-free-hash"  # ruff: ignore[private-member-access]
+    client._lifecycle_tasks[lifecycle_task] = object()  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
+    message_task = client._message_consumer_task  # ruff: ignore[private-member-access]
     assert message_task is not None
     await message_started.wait()
 

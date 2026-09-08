@@ -32,8 +32,8 @@ async def test_handler_accepts_text_and_bytearray_payloads(
         return True
 
     client = JackeryLocalMqttClient(hass, sink=_sink, topic_filter="jackery/#")
-    await client._handle_message("jackery/device", '{"soc":80}')
-    await client._handle_message("jackery/device", bytearray(b"not-json"))
+    await client._handle_message("jackery/device", '{"soc":80}')  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", bytearray(b"not-json"))  # ruff: ignore[private-member-access]
 
     assert received == [({"soc": 80}, b'{"soc":80}'), (None, b"not-json")]
 
@@ -45,9 +45,9 @@ async def test_stopping_handler_is_a_noop(
     """The unload barrier prevents direct ingress from mutating diagnostics."""
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
-    client._stopping = True
+    client._stopping = True  # ruff: ignore[private-member-access]
 
-    await client._handle_message("jackery/device", b"{}")
+    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
 
     sink.assert_not_awaited()
     assert client.diagnostics_snapshot()["messages_received"] == 0
@@ -60,7 +60,7 @@ async def test_payload_without_sink_is_counted_as_dropped(
     """Observation-only construction exposes an explicit dropped-frame count."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
 
-    await client._handle_message("jackery/device", "[]")
+    await client._handle_message("jackery/device", "[]")  # ruff: ignore[private-member-access]
 
     snapshot = client.diagnostics_snapshot(redact=False)
     assert snapshot["messages_received"] == 1
@@ -81,7 +81,7 @@ async def test_rejected_or_failed_sink_is_diagnosed(
         sink = AsyncMock(return_value=sink_result)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
 
-    await client._handle_message("jackery/device", b"{}")
+    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
 
     snapshot = client.diagnostics_snapshot()
     assert snapshot["messages_dropped"] == 1
@@ -99,7 +99,7 @@ async def test_sink_cancellation_propagates(hass: HomeAssistant) -> None:
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="jackery/#")
 
     with pytest.raises(asyncio.CancelledError):
-        await client._handle_message("jackery/device", b"{}")
+        await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
 
     assert client.diagnostics_snapshot()["messages_dropped"] == 0
 
@@ -114,7 +114,7 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_TOPIC_NAMES", 0)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
-    await client._handle_message("future/device", b"{}")
+    await client._handle_message("future/device", b"{}")  # ruff: ignore[private-member-access]
 
     snapshot = client.diagnostics_snapshot(redact=False)
     assert snapshot["topics_seen_truncated"] is True
@@ -131,7 +131,7 @@ async def test_oversized_payload_is_rejected_before_decode(
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_PAYLOAD_BYTES", 2)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
-    await client._handle_message("jackery/device", b"{} ")
+    await client._handle_message("jackery/device", b"{} ")  # ruff: ignore[private-member-access]
 
     sink.assert_not_awaited()
     snapshot = client.diagnostics_snapshot(redact=False)

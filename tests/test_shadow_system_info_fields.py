@@ -49,7 +49,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator._property_overrides = {}  # ruff: ignore[private-member-access]
     coordinator._system_info_cache = {}  # ruff: ignore[private-member-access]
     coordinator._system_info_cache_monotonic = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _system_body() -> dict[str, Any]:

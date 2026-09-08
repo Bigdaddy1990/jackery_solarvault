@@ -31,7 +31,7 @@ _FIRST_FIVE_MINUTE_KWH_AT_120_W = 0.01
 
 def test_day_chart_minute_parses_boundaries_and_rejects_end_marker() -> None:
     """Only real in-day H:MM labels resolve to a minute offset."""
-    parse = util._parse_day_chart_minute
+    parse = util._parse_day_chart_minute  # ruff: ignore[private-member-access]
 
     assert parse("0:00") == 0
     assert parse("23:59") == _MINUTES_AT_23_59
@@ -43,17 +43,17 @@ def test_day_chart_minute_parses_boundaries_and_rejects_end_marker() -> None:
 
 def test_day_power_sample_minute_prefers_label_then_falls_back_to_index() -> None:
     """Valid labels win; malformed or absent labels use five-minute indexes."""
-    sample_minute = util._day_power_sample_minute
+    sample_minute = util._day_power_sample_minute  # ruff: ignore[private-member-access]
 
-    assert sample_minute(["1:30"], 0) == 90
-    assert sample_minute(["bad"], 1) == 5
-    assert sample_minute(None, 2) == 10
+    assert sample_minute(["1:30"], 0) == 90  # ruff: ignore[magic-value-comparison]
+    assert sample_minute(["bad"], 1) == 5  # ruff: ignore[magic-value-comparison]
+    assert sample_minute(None, 2) == 10  # ruff: ignore[magic-value-comparison]
     assert sample_minute(None, 288) is None
 
 
 def test_day_power_sample_energy_value_preserves_directional_semantics() -> None:
     """Signed combined and split battery curves keep their documented direction."""
-    sample_value = util._day_power_sample_energy_value
+    sample_value = util._day_power_sample_energy_value  # ruff: ignore[private-member-access]
     battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
 
     assert (
@@ -68,13 +68,13 @@ def test_day_power_sample_energy_value_preserves_directional_semantics() -> None
     )
     assert (
         sample_value(-5, battery_day, APP_STAT_TOTAL_DISCHARGE, APP_CHART_SERIES_Y1)
-        == 5
+        == 5  # ruff: ignore[magic-value-comparison]
     )
     assert (
         sample_value(5, battery_day, APP_STAT_TOTAL_DISCHARGE, APP_CHART_SERIES_Y1) == 0
     )
     assert (
-        sample_value(5, battery_day, APP_STAT_TOTAL_DISCHARGE, APP_CHART_SERIES_Y2) == 5
+        sample_value(5, battery_day, APP_STAT_TOTAL_DISCHARGE, APP_CHART_SERIES_Y2) == 5  # ruff: ignore[magic-value-comparison]
     )
     assert (
         sample_value(
@@ -86,7 +86,7 @@ def test_day_power_sample_energy_value_preserves_directional_semantics() -> None
 
 def test_reconcile_rounded_day_values_handles_positive_and_negative_delta() -> None:
     """Rounding correction adds to or removes from trailing populated buckets."""
-    reconcile = util._reconcile_rounded_day_values
+    reconcile = util._reconcile_rounded_day_values  # ruff: ignore[private-member-access]
 
     assert reconcile([], 1.0) == []
     assert reconcile([0.1, 0.2], 0.31) == [0.1, 0.21]
@@ -97,7 +97,7 @@ def test_reconcile_rounded_day_values_handles_positive_and_negative_delta() -> N
 
 def test_resolve_day_request_window_rejects_missing_reversed_and_future_dates() -> None:
     """A day curve is importable only when its request window is coherent."""
-    resolve = util._resolve_day_request_window
+    resolve = util._resolve_day_request_window  # ruff: ignore[private-member-access]
     today = date(2026, 8, 10)
     now = datetime(2026, 8, 10, 10, 30)
 
@@ -185,7 +185,7 @@ def test_day_power_energy_points_rejects_invalid_bucket_sizes(
 
 
 def test_day_power_energy_points_rejects_unproven_scalar_and_unknown_unit() -> None:
-    """A scalar without positive curve energy and an unknown unit remain unimportable."""
+    """A scalar without positive curve energy and an unknown unit remain unimportable."""  # ruff: ignore[line-too-long]
     today = date(2026, 8, 10)
     base = {
         APP_CHART_SERIES_Y: [0],

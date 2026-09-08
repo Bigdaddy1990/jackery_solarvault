@@ -80,7 +80,9 @@ class TestBinarySensor:
         )
 
         description = JackeryBinaryDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="test_binary",
+            # pyrefly: ignore [unexpected-keyword]
             name="Test Binary",
             getter=lambda props, meta: True,
         )
@@ -113,7 +115,9 @@ class TestBinarySensor:
         )
 
         description = JackerySubdeviceAlarmBinarySensorDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="test_alarm",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="test_alarm",
             field="test_field",
         )

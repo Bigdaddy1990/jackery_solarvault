@@ -34,7 +34,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.select import (
     SELECT_DESCRIPTIONS,
     JackerySelect,
-    _SelectState,
+    _SelectState,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
 from homeassistant.exceptions import HomeAssistantError
@@ -54,7 +54,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:
+def _description(key: str) -> Any:  # ruff: ignore[any-type]
     """Return one production select description by stable key."""
     return next(
         description for description in SELECT_DESCRIPTIONS if description.key == key
@@ -78,9 +78,10 @@ def _select(key: str, payload: dict[str, Any]) -> JackerySelect:
     entity = JackerySelect.__new__(JackerySelect)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator({_DEVICE_ID: payload})
-    mutable._device_id = _DEVICE_ID
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
-    mutable._state = _SelectState()
+    mutable._state = _SelectState()  # ruff: ignore[private-member-access]
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -283,7 +284,7 @@ async def test_untranslated_write_error_becomes_entity_action_error() -> None:
         ],
     ],
 )
-async def test_portable_select_families_map_current_and_wire_values(
+async def test_portable_select_families_map_current_and_wire_values(  # ruff: ignore[too-many-arguments, too-many-positional-arguments]
     key: str,
     field: str,
     raw_value: int,
@@ -306,11 +307,11 @@ async def test_portable_select_families_map_current_and_wire_values(
 
 
 async def test_setup_listener_adds_new_home_selects_once_after_discovery() -> None:
-    """A later payload discovers selects once and unchanged callbacks add no duplicates."""
+    """A later payload discovers selects once and unchanged callbacks add no duplicates."""  # ruff: ignore[line-too-long]
     coordinator = _coordinator({})
     listeners: list[Any] = []
 
-    def _capture_listener(listener: Any) -> Any:
+    def _capture_listener(listener: Any) -> Any:  # ruff: ignore[any-type]
         listeners.append(listener)
         return lambda: None
 
@@ -333,7 +334,7 @@ async def test_setup_listener_adds_new_home_selects_once_after_discovery() -> No
     discovered_count = len(added)
     listeners[0]()
 
-    assert discovered_count == 2
+    assert discovered_count == 2  # ruff: ignore[magic-value-comparison]
     assert {entity.entity_description.key for entity in added} == {
         "electricity_price_mode",
         "work_mode_select",

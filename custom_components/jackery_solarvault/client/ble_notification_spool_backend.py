@@ -33,6 +33,7 @@ class _SqliteBleSpoolBackend:
         connection.execute("PRAGMA busy_timeout = 5000")
         return connection
 
+    # pyrefly: ignore [deprecated]
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
         """Yield one transactional connection and always close it."""
@@ -106,7 +107,7 @@ class _SqliteBleSpoolBackend:
                     )
                     raise RuntimeError(msg)
                 if str(row["entry_id"]) != self._entry_id:
-                    raise RuntimeError("Jackery BLE spool belongs to another entry")
+                    raise RuntimeError("Jackery BLE spool belongs to another entry")  # ruff: ignore[raise-vanilla-args]
 
             aggregate = connection.execute(
                 """
@@ -161,7 +162,7 @@ class _SqliteBleSpoolBackend:
             "SELECT * FROM spool_meta WHERE singleton = 1"
         ).fetchone()
         if row is None:
-            raise RuntimeError("Jackery BLE spool metadata is missing")
+            raise RuntimeError("Jackery BLE spool metadata is missing")  # ruff: ignore[raise-vanilla-args]
         return self._metrics_from_row(row)
 
     def append_batch(self, records: Sequence[BleSpoolRecord]) -> BleSpoolMetrics:
@@ -207,7 +208,7 @@ class _SqliteBleSpoolBackend:
                     (record.delivery_id,),
                 ).fetchone()
                 if existing is None or not self._record_matches(existing, record):
-                    raise RuntimeError(
+                    raise RuntimeError(  # ruff: ignore[raise-vanilla-args]
                         f"Conflicting Jackery BLE spool record {record.delivery_id}"
                     )
             next_sequence = max(record.sequence for record in records) + 1

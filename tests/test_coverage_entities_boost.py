@@ -12,11 +12,11 @@ def test_safe_helpers_edge_cases() -> None:
     """Test safe conversion helper functions."""
     assert safe_float(None) is None
     assert safe_float("invalid") is None
-    assert safe_float(12.34) == 12.34  # ruff: ignore[float-equality-comparison]
+    assert safe_float(12.34) == 12.34  # ruff: ignore[float-equality-comparison]  # ruff: ignore[magic-value-comparison]
 
     assert safe_int(None) is None
     assert safe_int("invalid") is None
-    assert safe_int(100) == 100
+    assert safe_int(100) == 100  # ruff: ignore[magic-value-comparison]
 
     assert safe_bool(None) is None
     assert safe_bool("true") is True

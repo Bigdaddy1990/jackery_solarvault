@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault import (
 class TestInitModule:
     """Test __init__.py module functions."""
 
-    def _create_hass(self):  # ruff: ignore[no-self-use]
+    def _create_hass(self):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-return-type-private-function]
         """Create a mock hass."""
         hass = MagicMock()
         hass.data = {}
@@ -27,7 +27,7 @@ class TestInitModule:
         hass.states = MagicMock()
         return hass
 
-    def _create_config_entry(self, data=None, options=None):  # ruff: ignore[no-self-use]
+    def _create_config_entry(self, data=None, options=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
         """Create a mock config entry."""
         entry = MagicMock()
         entry.entry_id = "test_entry"
@@ -37,7 +37,7 @@ class TestInitModule:
         entry.minor_version = 0
         return entry
 
-    def _create_coordinator(self):  # ruff: ignore[no-self-use]
+    def _create_coordinator(self):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-return-type-private-function, too-many-statements]
         """Create a mock coordinator."""
         coordinator = AsyncMock()
         coordinator.async_setup = AsyncMock()
@@ -147,7 +147,7 @@ class TestInitModule:
                                                 with patch.object(
                                                     hass.config_entries,
                                                     "async_forward_entry_setups",
-                                                    new_callable=AsyncMock,  # noqa: E501, RUF100
+                                                    new_callable=AsyncMock,  # noqa: E501, RUF100, RUF105
                                                 ):
                                                     with patch(
                                                         "custom_components.jackery_solarvault._schedule_layer5_start_if_ready"
@@ -192,7 +192,7 @@ class TestInitModule:
                             hass.config_entries,
                             "async_unload_platforms",
                             new_callable=AsyncMock,
-                            return_value=True,  # noqa: E501, RUF100
+                            return_value=True,  # noqa: E501, RUF100, RUF105
                         ):
                             with patch(
                                 "custom_components.jackery_solarvault._async_shutdown_coordinator_bounded",

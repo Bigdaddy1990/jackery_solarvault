@@ -20,7 +20,7 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
 
-# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)
+# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)  # ruff: ignore[line-too-long]
 CONF_LOCAL_MQTT_ENABLE = CONF_THIRD_PARTY_MQTT_ENABLE
 CONF_LOCAL_MQTT_HOST = CONF_THIRD_PARTY_MQTT_IP
 
@@ -28,21 +28,21 @@ _DEVICE_ID = "device-1"
 _TARGET_DAY = date(2026, 8, 10)
 
 
-def _bare_coordinator() -> Any:
+def _bare_coordinator() -> Any:  # ruff: ignore[any-type]
     """Return a coordinator shell with only state used by these contracts."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
-    shell._shutdown_started = False
-    shell._property_source_state = {}
-    shell._accessory_source_state = {}
-    shell._property_overrides = {}
-    shell._background_tasks = {}
-    shell._configured_update_interval = timedelta(seconds=15)
-    shell._polling_diagnostics = {}
-    shell._polling_timeout_started_monotonic = None
-    shell._mqtt = None
-    shell._ble_listener = None
-    shell._device_index = {}
+    shell._shutdown_started = False  # ruff: ignore[private-member-access]
+    shell._property_source_state = {}  # ruff: ignore[private-member-access]
+    shell._accessory_source_state = {}  # ruff: ignore[private-member-access]
+    shell._property_overrides = {}  # ruff: ignore[private-member-access]
+    shell._background_tasks = {}  # ruff: ignore[private-member-access]
+    shell._configured_update_interval = timedelta(seconds=15)  # ruff: ignore[private-member-access]
+    shell._polling_diagnostics = {}  # ruff: ignore[private-member-access]
+    shell._polling_timeout_started_monotonic = None  # ruff: ignore[private-member-access]
+    shell._mqtt = None  # ruff: ignore[private-member-access]
+    shell._ble_listener = None  # ruff: ignore[private-member-access]
+    shell._device_index = {}  # ruff: ignore[private-member-access]
     shell.entry = SimpleNamespace(options={}, data={})
     shell.api = SimpleNamespace(get_cached_mqtt_credentials=lambda: None)
     return shell
@@ -53,11 +53,11 @@ def test_polling_timeout_incident_is_counted_once_and_recovers() -> None:
     coordinator = _bare_coordinator()
 
     with patch.object(coord_mod.time, "monotonic", side_effect=[120.0, 124.0, 130.0]):
-        coordinator._note_polling_timeout(100.0)
-        coordinator._note_polling_timeout(100.0)
-        coordinator._recover_polling_timeout()
+        coordinator._note_polling_timeout(100.0)  # ruff: ignore[private-member-access]
+        coordinator._note_polling_timeout(100.0)  # ruff: ignore[private-member-access]
+        coordinator._recover_polling_timeout()  # ruff: ignore[private-member-access]
 
-    diagnostics = coordinator._polling_diagnostics
+    diagnostics = coordinator._polling_diagnostics  # ruff: ignore[private-member-access]
     assert diagnostics["timeout_incident_count"] == 1
     assert diagnostics["last_timeout_elapsed_sec"] == pytest.approx(24.0)
     assert diagnostics["incident_max_timeout_elapsed_sec"] == pytest.approx(24.0)
@@ -85,12 +85,12 @@ async def test_background_scheduler_reuses_active_task_then_allows_replay() -> N
         )
     )
 
-    first = coordinator._schedule_background_once(
+    first = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
         "refresh",
         operation,
         name="refresh-one",
     )
-    duplicate = coordinator._schedule_background_once(
+    duplicate = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
         "refresh",
         operation,
         name="refresh-two",
@@ -103,16 +103,16 @@ async def test_background_scheduler_reuses_active_task_then_allows_replay() -> N
     assert first is not None
     await first
     await asyncio.sleep(0)
-    assert "refresh" not in coordinator._background_tasks
+    assert "refresh" not in coordinator._background_tasks  # ruff: ignore[private-member-access]
 
-    replay = coordinator._schedule_background_once(
+    replay = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
         "refresh",
         operation,
         name="refresh-three",
     )
     assert replay is not None
     assert replay is not first
-    assert await replay == 2
+    assert await replay == 2  # ruff: ignore[magic-value-comparison]
 
 
 def test_stale_live_property_is_rejected_without_blocking_http_configuration() -> None:
@@ -120,7 +120,7 @@ def test_stale_live_property_is_rejected_without_blocking_http_configuration() -
     coordinator = _bare_coordinator()
     stale_at = datetime.now(UTC) - timedelta(hours=6)
 
-    merged = coordinator._property_updates_for_source(
+    merged = coordinator._property_updates_for_source(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {"soc": 12, "temperatureUnit": 1},
         TransportSource.HTTP,
@@ -128,7 +128,7 @@ def test_stale_live_property_is_rejected_without_blocking_http_configuration() -
         observed_at=stale_at,
     )
 
-    assert merged["soc"] == 83
+    assert merged["soc"] == 83  # ruff: ignore[magic-value-comparison]
     assert merged["temperatureUnit"] == 1
 
 
@@ -137,7 +137,7 @@ def test_stale_accessory_frame_keeps_identity_but_not_old_telemetry() -> None:
     coordinator = _bare_coordinator()
     stale_at = datetime.now(UTC) - timedelta(hours=6)
 
-    merged = coordinator._accessory_updates_for_source(
+    merged = coordinator._accessory_updates_for_source(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         "battery_packs",
         "pack-1",
@@ -148,19 +148,19 @@ def test_stale_accessory_frame_keeps_identity_but_not_old_telemetry() -> None:
     )
 
     assert merged["deviceSn"] == "pack-1"
-    assert merged["soc"] == 72
+    assert merged["soc"] == 72  # ruff: ignore[magic-value-comparison]
 
 
 def test_system_info_cache_fills_only_missing_values_until_expiry() -> None:
     """Cached HTTP system info fills gaps but never overwrites fresh values."""
     coordinator = _bare_coordinator()
-    coordinator._system_info_cache = {
+    coordinator._system_info_cache = {  # ruff: ignore[private-member-access]
         _DEVICE_ID: {"firmwareVersion": "1.2.3", "wifiName": "cached"}
     }
-    coordinator._system_info_cache_monotonic = {_DEVICE_ID: 100.0}
+    coordinator._system_info_cache_monotonic = {_DEVICE_ID: 100.0}  # ruff: ignore[private-member-access]
 
     with patch.object(coord_mod.time, "monotonic", return_value=101.0):
-        filled = coordinator._overlay_cached_system_info(
+        filled = coordinator._overlay_cached_system_info(  # ruff: ignore[private-member-access]
             _DEVICE_ID,
             {"wifiName": "fresh"},
         )
@@ -172,7 +172,7 @@ def test_system_info_cache_fills_only_missing_values_until_expiry() -> None:
         "monotonic",
         return_value=100.0 + coord_mod.SYSTEM_INFO_CACHE_MAX_AGE_SEC + 1,
     ):
-        expired = coordinator._overlay_cached_system_info(
+        expired = coordinator._overlay_cached_system_info(  # ruff: ignore[private-member-access]
             _DEVICE_ID,
             {},
         )
@@ -193,15 +193,15 @@ def test_transport_supervisors_are_independent_and_configuration_visible() -> No
         get_cached_mqtt_credentials=lambda: {"username": "cached"}
     )
 
-    assert coordinator._data_source_supervisor_available("http") is True
-    assert coordinator._data_source_supervisor_available("cloud_mqtt") is True
-    assert coordinator._data_source_supervisor_available("ble") is True
-    assert coordinator._data_source_supervisor_available("local_mqtt") is True
-    assert coordinator._data_source_supervisor_available("unknown") is False
+    assert coordinator._data_source_supervisor_available("http") is True  # ruff: ignore[private-member-access]
+    assert coordinator._data_source_supervisor_available("cloud_mqtt") is True  # ruff: ignore[private-member-access]
+    assert coordinator._data_source_supervisor_available("ble") is True  # ruff: ignore[private-member-access]
+    assert coordinator._data_source_supervisor_available("local_mqtt") is True  # ruff: ignore[private-member-access]
+    assert coordinator._data_source_supervisor_available("unknown") is False  # ruff: ignore[private-member-access]
 
-    coordinator._shutdown_started = True
-    assert coordinator._data_source_supervisor_available("http") is False
-    assert coordinator._command_source_available(_DEVICE_ID, "http") is False
+    coordinator._shutdown_started = True  # ruff: ignore[private-member-access]
+    assert coordinator._data_source_supervisor_available("http") is False  # ruff: ignore[private-member-access]
+    assert coordinator._command_source_available(_DEVICE_ID, "http") is False  # ruff: ignore[private-member-access]
 
 
 def test_command_sources_use_transport_specific_readiness() -> None:
@@ -210,26 +210,26 @@ def test_command_sources_use_transport_specific_readiness() -> None:
     coordinator.api = SimpleNamespace(
         get_cached_mqtt_credentials=lambda: {"username": "cached"}
     )
-    coordinator._mqtt = SimpleNamespace(is_connected=False)
-    coordinator._ble_listener = object()
-    coordinator._ble_writes_enabled = lambda: True
+    coordinator._mqtt = SimpleNamespace(is_connected=False)  # ruff: ignore[private-member-access]
+    coordinator._ble_listener = object()  # ruff: ignore[private-member-access]
+    coordinator._ble_writes_enabled = lambda: True  # ruff: ignore[private-member-access]
     coordinator.device_bluetooth_key = lambda _device_id: "key"
-    coordinator._ble_address_for_device = lambda _device_id: None
+    coordinator._ble_address_for_device = lambda _device_id: None  # ruff: ignore[private-member-access]
 
-    assert coordinator._command_source_available(_DEVICE_ID, "http") is True
-    assert coordinator._command_source_available(_DEVICE_ID, "cloud_mqtt") is True
-    assert coordinator._command_source_available(_DEVICE_ID, "ble") is True
-    assert coordinator._command_source_available(_DEVICE_ID, "local_mqtt") is False
+    assert coordinator._command_source_available(_DEVICE_ID, "http") is True  # ruff: ignore[private-member-access]
+    assert coordinator._command_source_available(_DEVICE_ID, "cloud_mqtt") is True  # ruff: ignore[private-member-access]
+    assert coordinator._command_source_available(_DEVICE_ID, "ble") is True  # ruff: ignore[private-member-access]
+    assert coordinator._command_source_available(_DEVICE_ID, "local_mqtt") is False  # ruff: ignore[private-member-access]
 
 
 def test_historical_sources_include_system_routes_only_with_system_id() -> None:
     """PV and trend backfill routes require a resolved system identifier."""
     coordinator = _bare_coordinator()
-    without_system = coordinator._historical_day_source_prefixes(
+    without_system = coordinator._historical_day_source_prefixes(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {},
     )
-    with_system = coordinator._historical_day_source_prefixes(
+    with_system = coordinator._historical_day_source_prefixes(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {coord_mod.PAYLOAD_SYSTEM: {coord_mod.FIELD_ID: "system-1"}},
     )
@@ -264,7 +264,7 @@ async def test_historical_http_sources_route_independently(
     coordinator.api = api
     payload = {coord_mod.PAYLOAD_SYSTEM: {coord_mod.FIELD_ID: "system-1"}}
 
-    status, result = await coordinator._async_fetch_historical_day_chart_source(
+    status, result = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload=payload,
         target_day=_TARGET_DAY,
@@ -296,7 +296,7 @@ async def test_historical_http_failures_remain_retryable_and_local(
         async_get_device_battery_stat=AsyncMock(side_effect=failure)
     )
 
-    status, result = await coordinator._async_fetch_historical_day_chart_source(
+    status, result = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
         device_id=_DEVICE_ID,
         payload={},
         target_day=_TARGET_DAY,
@@ -309,8 +309,8 @@ async def test_historical_http_failures_remain_retryable_and_local(
 
 def test_backfill_state_never_marks_an_open_period_imported() -> None:
     """Open buckets remain retryable while closed imported buckets stay durable."""
-    normalize = coord_mod._normalize_backfill_status
-    is_closed = coord_mod._backfill_period_is_closed
+    normalize = coord_mod._normalize_backfill_status  # ruff: ignore[private-member-access]
+    is_closed = coord_mod._backfill_period_is_closed  # ruff: ignore[private-member-access]
 
     assert normalize("imported", closed=False) is BackfillStatus.RETRYABLE
     assert normalize("imported", closed=True) is BackfillStatus.IMPORTED

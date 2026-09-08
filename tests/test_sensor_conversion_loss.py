@@ -90,6 +90,7 @@ def _sensor_coordinator(
     """Build the smallest real coordinator shell used by sensor properties."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator).data = data
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

@@ -252,16 +252,19 @@ class TestFindDictWithAnyKeyAdditional:
     def test_finds_key_in_nested_list(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Finds key in list within dict."""
         obj = {"devices": [{"deviceSn": "p1"}, {"deviceSn": "p2"}]}
+        # pyrefly: ignore [bad-argument-type]
         result = find_dict_with_any_key(obj, {"deviceSn"})
         assert result == obj["devices"][0]
 
     def test_returns_none_for_string_input(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Returns None for string input."""
+        # pyrefly: ignore [bad-argument-type]
         result = find_dict_with_any_key("string", {"deviceSn"})
         assert result is None
 
     def test_returns_none_for_int_input(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Returns None for int input."""
+        # pyrefly: ignore [bad-argument-type]
         result = find_dict_with_any_key(123, {"deviceSn"})
         assert result is None
 

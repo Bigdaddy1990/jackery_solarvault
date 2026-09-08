@@ -154,8 +154,8 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     # A readback arriving after unload has fenced this coordinator belongs to
     # the old runtime and must not mutate the new config-entry state.
     options_before_late_readback = dict(entry.options)
-    runtime_bucket = integration._entry_runtime_bucket(hass, entry)
-    runtime_bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
+    runtime_bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    runtime_bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator  # ruff: ignore[private-member-access]
     with patch.object(hass.config_entries, "async_update_entry") as update_entry:
         observer({
             "enable": 1,
@@ -239,18 +239,18 @@ async def test_entry_data_change_reloads_instead_of_mutating_transports(
     entry = _entry(hass, entry_id="data-change")
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_USERNAME: "old@example.com",
         CONF_PASSWORD: "secret",
     }
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}  # ruff: ignore[private-member-access]
 
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
         patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
-        await integration._async_entry_updated(hass, entry)
+        await integration._async_entry_updated(hass, entry)  # ruff: ignore[private-member-access]
 
     reload_entry.assert_awaited_once_with(entry.entry_id)
     reconcile.assert_not_called()
@@ -272,16 +272,16 @@ async def test_entry_options_apply_polling_entities_and_layer5_in_place(
     )
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {}  # ruff: ignore[private-member-access]
 
     with (
         patch.object(hass.config_entries, "async_reload", AsyncMock()) as reload_entry,
         patch.object(integration, "_async_clean_legacy_entities") as clean_entities,
         patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile,
     ):
-        await integration._async_entry_updated(hass, entry)
+        await integration._async_entry_updated(hass, entry)  # ruff: ignore[private-member-access]
 
     reload_entry.assert_not_awaited()
     coordinator.async_set_scan_interval.assert_called_once_with(timedelta(seconds=37))
@@ -299,8 +299,8 @@ async def test_options_reconcile_keeps_ble_running_when_local_mqtt_fails(
     coordinator = MagicMock(name="coordinator")
     coordinator.async_reconcile_ble_transport = AsyncMock(return_value=None)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_LOCAL_MQTT_TOPIC,
         CONF_ENABLE_BLE_TRANSPORT,
     }
@@ -311,7 +311,7 @@ async def test_options_reconcile_keeps_ble_running_when_local_mqtt_fails(
         "_async_start_local_mqtt",
         AsyncMock(side_effect=local_failure),
     ) as start_local:
-        await integration._async_reconcile_entry_options(
+        await integration._async_reconcile_entry_options(  # ruff: ignore[private-member-access]
             hass,
             entry,
             coordinator,
@@ -329,8 +329,8 @@ async def test_options_reconcile_restarts_listener_for_broker_endpoint_change(
     entry = _entry(hass, entry_id="broker-endpoint-reconcile")
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_IP,
     }
 
@@ -339,7 +339,7 @@ async def test_options_reconcile_restarts_listener_for_broker_endpoint_change(
         "_async_start_local_mqtt",
         AsyncMock(return_value=None),
     ) as start_local:
-        await integration._async_reconcile_entry_options(hass, entry, coordinator)
+        await integration._async_reconcile_entry_options(hass, entry, coordinator)  # ruff: ignore[private-member-access]
 
     start_local.assert_awaited_once_with(hass, entry, coordinator)
 
@@ -351,18 +351,18 @@ async def test_device_originated_reconcile_does_not_rewrite_device_config(
     entry = _entry(hass, entry_id="device-originated-options-reconcile")
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_IP,
     }
-    bucket[integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY] = set()
+    bucket[integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY] = set()  # ruff: ignore[private-member-access]
 
     with patch.object(
         integration,
         "_async_start_local_mqtt",
         AsyncMock(return_value=None),
     ) as start_local:
-        await integration._async_reconcile_entry_options(hass, entry, coordinator)
+        await integration._async_reconcile_entry_options(hass, entry, coordinator)  # ruff: ignore[private-member-access]
 
     start_local.assert_awaited_once_with(hass, entry, coordinator)
     coordinator.async_schedule_local_mqtt_device_config.assert_not_called()
@@ -381,27 +381,27 @@ async def test_layer5_option_changes_coalesce_into_one_reconcile_task(
         "_async_start_local_mqtt",
         AsyncMock(return_value=None),
     ) as start_local:
-        integration._schedule_layer5_start_if_ready(
+        integration._schedule_layer5_start_if_ready(  # ruff: ignore[private-member-access]
             hass,
             entry,
             coordinator,
             {CONF_LOCAL_MQTT_TOPIC},
         )
-        first_task = integration._entry_runtime_task(
+        first_task = integration._entry_runtime_task(  # ruff: ignore[private-member-access]
             hass,
             entry,
-            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,  # ruff: ignore[private-member-access]
         )
-        integration._schedule_layer5_start_if_ready(
+        integration._schedule_layer5_start_if_ready(  # ruff: ignore[private-member-access]
             hass,
             entry,
             coordinator,
             {CONF_THIRD_PARTY_MQTT_QOS},
         )
-        second_task = integration._entry_runtime_task(
+        second_task = integration._entry_runtime_task(  # ruff: ignore[private-member-access]
             hass,
             entry,
-            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,  # ruff: ignore[private-member-access]
         )
 
         assert first_task is not None
@@ -421,24 +421,24 @@ async def test_finished_options_reconcile_task_is_replaced(
     entry.runtime_data = coordinator
     finished = hass.async_create_task(asyncio.sleep(0), "finished-options-task")
     await finished
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY] = finished
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY] = finished  # ruff: ignore[private-member-access]
 
     with patch.object(
         integration,
         "_async_reconcile_entry_options",
         AsyncMock(return_value=None),
     ) as reconcile:
-        integration._schedule_layer5_start_if_ready(
+        integration._schedule_layer5_start_if_ready(  # ruff: ignore[private-member-access]
             hass,
             entry,
             coordinator,
             {CONF_THIRD_PARTY_MQTT_QOS},
         )
-        replacement = integration._entry_runtime_task(
+        replacement = integration._entry_runtime_task(  # ruff: ignore[private-member-access]
             hass,
             entry,
-            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,
+            integration._OPTIONS_RECONCILE_TASK_RUNTIME_KEY,  # ruff: ignore[private-member-access]
         )
 
         assert replacement is not None
@@ -459,14 +459,14 @@ async def test_token_only_option_change_schedules_device_reconcile(
     )
     coordinator = MagicMock(name="coordinator")
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_TOKEN: "old-token"
     }
 
     with patch.object(integration, "_schedule_layer5_start_if_ready") as reconcile:
-        await integration._async_entry_updated(hass, entry)
+        await integration._async_entry_updated(hass, entry)  # ruff: ignore[private-member-access]
 
     reconcile.assert_called_once_with(
         hass,
@@ -499,7 +499,7 @@ async def test_cancel_wait_is_hard_bounded_for_uncooperative_task(
     try:
         started = time.monotonic()
         with patch.object(integration, "_ENTRY_TASK_CANCEL_TIMEOUT_SEC", 0.01):
-            await integration._async_await_cancelled_runtime_task(
+            await integration._async_await_cancelled_runtime_task(  # ruff: ignore[private-member-access]
                 hass,
                 entry,
                 task,
@@ -507,9 +507,9 @@ async def test_cancel_wait_is_hard_bounded_for_uncooperative_task(
             )
         elapsed = time.monotonic() - started
 
-        assert elapsed < 0.1
-        bucket = integration._entry_runtime_bucket(hass, entry)
-        assert task in bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]
+        assert elapsed < 0.1  # ruff: ignore[magic-value-comparison]
+        bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+        assert task in bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]  # ruff: ignore[private-member-access]
     finally:
         release_handle.cancel()
         release.set()
@@ -534,7 +534,7 @@ async def test_cancelled_cancel_wait_retains_child_cleanup_ownership(
     await asyncio.sleep(0)
     child.cancel()
     waiter = hass.async_create_task(
-        integration._async_await_cancelled_runtime_task(
+        integration._async_await_cancelled_runtime_task(  # ruff: ignore[private-member-access]
             hass,
             entry,
             child,
@@ -548,8 +548,8 @@ async def test_cancelled_cancel_wait_retains_child_cleanup_ownership(
     try:
         with pytest.raises(asyncio.CancelledError):
             await waiter
-        bucket = integration._entry_runtime_bucket(hass, entry)
-        assert child in bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]
+        bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+        assert child in bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]  # ruff: ignore[private-member-access]
     finally:
         release.set()
         await child
@@ -571,12 +571,12 @@ async def test_cancelled_local_mqtt_stop_is_deferred_and_owned(
 
     client = MagicMock(spec=integration.JackeryLocalMqttClient)
     client.async_stop = AsyncMock(side_effect=ignore_cancellation)
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client  # ruff: ignore[private-member-access]
 
     with patch.object(integration, "_schedule_supplemental_cleanup") as cleanup:
         waiter = hass.async_create_task(
-            integration._async_stop_local_mqtt_client(hass, entry, client),
+            integration._async_stop_local_mqtt_client(hass, entry, client),  # ruff: ignore[private-member-access]
             "cancelled-local-mqtt-stop-waiter",
         )
         await asyncio.sleep(0)
@@ -585,9 +585,9 @@ async def test_cancelled_local_mqtt_stop_is_deferred_and_owned(
             with pytest.raises(asyncio.CancelledError):
                 await waiter
 
-            assert integration._LOCAL_MQTT_RUNTIME_KEY not in bucket
-            assert client in bucket[integration._SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY]
-            stop_records = bucket[integration._LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY]
+            assert integration._LOCAL_MQTT_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
+            assert client in bucket[integration._SUPPLEMENTAL_LOCAL_MQTT_RUNTIME_KEY]  # ruff: ignore[private-member-access]
+            stop_records = bucket[integration._LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY]  # ruff: ignore[private-member-access]
             assert len(stop_records) == 1
             owned_client, stop_task = stop_records[id(client)]
             assert owned_client is client
@@ -596,7 +596,7 @@ async def test_cancelled_local_mqtt_stop_is_deferred_and_owned(
         finally:
             release.set()
             await stop_task
-            assert await integration._async_stop_local_mqtt_client(
+            assert await integration._async_stop_local_mqtt_client(  # ruff: ignore[private-member-access]
                 hass,
                 entry,
                 client,
@@ -617,24 +617,24 @@ async def test_supplemental_cleanup_call_is_hard_bounded(
             except asyncio.CancelledError:
                 continue
 
-    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
     try:
         started = time.monotonic()
         with patch.object(integration, "_ENTRY_TASK_CANCEL_TIMEOUT_SEC", 0.01):
-            assert not await integration._async_run_supplemental_cleanup_call(
+            assert not await integration._async_run_supplemental_cleanup_call(  # ruff: ignore[private-member-access]
                 hass,
                 entry,
                 ignore_cancellation(),
                 name="bounded-supplemental-call-child",
             )
-        assert time.monotonic() - started < 0.1
+        assert time.monotonic() - started < 0.1  # ruff: ignore[magic-value-comparison]
 
-        stop_tasks = bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]
+        stop_tasks = bucket[integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY]  # ruff: ignore[private-member-access]
         assert len(stop_tasks) == 1
     finally:
         release.set()
         for task in bucket.get(
-            integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,  # ruff: ignore[private-member-access]
             [],
         ):
             with contextlib.suppress(asyncio.CancelledError):
@@ -667,7 +667,7 @@ async def test_layer5_device_config_does_not_wait_for_ble_start(
 
     with patch.object(integration, "_async_start_local_mqtt", side_effect=start_local):
         task = hass.async_create_task(
-            integration._async_start_layer5_transports(hass, entry, coordinator),
+            integration._async_start_layer5_transports(hass, entry, coordinator),  # ruff: ignore[private-member-access]
             "independent-layer5-start",
         )
         try:
@@ -704,7 +704,7 @@ async def test_layer5_device_config_does_not_wait_for_local_mqtt_start(
 
     with patch.object(integration, "_async_start_local_mqtt", side_effect=start_local):
         task = hass.async_create_task(
-            integration._async_start_layer5_transports(hass, entry, coordinator),
+            integration._async_start_layer5_transports(hass, entry, coordinator),  # ruff: ignore[private-member-access]
             "local-independent-layer5-start",
         )
         try:
@@ -744,7 +744,7 @@ async def test_layer5_handles_cloud_failure_before_ble_start_finishes(
         AsyncMock(return_value=None),
     ):
         task = hass.async_create_task(
-            integration._async_start_layer5_transports(hass, entry, coordinator),
+            integration._async_start_layer5_transports(hass, entry, coordinator),  # ruff: ignore[private-member-access]
             "cloud-result-independent-layer5-start",
         )
         try:
@@ -769,7 +769,7 @@ async def test_unload_cancellation_preserves_runtime_fence(
     entry = _entry(hass, entry_id="cancelled-unload")
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
 
     with (
         patch.object(
@@ -787,7 +787,7 @@ async def test_unload_cancellation_preserves_runtime_fence(
         await integration.async_unload_entry(hass, entry)
 
     assert entry.runtime_data is coordinator
-    assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator
+    assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator  # ruff: ignore[private-member-access]
 
 
 async def test_concurrent_local_mqtt_stop_reuses_one_owned_task(
@@ -804,17 +804,17 @@ async def test_concurrent_local_mqtt_stop_reuses_one_owned_task(
         await release_stop.wait()
 
     client.async_stop = AsyncMock(side_effect=_blocking_stop)
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client  # ruff: ignore[private-member-access]
     first = hass.async_create_task(
-        integration._async_stop_local_mqtt_client(hass, entry, client),
+        integration._async_stop_local_mqtt_client(hass, entry, client),  # ruff: ignore[private-member-access]
         "first-local-mqtt-stop",
     )
     second: asyncio.Task[bool] | None = None
     try:
         await asyncio.wait_for(stop_entered.wait(), timeout=1)
         second = hass.async_create_task(
-            integration._async_stop_local_mqtt_client(hass, entry, client),
+            integration._async_stop_local_mqtt_client(hass, entry, client),  # ruff: ignore[private-member-access]
             "second-local-mqtt-stop",
         )
         await asyncio.sleep(0)
@@ -843,16 +843,16 @@ async def test_cancelled_waiter_does_not_cancel_shared_local_mqtt_stop(
         await release_stop.wait()
 
     client.async_stop = AsyncMock(side_effect=_blocking_stop)
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = client  # ruff: ignore[private-member-access]
     with patch.object(integration, "_schedule_supplemental_cleanup"):
         first = hass.async_create_task(
-            integration._async_stop_local_mqtt_client(hass, entry, client),
+            integration._async_stop_local_mqtt_client(hass, entry, client),  # ruff: ignore[private-member-access]
             "cancelled-local-mqtt-stop-waiter",
         )
         await asyncio.wait_for(stop_entered.wait(), timeout=1)
         second = hass.async_create_task(
-            integration._async_stop_local_mqtt_client(hass, entry, client),
+            integration._async_stop_local_mqtt_client(hass, entry, client),  # ruff: ignore[private-member-access]
             "surviving-local-mqtt-stop-waiter",
         )
         await asyncio.sleep(0)
@@ -878,12 +878,12 @@ async def test_entry_update_after_runtime_clear_is_ignored(
         options={CONF_SCAN_INTERVAL: 30},
     )
     entry.runtime_data = None
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {CONF_SCAN_INTERVAL: 15}
-    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_SNAPSHOT_RUNTIME_KEY] = {CONF_SCAN_INTERVAL: 15}  # ruff: ignore[private-member-access]
+    bucket[integration._ENTRY_DATA_SNAPSHOT_RUNTIME_KEY] = dict(entry.data)  # ruff: ignore[private-member-access]
 
     with patch.object(integration, "_schedule_layer5_start_if_ready") as schedule:
-        await integration._async_entry_updated(hass, entry)
+        await integration._async_entry_updated(hass, entry)  # ruff: ignore[private-member-access]
 
     schedule.assert_not_called()
 
@@ -913,10 +913,10 @@ async def test_supplemental_cleanup_preserves_concurrent_layer5_append(
         concurrent_release.wait(),
         "concurrent-supplemental-task",
     )
-    integration._append_supplemental_runtime_object(
+    integration._append_supplemental_runtime_object(  # ruff: ignore[private-member-access]
         hass,
         entry,
-        integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+        integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,  # ruff: ignore[private-member-access]
         initial_task,
     )
     cleanup_pending = MagicMock(side_effect=[True, False, False])
@@ -928,23 +928,23 @@ async def test_supplemental_cleanup_preserves_concurrent_layer5_append(
             cleanup_pending,
         ):
             cleanup_task = hass.async_create_task(
-                integration._async_cleanup_stale_supplemental(hass, entry),
+                integration._async_cleanup_stale_supplemental(hass, entry),  # ruff: ignore[private-member-access]
                 "supplemental-concurrent-cleanup",
             )
             await asyncio.wait_for(cancel_seen.wait(), timeout=1)
-            integration._append_supplemental_runtime_object(
+            integration._append_supplemental_runtime_object(  # ruff: ignore[private-member-access]
                 hass,
                 entry,
-                integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+                integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,  # ruff: ignore[private-member-access]
                 concurrent_task,
             )
             release_initial.set()
             await cleanup_task
 
-        bucket = integration._entry_runtime_bucket(hass, entry)
-        remaining = integration._supplemental_runtime_items(
+        bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+        remaining = integration._supplemental_runtime_items(  # ruff: ignore[private-member-access]
             bucket,
-            integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
+            integration._SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,  # ruff: ignore[private-member-access]
         )
         assert any(item is concurrent_task for item in remaining)
     finally:
@@ -966,8 +966,8 @@ async def test_successful_unload_defers_pending_supplemental_cleanup(
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)
     coordinator.has_pending_supplemental_transport_cleanup = True
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {"old-topic"}
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {"old-topic"}  # ruff: ignore[private-member-access]
 
     with (
         patch.object(
@@ -987,7 +987,7 @@ async def test_successful_unload_defers_pending_supplemental_cleanup(
 
     defer.assert_called_once_with(hass, entry, coordinator)
     cleanup.assert_called_once_with(hass, entry)
-    assert integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY not in bucket
+    assert integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
 
 
 async def test_shutdown_timeout_clears_transition_only_option_markers(
@@ -997,14 +997,14 @@ async def test_shutdown_timeout_clears_transition_only_option_markers(
     entry = _entry(hass, entry_id="shutdown-timeout-clears-option-markers")
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_QOS
     }
-    bucket[integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY] = {
+    bucket[integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_TOKEN
     }
-    bucket[integration._DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY] = {
+    bucket[integration._DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY] = {  # ruff: ignore[private-member-access]
         CONF_THIRD_PARTY_MQTT_QOS: 1
     }
 
@@ -1022,9 +1022,9 @@ async def test_shutdown_timeout_clears_transition_only_option_markers(
     ):
         assert await integration.async_unload_entry(hass, entry) is True
 
-    assert integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY not in bucket
-    assert integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY not in bucket
-    assert integration._DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY not in bucket
+    assert integration._OPTIONS_RECONCILE_PENDING_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
+    assert integration._OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
+    assert integration._DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
 
 
 async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
@@ -1034,9 +1034,9 @@ async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
     entry = _entry(hass, entry_id="fenced-owner")
     coordinator = MagicMock(spec=JackerySolarVaultCoordinator)
     entry.runtime_data = coordinator
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
-    bucket[integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY] = coordinator
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator  # ruff: ignore[private-member-access]
+    bucket[integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY] = coordinator  # ruff: ignore[private-member-access]
 
     with (
         patch.object(
@@ -1047,16 +1047,16 @@ async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
         patch.object(integration, "_defer_supplemental_transports") as defer,
         patch.object(integration, "_schedule_supplemental_cleanup") as cleanup,
     ):
-        assert not await integration._async_release_fenced_coordinator(hass, entry)
+        assert not await integration._async_release_fenced_coordinator(hass, entry)  # ruff: ignore[private-member-access]
         assert entry.runtime_data is coordinator
-        assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator
+        assert bucket[integration._UNLOADING_COORDINATOR_RUNTIME_KEY] is coordinator  # ruff: ignore[private-member-access]
 
-        assert await integration._async_release_fenced_coordinator(hass, entry)
+        assert await integration._async_release_fenced_coordinator(hass, entry)  # ruff: ignore[private-member-access]
 
-    assert shutdown.await_count == 2
+    assert shutdown.await_count == 2  # ruff: ignore[magic-value-comparison]
     assert entry.runtime_data is None
-    assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket
-    assert integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY not in bucket
+    assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
+    assert integration._PRIMARY_SETUP_COORDINATOR_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
     defer.assert_called_once_with(hass, entry, coordinator)
     cleanup.assert_called_once_with(hass, entry)
 
@@ -1076,9 +1076,9 @@ async def test_failed_platform_unload_preserves_http_runtime_fence(
         layer5_gate.wait(),
         "failed-unload-layer5",
     )
-    bucket = integration._entry_runtime_bucket(hass, entry)
-    bucket[integration._LAYER5_TASK_RUNTIME_KEY] = layer5_task
-    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = local_mqtt
+    bucket = integration._entry_runtime_bucket(hass, entry)  # ruff: ignore[private-member-access]
+    bucket[integration._LAYER5_TASK_RUNTIME_KEY] = layer5_task  # ruff: ignore[private-member-access]
+    bucket[integration._LOCAL_MQTT_RUNTIME_KEY] = local_mqtt  # ruff: ignore[private-member-access]
 
     try:
         with (
@@ -1106,9 +1106,9 @@ async def test_failed_platform_unload_preserves_http_runtime_fence(
         stop_local_mqtt.assert_not_awaited()
         assert entry.runtime_data is coordinator
         assert not layer5_task.done()
-        assert bucket[integration._LAYER5_TASK_RUNTIME_KEY] is layer5_task
-        assert bucket[integration._LOCAL_MQTT_RUNTIME_KEY] is local_mqtt
-        assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket
+        assert bucket[integration._LAYER5_TASK_RUNTIME_KEY] is layer5_task  # ruff: ignore[private-member-access]
+        assert bucket[integration._LOCAL_MQTT_RUNTIME_KEY] is local_mqtt  # ruff: ignore[private-member-access]
+        assert integration._UNLOADING_COORDINATOR_RUNTIME_KEY not in bucket  # ruff: ignore[private-member-access]
     finally:
         layer5_gate.set()
         with contextlib.suppress(asyncio.CancelledError):
@@ -1250,7 +1250,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
         via_device=(DOMAIN, "head-1"),
     )
 
-    assert integration._battery_pack_registry_identity(
+    assert integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
         registry,
         child,
     ) == ("head-1", "head-1_battery_pack_PACK-1", "PACK-1")
@@ -1266,7 +1266,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
         via_device=(DOMAIN, "head-1"),
     )
     assert (
-        integration._battery_pack_registry_identity(
+        integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
             registry,
             ambiguous,
         )
@@ -1297,7 +1297,7 @@ def test_phantom_cleanup_removes_head_unit_duplicate_pack(
         via_device=(DOMAIN, "head-2"),
     )
 
-    integration._async_remove_phantom_battery_pack_devices(
+    integration._async_remove_phantom_battery_pack_devices(  # ruff: ignore[private-member-access]
         hass,
         entry,
     )

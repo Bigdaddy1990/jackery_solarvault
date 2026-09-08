@@ -8,10 +8,10 @@ import pytest
 
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
-    _clean_dict_list_update,
-    _is_blank_value,
-    _is_system_busy_error,
-    _merge_identified_dict_lists,
+    _clean_dict_list_update,  # ruff: ignore[import-private-name]
+    _is_blank_value,  # ruff: ignore[import-private-name]
+    _is_system_busy_error,  # ruff: ignore[import-private-name]
+    _merge_identified_dict_lists,  # ruff: ignore[import-private-name]
     battery_pack_serial,
     battery_packs_from_source,
     call,
@@ -69,7 +69,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     """Test JackerySolarVaultCoordinator class."""
 
     @staticmethod
-    def _closed_background_task(*args, **_kwargs):
+    def _closed_background_task(*args, **_kwargs):  # ruff: ignore[missing-type-args, missing-type-kwargs, missing-return-type-static-method]
         """Consume scheduled coroutines when hass is a MagicMock."""
         for arg in args:
             if asyncio.iscoroutine(arg):
@@ -78,7 +78,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         task.done.return_value = False
         return task
 
-    def _create_coordinator(self, hass=None):
+    def _create_coordinator(self, hass=None):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
         """Create a basic coordinator for testing."""
         if hass is None:
             hass = MagicMock()
@@ -108,7 +108,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         poll_unsub = getattr(coordinator, "_poll_watchdog_unsub", None)
         if poll_unsub is not None:
             poll_unsub()
-            coordinator._poll_watchdog_unsub = None
+            coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]
         return coordinator
 
     def test_creation(self) -> None:
@@ -160,7 +160,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         coordinator = self._create_coordinator()
         observer = MagicMock()
         coordinator.set_local_mqtt_config_observer(observer)
-        assert coordinator._local_mqtt_config_observer is observer
+        assert coordinator._local_mqtt_config_observer is observer  # ruff: ignore[private-member-access]
 
     def test_async_schedule_local_mqtt_device_config(self) -> None:
         """Test async_schedule_local_mqtt_device_config method."""
@@ -185,13 +185,13 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         coordinator.async_set_scan_interval(new_interval)
         assert coordinator.configured_update_interval == new_interval
         assert coordinator.update_interval == new_interval
-        assert coordinator._system_info_query_interval_sec == 600
-        assert coordinator._subdevice_query_interval_sec == 600
+        assert coordinator._system_info_query_interval_sec == 600  # ruff: ignore[magic-value-comparison, private-member-access]
+        assert coordinator._subdevice_query_interval_sec == 600  # ruff: ignore[magic-value-comparison, private-member-access]
 
     def test_poll_cycle_timeout_seconds(self) -> None:
         """Test _poll_cycle_timeout_seconds method."""
         coordinator = self._create_coordinator()
-        timeout = coordinator._poll_cycle_timeout_seconds()
+        timeout = coordinator._poll_cycle_timeout_seconds()  # ruff: ignore[private-member-access]
         assert isinstance(timeout, float)
         assert timeout > 0
 
@@ -199,7 +199,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     async def test_update_data_records_next_poll_delay(self) -> None:
         """Test _async_update_data records elapsed and configured next delay."""
         coordinator = self._create_coordinator()
-        coordinator._async_update_data_guarded = AsyncMock(return_value={})
+        coordinator._async_update_data_guarded = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
 
         with patch(
             "custom_components.jackery_solarvault.coordinator.time.monotonic",
@@ -212,7 +212,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
                 105.0,
             ],
         ):
-            await coordinator._async_update_data()
+            await coordinator._async_update_data()  # ruff: ignore[private-member-access]
 
         diagnostics = coordinator.polling_diagnostics
         assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(5.0)
@@ -225,10 +225,10 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         async def dummy_factory() -> None:
             pass
 
-        task = coordinator._schedule_background_once(
+        task = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
             "test_key", dummy_factory, name="test_task"
-        )  # noqa: E501, RUF100, SLF001
-        assert task is not None or coordinator._shutdown_started
+        )  # noqa: E501, RUF100, RUF105, SLF001
+        assert task is not None or coordinator._shutdown_started  # ruff: ignore[private-member-access]
         if task:
             task.cancel()
 
@@ -262,21 +262,21 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     def test_metric_source_candidates(self) -> None:
         """Test _metric_source_candidates method."""
         coordinator = self._create_coordinator()
-        # Function requires section_prefix, stat_key, metric_key and returns list of tuples
-        candidates = coordinator._metric_source_candidates("test", "stat", "metric")
+        # Function requires section_prefix, stat_key, metric_key and returns list of tuples  # ruff: ignore[line-too-long]
+        candidates = coordinator._metric_source_candidates("test", "stat", "metric")  # ruff: ignore[private-member-access]
         assert isinstance(candidates, list)
-        assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)
+        assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)  # ruff: ignore[magic-value-comparison]
 
     def test_enabled_app_chart_date_types(self) -> None:
         """Test _enabled_app_chart_date_types method."""
         coordinator = self._create_coordinator()
-        date_types = coordinator._enabled_app_chart_date_types()
+        date_types = coordinator._enabled_app_chart_date_types()  # ruff: ignore[private-member-access]
         assert isinstance(date_types, set)
 
     def test_derived_home_energy_fallback_enabled(self) -> None:
         """Test _derived_home_energy_fallback_enabled method."""
         coordinator = self._create_coordinator()
-        result = coordinator._derived_home_energy_fallback_enabled()
+        result = coordinator._derived_home_energy_fallback_enabled()  # ruff: ignore[private-member-access]
         assert isinstance(result, bool)
 
     def test_ble_observations(self) -> None:
@@ -306,66 +306,66 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     def test_local_mqtt_direct_client_connected(self) -> None:
         """Test _local_mqtt_direct_client_connected method."""
         coordinator = self._create_coordinator()
-        result = coordinator._local_mqtt_direct_client_connected()
+        result = coordinator._local_mqtt_direct_client_connected()  # ruff: ignore[private-member-access]
         assert isinstance(result, bool)
 
     def test_local_mqtt_is_active(self) -> None:
         """Test _local_mqtt_is_active method."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        result = coordinator._local_mqtt_is_active(now_monotonic=time.monotonic())
+        result = coordinator._local_mqtt_is_active(now_monotonic=time.monotonic())  # ruff: ignore[private-member-access]
         assert isinstance(result, bool)
 
     def test_ble_backoff_for_device(self) -> None:
         """Test _ble_backoff_for_device method."""
         coordinator = self._create_coordinator()
-        backoff = coordinator._ble_backoff_for_device("test_device")
-        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
+        backoff = coordinator._ble_backoff_for_device("test_device")  # ruff: ignore[private-member-access]
+        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff  # ruff: ignore[import-outside-top-level]
 
         assert isinstance(backoff, BleConnectBackoff)
 
     def test_ble_connect_backoff_remaining(self) -> None:
         """Test _ble_connect_backoff_remaining method."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        remaining = coordinator._ble_connect_backoff_remaining(
+        remaining = coordinator._ble_connect_backoff_remaining(  # ruff: ignore[private-member-access]
             "test_device", time.monotonic()
-        )  # noqa: E501, RUF100, SLF001
+        )  # noqa: E501, RUF100, RUF105, SLF001
         assert isinstance(remaining, float)
         assert remaining >= 0
 
     def test_ble_note_connect_failure(self) -> None:
         """Test _ble_note_connect_failure method."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        delay = coordinator._ble_note_connect_failure("test_device", time.monotonic())
+        delay = coordinator._ble_note_connect_failure("test_device", time.monotonic())  # ruff: ignore[private-member-access]
         assert isinstance(delay, float)
         assert delay > 0
 
     def test_ble_note_connect_success(self) -> None:
         """Test _ble_note_connect_success method."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        coordinator._ble_note_connect_failure("test_device", time.monotonic())
-        coordinator._ble_note_connect_success("test_device")
+        coordinator._ble_note_connect_failure("test_device", time.monotonic())  # ruff: ignore[private-member-access]
+        coordinator._ble_note_connect_success("test_device")  # ruff: ignore[private-member-access]
         # Should reset the backoff
-        remaining = coordinator._ble_connect_backoff_remaining(
+        remaining = coordinator._ble_connect_backoff_remaining(  # ruff: ignore[private-member-access]
             "test_device", time.monotonic()
-        )  # noqa: E501, RUF100, SLF001
+        )  # noqa: E501, RUF100, RUF105, SLF001
         assert remaining == 0.0  # ruff: ignore[float-equality-comparison]
 
     def test_local_mqtt_config_diagnostics_increment(self) -> None:
         """Test local_mqtt_config_diagnostics tracks scheduled count."""
         coordinator = self._create_coordinator()
-        initial = coordinator._local_mqtt_config_diagnostics.get("scheduled", 0)
+        initial = coordinator._local_mqtt_config_diagnostics.get("scheduled", 0)  # ruff: ignore[private-member-access]
         task = coordinator.async_schedule_local_mqtt_device_config()
         if task:
             task.cancel()
-        new = coordinator._local_mqtt_config_diagnostics.get("scheduled", 0)
+        new = coordinator._local_mqtt_config_diagnostics.get("scheduled", 0)  # ruff: ignore[private-member-access]
         assert new >= initial
 
     def test_async_discover(self) -> None:
@@ -390,23 +390,23 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     def test_async_stop_supplemental_transports(self) -> None:
         """Test async_stop_supplemental_transports method."""
         coordinator = self._create_coordinator()
-        coordinator._async_stop_layer5_transports = AsyncMock(return_value=[])
+        coordinator._async_stop_layer5_transports = AsyncMock(return_value=[])  # ruff: ignore[private-member-access]
 
-        import asyncio
+        import asyncio  # ruff: ignore[import-outside-top-level]
 
         asyncio.run(coordinator.async_stop_supplemental_transports())
-        coordinator._async_stop_layer5_transports.assert_called_once()
+        coordinator._async_stop_layer5_transports.assert_called_once()  # ruff: ignore[private-member-access]
 
     def test_has_pending_supplemental_transport_cleanup(self) -> None:
         """Test has_pending_supplemental_transport_cleanup property."""
         coordinator = self._create_coordinator()
-        coordinator._supplemental_transport_tasks = MagicMock(return_value=set())
+        coordinator._supplemental_transport_tasks = MagicMock(return_value=set())  # ruff: ignore[private-member-access]
         assert coordinator.has_pending_supplemental_transport_cleanup is False
 
         # With pending tasks
         mock_task = MagicMock()
         mock_task.done.return_value = False
-        coordinator._supplemental_transport_tasks = MagicMock(return_value={mock_task})
+        coordinator._supplemental_transport_tasks = MagicMock(return_value={mock_task})  # ruff: ignore[private-member-access]
         assert coordinator.has_pending_supplemental_transport_cleanup is True
 
     def test_async_schedule_discovery_refresh(self) -> None:
@@ -419,11 +419,11 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         """Test _async_refresh_discovery_if_due method."""
         coordinator = self._create_coordinator()
         coordinator.async_discover = AsyncMock(return_value=True)
-        coordinator._discovery_refresh_scheduled = True
+        coordinator._discovery_refresh_scheduled = True  # ruff: ignore[private-member-access]
 
-        import asyncio
+        import asyncio  # ruff: ignore[import-outside-top-level]
 
-        asyncio.run(coordinator._async_refresh_discovery_if_due())
+        asyncio.run(coordinator._async_refresh_discovery_if_due())  # ruff: ignore[private-member-access]
         coordinator.async_discover.assert_called_once()
 
     def test_mqtt_connection_manager_methods(self) -> None:
@@ -434,12 +434,12 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
 
     def test_ble_connect_backoff_methods(self) -> None:  # ruff: ignore[no-self-use]
         """Test BleConnectBackoff methods."""
-        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
+        from custom_components.jackery_solarvault.coordinator import BleConnectBackoff  # ruff: ignore[import-outside-top-level]
 
         backoff = BleConnectBackoff()
 
         # Test seconds_until_allowed
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
         remaining = backoff.seconds_until_allowed(time.monotonic())
         assert remaining == 0.0  # ruff: ignore[float-equality-comparison]
@@ -460,11 +460,11 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
     def test_polling_diagnostics_methods(self) -> None:
         """Test polling diagnostics methods."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        coordinator._bump_polling_diag("test_key")
-        coordinator._note_polling_timeout(time.monotonic())
-        coordinator._recover_polling_timeout()
+        coordinator._bump_polling_diag("test_key")  # ruff: ignore[private-member-access]
+        coordinator._note_polling_timeout(time.monotonic())  # ruff: ignore[private-member-access]
+        coordinator._recover_polling_timeout()  # ruff: ignore[private-member-access]
 
         diag = coordinator.polling_diagnostics
         assert isinstance(diag, dict)
@@ -474,11 +474,11 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         """Test _poll_cycle_timeout_seconds and cycle delay diagnostics."""
         coordinator = self._create_coordinator()
 
-        timeout = coordinator._poll_cycle_timeout_seconds()
+        timeout = coordinator._poll_cycle_timeout_seconds()  # ruff: ignore[private-member-access]
         assert isinstance(timeout, float)
         assert timeout > 0
 
-        coordinator._async_update_data_guarded = AsyncMock(return_value={})
+        coordinator._async_update_data_guarded = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
 
         with patch(
             "custom_components.jackery_solarvault.coordinator.time.monotonic",
@@ -491,7 +491,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
                 205.0,
             ],
         ):
-            await coordinator._async_update_data()
+            await coordinator._async_update_data()  # ruff: ignore[private-member-access]
 
         diagnostics = coordinator.polling_diagnostics
         assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(5.0)
@@ -504,56 +504,56 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         async def dummy_factory() -> None:
             pass
 
-        task = coordinator._schedule_background_once(
+        task = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
             "test_key", dummy_factory, name="test_task"
-        )  # noqa: E501, RUF100, SLF001
-        assert task is not None or coordinator._shutdown_started
+        )  # noqa: E501, RUF100, RUF105, SLF001
+        assert task is not None or coordinator._shutdown_started  # ruff: ignore[private-member-access]
         if task:
             task.cancel()
 
         # Test idempotency - second call should return same task
-        task2 = coordinator._schedule_background_once(
+        task2 = coordinator._schedule_background_once(  # ruff: ignore[private-member-access]
             "test_key", dummy_factory, name="test_task"
-        )  # noqa: E501, RUF100, SLF001
+        )  # noqa: E501, RUF100, RUF105, SLF001
         if task and task2:
             assert task is task2
 
     def test_supplemental_transport_tasks(self) -> None:
         """Test _supplemental_transport_tasks and _retain_pending_supplemental_tasks."""
         coordinator = self._create_coordinator()
-        tasks = coordinator._supplemental_transport_tasks()
+        tasks = coordinator._supplemental_transport_tasks()  # ruff: ignore[private-member-access]
         assert isinstance(tasks, set)
 
         # Test retain
-        coordinator._retain_pending_supplemental_tasks(tasks)
-        assert coordinator._supplemental_transport_tasks() is not None
+        coordinator._retain_pending_supplemental_tasks(tasks)  # ruff: ignore[private-member-access]
+        assert coordinator._supplemental_transport_tasks() is not None  # ruff: ignore[private-member-access]
 
     def test_local_mqtt_direct_client_connected(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _local_mqtt_direct_client_connected method."""
         coordinator = self._create_coordinator()
-        result = coordinator._local_mqtt_direct_client_connected()
+        result = coordinator._local_mqtt_direct_client_connected()  # ruff: ignore[private-member-access]
         assert isinstance(result, bool)
 
     def test_local_mqtt_is_active(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _local_mqtt_is_active method."""
         coordinator = self._create_coordinator()
-        import time
+        import time  # ruff: ignore[import-outside-top-level]
 
-        result = coordinator._local_mqtt_is_active(now_monotonic=time.monotonic())
+        result = coordinator._local_mqtt_is_active(now_monotonic=time.monotonic())  # ruff: ignore[private-member-access]
         assert isinstance(result, bool)
 
     def test_ble_address_for_device(self) -> None:
         """Test _ble_address_for_device method."""
         coordinator = self._create_coordinator()
-        result = coordinator._ble_address_for_device("test_device")
+        result = coordinator._ble_address_for_device("test_device")  # ruff: ignore[private-member-access]
         assert result is None or isinstance(result, str)
 
     def test_async_local_mqtt_config_retry_sleep(self) -> None:
         """Test _async_local_mqtt_config_retry_sleep static method."""
         coordinator = self._create_coordinator()
-        import asyncio
+        import asyncio  # ruff: ignore[import-outside-top-level]
 
-        asyncio.run(coordinator._async_local_mqtt_config_retry_sleep(0.01))
+        asyncio.run(coordinator._async_local_mqtt_config_retry_sleep(0.01))  # ruff: ignore[private-member-access]
 
     # ===== Tests for uncovered helper methods =====
 
@@ -672,7 +672,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test source_regions function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_COUNTRY,
             FIELD_SYSTEM_REGION,
         )
@@ -694,7 +694,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_normalized_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalized_source_regions function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_COUNTRY,
             FIELD_SYSTEM_REGION,
         )
@@ -746,7 +746,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_is_transient_connect_failure(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_transient_connect_failure function."""
-        # Function checks for "server unavailable", "connection refused", "connection timed out", or "unknown"
+        # Function checks for "server unavailable", "connection refused", "connection timed out", or "unknown"  # ruff: ignore[line-too-long]
         # but first excludes auth failures via is_mqtt_auth_failure
         assert is_transient_connect_failure("server unavailable") is True
         assert is_transient_connect_failure("connection refused") is True
@@ -802,9 +802,11 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         current = [{"id": 1, "value": "a"}, {"id": 2, "value": "b"}]
         value = [{"id": 2, "value": "updated"}, {"id": 3, "value": "c"}]
         result = _merge_identified_dict_lists(current, value)
-        assert len(result) == 3
+        # pyrefly: ignore [bad-argument-type]
+        assert len(result) == 3  # ruff: ignore[magic-value-comparison]
         # Check that id=2 was updated
-        item2 = next(item for item in result if item["id"] == 2)
+        # pyrefly: ignore [not-iterable]
+        item2 = next(item for item in result if item["id"] == 2)  # ruff: ignore[magic-value-comparison]
         assert item2["value"] == "updated"
 
     def test_merge_present_dict_values(self) -> None:  # ruff: ignore[no-self-use]
@@ -850,8 +852,8 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     def test_call_function(self) -> None:  # ruff: ignore[no-self-use]
         """Test call function."""
         # call is an async function that takes a coordinator, method name, and args
-        import asyncio
-        from unittest.mock import AsyncMock, MagicMock
+        import asyncio  # ruff: ignore[import-outside-top-level]
+        from unittest.mock import AsyncMock, MagicMock  # ruff: ignore[import-outside-top-level]
 
         coordinator = MagicMock()
         coordinator.some_method = AsyncMock(return_value="result")
@@ -862,8 +864,8 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_normalized_company_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalized_company_id function."""
-        assert normalized_company_id(123) == 123
-        assert normalized_company_id("456") == 456
+        assert normalized_company_id(123) == 123  # ruff: ignore[magic-value-comparison]
+        assert normalized_company_id("456") == 456  # ruff: ignore[magic-value-comparison]
         assert normalized_company_id("invalid") is None
 
     def test_normalized_region(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
@@ -878,7 +880,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     def test_source_regions(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test source_regions function."""
         # Function looks for FIELD_SYSTEM_REGION or FIELD_COUNTRY
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_COUNTRY,
             FIELD_SYSTEM_REGION,
         )
@@ -897,7 +899,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_normalized_source_regions(self) -> None:  # ruff: ignore[redefined-while-unused, no-self-use]
         """Test normalized_source_regions function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_COUNTRY,
             FIELD_SYSTEM_REGION,
         )
@@ -920,8 +922,8 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_valid_price_sources(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_price_sources function."""
-        # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present
-        from custom_components.jackery_solarvault.const import (
+        # Function requires FIELD_PLATFORM_COMPANY_ID and normalized_source_regions to be present  # ruff: ignore[line-too-long]
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_PLATFORM_COMPANY_ID,
             FIELD_SYSTEM_REGION,
         )
@@ -932,7 +934,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             {"price": 100},  # Missing required fields
         ]
         result = valid_price_sources(sources)
-        assert len(result) == 2
+        assert len(result) == 2  # ruff: ignore[magic-value-comparison]
         # Test with invalid company_id
         sources2 = [
             {FIELD_PLATFORM_COMPANY_ID: "invalid", FIELD_SYSTEM_REGION: "de"},
@@ -944,7 +946,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_is_alarm_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_alarm_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_CMD,
             MQTT_ACTION_IDS_ALARM,
             MQTT_CMD_UPLOAD_DEVICE_ALERT,
@@ -959,13 +961,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             is_alarm_message(None, None, {FIELD_CMD: MQTT_CMD_UPLOAD_DEVICE_ALERT})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not an alarm
         assert is_alarm_message("other", 999, {FIELD_CMD: 123}) is False
 
     def test_is_third_party_mqtt_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_third_party_mqtt_config_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
             ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG,
             FIELD_CMD,
@@ -981,47 +983,47 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 MQTT_MESSAGE_THIRD_PARTY_MQTT_CONFIG, None, {}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             is_third_party_mqtt_config_message(
                 MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG, None, {}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # action_id match
         assert (
             is_third_party_mqtt_config_message(
                 None, ACTION_ID_SET_THIRD_PARTY_MQTT_CONFIG, {}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             is_third_party_mqtt_config_message(
                 None, ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG, {}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # body cmd match
         assert (
             is_third_party_mqtt_config_message(
                 None, None, {FIELD_CMD: MQTT_CMD_THIRD_PARTY_MQTT_CONFIG}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             is_third_party_mqtt_config_message(
                 None, None, {FIELD_CMD: MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not a third party mqtt config
         assert (
             is_third_party_mqtt_config_message("other", 999, {FIELD_CMD: 123}) is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     def test_is_wifi_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_wifi_config_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
             ACTION_ID_QUERY_WIFI_CONFIG,
             FIELD_CMD,
@@ -1033,20 +1035,20 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert is_wifi_config_message(None, ACTION_ID_QUERY_WIFI_CONFIG, {}) is True
         assert (
             is_wifi_config_message(None, ACTION_ID_PORTABLE_GET_WIFI_CONFIG, {}) is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # msg_type match
         assert is_wifi_config_message(MQTT_MESSAGE_QUERY_WIFI_CONFIG, None, {}) is True
         # body cmd match
         assert (
             is_wifi_config_message(None, None, {FIELD_CMD: MQTT_CMD_QUERY_WIFI_CONFIG})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not a wifi config
         assert is_wifi_config_message("other", 999, {FIELD_CMD: 123}) is False
 
     def test_is_wifi_list_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_wifi_list_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_READ_WIFI_LIST,
             FIELD_CMD,
             MQTT_CMD_READ_WIFI_LIST,
@@ -1062,7 +1064,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_is_time_zone_config_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_time_zone_config_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_GET_TIME_ZONE,
             ACTION_ID_SEND_TIME_ZONE,
             FIELD_CMD,
@@ -1077,18 +1079,18 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             is_time_zone_config_message(None, {FIELD_CMD: MQTT_CMD_GET_TIME_ZONE})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             is_time_zone_config_message(None, {FIELD_CMD: MQTT_CMD_SEND_TIME_ZONE})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not a time zone config
         assert is_time_zone_config_message(999, {FIELD_CMD: 123}) is False
         assert is_time_zone_config_message(None, {}) is False
 
     def test_is_grid_standard_sync_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_grid_standard_sync_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_SYNC_GRID_STANDARD,
             FIELD_CMD,
             MQTT_CMD_SYNC_GRID_STANDARD,
@@ -1102,14 +1104,14 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 None, {FIELD_CMD: MQTT_CMD_SYNC_GRID_STANDARD}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not a grid standard sync
         assert is_grid_standard_sync_message(999, {FIELD_CMD: 123}) is False
         assert is_grid_standard_sync_message(None, {}) is False
 
     def test_is_mqtt_connect_info_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_mqtt_connect_info_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_SYNC_MQTT_CONNECT_INFO,
             FIELD_CMD,
             MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
@@ -1118,21 +1120,21 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         # action_id match
         assert (
             is_mqtt_connect_info_message(ACTION_ID_SYNC_MQTT_CONNECT_INFO, {}) is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # body cmd match
         assert (
             is_mqtt_connect_info_message(
                 None, {FIELD_CMD: MQTT_CMD_SYNC_MQTT_CONNECT_INFO}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not a connect info message
         assert is_mqtt_connect_info_message(999, {FIELD_CMD: 100}) is False
         assert is_mqtt_connect_info_message(None, {}) is False
 
     def test_is_device_ota_version_message(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_device_ota_version_message function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             ACTION_ID_GET_DEVICE_OTA_VERSION,
             FIELD_CMD,
             MQTT_CMD_GET_DEVICE_OTA_VERSION,
@@ -1141,21 +1143,21 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         # action_id match
         assert (
             is_device_ota_version_message(ACTION_ID_GET_DEVICE_OTA_VERSION, {}) is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # body cmd match
         assert (
             is_device_ota_version_message(
                 None, {FIELD_CMD: MQTT_CMD_GET_DEVICE_OTA_VERSION}
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Not an OTA version message
         assert is_device_ota_version_message(999, {FIELD_CMD: 99}) is False
         assert is_device_ota_version_message(None, {}) is False
 
     def test_is_subdevice_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_subdevice_payload function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACTION_ID,
             FIELD_DEVICE_TYPE,
             FIELD_DEV_TYPE,
@@ -1180,7 +1182,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Test 2: action_id in MQTT_ACTION_IDS_SUBDEVICE
         payload = {FIELD_ACTION_ID: next(iter(MQTT_ACTION_IDS_SUBDEVICE))}
@@ -1193,7 +1195,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Test 3: updates contains subdevice hint keys
         payload = {}
@@ -1207,7 +1209,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Test 4: dev_type in body matches (FIELD_DEV_TYPE)
         payload = {}
@@ -1221,7 +1223,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Test 5: dev_type in body matches (FIELD_DEVICE_TYPE)
         body = {FIELD_DEVICE_TYPE: "smart_meter"}
@@ -1234,7 +1236,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Test 6: key in body directly
         payload = {}
@@ -1248,7 +1250,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Not a subdevice
         payload2 = {"type": "other"}
@@ -1262,7 +1264,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 subdevice_dev_type_strings,
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     def test_normalize_battery_pack_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test normalize_battery_pack_payload function."""
@@ -1279,13 +1281,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 {"sn": "123", "soc": 50}, ct_meter_keys, battery_pack_hint_keys
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             looks_like_battery_pack(
                 {"type": "other"}, ct_meter_keys, battery_pack_hint_keys
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     def test_battery_packs_from_source(self) -> None:  # ruff: ignore[no-self-use]
         """Test battery_packs_from_source function."""
@@ -1294,7 +1296,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         source = {"batteryPacks": [{"sn": "123", "soc": 50}]}
         result = battery_packs_from_source(
             source, ct_meter_keys, battery_pack_hint_keys
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert isinstance(result, list)
 
     def test_subdevice_serial(self) -> None:  # ruff: ignore[no-self-use]
@@ -1313,13 +1315,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         """Test sorted_battery_pack_payloads function."""
         items = [{"sn": "2", "soc": 10}, {"sn": "1", "soc": 20}]
         result = sorted_battery_pack_payloads(items)
-        assert len(result) == 2
+        assert len(result) == 2  # ruff: ignore[magic-value-comparison]
         assert result[0]["sn"] == "1"
 
     def test_valid_discovery_list_response(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_discovery_list_response function."""
         # The function expects a mapping with FIELD_DATA key
-        from custom_components.jackery_solarvault.const import FIELD_DATA
+        from custom_components.jackery_solarvault.const import FIELD_DATA  # ruff: ignore[import-outside-top-level]
 
         assert valid_discovery_list_response({FIELD_DATA: [{"sn": "123"}]}) is True
         assert valid_discovery_list_response("invalid") is False
@@ -1328,13 +1330,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         """Test valid_discovery_device_identity function."""
         assert (
             valid_discovery_device_identity({"sn": "123", "deviceType": "test"}) is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert valid_discovery_device_identity({"type": "other"}) is False
 
     def test_valid_system_parent_identity(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_parent_identity function."""
         # Function expects FIELD_DEVICE_ID or FIELD_ID
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_ID  # ruff: ignore[import-outside-top-level]
 
         assert valid_system_parent_identity({FIELD_DEVICE_ID: "123"}) is True
         assert valid_system_parent_identity({FIELD_ID: 123}) is True
@@ -1343,7 +1345,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     def test_valid_system_discovery_identity(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_identity function."""
         # Function expects FIELD_ID or FIELD_SYSTEM_ID
-        from custom_components.jackery_solarvault.const import FIELD_ID, FIELD_SYSTEM_ID
+        from custom_components.jackery_solarvault.const import FIELD_ID, FIELD_SYSTEM_ID  # ruff: ignore[import-outside-top-level]
 
         assert valid_system_discovery_identity({FIELD_ID: "123"}) is True
         assert valid_system_discovery_identity({FIELD_SYSTEM_ID: 123}) is True
@@ -1352,7 +1354,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     def test_valid_system_discovery_entries(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_entries function."""
         # Function expects list of systems with valid identities and devices
-        from custom_components.jackery_solarvault.const import FIELD_DEVICES, FIELD_ID
+        from custom_components.jackery_solarvault.const import FIELD_DEVICES, FIELD_ID  # ruff: ignore[import-outside-top-level]
 
         # Need a system with valid identity and devices
         system = {FIELD_ID: "123", FIELD_DEVICES: [{FIELD_ID: "device1"}]}
@@ -1362,7 +1364,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
     def test_valid_system_discovery_response(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_system_discovery_response function."""
         # Function expects a mapping with FIELD_DATA containing valid entries
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_DATA,
             FIELD_DEVICES,
             FIELD_ID,
@@ -1375,7 +1377,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_subdevice_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_id function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_DEVICE_ID,
             FIELD_DEV_ID,
             FIELD_ID,
@@ -1399,7 +1401,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_subdevice_identity_values(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_identity_values function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_SN
+        from custom_components.jackery_solarvault.const import FIELD_DEVICE_ID, FIELD_SN  # ruff: ignore[import-outside-top-level]
 
         item = {FIELD_DEVICE_ID: "123", FIELD_SN: "456"}
         result = subdevice_identity_values(item)
@@ -1408,17 +1410,17 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_subdevice_dev_type(self) -> None:  # ruff: ignore[no-self-use]
         """Test subdevice_dev_type function."""
-        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE
+        from custom_components.jackery_solarvault.const import FIELD_DEV_TYPE  # ruff: ignore[import-outside-top-level]
 
         # Function expects FIELD_DEV_TYPE as integer
         assert subdevice_dev_type({FIELD_DEV_TYPE: 1}) == 1
-        assert subdevice_dev_type({FIELD_DEV_TYPE: "2"}) == 2
+        assert subdevice_dev_type({FIELD_DEV_TYPE: "2"}) == 2  # ruff: ignore[magic-value-comparison]
         assert subdevice_dev_type({}) is None
 
     def test_is_smart_meter_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test is_smart_meter_accessory function."""
-        # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)
-        from custom_components.jackery_solarvault.const import (
+        # Function checks FIELD_DEV_TYPE or FIELD_DEVICE_TYPE == "3" (SUBDEVICE_TYPE_SMART_METER)  # ruff: ignore[line-too-long]
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_DEVICE_TYPE,
             FIELD_DEV_TYPE,
             SUBDEVICE_TYPE_SMART_METER,
@@ -1427,18 +1429,18 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             is_smart_meter_accessory({FIELD_DEV_TYPE: SUBDEVICE_TYPE_SMART_METER})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             is_smart_meter_accessory({FIELD_DEVICE_TYPE: SUBDEVICE_TYPE_SMART_METER})
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert is_smart_meter_accessory({FIELD_DEV_TYPE: "other"}) is False
         assert is_smart_meter_accessory({}) is False
 
     def test_smart_meter_accessories(self) -> None:  # ruff: ignore[no-self-use]
         """Test smart_meter_accessories function."""
         # Function looks for accessories in source or in system
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             PAYLOAD_SYSTEM,
             SUBDEVICE_TYPE_SMART_METER,
@@ -1453,7 +1455,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             PAYLOAD_SYSTEM: {
                 FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER}]
             }
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         result2 = smart_meter_accessories(source2)
         assert len(result2) == 1
         # Multiple accessories
@@ -1465,13 +1467,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             ]
         }
         result3 = smart_meter_accessories(source3)
-        assert len(result3) == 2
+        assert len(result3) == 2  # ruff: ignore[magic-value-comparison]
         # No accessories
         assert smart_meter_accessories({}) == []
 
     def test_smart_meter_accessory_device_id(self) -> None:  # ruff: ignore[no-self-use]
         """Test smart_meter_accessory_device_id function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             FIELD_DEVICE_ID,
             FIELD_ID,
@@ -1484,19 +1486,19 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             FIELD_ACCESSORIES: [
                 {"devType": SUBDEVICE_TYPE_SMART_METER, FIELD_DEVICE_ID: "123"}
             ]
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         result = smart_meter_accessory_device_id(source)
         assert result == "123"
         # Test with id
         source2 = {
             FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER, FIELD_ID: 456}]
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         result2 = smart_meter_accessory_device_id(source2)
         assert result2 == "456"
         # Test with dev_id
         source3 = {
             FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER, "devId": "789"}]
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         result3 = smart_meter_accessory_device_id(source3)
         assert result3 == "789"
         # Test fallback to ct_meter
@@ -1508,7 +1510,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
 
     def test_has_smart_meter_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_smart_meter_accessory function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             SUBDEVICE_TYPE_SMART_METER,
         )
@@ -1518,12 +1520,12 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 FIELD_ACCESSORIES: [{"devType": SUBDEVICE_TYPE_SMART_METER}]
             })
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert has_smart_meter_accessory({}) is False
 
     def test_has_subdevice_accessory_or_bucket(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_subdevice_accessory_or_bucket function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             FIELD_DEV_TYPE,
             PAYLOAD_SMART_PLUGS,
@@ -1532,7 +1534,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             SUBDEVICE_DEV_TYPE_SOCKET,
         )
 
-        # Function checks for accessories with matching dev_type or bucket with dict items
+        # Function checks for accessories with matching dev_type or bucket with dict items  # ruff: ignore[line-too-long]
         # Test with matching dev_type in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]}
         assert (
@@ -1540,19 +1542,19 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET, bucket="smart_plugs"
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Test with matching dev_type in system
         payload2 = {
             PAYLOAD_SYSTEM: {
                 FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]
             }
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         assert (
             has_subdevice_accessory_or_bucket(
                 payload2, dev_type=SUBDEVICE_DEV_TYPE_BREAKER, bucket="circuit_property"
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Test with bucket containing dict items
         payload3 = {PAYLOAD_SMART_PLUGS: [{"id": "1"}]}
         assert (
@@ -1560,7 +1562,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 payload3, dev_type=999, bucket=PAYLOAD_SMART_PLUGS
             )
             is True
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Test without match
         assert (
             has_subdevice_accessory_or_bucket(
@@ -1569,13 +1571,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 bucket="smart_plugs",
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             has_subdevice_accessory_or_bucket(
                 {}, dev_type=SUBDEVICE_DEV_TYPE_SOCKET, bucket="smart_plugs"
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert (
             has_subdevice_accessory_or_bucket(
                 {"accessories": []},
@@ -1583,7 +1585,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 bucket="smart_plugs",
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         # Test bucket with non-dict items
         payload4 = {"circuit_property": ["not a dict"]}
         assert (
@@ -1591,11 +1593,11 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
                 payload4, dev_type=SUBDEVICE_DEV_TYPE_BREAKER, bucket="circuit_property"
             )
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     def test_has_meter_head_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_meter_head_accessory function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             FIELD_DEV_TYPE,
             PAYLOAD_METER_HEADS,
@@ -1604,7 +1606,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             SUBDEVICE_DEV_TYPE_METER_HEAD,
         )
 
-        # Function checks for meter head (dev_type=4) or meter (dev_type=5) in accessories or meter_heads bucket
+        # Function checks for meter head (dev_type=4) or meter (dev_type=5) in accessories or meter_heads bucket  # ruff: ignore[line-too-long]
         # Test with meter head in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_METER_HEAD}]}
         assert has_meter_head_accessory(payload) is True
@@ -1616,7 +1618,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             PAYLOAD_SYSTEM: {
                 FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_METER_HEAD}]
             }
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         assert has_meter_head_accessory(payload3) is True
         # Test with bucket containing dict items
         payload4 = {PAYLOAD_METER_HEADS: [{"id": "1"}]}
@@ -1625,13 +1627,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             has_meter_head_accessory({FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: "other"}]})
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert has_meter_head_accessory({}) is False
         assert has_meter_head_accessory({FIELD_ACCESSORIES: []}) is False
 
     def test_has_smart_plug_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_smart_plug_accessory function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             FIELD_DEV_TYPE,
             PAYLOAD_SMART_PLUGS,
@@ -1639,7 +1641,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             SUBDEVICE_DEV_TYPE_SOCKET,
         )
 
-        # Function checks for smart plug (dev_type=6) in accessories or smart_plugs bucket
+        # Function checks for smart plug (dev_type=6) in accessories or smart_plugs bucket  # ruff: ignore[line-too-long]
         # Test with smart plug in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]}
         assert has_smart_plug_accessory(payload) is True
@@ -1648,7 +1650,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             PAYLOAD_SYSTEM: {
                 FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]
             }
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         assert has_smart_plug_accessory(payload2) is True
         # Test with bucket containing dict items
         payload3 = {PAYLOAD_SMART_PLUGS: [{"id": "1"}]}
@@ -1657,13 +1659,13 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             has_smart_plug_accessory({FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: "other"}]})
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert has_smart_plug_accessory({}) is False
         assert has_smart_plug_accessory({FIELD_ACCESSORIES: []}) is False
 
     def test_has_breaker_accessory(self) -> None:  # ruff: ignore[no-self-use]
         """Test has_breaker_accessory function."""
-        from custom_components.jackery_solarvault.const import (
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             FIELD_ACCESSORIES,
             FIELD_DEV_TYPE,
             PAYLOAD_CIRCUIT_PROPERTY,
@@ -1671,7 +1673,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             SUBDEVICE_DEV_TYPE_BREAKER,
         )
 
-        # Function checks for breaker (dev_type=7) in accessories or circuit_property bucket
+        # Function checks for breaker (dev_type=7) in accessories or circuit_property bucket  # ruff: ignore[line-too-long]
         # Test with breaker in accessories
         payload = {FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]}
         assert has_breaker_accessory(payload) is True
@@ -1680,7 +1682,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
             PAYLOAD_SYSTEM: {
                 FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]
             }
-        }  # noqa: E501, RUF100
+        }  # noqa: E501, RUF100, RUF105
         assert has_breaker_accessory(payload2) is True
         # Test with bucket containing dict items
         payload3 = {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "1"}]}
@@ -1689,7 +1691,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         assert (
             has_breaker_accessory({FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: "other"}]})
             is False
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
         assert has_breaker_accessory({}) is False
         assert has_breaker_accessory({FIELD_ACCESSORIES: []}) is False
 
