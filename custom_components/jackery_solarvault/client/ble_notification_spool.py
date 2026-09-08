@@ -75,7 +75,7 @@ class BleNotificationSpool:
     def namespace(self) -> str:
         """Persistent entry namespace after opening."""
         if self._namespace is None:
-            raise RuntimeError("Jackery BLE spool is not open")  # ruff: ignore[raise-vanilla-args]
+            raise RuntimeError("Jackery BLE spool is not open")
         return self._namespace
 
     @property
@@ -96,10 +96,9 @@ class BleNotificationSpool:
             ),
         )
 
-    async def _async_executor(self, method: Callable[..., Any], *args: Any) -> Any:  # ruff: ignore[any-type]
+    async def _async_executor(self, method: Callable[..., Any], *args: Any) -> Any:
         add_executor_job = getattr(self._hass, "async_add_executor_job", None)
         if callable(add_executor_job):
-            # pyrefly: ignore [not-async]
             return await add_executor_job(method, *args)
         return await asyncio.to_thread(method, *args)
 
@@ -142,7 +141,7 @@ class BleNotificationSpool:
         self._opened = True
 
     @callback
-    def stage_notification(  # ruff: ignore[too-many-arguments]
+    def stage_notification(
         self,
         *,
         device_id: str,
@@ -154,9 +153,9 @@ class BleNotificationSpool:
     ) -> BleSpoolTicket:
         """Observe one callback and schedule its write-ahead commit."""
         if not self._opened or self._namespace is None:
-            raise RuntimeError("Jackery BLE spool is not open")  # ruff: ignore[raise-vanilla-args]
+            raise RuntimeError("Jackery BLE spool is not open")
         if self._closing:
-            raise RuntimeError("Jackery BLE spool is closing")  # ruff: ignore[raise-vanilla-args]
+            raise RuntimeError("Jackery BLE spool is closing")
         sequence = self._next_sequence
         self._next_sequence += 1
         delivery_id = f"{self._namespace}:n:{sequence}"
@@ -218,7 +217,7 @@ class BleNotificationSpool:
                 for expected in batch:
                     current = self._staging.popleft()
                     if current.delivery_id != expected.delivery_id:
-                        raise RuntimeError("Jackery BLE staging FIFO ownership changed")  # ruff: ignore[raise-vanilla-args]
+                        raise RuntimeError("Jackery BLE staging FIFO ownership changed")
                     self._staging_bytes -= len(current.raw)
                 async with self._writer_condition:
                     self._metrics = metrics
@@ -237,7 +236,7 @@ class BleNotificationSpool:
     async def async_flush_through(self, sequence: int) -> None:
         """Wait until every observed record through ``sequence`` is durable."""
         while self._durable_through < sequence:
-            if self._writer_task is None or self._writer_task.done():  # ruff: ignore[collapsible-if]
+            if self._writer_task is None or self._writer_task.done():
                 if not self._async_start_writer():
                     msg = "Home Assistant rejected the Jackery BLE spool writer"
                     raise RuntimeError(msg) from self._last_persist_error
@@ -302,7 +301,7 @@ class BleNotificationSpool:
     ) -> None:
         """Persist a fragment, unrouted, or invalid disposition without deletion."""
         if sequence <= 0 or sequence >= self._next_sequence:
-            raise ValueError(f"Unknown Jackery BLE spool sequence {sequence}")  # ruff: ignore[raise-vanilla-args]
+            raise ValueError(f"Unknown Jackery BLE spool sequence {sequence}")
         await self.async_flush_through(sequence)
         async with self._mutation_lock:
             updated = await self._async_executor(
@@ -314,7 +313,7 @@ class BleNotificationSpool:
                 chunk_count,
             )
         if not updated:
-            raise RuntimeError(  # ruff: ignore[raise-vanilla-args]
+            raise RuntimeError(
                 f"Jackery BLE spool sequence {sequence} is no longer pending"
             )
 

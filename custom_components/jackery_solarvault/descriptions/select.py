@@ -816,9 +816,7 @@ async def _portable_dc_priority_select(entity: JackerySelect, option: str) -> No
 
 SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="work_mode_select",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="work_mode_select",
         options=list(_OPTION_TO_WORK_MODE.keys()),
         value_fn=_work_mode_current,
@@ -827,9 +825,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         warn_unknown_kind="work mode",
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="temp_unit_select",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="temp_unit_select",
         options=list(_OPTION_TO_TEMP_UNIT.keys()),
         value_fn=_temp_unit_current,
@@ -837,9 +833,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_temp_unit_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="auto_off_island_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="auto_off_island_mode",
         options=list(_AUTO_OFF_OPTIONS),
         value_fn=_island_auto_off_current,
@@ -847,9 +841,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_island_auto_off_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="storm_warning_minutes_select",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="storm_warning_minutes_select",
         device_registry_role="system",
         options_fn=_storm_minutes_options,
@@ -858,9 +850,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_storm_minutes_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="electricity_price_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="electricity_price_mode",
         device_registry_role="system",
         options=[PRICE_MODE_TO_OPTION[1], PRICE_MODE_TO_OPTION[2]],
@@ -870,9 +860,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         warn_unknown_kind="electricity price mode",
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="electricity_price_provider",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="electricity_price_provider",
         device_registry_role="system",
         options_fn=_price_provider_options,
@@ -881,9 +869,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_price_provider_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="ct_phase_select",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="ct_phase_select",
         options=list(_CT_PHASE_TO_OPTION.values()),
         value_fn=_ct_phase_current,
@@ -891,9 +877,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_ct_phase_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_ups_model",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ups_model",
         options=list(_OPTION_TO_UPS_MODEL.keys()),
         value_fn=_portable_ups_model_current,
@@ -901,9 +885,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_ups_model_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_power_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_power_mode",
         options=list(_OPTION_TO_POWER_MODE.keys()),
         value_fn=_portable_power_mode_current,
@@ -911,11 +893,8 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_power_mode_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_screen",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_screen",
-        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         options=list(_OPTION_TO_SCREEN_TIMEOUT.keys()),
         value_fn=_portable_screen_current,
@@ -923,9 +902,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_screen_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_battery_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_battery_mode",
         options=list(_OPTION_TO_BATTERY_MODE.keys()),
         value_fn=_portable_battery_mode_current,
@@ -933,9 +910,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_battery_mode_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_charge_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_charge_mode",
         options=list(_OPTION_TO_CHARGE_MODE.keys()),
         value_fn=_portable_charge_mode_current,
@@ -943,9 +918,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_charge_mode_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac_output_mode",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac_output_mode",
         options=list(_OPTION_TO_AC_OUTPUT_MODE.keys()),
         value_fn=_portable_ac_output_mode_current,
@@ -953,9 +926,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_ac_output_mode_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_output_priority",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_output_priority",
         options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
         value_fn=_portable_output_priority_current,
@@ -963,9 +934,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_output_priority_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac1_priority",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac1_priority",
         options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
         value_fn=_portable_ac1_priority_current,
@@ -973,9 +942,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_ac1_priority_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac2_priority",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac2_priority",
         options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
         value_fn=_portable_ac2_priority_current,
@@ -983,9 +950,7 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         select_fn=_portable_ac2_priority_select,
     ),
     JackerySelectDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_priority",
-        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_priority",
         options=list(_OPTION_TO_OUTPUT_PRIORITY.keys()),
         value_fn=_portable_dc_priority_current,

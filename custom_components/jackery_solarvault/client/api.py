@@ -20,9 +20,10 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
-from collections.abc import Callable
-from dataclasses import dataclass
-from enum import StrEnum
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import date, timezone
+from enum import StrEnum, auto
 import hashlib
 from http import HTTPStatus
 import inspect
@@ -31,7 +32,7 @@ import logging
 import os
 import re
 import time
-from typing import TYPE_CHECKING, Any, Final, TypedDict
+from typing import TYPE_CHECKING, Any, Final, Generic, TypedDict
 import uuid
 
 import aiohttp
@@ -40,6 +41,10 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 import voluptuous as vol
+
+from homeassistant.const import Platform
+from homeassistant.core import callback
+from homeassistant.helpers.json import json_dumps
 
 from ..const import (
     ACCESSORIES_BIND_PATH,
@@ -273,9 +278,6 @@ from .credentials import (
     credential_text,
     redacted_error,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Mapping, Sequence
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -849,7 +851,6 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 raise JackeryApiError.invalid_json() from err
         raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
         try:
-            # pyrefly: ignore [no-any-return-explicit]
             return json.loads(raw)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as err:
             raise JackeryApiError.invalid_json() from err
@@ -959,7 +960,6 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 headers=headers,
                 timeout=_HTTP_POLICY.timeout(LOGIN_TIMEOUT_SEC),
             ) as resp:
-                # pyrefly: ignore [no-any-return-explicit]
                 return await self._decode_login_response(resp)
         except (TimeoutError, aiohttp.ClientError) as err:
             self._requests_failed += 1

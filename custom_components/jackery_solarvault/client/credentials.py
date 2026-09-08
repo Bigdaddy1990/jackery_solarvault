@@ -1,7 +1,12 @@
 """Shared credential safety contract for Jackery SolarVault."""
 
+from __future__ import annotations
+
 import hashlib
-from typing import TYPE_CHECKING, Final
+import logging
+from collections.abc import Mapping
+from dataclasses import field
+from typing import Final, TYPE_CHECKING
 
 import voluptuous as vol
 
@@ -10,6 +15,8 @@ from ..const import REDACTED_VALUE
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+
+_LOGGER = logging.getLogger(__name__)
 MAX_TOKEN_LENGTH: Final = 512
 MAX_USERNAME_LENGTH: Final = 128
 MAX_PASSWORD_LENGTH: Final = 128

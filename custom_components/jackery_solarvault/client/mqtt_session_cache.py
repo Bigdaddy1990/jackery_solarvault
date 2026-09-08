@@ -16,15 +16,22 @@ has succeeded.
 """
 
 
+from __future__ import annotations
+
 import asyncio
 import base64
-import binascii
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Any, Final
+from collections.abc import Mapping
+from dataclasses import field
+from typing import Any, Final, TYPE_CHECKING
 
+import binascii
+
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+
 from ..const import (
     CACHE_ENTRIES_KEY,
     CACHE_STORAGE_VERSION,

@@ -233,7 +233,6 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             return self.entity_description.dynamic_unit(
                 self._payload_for_sources(self.entity_description.data_sources)
             )
-        # pyrefly: ignore [no-any-return-implicit]
         return self.entity_description.native_unit_of_measurement
 
     @property

@@ -4,14 +4,20 @@ Each transport (BLE, Cloud MQTT, Local MQTT) gets its own supervisor with
 independent lifecycle, reconnect logic, and credential management.
 """
 
+from __future__ import annotations
+
 import asyncio
 import contextlib
+import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
-import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any, Callable, TYPE_CHECKING
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

@@ -18,6 +18,7 @@ has succeeded.
 import asyncio
 import base64
 import binascii
+import logging
 import math
 import time
 from typing import TYPE_CHECKING, Any, Final, TypeGuard
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
 
+_LOGGER = logging.getLogger(__name__)
 _STORAGE_VERSION: Final = CACHE_STORAGE_VERSION
 _STORAGE_KEY: Final = MQTT_SESSION_CACHE_STORAGE_KEY
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"

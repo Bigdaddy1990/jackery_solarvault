@@ -1,10 +1,12 @@
 """Direct local-broker MQTT transport for Jackery telemetry."""
 
+from __future__ import annotations
+
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import json
 import logging
@@ -14,6 +16,9 @@ from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict, Unpack, cast
 from aiomqtt import Client as MqttClient, MqttError
 
 from homeassistant.components.mqtt.util import valid_subscribe_topic
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import Event, HomeAssistant
+from homeassistant.helpers.json import json_dumps
 
 from ..const import (
     DOMAIN,
@@ -25,12 +30,6 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Coroutine
-
-    from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")

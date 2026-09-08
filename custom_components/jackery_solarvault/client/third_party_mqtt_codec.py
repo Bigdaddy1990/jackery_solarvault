@@ -1,12 +1,11 @@
 """App-compatible codec for ThirdPartMQTTConfig credential fields."""
 
 import base64
+from collections.abc import Mapping
+from dataclasses import field
 import logging
 import secrets
 from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from collections.abc import Mapping
 
 from ..const import (
     CONF_LOCAL_MQTT_ENABLE,

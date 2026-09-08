@@ -21,15 +21,21 @@ reset the midnight anchor. The cache key is ``DOMAIN.local_daily_cache``
 and is stored under HA's standard :class:`Store`.
 """
 
+from __future__ import annotations
 
 import asyncio
-from datetime import date, timedelta
+import base64
 import json
 import logging
+from collections.abc import Mapping
+from datetime import date, time, timedelta
+from dataclasses import field
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.json import json_dumps
 from homeassistant.helpers.storage import Store
+
 from ..const import (
     CACHE_ENTRIES_KEY,
     CACHE_STORAGE_VERSION,

@@ -5,8 +5,14 @@ constants live one level up in ``..util`` and ``..const`` so the integration
 maintains a single source of truth — there is no separate, standalone copy.
 """
 
+from __future__ import annotations
+
 from importlib import import_module
-from typing import TYPE_CHECKING, cast
+import logging
+from typing import TYPE_CHECKING, Final, cast
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
 from .api import (
     DevicePeriodQuery,
@@ -15,9 +21,9 @@ from .api import (
     JackeryAuthError,
     JackeryError,
 )
+from .mqtt_push import JackeryMqttPushClient
 
-if TYPE_CHECKING:
-    from .mqtt_push import JackeryMqttPushClient
+_LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     "DevicePeriodQuery",
@@ -45,3 +51,8 @@ def __getattr__(name: str) -> type[JackeryMqttPushClient]:  # PEP 562 lazy re-ex
         module = import_module(f"{__name__}.mqtt_push")
         return cast("type[JackeryMqttPushClient]", module.JackeryMqttPushClient)
     raise AttributeError(name)
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: CustomConfigEntry) -> bool:
+    """Entlädt einen ConfigEntry sauber."""
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
