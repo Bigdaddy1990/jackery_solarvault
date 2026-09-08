@@ -36,11 +36,11 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
-          pyrefly suppress --remove-unused || true
-          pyrefly check . --summarize-errors || true
-          pyrefly infer . || true
-          pyrefly coverage check . || true
-          pyrefly stubgen . || true
+          pyrefly suppress --remove-unused --output-format=github || true
+          pyrefly check . --summarize-errors --output-format=github || true
+          pyrefly infer . --output-format=github || true
+          pyrefly coverage check . --output-format=github || true
+          pyrefly stubgen . --output-format=github || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual --check --py314-plus --ruff || true
 
