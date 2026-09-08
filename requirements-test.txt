@@ -7,7 +7,7 @@ attrs>=26.1.0
 autotyping>=24.9.0
 coverage
 coverage[toml]
-homeassistant>=2026.9.0
+homeassistant>=2026.9.1
 homeassistant-stubs
 hypothesis>=6.167.1
 ifaddr>=0.2.0
