@@ -34,7 +34,7 @@ pytest_aiohttp
 python-dateutil>=2.9.0.post0
 python_discovery>=1.6.0
 pyyaml
-ruff>=0.16.6
+ruff>=0.16.7
 smellcheck>=0.3.10
 ty<=0.0.79
 types-aiofiles>=25.1.0.20260518
