@@ -1,12 +1,9 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
-from __future__ import annotations
-
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable, Coroutine, Mapping
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, time, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 import json
 import logging
@@ -15,12 +12,8 @@ import ssl
 from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiomqtt
-from aiomqtt import Client as MQTTClient, MqttError
+from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
-
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.json import json_dumps
 
 from ..const import (
     FIELD_ACTION_ID,
@@ -41,6 +34,14 @@ from ..const import (
     REDACTED_VALUE,
 )
 from .credentials import credential_fingerprint, redacted_error
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Coroutine
+
+    from aiomqtt import Client as MQTTClient
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")

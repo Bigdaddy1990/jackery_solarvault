@@ -31,13 +31,11 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import binascii
 from collections import deque
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 import importlib
@@ -49,21 +47,24 @@ import time
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from bleak import BleakClient
-from bleak.backends.device import BLEDevice
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
-
-from homeassistant.components.bluetooth import (
-    BluetoothCallbackMatcher,
-    BluetoothChange,
-    BluetoothScanningMode as HABluetoothScanningMode,
-    BluetoothServiceInfoBleak,
-)
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.json import json_dumps
 
 from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from bleak.backends.device import BLEDevice
+
+    from homeassistant.components.bluetooth import (
+        BluetoothCallbackMatcher,
+        BluetoothChange,
+        BluetoothScanningMode as HABluetoothScanningMode,
+        BluetoothServiceInfoBleak,
+    )
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
 
 
 class _BluetoothModule(Protocol):

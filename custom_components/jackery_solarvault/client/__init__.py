@@ -5,14 +5,11 @@ constants live one level up in ``..util`` and ``..const`` so the integration
 maintains a single source of truth — there is no separate, standalone copy.
 """
 
-from __future__ import annotations
-
 from importlib import import_module
 import logging
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 
 from .api import (
     DevicePeriodQuery,
@@ -23,9 +20,13 @@ from .api import (
 )
 from .mqtt_push import JackeryMqttPushClient
 
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
 _LOGGER = logging.getLogger(__name__)
 
 __all__ = [
+    "ConfigEntry",
     "DevicePeriodQuery",
     "JackeryApi",
     "JackeryApiError",

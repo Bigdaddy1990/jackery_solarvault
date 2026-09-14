@@ -54,14 +54,10 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from datetime import time
+from dataclasses import dataclass
 import logging
 import os
 import secrets
-from typing import Final
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
