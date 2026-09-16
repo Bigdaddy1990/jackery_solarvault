@@ -6,7 +6,7 @@ annotatedyaml>=1.0.2
 attrs>=26.1.0
 astroid
 autotyping>=24.9.0
-coverage>=7.1.0
+coverage>=7.16.1
 coverage[toml]>=7.6.0
 homeassistant>=2026.9.2
 homeassistant-stubs>=2026.9.2
