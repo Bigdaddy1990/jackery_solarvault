@@ -49,7 +49,7 @@ jobs:
         run: |
           pip install -r requirements.txt --upgrade
           pip install -r requirements-test.txt --upgrade
-          pip install --upgrade uv-pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+          pip install --upgrade uv-pre-commit ruff pyupgrade pyprefly flake8-type-checking reorder-python-imports
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -74,6 +74,10 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
+          ruff check tests/ --fix || true
+          ruff format tests/ || true
+          pyrefly infer tests/ || true
+          pyrefly infer custom_components/jackery_solarvault || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
 
