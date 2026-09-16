@@ -36,6 +36,8 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
+          ruff check tests/ --fix || true
+          ruff format tests/ || true
           pyrefly suppress --remove-unused --output-format=github || true
           pyrefly check --summarize-errors --output-format=github || true
           pyrefly infer --output-format=github || true
