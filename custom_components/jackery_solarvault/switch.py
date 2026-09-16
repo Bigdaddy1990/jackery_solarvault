@@ -35,19 +35,14 @@ from .const import (
     FIELD_DEV_ID,
     FIELD_DEV_SN,
     FIELD_ID,
-    FIELD_IDX,
     FIELD_IS_AUTO_STANDBY,
     FIELD_IS_CLOUD,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_NM,
     FIELD_OFF_GRID_DOWN,
-    FIELD_PC,
-    FIELD_PR,
     FIELD_SCAN_NAME,
     FIELD_SN,
     FIELD_SOCKET_PRIORITY,
-    FIELD_SPH,
-    FIELD_SPH_PC,
     FIELD_SW,
     FIELD_SWITCH_STATE,
     FIELD_SYS_SWITCH,
@@ -419,7 +414,8 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
         self._breaker_id = breaker_id
         self._breaker_key = breaker_key
         # Build the per-breaker device_info once at construction.
-        from .sensor import _build_breaker_device_info
+        from .sensor import _build_breaker_device_info  # ruff: ignore[import-outside-top-level]
+
         self._attr_device_info = _build_breaker_device_info(
             coordinator,
             device_id,
@@ -479,7 +475,8 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Diagnostic state attributes for the breaker."""
-        from .sensor import _get_breaker_extra_state_attributes
+        from .sensor import _get_breaker_extra_state_attributes  # ruff: ignore[import-outside-top-level]
+
         return _get_breaker_extra_state_attributes(self._breaker, self._breaker_index)
 
 

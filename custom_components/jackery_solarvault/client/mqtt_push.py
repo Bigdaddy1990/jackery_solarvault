@@ -1157,10 +1157,11 @@ class JackeryMqttPushClient:
         timeout_sec: float | None = None,
     ) -> None:
         """Wait until every accepted frame has completed serial delivery."""
-        from .storage_helpers import async_wait_mqtt_message_queue_idle
+        from .storage_helpers import async_wait_mqtt_message_queue_idle  # ruff: ignore[import-outside-top-level]
 
         async def _wait_until_idle() -> None:
             await async_wait_mqtt_message_queue_idle(
+                # pyrefly: ignore [bad-argument-type]
                 message_queue=self._message_queue,
                 message_consumer_task=self._message_consumer_task,
                 message_delivery_task=self._message_delivery_task,

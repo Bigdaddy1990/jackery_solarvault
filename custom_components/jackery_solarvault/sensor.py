@@ -4651,9 +4651,11 @@ def _build_breaker_device_info(
     """
     payload = (coordinator.data or {}).get(device_id, {}) or {}
     system = payload.get(PAYLOAD_SYSTEM) or {}
-    discovery = payload.get(PAYLOAD_DISCOVERY_INFO) or {}
-    properties = payload.get(PAYLOAD_PROPERTY) or {}
-    
+    # pyrefly: ignore [unknown-name]
+    discovery = payload.get(PAYLOAD_DISCOVERY_INFO) or {}  # ruff: ignore[undefined-name]
+    # pyrefly: ignore [unknown-name]
+    properties = payload.get(PAYLOAD_PROPERTY) or {}  # ruff: ignore[undefined-name]
+
     base_name = first_nonblank_text(
         system.get(FIELD_DEVICE_NAME),
         discovery.get(FIELD_DEVICE_NAME),
@@ -4677,7 +4679,7 @@ def _get_breaker_extra_state_attributes(
     breaker_index: int,
 ) -> dict[str, Any]:
     """Return diagnostic state attributes for a breaker.
-    
+
     Returns:
         dict[str, Any]: Mapping of attribute names to their current values.
     """

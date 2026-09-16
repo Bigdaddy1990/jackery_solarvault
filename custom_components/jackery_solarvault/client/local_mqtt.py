@@ -573,7 +573,7 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except (TimeoutError, OSError):
+            except TimeoutError, OSError:
                 # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
@@ -613,9 +613,10 @@ class JackeryLocalMqttClient:
 
     async def async_wait_message_queue_idle(self) -> None:
         """Wait until every accepted frame has completed serial delivery."""
-        from .storage_helpers import async_wait_mqtt_message_queue_idle
-        
+        from .storage_helpers import async_wait_mqtt_message_queue_idle  # ruff: ignore[import-outside-top-level]
+
         await async_wait_mqtt_message_queue_idle(
+            # pyrefly: ignore [bad-argument-type]
             message_queue=self._message_queue,
             message_consumer_task=self._message_consumer_task,
             message_delivery_task=self._message_delivery_task,

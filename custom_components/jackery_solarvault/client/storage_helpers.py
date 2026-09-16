@@ -1,25 +1,25 @@
 """Shared MQTT utilities for Jackery SolarVault integration."""
 
 import asyncio
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    pass
+from typing import Any
 
 
-async def async_wait_mqtt_message_queue_idle(
+async def async_wait_mqtt_message_queue_idle(  # ruff: ignore[too-many-arguments, too-many-positional-arguments]
     message_queue: list[Any],
     message_consumer_task: asyncio.Task | None,
     message_delivery_task: asyncio.Task | None,
+    # pyrefly: ignore [not-a-type]
     settle_consumer: callable,
+    # pyrefly: ignore [not-a-type]
     settle_delivery: callable,
+    # pyrefly: ignore [not-a-type]
     ensure_consumer: callable,
 ) -> None:
     """Wait until every accepted MQTT frame has completed serial delivery.
-    
+
     This is a shared utility for waiting on MQTT message queue idle state.
     It handles the common pattern used by both local_mqtt and mqtt_push modules.
-    
+
     Parameters:
         message_queue: The queue of pending messages
         message_consumer_task: The task consuming messages from the queue

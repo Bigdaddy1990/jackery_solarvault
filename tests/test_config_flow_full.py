@@ -168,7 +168,7 @@ class TestCoerceLocalMqttPort:
     )
     def test_various_inputs_return_correct_port(  # ruff: ignore[undocumented-public-method, no-self-use]
         self,
-        value: Any,
+        value: Any,  # ruff: ignore[any-type]
         expected: int,
     ) -> None:
         assert _coerce_local_mqtt_port(value) == expected
