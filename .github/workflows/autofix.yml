@@ -55,7 +55,7 @@ jobs:
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
           #enable-cache: true
           #ignore-nothing-to-cache: true
-      - run: uv python install ruff pyrely
+      - run: uv add ruff pyrely
       - uses: astral-sh/ruff-action@v4.1.0
       - run: ruff check --fix
       - run: ruff format
