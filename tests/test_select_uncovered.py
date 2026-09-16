@@ -410,7 +410,7 @@ class TestJackerySelect:
         coordinator.async_set_storm_warning = AsyncMock()
         return coordinator
 
-    def _create_select(
+    def _create_select(  # ruff: ignore[no-self-use]
         self, coordinator: MagicMock, key: str = "work_mode_select"
     ) -> JackerySelect:
         """Create a select instance for testing."""
