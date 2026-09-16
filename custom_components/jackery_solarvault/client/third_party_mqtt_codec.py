@@ -257,10 +257,8 @@ def decode_third_party_mqtt_config_body(
             continue
         try:
             config[key] = decode_third_party_mqtt_field(value, bluetooth_key)
-        except ValueError as err:
-            _LOGGER.debug(
-                "failed to decode third-party MQTT credential field %s: %s", key, err,
-            )
+        except ValueError:
+            _LOGGER.debug("failed to decode third-party MQTT credential field")
             failed_fields.append(key)
             continue
         decoded_fields.add(key)
