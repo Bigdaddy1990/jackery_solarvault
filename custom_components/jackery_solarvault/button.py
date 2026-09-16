@@ -306,6 +306,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
 
     entity_description: JackeryButtonDescription
     _attr_entity_category = EntityCategory.CONFIG
+    device_registry_role: str | None
 
     def __init__(
         self,

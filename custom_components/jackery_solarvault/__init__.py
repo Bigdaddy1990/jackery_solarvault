@@ -25,6 +25,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store as Store
 from homeassistant.helpers.update_coordinator import UpdateFailed
+import voluptuous as vol
 
 from .client import (
     JackeryApi,
@@ -150,7 +151,7 @@ _LOGGER = logging.getLogger(__name__)
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
 # accident.
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+CONFIG_SCHEMA: vol.Schema = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(  # HA loader contract.
