@@ -1,56 +1,28 @@
 ```
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-.ENV
-.python-version
-.pytest_cache/
-.mypy_cache/
-
 # Dependencies
-requirements.txt.bak
+*.egg-info/
+*.egg
+*.pyc
+__pycache__/
 
-# Build artifacts
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build/dist directories
 build/
 dist/
-*.egg
 *.egg-info/
-*.so
-*.dylib
-*.dll
 
 # Logs
 *.log
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# Environment
+# Environment files
 .env
 .env.local
-*.env
 *.env.*
+
+# Test requirements - since requirements-test.txt was modified
+requirements-test.txt.bak
 ```
