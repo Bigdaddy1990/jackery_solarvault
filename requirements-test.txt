@@ -58,3 +58,4 @@ typing-inspection>=0.4.2
 uv>=0.5.1
 voluptuous>=0.16.0
 voluptuous-serialize>=2.7.0
+wrapt>=2.4.0
