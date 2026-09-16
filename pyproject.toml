@@ -432,7 +432,7 @@ max-complexity = 20
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["module-import-not-at-top-of-file"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-"tests/**" = ["ANN401"]  # Allow Any in tests
+"tests/**" = ["any-type"]  # Allow Any in tests
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
