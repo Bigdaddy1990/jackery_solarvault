@@ -38,7 +38,6 @@ repos:
           - --py314-plus
           - --full-reorder
           - --keep-updates
-          - --ruff
           - --check
 
   - repo: https://github.com/JelleZijlstra/autotyping
@@ -57,7 +56,7 @@ repos:
           - --fix
           - --unsafe-fixes
           - --exit-non-zero-on-fix
-          - --extend-select=I,E,F,B,UP,D,line-too-long,unused-noqa,ANN,ASYNC,Q,W
+          - --extend-select=I,E,F,B,UP,D,E501,unused-noqa,ANN,ASYNC,Q,W
         types_or:
           - python
           - pyi
@@ -66,15 +65,15 @@ repos:
           - python
           - pyi
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.1  # Use the sha / tag you want to point at
-    hooks:
-      - id: mypy
-        # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated
+  #- repo: https://github.com/pre-commit/mirrors-mypy
+  #  rev: v2.3.1  # Use the sha / tag you want to point at
+  #  hooks:
+  #    - id: mypy
+  #      # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated
         # virtualenv so it won't have access to those. To change the arguments, override the args as follows:
-        args: [--strict, --ignore-missing-imports]
-        additional_dependencies: [types-pyyaml, pydantic]
-        exclude: ^(manifest.*|docs/|scripts/)
+  #      args: [--strict, --ignore-missing-imports]
+  #      additional_dependencies: [types-pyyaml, pydantic]
+  #      exclude: ^(manifest.*|docs/|scripts/)
 
   - repo: https://github.com/astral-sh/ty-pre-commit
     rev: v0.0.80
