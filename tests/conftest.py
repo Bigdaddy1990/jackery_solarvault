@@ -21,7 +21,8 @@ from unittest.mock import patch
 
 import pytest
 
-from collections.abc import Generator, Mapping
+if TYPE_CHECKING:
+    from collections.abc import Generator, Mapping
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
