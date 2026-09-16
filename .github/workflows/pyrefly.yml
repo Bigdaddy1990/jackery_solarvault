@@ -41,7 +41,7 @@ jobs:
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
           #enable-cache: true
           #ignore-nothing-to-cache: true
-      - run: uv python install ruff pyrely
+      - run: uv add ruff pyrely
       # Install Python dependencies and create environment
       - name: Install dependencies
         run: |
@@ -49,8 +49,8 @@ jobs:
           # Install your dependencies; adjust the following lines as needed
           pip install -r requirements-test.txt
 
-      - name: Install Pyrefly
-        run: pip install pyrefly
+      #- name: Install Pyrefly
+        #run: pip install pyrefly
 
       - name: Run Pyrefly Type Checker
         run: pyrefly check --output-format=github --python-version=3.14
