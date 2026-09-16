@@ -44,6 +44,6 @@ jobs:
           pyrefly infer --output-format=github || true
           pyrefly coverage check --output-format=github || true
           pyrefly stubgen --output-format=github || true
-           
+
       - name: Run Pyrefly Type Checker
         run: pyrefly check --output-format=github --python-version=3.14

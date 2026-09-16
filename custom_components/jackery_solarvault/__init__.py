@@ -25,7 +25,6 @@ from homeassistant.helpers import (
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store as Store
 from homeassistant.helpers.update_coordinator import UpdateFailed
-import voluptuous as vol
 
 from .client import (
     JackeryApi,
@@ -123,6 +122,8 @@ from .util import (
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Coroutine, Iterable
+
+    import voluptuous as vol
 
     from homeassistant.core import HomeAssistant
 
