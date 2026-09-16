@@ -2,11 +2,12 @@
 
 import importlib.util
 import json
-import pytest
 from pathlib import Path
 import subprocess
 import tempfile
 from unittest.mock import patch
+
+import pytest
 
 SPEC = importlib.util.spec_from_file_location(
     "task_quality_hook",

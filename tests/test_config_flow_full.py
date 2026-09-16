@@ -10,10 +10,11 @@ is exercised here. Lines targeted:
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.config_flow import (
@@ -46,8 +47,10 @@ from custom_components.jackery_solarvault.const import (
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
 )
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.config_entries import ConfigEntryState
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
 
 _BASE_TIME = "2026-07-29T10:00:00Z"
 

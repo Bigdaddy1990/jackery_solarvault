@@ -1792,14 +1792,8 @@ async def test_setup_services_is_idempotent(
 ) -> None:
     """A second setup keeps the first registration instead of re-adding it."""
     monkeypatch.setattr(services, "async_setup_services", services.async_setup_services)
-    await services.async_setup_services(hass)  # ruff: ignore[private-member-access]
-    registered = {
-        service
-        for service in hass.services.async_services().get(DOMAIN, {})
-    }
-    await services.async_setup_services(hass)  # ruff: ignore[private-member-access]
+    await services.async_setup_services(hass)
+    registered = set(hass.services.async_services().get(DOMAIN, {}))
+    await services.async_setup_services(hass)
     assert registered
-    assert registered == {
-        service
-        for service in hass.services.async_services().get(DOMAIN, {})
-    }
+    assert registered == set(hass.services.async_services().get(DOMAIN, {}))
