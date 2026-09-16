@@ -35,7 +35,7 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(
+    def _create_query_description(  # ruff: ignore[no-self-use]
         self, key: str = "refresh_system_info"
     ) -> JackeryButtonDescription:
         """Create a query button description for testing."""
