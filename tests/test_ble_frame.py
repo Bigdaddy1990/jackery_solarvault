@@ -518,6 +518,16 @@ def test_decrypt_binary_notify_rejects_short_frame() -> None:
         decrypt_binary_notify(b"too short", key)
 
 
+def test_decrypt_binary_notify_rejects_unknown_version() -> None:
+    """Frames with an unknown protocol version raise ``ValueError``."""
+    key = base64.b64decode(_LIVE_KEY_B64)
+    plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
+    mutated = plain[:2] + b"\x99\x99" + plain[4:]
+    blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
+    with pytest.raises(ValueError, match="unexpected protocol version"):
+        decrypt_binary_notify(blob, key)
+
+
 def test_build_then_decrypt_binary_frame_round_trips() -> None:
     """Encode a frame, encrypt it, then run the live decoder to recover it.
 
@@ -655,7 +665,7 @@ def test_manifest_declares_bluetooth_matcher_without_core_requirement() -> None:
         matchers
     )
     assert "bluetooth" in (manifest.get("after_dependencies") or [])
-    assert not any(
+    assert any(
         req.startswith("bleak-retry-connector")
         for req in manifest.get("requirements", [])
     ), manifest.get("requirements")
@@ -1553,6 +1563,11 @@ def test_listener_notification_queue_preserves_every_burst_frame() -> None:
 
         for frame in frames:
             listener._schedule_notification("dev", session, frame)  # ruff: ignore[private-member-access]  # isort: skip
+
+        timestamps = [queued_at for queued_at, _size in session.notify_pending_metadata]
+        assert len(timestamps) == len(frames)
+        assert timestamps == sorted(timestamps)
+        assert all(queued_at > 0 for queued_at in timestamps)
 
         await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
         notify_task = session.notify_task

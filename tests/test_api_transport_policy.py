@@ -25,7 +25,7 @@ class _Chunks:
             yield chunk
 
 
-def _response(content_type: str, *, json_value: object = None):  # ruff: ignore[missing-return-type-private-function]
+def _response(content_type: str, *, json_value: object = None) -> SimpleNamespace:
     return SimpleNamespace(
         headers={"content-type": content_type},
         content=SimpleNamespace(),
