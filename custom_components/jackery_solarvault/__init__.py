@@ -298,8 +298,7 @@ def _async_remove_legacy_system_parent_devices(
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
+    hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """Return the per-entry local MQTT client stored in hass.data.
 
@@ -1704,7 +1703,7 @@ def _local_mqtt_connection_settings(
     if should_run and not configured_host:
         _LOGGER.warning(
             "Jackery local MQTT is enabled without a broker host; "
-            "the direct listener will remain stopped",
+            "the direct listener will remain stopped"
         )
         should_run = False
     configured_settings = LocalMqttConnectionSettings(
@@ -1826,7 +1825,7 @@ async def _async_start_new_local_mqtt_client(
         return
 
     snapshot_topic_prefix, snapshot_device_topic_segment = _local_mqtt_snapshot_route(
-        settings.topic_filter,
+        settings.topic_filter
     )
     client.set_snapshot_requester(
         lambda: coordinator.async_poll_local_mqtt_devices(
@@ -2559,7 +2558,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             entry,
             coordinator,
             config,
-        ),
+        )
     )
     entry.runtime_data = coordinator
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
@@ -2584,7 +2583,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             # Propagate immediately available auth/cancellation failures while
             # never waiting for network I/O on a cache-backed reload.
             await asyncio.sleep(0)
+            # pyrefly: ignore [missing-attribute]
             if cached_http_startup.done():
+                # pyrefly: ignore [missing-attribute]
                 cached_http_startup.result()
         if not cache_ready:
             try:
@@ -2710,8 +2711,7 @@ def _async_migrate_portable_screen_entity(
     for old_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         unique_id = old_entry.unique_id or ""
         if old_entry.domain != "switch" or not _legacy_suffix_matches(
-            unique_id,
-            _PORTABLE_SCREEN_UID_SUFFIX,
+            unique_id, _PORTABLE_SCREEN_UID_SUFFIX
         ):
             continue
 
@@ -3085,9 +3085,7 @@ def _seed_battery_pack_registry_identities(
                 blocked_keys.add(key)
                 continue
             coordinator.set_battery_pack_identity_override(
-                parent_device_id,
-                live_index,
-                serial,
+                parent_device_id, live_index, serial
             )
             matched_keys.add(key)
 
@@ -3121,9 +3119,7 @@ def _seed_battery_pack_registry_identities(
                 )
                 continue
             coordinator.set_battery_pack_identity_override(
-                parent_device_id,
-                index,
-                serial,
+                parent_device_id, index, serial
             )
 
 
@@ -3349,13 +3345,10 @@ def _async_migrate_battery_pack_identities(
 
         remaining_old_indices.setdefault(parent_device_id, set()).add(numeric_index)
         live_serial = entry.runtime_data.battery_pack_observed_serial(
-            parent_device_id,
-            numeric_index,
+            parent_device_id, numeric_index
         )
         entry.runtime_data.set_battery_pack_identity_override(
-            parent_device_id,
-            numeric_index,
-            None,
+            parent_device_id, numeric_index, None
         )
         if (
             stored_serial is not None
@@ -3431,7 +3424,7 @@ def _move_parent_attached_battery_pack_entities(
         current_unique_id = entity.unique_id or ""
         if current_unique_id.startswith(legacy_prefix):
             new_unique_id = target_prefix + current_unique_id.removeprefix(
-                legacy_prefix,
+                legacy_prefix
             )
         elif current_unique_id.startswith(target_prefix):
             new_unique_id = current_unique_id
@@ -3497,7 +3490,7 @@ def _async_migrate_parent_attached_battery_pack_entities(  # ruff: ignore[too-ma
             if index in remaining_old_indices.get(parent_device_id, set()):
                 continue
             serial = battery_pack_serial(
-                pack,
+                pack
             ) or coordinator.battery_pack_identity_serial(parent_device_id, index)
             pack_key = stable_subdevice_key("battery_pack", serial, index)
             target_identifier = (DOMAIN, f"{parent_device_id}_{pack_key}")
@@ -3531,9 +3524,7 @@ def _async_migrate_parent_attached_battery_pack_entities(  # ruff: ignore[too-ma
             )
             if moved:
                 coordinator.set_battery_pack_identity_override(
-                    parent_device_id,
-                    index,
-                    serial,
+                    parent_device_id, index, serial
                 )
                 remaining_old_indices.setdefault(parent_device_id, set()).discard(index)
                 if serial is not None:
@@ -3725,7 +3716,7 @@ def _async_remove_phantom_battery_pack_devices(
     coordinator = entry.runtime_data
     device_registry = dr.async_get(hass)
     for device in list(
-        dr.async_entries_for_config_entry(device_registry, entry.entry_id),
+        dr.async_entries_for_config_entry(device_registry, entry.entry_id)
     ):
         _async_remove_phantom_battery_pack_device(
             device_registry,

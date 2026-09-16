@@ -84,7 +84,7 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     shell._pending_device_removals = []  # ruff: ignore[private-member-access]
     shell._device_index = {}  # ruff: ignore[private-member-access]
     shell._device_registry_observer = None  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]

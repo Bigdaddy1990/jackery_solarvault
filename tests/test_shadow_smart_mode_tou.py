@@ -34,6 +34,7 @@ _TIME_DIFFERENCE = 42
 
 def _bare_coordinator() -> JackerySolarVaultCoordinator:
     """Create a coordinator shell for the HTTP-poll helpers without HA setup."""
+    # pyrefly: ignore [no-any-return-implicit]
     return JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
 
 

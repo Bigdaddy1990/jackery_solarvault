@@ -755,7 +755,7 @@ def split_payload_into_frames(
                 action_id=action_id,
                 ble_cmd=ble_cmd,
                 chunk_payload=b"",
-            ),
+            )
         ]
     chunks = [
         payload[offset : offset + chunk_size]

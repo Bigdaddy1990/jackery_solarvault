@@ -264,7 +264,7 @@ class _GattSession:
     # backpressure. Keep accepted frames in a lossless FIFO; queue depth and its
     # high-water mark are surfaced in diagnostics instead of deleting telemetry.
     notify_queue: asyncio.Queue[tuple[int, bytes, datetime]] = field(
-        default_factory=asyncio.Queue,
+        default_factory=asyncio.Queue
     )
     notify_pending_metadata: deque[tuple[float, int]] = field(default_factory=deque)
     notify_pending_bytes: int = 0
@@ -1126,9 +1126,7 @@ class JackeryBleListener:
         # service calls cannot interleave.
         async with session.write_lock:
             if not self._session_is_current(device_id, session) or not getattr(
-                client,
-                "is_connected",
-                False,
+                client, "is_connected", False
             ):
                 return False
             # Register the ACK *before* the write — otherwise a fast-echoing
@@ -1198,8 +1196,7 @@ class JackeryBleListener:
             # it ourselves so the notify handler can observe the
             # removal cleanly.
             await asyncio.wait_for(
-                asyncio.shield(pending.future),
-                timeout=ack_timeout_sec,
+                asyncio.shield(pending.future), timeout=ack_timeout_sec
             )
         except TimeoutError as err:
             self._discard_pending_ack(device_id, pending)
@@ -1556,9 +1553,7 @@ class JackeryBleListener:
                 unregister()
             except Exception as err:  # pragma: no cover — HA callback contract is sync
                 _LOGGER.debug(
-                    "Jackery BLE: callback unregister failed: %s",
-                    err,
-                    exc_info=True,
+                    "Jackery BLE: callback unregister failed: %s", err, exc_info=True
                 )
         self._unregister_callbacks.clear()
         for bucket in self._pending_acks.values():
@@ -1602,7 +1597,7 @@ class JackeryBleListener:
                 task
                 for _, task in connection_items
                 if not task.done() and task is not current_task
-            ),
+            )
         )
         current_task_owned = current_task is not None and any(
             task is current_task for _, task in connection_items
@@ -1824,9 +1819,7 @@ class JackeryBleListener:
                     stats.last_error = "Home Assistant Bluetooth is not loaded"
                     return
                 ble_device = bluetooth_module.async_ble_device_from_address(
-                    self._hass,
-                    address,
-                    connectable=True,
+                    self._hass, address, connectable=True
                 )
                 if ble_device is None:
                     # PROTOCOL.md §4: the SolarVault peripheral typically
@@ -1844,8 +1837,7 @@ class JackeryBleListener:
                     # parallel still works, and ``_stop_event`` aborts the
                     # wait cleanly on integration unload.
                     delay = self._connect_backoff_note_failure(
-                        device_id,
-                        asyncio.get_running_loop().time(),
+                        device_id, asyncio.get_running_loop().time()
                     )
                     self._log_connection_unavailable(
                         device_id,
@@ -1889,8 +1881,7 @@ class JackeryBleListener:
                     # One library-level attempt keeps the integration's own
                     # proxy-safe backoff in control of the retry cadence.
                     delay = self._connect_backoff_note_failure(
-                        device_id,
-                        asyncio.get_running_loop().time(),
+                        device_id, asyncio.get_running_loop().time()
                     )
                     self._log_connection_unavailable(
                         device_id,
@@ -1904,8 +1895,7 @@ class JackeryBleListener:
                     continue
 
                 if self._stop_event.is_set() or not self._connection_is_current(
-                    device_id,
-                    runner_task,
+                    device_id, runner_task
                 ):
                     try:
                         await asyncio.wait_for(client.disconnect(), timeout=5.0)
@@ -1947,8 +1937,7 @@ class JackeryBleListener:
                 backoff_reset = False
                 try:  # ruff: ignore[too-many-statements-in-try-clause] - this owns subscribe, monitor, and teardown state
                     await client.start_notify(
-                        ble.BLE_NOTIFY_CHAR_UUID,
-                        _notify_callback,
+                        ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
                     )
                     session.notify_started = True
                     self._log_connection_available(

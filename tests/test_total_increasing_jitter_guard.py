@@ -38,7 +38,7 @@ def _smart_meter_sensor(key: str) -> JackerySmartMeterSensor:
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
     # Mirrors __init__: _sync_device_mac_connection reads this on every refresh.
     mutable._registered_identity = None  # ruff: ignore[private-member-access]
-    return sensor
+    return sensor  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _set_ct_counter(sensor: JackerySmartMeterSensor, value_wh: int) -> None:

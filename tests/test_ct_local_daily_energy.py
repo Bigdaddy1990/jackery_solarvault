@@ -44,6 +44,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
             ],
         },
     }
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

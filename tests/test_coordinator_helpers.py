@@ -589,6 +589,7 @@ async def test_mqtt_payload_debug_is_enqueued_without_waiting_for_disk() -> None
     coordinator._async_payload_debug_event = direct_writer  # ruff: ignore[private-member-access]
     coordinator._resolve_device_id_from_mqtt = MagicMock(return_value=None)  # ruff: ignore[private-member-access]
 
+    # pyrefly: ignore [missing-attribute]
     raw_handler = JackerySolarVaultCoordinator.async_handle_mqtt_message.__wrapped__
     await raw_handler(coordinator, "hb/app/test", {})
 
@@ -654,6 +655,7 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
     await coordinator._async_drain_payload_debug_events()  # ruff: ignore[private-member-access]
 
     executor_job.assert_awaited_once()
+    # pyrefly: ignore [missing-attribute]
     writer, _path, events = executor_job.await_args.args
     assert writer.__name__ == "append_payload_debug_lines"
     assert [event["sequence"] for event in events] == [1, 2]

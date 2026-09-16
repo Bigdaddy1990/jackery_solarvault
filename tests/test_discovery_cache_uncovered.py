@@ -279,6 +279,7 @@ class TestAsyncSaveDiscoveryCache:
                 mock_store_instance.async_save = AsyncMock()
                 mock_store.return_value = mock_store_instance
 
+                # pyrefly: ignore [bad-argument-type]
                 await async_save_discovery_cache(hass, "test_entry", device_index)
 
                 # Wait for the persist task to complete

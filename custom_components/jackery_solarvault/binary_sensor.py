@@ -74,8 +74,7 @@ BINARY_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = tuple(
 )
 
 SUBDEVICE_ALARM_DESCRIPTIONS: tuple[
-    JackerySubdeviceAlarmBinarySensorDescription,
-    ...,
+    JackerySubdeviceAlarmBinarySensorDescription, ...
 ] = tuple(
     description
     for description in BINARY_SENSOR_DESCRIPTIONS
@@ -142,7 +141,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     subdevice_accessories(
                         payload,
                         dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
-                    ),
+                    )
                 )
             for index, plug in enumerate(valid_plugs, start=1):
                 plug_sn = smart_plug_serial(plug)
@@ -182,9 +181,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 if sub_device_sn is None:
                     continue
                 sub_device_key = stable_subdevice_key(
-                    "sub_device",
-                    sub_device_sn,
-                    index,
+                    "sub_device", sub_device_sn, index
                 )
                 for alarm_desc in SUBDEVICE_ALARM_DESCRIPTIONS:
                     _append_unique(

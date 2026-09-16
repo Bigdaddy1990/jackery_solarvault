@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+# pyrefly: ignore [untyped-import]
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]

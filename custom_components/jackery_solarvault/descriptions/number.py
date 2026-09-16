@@ -569,13 +569,21 @@ def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
 
 NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="soc_charge_limit_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_charge_limit_set",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (
@@ -587,13 +595,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_soc_charge,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="soc_discharge_limit_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_discharge_limit_set",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (
@@ -605,13 +621,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_soc_discharge,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="max_output_power_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="max_output_power_set",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=2500,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=10,
         value_fn=(
             lambda e: (
@@ -622,13 +646,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_max_output_power,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="max_feed_grid",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="max_feed_grid",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=800,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=2500,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1700,
         value_fn=(
             lambda e: (
@@ -642,13 +674,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         allowed_values=_max_feed_grid_allowed_values,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="default_power_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="default_power_set",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=200,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=10,
         value_fn=(
             lambda e: (
@@ -659,12 +699,19 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_default_power,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="single_tariff_price_set",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="single_tariff_price_set",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=10,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=0.01,
         device_registry_role="system",
         value_fn=(
@@ -679,12 +726,19 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         command_sources=HTTP_COMMAND_SOURCES,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="third_party_mqtt_port",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="third_party_mqtt_port",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=1,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=65535,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         integer_value=True,
         display_precision=0,
@@ -696,105 +750,173 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_third_party_mqtt_port,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_charge_power",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_charge_power",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=2000,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=100,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("csc")))[1]),
         setter=_set_portable_charge_power,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_energy_storage_charge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_energy_storage_charge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("dt")))[1]),
         setter=_set_portable_energy_storage_charge_limit,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_auto_shutdown_time",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_auto_shutdown_time",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("ast")))[1]),
         setter=_set_portable_auto_shutdown_time,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("oact")))[1]),
         setter=_set_portable_ac_countdown,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac_output_delay",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac_output_delay",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfTime.SECONDS,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=86340,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=60,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("acdt")))[1]),
         setter=_set_portable_ac_output_delay,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_custom_use_discharge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_custom_use_discharge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("dl")))[1]),
         setter=_set_portable_custom_use_discharge_limit,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_custom_use_charge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_custom_use_charge_limit",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("cl")))[1]),
         setter=_set_portable_custom_use_charge_limit,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("odct")))[1]),
         setter=_set_portable_dc_countdown,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_usb_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_usb_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (section := e.section, safe_float(section.get("odcut")))[1]
@@ -802,12 +924,19 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_portable_dc_usb_countdown,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_car_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_car_countdown",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (section := e.section, safe_float(section.get("odcct")))[1]
@@ -815,13 +944,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_portable_dc_car_countdown,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac1_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac1_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (section := e.section, safe_float(section.get("oac1PrioSoc")))[1]
@@ -829,13 +966,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_portable_ac1_priority_soc,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_ac2_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ac2_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (section := e.section, safe_float(section.get("oac2PrioSoc")))[1]
@@ -843,13 +988,21 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_portable_ac2_priority_soc,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_dc_priority_soc",
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.SLIDER,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(
             lambda e: (section := e.section, safe_float(section.get("odcPrioSoc")))[1]
@@ -857,12 +1010,19 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         setter=_set_portable_dc_priority_soc,
     ),
     JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="portable_bluetooth_sleep",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_bluetooth_sleep",
+        # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=1440,
+        # pyrefly: ignore [unexpected-keyword]
         native_step=1,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("tmt")))[1]),
         setter=_set_portable_bluetooth_sleep,

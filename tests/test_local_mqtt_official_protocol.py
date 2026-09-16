@@ -36,7 +36,7 @@ def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_unidentified_local_frames_cannot_claim_the_only_jackery(
     """A shared broker cannot assign unrelated traffic to the sole known host."""
     coordinator = _coordinator_shell()
     assert (
-        coordinator._mqtt_route_context(
+        coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
             "homeassistant/sensor/esp32/ip/config", payload, TransportSource.LOCAL_MQTT
         )
         is None

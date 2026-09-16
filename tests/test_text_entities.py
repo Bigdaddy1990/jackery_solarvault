@@ -92,6 +92,7 @@ def _system_name(data: dict[str, Any]) -> JackerySystemNameText:
     mutable.coordinator = _coordinator(data)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -101,6 +102,7 @@ def _device_name(data: dict[str, Any]) -> JackeryDeviceNameText:
     mutable.coordinator = _coordinator(data)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.async_write_ha_state = MagicMock()
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -224,7 +226,7 @@ def _third_party(field: str, data: dict[str, Any]) -> JackeryThirdPartyMqttText:
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable._field = field  # ruff: ignore[private-member-access]
     mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
-    return entity
+    return entity  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_third_party_native_value_from_plaintext_accessor() -> None:
@@ -308,6 +310,7 @@ def _pv_name(data: dict[str, Any], index: int) -> JackeryPvNameText:
         else None
     )
     mutable.async_write_ha_state = MagicMock()
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 

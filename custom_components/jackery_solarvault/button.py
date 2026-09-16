@@ -231,7 +231,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     subdevice_accessories(
                         payload,
                         dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
-                    ),
+                    )
                 )
             for plug in valid_plugs:
                 plug_sn = _smart_plug_device_sn(plug)

@@ -196,7 +196,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """Read the configured payload section (properties/price/...)."""
         if self.entity_description.source_section == PAYLOAD_THIRD_PARTY_MQTT_CONFIG:
             section = self.coordinator.third_party_mqtt_config_plaintext(
-                self._device_id,
+                self._device_id
             )
             return section if isinstance(section, dict) else {}
         return self._payload_section_for_sources(
@@ -214,7 +214,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """The highest value the user can write."""
         if self.entity_description.dynamic_max is not None:
             return self.entity_description.dynamic_max(
-                self._payload_for_sources(self.entity_description.data_sources),
+                self._payload_for_sources(self.entity_description.data_sources)
             )
         if self.entity_description.native_max_value is not None:
             return float(self.entity_description.native_max_value)
@@ -231,8 +231,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         """
         if self.entity_description.dynamic_unit is not None:
             return self.entity_description.dynamic_unit(
-                self._payload_for_sources(self.entity_description.data_sources),
+                self._payload_for_sources(self.entity_description.data_sources)
             )
+        # pyrefly: ignore [no-any-return-implicit]
         return self.entity_description.native_unit_of_measurement
 
     @property
@@ -260,8 +261,8 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             # type falls back to `Top[(...) -> object]`; mypy narrows correctly.
             return tuple(
                 allowed(  # ty: ignore[call-top-callable, invalid-argument-type]
-                    self._payload_for_sources(self.entity_description.data_sources),
-                ),
+                    self._payload_for_sources(self.entity_description.data_sources)
+                )
             )
         return tuple(allowed)
 
@@ -321,9 +322,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         try:
             await self.entity_description.setter(
-                self.coordinator,
-                self._device_id,
-                transformed_value,
+                self.coordinator, self._device_id, transformed_value
             )
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
@@ -371,7 +370,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
             is_portable = _is_portable_payload(payload, props)
             for description in NUMBER_DESCRIPTIONS:
                 if description.key == "third_party_mqtt_port" and not payload.get(
-                    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+                    PAYLOAD_THIRD_PARTY_MQTT_CONFIG
                 ):
                     continue
                 if description.key.startswith("portable_") != is_portable:
@@ -380,8 +379,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                     continue
 
                 _append_unique(
-                    entities,
-                    JackeryNumber(coordinator, dev_id, description),
+                    entities, JackeryNumber(coordinator, dev_id, description)
                 )
         return entities
 

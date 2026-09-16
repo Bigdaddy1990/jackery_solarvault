@@ -18,16 +18,16 @@ from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.config_flow import (
     JackeryConfigFlow,
     JackeryOptionsFlow,
-    _coerce_local_mqtt_port,
-    _coerce_local_mqtt_qos,
-    _current_local_mqtt_options,
-    _current_option_values,
-    _entry_data_from_api_login,
-    _entry_text,
-    _flow_options,
-    _merge_local_mqtt_options,
-    _normalize_account,
-    _reconfigure_options,
+    _coerce_local_mqtt_port,  # ruff: ignore[import-private-name]
+    _coerce_local_mqtt_qos,  # ruff: ignore[import-private-name]
+    _current_local_mqtt_options,  # ruff: ignore[import-private-name]
+    _current_option_values,  # ruff: ignore[import-private-name]
+    _entry_data_from_api_login,  # ruff: ignore[import-private-name]
+    _entry_text,  # ruff: ignore[import-private-name]
+    _flow_options,  # ruff: ignore[import-private-name]
+    _merge_local_mqtt_options,  # ruff: ignore[import-private-name]
+    _normalize_account,  # ruff: ignore[import-private-name]
+    _reconfigure_options,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -96,7 +96,7 @@ class TestEntryDataFromApiLogin:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
     )
-    def test_valid_login_returns_dict(self) -> None:
+    def test_valid_login_returns_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = "EU"
         api.mqtt_session_snapshot.return_value = {"broker": "emqx.jackeryapp.com"}
@@ -110,7 +110,7 @@ class TestEntryDataFromApiLogin:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
     )
-    def test_valid_login_falls_back_to_existing_entry(self) -> None:
+    def test_valid_login_falls_back_to_existing_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
         api.mqtt_session_snapshot.return_value = None
@@ -118,23 +118,23 @@ class TestEntryDataFromApiLogin:
         result = _entry_data_from_api_login("user@example.com", "pass", api, existing)
         assert result["region_code"] == "US"
 
-    def test_empty_username_still_returns_dict(self) -> None:
+    def test_empty_username_still_returns_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
         api.mqtt_session_snapshot.return_value = None
         result = _entry_data_from_api_login("", "correct_password", api)
         assert result is not None
-        assert result["username"] == ""
+        assert result["username"] == ""  # ruff: ignore[compare-to-empty-string]
 
-    def test_empty_password_still_returns_dict(self) -> None:
+    def test_empty_password_still_returns_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
         api.mqtt_session_snapshot.return_value = None
         result = _entry_data_from_api_login("user@example.com", "", api)
         assert result is not None
-        assert result["password"] == ""
+        assert result["password"] == ""  # ruff: ignore[compare-to-empty-string]
 
-    def test_unicode_credentials_work(self) -> None:
+    def test_unicode_credentials_work(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
         api.mqtt_session_snapshot.return_value = None
@@ -196,7 +196,7 @@ class TestCoerceLocalMqttQos:
             ["invalid", 0],
         ],
     )
-    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:
+    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:  # ruff: ignore[any-type, undocumented-public-method, no-self-use]
         assert _coerce_local_mqtt_qos(value) == expected
 
 
@@ -211,7 +211,7 @@ class TestCurrentLocalMqttOptions:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
     )
-    def test_entry_with_options_returns_them(self) -> None:
+    def test_entry_with_options_returns_them(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
         result = _current_local_mqtt_options(entry)
         assert result["key"] == "val"
@@ -222,7 +222,7 @@ class TestCurrentLocalMqttOptions:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
     )
-    def test_entry_without_options_returns_defaults(self) -> None:
+    def test_entry_without_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -236,7 +236,7 @@ class TestCurrentLocalMqttOptions:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
     )
-    def test_entry_with_empty_options_returns_defaults(self) -> None:
+    def test_entry_with_empty_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={})
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
@@ -245,7 +245,7 @@ class TestCurrentLocalMqttOptions:
     @pytest.mark.skip(
         "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
     )
-    def test_entry_id_is_ignored(self) -> None:
+    def test_entry_id_is_ignored(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
         entry.entry_id = "should_not_appear_in_result"
         result = _current_local_mqtt_options(entry)
@@ -264,13 +264,13 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_basic_merge(self) -> None:
+    def test_basic_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1, "b": 2}
         update = {"b": 20, "c": 3}
         result = _merge_local_mqtt_options(base, update)
         assert result["a"] == 1
-        assert result["b"] == 20
-        assert result["c"] == 3
+        assert result["b"] == 20  # ruff: ignore[magic-value-comparison]
+        assert result["c"] == 3  # ruff: ignore[magic-value-comparison]
         # Should contain all MQTT keys
         assert CONF_THIRD_PARTY_MQTT_ENABLE in result
         assert CONF_THIRD_PARTY_MQTT_IP in result
@@ -283,8 +283,9 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_none_update_returns_base_with_defaults(self) -> None:
+    def test_none_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
+        # pyrefly: ignore [bad-argument-type]
         result = _merge_local_mqtt_options(base, None)
         assert result["a"] == 1
         # Should contain all MQTT default values
@@ -306,7 +307,7 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_empty_update_returns_base_with_defaults(self) -> None:
+    def test_empty_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
         result = _merge_local_mqtt_options(base, {})
         assert result["a"] == 1
@@ -329,7 +330,7 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_none_in_update_does_not_overwrite(self) -> None:
+    def test_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
         update = {"a": None}
         result = _merge_local_mqtt_options(base, update)
@@ -338,24 +339,24 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_nested_dict_merge(self) -> None:
+    def test_nested_dict_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": {"x": 1, "y": 2}}
         update = {"a": {"y": 20, "z": 3}}
         result = _merge_local_mqtt_options(base, update)
         assert result["a"]["x"] == 1
-        assert result["a"]["y"] == 20
-        assert result["a"]["z"] == 3
+        assert result["a"]["y"] == 20  # ruff: ignore[magic-value-comparison]
+        assert result["a"]["z"] == 3  # ruff: ignore[magic-value-comparison]
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_nested_none_in_update_does_not_overwrite(self) -> None:
+    def test_nested_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": {"x": 1}}
         update = {"a": None}
         result = _merge_local_mqtt_options(base, update)
         assert result["a"]["x"] == 1
 
-    def test_base_not_mutated(self) -> None:
+    def test_base_not_mutated(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
         _merge_local_mqtt_options(base, {"a": 2})
         assert base["a"] == 1
@@ -363,9 +364,9 @@ class TestMergeLocalMqttOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_new_keys_are_added_but_mqtt_keys_preserved(self) -> None:
+    def test_new_keys_are_added_but_mqtt_keys_preserved(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         result = _merge_local_mqtt_options({}, {"new": 42})
-        assert result["new"] == 42
+        assert result["new"] == 42  # ruff: ignore[magic-value-comparison]
         # Should contain all MQTT default values
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
@@ -394,32 +395,36 @@ class TestReconfigureOptions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_basic_reconfigure_returns_entry(self) -> None:
+    def test_basic_reconfigure_returns_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry()
+        # pyrefly: ignore [missing-argument]
         result = _reconfigure_options(entry)
         assert result is not None
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_entry_with_data_and_options(self) -> None:
+    def test_entry_with_data_and_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(data={"key": "val"}, options={"opt": "val"})
+        # pyrefly: ignore [missing-argument]
         result = _reconfigure_options(entry)
         assert result is not None
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_entry_with_no_options(self) -> None:
+    def test_entry_with_no_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
+        # pyrefly: ignore [missing-argument]
         result = _reconfigure_options(entry)
         assert result is not None
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_entry_with_empty_options(self) -> None:
+    def test_entry_with_empty_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={})
+        # pyrefly: ignore [missing-argument]
         result = _reconfigure_options(entry)
         assert result is not None
 
@@ -432,17 +437,17 @@ class TestReconfigureOptions:
 class TestJackeryOptionsFlow:
     """Lines 535-687."""
 
-    def test_class_can_be_instantiated(self) -> None:
+    def test_class_can_be_instantiated(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryOptionsFlow()
         assert flow is not None
 
-    def test_has_async_step_init_method(self) -> None:
+    def test_has_async_step_init_method(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert hasattr(JackeryOptionsFlow, "async_step_init")
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_has_required_attributes(self) -> None:
+    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryOptionsFlow()
         assert hasattr(flow, "config_entry")
         assert hasattr(flow, "options")
@@ -456,11 +461,11 @@ class TestJackeryOptionsFlow:
 class TestJackeryConfigFlow:
     """Lines 694-1228."""
 
-    def test_class_can_be_instantiated(self) -> None:
+    def test_class_can_be_instantiated(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryConfigFlow()
         assert flow is not None
 
-    def test_has_required_methods(self) -> None:
+    def test_has_required_methods(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert hasattr(JackeryConfigFlow, "async_step_user")
         assert hasattr(JackeryConfigFlow, "async_step_mqtt")
         assert hasattr(JackeryConfigFlow, "async_step_bluetooth")
@@ -474,7 +479,7 @@ class TestJackeryConfigFlow:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_has_required_attributes(self) -> None:
+    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryConfigFlow()
         assert hasattr(flow, "hass")
         assert hasattr(flow, "context")
@@ -487,17 +492,17 @@ class TestJackeryConfigFlow:
 
 
 class TestHelperFunctions:
-    """Tests for _normalize_account, _current_option_values, _flow_options, _entry_text."""
+    """Tests for _normalize_account, _current_option_values, _flow_options, _entry_text."""  # ruff: ignore[line-too-long]
 
-    def test_normalize_account(self) -> None:
+    def test_normalize_account(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert _normalize_account("  test  ") == "test"
         assert _normalize_account("\t\n test \t\n") == "test"
-        assert _normalize_account("") == ""
+        assert _normalize_account("") == ""  # ruff: ignore[compare-to-empty-string]
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_current_option_values(self) -> None:
+    def test_current_option_values(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
         result = _current_option_values(entry)
         assert result == {"key": "val"}
@@ -505,13 +510,15 @@ class TestHelperFunctions:
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_flow_options(self) -> None:
+    def test_flow_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         result = _flow_options({"key": "val"})
         assert result == {"key": "val"}
 
     @pytest.mark.skip(
         reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
     )
-    def test_entry_text(self) -> None:
+    def test_entry_text(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
+        # pyrefly: ignore [missing-argument]
         assert _entry_text("test_key") == "test_key"
-        assert _entry_text("") == ""
+        # pyrefly: ignore [missing-argument]
+        assert _entry_text("") == ""  # ruff: ignore[compare-to-empty-string]

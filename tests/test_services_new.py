@@ -44,7 +44,7 @@ def _make_service_call(data: dict[str, Any]) -> SimpleNamespace:
     return call
 
 
-async def _registered_handler(hass: SimpleNamespace, service_name: str):
+async def _registered_handler(hass: SimpleNamespace, service_name: str):  # ruff: ignore[missing-return-type-private-function]
     await services.async_setup_services(hass)
     for call in hass.services.async_register.call_args_list:
         if call[0][0] == DOMAIN and call[0][1] == service_name:
@@ -57,7 +57,7 @@ def _make_hass() -> SimpleNamespace:
     hass = SimpleNamespace()
     hass.data = {}
     # Device registry mock - needed for _resolve_jackery_device_id
-    from homeassistant.helpers import device_registry as dr
+    from homeassistant.helpers import device_registry as dr  # ruff: ignore[import-outside-top-level]
 
     mock_registry = SimpleNamespace()
     mock_registry.async_get = Mock(
@@ -88,7 +88,7 @@ class TestServiceBindCurrency:
     """Test SERVICE_BIND_CURRENCY handler."""
 
     @pytest.mark.asyncio()
-    async def test_bind_currency_success(self) -> None:
+    async def test_bind_currency_success(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_bind_currency = AsyncMock(return_value=None)
@@ -108,7 +108,7 @@ class TestServiceBindCurrency:
             )
 
     @pytest.mark.asyncio()
-    async def test_bind_currency_auth_error(self) -> None:
+    async def test_bind_currency_auth_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_bind_currency = AsyncMock(
@@ -127,7 +127,7 @@ class TestServiceBindCurrency:
                 )
 
     @pytest.mark.asyncio()
-    async def test_bind_currency_error(self) -> None:
+    async def test_bind_currency_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_bind_currency = AsyncMock(side_effect=JackeryError("error"))
@@ -144,7 +144,7 @@ class TestServiceBindCurrency:
                 )
 
     @pytest.mark.asyncio()
-    async def test_bind_currency_no_coordinator(self) -> None:
+    async def test_bind_currency_no_coordinator(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         with patch.object(services, "_coordinator_for_device", return_value=None):
             await services.async_setup_services(hass)
@@ -161,7 +161,7 @@ class TestServiceCheckSystemBound:
     """Test SERVICE_CHECK_SYSTEM_BOUND handler."""
 
     @pytest.mark.asyncio()
-    async def test_check_system_bound_true(self) -> None:
+    async def test_check_system_bound_true(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(return_value=True)
@@ -187,7 +187,7 @@ class TestServiceCheckSystemBound:
             assert result == {"exists": True}
 
     @pytest.mark.asyncio()
-    async def test_check_system_bound_false(self) -> None:
+    async def test_check_system_bound_false(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(return_value=False)
@@ -213,7 +213,7 @@ class TestServiceCheckSystemBound:
             assert result == {"exists": False}
 
     @pytest.mark.asyncio()
-    async def test_check_system_bound_auth_error(self) -> None:
+    async def test_check_system_bound_auth_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(
@@ -237,7 +237,7 @@ class TestServiceCheckSystemBound:
                 )
 
     @pytest.mark.asyncio()
-    async def test_check_system_bound_error(self) -> None:
+    async def test_check_system_bound_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(
@@ -265,7 +265,7 @@ class TestServiceUnbindAccessories:
     """Test SERVICE_UNBIND_ACCESSORIES handler."""
 
     @pytest.mark.asyncio()
-    async def test_unbind_accessories_success(self) -> None:
+    async def test_unbind_accessories_success(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_unbind_accessories = AsyncMock(return_value={"ok": True})
@@ -284,7 +284,7 @@ class TestServiceUnbindAccessories:
             assert result == {"result": {"ok": True}}
 
     @pytest.mark.asyncio()
-    async def test_unbind_accessories_auth_error(self) -> None:
+    async def test_unbind_accessories_auth_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_unbind_accessories = AsyncMock(
@@ -306,7 +306,7 @@ class TestServiceUnbindAccessories:
                 )
 
     @pytest.mark.asyncio()
-    async def test_unbind_accessories_error(self) -> None:
+    async def test_unbind_accessories_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_unbind_accessories = AsyncMock(
@@ -332,7 +332,7 @@ class TestServiceSetAcNickname:
     """Test SERVICE_SET_AC_NICKNAME handler."""
 
     @pytest.mark.asyncio()
-    async def test_set_ac_nickname_success(self) -> None:
+    async def test_set_ac_nickname_success(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(return_value=None)
@@ -356,7 +356,7 @@ class TestServiceSetAcNickname:
             )
 
     @pytest.mark.asyncio()
-    async def test_set_ac_nickname_auth_error(self) -> None:
+    async def test_set_ac_nickname_auth_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(
@@ -379,7 +379,7 @@ class TestServiceSetAcNickname:
                 )
 
     @pytest.mark.asyncio()
-    async def test_set_ac_nickname_error(self) -> None:
+    async def test_set_ac_nickname_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(side_effect=JackeryError("error"))
@@ -404,7 +404,7 @@ class TestServiceReportDeviceTimezone:
     """Test SERVICE_REPORT_DEVICE_TIMEZONE handler."""
 
     @pytest.mark.asyncio()
-    async def test_report_device_timezone_success(self) -> None:
+    async def test_report_device_timezone_success(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_report_device_timezone = AsyncMock(return_value=None)
@@ -428,7 +428,7 @@ class TestServiceReportDeviceTimezone:
             )
 
     @pytest.mark.asyncio()
-    async def test_report_device_timezone_auth_error(self) -> None:
+    async def test_report_device_timezone_auth_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_report_device_timezone = AsyncMock(
@@ -451,7 +451,7 @@ class TestServiceReportDeviceTimezone:
                 )
 
     @pytest.mark.asyncio()
-    async def test_report_device_timezone_error(self) -> None:
+    async def test_report_device_timezone_error(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_report_device_timezone = AsyncMock(

@@ -39,6 +39,7 @@ def _make_coordinator_stub() -> JackerySolarVaultCoordinator:
     coordinator._property_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
     coordinator.entry = SimpleNamespace(entry_id="test_entry")
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -54,6 +55,7 @@ class MockTransportSource:
 async def test_poll_watchdog_stall_threshold() -> None:  # ruff: ignore[unused-async]
     """Poll watchdog calculates stall threshold correctly."""
     coordinator = _make_coordinator_stub()
+    # pyrefly: ignore [missing-attribute]
     coordinator._configured_update_interval.total_seconds.return_value = 15.0  # ruff: ignore[private-member-access]
 
     # Threshold = max(4 * 15, 60) = 60 seconds
@@ -184,6 +186,7 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:  # ruff: igno
     coordinator.api.async_get_system_shadow = AsyncMock(return_value={})
     coordinator.api.async_get_sub_shadow = AsyncMock(return_value={})
     coordinator.api.async_get_battery_pack_list = AsyncMock(return_value=[])
+    # pyrefly: ignore [bad-assignment]
     coordinator._device_index = {"sys1": ["dev1"]}  # ruff: ignore[private-member-access]
     coordinator.data = {"dev1": {"device_sn": "sn1"}}
     # Add hass for _local_timezone
@@ -208,6 +211,7 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:  # ruff: igno
     def mock_schedule_background_once(key, coro, name) -> None:  # ruff: ignore[missing-type-function-argument]
         scheduled_tasks.append((key, coro, name))
 
+    # pyrefly: ignore [bad-assignment]
     coordinator._schedule_background_once = mock_schedule_background_once  # ruff: ignore[private-member-access]
 
     # Just verify the _schedule_background_once is set up correctly for shadow queries
@@ -255,11 +259,13 @@ async def test_poll_watchdog_uses_configured_interval() -> None:  # ruff: ignore
     coordinator = _make_coordinator_stub()
 
     # Test with 30s interval
+    # pyrefly: ignore [missing-attribute]
     coordinator._configured_update_interval.total_seconds.return_value = 30.0  # ruff: ignore[private-member-access]
     threshold = max(4 * 30.0, 60.0)
     assert threshold == 120.0  # 4 * 30 = 120 > 60  # ruff: ignore[magic-value-comparison, float-equality-comparison]
 
     # Test with 5s interval
+    # pyrefly: ignore [missing-attribute]
     coordinator._configured_update_interval.total_seconds.return_value = 5.0  # ruff: ignore[private-member-access]
     threshold = max(4 * 5.0, 60.0)
     assert threshold == 60.0  # min is 60  # ruff: ignore[magic-value-comparison, float-equality-comparison]
@@ -268,6 +274,7 @@ async def test_poll_watchdog_uses_configured_interval() -> None:  # ruff: ignore
 async def test_merge_handles_missing_property_source_state() -> None:  # ruff: ignore[unused-async]
     """Merge handles missing property source state gracefully."""
     coordinator = _make_coordinator_stub()
+    # pyrefly: ignore [bad-assignment]
     coordinator._property_source_state = None  # ruff: ignore[private-member-access]
 
     baseline = {"device1": {PAYLOAD_PROPERTIES: {"batSoc": 50}}}

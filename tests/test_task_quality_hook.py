@@ -181,7 +181,7 @@ def test_precommit_runs_for_deleted_path_without_retrying_unchanged_failure() ->
             def __init__(self, args: list[str], **kwargs: object) -> None:
                 calls.append(args)
 
-            def wait(self, timeout: int | None = None) -> int:
+            def wait(self, timeout: int | None = None) -> int:  # ruff: ignore[no-self-use]
                 return 1 if "--files" in calls[-1] else 0
 
         with (
