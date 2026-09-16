@@ -1419,7 +1419,7 @@ class MqttConnectionManager:
             not verify_connected_session
             and not force
             and reconnect_needed
-            and now - self.last_connect_attempt < MQTT_RECONNECT_THROTTLE_SEC
+            and now - self.last_connect_attempt < MQTT_RECONNECT_THROTTLE_SEC,
         )
 
     def record_connect_attempt(self) -> None:
@@ -2320,7 +2320,7 @@ def valid_system_discovery_entries(entries: object) -> bool:
 def valid_system_discovery_response(response: object) -> bool:
     """Return whether system discovery is non-empty and removal-authoritative."""
     return isinstance(response, Mapping) and valid_system_discovery_entries(
-        response.get(FIELD_DATA)
+        response.get(FIELD_DATA),
     )
 
 
@@ -2523,7 +2523,7 @@ def has_sub_device_accessory(payload: dict[str, Any]) -> bool:
             if not isinstance(item, dict):
                 continue
             item_type = str(
-                item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or ""
+                item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "",
             )
             if item_type in {
                 SUBDEVICE_TYPE_SMOKE,
@@ -2604,7 +2604,8 @@ def _expected_battery_pack_count(
     if _is_blank_value(raw_expected):
         return 0
     if isinstance(raw_expected, bool) or not isinstance(
-        raw_expected, str | int | float
+        raw_expected,
+        str | int | float,
     ):
         if rejection_callback is not None:
             rejection_callback("battery_pack_bat_num_type_error")
@@ -2804,7 +2805,7 @@ def _apply_shelly_rpc_power(
                 "c_aprt_power": FIELD_CT_APPARENT_POWER3,
                 "total_aprt_power": FIELD_CT_APPARENT_POWER,
             },
-        )
+        ),
     )
     for source_keys, target_key in (
         (("a_voltage", "b_voltage", "c_voltage"), FIELD_CT_VOLT),
@@ -2838,7 +2839,7 @@ def _apply_shelly_rpc_energy(
                 "total_act": FIELD_CT_TOTAL_PHASE_ENERGY,
                 "total_act_ret": FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
             },
-        )
+        ),
     )
 
 
@@ -2916,7 +2917,8 @@ def mqtt_payload_observed_at(
     if _is_blank_value(raw_timestamp):
         return None
     if not isinstance(raw_timestamp, datetime | int | float | str) or isinstance(
-        raw_timestamp, bool
+        raw_timestamp,
+        bool,
     ):
         if skew_callback is not None:
             skew_callback(f"unusable_timestamp_type_{type(raw_timestamp).__name__}")
@@ -3938,7 +3940,7 @@ class _HttpDayBackfillProgress:
     unmapped_sources: int = 0
     successful_devices: set[str] = dataclass_field(default_factory=set)
     verified_day_updates: dict[str, dict[str, Any]] = dataclass_field(
-        default_factory=dict
+        default_factory=dict,
     )
 
 
@@ -4103,7 +4105,7 @@ type _DocumentedHttpRequest = tuple[
 
 
 class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # HA coordinator owns the integration's public runtime surface.
-    DataUpdateCoordinator[dict[str, dict[str, Any]]]
+    DataUpdateCoordinator[dict[str, dict[str, Any]]],
 ):
     """Polls all known Jackery devices."""
 
@@ -4118,7 +4120,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             cur = merged.get(key)
             if isinstance(cur, dict) and isinstance(value, dict):
                 merged[key] = JackerySolarVaultCoordinator._merge_dict_values(
-                    cur, value
+                    cur,
+                    value,
                 )
             else:
                 merged[key] = value
@@ -4292,7 +4295,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 entry.options.get(
                     CONF_HTTP_MAX_PARALLEL_REQUESTS,
                     DEFAULT_HTTP_MAX_PARALLEL_REQUESTS,
-                )
+                ),
             )
             or DEFAULT_HTTP_MAX_PARALLEL_REQUESTS,
         )
@@ -4804,7 +4807,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             system_meta[FIELD_ACCESSORIES] = accessories
             for device in devices:
                 if not isinstance(
-                    device, dict
+                    device,
+                    dict,
                 ) or not self._is_property_device_candidate(device):
                     continue
                 device_id = device.get(FIELD_DEVICE_ID) or device.get(FIELD_ID)
@@ -4863,7 +4867,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         except JackeryAuthError as err:
             if has_system_devices:
                 self._reset_discovery_removal_confirmations(
-                    DISCOVERY_SOURCE_LEGACY_BIND_LIST
+                    DISCOVERY_SOURCE_LEGACY_BIND_LIST,
                 )
                 _LOGGER.debug(
                     "Jackery: legacy portable discovery auth failed after "
@@ -4882,7 +4886,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 msg = f"legacy bind/list failed: {err}"
                 raise UpdateFailed(msg) from err
             self._reset_discovery_removal_confirmations(
-                DISCOVERY_SOURCE_LEGACY_BIND_LIST
+                DISCOVERY_SOURCE_LEGACY_BIND_LIST,
             )
             _LOGGER.debug(
                 "Jackery: legacy portable discovery failed after system/list "
@@ -5051,7 +5055,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 self._endpoint_backoff_note_success(_ACCESSORIES_SYNC_BACKOFF_KEY)
         calls = {
             (dev_id, "accessories"): partial(
-                self.api.async_get_accessories_list, dev_id
+                self.api.async_get_accessories_list,
+                dev_id,
             )
             for dev_id in index
         }
@@ -5087,13 +5092,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             refreshed_record = refreshed.get(device_id)
             current_record = self._device_index.get(device_id)
             if not isinstance(refreshed_record, dict) or not isinstance(
-                current_record, dict
+                current_record,
+                dict,
             ):
                 continue
             before_system = before_record.get(PAYLOAD_SYSTEM_META) or {}
             refreshed_system = refreshed_record.get(PAYLOAD_SYSTEM_META) or {}
             if not isinstance(before_system, dict) or not isinstance(
-                refreshed_system, dict
+                refreshed_system,
+                dict,
             ):
                 continue
             before_accessories = before_system.get(FIELD_ACCESSORIES)
@@ -5223,7 +5230,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         removed_device_ids = old_device_ids - current_device_ids
         if removed_device_ids:
             removed_registry_devices = self._unlink_removed_parent_devices(
-                removed_device_ids
+                removed_device_ids,
             )
             _LOGGER.info(
                 "Jackery: runtime discovery removed %d parent device(s) and "
@@ -5285,7 +5292,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     unlinked += 1
             for cache_key in tuple(self._slow_cache):
                 if cache_key == f"dev:{device_id}" or cache_key.startswith(
-                    f"dev:{device_id}:"
+                    f"dev:{device_id}:",
                 ):
                     self._slow_cache.pop(cache_key, None)
             self._last_system_info_query.pop(device_id, None)
@@ -5302,7 +5309,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         registry = er.async_get(self.hass)
         removed = 0
         for entity in tuple(
-            er.async_entries_for_config_entry(registry, self.entry.entry_id)
+            er.async_entries_for_config_entry(registry, self.entry.entry_id),
         ):
             if entity.device_id not in device_ids:
                 continue
@@ -5319,7 +5326,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if safe_bool(bind_key) is False:
             return False
         if safe_int(dev.get(FIELD_DEV_TYPE)) == SUBDEVICE_DEV_TYPE_CT and safe_bool(
-            dev.get(FIELD_IS_CLOUD)
+            dev.get(FIELD_IS_CLOUD),
         ):
             return False
         return not (not dev.get(FIELD_MODEL_CODE) and not dev.get(FIELD_DEV_MODEL))
@@ -5499,7 +5506,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if not snapshot:
             _LOGGER.debug(
                 "Jackery Cloud MQTT birth snapshot deferred until HTTP discovery "
-                "provides the device inventory"
+                "provides the device inventory",
             )
             return
 
@@ -5923,7 +5930,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self._supplemental_transport_tasks()
             or bool(getattr(self, "_layer5_stop_tasks", {}))
             or getattr(self, "_mqtt", None) is not None
-            or getattr(self, "_ble_listener", None) is not None
+            or getattr(self, "_ble_listener", None) is not None,
         )
 
     async def async_stop_supplemental_transports(self) -> None:
@@ -5954,7 +5961,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if pending_tasks:
             cleanup_errors.append(
                 f"{len(pending_tasks)} supplemental task(s) did not stop within "
-                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s"
+                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s",
             )
         cleanup_errors.extend(await self._async_stop_layer5_transports())
         if cleanup_errors:
@@ -6065,7 +6072,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             label, _attribute, _client = active[task]
             errors.append(
                 f"{label} stop still pending after "
-                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s"
+                f"{_BACKGROUND_TASK_STOP_TIMEOUT_SEC:.1f}s",
             )
         return errors
 
@@ -6100,7 +6107,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 continue
             if replacement_blocked:
                 stop_errors.append(
-                    f"{label} replacement is waiting for an older stop task"
+                    f"{label} replacement is waiting for an older stop task",
                 )
                 continue
             new_task, error = self._create_layer5_stop_task(
@@ -6221,7 +6228,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 json.dumps(body)
             except TypeError, ValueError:
                 _LOGGER.exception(
-                    "Invalid JSON in BLE command body for device %s", device_id
+                    "Invalid JSON in BLE command body for device %s",
+                    device_id,
                 )
                 raise
 
@@ -6302,16 +6310,16 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 "frames_decoded": int(getattr(stats, "frames_decoded", 0)),
                 "frames_decode_failed": int(getattr(stats, "frames_decode_failed", 0)),
                 "multi_chunk_frames_buffered": int(
-                    getattr(stats, "multi_chunk_frames_buffered", 0)
+                    getattr(stats, "multi_chunk_frames_buffered", 0),
                 ),
                 "multi_chunk_messages_assembled": int(
-                    getattr(stats, "multi_chunk_messages_assembled", 0)
+                    getattr(stats, "multi_chunk_messages_assembled", 0),
                 ),
                 "multi_chunk_assemblies_dropped": int(
-                    getattr(stats, "multi_chunk_assemblies_dropped", 0)
+                    getattr(stats, "multi_chunk_assemblies_dropped", 0),
                 ),
                 "notify_frames_dropped": int(
-                    getattr(stats, "notify_frames_dropped", 0)
+                    getattr(stats, "notify_frames_dropped", 0),
                 ),
                 "acks_received": int(getattr(stats, "acks_received", 0)),
                 "acks_timed_out": int(getattr(stats, "acks_timed_out", 0)),
@@ -6476,7 +6484,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             "messages_filtered": snap.get("messages_filtered", 0),
             "messages_rejected_by_sink": snap.get("messages_rejected_by_sink", 0),
             "rejection_reason_counts": dict(
-                getattr(self, "_local_mqtt_rejection_reasons", {})
+                getattr(self, "_local_mqtt_rejection_reasons", {}),
             ),
             "last_rejection_reason": getattr(
                 self,
@@ -6645,7 +6653,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         payload,
                         action_id,
                     )
-                )
+                ),
             }
         elif is_wifi_config_message(message_type, action_id, classified):
             update = {PAYLOAD_WIFI_CONFIG: payload}
@@ -6899,7 +6907,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     f"{__package__}.client.ble_transport",
                 )
                 listener_class = cast(  # ty: ignore[redundant-cast]
-                    "Any", ble_transport_module
+                    "Any",
+                    ble_transport_module,
                 ).JackeryBleListener
             except (AttributeError, ImportError) as err:
                 _LOGGER.warning(
@@ -7174,7 +7183,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Normalize one MQTT envelope without discarding its original payload."""
         device_id = (
             self._resolve_device_id_from_mqtt(
-                payload, allow_single_device_fallback=False
+                payload,
+                allow_single_device_fallback=False,
             )
             if source is TransportSource.LOCAL_MQTT
             else self._resolve_device_id_from_mqtt(payload)
@@ -7215,7 +7225,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             current=current,
             source=source,
             observed_at=mqtt_payload_observed_at(
-                payload, self.record_timestamp_skew_rejection
+                payload,
+                self.record_timestamp_skew_rejection,
             ),
             message_type=message_type,
             local_report_type=local_report_type,
@@ -7536,7 +7547,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     context,
                     updated,
                     canonical=False,
-                )
+                ),
             )
         if context.combine_data and not context.is_subdevice and context.body:
             property_body = self._merge_mqtt_main_properties(
@@ -7558,7 +7569,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         context,
                         updated,
                         canonical=context.combine_data,
-                    )
+                    ),
                 )
                 or touched
             )
@@ -7785,7 +7796,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             partial_entry = {
                 PAYLOAD_CT_METER: (
                     dict(current_ct) if isinstance(current_ct, dict) else {}
-                )
+                ),
             }
             if not self._merge_shelly_cloud_item(partial_entry, ct_update):
                 return device_id
@@ -7858,7 +7869,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             ):
                 return self._record_unrouted_local_mqtt_message("unsupported_report")
             accepted_device_id = self._resolve_device_id_from_mqtt(
-                normalized, allow_single_device_fallback=False
+                normalized,
+                allow_single_device_fallback=False,
             )
             if not accepted_device_id:
                 return self._record_unrouted_local_mqtt_message("unknown_device")
@@ -8408,7 +8420,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         filled = dict(props)
         for key, value in cached.items():
             if not self._property_value_present(
-                filled.get(key)
+                filled.get(key),
             ) and self._property_value_present(value):
                 filled[key] = value
         return filled
@@ -9445,7 +9457,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     and live_properties.get(local_key) is not None
                 )
                 if local_live_confirmed and not local_period_total_supersedes_cloud(
-                    current, value
+                    current,
+                    value,
                 ):
                     continue
                 if (
@@ -10334,7 +10347,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             resolved_source = TransportSource.HTTP
         if observed_at is None and isinstance(mqtt_last, dict):
             observed_at = mqtt_payload_observed_at(
-                mqtt_last, self.record_timestamp_skew_rejection
+                mqtt_last,
+                self.record_timestamp_skew_rejection,
             )
         merged[PAYLOAD_PROPERTIES] = self._merge_main_properties_for_device(
             device_id,
@@ -13007,7 +13021,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         return bool(
             not config.get("_decode_error")
             and FIELD_THIRD_PARTY_MQTT_TOKEN not in failed_fields
-            and str(config.get(FIELD_THIRD_PARTY_MQTT_TOKEN) or "")
+            and str(config.get(FIELD_THIRD_PARTY_MQTT_TOKEN) or ""),
         )
 
     def set_local_mqtt_config_observer(
@@ -13131,7 +13145,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Build the encrypted command body and plaintext readback contract."""
         normalized_token, _ = self._stable_third_party_mqtt_token(
-            options.get("token", "")
+            options.get("token", ""),
         )
         bluetooth_key = self.device_bluetooth_key(device_id)
         if bluetooth_key is None:
@@ -13927,7 +13941,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             body_fields={field: value},
         )
         self._apply_local_property_patch(
-            device_id, local_patch if local_patch is not None else {field: value}
+            device_id,
+            local_patch if local_patch is not None else {field: value},
         )
 
     def _should_query_subdevice_action(
@@ -14655,7 +14670,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 return await self._async_add_app_chart_statistics_locked(**options)
             except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug(
-                    "Deferring app chart import after recorder read failure: %s", err
+                    "Deferring app chart import after recorder read failure: %s",
+                    err,
                 )
                 return False, 0
 
@@ -15229,7 +15245,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         self._polling_diagnostics.get(
                             "max_cycle_start_gap_sec",
                             0.0,
-                        )
+                        ),
                     ),
                     start_gap,
                 ),
@@ -15243,10 +15259,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         finally:
             elapsed = max(0.0, time.monotonic() - cycle_started)
             self._polling_diagnostics["last_total_cycle_elapsed_sec"] = round(
-                elapsed, 3
+                elapsed,
+                3,
             )
             self._polling_diagnostics["next_poll_delay_sec"] = round(
-                self._configured_update_interval.total_seconds(), 3
+                self._configured_update_interval.total_seconds(),
+                3,
             )
             if current_task is not None:
                 self._active_http_update_tasks.discard(current_task)
@@ -15966,7 +15984,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             _make_previous_home_month_refresher(
                                 cache_key,
                                 request_kwargs,
-                            )
+                            ),
                         )
                     return await self._async_get_with_ttl(
                         sys_id,
@@ -16173,7 +16191,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             ),
                         ),
                         "pv_stat",
-                    )
+                    ),
                 )
             requests.extend((
                 self._cached_device_period_request(
@@ -16663,7 +16681,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     ct_device_id=ct_dev_id,
                     today=today,
                     stale_ok=True,
-                )
+                ),
             )
         except JackeryAuthError as err:
             _LOGGER.debug(
@@ -16792,13 +16810,13 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             PAYLOAD_SYSTEM: idx.get(PAYLOAD_SYSTEM_META) or {},
             PAYLOAD_DISCOVERY: idx.get(PAYLOAD_DEVICE_META) or {},
             PAYLOAD_DEVICE_STATISTIC: dict(
-                sources.extras.get(PAYLOAD_DEVICE_STATISTIC) or {}
+                sources.extras.get(PAYLOAD_DEVICE_STATISTIC) or {},
             ),
             **period_payloads,
             # Preserve ``device/stat/today`` so reconciliation can compare
             # it with the dated day-stat response without losing either.
             APP_SECTION_TODAY_ENERGY: dict(
-                sources.extras.get(APP_SECTION_TODAY_ENERGY) or {}
+                sources.extras.get(APP_SECTION_TODAY_ENERGY) or {},
             ),
             PAYLOAD_OTA: sources.extras.get(PAYLOAD_OTA) or {},
             PAYLOAD_LOCATION: sources.extras.get(PAYLOAD_LOCATION) or {},
@@ -17024,7 +17042,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 self._activation_issue_active.discard(existing_issue_id)
 
         activated_flag_is_unconfirmed = device_data.get(
-            "activated"
+            "activated",
         ) == 0 and self._has_activation_contradicting_payload(entry)
         if device_data.get("activated") == 0 and not activated_flag_is_unconfirmed:
             if act_issue_id in self._activation_issue_active:
@@ -17088,7 +17106,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> None:
         """Build every device result from authoritative property responses."""
         for (dev_id, idx), property_result in zip(
-            device_items, property_results, strict=True
+            device_items,
+            property_results,
+            strict=True,
         ):
             await self._async_build_guarded_http_device(
                 dev_id,
@@ -17262,7 +17282,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         refreshers.extend(cycle.historical_month_refreshers)
         if cycle.shelly_cache_stale:
             refreshers.append(
-                partial(self._async_fetch_shelly_cloud_devices, stale_ok=False)
+                partial(self._async_fetch_shelly_cloud_devices, stale_ok=False),
             )
         self._launch_background_slow_refresh(
             cycle.systems_needing_refresh,
@@ -17991,7 +18011,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 and self._ble_writes_enabled()
                 and bool(
                     self.device_bluetooth_key(device_id)
-                    or self._ble_address_for_device(device_id)
+                    or self._ble_address_for_device(device_id),
                 )
             )
         # App 2.4.0 contains no Local-MQTT command publisher.
@@ -18274,7 +18294,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 continue
             scaled_anchor = int(anchor * 10)
             if current < scaled_anchor or current - scaled_anchor > max(
-                10_000, int(anchor)
+                10_000,
+                int(anchor),
             ):
                 continue
             values[metric] = scaled_anchor
@@ -18574,7 +18595,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 CONF_THIRD_PARTY_MQTT_IP,
                 "",
             )
-            or ""
+            or "",
         ).strip()
         if not host:
             if not getattr(self, "_local_mqtt_no_host_warned", False):
@@ -18593,7 +18614,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 self._local_mqtt_bridge_option(
                     CONF_THIRD_PARTY_MQTT_PORT,
                     DEFAULT_THIRD_PARTY_MQTT_PORT,
-                )
+                ),
             )
             or DEFAULT_THIRD_PARTY_MQTT_PORT
         )
@@ -18602,14 +18623,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 "",
             )
-            or ""
+            or "",
         )
         password = str(
             self._local_mqtt_bridge_option(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 "",
             )
-            or ""
+            or "",
         )
         return _LocalMqttBridgeConfig(host, port, username, password)
 
@@ -18620,7 +18641,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 self,
                 "_local_mqtt_head_traffic_observed_ids",
                 getattr(self, "_local_mqtt_device_traffic_observed_ids", set()),
-            )
+            ),
         )
 
     def _local_mqtt_config_signature_matches(
@@ -18635,7 +18656,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             and len(signature) == _LOCAL_MQTT_SIGNATURE_FIELDS
             and signature[:4]
             == (config.host, config.port, config.username, config.password)
-            and tuple(sorted(device_ids)) == signature[5]
+            and tuple(sorted(device_ids)) == signature[5],
         )
 
     async def _async_apply_local_mqtt_config_to_device(
@@ -18655,7 +18676,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         docstring promises.
         """
         token, readback = await self._async_local_mqtt_device_token_and_readback(
-            device_id
+            device_id,
         )
         expected = {
             FIELD_THIRD_PARTY_MQTT_ENABLE: 1,
@@ -18766,7 +18787,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     self,
                     "_local_mqtt_lifetime_traffic_observed_ids",
                     set(),
-                )
+                ),
             )
             lifetime_observed -= written
             self._local_mqtt_lifetime_traffic_observed_ids = lifetime_observed
@@ -19870,7 +19891,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         startup = getattr(self, "_statistics_startup_sync_pending", False)
         visited: set[tuple[str, str, str]] = getattr(
-            self, "_statistics_startup_fetched", set()
+            self,
+            "_statistics_startup_fetched",
+            set(),
         )
         if startup and key in visited:
             return None
@@ -19956,7 +19979,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 candidate.attempts,
                 candidate.device_id,
                 candidate.section_prefix,
-            )
+            ),
         )
         progress.actionable_sources = len(candidates)
         return candidates
@@ -20094,7 +20117,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if progress.state_changed:
             await self._async_save_statistics_backfill_state()
         backfill_had_source = progress.source_days > 0 and bool(
-            progress.successful_devices
+            progress.successful_devices,
         )
         retry_after_sec = (
             _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC
@@ -20147,7 +20170,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             "last_http_backfill_entity_failed_rows": 0,
             "last_http_backfill_source_days": progress.source_days,
             "last_http_backfill_successful_device_count": len(
-                progress.successful_devices
+                progress.successful_devices,
             ),
             "last_http_backfill_requests": progress.requests,
             "last_http_backfill_terminal_transitions": (progress.terminal_transitions),
@@ -20426,7 +20449,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 candidate.date_type,
                 candidate.attempted,
                 candidate.last_attempt,
-            )
+            ),
         )
         progress.actionable_sources = len(candidates)
         _LOGGER.debug(
@@ -20453,7 +20476,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     self._smart_meter_accessory_device_id(candidate.payload)
                     or self._smart_meter_accessory_device_id(
                         getattr(self, "_device_index", {}).get(candidate.device_id)
-                        or {}
+                        or {},
                     )
                 ),
                 section_prefix=candidate.section_prefix,
@@ -20499,7 +20522,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         progress.requests += 1
         state = candidate.bucket_state
         status, source = await self._async_fetch_http_period_backfill_candidate(
-            candidate
+            candidate,
         )
         state.update({
             "last_attempt_at": utc_now().isoformat(),
@@ -20521,7 +20544,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             repaired, failed = await self._import_collected_repair_buckets(
                 device_id=candidate.device_id,
                 name_prefix=self._app_chart_name_prefix(
-                    candidate.device_id, candidate.payload
+                    candidate.device_id,
+                    candidate.payload,
                 ),
                 collected={
                     (
@@ -20931,7 +20955,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Check Jackery accessory existence for serialized device SN info."""
         if context_device_id is not None:
             self._require_home_config_context(
-                context_device_id, "check Jackery accessories"
+                context_device_id,
+                "check Jackery accessories",
             )
         return await self.api.async_check_jackery_accessories_exist(
             device_sn_infos=device_sn_infos,
@@ -21016,7 +21041,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> dict[str, Any]:
         """Cancel dynamic-price contract authorization and refresh."""
         self._require_home_config_context(
-            device_id, "cancel dynamic price contract auth"
+            device_id,
+            "cancel dynamic price contract auth",
         )
         system_id = self._resolve_system_id(device_id)
         if not system_id:
@@ -21054,7 +21080,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Query app socket chart statistics for an accessory device id."""
         if context_device_id is not None:
             self._require_home_config_context(
-                context_device_id, "query socket statistics"
+                context_device_id,
+                "query socket statistics",
             )
         return await self.api.async_get_device_socket_stat(
             target_device_id,

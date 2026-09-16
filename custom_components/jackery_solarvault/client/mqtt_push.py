@@ -1,7 +1,5 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
-from __future__ import annotations
-
 import asyncio
 from collections import deque
 from dataclasses import dataclass
@@ -120,13 +118,19 @@ JACKERY_MQTT_SUPPORTS_LWT: Final = False
 JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE: Final = False
 MQTT_MESSAGE_SPECS: Final = {
     MqttMessageType.SUBSCRIPTION: MqttMessageSpec(
-        topic_suffixes=MQTT_TOPIC_SUFFIXES, qos=0, retain=False
+        topic_suffixes=MQTT_TOPIC_SUFFIXES,
+        qos=0,
+        retain=False,
     ),
     MqttMessageType.COMMAND: MqttMessageSpec(
-        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False
+        topic_suffixes=(MQTT_TOPIC_COMMAND,),
+        qos=0,
+        retain=False,
     ),
     MqttMessageType.BIRTH: MqttMessageSpec(
-        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False
+        topic_suffixes=(MQTT_TOPIC_COMMAND,),
+        qos=0,
+        retain=False,
     ),
 }
 
@@ -200,7 +204,8 @@ class JackeryMqttPushClient:
         self._tls_x509_strict_disabled = False
         # Getter response correlation (bounded session state)
         self._pending_responses: dict[
-            tuple[int, int, str | int | None], asyncio.Future[dict[str, Any]]
+            tuple[int, int, str | int | None],
+            asyncio.Future[dict[str, Any]],
         ] = {}
         self._responses_correlated = 0
         self._responses_expired = 0
@@ -286,7 +291,7 @@ class JackeryMqttPushClient:
             self._last_connect_failure_signature = None
 
             ssl_context = await self._hass.async_add_executor_job(
-                self._build_ssl_context_blocking
+                self._build_ssl_context_blocking,
             )
             if not self._session_is_current(generation):
                 return
@@ -308,7 +313,7 @@ class JackeryMqttPushClient:
                         ssl_context=ssl_context,
                         topics=session_topics,
                         generation=generation,
-                    )
+                    ),
                 ),
                 name="jackery_mqtt_runner",
             )
@@ -540,7 +545,7 @@ class JackeryMqttPushClient:
             runner_count = int(plan.runner_task in still_pending)
             lifecycle_count = len(still_pending & plan.lifecycle_tasks)
             accepted_backlog = len(self._message_queue) + int(
-                self._message_delivery_item is not None
+                self._message_delivery_item is not None,
             )
             msg = (
                 "Jackery MQTT stop timed out after "
@@ -553,7 +558,7 @@ class JackeryMqttPushClient:
             await self.async_wait_message_queue_idle(timeout_sec=_MQTT_STOP_TIMEOUT_SEC)
         except TimeoutError as err:
             accepted_backlog = len(self._message_queue) + int(
-                self._message_delivery_item is not None
+                self._message_delivery_item is not None,
             )
             msg = (
                 "Jackery MQTT stop timed out after "
@@ -859,8 +864,10 @@ class JackeryMqttPushClient:
 
         ca_path = Path(
             self._hass.config.path(
-                "custom_components", "jackery_solarvault", "jackery_ca.crt"
-            )
+                "custom_components",
+                "jackery_solarvault",
+                "jackery_ca.crt",
+            ),
         )
         if ca_path.is_file():
             try:
@@ -924,7 +931,8 @@ class JackeryMqttPushClient:
         if self._stopping:
             return
         if generation is not None and not self._session_is_current(
-            generation, runner_task
+            generation,
+            runner_task,
         ):
             return
         try:
@@ -1091,7 +1099,7 @@ class JackeryMqttPushClient:
             )
             _LOGGER.error(
                 "Jackery MQTT message callback was cancelled before completing "
-                "an accepted frame"
+                "an accepted frame",
             )
             return
         try:
@@ -1148,7 +1156,7 @@ class JackeryMqttPushClient:
             if self._message_queue or self._message_delivery_task is not None:
                 _LOGGER.warning(
                     "Jackery MQTT FIFO actor was cancelled with accepted delivery "
-                    "still pending"
+                    "still pending",
                 )
         except Exception:
             _LOGGER.exception("Jackery MQTT FIFO consumer failed")
@@ -1210,13 +1218,15 @@ class JackeryMqttPushClient:
         tracked_tasks: set[asyncio.Task[None]] | None = None,
     ) -> None:
         if generation is not None and not self._session_is_current(
-            generation, runner_task
+            generation,
+            runner_task,
         ):
             return
 
         async def _runner() -> None:
             if generation is not None and not self._session_is_current(
-                generation, runner_task
+                generation,
+                runner_task,
             ):
                 return
             await coro_factory()
@@ -1308,7 +1318,7 @@ class JackeryMqttPushClient:
             if not self._birth_not_connected_logged:
                 self._birth_not_connected_logged = True
                 _LOGGER.debug(
-                    "Jackery MQTT birth snapshot skipped: session not connected"
+                    "Jackery MQTT birth snapshot skipped: session not connected",
                 )
             return
 
@@ -1439,7 +1449,8 @@ class JackeryMqttPushClient:
         """
         raw_request_id = data.get("request_id", data.get(FIELD_ID))
         if not isinstance(raw_request_id, (str, int)) or isinstance(
-            raw_request_id, bool
+            raw_request_id,
+            bool,
         ):
             return
         try:
@@ -1447,7 +1458,7 @@ class JackeryMqttPushClient:
         except TypeError, ValueError:
             return
         response_type = self._normalize_response_type(
-            data.get("response_type", data.get(FIELD_ACTION_ID))
+            data.get("response_type", data.get(FIELD_ACTION_ID)),
         )
         keys = (
             (self._session_generation, request_id, response_type),
@@ -1512,11 +1523,11 @@ class JackeryMqttPushClient:
             "message_queue_depth": len(self._message_queue),
             "message_consumer_running": bool(
                 self._message_consumer_task is not None
-                and not self._message_consumer_task.done()
+                and not self._message_consumer_task.done(),
             ),
             "message_delivery_running": bool(
                 self._message_delivery_task is not None
-                and not self._message_delivery_task.done()
+                and not self._message_delivery_task.done(),
             ),
             "messages_delivered": self._messages_delivered,
             "message_handler_errors": self._message_handler_errors,

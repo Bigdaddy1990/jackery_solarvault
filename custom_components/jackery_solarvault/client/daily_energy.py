@@ -5,8 +5,6 @@ minimum state required to continue an already-observed local day after a Home
 Assistant restart; it never stores completed days, weeks, months, or years.
 """
 
-from __future__ import annotations
-
 import asyncio
 from datetime import date
 import json

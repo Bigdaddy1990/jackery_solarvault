@@ -24,7 +24,9 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         task.cancelled.return_value = False
         task.cancel.return_value = None
 
-        def _create(coro: Coroutine[object, object, object], **_kwargs: object) -> MagicMock:
+        def _create(
+            coro: Coroutine[object, object, object], **_kwargs: object
+        ) -> MagicMock:
             coro.close()
             return task
 
@@ -50,7 +52,9 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         client._session_generation = generation
         return client
 
-    def _create_client_with_tls_ca_missing(self, generation: int = 0) -> JackeryMqttPushClient:
+    def _create_client_with_tls_ca_missing(
+        self, generation: int = 0
+    ) -> JackeryMqttPushClient:
         """Create a client with missing TLS CA file."""
         hass = MagicMock()
         hass.data = {}

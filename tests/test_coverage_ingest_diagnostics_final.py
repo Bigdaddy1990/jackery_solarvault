@@ -355,7 +355,10 @@ def test_local_mqtt_diagnostics_reports_coordinator_not_ready() -> None:
             "Any",
             _entry(
                 object(),
-                {CONF_THIRD_PARTY_MQTT_ENABLE: True, CONF_THIRD_PARTY_MQTT_IP: "broker"},
+                {
+                    CONF_THIRD_PARTY_MQTT_ENABLE: True,
+                    CONF_THIRD_PARTY_MQTT_IP: "broker",
+                },
             ),
         ),
     )
@@ -394,7 +397,10 @@ def test_local_mqtt_diagnostics_reports_missing_started_client(
             "Any",
             _entry(
                 coordinator,
-                {CONF_THIRD_PARTY_MQTT_ENABLE: True, CONF_THIRD_PARTY_MQTT_IP: "broker"},
+                {
+                    CONF_THIRD_PARTY_MQTT_ENABLE: True,
+                    CONF_THIRD_PARTY_MQTT_IP: "broker",
+                },
             ),
         ),
     )

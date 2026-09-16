@@ -461,7 +461,7 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
                     str(
                         accessory.get(FIELD_DEV_TYPE)
                         or accessory.get(FIELD_DEVICE_TYPE)
-                        or ""
+                        or "",
                     ),
                     first_nonblank_text(
                         accessory.get(FIELD_DEVICE_SN),
@@ -475,7 +475,7 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
                     _present_fields(accessory),
                 )
                 for index, accessory in enumerate(valid_accessories, start=1)
-            )
+            ),
         )
         plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
         plug_keys = tuple(
@@ -499,7 +499,7 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
                     _present_fields(pack),
                 )
                 for index, pack in enumerate(valid_packs, start=1)
-            )
+            ),
         )
         meter_heads = sorted_meter_heads(payload.get(PAYLOAD_METER_HEADS))
         meter_keys = tuple(
@@ -676,7 +676,9 @@ def app_period_date_bounds(
 
 
 def app_period_request_kwargs(
-    date_type: str, *, today: date | None = None
+    date_type: str,
+    *,
+    today: date | None = None,
 ) -> dict[str, str]:
     """Return method kwargs for documented app-period API calls."""
     begin, end = app_period_date_bounds(date_type, today=today)
@@ -1224,7 +1226,7 @@ def append_payload_debug_lines(
                     ensure_ascii=False,
                     sort_keys=True,
                     default=str,
-                )
+                ),
             )
             file.write("\n")
 
@@ -2111,7 +2113,8 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
     pv_residual_after_self_consumption_energy = None
     if year_generation is not None:
         pv_residual_after_self_consumption_energy = max(
-            0.0, year_generation - savings_energy
+            0.0,
+            year_generation - savings_energy,
         )
 
     calculated_total = round(savings_energy * price, 2)
@@ -2135,7 +2138,7 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
             "battery_charge_discharge_balance_year_kwh": _round_stat_value(
-                battery_balance
+                battery_balance,
             ),
             "conversion_loss_year_kwh": _round_stat_value(conversion_loss_energy),
             "conversion_loss_year_kwh_signed": _round_stat_value(
@@ -2231,7 +2234,8 @@ def _backfill_pv_revenue(
     monthly_total = round(sum(revenue_values), 2)
     raw_total = _pv_revenue_value(year_source)
     if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-        raw_total, monthly_total
+        raw_total,
+        monthly_total,
     ):
         return
 
@@ -2322,7 +2326,8 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
             else safe_float(year_source.get(stat_key))
         )
         if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-            raw_total, monthly_total
+            raw_total,
+            monthly_total,
         ):
             continue
 
@@ -2530,7 +2535,7 @@ def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetim
                     "corrected_total": round(corrected_generation, 2),
                     "current_year_total": _round_stat_value(year_generation),
                     "previous_total": _round_stat_value(previous_generation),
-                }
+                },
             },
         }
         statistic["_total_lower_bound_guard"] = guard_meta
@@ -2559,7 +2564,7 @@ def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetim
                     "corrected_total": round(previous_generation, 2),
                     "current_year_total": _round_stat_value(year_generation),
                     "previous_total": round(previous_generation, 2),
-                }
+                },
             },
         }
         payload[PAYLOAD_STATISTIC] = statistic
@@ -2666,10 +2671,10 @@ def trend_series_points(
     if isinstance(request, dict):
         begin = _parse_iso_date(
             request.get(APP_REQUEST_BEGIN_DATE)
-            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT),
         )
         end = _parse_iso_date(
-            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT),
         )
 
     date_type = _trend_date_type(section, source)
@@ -2692,7 +2697,7 @@ def trend_series_points(
         if value_float is None:
             continue
         points.append(
-            TrendStatisticPoint(bucket_start, round(value_float * unit_scale, 5))
+            TrendStatisticPoint(bucket_start, round(value_float * unit_scale, 5)),
         )
     return points
 
@@ -2789,7 +2794,8 @@ def _day_power_sample_energy_value(
 
 
 def _reconcile_rounded_day_values(
-    rounded_values: list[float], scalar_total: float
+    rounded_values: list[float],
+    scalar_total: float,
 ) -> list[float]:
     """Reconcile rounded buckets exactly to a non-negative scalar total.
 
@@ -2849,10 +2855,10 @@ def _resolve_day_request_window(
     if isinstance(request, dict):
         begin = _parse_iso_date(
             request.get(APP_REQUEST_BEGIN_DATE)
-            or request.get(APP_REQUEST_BEGIN_DATE_ALT)
+            or request.get(APP_REQUEST_BEGIN_DATE_ALT),
         )
         end = _parse_iso_date(
-            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
+            request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT),
         )
 
     if begin is None or (end is not None and begin > end):
@@ -2996,7 +3002,9 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
             bucket_value,
         )
         for (minute, _value), bucket_value in zip(
-            bucket_items, rounded_values, strict=False
+            bucket_items,
+            rounded_values,
+            strict=False,
         )
     ]
 
@@ -3140,10 +3148,14 @@ def app_data_quality_warnings(
             year_section, year_source = year
             week_section, week_source = week
             year_total = effective_period_total_value(
-                year_source, year_section, stat_key
+                year_source,
+                year_section,
+                stat_key,
             )
             week_total = effective_period_total_value(
-                week_source, week_section, stat_key
+                week_source,
+                week_section,
+                stat_key,
             )
             if (
                 year_total is not None
@@ -3162,7 +3174,7 @@ def app_data_quality_warnings(
                         reference_source=week_source,
                         reference_value=week_total,
                         stat_key=stat_key,
-                    )
+                    ),
                 )
 
     statistic = payload.get("statistic")
@@ -3196,7 +3208,7 @@ def app_data_quality_warnings(
                         APP_STAT_TOTAL_SOLAR_ENERGY,
                     ),
                     total_method="chart_series_sum",
-                )
+                ),
             )
     return warnings
 
@@ -3224,10 +3236,10 @@ def _request_range_text(section: str, request: object) -> str | None:
     if not isinstance(request, dict):
         return None
     date_type = request.get(APP_REQUEST_DATE_TYPE) or request.get(
-        APP_REQUEST_DATE_TYPE_ALT
+        APP_REQUEST_DATE_TYPE_ALT,
     )
     begin = request.get(APP_REQUEST_BEGIN_DATE) or request.get(
-        APP_REQUEST_BEGIN_DATE_ALT
+        APP_REQUEST_BEGIN_DATE_ALT,
     )
     end = request.get(APP_REQUEST_END_DATE) or request.get(APP_REQUEST_END_DATE_ALT)
     if not date_type or not begin or not end:
@@ -3337,7 +3349,9 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
         `None` if no CT-derived power values are available.
     """
     total = directional_power_value(
-        ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],)
+        ct,
+        (CT_TOTAL_POWER_PAIR[0],),
+        (CT_TOTAL_POWER_PAIR[1],),
     )
     if total is not None:
         return total
@@ -3611,7 +3625,7 @@ def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
     # The EPS day view exposes one unlabeled x/y curve and cannot safely back
     # either directional total. Other period shapes have documented mappings.
     if section.startswith(APP_SECTION_EPS_STAT) and section.endswith(
-        f"_{DATE_TYPE_DAY}"
+        f"_{DATE_TYPE_DAY}",
     ):
         return None
 
@@ -3933,7 +3947,7 @@ def trend_series_has_value(  # ruff: ignore[too-many-return-statements]
         # empty envelope from ``code=0`` stays discarded — it carries neither a
         # unit nor a total, per docs/CODEMAPS/data.md.
         return bool(
-            unit_scale is not None and server_total is not None and server_total >= 0
+            unit_scale is not None and server_total is not None and server_total >= 0,
         )
 
     if any(safe_float(item) is not None for item in series):
@@ -3950,7 +3964,8 @@ def trend_series_has_value(  # ruff: ignore[too-many-return-statements]
 
 
 def task_plan_value(
-    task_plan: dict[str, Any], *keys: str
+    task_plan: dict[str, Any],
+    *keys: str,
 ) -> str | int | float | bool | None:  # primitive payload value
     """Retrieve the first non-None task-plan value.
 

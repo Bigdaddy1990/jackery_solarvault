@@ -441,13 +441,17 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: object) -> None:
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, True
+            self._device_id,
+            self._breaker_id,
+            True,
         )
 
     async def async_turn_off(self, **kwargs: object) -> None:
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, False
+            self._device_id,
+            self._breaker_id,
+            False,
         )
 
     def _build_breaker_device_info(
@@ -603,7 +607,7 @@ def _collect_smart_plug_switches(
     plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
     if not plugs:
         plugs = sorted_smart_plugs(
-            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
+            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET),
         )
     for index, plug in enumerate(plugs, start=1):
         serial = smart_plug_serial(plug)
@@ -646,7 +650,7 @@ def _collect_breaker_switches(
     breakers = sorted_circuits(payload.get(PAYLOAD_CIRCUIT_PROPERTY))
     if not breakers:
         breakers = sorted_circuits(
-            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_BREAKER)
+            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_BREAKER),
         )
     for index, breaker in enumerate(breakers, start=1):
         breaker_id = circuit_id(breaker)

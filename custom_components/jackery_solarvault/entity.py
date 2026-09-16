@@ -361,7 +361,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
                 self._system.get(FIELD_MAC),
                 self._discovery.get(FIELD_MAC),
                 self._device_meta.get(FIELD_MAC),
-            )
+            ),
         )
         if parent_mac is not None:
             info["connections"] = {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
@@ -491,7 +491,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
                     description,
                     "availability_uses_supervisor",
                     self.availability_uses_supervisor,
-                )
+                ),
             ),
         )
 
@@ -527,7 +527,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
                     command_sources=command_sources,
                     fields=fields,
                     supervisor_only=supervisor_only,
-                )
+                ),
             )
             if not transport_reachable:
                 return False

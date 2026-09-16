@@ -7,13 +7,12 @@ is exercised here. Lines targeted:
 - 1105-1136, 1228
 """
 
-from __future__ import annotations
-
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.config_flow import (
@@ -46,8 +45,10 @@ from custom_components.jackery_solarvault.const import (
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
 )
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.config_entries import ConfigEntryState
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
 
 _BASE_TIME = "2026-07-29T10:00:00Z"
 
@@ -57,7 +58,11 @@ _BASE_TIME = "2026-07-29T10:00:00Z"
 # =============================================================================
 
 
-def _make_entry(data: dict[str, Any] | None = None, options: dict[str, Any] | None = None, state: ConfigEntryState = ConfigEntryState.LOADED) -> ConfigEntry:
+def _make_entry(
+    data: dict[str, Any] | None = None,
+    options: dict[str, Any] | None = None,
+    state: ConfigEntryState = ConfigEntryState.LOADED,
+) -> ConfigEntry:
     return MockConfigEntry(
         entry_id="test",
         domain="domain",
@@ -88,7 +93,9 @@ def _fake_hass() -> SimpleNamespace:
 class TestEntryDataFromApiLogin:
     """Lines 212-250."""
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _entry_data_from_api_login behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
+    )
     def test_valid_login_returns_dict(self) -> None:
         api = MagicMock(spec=JackeryApi)
         api.region_code = "EU"
@@ -100,7 +107,9 @@ class TestEntryDataFromApiLogin:
         assert result["region_code"] == "EU"
         assert result["mqtt_session"] == {"broker": "emqx.jackeryapp.com"}
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _entry_data_from_api_login behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
+    )
     def test_valid_login_falls_back_to_existing_entry(self) -> None:
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
@@ -157,7 +166,9 @@ class TestCoerceLocalMqttPort:
             ["", 1883],
         ],
     )
-    def test_various_inputs_return_correct_port(self, value: Any, expected: int) -> None:
+    def test_various_inputs_return_correct_port(
+        self, value: Any, expected: int
+    ) -> None:
         assert _coerce_local_mqtt_port(value) == expected
 
 
@@ -197,7 +208,9 @@ class TestCoerceLocalMqttQos:
 class TestCurrentLocalMqttOptions:
     """Lines 303-394."""
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _current_local_mqtt_options behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+    )
     def test_entry_with_options_returns_them(self) -> None:
         entry = _make_entry(options={"key": "val"})
         result = _current_local_mqtt_options(entry)
@@ -206,23 +219,32 @@ class TestCurrentLocalMqttOptions:
         assert CONF_THIRD_PARTY_MQTT_ENABLE in result
         assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _current_local_mqtt_options behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+    )
     def test_entry_without_options_returns_defaults(self) -> None:
         entry = _make_entry(options=None)
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
         assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        )
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _current_local_mqtt_options behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+    )
     def test_entry_with_empty_options_returns_defaults(self) -> None:
         entry = _make_entry(options={})
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
 
-    @pytest.mark.skip("pre-existing: stale assertion against legacy _current_local_mqtt_options behavior")
+    @pytest.mark.skip(
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+    )
     def test_entry_id_is_ignored(self) -> None:
         entry = _make_entry(options={"key": "val"})
         entry.entry_id = "should_not_appear_in_result"
@@ -239,7 +261,9 @@ class TestCurrentLocalMqttOptions:
 class TestMergeLocalMqttOptions:
     """Lines 394-477."""
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_basic_merge(self) -> None:
         base = {"a": 1, "b": 2}
         update = {"b": 20, "c": 3}
@@ -256,7 +280,9 @@ class TestMergeLocalMqttOptions:
         assert CONF_THIRD_PARTY_MQTT_PASSWORD in result
         assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_none_update_returns_base_with_defaults(self) -> None:
         base = {"a": 1}
         result = _merge_local_mqtt_options(base, None)
@@ -266,11 +292,20 @@ class TestMergeLocalMqttOptions:
         assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
         assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        assert result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        assert result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        )
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_empty_update_returns_base_with_defaults(self) -> None:
         base = {"a": 1}
         result = _merge_local_mqtt_options(base, {})
@@ -280,18 +315,29 @@ class TestMergeLocalMqttOptions:
         assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
         assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        assert result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        assert result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        )
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_none_in_update_does_not_overwrite(self) -> None:
         base = {"a": 1}
         update = {"a": None}
         result = _merge_local_mqtt_options(base, update)
         assert result["a"] == 1
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_nested_dict_merge(self) -> None:
         base = {"a": {"x": 1, "y": 2}}
         update = {"a": {"y": 20, "z": 3}}
@@ -300,7 +346,9 @@ class TestMergeLocalMqttOptions:
         assert result["a"]["y"] == 20
         assert result["a"]["z"] == 3
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_nested_none_in_update_does_not_overwrite(self) -> None:
         base = {"a": {"x": 1}}
         update = {"a": None}
@@ -312,7 +360,9 @@ class TestMergeLocalMqttOptions:
         _merge_local_mqtt_options(base, {"a": 2})
         assert base["a"] == 1
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_new_keys_are_added_but_mqtt_keys_preserved(self) -> None:
         result = _merge_local_mqtt_options({}, {"new": 42})
         assert result["new"] == 42
@@ -321,9 +371,16 @@ class TestMergeLocalMqttOptions:
         assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
         assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        assert result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        assert result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+        )
+        assert (
+            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+        )
 
 
 # =============================================================================
@@ -334,25 +391,33 @@ class TestMergeLocalMqttOptions:
 class TestReconfigureOptions:
     """Lines 477-530."""
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_basic_reconfigure_returns_entry(self) -> None:
         entry = _make_entry()
         result = _reconfigure_options(entry)
         assert result is not None
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_entry_with_data_and_options(self) -> None:
         entry = _make_entry(data={"key": "val"}, options={"opt": "val"})
         result = _reconfigure_options(entry)
         assert result is not None
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_entry_with_no_options(self) -> None:
         entry = _make_entry(options=None)
         result = _reconfigure_options(entry)
         assert result is not None
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_entry_with_empty_options(self) -> None:
         entry = _make_entry(options={})
         result = _reconfigure_options(entry)
@@ -374,7 +439,9 @@ class TestJackeryOptionsFlow:
     def test_has_async_step_init_method(self) -> None:
         assert hasattr(JackeryOptionsFlow, "async_step_init")
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_has_required_attributes(self) -> None:
         flow = JackeryOptionsFlow()
         assert hasattr(flow, "config_entry")
@@ -404,7 +471,9 @@ class TestJackeryConfigFlow:
         assert hasattr(JackeryConfigFlow, "async_step_reauth_confirm")
         assert hasattr(JackeryConfigFlow, "async_step_accept_shared")
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_has_required_attributes(self) -> None:
         flow = JackeryConfigFlow()
         assert hasattr(flow, "hass")
@@ -425,18 +494,24 @@ class TestHelperFunctions:
         assert _normalize_account("\t\n test \t\n") == "test"
         assert _normalize_account("") == ""
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_current_option_values(self) -> None:
         entry = _make_entry(options={"key": "val"})
         result = _current_option_values(entry)
         assert result == {"key": "val"}
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_flow_options(self) -> None:
         result = _flow_options({"key": "val"})
         assert result == {"key": "val"}
 
-    @pytest.mark.skip(reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)")
+    @pytest.mark.skip(
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+    )
     def test_entry_text(self) -> None:
         assert _entry_text("test_key") == "test_key"
         assert _entry_text("") == ""

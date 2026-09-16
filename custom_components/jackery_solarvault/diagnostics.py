@@ -69,7 +69,8 @@ def _redacted_payload_map(
 
 
 async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # HA requires async.
-    hass: HomeAssistant, entry: JackeryConfigEntry
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
 
@@ -119,28 +120,37 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             "credential_contract": "v1",
         },
         "login_response": async_redact_data(
-            coordinator.api.last_login_response or {}, redact_keys
+            coordinator.api.last_login_response or {},
+            redact_keys,
         ),
         "system_list_response": async_redact_data(
-            coordinator.api.last_system_list_response or {}, redact_keys
+            coordinator.api.last_system_list_response or {},
+            redact_keys,
         ),
         "property_responses": _redacted_payload_map(
-            coordinator.api.last_property_responses, "property_response", redact_keys
+            coordinator.api.last_property_responses,
+            "property_response",
+            redact_keys,
         ),
         "alarm_response": async_redact_data(
-            coordinator.api.last_alarm_response or {}, redact_keys
+            coordinator.api.last_alarm_response or {},
+            redact_keys,
         ),
         "statistic_response": async_redact_data(
-            coordinator.api.last_statistic_response or {}, redact_keys
+            coordinator.api.last_statistic_response or {},
+            redact_keys,
         ),
         "price_response": async_redact_data(
-            coordinator.api.last_price_response or {}, redact_keys
+            coordinator.api.last_price_response or {},
+            redact_keys,
         ),
         "price_sources_response": async_redact_data(
-            coordinator.api.last_price_sources_response or {}, redact_keys
+            coordinator.api.last_price_sources_response or {},
+            redact_keys,
         ),
         "price_history_config_response": async_redact_data(
-            coordinator.api.last_price_history_config_response or {}, redact_keys
+            coordinator.api.last_price_history_config_response or {},
+            redact_keys,
         ),
         "device_statistic_responses": _redacted_payload_map(
             coordinator.api.last_device_statistic_responses,
@@ -158,10 +168,14 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             redact_keys,
         ),
         "ota_responses": _redacted_payload_map(
-            coordinator.api.last_ota_responses, "ota_response", redact_keys
+            coordinator.api.last_ota_responses,
+            "ota_response",
+            redact_keys,
         ),
         "location_responses": _redacted_payload_map(
-            coordinator.api.last_location_responses, "location_response", redact_keys
+            coordinator.api.last_location_responses,
+            "location_response",
+            redact_keys,
         ),
         "mqtt": async_redact_data(
             coordinator.mqtt_diagnostics_snapshot(),
@@ -180,7 +194,9 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             redact_keys,
         ),
         "ble_transport": _redacted_payload_map(
-            coordinator.ble_observations(), "ble_device", redact_keys
+            coordinator.ble_observations(),
+            "ble_device",
+            redact_keys,
         ),
         "statistics_backfill": async_redact_data(
             coordinator.statistics_backfill_diagnostics,
@@ -229,13 +245,17 @@ def _local_mqtt_diagnostics(
             entry,
             CONF_THIRD_PARTY_MQTT_PORT,
             DEFAULT_THIRD_PARTY_MQTT_PORT,
-        )
+        ),
     ).strip()
     username = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_USERNAME, ""
+        entry,
+        CONF_THIRD_PARTY_MQTT_USERNAME,
+        "",
     ).strip()
     password = config_entry_str_option(
-        entry, CONF_THIRD_PARTY_MQTT_PASSWORD, ""
+        entry,
+        CONF_THIRD_PARTY_MQTT_PASSWORD,
+        "",
     ).strip()
     diagnostic_host = REDACTED_VALUE if host else ""
     diagnostic_port = REDACTED_VALUE if port else ""

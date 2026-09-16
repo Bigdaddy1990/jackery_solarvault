@@ -384,7 +384,7 @@ class JackeryApiError(JackeryError):
     def unexpected_content_type(cls, media_type: str) -> JackeryApiError:
         """Build an error for a non-JSON response media type."""
         return cls(
-            f"Unexpected Content-Type {media_type or "(missing)"}; expected JSON"
+            f"Unexpected Content-Type {media_type or "(missing)"}; expected JSON",
         )
 
     @classmethod
@@ -1040,7 +1040,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 body={"form_fields": sorted(form_body)},
                 status=200,
                 response=redacted,
-            )
+            ),
         )
 
         if self._extract_code(data) != CODE_OK:
@@ -1325,7 +1325,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """
         async with self._lock:
             token_was_refreshed = bool(
-                self._token is not None and self._token != token_used
+                self._token is not None and self._token != token_used,
             )
             if not token_was_refreshed:
                 if not self._auto_relogin_allowed():
@@ -1465,7 +1465,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                     status=status,
                     data=data,
                     retry_transport_once=retry_transport_once,
-                )
+                ),
             )
         if status != HTTPStatus.OK:
             msg = f"{method} {path} HTTP {status}"
@@ -1493,7 +1493,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 await result
         except Exception as err:
             _LOGGER.debug(
-                "Jackery auth rejection callback failed: %s", err, exc_info=True
+                "Jackery auth rejection callback failed: %s",
+                err,
+                exc_info=True,
             )
 
     async def _emit_payload_debug(
@@ -1519,7 +1521,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             Exception
         ) as err:  # best-effort debug logging must never break the API path
             _LOGGER.debug(
-                "Jackery payload debug logging failed: %s", err, exc_info=True
+                "Jackery payload debug logging failed: %s",
+                err,
+                exc_info=True,
             )
 
     @staticmethod
@@ -1566,7 +1570,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                     result[key] = REDACTED_VALUE
                 else:
                     result[key] = JackeryApi._redact_http_diagnostic(
-                        item, depth=depth + 1
+                        item,
+                        depth=depth + 1,
                     )
             return result
         if isinstance(value, list | tuple):
@@ -1576,7 +1581,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             ]
             if len(value) > _HTTP_DIAGNOSTIC_MAX_ITEMS:
                 items.append(
-                    f"<truncated {len(value) - _HTTP_DIAGNOSTIC_MAX_ITEMS} items>"
+                    f"<truncated {len(value) - _HTTP_DIAGNOSTIC_MAX_ITEMS} items>",
                 )
             return items
         if isinstance(value, str):
@@ -1585,7 +1590,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 return value
             return (
                 encoded[: _HTTP_POLICY.diagnostic_bytes].decode(
-                    "utf-8", errors="ignore"
+                    "utf-8",
+                    errors="ignore",
                 )
                 + "<truncated>"
             )
@@ -1595,7 +1601,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
     @staticmethod
     def _coalesced_day_stat_copy(
-        data: dict[str, Any], date_type: str
+        data: dict[str, Any],
+        date_type: str,
     ) -> dict[str, Any]:
         """Return a diagnostics copy of a day-stat response with invalid gaps.
 
@@ -1896,7 +1903,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def async_get_alarm(self, system_id: str | int) -> object:
         """GET /v1/api/alarm — alarm list for a system."""
         data = await self._get_json(
-            ALARM_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            ALARM_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_alarm_response = data
         return data.get(FIELD_DATA)
@@ -1912,7 +1920,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             totalGeneration, totalRevenue, totalCarbon, isSetPrice
         """
         data = await self._get_json(
-            SYSTEM_STATISTIC_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            SYSTEM_STATISTIC_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_statistic_response = data
         return self._payload_dict(data, SYSTEM_STATISTIC_PATH)
@@ -1927,7 +1936,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """GET the app-version-compatible system PV historical curves."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -1954,13 +1965,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def async_get_power_price(self, system_id: str | int) -> dict[str, Any]:
         """GET /v1/device/dynamic/powerPriceConfig — tariff config."""
         data = await self._get_json(
-            POWER_PRICE_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            POWER_PRICE_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_response = data
         return self._payload_dict(data, POWER_PRICE_PATH)
 
     async def async_get_price_sources(
-        self, system_id: str | int
+        self,
+        system_id: str | int,
     ) -> list[dict[str, Any]]:
         """GET /v1/device/dynamic/priceCompany — dynamic-price providers.
 
@@ -1970,13 +1983,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             item fields: platformCompanyId, cid, country, companyName, loginAllowed
         """
         data = await self._get_json(
-            PRICE_SOURCE_LIST_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            PRICE_SOURCE_LIST_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_sources_response = data
         return self._payload_list(data, PRICE_SOURCE_LIST_PATH)
 
     async def async_get_price_history_config(
-        self, system_id: str | int
+        self,
+        system_id: str | int,
     ) -> dict[str, Any]:
         """Retrieve the price history configuration for the specified system.
 
@@ -1987,7 +2002,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             missing or not a dict.
         """
         data = await self._get_json(
-            PRICE_HISTORY_CONFIG_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            PRICE_HISTORY_CONFIG_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
         )
         self.last_price_history_config_response = data
         return self._payload_dict(data, PRICE_HISTORY_CONFIG_PATH)
@@ -2006,7 +2022,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             dict: Mapping of statistic keys to their values as strings in kWh.
         """
         data = await self._get_json(
-            DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_STATISTIC_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
@@ -2041,7 +2058,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         # month/year with today..today can return day-like partial totals.
         date_type = query.date_type
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=query.begin_date, end_date=query.end_date
+            date_type,
+            begin_date=query.begin_date,
+            end_date=query.end_date,
         )
         params: dict[str, str] = {
             FIELD_DEVICE_ID: str(device_id),
@@ -2217,7 +2236,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         GET /v1/device/stat/meter
         """
         data = await self._get_json(
-            DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_METER_STAT_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_device_period_stat_responses[
             f"{DEVICE_METER_STAT_PATH}:{device_id}:panel"
@@ -2298,7 +2318,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             item is found.
         """
         data = await self._get_json(
-            OTA_LIST_PATH, params={FIELD_DEVICE_SN_LIST: device_sn}
+            OTA_LIST_PATH,
+            params={FIELD_DEVICE_SN_LIST: device_sn},
         )
         self.last_ota_responses[device_sn] = data
         raw = data.get(FIELD_DATA)
@@ -2352,7 +2373,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         GET /v1/device/location
         """
         data = await self._get_json(
-            LOCATION_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            LOCATION_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         self.last_location_responses[str(device_id)] = data
         return self._payload_dict(data, LOCATION_PATH)
@@ -2935,7 +2957,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """GET /v1/device/stat/sys/home/trends — home consumption breakdown."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -2962,7 +2986,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """GET /v1/device/stat/sys/battery/trends — battery charge/discharge history."""
         begin_date, end_date = app_period_date_bounds(
-            date_type, begin_date=begin_date, end_date=end_date
+            date_type,
+            begin_date=begin_date,
+            end_date=end_date,
         )
         params = {
             FIELD_SYSTEM_ID: str(system_id),
@@ -3654,7 +3680,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         return self._payload_dict(data, ACCESSORIES_PATH)
 
     async def async_remove_accessory(
-        self, *, accessory_id: str | int
+        self,
+        *,
+        accessory_id: str | int,
     ) -> dict[str, Any]:
         """Remove one smart accessory by its backend identifier."""
         data = await self._delete_json(
@@ -4130,7 +4158,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             {
                 "pendingAgreeVersionIds": [
                     int(version_id) for version_id in pending_agree_version_ids
-                ]
+                ],
             },
         )
 
@@ -4388,12 +4416,14 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 body=payload,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     async def async_set_system_name(
-        self, system_id: str | int, system_name: str
+        self,
+        system_id: str | int,
+        system_name: str,
     ) -> bool:
         """Rename the specified system to the given name.
 
@@ -4514,7 +4544,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 body=debug_body,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
@@ -4677,14 +4707,17 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 body=payload,
                 status=status,
                 response=data,
-            )
+            ),
         )
         return data
 
     async def _post_json(
-        self, path: str, payload: dict[str, Any]
+        self,
+        path: str,
+        payload: dict[str, Any],
     ) -> dict[
-        str, Any
+        str,
+        Any,
     ]:  # linear re-login ladder; splitting would thread session state through helpers
         """Generic JSON-body POST with auto re-login on expiry."""
         token_used = await self._ensure_token()
