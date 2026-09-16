@@ -147,7 +147,7 @@ def _discovery_coordinator(*, systems: list[Any]) -> JackerySolarVaultCoordinato
     )
     mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
     mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _home_power_sensor(
@@ -168,6 +168,7 @@ def _home_power_sensor(
     mutable._device_id = dev_id  # ruff: ignore[private-member-access]
     mutable._attr_unique_id = f"{dev_id}_{description.key}"  # ruff: ignore[private-member-access]
     mutable.entity_description = description
+    # pyrefly: ignore [no-any-return-implicit]
     return sensor
 
 

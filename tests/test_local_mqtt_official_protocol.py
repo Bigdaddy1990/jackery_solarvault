@@ -36,7 +36,7 @@ def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 @pytest.mark.parametrize(
@@ -52,9 +52,12 @@ def test_unidentified_local_frames_cannot_claim_the_only_jackery(
 ) -> None:
     """A shared broker cannot assign unrelated traffic to the sole known host."""
     coordinator = _coordinator_shell()
-    assert coordinator._mqtt_route_context(
-        "homeassistant/sensor/esp32/ip/config", payload, TransportSource.LOCAL_MQTT
-    ) is None
+    assert (
+        coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
+            "homeassistant/sensor/esp32/ip/config", payload, TransportSource.LOCAL_MQTT
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio()
@@ -217,5 +220,7 @@ async def test_local_poll_publishes_official_request_family() -> None:
         for call in calls
         if call.args[1]["type"] == 100  # ruff: ignore[magic-value-comparison]
     ] == [1, 2, 5, 6]
-    assert all(call.args[0] == f"hb/app/user123/device/{_DEVICE_SN}/action" for call in calls)
+    assert all(
+        call.args[0] == f"hb/app/user123/device/{_DEVICE_SN}/action" for call in calls
+    )
     assert all(call.args[1]["token"] == _TOKEN for call in calls)

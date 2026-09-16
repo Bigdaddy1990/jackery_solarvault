@@ -32,6 +32,7 @@ class MockJackeryApi(JackeryApi):
         )
         self.captured_params: dict[str, dict[str, str]] = {}
 
+    # pyrefly: ignore [bad-override]
     async def _get_json(self, path: str, params: dict[str, str]) -> dict[str, Any]:
         self.captured_params[path] = params
         return {"code": 0, "data": {"x": [], "y": [], "y1": [], "y2": []}}

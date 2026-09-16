@@ -57,7 +57,7 @@ def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoor
     obj._shutdown_started = False  # ruff: ignore[private-member-access]
     obj.data = data or {}
     obj._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 class TestTransportIsolationMatrix:

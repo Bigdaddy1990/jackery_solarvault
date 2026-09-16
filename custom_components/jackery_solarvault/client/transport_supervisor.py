@@ -4,8 +4,6 @@ Each transport (BLE, Cloud MQTT, Local MQTT) gets its own supervisor with
 independent lifecycle, reconnect logic, and credential management.
 """
 
-from __future__ import annotations
-
 import asyncio
 import contextlib
 from dataclasses import dataclass

@@ -3631,7 +3631,7 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
 
 
 @callback
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # ruff: ignore[unused-async]
     """Register the integration's domain-scoped Home Assistant services.
 
     Bind each service to its handler.

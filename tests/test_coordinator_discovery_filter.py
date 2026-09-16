@@ -49,7 +49,7 @@ def _discovery_coordinator(
     mutable = cast("Any", coordinator)
     mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
     mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() -> None:

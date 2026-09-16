@@ -41,6 +41,7 @@ def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
     obj._http_request_semaphore = asyncio.Semaphore(1)  # ruff: ignore[private-member-access]
     obj.api = MagicMock()
     obj.async_request_refresh = AsyncMock()
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

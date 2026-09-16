@@ -78,7 +78,12 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
         "async_step_zeroconf": mock_zeroconf,
     }
 
-    for method_name in ("async_step_bluetooth", "async_step_dhcp", "async_step_mqtt", "async_step_zeroconf"):
+    for method_name in (
+        "async_step_bluetooth",
+        "async_step_dhcp",
+        "async_step_mqtt",
+        "async_step_zeroconf",
+    ):
         flow = _flow()
         with patch.object(
             flow,
@@ -158,7 +163,7 @@ async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
             AsyncMock(return_value=user_result),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")
+        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
 
     assert result == user_result
     abort_guard.assert_called_once_with()
@@ -190,7 +195,7 @@ async def test_route_discovery_to_user_short_circuits_on_duplicate() -> None:
             AsyncMock(return_value={"type": FlowResultType.FORM}),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")
+        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
 
     assert result == abort_result
     assert "title_placeholders" not in flow.context
@@ -215,6 +220,7 @@ async def _discovered_name(method_name: str, discovery_info: SimpleNamespace) ->
     ):
         await getattr(flow, method_name)(discovery_info)
 
+    # pyrefly: ignore [missing-attribute]
     return cast("str", router.await_args.args[0])
 
 
@@ -292,7 +298,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[object()]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        result = flow._async_abort_duplicate_discovery()
+        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -303,7 +309,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[object()]),
     ):
-        result = flow._async_abort_duplicate_discovery()
+        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -314,7 +320,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        assert flow._async_abort_duplicate_discovery() is None
+        assert flow._async_abort_duplicate_discovery() is None  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()

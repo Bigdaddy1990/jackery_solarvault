@@ -60,7 +60,7 @@ def _stat_sensor() -> JackeryStatSensor:
     mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
     mutable._cached_last_reset = sensor._compute_period_start(description.reset_period)  # ruff: ignore[private-member-access]
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
-    return sensor
+    return sensor  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_stat_entity_does_not_clamp_negative_period_values() -> None:
@@ -759,7 +759,7 @@ def _period_sensor(reset_period: str) -> JackeryStatSensor:
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
     mutable._cached_source_section = description.section  # ruff: ignore[private-member-access]
     mutable._cached_last_reset = sensor._compute_period_start(cast("Any", reset_period))  # ruff: ignore[private-member-access]
-    return sensor
+    return sensor  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_week_period_sensor_is_total_with_last_reset() -> None:

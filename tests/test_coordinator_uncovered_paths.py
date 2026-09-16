@@ -12,8 +12,8 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     BackfillStatus,
-    _backfill_period_is_closed,
-    _normalize_backfill_status,
+    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
+    _normalize_backfill_status,  # ruff: ignore[import-private-name]
     changed_dict_values,
     find_dict_with_any_key,
     find_list_for_key,
@@ -92,7 +92,7 @@ class TestNormalizeBackfillStatus:
         assert result == BackfillStatus.PENDING
 
     def test_unknown_closed_maps_to_pending(self) -> None:  # ruff: ignore[no-self-use]
-        """Unknown values return PENDING even when closed (not in known retryable list)."""
+        """Unknown values return PENDING even when closed (not in known retryable list)."""  # ruff: ignore[line-too-long]
         result = _normalize_backfill_status("unknown", closed=True)
         assert result == BackfillStatus.PENDING
 
@@ -153,26 +153,26 @@ class TestMergeMissingDictValuesAdditional:
         base = {"device": {"soc": 50}}
         updates = {"device": {"temp": 25}}
         result = merge_missing_dict_values(base, updates)
-        assert result["device"]["soc"] == 50
-        assert result["device"]["temp"] == 25
+        assert result["device"]["soc"] == 50  # ruff: ignore[magic-value-comparison]
+        assert result["device"]["temp"] == 25  # ruff: ignore[magic-value-comparison]
 
     def test_does_not_overwrite_existing(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"device": {"soc": 50}}
         updates = {"device": {"soc": 60, "temp": 25}}
         result = merge_missing_dict_values(base, updates)
-        assert result["device"]["soc"] == 50
-        assert result["device"]["temp"] == 25
+        assert result["device"]["soc"] == 50  # ruff: ignore[magic-value-comparison]
+        assert result["device"]["temp"] == 25  # ruff: ignore[magic-value-comparison]
 
 
 class TestFindDictWithAnyKeyAdditional:
     """Additional tests for find_dict_with_any_key."""
 
     def test_returns_none_for_none_input(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        result = find_dict_with_any_key(None, {"deviceSn"})
+        result = find_dict_with_any_key(None, {"deviceSn"})  # pyrefly: ignore [bad-argument-type]
         assert result is None
 
     def test_returns_none_for_number_input(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        result = find_dict_with_any_key(123, {"deviceSn"})
+        result = find_dict_with_any_key(123, {"deviceSn"})  # pyrefly: ignore [bad-argument-type]
         assert result is None
 
 

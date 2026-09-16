@@ -62,7 +62,9 @@ def test_no_changes_never_launch_checks_and_missing_baseline_is_reported() -> No
             assert len(list((root / ".claude-flow/task-quality").glob("*.json"))) == 1
 
 
-@pytest.mark.skip(reason="test internals: tests hook implementation details (snapshot/snapshot diff) that changed with symlink/deleted-file refactor")
+@pytest.mark.skip(
+    reason="test internals: tests hook implementation details (snapshot/snapshot diff) that changed with symlink/deleted-file refactor"
+)
 def test_autofix_rechecked_and_real_tests_run_with_backup() -> None:
     """Recheck fixes and retain originals before launching tests."""
     with tempfile.TemporaryDirectory() as directory:
@@ -166,7 +168,9 @@ def test_symlink_replacement_never_copies_or_fixes_external_file() -> None:
         assert secret.read_text() == "private = 1\n"
 
 
-@pytest.mark.skip(reason="test internals: tests hook implementation details (deleted-file handling) that changed with deleted-file refactor")
+@pytest.mark.skip(
+    reason="test internals: tests hook implementation details (deleted-file handling) that changed with deleted-file refactor"
+)
 def test_precommit_runs_for_deleted_path_without_retrying_unchanged_failure() -> None:
     """Run pre-commit for deletions and retry only after an actual fix."""
     with tempfile.TemporaryDirectory() as directory:
@@ -177,7 +181,7 @@ def test_precommit_runs_for_deleted_path_without_retrying_unchanged_failure() ->
             def __init__(self, args: list[str], **kwargs: object) -> None:
                 calls.append(args)
 
-            def wait(self, timeout: int | None = None) -> int:
+            def wait(self, timeout: int | None = None) -> int:  # ruff: ignore[no-self-use]
                 return 1 if "--files" in calls[-1] else 0
 
         with (

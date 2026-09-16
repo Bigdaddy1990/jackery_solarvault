@@ -92,6 +92,7 @@ async def test_integration_setup_creates_expected_entities(
     entry = await _setup_entry(hass, mock_jackery_login)
 
     # Verify coordinator is initialized
+    # pyrefly: ignore [missing-attribute]
     coordinator = entry.runtime_data
     assert coordinator is not None
 
@@ -99,6 +100,7 @@ async def test_integration_setup_creates_expected_entities(
     from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
+    # pyrefly: ignore [missing-attribute]
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert len(entities) > 0
 
@@ -223,17 +225,21 @@ async def test_integration_unload_removes_entities(
     from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
+    # pyrefly: ignore [missing-attribute]
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert len(entities_before) > 0
     entity_ids_before = {entity.entity_id for entity in entities_before}
 
     # Unload
+    # pyrefly: ignore [missing-attribute]
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
+    # pyrefly: ignore [missing-attribute]
     assert entry.state == ConfigEntryState.NOT_LOADED
 
     # Home Assistant deliberately retains registry entries across unload/reload
     # so entity IDs and user customizations remain stable. Runtime states vanish.
+    # pyrefly: ignore [missing-attribute]
     entities_after = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     assert {entity.entity_id for entity in entities_after} == entity_ids_before
     states_after = [hass.states.get(entity_id) for entity_id in entity_ids_before]
@@ -253,6 +259,7 @@ async def test_reload_integration_preserves_entities(
     from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
+    # pyrefly: ignore [missing-attribute]
     entities_before = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     entity_ids_before = {e.entity_id for e in entities_before}
     assert len(entity_ids_before) > 0
@@ -285,11 +292,14 @@ async def test_reload_integration_preserves_entities(
             AsyncMock(return_value=None),
         ),
     ):
+        # pyrefly: ignore [missing-attribute]
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
+    # pyrefly: ignore [missing-attribute]
     assert entry.state == ConfigEntryState.LOADED
 
     # Entities should still exist with same IDs
+    # pyrefly: ignore [missing-attribute]
     entities_after = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
     entity_ids_after = {e.entity_id for e in entities_after}
     assert entity_ids_after == entity_ids_before
@@ -321,6 +331,7 @@ async def test_integration_with_multiple_devices(
     from homeassistant.helpers import entity_registry as er  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     ent_reg = er.async_get(hass)
+    # pyrefly: ignore [missing-attribute]
     entities = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
 
     # Should have entities for both devices

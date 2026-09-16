@@ -77,6 +77,7 @@ def _number(key: str, data: dict[str, Any]) -> JackeryNumber:
     mutable.coordinator = _coordinator(data)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 

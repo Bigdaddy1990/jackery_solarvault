@@ -89,34 +89,52 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[
     JackeryBinaryDescription | JackerySubdeviceAlarmBinarySensorDescription, ...
 ] = (
     JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="online",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="online",
+        # pyrefly: ignore [unexpected-keyword]
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
         value_fn=lambda e: e.device_meta.get(FIELD_ONLINE_STATUS),
     ),
     JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="eps_active",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="eps_active",
+        # pyrefly: ignore [unexpected-keyword]
         device_class=BinarySensorDeviceClass.RUNNING,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
         value_fn=lambda e: e.merged_properties.get(FIELD_SW_EPS_STATE),
         required_property_keys=(FIELD_SW_EPS_STATE,),
     ),
     JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="eth_connected",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="eth_connected",
+        # pyrefly: ignore [unexpected-keyword]
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
         value_fn=lambda e: e.merged_properties.get(FIELD_ETH_PORT),
         required_property_keys=(FIELD_ETH_PORT,),
     ),
     JackerySubdeviceAlarmBinarySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="alarm",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="subdevice_alarm",
+        # pyrefly: ignore [unexpected-keyword]
         device_class=BinarySensorDeviceClass.SAFETY,
         field=FIELD_ALERT_COUNT,
         value_fn=lambda e: (

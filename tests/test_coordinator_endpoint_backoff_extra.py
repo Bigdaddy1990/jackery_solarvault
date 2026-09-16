@@ -41,7 +41,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._endpoint_backoff = {}  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _due_coordinator() -> JackerySolarVaultCoordinator:

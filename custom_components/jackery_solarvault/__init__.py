@@ -2583,7 +2583,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
             # Propagate immediately available auth/cancellation failures while
             # never waiting for network I/O on a cache-backed reload.
             await asyncio.sleep(0)
+            # pyrefly: ignore [missing-attribute]
             if cached_http_startup.done():
+                # pyrefly: ignore [missing-attribute]
                 cached_http_startup.result()
         if not cache_ready:
             try:

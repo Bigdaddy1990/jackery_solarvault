@@ -17,7 +17,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from custom_components.jackery_solarvault.diagnostics import _local_mqtt_diagnostics
+from custom_components.jackery_solarvault.diagnostics import _local_mqtt_diagnostics  # ruff: ignore[import-private-name]
 from custom_components.jackery_solarvault.ingest import (
     allow_periodic_section_from_source,
     ingest_observation,
@@ -336,7 +336,7 @@ def test_fresh_layer5_nested_value_rejects_redundant_http_snapshot() -> None:
     assert result.accepted_fields == frozenset()
 
 
-def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:
+def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:  # ruff: ignore[any-type]
     """Return the minimal config-entry surface used by diagnostics."""
     return SimpleNamespace(
         data={},
@@ -355,7 +355,10 @@ def test_local_mqtt_diagnostics_reports_coordinator_not_ready() -> None:
             "Any",
             _entry(
                 object(),
-                {CONF_THIRD_PARTY_MQTT_ENABLE: True, CONF_THIRD_PARTY_MQTT_IP: "broker"},
+                {
+                    CONF_THIRD_PARTY_MQTT_ENABLE: True,
+                    CONF_THIRD_PARTY_MQTT_IP: "broker",
+                },
             ),
         ),
     )
@@ -394,7 +397,10 @@ def test_local_mqtt_diagnostics_reports_missing_started_client(
             "Any",
             _entry(
                 coordinator,
-                {CONF_THIRD_PARTY_MQTT_ENABLE: True, CONF_THIRD_PARTY_MQTT_IP: "broker"},
+                {
+                    CONF_THIRD_PARTY_MQTT_ENABLE: True,
+                    CONF_THIRD_PARTY_MQTT_IP: "broker",
+                },
             ),
         ),
     )

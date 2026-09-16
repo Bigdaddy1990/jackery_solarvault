@@ -12,6 +12,7 @@ _COMPONENT = Path(__file__).parents[1] / "custom_components" / "jackery_solarvau
 
 
 def _translation(filename: str) -> dict:
+    # pyrefly: ignore [no-any-return-explicit]
     return json.loads((_COMPONENT / filename).read_text(encoding="utf-8"))
 
 

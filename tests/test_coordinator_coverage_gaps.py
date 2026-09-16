@@ -187,6 +187,7 @@ class TestMqttConnectionManagerCoverageGaps:
         """record_connect_success returns early when mqtt is None (line 1380)."""
         mgr = MqttConnectionManager()
         # Should not raise, just return
+        # pyrefly: ignore [bad-argument-type]
         mgr.record_connect_success(None, ("client", "host", "session"))
         # State unchanged
         assert mgr.fingerprint is None

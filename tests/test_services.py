@@ -85,6 +85,7 @@ def _service_call(data: dict[str, object]) -> ServiceCall:
     return cast("ServiceCall", _Call(data))
 
 
+# pyrefly: ignore [deprecated]
 @contextmanager
 def _ignore_private() -> Iterator[None]:
     """Mark deliberate private service-helper access in tests.
@@ -1115,6 +1116,7 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
         "error": "ack_timeout must be a number",
     }
 
+
 # ---------------------------------------------------------------------------
 # Pure coercion / validation helpers — exercise every branch
 # ---------------------------------------------------------------------------
@@ -1264,6 +1266,7 @@ def test_json_native_body_rejects_non_string_keys() -> None:
 def test_json_native_body_rejects_non_dict_body() -> None:
     """A list body is redacted and rejected."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        # pyrefly: ignore [bad-argument-type]
         services._json_native_body([1], "dev")  # ruff: ignore[private-member-access]
     assert err.value.translation_key == "send_ble_command_failed"
     assert "**REDACTED**" in err.value.translation_placeholders["error"]
@@ -1297,8 +1300,9 @@ def test_ble_body_rejects_non_container_value() -> None:
     """Integers are neither mapping nor JSON string."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._ble_body_from_service(42, "dev")  # ruff: ignore[private-member-access]
-    assert "must be a mapping or JSON object string" in (
-        err.value.translation_placeholders["error"]
+    assert (
+        "must be a mapping or JSON object string"
+        in (err.value.translation_placeholders["error"])
     )
 
 
@@ -1331,8 +1335,9 @@ def test_tou_tasks_rejects_non_dict_task() -> None:
     """Tasks must be JSON objects."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._tou_tasks_from_service(["string"], "dev")  # ruff: ignore[private-member-access]
-    assert "each TOU task must be a JSON object" in (
-        err.value.translation_placeholders["error"]
+    assert (
+        "each TOU task must be a JSON object"
+        in (err.value.translation_placeholders["error"])
     )
 
 
@@ -1396,8 +1401,9 @@ def test_service_required_text_rejects_overlong() -> None:
         services._service_required_text(  # ruff: ignore[private-member-access]
             "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "f must be at most 10 characters" in (
-        err.value.translation_placeholders["error"]
+    assert (
+        "f must be at most 10 characters"
+        in (err.value.translation_placeholders["error"])
     )
 
 
@@ -1440,8 +1446,9 @@ def test_service_optional_text_rejects_overlong() -> None:
         services._service_optional_text(  # ruff: ignore[private-member-access]
             "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "f must be at most 10 characters" in (
-        err.value.translation_placeholders["error"]
+    assert (
+        "f must be at most 10 characters"
+        in (err.value.translation_placeholders["error"])
     )
 
 
@@ -1504,8 +1511,9 @@ def test_service_float_rejects_out_of_range(raw: object) -> None:
             device_id="d",
             bounds=(1.0, 10.0),
         )
-    assert "f must be between 1.0 and 10.0" in (
-        err.value.translation_placeholders["error"]
+    assert (
+        "f must be between 1.0 and 10.0"
+        in (err.value.translation_placeholders["error"])
     )
 
 
@@ -1520,8 +1528,9 @@ def test_service_float_rejects_non_number() -> None:
 
 def test_reject_json_constant_names_the_constant() -> None:
     """The constant name is part of the rejection message."""
-    with pytest.raises(ValueError, match="invalid JSON constant: NaN"), (
-        _ignore_private()
+    with (
+        pytest.raises(ValueError, match="invalid JSON constant: NaN"),
+        _ignore_private(),
     ):
         services._reject_json_constant("NaN")  # ruff: ignore[private-member-access]
 
@@ -1649,9 +1658,7 @@ def test_is_portable_device_false_for_home_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Home-payload evidence always outranks portable classification."""
-    monkeypatch.setattr(
-        services, "_payload_has_home_payload_evidence", lambda _p: True
-    )
+    monkeypatch.setattr(services, "_payload_has_home_payload_evidence", lambda _p: True)
     assert services._is_portable_device(_fake_coordinator({}), "dev1") is False  # ruff: ignore[private-member-access]
 
 
@@ -1663,11 +1670,11 @@ def test_is_portable_device_true_for_legacy_bind_list(
     monkeypatch.setattr(
         services, "_payload_has_home_payload_evidence", lambda _p: False
     )
-    coordinator = _fake_coordinator(
-        {"dev1": {section: {PAYLOAD_DISCOVERY_SOURCE: (
-            DISCOVERY_SOURCE_LEGACY_BIND_LIST
-        )}}}
-    )
+    coordinator = _fake_coordinator({
+        "dev1": {
+            section: {PAYLOAD_DISCOVERY_SOURCE: (DISCOVERY_SOURCE_LEGACY_BIND_LIST)}
+        }
+    })
     assert services._is_portable_device(coordinator, "dev1") is True  # ruff: ignore[private-member-access]
 
 
@@ -1678,9 +1685,9 @@ def test_is_portable_device_false_for_other_source(
     monkeypatch.setattr(
         services, "_payload_has_home_payload_evidence", lambda _p: False
     )
-    coordinator = _fake_coordinator(
-        {"dev1": {PAYLOAD_DEVICE: {PAYLOAD_DISCOVERY_SOURCE: "cloud_bind"}}}
-    )
+    coordinator = _fake_coordinator({
+        "dev1": {PAYLOAD_DEVICE: {PAYLOAD_DISCOVERY_SOURCE: "cloud_bind"}}
+    })
     assert services._is_portable_device(coordinator, "dev1") is False  # ruff: ignore[private-member-access]
 
 
@@ -1742,12 +1749,10 @@ def test_loaded_coordinators_keeps_only_typed_runtime_data(
         SimpleNamespace(),
     ]
     hass = SimpleNamespace(
-        config_entries=SimpleNamespace(
-            async_loaded_entries=lambda _domain: entries
-        )
+        config_entries=SimpleNamespace(async_loaded_entries=lambda _domain: entries)
     )
     with _ignore_private():
-        result = services._loaded_coordinators(cast("HomeAssistant", hass))
+        result = services._loaded_coordinators(cast("HomeAssistant", hass))  # ruff: ignore[private-member-access]
     assert result == [coordinator]
 
 
@@ -1758,6 +1763,7 @@ async def test_get_share_qr_code_returns_response_envelope(
     coordinator = _fake_coordinator({"dev1": {}})
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, raw: raw)
     monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    # pyrefly: ignore [missing-attribute]
     coordinator.async_get_share_qr_code = AsyncMock(
         return_value={FIELD_QR_CODE_ID: "qr-1", FIELD_USER_ID: "user-1"}
     )
@@ -1783,7 +1789,7 @@ def test_coordinator_for_system_skips_payload_without_system(
     coordinator = _fake_coordinator({"dev1": {}})
     monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
     with _ignore_private():
-        assert services._coordinator_for_system(_test_hass(), "sys1") is None
+        assert services._coordinator_for_system(_test_hass(), "sys1") is None  # ruff: ignore[private-member-access]
 
 
 async def test_setup_services_is_idempotent(
