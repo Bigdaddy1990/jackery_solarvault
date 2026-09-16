@@ -1,44 +1,56 @@
 ```
-# Dependencies
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
-.env.local
-.env.*
-
-# Build/dist directories
-build/
-dist/
-*.egg-info/
-
-# Testing
-.coverage
-htmlcov/
-.coverage.*
-.noserc
-.tox/
-
-# Virtual environments
+.Python
+env/
 venv/
 .venv/
-env/
-.ENV/
+.ENV
+.python-version
+.pytest_cache/
+.mypy_cache/
 
-# IDE
+# Dependencies
+requirements.txt.bak
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+*.dylib
+*.dll
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
 # Coverage
+.coverage
 coverage/
+htmlcov/
+
+# Environment
+.env
+.env.local
+*.env
+*.env.*
 ```
