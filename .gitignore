@@ -4,45 +4,41 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-venv/
-.venv/
 .env
 .env.local
 .env.*
-.env~*
-requirements*.txt
-poetry.lock
-Pipfile.lock
-.tox/
-.coverage
-.coverage.*
-.nox/
-.mypy_cache/
-.pytest_cache/
-.hypothesis/
 
-# Build artifacts
-dist/
+# Build/dist directories
 build/
+dist/
 *.egg-info/
-.installed.cfg
-*.egg
-target/
 
-# Logs
-*.log
+# Testing
+.coverage
+htmlcov/
+.coverage.*
+.noserc
+.tox/
 
-# Editor/IDE
+# Virtual environments
+venv/
+.venv/
+env/
+.ENV/
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# OS
 .DS_Store
 Thumbs.db
 
+# Logs
+*.log
+
 # Coverage
 coverage/
-htmlcov/
 ```

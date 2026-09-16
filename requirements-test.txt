@@ -20,7 +20,7 @@ packaging>=26.3
 pip>=26.2.1
 pre-commit>=4.6.1
 pydantic
-pylint
+pylint>=3.3.0
 pyrefly
 pytest
 pytest-asyncio

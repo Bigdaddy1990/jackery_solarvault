@@ -432,6 +432,7 @@ max-complexity = 20
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["module-import-not-at-top-of-file"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+"tests/**" = ["ANN401"]  # Allow Any in tests
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -969,9 +970,3 @@ no_implicit_reexport = true
 python-version = "3.14.0"
 preset = "legacy"
 ignore-missing-imports = ["*"]
-
-[[tool.mypy.pydantic-mypy]]
-init_forbid_extra = true
-init_typed = true
-warn_required_dynamic_aliases = true
-warn_untyped_fields = true
