@@ -3384,6 +3384,9 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             and len(state.values) <= _MAX_PERIOD_VALUES
         ):
             attrs["period_values"] = state.values
+        # Audit note: year totals repaired from same-endpoint month payloads
+        # (documented in the module header); the correction metadata stays
+        # visible here instead of silently replacing the cloud value.
         year_backfill = state.source.get(APP_YEAR_BACKFILL_META)
         if isinstance(year_backfill, dict):
             attrs["year_month_backfill"] = year_backfill

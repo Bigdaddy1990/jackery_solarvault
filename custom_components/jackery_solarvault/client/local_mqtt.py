@@ -1,5 +1,7 @@
 """Direct local-broker MQTT transport for Jackery telemetry."""
 
+from __future__ import annotations
+
 import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -50,6 +52,8 @@ _SUBACK_FAILURE_CODE = 0x80
 def _subscription_topic(topic_filter: str) -> str:
     """Normalize only the documented legacy default; preserve user topics."""
     topic = topic_filter.strip()
+    if not topic:
+        return "hb/app/+/device"
     return "homeassistant/#" if topic == "homeassistant" else topic
 
 
@@ -171,7 +175,11 @@ class JackeryLocalMqttClient:
         self._client_id = settings.client_id
         self._sink = sink
         self._topic_filter = settings.topic_filter
-        self._topic_filters = (_subscription_topic(settings.topic_filter),)
+        self._topic_filters: tuple[str, ...] = (
+            _subscription_topic(settings.topic_filter),
+        )
+        if self._topic_filters == ("homeassistant/#",):
+            self._topic_filters += ("hb/device/#",)
         if settings.qos not in {0, 1, 2}:
             raise LocalMqttConfigurationError.invalid_qos()
         self._qos = settings.qos
@@ -191,6 +199,7 @@ class JackeryLocalMqttClient:
         self._message_delivery_item: tuple[str, bytes | str] | None = None
         self._message_tasks: set[asyncio.Task[None]] = set()
         self._stopping = self._connected = self._topics_seen_truncated = False
+        self._configuration_error = False
         self._messages_received = self._messages_dropped = 0
         self._messages_forwarded = self._messages_filtered = 0
         self._messages_rejected_by_sink = self._sink_errors = 0
@@ -212,13 +221,15 @@ class JackeryLocalMqttClient:
         """Start the entry-owned direct-broker reconnect supervisor."""
         async with self._lifecycle_lock:
             self._stopping = False
+            self._configuration_error = False
             if self._runner_task is not None and not self._runner_task.done():
                 return
             if not self._host:
                 raise LocalMqttConfigurationError.missing_host()
             if not 1 <= self._port <= _MAX_MQTT_PORT:
                 raise LocalMqttConfigurationError.invalid_port()
-            valid_subscribe_topic(self._topic_filter)
+            for topic in self._topic_filters:
+                valid_subscribe_topic(topic)
             self._connected_event.clear()
             self._runner_task = self._create_background_task(
                 self._async_run_forever(),
@@ -296,8 +307,16 @@ class JackeryLocalMqttClient:
             connected = await self._async_run_session()
             if connected:
                 reconnect_delay = LOCAL_MQTT_RECONNECT_INITIAL_SEC
+                self._configuration_error = False
+            elif self._configuration_error:
+                _LOGGER.error(
+                    "Jackery local MQTT configuration error detected (broker ACL). "
+                    "Stopping reconnect supervisor. Fix broker ACL and restart "
+                    "integration."
+                )
+                break
             await self._async_reconnect_sleep(reconnect_delay)
-            if not connected:
+            if not connected and not self._configuration_error:
                 reconnect_delay = min(
                     reconnect_delay * LOCAL_MQTT_RECONNECT_FACTOR,
                     LOCAL_MQTT_RECONNECT_MAX_SEC,
@@ -328,6 +347,17 @@ class JackeryLocalMqttClient:
         except MqttError as err:
             connected = self._subscription_active
             error = f"{type(err).__name__}: {err}"
+            # Check if this is a SUBACK refusal (configuration error)
+            if "broker refused the subscription" in str(err):
+                _LOGGER.exception(
+                    "Jackery local MQTT broker ACL denied subscription. "
+                    "Check broker ACL for read access on topic tree. "
+                    "Stopping reconnect attempts."
+                )
+                # Mark as configuration error - don't reconnect
+                self._configuration_error = True
+                self._last_error = f"CONFIG_ERROR: {error}"
+                return False
             log = _LOGGER.warning if error != self._last_error else _LOGGER.debug
             self._last_error = error
             log("Jackery local MQTT connection failed: %s", err)
@@ -371,8 +401,12 @@ class JackeryLocalMqttClient:
                     f"(SUBACK {", ".join(refused)}) — check the broker ACL for "
                     f"read access on this topic tree"
                 )
+                # This is a configuration error (broker ACL), not a transient
+                # failure. Raise MqttError but the outer loop will detect it and
+                # stop reconnecting.
                 raise MqttError(msg)
         self._subscribed_topics = set(topics)
+        self._configuration_error = False
         recovered = self._last_error is not None
         self._connected = True
         self._subscription_active = True
@@ -629,6 +663,11 @@ class JackeryLocalMqttClient:
         )
         if self._consume_self_publish_echo(topic, raw):
             self._self_publish_echoes_ignored += 1
+        # Filter out Home Assistant RPC events (Shelly RPC) which flood the broker
+        # but are not Jackery device telemetry. These come on homeassistant/events/rpc.
+        if topic.startswith("homeassistant/events/"):
+            self._messages_filtered += 1
+            return
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)

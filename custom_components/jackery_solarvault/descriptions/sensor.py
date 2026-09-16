@@ -500,6 +500,16 @@ def _first_non_none[T](*values: T | None) -> T | None:
     return next((value for value in values if value is not None), None)
 
 
+def _first_non_none_state(*values: StateType) -> StateType:
+    """Return the first ``StateType`` value that is present, preserving zero.
+
+    Concretely typed (rather than the generic ``_first_non_none``) so it can be
+    used inline in a ``value_fn`` lambda without confusing mypy's inference
+    over the ``str | int | float | None`` union.
+    """
+    return next((value for value in values if value is not None), None)
+
+
 def _storm_minutes_from_plan(weather_plan: dict[str, Any]) -> int | None:
     """Extract storm warning minutes from weather-plan root or row variants."""
     for key in (FIELD_WPC, FIELD_MINS_INTERVAL):
@@ -889,9 +899,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_BAT_IN_PW,),
         key="battery_charge_power",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_BAT_IN_PW))
-            or (_get_payload_http_prop(e, FIELD_BAT_IN_PW))
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_BAT_IN_PW),
+            _get_payload_http_prop(e, FIELD_BAT_IN_PW),
         ),
         translation_key="battery_charge_power",
         device_class=SensorDeviceClass.POWER,
@@ -901,9 +911,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_BAT_OUT_PW,),
         key="battery_discharge_power",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_BAT_OUT_PW))
-            or (_get_payload_http_prop(e, FIELD_BAT_OUT_PW))
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_BAT_OUT_PW),
+            _get_payload_http_prop(e, FIELD_BAT_OUT_PW),
         ),
         translation_key="battery_discharge_power",
         device_class=SensorDeviceClass.POWER,
@@ -1212,26 +1222,20 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_WORK_MODEL,),
         key="work_mode",
-        value_fn=lambda e: (
-            (
-                (_get_prop(e, FIELD_WORK_MODEL))
-                or (
-                    _task_plan_value(
-                        (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
-                        FIELD_WORK_MODEL,
-                    )
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_WORK_MODEL),
+            _task_plan_value(
+                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
+                FIELD_WORK_MODEL,
+            ),
+            7
+            if safe_int(
+                ((e.payload or {}).get(PAYLOAD_PRICE) or {}).get(
+                    FIELD_DYNAMIC_OR_SINGLE
                 )
             )
-            or (
-                7
-                if safe_int(
-                    ((e.payload or {}).get(PAYLOAD_PRICE) or {}).get(
-                        FIELD_DYNAMIC_OR_SINGLE
-                    )
-                )
-                == 1
-                else None
-            )
+            == 1
+            else None,
         ),
         translation_key="work_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1257,16 +1261,14 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_OFF_GRID_TIME,),
         key="off_grid_time",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_OFF_GRID_TIME))
-            or (
-                _task_plan_value(
-                    (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
-                    FIELD_OFF_GRID_TIME,
-                    FIELD_OFF_GRID_DOWN_TIME,
-                    FIELD_OFF_GRID_AUTO_OFF_TIME,
-                )
-            )
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_OFF_GRID_TIME),
+            _task_plan_value(
+                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
+                FIELD_OFF_GRID_TIME,
+                FIELD_OFF_GRID_DOWN_TIME,
+                FIELD_OFF_GRID_AUTO_OFF_TIME,
+            ),
         ),
         translation_key="off_grid_time",
         native_unit_of_measurement=UnitOfTime.MINUTES,
@@ -1320,15 +1322,13 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_IS_FOLLOW_METER_PW,),
         key="follow_meter_state",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_IS_FOLLOW_METER_PW))
-            or (
-                _task_plan_value(
-                    (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
-                    FIELD_IS_FOLLOW_METER_PW,
-                    FIELD_FOLLOW_METER,
-                )
-            )
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_IS_FOLLOW_METER_PW),
+            _task_plan_value(
+                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
+                FIELD_IS_FOLLOW_METER_PW,
+                FIELD_FOLLOW_METER,
+            ),
         ),
         translation_key="follow_meter_state",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1336,13 +1336,11 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_OFF_GRID_DOWN,),
         key="off_grid_shutdown_state",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_OFF_GRID_DOWN))
-            or (
-                _task_plan_value(
-                    (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {}, FIELD_OFF_GRID_DOWN
-                )
-            )
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_OFF_GRID_DOWN),
+            _task_plan_value(
+                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {}, FIELD_OFF_GRID_DOWN
+            ),
         ),
         translation_key="off_grid_shutdown_state",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2983,9 +2981,9 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_IACPW, FIELD_IP),
         key="input_power_portable",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_IP))
-            or (_get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_IACPW))
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_IP),
+            _get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_IACPW),
         ),
         translation_key="input_power_portable",
         device_class=SensorDeviceClass.POWER,
@@ -2995,9 +2993,9 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_OACPW, FIELD_OP),
         key="output_power_portable",
-        value_fn=lambda e: (
-            (_get_prop(e, FIELD_OP))
-            or (_get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_OACPW))
+        value_fn=lambda e: _first_non_none_state(
+            _get_prop(e, FIELD_OP),
+            _get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_OACPW),
         ),
         translation_key="output_power_portable",
         device_class=SensorDeviceClass.POWER,

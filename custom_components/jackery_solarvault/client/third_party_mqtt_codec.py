@@ -6,18 +6,12 @@ import secrets
 from typing import TYPE_CHECKING, Any
 
 from ..const import (
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
@@ -110,8 +104,7 @@ def _broker_port(options: Mapping[str, Any]) -> int:
     that would take the device offline over a typo in one option.
     """
     raw = (
-        options.get(CONF_LOCAL_MQTT_PORT)
-        or options.get(CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT)
+        options.get(CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT)
         or DEFAULT_THIRD_PARTY_MQTT_PORT
     )
     try:
@@ -156,35 +149,27 @@ def third_party_mqtt_config_from_options(
     )
     if not token.strip() and generated_token is not None:
         token = generated_token
-    if CONF_LOCAL_MQTT_ENABLE in options:
-        enabled_value = options.get(CONF_LOCAL_MQTT_ENABLE)
-        enabled_default = DEFAULT_LOCAL_MQTT_ENABLE
-    else:
-        enabled_value = options.get(
-            CONF_THIRD_PARTY_MQTT_ENABLE,
-            DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-        )
-        enabled_default = DEFAULT_THIRD_PARTY_MQTT_ENABLE
+    enabled_value = options.get(
+        CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
+    )
     parsed_enabled = safe_bool(enabled_value)
-    enabled = enabled_default if parsed_enabled is None else parsed_enabled
+    enabled = (
+        DEFAULT_THIRD_PARTY_MQTT_ENABLE if parsed_enabled is None else parsed_enabled
+    )
     return {
         FIELD_THIRD_PARTY_MQTT_ENABLE: 1 if enabled else 0,
         FIELD_THIRD_PARTY_MQTT_IP: str(
-            options.get(CONF_LOCAL_MQTT_HOST)
-            or options.get(CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP)
-            or "",
+            options.get(CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP) or "",
         ),
         FIELD_THIRD_PARTY_MQTT_PORT: _broker_port(options),
         FIELD_THIRD_PARTY_MQTT_USERNAME: str(
-            options.get(CONF_LOCAL_MQTT_USERNAME)
-            or options.get(
+            options.get(
                 CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
             )
             or "",
         ),
         FIELD_THIRD_PARTY_MQTT_PASSWORD: str(
-            options.get(CONF_LOCAL_MQTT_PASSWORD)
-            or options.get(
+            options.get(
                 CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
             )
             or "",
@@ -316,6 +301,10 @@ def third_party_mqtt_config_plaintext(
         dict[str, Any]: The merged plaintext ThirdPartMQTTConfig ready for entity
         setters.
     """
+    # Audit note (transport layers, const.py): this builds the entity-setter
+    # view only. The encrypted MQTT/BLE wire body is built separately in
+    # coordinator._third_party_mqtt_config_payloads; the formats are not
+    # merged.
     config = third_party_mqtt_config_from_options(options, generated_token)
     if isinstance(device_data, dict):
         current = device_data.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
@@ -329,6 +318,9 @@ def third_party_mqtt_config_plaintext(
                     config[key] = current[key]
             decoded_fields = set(current.get("_decoded_fields") or ())
             failed_fields = set(current.get("_decode_failed_fields") or ())
+            # Only successfully decoded credential fields may overwrite HA
+            # options; failed or absent decodes never replace configured
+            # plaintext (see test_plaintext_merge_keeps_unverified_...).
             if current.get("_ha_plaintext") is True or decoded_fields:
                 for key in (
                     FIELD_THIRD_PARTY_MQTT_USERNAME,

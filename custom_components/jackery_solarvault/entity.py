@@ -535,7 +535,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             transport_reachable = self.coordinator.is_device_reachable(
                 self._device_id,
             )
-        if not super().available and not transport_reachable:
+        if not super().available or not transport_reachable:
             return False
         if not self._online_marker_available(transport_reachable):
             return False

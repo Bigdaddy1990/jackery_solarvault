@@ -837,7 +837,7 @@ BIND_DEVICE_SCHEMA = vol.Schema({
     ),
     vol.Required(SERVICE_FIELD_TARGET_DEV_ID): vol.All(
         cv.string,
-        vol.Match(SERVICE_NUMERIC_ID_PATTERN),
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_BIND_KEY): vol.All(
         cv.string,
@@ -938,7 +938,7 @@ ACCEPT_SHARED_DEVICE_SCHEMA = vol.Schema({
     ),
     vol.Required(SERVICE_FIELD_TARGET_DEV_ID): vol.All(
         cv.string,
-        vol.Match(SERVICE_NUMERIC_ID_PATTERN),
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_QR_CODE_ID): vol.All(
         cv.string,
@@ -968,7 +968,7 @@ REMOVE_SHARED_ACCESS_SCHEMA = vol.Schema({
     ),
     vol.Optional(SERVICE_FIELD_TARGET_DEV_ID): vol.All(
         cv.string,
-        vol.Match(SERVICE_NUMERIC_ID_PATTERN),
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
     vol.Required(SERVICE_FIELD_BIND_USER_ID): vol.All(
         cv.string,
@@ -2298,12 +2298,10 @@ async def _async_handle_bind_device(
             error="no Jackery entry owns this device id",
         )
     bind_key = call.data[SERVICE_FIELD_BIND_KEY]
-    target_dev_id = _service_required_text(
+    target_dev_id = _device_id_from_service(
+        hass,
         call.data[SERVICE_FIELD_TARGET_DEV_ID],
-        field_name=SERVICE_FIELD_TARGET_DEV_ID,
         translation_key="bind_device_failed",
-        device_id=device_id,
-        max_length=64,
     )
     guid = _service_required_text(
         call.data[SERVICE_FIELD_GUID],
@@ -2735,12 +2733,10 @@ async def _async_handle_accept_shared_device(
             device_id=device_id,
             error="no Jackery entry owns this device id",
         )
-    target_dev_id = _service_required_text(
+    target_dev_id = _device_id_from_service(
+        hass,
         call.data[SERVICE_FIELD_TARGET_DEV_ID],
-        field_name=SERVICE_FIELD_TARGET_DEV_ID,
         translation_key="accept_shared_device_failed",
-        device_id=device_id,
-        max_length=128,
     )
     qr_code_id = _service_required_text(
         call.data[SERVICE_FIELD_QR_CODE_ID],
@@ -2890,12 +2886,10 @@ async def _async_handle_remove_shared_access(
         device_id=device_id,
         max_length=128,
     )
-    target_device_id = _service_required_text(
+    target_device_id = _device_id_from_service(
+        hass,
         call.data.get(SERVICE_FIELD_TARGET_DEV_ID, device_id),
-        field_name=SERVICE_FIELD_TARGET_DEV_ID,
         translation_key="remove_shared_access_failed",
-        device_id=device_id,
-        max_length=128,
     )
     try:
         await coordinator.async_remove_shared_access(
@@ -3637,7 +3631,7 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
 
 
 @callback
-def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration's domain-scoped Home Assistant services.
 
     Bind each service to its handler.
@@ -4563,12 +4557,10 @@ async def _async_handle_query_socket_stat(
         translation_key="query_socket_stat_failed",
         service_name=SERVICE_QUERY_SOCKET_STAT,
     )
-    target_device_id = _service_required_text(
+    target_device_id = _device_id_from_service(
+        hass,
         call.data[SERVICE_FIELD_TARGET_DEV_ID],
-        field_name=SERVICE_FIELD_TARGET_DEV_ID,
         translation_key="query_socket_stat_failed",
-        device_id=device_id,
-        max_length=128,
     )
     begin_date = _service_required_text(
         call.data[SERVICE_FIELD_BEGIN_DATE],

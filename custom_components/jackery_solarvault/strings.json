@@ -78,7 +78,7 @@
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2).",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "Subscription filter for raw SolarVault bridge telemetry received by the integration. The default is `hb/device/#`, and every valid configured value is used verbatim.",
+          "third_party_mqtt_topic_filter": "Leave empty to use the official Jackery device topics `hb/device/#`. This does not enable local MQTT. `homeassistant` is the Home Assistant discovery prefix; an explicit value subscribes to its child topics alongside the Jackery device topics. Custom topic filters are preserved.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Update the password, optional sensor toggles, and the experimental Third-Party MQTT bridge for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
@@ -1920,7 +1920,7 @@
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2).",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "Subscription filter for raw SolarVault bridge telemetry received by the integration. The default is `hb/device/#`, and every valid configured value is used verbatim.",
+          "third_party_mqtt_topic_filter": "Leave empty to use the official Jackery device topics `hb/device/#`. This does not enable local MQTT. `homeassistant` is the Home Assistant discovery prefix; an explicit value subscribes to its child topics alongside the Jackery device topics. Custom topic filters are preserved.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values. The Third-Party MQTT bridge is experimental and asks the SolarVault to publish telemetry to your local broker as documented in PROTOCOL.md §5.",

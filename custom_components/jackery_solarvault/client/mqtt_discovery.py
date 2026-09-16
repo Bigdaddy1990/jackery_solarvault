@@ -8,7 +8,7 @@ from enum import Enum
 from itertools import starmap
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from homeassistant.components import mqtt
 from homeassistant.core import callback
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+
 
 _LOGGER = logging.getLogger(__name__)
 _DISCOVERY_PREFIX = "homeassistant"
@@ -39,14 +40,35 @@ _CT_DISCOVERY_NAMES = {
 }
 _MIRROR_UNIQUE_ID_PREFIX = f"{DOMAIN}_mqtt_"
 _CLEANUP_SCAN_DELAYS_SEC = (0.0, 5.0, 30.0)
+_IDENTIFIER_PART_COUNT = 2
 
 
-def _enum_value(value: Any) -> Any:
+class _EntityDeviceLike(Protocol):
+    """Minimal protocol for entities that expose device_info and native_value."""
+
+    device_info: Mapping[str, Any] | None
+    native_value: Any
+    unique_id: str
+
+
+class _DescriptionLike(Protocol):
+    """Minimal protocol for sensor descriptions."""
+
+    translation_key: str | None
+    key: str | None
+    entity_registry_enabled_default: bool
+    device_class: str | None
+    entity_category: str | None
+    state_class: str | None
+    native_unit_of_measurement: str | None
+
+
+def _enum_value(value: Any) -> Any:  # ruff:ignore[any-type] — generic enum/unwrap helper
     """Return a JSON/MQTT scalar for Home Assistant enums."""
     return value.value if isinstance(value, Enum) else value
 
 
-def _state_payload(value: Any) -> str:
+def _state_payload(value: Any) -> str:  # ruff:ignore[any-type] — accepts heterogeneous sensor values
     """Serialize one native sensor value without inventing an unknown marker."""
     value = _enum_value(value)
     if isinstance(value, date | datetime):
@@ -56,14 +78,14 @@ def _state_payload(value: Any) -> str:
     return str(value)
 
 
-def _device_config(entity: Any) -> tuple[str, dict[str, Any]]:
+def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
     """Build a JSON-safe MQTT device block and return its stable identifier."""
     raw = getattr(entity, "device_info", None)
     info: Mapping[str, Any] = raw if isinstance(raw, Mapping) else {}
     identifiers: list[str] = []
     device_id = "unknown"
     for identifier in info.get("identifiers", ()) or ():
-        if isinstance(identifier, tuple) and len(identifier) == 2:
+        if isinstance(identifier, tuple) and len(identifier) == _IDENTIFIER_PART_COUNT:
             namespace, identifier_value = str(identifier[0]), str(identifier[1])
             identifiers.append(f"{namespace}:{identifier_value}")
             if namespace == DOMAIN and device_id == "unknown":
@@ -87,7 +109,7 @@ def _device_config(entity: Any) -> tuple[str, dict[str, Any]]:
         if metadata_value is not None and str(metadata_value).strip():
             config[key] = str(metadata_value)
     via_device = info.get("via_device")
-    if isinstance(via_device, tuple) and len(via_device) == 2:
+    if isinstance(via_device, tuple) and len(via_device) == _IDENTIFIER_PART_COUNT:
         config["via_device"] = f"{via_device[0]}:{via_device[1]}"
     elif via_device:
         config["via_device"] = str(via_device)
@@ -96,7 +118,9 @@ def _device_config(entity: Any) -> tuple[str, dict[str, Any]]:
     return device_id, config
 
 
-def _description_name(entity: Any, description: Any, unique_id: str) -> str:
+def _description_name(
+    entity: _EntityDeviceLike, description: _DescriptionLike | None, unique_id: str
+) -> str:
     """Return a readable, stable discovery name without localization coupling."""
     raw = (
         getattr(description, "translation_key", None)
@@ -162,7 +186,7 @@ class JackeryMqttSensorPublisher:
             or self._owner_bucket.get(_PUBLISHER_RUNTIME_KEY) is self
         )
 
-    def track(self, entity: Any) -> None:
+    def track(self, entity: _EntityDeviceLike) -> None:
         """Track one registered native sensor by its stable unique ID."""
         unique_id = getattr(entity, "unique_id", None)
         if unique_id:
@@ -199,7 +223,7 @@ class JackeryMqttSensorPublisher:
         """Publish discovery and changed states for all value-bearing sensors."""
         semaphore = asyncio.Semaphore(_PUBLISH_CONCURRENCY)
 
-        async def _publish_one(unique_id: str, entity: Any) -> None:
+        async def _publish_one(unique_id: str, entity: _EntityDeviceLike) -> None:
             async with semaphore:
                 await self._async_publish_entity(unique_id, entity)
 
@@ -211,7 +235,9 @@ class JackeryMqttSensorPublisher:
             if isinstance(result, BaseException):
                 raise result
 
-    async def _async_publish_entity(self, unique_id: str, entity: Any) -> None:
+    async def _async_publish_entity(
+        self, unique_id: str, entity: _EntityDeviceLike
+    ) -> None:
         """Publish one entity in config, state, availability order."""
         description = getattr(entity, "entity_description", None)
         device_id, device = _device_config(entity)
@@ -252,9 +278,8 @@ class JackeryMqttSensorPublisher:
             config = self._discovery_config(
                 entity,
                 description,
+                topics=(state_topic, availability_topic),
                 unique_id=unique_id,
-                state_topic=state_topic,
-                availability_topic=availability_topic,
                 device=device,
             )
             await self._async_publish(config_topic, json.dumps(config))
@@ -272,15 +297,15 @@ class JackeryMqttSensorPublisher:
 
     @staticmethod
     def _discovery_config(
-        entity: Any,
-        description: Any,
+        entity: _EntityDeviceLike,
+        description: _DescriptionLike | None,
         *,
         unique_id: str,
-        state_topic: str,
-        availability_topic: str,
+        topics: tuple[str, str],
         device: dict[str, Any],
     ) -> dict[str, Any]:
         """Build one Home Assistant MQTT sensor discovery document."""
+        state_topic, availability_topic = topics
         config: dict[str, Any] = {
             "availability_topic": availability_topic,
             "device": device,
@@ -317,10 +342,10 @@ class JackeryMqttSensorPublisher:
             )
             or getattr(entity, "native_unit_of_measurement", None),
         }
-        for key, value in optional_fields.items():
-            value = _enum_value(value)
-            if value is not None:
-                config[key] = value
+        for key, raw in optional_fields.items():
+            scalar_val = _enum_value(raw)
+            if scalar_val is not None:
+                config[key] = scalar_val
         return config
 
     async def _async_publish(self, topic: str, payload: str) -> None:

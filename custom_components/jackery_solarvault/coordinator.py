@@ -205,10 +205,6 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -2885,15 +2881,19 @@ def shelly_rpc_ct_update(
     return str(update[FIELD_DEVICE_SN]), update
 
 
-_LOCAL_MQTT_TOPIC_RE: Final = re.compile(
-    r"(?:^|/)devices?/(?P<serial>[^/]+)/(?P<channel>status|event)$"
-)
+_LOCAL_MQTT_TOPIC_RE: Final = re.compile(r"hb/app/[^/]+/device")
 
 
 def local_mqtt_topic_device_serial(topic: str) -> str | None:
-    """Extract the official Jackery host serial from a status/event topic."""
-    match = _LOCAL_MQTT_TOPIC_RE.search(topic)
-    return match.group("serial") if match else None
+    """Extract the official Jackery host serial from a status/event topic.
+
+    The topic format is hb/app/<userId>/device which does not contain the serial.
+    Serial must be extracted from the payload instead. This function returns
+    None to indicate payload-based extraction is required.
+    """
+    if _LOCAL_MQTT_TOPIC_RE.search(topic):
+        return "__from_payload__"
+    return None
 
 
 def mqtt_payload_observed_at(
@@ -3698,6 +3698,7 @@ _STATISTICS_HTTP_RETRY_AFTER_EPOCH = "retry_after_epoch"
 _STATISTICS_HTTP_VERIFIED_TOTALS = "verified_totals"
 _STATISTICS_IMPORT_THROTTLE_SEC = 300
 _STATISTICS_IMPORT_STATE_TOLERANCE = 1e-4
+_STATISTICS_IMPORT_MAX_SUM_KWH = 1_000_000_000.0
 _LOCAL_MQTT_CONFIG_RETRY_DELAYS_SEC = (15.0, 60.0, 300.0)
 # Increased from 15s to 30s to handle slower device responses (owner live-verified)
 _THIRD_PARTY_MQTT_READBACK_TIMEOUT_SEC = 30.0
@@ -7171,7 +7172,13 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         source: TransportSource,
     ) -> _MqttRouteContext | None:
         """Normalize one MQTT envelope without discarding its original payload."""
-        device_id = self._resolve_device_id_from_mqtt(payload)
+        device_id = (
+            self._resolve_device_id_from_mqtt(
+                payload, allow_single_device_fallback=False
+            )
+            if source is TransportSource.LOCAL_MQTT
+            else self._resolve_device_id_from_mqtt(payload)
+        )
         if not device_id:
             return None
         current = self._transport_partial_update_base(device_id)
@@ -7655,7 +7662,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             touched=touched,
         )
 
-    def _resolve_device_id_from_mqtt(self, payload: dict[str, Any]) -> str | None:
+    def _resolve_device_id_from_mqtt(
+        self,
+        payload: dict[str, Any],
+        *,
+        allow_single_device_fallback: bool = True,
+    ) -> str | None:
         body = payload.get(FIELD_BODY)
         if not isinstance(body, dict):
             alt_body = payload.get(FIELD_DATA)
@@ -7693,7 +7705,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             # sole cached device.
             return None
 
-        if len(self._device_index) == 1:
+        if allow_single_device_fallback and len(self._device_index) == 1:
             return next(iter(self._device_index))
         return None
 
@@ -7819,15 +7831,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         accepted_device_id = self._apply_shelly_rpc_local_update(topic, payload)
         normalized = self._normalize_local_mqtt_payload(payload)
-        topic_serial = local_mqtt_topic_device_serial(topic)
-        if topic_serial is not None:
-            explicit_serial = (
-                normalized.get(FIELD_DEVICE_SN)
-                or normalized.get(FIELD_DEV_SN)
-                or normalized.get(FIELD_SN)
-            )
-            if explicit_serial is None:
-                normalized[FIELD_DEVICE_SN] = topic_serial
+        # Extract serial from payload fields since topic doesn't contain it
+        explicit_serial = (
+            normalized.get(FIELD_DEVICE_SN)
+            or normalized.get(FIELD_DEV_SN)
+            or normalized.get(FIELD_SN)
+        )
+        if explicit_serial is not None:
+            normalized[FIELD_DEVICE_SN] = explicit_serial
         if "type" in payload:
             normalized["type"] = payload["type"]
 
@@ -7846,14 +7857,16 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 or not body
             ):
                 return self._record_unrouted_local_mqtt_message("unsupported_report")
-            accepted_device_id = self._resolve_device_id_from_mqtt(normalized)
+            accepted_device_id = self._resolve_device_id_from_mqtt(
+                normalized, allow_single_device_fallback=False
+            )
             if not accepted_device_id:
                 return self._record_unrouted_local_mqtt_message("unknown_device")
         # Freshness is diagnostic state only; Local MQTT never controls the
         # lifecycle or scheduling of HTTP, Cloud MQTT, or BLE.
         self._record_local_mqtt_traffic(
             accepted_device_id,
-            official_head_topic=topic_serial is not None,
+            official_head_topic=bool(_LOCAL_MQTT_TOPIC_RE.search(topic)),
             body=normalized.get(FIELD_BODY),
         )
         return True
@@ -7886,6 +7899,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 (2, None),
                 (100, {FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BATTERY_PACK}),
                 (100, {FIELD_DEV_TYPE: 2}),
+                (100, {FIELD_DEV_TYPE: 5}),
                 (100, {FIELD_DEV_TYPE: 6}),
             )
             for request_type, body in request_specs:
@@ -14739,6 +14753,43 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         return statistics, cumulative, last_start_ts
 
     @staticmethod
+    def _validate_app_chart_statistics(
+        statistics: list[StatisticData],
+    ) -> bool:
+        """Validate statistics before importing to recorder.
+
+        Rejects only unambiguous garbage (negative or absurd sums).
+        Deliberately no monotonicity check: the import pipeline handles
+        legitimate signed cloud corrections by rebasing later sums, and a
+        strict monotonic gate would block those corrections from importing.
+
+        Returns True if valid, False if data should be rejected.
+        """
+        valid = bool(statistics)
+        if valid:
+            for stat in statistics:
+                if stat.get("sum") is not None and stat["sum"] < 0:
+                    _LOGGER.debug(
+                        "Rejected app chart statistic with negative sum: %s",
+                        stat["sum"],
+                    )
+                    valid = False
+                    break
+        if valid:
+            for stat in statistics:
+                if (
+                    stat.get("sum") is not None
+                    and stat["sum"] > _STATISTICS_IMPORT_MAX_SUM_KWH
+                ):
+                    _LOGGER.debug(
+                        "Rejected app chart statistic: excessive sum %s",
+                        stat["sum"],
+                    )
+                    valid = False
+                    break
+        return valid
+
+    @staticmethod
     def _app_chart_statistic_metadata(
         options: _AppChartStatisticImport,
         statistic_id: str,
@@ -14757,7 +14808,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
         }
 
-    async def _async_add_app_chart_statistics_locked(
+    async def _async_add_app_chart_statistics_locked(  # ruff: ignore[too-many-return-statements]
         self,
         **options: Unpack[_AppChartStatisticImport],
     ) -> tuple[bool, int]:
@@ -14835,6 +14886,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 )
                 for start, sum_value in future_sums
             )
+
+        # Validate imported statistics before writing to recorder
+        if not self._validate_app_chart_statistics(statistics):
+            _LOGGER.warning(
+                "Rejected invalid app chart statistics for %s: failed validation",
+                statistic_id,
+            )
+            return False, 0
 
         metadata_dict = self._app_chart_statistic_metadata(options, statistic_id)
         try:
@@ -18499,14 +18558,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     def _local_mqtt_bridge_option(
         self,
-        local_key: str,
         canonical_key: str,
         default: _CachePayload,
     ) -> _CachePayload:
-        """Resolve local keys before canonical bridge keys."""
+        """Read the single bridge configuration from options, then entry data."""
         for source in (self.entry.options, self.entry.data):
-            if local_key in source:
-                return source[local_key]
             if canonical_key in source:
                 return source[canonical_key]
         return default
@@ -18515,7 +18571,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Resolve the configured broker target or record a missing host."""
         host = str(
             self._local_mqtt_bridge_option(
-                CONF_LOCAL_MQTT_HOST,
                 CONF_THIRD_PARTY_MQTT_IP,
                 "",
             )
@@ -18536,7 +18591,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         port = (
             safe_int(
                 self._local_mqtt_bridge_option(
-                    CONF_LOCAL_MQTT_PORT,
                     CONF_THIRD_PARTY_MQTT_PORT,
                     DEFAULT_THIRD_PARTY_MQTT_PORT,
                 )
@@ -18545,7 +18599,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         username = str(
             self._local_mqtt_bridge_option(
-                CONF_LOCAL_MQTT_USERNAME,
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 "",
             )
@@ -18553,7 +18606,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         password = str(
             self._local_mqtt_bridge_option(
-                CONF_LOCAL_MQTT_PASSWORD,
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 "",
             )
@@ -18741,7 +18793,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> bool:
         """Push the user's local-MQTT bridge config to every known device.
 
-        Reads the config-entry options (``CONF_LOCAL_MQTT_ENABLE``, host, port,
+        Reads the config-entry options (``CONF_THIRD_PARTY_MQTT_ENABLE``, host, port,
         credentials) and, when enabled, sends ``SET_THIRD_PARTY_MQTT_CONFIG``
         (actionId 3046 / BLE message type 113) to each device in
         ``_device_index`` through the independent concurrent BLE and Cloud-MQTT

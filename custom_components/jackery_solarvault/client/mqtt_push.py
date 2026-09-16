@@ -1,5 +1,7 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
+from __future__ import annotations
+
 import asyncio
 from collections import deque
 from dataclasses import dataclass
@@ -1417,7 +1419,9 @@ class JackeryMqttPushClient:
             request_id,
             self._normalize_response_type(expected_response_type),
         )
-        future = asyncio.get_running_loop().create_future()
+        future: asyncio.Future[dict[str, Any]] = (
+            asyncio.get_running_loop().create_future()
+        )
         self._pending_responses[key] = future
         try:
             return await asyncio.wait_for(future, timeout=timeout_sec)

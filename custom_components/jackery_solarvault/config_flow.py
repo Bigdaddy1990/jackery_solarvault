@@ -30,7 +30,6 @@ from .const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
     CONF_SCAN_INTERVAL,
@@ -80,7 +79,6 @@ from .const import (
     FLOW_STEP_USER,
     MAX_SCAN_INTERVAL_SEC,
     MIN_SCAN_INTERVAL_SEC,
-    REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
     _ENTITY_CREATING_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
@@ -152,6 +150,19 @@ def _normalize_account(value: str) -> str:
         The account identifier with leading and trailing whitespace removed.
     """
     return value.strip()
+
+
+def _mqtt_discovery_name(topic: str) -> str:
+    """Build the display name for an MQTT discovery topic.
+
+    The trailing topic segment names the device; an empty or whitespace-only
+    segment falls back to the bare label so the title never renders as
+    ``"Jackery MQTT ()"``.
+    """
+    suffix = topic.rsplit("/", 1)[-1].strip() if topic else ""
+    if not suffix:
+        return "Jackery MQTT"
+    return f"Jackery MQTT ({suffix})"
 
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
@@ -422,58 +433,41 @@ def _merge_local_mqtt_options(
             - CONF_THIRD_PARTY_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
     """
-    # The options/reconfigure forms expose these fields under the legacy
-    # ``third_party_mqtt_*`` keys, while the stored option + coordinator read the
-    # ``local_mqtt_*`` keys (``_current_local_mqtt_options`` resolves either).
-    # Read the ``local_*`` key first (direct/newer forms), then fall back to the
-    # form's ``third_party_*`` key, then the current value. Without the middle
-    # fallback the submitted switch/host/port/credentials were silently dropped
-    # and the toggle appeared to do nothing. ``local_*`` precedence also avoids
-    # the reconfigure form's ``bool``-typed ``third_party_mqtt_ip`` field.
     enable_value = user_input.get(
-        CONF_LOCAL_MQTT_ENABLE,
-        user_input.get(
-            CONF_THIRD_PARTY_MQTT_ENABLE,
-            current[CONF_THIRD_PARTY_MQTT_ENABLE],
-        ),
+        CONF_THIRD_PARTY_MQTT_ENABLE,
+        current.get(CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE),
     )
     parsed_enable = safe_bool(enable_value)
     return {
         CONF_THIRD_PARTY_MQTT_ENABLE: (
-            current[CONF_THIRD_PARTY_MQTT_ENABLE]
+            current.get(CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE)
             if parsed_enable is None
             else parsed_enable
         ),
         CONF_THIRD_PARTY_MQTT_IP: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_IP,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_IP, current[CONF_THIRD_PARTY_MQTT_IP]
-                ),
+                current.get(CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP),
             )
             or "",
         ).strip(),
         CONF_THIRD_PARTY_MQTT_PORT: _coerce_local_mqtt_port(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_PORT,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_PORT,
-                    current[CONF_THIRD_PARTY_MQTT_PORT],
-                ),
+                current.get(CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT),
             ),
         ),
         CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_QOS,
-                current[CONF_THIRD_PARTY_MQTT_QOS],
+                current.get(CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS),
             ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_USERNAME,
-                    current[CONF_THIRD_PARTY_MQTT_USERNAME],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
                 ),
             )
             or "",
@@ -481,9 +475,8 @@ def _merge_local_mqtt_options(
         CONF_THIRD_PARTY_MQTT_PASSWORD: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_PASSWORD,
-                    current[CONF_THIRD_PARTY_MQTT_PASSWORD],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
                 ),
             )
             or "",
@@ -491,7 +484,10 @@ def _merge_local_mqtt_options(
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                ),
             )
             or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
         ).strip(),
@@ -519,8 +515,6 @@ def _reconfigure_options(
     merged.pop(CONF_USERNAME, None)
     merged.pop(CONF_PASSWORD, None)
     merged.pop("enable_unredacted_diagnostics", None)
-    for key in REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS:
-        merged.pop(key, None)
     current_options = _current_option_values(entry)
     merged.update(
         _flow_options(
@@ -586,7 +580,8 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
             merged = _flow_options(user_input, current_options)
             merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
             try:
-                valid_subscribe_topic(merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER])
+                if merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]:
+                    valid_subscribe_topic(merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER])
             except vol.Invalid:
                 errors[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = FLOW_ERROR_BASE
             else:
@@ -783,7 +778,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         if not isinstance(dev_sn, str) or not dev_sn:
             return self.async_abort(reason="invalid_discovery_info")
 
-        return await self.async_step_user()
+        discovered_name = _mqtt_discovery_name(discovery_info.topic)
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_bluetooth(
         self,

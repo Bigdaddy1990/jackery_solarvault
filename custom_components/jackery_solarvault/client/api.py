@@ -997,9 +997,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             UnicodeDecodeError,
             ValueError,
         ) as err:
-            raw = (await resp.text())[:HTTP_RAW_TEXT_LIMIT]
-            msg = f"Login returned invalid JSON: {raw!r}"
-            raise JackeryApiError(msg) from err
+            raise JackeryApiError.invalid_login_json() from err
 
     async def async_login(self) -> str:
         """Perform the app-compatible encrypted HTTP login."""

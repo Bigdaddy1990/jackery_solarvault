@@ -1,5 +1,7 @@
 """Shared credential safety contract for Jackery SolarVault."""
 
+from __future__ import annotations
+
 import hashlib
 import logging
 from typing import TYPE_CHECKING, Final

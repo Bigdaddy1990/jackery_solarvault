@@ -399,7 +399,8 @@ query_socket_stat:
       required: true
       example: '573702884982521856'
       selector:
-        text: null
+        device:
+          integration: jackery_solarvault
     date_type:
       required: true
       example: day
@@ -921,7 +922,8 @@ bind_device:
       required: true
       example: '573702884982521856'
       selector:
-        text: null
+        device:
+          integration: jackery_solarvault
     bind_key:
       required: true
       example: 123456
@@ -1053,7 +1055,8 @@ accept_shared_device:
       required: true
       example: '573702884982521856'
       selector:
-        text: null
+        device:
+          integration: jackery_solarvault
     qr_code_id:
       required: true
       example: '1234567890'
@@ -1156,7 +1159,8 @@ remove_shared_access:
       required: false
       example: '573702884982521856'
       selector:
-        text: null
+        device:
+          integration: jackery_solarvault
     bind_user_id:
       required: true
       example: '12345678'

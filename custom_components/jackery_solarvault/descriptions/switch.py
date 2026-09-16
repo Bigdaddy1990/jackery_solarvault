@@ -137,6 +137,10 @@ class JackerySwitchDescription(SwitchEntityDescription):
                 sources = HTTP_DATA_SOURCES
             object.__setattr__(self, "data_sources", sources)
         if not self.command_sources and setter is not None:
+            # Audit note (transport layers, const.py): device commands such
+            # as SET_THIRD_PARTY_MQTT_CONFIG (3046) have no HTTP endpoint and
+            # travel BLE-first with MQTT fallback, so LAYER5_COMMAND_SOURCES
+            # here is the compliant path, not an HTTP bypass.
             object.__setattr__(self, "command_sources", LAYER5_COMMAND_SOURCES)
 
 

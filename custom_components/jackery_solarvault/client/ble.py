@@ -54,6 +54,8 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 import os
@@ -474,11 +476,13 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         _BINARY_FRAME_INBOUND_VERSION_BE,
         _BINARY_FRAME_OUTBOUND_VERSION_BE,
     }:
-        # Soft assertion — live notifications carry 0x0064 while App writes
-        # carry 0x0001. Preserve forward compatibility for future firmware.
-        # We do not refuse parsing on mismatch, but the caller's debug
-        # log will surface unexpected values for analysis.
-        pass
+        # Live notifications carry 0x0064 while App writes carry 0x0001.
+        # An unknown version means the firmware framing changed and the
+        # offsets below can no longer be trusted, so refuse explicitly and
+        # let the caller's defensive logging capture the raw bytes for
+        # offline analysis instead of parsing positions blindly.
+        msg = f"unexpected protocol version {plaintext[2:4].hex()!r}"
+        raise ValueError(msg)
     if plaintext[12:14] != _BINARY_FRAME_PAYLOAD_MARKER_BE:
         msg = f"unexpected payload marker {plaintext[12:14].hex()!r}"
         raise ValueError(msg)

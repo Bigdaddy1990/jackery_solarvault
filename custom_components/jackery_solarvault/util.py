@@ -170,9 +170,7 @@ def local_mqtt_opt_in(entry: object) -> bool:
     Single source for the opt-in so the options flow and the runtime start path
     cannot disagree. ``config_flow._current_local_mqtt_options`` documents the
     same precedence. The canonical ``third_party_mqtt_enable`` option is the
-    current form value and therefore wins over every retired
-    ``local_mqtt_enable`` copy. Legacy keys remain read-only fallbacks until
-    setup migration removes them.
+    only form value; retired ``local_mqtt_enable`` copies are ignored.
 
     With no explicit choice, the receiver stays disabled exactly like the
     options flow's canonical third-party MQTT switch.
@@ -189,19 +187,11 @@ def local_mqtt_opt_in(entry: object) -> bool:
         parsed = safe_bool(options[CONF_THIRD_PARTY_MQTT_ENABLE])
         if parsed is not None:
             return parsed
-    if "local_mqtt_enable" in options:
-        parsed = safe_bool(options["local_mqtt_enable"])
-        if parsed is not None:
-            return parsed
 
     # Config-entry data is older than options, but its canonical key still wins
     # over the retired alias within that storage layer.
     if CONF_THIRD_PARTY_MQTT_ENABLE in data:
         parsed = safe_bool(data[CONF_THIRD_PARTY_MQTT_ENABLE])
-        if parsed is not None:
-            return parsed
-    if "local_mqtt_enable" in data:
-        parsed = safe_bool(data["local_mqtt_enable"])
         if parsed is not None:
             return parsed
 

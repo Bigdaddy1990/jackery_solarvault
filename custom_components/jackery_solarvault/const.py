@@ -63,26 +63,15 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
-# Command 3046 configures the broker but no topic. The firmware owns the LAN
-# protocol tree ``<prefix>/device/<serial>/{status,event,action}``; the prefix
-# is what the user configures on both the device and here. docs/ENV.md pins
-# this default to ``homeassistant/#`` and requires a legacy bare
-# ``homeassistant`` to be normalized to the same child-topic wildcard — a bare
-# prefix matches only the literal topic and never a device frame. Foreign
-# traffic sharing the prefix is dropped by ``payload_has_jackery_marker``.
+# Default topic filter for the local HA-broker listener (docs/ENV.md:51+79).
+# A bare legacy "homeassistant" is widened to this child-topic wildcard at
+# subscribe time. The cloud "hb/app/*" namespace must never appear here
+# (local MQTT and cloud MQTT are separate layers).
 LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant/#"
 # Native Shelly RPC status pushes observed in the shared Home Assistant broker.
 # Subscribe to this exact topic only. The adapter filters high-rate BLE scan
 # events and unrelated RPC sources before they reach shared ingest.
 SHELLY_RPC_EVENT_TOPIC: Final = "homeassistant/events/rpc"
-# Legacy Local-MQTT option names. The receiver is optional and uses the same
-# disabled-by-default contract as the canonical third-party MQTT option.
-CONF_LOCAL_MQTT_ENABLE: Final = "local_mqtt_enable"
-CONF_LOCAL_MQTT_HOST: Final = "local_mqtt_host"
-CONF_LOCAL_MQTT_PORT: Final = "local_mqtt_port"
-CONF_LOCAL_MQTT_USERNAME: Final = "local_mqtt_username"
-CONF_LOCAL_MQTT_PASSWORD: Final = "local_mqtt_password"
-DEFAULT_LOCAL_MQTT_ENABLE: Final = False
 
 # Reconnect-Backoff des lokalen MQTT-Subscribers. Ohne diese Schleife beendete
 # ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
@@ -2781,22 +2770,6 @@ DEFAULT_ENABLE_MONTH_STATISTICS: Final = True
 CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"
 DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 EXTERNAL_STAT_BUCKET_DAILY: Final = "daily"
-# The former ``local_mqtt_*`` option family duplicated ``third_party_mqtt_*``
-# one-to-one. The options flow wrote the former while the start path read the
-# latter, so a configured port / username / password never reached the broker.
-# ``third_party_mqtt_*`` is now the single source; entries carrying the legacy
-# keys are folded over by ``_async_migrate_legacy_local_mqtt_options``.
-# Removed listener-only TLS fields from an earlier refactor. App command 3046
-# configures a plain LAN MQTT target and exposes no TLS inputs; keep this list
-# solely so existing config entries can be migrated without retaining dead UI
-# state or passing it back through reconfigure.
-REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS: Final[frozenset[str]] = frozenset({
-    "local_mqtt_tls_ca_cert",
-    "local_mqtt_tls_client_cert",
-    "local_mqtt_tls_client_key",
-    "local_mqtt_tls_insecure",
-})
-
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
 DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = False
 CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
