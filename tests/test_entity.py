@@ -49,7 +49,7 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
     return JackeryEntity(coordinator, "dev1", "test")
 
 
-def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # ruff: ignore[any-type]
+def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     """Create and initialize an instance of the given sensor class for tests using the provided device payload.
 
     Parameters:

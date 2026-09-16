@@ -78,13 +78,13 @@ async def test_cached_reload_starts_layer5_before_primary_http_finishes(
     async def _prepare_http(
         _hass: HomeAssistant,
         _entry: MockConfigEntry,
-        coordinator: Any,  # ruff: ignore[any-type]
+        coordinator: Any,
     ) -> None:
         http_started.set()
         await release_http.wait()
         coordinator.data = {}
 
-    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # ruff: ignore[any-type]
+    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:
         await asyncio.sleep(0)
         events.append("platforms")
 
@@ -94,8 +94,8 @@ async def test_cached_reload_starts_layer5_before_primary_http_finishes(
         layer5_started.set()
 
     async def mock_start_local_mqtt_listener(  # ruff: ignore[unused-async]
-        *_args: Any,  # ruff: ignore[any-type]
-        **_kwargs: Any,  # ruff: ignore[any-type]
+        *_args: Any,
+        **_kwargs: Any,
     ) -> None:
         return None
 

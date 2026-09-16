@@ -84,7 +84,7 @@ async def test_ambiguous_append_retry_is_idempotent_only_for_same_ticket(
     def _commit_then_raise_once(
         backend: _SqliteBleSpoolBackend,
         records: tuple[BleSpoolRecord, ...],
-    ) -> Any:  # ruff: ignore[any-type]
+    ) -> Any:
         nonlocal calls
         calls += 1
         metrics = real_append(backend, records)
@@ -124,7 +124,7 @@ async def test_precommit_append_failure_retries_the_same_ticket_without_loss(
     def _fail_before_first_commit(
         backend: _SqliteBleSpoolBackend,
         records: tuple[BleSpoolRecord, ...],
-    ) -> Any:  # ruff: ignore[any-type]
+    ) -> Any:
         attempts.append(tuple(record.delivery_id for record in records))
         if len(attempts) == 1:
             raise OSError("temporary storage failure")  # ruff: ignore[raise-vanilla-args]
@@ -159,7 +159,7 @@ async def test_task_factory_rejection_retains_staging_for_later_flush(
     await spool.async_open()
     real_create = hass.async_create_background_task
 
-    def _reject_task(*_args: Any, **_kwargs: Any) -> Any:  # ruff: ignore[any-type]
+    def _reject_task(*_args: Any, **_kwargs: Any) -> Any:
         raise RuntimeError("task factory is closing")  # ruff: ignore[raise-vanilla-args]
 
     monkeypatch.setattr(hass, "async_create_background_task", _reject_task)

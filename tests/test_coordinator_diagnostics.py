@@ -33,7 +33,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _Coordinator = JackerySolarVaultCoordinator
 
 
-def _bare() -> Any:  # ruff: ignore[any-type]
+def _bare() -> Any:
     """Return an uninitialised coordinator shell for attribute injection."""
     return cast("Any", _Coordinator.__new__(_Coordinator))
 

@@ -101,7 +101,7 @@ class _ImmediateBackgroundEntry:
         return asyncio.create_task(coro, name=name)
 
 
-def _set_test_attr(target: object, name: str, value: Any) -> None:  # ruff: ignore[any-type]
+def _set_test_attr(target: object, name: str, value: Any) -> None:
     """Set private coordinator seams used by narrow regression test doubles."""
     setattr(target, name, value)
 

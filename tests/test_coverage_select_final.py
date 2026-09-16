@@ -54,7 +54,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # ruff: ignore[any-type]
+def _description(key: str) -> Any:
     """Return one production select description by stable key."""
     return next(
         description for description in SELECT_DESCRIPTIONS if description.key == key
@@ -311,7 +311,7 @@ async def test_setup_listener_adds_new_home_selects_once_after_discovery() -> No
     coordinator = _coordinator({})
     listeners: list[Any] = []
 
-    def _capture_listener(listener: Any) -> Any:  # ruff: ignore[any-type]
+    def _capture_listener(listener: Any) -> Any:
         listeners.append(listener)
         return lambda: None
 

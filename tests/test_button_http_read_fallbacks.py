@@ -55,7 +55,7 @@ _LIVE_PACK_SOC = 80
 _SYSTEM_ENERGY_PLAN_POWER = 725
 
 
-def _description(key: str) -> Any:  # ruff: ignore[any-type]
+def _description(key: str) -> Any:
     """Return one query-button description by key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -87,12 +87,12 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
-def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]
+def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:
     """Return the API test double behind the coordinator's typed boundary."""
     return cast("Any", coordinator.api)
 
 
-def _button(coordinator: Any, key: str) -> JackeryQueryButton:  # ruff: ignore[any-type]
+def _button(coordinator: Any, key: str) -> JackeryQueryButton:
     """Create a query button against a lightweight coordinator double."""
     coordinator.data = {_DEVICE_ID: {}}
     coordinator.last_update_success = True

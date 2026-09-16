@@ -49,7 +49,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # ruff: ignore[any-type]
+def _description(key: str) -> Any:
     return next(desc for desc in NUMBER_DESCRIPTIONS if desc.key == key)
 
 

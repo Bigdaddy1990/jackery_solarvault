@@ -48,7 +48,7 @@ _STALE_POWER = 5
 _FILL_VALUE = 7
 
 
-def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:  # ruff: ignore[any-type]
+def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:
     """Build a bare coordinator exposing only merge-relevant state."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)

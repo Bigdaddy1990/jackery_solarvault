@@ -63,7 +63,7 @@ def _coordinator(
     return coordinator
 
 
-def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]
+def _api(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator).api
 
 

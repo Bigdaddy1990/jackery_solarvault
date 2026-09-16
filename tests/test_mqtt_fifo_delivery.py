@@ -116,7 +116,7 @@ async def test_cloud_mqtt_stop_drains_accepted_frames_without_cancelling(
 
 async def test_cloud_mqtt_callback_error_is_visible_and_fifo_continues(
     hass: HomeAssistant,
-    caplog: Any,  # ruff: ignore[any-type]
+    caplog: Any,
 ) -> None:
     """One bad callback is logged and cannot strand later accepted frames."""
     invoked: list[int] = []
@@ -486,7 +486,7 @@ async def test_local_sink_cancelled_error_is_not_retried(
 
 async def test_cloud_stop_timeout_reports_real_accepted_backlog(
     hass: HomeAssistant,
-    monkeypatch: Any,  # ruff: ignore[any-type]
+    monkeypatch: Any,
 ) -> None:
     """A runner timeout reports queued plus in-flight accepted frames."""
     callback_started = asyncio.Event()

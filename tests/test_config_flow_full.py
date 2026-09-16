@@ -198,7 +198,7 @@ class TestCoerceLocalMqttQos:
             ["invalid", 0],
         ],
     )
-    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:  # ruff: ignore[any-type, undocumented-public-method, no-self-use]
+    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert _coerce_local_mqtt_qos(value) == expected
 
 

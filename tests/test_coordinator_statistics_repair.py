@@ -56,7 +56,7 @@ async def test_startup_fetches_prior_periods_once_then_only_missing_periods() ->
     })
     fetched: list[date] = []
 
-    async def fetch(**kwargs: Any) -> dict[str, Any]:  # ruff: ignore[any-type]
+    async def fetch(**kwargs: Any) -> dict[str, Any]:
         fetched.append(kwargs["period_start"])
         await asyncio.sleep(0)
         return {}

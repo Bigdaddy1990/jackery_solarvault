@@ -39,7 +39,7 @@ async def _teardown(hass: HomeAssistant, entry_id: str) -> None:
     await hass.async_block_till_done()
 
 
-def _fake_mqtt(*, connected: bool = False, last_error: Any = None) -> MagicMock:  # ruff: ignore[any-type]
+def _fake_mqtt(*, connected: bool = False, last_error: Any = None) -> MagicMock:
     """Build a stubbed JackeryMqttPushClient surface for lifecycle tests."""
     mqtt = MagicMock(name="JackeryMqttPushClient")
     mqtt.is_connected = connected
@@ -78,7 +78,7 @@ async def coordinator(hass: HomeAssistant) -> AsyncGenerator[Any]:
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_returns_early_without_runtime(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_returns_early_without_runtime(coordinator: Any) -> None:
     """Without an MQTT runtime there is nothing to start."""
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
     calls_before = coordinator.api.get_cached_mqtt_credentials.call_count
@@ -88,7 +88,7 @@ async def test_ensure_mqtt_returns_early_without_runtime(coordinator: Any) -> No
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_defers_without_cached_credentials(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_defers_without_cached_credentials(coordinator: Any) -> None:
     """No cached credentials: back off and let the HTTP login path acquire them."""
     coordinator._mqtt = _fake_mqtt()  # ruff: ignore[private-member-access]
     coordinator.api.get_cached_mqtt_credentials = MagicMock(return_value=None)
@@ -99,7 +99,7 @@ async def test_ensure_mqtt_defers_without_cached_credentials(coordinator: Any) -
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_skips_when_manager_says_so(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_skips_when_manager_says_so(coordinator: Any) -> None:
     """The manager's skip decision is honored (e.g. active pause/backoff)."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -114,7 +114,7 @@ async def test_ensure_mqtt_skips_when_manager_says_so(coordinator: Any) -> None:
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_starts_with_cached_credentials(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_starts_with_cached_credentials(coordinator: Any) -> None:
     """Cached credentials drive a real async_start with the credential fields."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -135,7 +135,7 @@ async def test_ensure_mqtt_starts_with_cached_credentials(coordinator: Any) -> N
 
 @pytest.mark.asyncio()
 async def test_ensure_mqtt_records_success_when_already_connected(
-    coordinator: Any,  # ruff: ignore[any-type]
+    coordinator: Any,
 ) -> None:
     """A client-verified no-op repairs manager state when already connected."""
     mqtt = _fake_mqtt(connected=True)
@@ -153,7 +153,7 @@ async def test_ensure_mqtt_records_success_when_already_connected(
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_wait_connected_success_path(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_wait_connected_success_path(coordinator: Any) -> None:
     """wait_connected=True waits for CONNACK then records the fingerprint."""
     mqtt = _fake_mqtt(connected=True)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -170,7 +170,7 @@ async def test_ensure_mqtt_wait_connected_success_path(coordinator: Any) -> None
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator: Any) -> None:
     """A broker credential rejection pauses MQTT and re-raises, never reauth."""
     mqtt = _fake_mqtt(connected=False)
     mqtt.diagnostics = {"last_error": "connect rc=5"}
@@ -192,7 +192,7 @@ async def test_ensure_mqtt_wait_connected_auth_failure_pauses(coordinator: Any) 
 
 @pytest.mark.asyncio()
 async def test_ensure_mqtt_wait_connected_network_error_backs_off(
-    coordinator: Any,  # ruff: ignore[any-type]
+    coordinator: Any,
 ) -> None:
     """A non-auth connect failure records backoff and re-raises."""
     mqtt = _fake_mqtt(connected=False)
@@ -213,7 +213,7 @@ async def test_ensure_mqtt_wait_connected_network_error_backs_off(
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator: Any) -> None:
     """A concurrent unload/reload replacing the runtime bails out quietly."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -236,7 +236,7 @@ async def test_ensure_mqtt_returns_early_on_stale_handle(coordinator: Any) -> No
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator: Any) -> None:
     """A generated macId source is flagged once, not every connect."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -253,7 +253,7 @@ async def test_ensure_mqtt_logs_generated_mac_warning_once(coordinator: Any) -> 
 
 
 @pytest.mark.asyncio()
-async def test_ensure_mqtt_logs_credential_session_change(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_ensure_mqtt_logs_credential_session_change(coordinator: Any) -> None:
     """A changed credential fingerprint logs a reconnect notice."""
     mqtt = _fake_mqtt(connected=False)
     coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]
@@ -274,7 +274,7 @@ async def test_ensure_mqtt_logs_credential_session_change(coordinator: Any) -> N
 
 
 @pytest.mark.asyncio()
-async def test_mqtt_connected_returns_early_during_shutdown(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_mqtt_connected_returns_early_during_shutdown(coordinator: Any) -> None:
     """No snapshot work happens once shutdown has begun."""
     coordinator._shutdown_started = True  # ruff: ignore[private-member-access]
     coordinator._mqtt = _fake_mqtt(connected=True)  # ruff: ignore[private-member-access]
@@ -299,7 +299,7 @@ async def test_mqtt_connected_returns_early_during_shutdown(coordinator: Any) ->
 
 @pytest.mark.asyncio()
 async def test_mqtt_connected_records_success_and_queries_missing(
-    coordinator: Any,  # ruff: ignore[any-type]
+    coordinator: Any,
 ) -> None:
     """On connect the manager records success and the enrichment queries run."""
     mqtt = _fake_mqtt(connected=True)
@@ -356,7 +356,7 @@ async def test_mqtt_connected_records_success_and_queries_missing(
 
 @pytest.mark.asyncio()
 async def test_mqtt_birth_and_poll_overlap_share_one_query_flight(
-    coordinator: Any,  # ruff: ignore[any-type]
+    coordinator: Any,
 ) -> None:
     """A scheduled poll must not duplicate an in-flight connect birth."""
     coordinator._mqtt = _fake_mqtt(connected=True)  # ruff: ignore[private-member-access]
@@ -365,7 +365,7 @@ async def test_mqtt_birth_and_poll_overlap_share_one_query_flight(
     entered = asyncio.Event()
     release = asyncio.Event()
 
-    async def _block_first_query(**_kwargs: Any) -> None:  # ruff: ignore[any-type]
+    async def _block_first_query(**_kwargs: Any) -> None:
         entered.set()
         await release.wait()
 
@@ -412,7 +412,7 @@ async def test_mqtt_birth_and_poll_overlap_share_one_query_flight(
 
 
 @pytest.mark.asyncio()
-async def test_mqtt_connected_defers_background_auth_failure(coordinator: Any) -> None:  # ruff: ignore[any-type]
+async def test_mqtt_connected_defers_background_auth_failure(coordinator: Any) -> None:
     """A ConfigEntryAuthFailed during enrichment is deferred, not raised."""
     coordinator._mqtt = _fake_mqtt(connected=True)  # ruff: ignore[private-member-access]
     coordinator.data = {"device-1": {}}
