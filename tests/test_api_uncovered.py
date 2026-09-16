@@ -2296,9 +2296,7 @@ class TestAdditionalEndpoints:  # ruff: ignore[too-many-public-methods]
     async def test_async_sync_offline_statistics(self) -> None:
         """Upload the original offline packet and return its acknowledgement."""
         client = self._create_client()
-        client._post_json = AsyncMock(
-            return_value={"code": 0, "data": True}
-        )  # noqa: E501, RUF100, SLF001
+        client._post_json = AsyncMock(return_value={"code": 0, "data": True})  # noqa: E501, RUF100, SLF001
 
         result = await client.async_sync_offline_statistics({"offline": "data"})
 

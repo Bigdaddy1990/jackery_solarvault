@@ -119,7 +119,9 @@ def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
 
 
 def _description_name(
-    entity: _EntityDeviceLike, description: _DescriptionLike | None, unique_id: str,
+    entity: _EntityDeviceLike,
+    description: _DescriptionLike | None,
+    unique_id: str,
 ) -> str:
     """Return a readable, stable discovery name without localization coupling."""
     raw = (
@@ -236,7 +238,9 @@ class JackeryMqttSensorPublisher:
                 raise result
 
     async def _async_publish_entity(
-        self, unique_id: str, entity: _EntityDeviceLike,
+        self,
+        unique_id: str,
+        entity: _EntityDeviceLike,
     ) -> None:
         """Publish one entity in config, state, availability order."""
         description = getattr(entity, "entity_description", None)
@@ -338,7 +342,9 @@ class JackeryMqttSensorPublisher:
             "state_class": getattr(description, "state_class", None)
             or getattr(entity, "state_class", None),
             "unit_of_measurement": getattr(
-                description, "native_unit_of_measurement", None,
+                description,
+                "native_unit_of_measurement",
+                None,
             )
             or getattr(entity, "native_unit_of_measurement", None),
         }

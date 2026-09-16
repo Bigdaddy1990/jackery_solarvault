@@ -99,7 +99,7 @@ def normalize_mqtt_session_snapshot(
     assert isinstance(mac_id, str)
     try:
         seed = base64.b64decode(seed_b64, validate=True)
-    except (binascii.Error, ValueError):
+    except binascii.Error, ValueError:
         return None
     if len(seed) != _MQTT_SEED_LEN:
         return None
@@ -129,7 +129,8 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 
 async def async_load_mqtt_session(
-    hass: HomeAssistant, entry_id: str,
+    hass: HomeAssistant,
+    entry_id: str,
 ) -> dict[str, str] | None:
     """Load cached MQTT session credentials for the given config entry.
 

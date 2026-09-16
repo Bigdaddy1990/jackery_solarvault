@@ -321,7 +321,9 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 
         try:
             await self.entity_description.setter(
-                self.coordinator, self._device_id, transformed_value,
+                self.coordinator,
+                self._device_id,
+                transformed_value,
             )
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
@@ -378,7 +380,8 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                     continue
 
                 _append_unique(
-                    entities, JackeryNumber(coordinator, dev_id, description),
+                    entities,
+                    JackeryNumber(coordinator, dev_id, description),
                 )
         return entities
 

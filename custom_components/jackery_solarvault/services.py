@@ -342,17 +342,23 @@ SET_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
     ),
     vol.Optional(SERVICE_FIELD_USERNAME, default=""): vol.All(
         lambda value: credential_text(
-            value, field="username", max_length=MAX_USERNAME_LENGTH,
+            value,
+            field="username",
+            max_length=MAX_USERNAME_LENGTH,
         ),
     ),
     vol.Optional(SERVICE_FIELD_PASSWORD, default=""): vol.All(
         lambda value: credential_text(
-            value, field="password", max_length=MAX_PASSWORD_LENGTH,
+            value,
+            field="password",
+            max_length=MAX_PASSWORD_LENGTH,
         ),
     ),
     vol.Optional(SERVICE_FIELD_TOKEN, default=""): vol.All(
         lambda value: credential_text(
-            value, field="token", max_length=MAX_TOKEN_LENGTH,
+            value,
+            field="token",
+            max_length=MAX_TOKEN_LENGTH,
         ),
     ),
 })
@@ -3219,7 +3225,9 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
     """
     return (
         _ServiceRegistration(
-            SERVICE_RENAME_SYSTEM, _async_handle_rename, RENAME_SCHEMA,
+            SERVICE_RENAME_SYSTEM,
+            _async_handle_rename,
+            RENAME_SCHEMA,
         ),
         _ServiceRegistration(
             SERVICE_REFRESH_WEATHER_PLAN,
@@ -3655,7 +3663,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 coordinator = None
                 if device_id := call.data.get(SERVICE_FIELD_DEVICE_ID):
                     coordinator = _coordinator_for_device(
-                        hass, _resolve_jackery_device_id(hass, device_id),
+                        hass,
+                        _resolve_jackery_device_id(hass, device_id),
                     )
                 elif system_id := call.data.get(SERVICE_FIELD_SYSTEM_ID):
                     coordinator = _coordinator_for_system(hass, str(system_id))
@@ -5173,7 +5182,9 @@ async def _async_handle_sync_offline_statistics(
     if not accepted:
         msg = "sync_offline_statistics_failed"
         raise _service_action_error(
-            msg, device_id=device_id, error="backend did not acknowledge the upload",
+            msg,
+            device_id=device_id,
+            error="backend did not acknowledge the upload",
         )
     return {"synced": True}
 

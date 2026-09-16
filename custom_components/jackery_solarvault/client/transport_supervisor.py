@@ -4,8 +4,6 @@ Each transport (BLE, Cloud MQTT, Local MQTT) gets its own supervisor with
 independent lifecycle, reconnect logic, and credential management.
 """
 
-from __future__ import annotations
-
 import asyncio
 import contextlib
 from dataclasses import dataclass
@@ -168,7 +166,8 @@ class TransportSupervisor:
                     await self.config.start_fn()
                     self._state = SupervisorState.RUNNING
                     _LOGGER.info(
-                        "Transport %s reconnected successfully", self.config.name,
+                        "Transport %s reconnected successfully",
+                        self.config.name,
                     )
                     return  # ruff: ignore[try-consider-else]
                 except ConfigEntryAuthFailed:
@@ -252,7 +251,10 @@ class TransportSupervisorManager:
     ) -> TransportSupervisor:
         """Register a new transport supervisor."""
         supervisor = TransportSupervisor(
-            self.hass, self.entry, self.coordinator, config,
+            self.hass,
+            self.entry,
+            self.coordinator,
+            config,
         )
         self._supervisors[name] = supervisor
         return supervisor
@@ -271,7 +273,9 @@ class TransportSupervisorManager:
         if start_tasks:
             results = await asyncio.gather(*start_tasks, return_exceptions=True)
             for (name, _), result in zip(
-                self._supervisors.items(), results, strict=False,
+                self._supervisors.items(),
+                results,
+                strict=False,
             ):
                 if isinstance(result, ConfigEntryAuthFailed):
                     _LOGGER.warning(

@@ -441,13 +441,17 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: object) -> None:
         """Close the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, True,
+            self._device_id,
+            self._breaker_id,
+            True,
         )
 
     async def async_turn_off(self, **kwargs: object) -> None:
         """Open the breaker relay."""
         await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, False,
+            self._device_id,
+            self._breaker_id,
+            False,
         )
 
     def _build_breaker_device_info(

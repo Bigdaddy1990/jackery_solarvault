@@ -5,8 +5,6 @@ minimum state required to continue an already-observed local day after a Home
 Assistant restart; it never stores completed days, weeks, months, or years.
 """
 
-from __future__ import annotations
-
 import asyncio
 from datetime import date
 import json
@@ -63,7 +61,7 @@ def _clean_values(value: object) -> dict[str, int]:
             continue
         try:
             cleaned[metric] = int(raw)
-        except (OverflowError, TypeError, ValueError):
+        except OverflowError, TypeError, ValueError:
             continue
     return cleaned
 
@@ -205,7 +203,7 @@ def daily_delta(
         return None
     try:
         current = int(current_lifetime_value)
-    except (OverflowError, TypeError, ValueError):
+    except OverflowError, TypeError, ValueError:
         return None
     return current - anchor if current >= anchor else None
 

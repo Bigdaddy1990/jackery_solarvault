@@ -1,7 +1,5 @@
 """Direct local-broker MQTT transport for Jackery telemetry."""
 
-from __future__ import annotations
-
 import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -575,7 +573,7 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except (TimeoutError, OSError):
+            except TimeoutError, OSError:
                 # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
@@ -645,7 +643,9 @@ class JackeryLocalMqttClient:
                     raise
 
     async def _handle_message(
-        self, topic: str, payload: bytes | bytearray | str,
+        self,
+        topic: str,
+        payload: bytes | bytearray | str,
     ) -> None:
         """Process one direct call unless lifecycle stop blocks new ingress."""
         if self._stopping:
@@ -653,7 +653,9 @@ class JackeryLocalMqttClient:
         await self._process_message(topic, payload)
 
     async def _process_message(
-        self, topic: str, payload: bytes | bytearray | str,
+        self,
+        topic: str,
+        payload: bytes | bytearray | str,
     ) -> None:
         """Decode and forward one frame that already crossed acceptance."""
         raw = (
@@ -693,7 +695,7 @@ class JackeryLocalMqttClient:
             parsed = json.loads(raw.decode())
             if isinstance(parsed, dict):
                 data = parsed
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             pass
         if self._sink is None:
             self._messages_dropped += 1
@@ -970,7 +972,8 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant, entry: ConfigEntry,
+    hass: HomeAssistant,
+    entry: ConfigEntry,
 ) -> JackeryLocalMqttClient | None:
     """Return the local MQTT adapter stored for a config entry."""
     coordinator = getattr(entry, "runtime_data", None)

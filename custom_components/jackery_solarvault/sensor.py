@@ -578,7 +578,7 @@ async def _async_restored_lifetime_energy_value(
         return None
     try:
         value = float(native_value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
     if not isfinite(value) or value < 0:
         return None
@@ -819,7 +819,8 @@ def _period_start_at(reset_period: StatResetPeriod, now: datetime) -> datetime:
 
 
 def _period_start(
-    reset_period: StatResetPeriod, timezone: tzinfo | None = None,
+    reset_period: StatResetPeriod,
+    timezone: tzinfo | None = None,
 ) -> datetime:
     """The the timezone-aware start datetime for the current statistic period.
 
@@ -1354,7 +1355,9 @@ class JackeryConversionLossPowerSensor(JackeryEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "conversion_loss_power")
@@ -2742,7 +2745,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         chart_series_sum: float | None = None
         if isinstance(values, list):
             chart_series_sum = round(
-                sum(value for value in values if value is not None), 2,
+                sum(value for value in values if value is not None),
+                2,
             )
         scalar_total = safe_float(source.get(stat_key))
         server_total = scalar_total
@@ -3000,7 +3004,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 selected = zeroes[-1]
             else:
                 selected = next(
-                    (observation for observation in zeroes if observation[3]), None,
+                    (observation for observation in zeroes if observation[3]),
+                    None,
                 )
 
         if selected is None:
@@ -3647,7 +3652,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         self._cache_initializing = True
         try:
             await super().async_added_to_hass()
-        except (Exception, asyncio.CancelledError):
+        except Exception, asyncio.CancelledError:
             batch.discard(self)
             raise
         finally:
@@ -4180,7 +4185,9 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
         # entity read a sibling pack's values or flip to Unknown.
         if self._pack_sn is not None:
             serial_key = stable_subdevice_key(
-                "battery_pack", self._pack_sn, self._pack_index,
+                "battery_pack",
+                self._pack_sn,
+                self._pack_index,
             )
             for pack in pack_dicts:
                 if (
@@ -4435,7 +4442,9 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
         # Build the per-plug device_info once at construction (see PROTOCOL §8
         # and binary_sensor.py for the rationale).
         self._attr_device_info = self._build_smart_plug_device_info(
-            plug_index, self._plug, plug_key,
+            plug_index,
+            self._plug,
+            plug_key,
         )
 
     @property
@@ -5250,7 +5259,9 @@ class JackeryRawPropertiesSensor(JackeryEntity, SensorEntity):
     _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "raw_properties")
@@ -5292,7 +5303,9 @@ class JackeryBleTransportSensor(JackeryEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialize the device's BLE transport diagnostic sensor.
 
@@ -5621,7 +5634,9 @@ class JackeryWeatherPlanSensor(JackeryEntity, SensorEntity):
     _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, PAYLOAD_WEATHER_PLAN)
@@ -5651,7 +5666,9 @@ class JackeryTaskPlanSensor(JackeryEntity, SensorEntity):
     _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, PAYLOAD_TASK_PLAN)
@@ -5694,7 +5711,9 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "battery_net_power")
@@ -5727,10 +5746,12 @@ class JackeryBatteryNetPowerSensor(JackeryEntity, SensorEntity):
             "http_batOutPw": http_props.get(FIELD_BAT_OUT_PW),
             "http_batInPw": http_props.get(FIELD_BAT_IN_PW),
             "mqtt_minus_http_batInPw": _signed_diff(
-                merged.get(FIELD_BAT_IN_PW), http_props.get(FIELD_BAT_IN_PW),
+                merged.get(FIELD_BAT_IN_PW),
+                http_props.get(FIELD_BAT_IN_PW),
             ),
             "mqtt_minus_http_batOutPw": _signed_diff(
-                merged.get(FIELD_BAT_OUT_PW), http_props.get(FIELD_BAT_OUT_PW),
+                merged.get(FIELD_BAT_OUT_PW),
+                http_props.get(FIELD_BAT_OUT_PW),
             ),
             "stackOutPw": merged.get(FIELD_STACK_OUT_PW),
             "stackInPw": merged.get(FIELD_STACK_IN_PW),
@@ -5748,7 +5769,9 @@ class JackeryBatteryStackNetPowerSensor(JackeryEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "battery_stack_net_power")
@@ -5812,7 +5835,9 @@ class JackeryGridNetPowerSensor(JackeryEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "grid_net_power")
@@ -5856,7 +5881,9 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
     _attr_native_unit_of_measurement = UnitOfPower.WATT
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "home_consumption_power")
@@ -5878,7 +5905,9 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
 
     @classmethod
     def _home_consumption_power(
-        cls, ct: dict[str, Any], props: dict[str, Any],
+        cls,
+        ct: dict[str, Any],
+        props: dict[str, Any],
     ) -> HomeConsumptionPower | None:
         """The home consumption and its components."""
         return jackery_corrected_home_consumption_power(ct, props)
@@ -5944,10 +5973,12 @@ class JackeryHomeConsumptionPowerSensor(JackeryEntity, SensorEntity):
             if result.smart_meter_net_power is not None:
                 attrs["smart_meter_net_power"] = round(result.smart_meter_net_power, 2)
             attrs["jackery_grid_side_input_power"] = round(
-                result.jackery_input_power, 2,
+                result.jackery_input_power,
+                2,
             )
             attrs["jackery_grid_side_output_power"] = round(
-                result.jackery_output_power, 2,
+                result.jackery_output_power,
+                2,
             )
 
         phases = JackerySmartMeterSensor._signed_phase_values(ct)  # ruff:ignore[private-member-access]  # reuse of sibling sensor's classmethod phase helper (same module)
@@ -5988,7 +6019,9 @@ class JackeryAlarmSensor(JackeryEntity, SensorEntity):
     _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "alarm_count")
@@ -6064,7 +6097,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except (TypeError, ValueError, OSError):
+        except TypeError, ValueError, OSError:
             return None
 
 
@@ -6113,7 +6146,9 @@ class JackeryFirmwareSensor(JackeryEntity, SensorEntity):
     _attr_entity_registry_enabled_default = False
 
     def __init__(
-        self, coordinator: JackerySolarVaultCoordinator, device_id: str,
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, "firmware_version")

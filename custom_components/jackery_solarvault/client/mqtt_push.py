@@ -1,7 +1,5 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
-from __future__ import annotations
-
 import asyncio
 from collections import deque
 from dataclasses import dataclass
@@ -120,13 +118,19 @@ JACKERY_MQTT_SUPPORTS_LWT: Final = False
 JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE: Final = False
 MQTT_MESSAGE_SPECS: Final = {
     MqttMessageType.SUBSCRIPTION: MqttMessageSpec(
-        topic_suffixes=MQTT_TOPIC_SUFFIXES, qos=0, retain=False,
+        topic_suffixes=MQTT_TOPIC_SUFFIXES,
+        qos=0,
+        retain=False,
     ),
     MqttMessageType.COMMAND: MqttMessageSpec(
-        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False,
+        topic_suffixes=(MQTT_TOPIC_COMMAND,),
+        qos=0,
+        retain=False,
     ),
     MqttMessageType.BIRTH: MqttMessageSpec(
-        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False,
+        topic_suffixes=(MQTT_TOPIC_COMMAND,),
+        qos=0,
+        retain=False,
     ),
 }
 
@@ -200,7 +204,8 @@ class JackeryMqttPushClient:
         self._tls_x509_strict_disabled = False
         # Getter response correlation (bounded session state)
         self._pending_responses: dict[
-            tuple[int, int, str | int | None], asyncio.Future[dict[str, Any]],
+            tuple[int, int, str | int | None],
+            asyncio.Future[dict[str, Any]],
         ] = {}
         self._responses_correlated = 0
         self._responses_expired = 0
@@ -859,7 +864,9 @@ class JackeryMqttPushClient:
 
         ca_path = Path(
             self._hass.config.path(
-                "custom_components", "jackery_solarvault", "jackery_ca.crt",
+                "custom_components",
+                "jackery_solarvault",
+                "jackery_ca.crt",
             ),
         )
         if ca_path.is_file():
@@ -924,7 +931,8 @@ class JackeryMqttPushClient:
         if self._stopping:
             return
         if generation is not None and not self._session_is_current(
-            generation, runner_task,
+            generation,
+            runner_task,
         ):
             return
         try:
@@ -1210,13 +1218,15 @@ class JackeryMqttPushClient:
         tracked_tasks: set[asyncio.Task[None]] | None = None,
     ) -> None:
         if generation is not None and not self._session_is_current(
-            generation, runner_task,
+            generation,
+            runner_task,
         ):
             return
 
         async def _runner() -> None:
             if generation is not None and not self._session_is_current(
-                generation, runner_task,
+                generation,
+                runner_task,
             ):
                 return
             await coro_factory()
@@ -1439,12 +1449,13 @@ class JackeryMqttPushClient:
         """
         raw_request_id = data.get("request_id", data.get(FIELD_ID))
         if not isinstance(raw_request_id, (str, int)) or isinstance(
-            raw_request_id, bool,
+            raw_request_id,
+            bool,
         ):
             return
         try:
             request_id = int(raw_request_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         response_type = self._normalize_response_type(
             data.get("response_type", data.get(FIELD_ACTION_ID)),

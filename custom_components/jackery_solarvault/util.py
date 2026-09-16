@@ -312,7 +312,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -676,7 +676,9 @@ def app_period_date_bounds(
 
 
 def app_period_request_kwargs(
-    date_type: str, *, today: date | None = None,
+    date_type: str,
+    *,
+    today: date | None = None,
 ) -> dict[str, str]:
     """Return method kwargs for documented app-period API calls."""
     begin, end = app_period_date_bounds(date_type, today=today)
@@ -950,7 +952,7 @@ def safe_float(
         return _parse_float_string(value)
     try:
         parsed = float(value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
     return parsed if math.isfinite(parsed) else None
 
@@ -2111,7 +2113,8 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
     pv_residual_after_self_consumption_energy = None
     if year_generation is not None:
         pv_residual_after_self_consumption_energy = max(
-            0.0, year_generation - savings_energy,
+            0.0,
+            year_generation - savings_energy,
         )
 
     calculated_total = round(savings_energy * price, 2)
@@ -2231,7 +2234,8 @@ def _backfill_pv_revenue(
     monthly_total = round(sum(revenue_values), 2)
     raw_total = _pv_revenue_value(year_source)
     if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-        raw_total, monthly_total,
+        raw_total,
+        monthly_total,
     ):
         return
 
@@ -2322,7 +2326,8 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
             else safe_float(year_source.get(stat_key))
         )
         if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-            raw_total, monthly_total,
+            raw_total,
+            monthly_total,
         ):
             continue
 
@@ -2789,7 +2794,8 @@ def _day_power_sample_energy_value(
 
 
 def _reconcile_rounded_day_values(
-    rounded_values: list[float], scalar_total: float,
+    rounded_values: list[float],
+    scalar_total: float,
 ) -> list[float]:
     """Reconcile rounded buckets exactly to a non-negative scalar total.
 
@@ -2996,7 +3002,9 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
             bucket_value,
         )
         for (minute, _value), bucket_value in zip(
-            bucket_items, rounded_values, strict=False,
+            bucket_items,
+            rounded_values,
+            strict=False,
         )
     ]
 
@@ -3140,10 +3148,14 @@ def app_data_quality_warnings(
             year_section, year_source = year
             week_section, week_source = week
             year_total = effective_period_total_value(
-                year_source, year_section, stat_key,
+                year_source,
+                year_section,
+                stat_key,
             )
             week_total = effective_period_total_value(
-                week_source, week_section, stat_key,
+                week_source,
+                week_section,
+                stat_key,
             )
             if (
                 year_total is not None
@@ -3337,7 +3349,9 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
         `None` if no CT-derived power values are available.
     """
     total = directional_power_value(
-        ct, (CT_TOTAL_POWER_PAIR[0],), (CT_TOTAL_POWER_PAIR[1],),
+        ct,
+        (CT_TOTAL_POWER_PAIR[0],),
+        (CT_TOTAL_POWER_PAIR[1],),
     )
     if total is not None:
         return total
@@ -3950,7 +3964,8 @@ def trend_series_has_value(  # ruff: ignore[too-many-return-statements]
 
 
 def task_plan_value(
-    task_plan: dict[str, Any], *keys: str,
+    task_plan: dict[str, Any],
+    *keys: str,
 ) -> str | int | float | bool | None:  # primitive payload value
     """Retrieve the first non-None task-plan value.
 
