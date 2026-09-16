@@ -36,7 +36,9 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Install Pyrefly
-        run: pip install pyrefly
-
+        run: |
+          pyrefly infer tests/ || true
+          pyrefly infer custom_components/jackery_solarvault/ || true
+           
       - name: Run Pyrefly Type Checker
         run: pyrefly check --output-format=github --python-version=3.14
