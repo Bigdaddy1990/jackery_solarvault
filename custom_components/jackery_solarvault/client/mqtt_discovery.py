@@ -1,18 +1,17 @@
 """Publish native Jackery sensor values through Home Assistant MQTT discovery."""
 
 import asyncio
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 import contextlib
 from datetime import date, datetime
 from enum import Enum
 from itertools import starmap
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import mqtt
-from homeassistant.core import callback, HomeAssistant
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
@@ -20,7 +19,7 @@ from homeassistant.util import slugify
 from ..const import DOMAIN, MANUFACTURER
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
@@ -429,6 +428,7 @@ class JackeryMqttSensorPublisher:
             )
         if self._cleanup_topics and mqtt.is_connected(self._hass):
             self._async_schedule_cleanup_worker()
+
 
 def registered_mirror_config_topics(hass: HomeAssistant) -> set[str]:
     """Return retained config topics created by the removed sensor mirror."""

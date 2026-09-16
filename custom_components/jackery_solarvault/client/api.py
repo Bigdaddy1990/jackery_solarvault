@@ -20,10 +20,9 @@ Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 import asyncio
 import base64
 import binascii
-from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import date, timezone
-from enum import StrEnum, auto
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from enum import StrEnum
 import hashlib
 from http import HTTPStatus
 import inspect
@@ -32,7 +31,7 @@ import logging
 import os
 import re
 import time
-from typing import TYPE_CHECKING, Any, Final, Generic, TypedDict
+from typing import TYPE_CHECKING, Any, Final, TypedDict
 import uuid
 
 import aiohttp
@@ -41,10 +40,6 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 import voluptuous as vol
-
-from homeassistant.const import Platform
-from homeassistant.core import callback
-from homeassistant.helpers.json import json_dumps
 
 from ..const import (
     ACCESSORIES_BIND_PATH,
@@ -278,6 +273,9 @@ from .credentials import (
     credential_text,
     redacted_error,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 _LOGGER = logging.getLogger(__name__)
 

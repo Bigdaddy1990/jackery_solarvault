@@ -1,8 +1,6 @@
 """App-compatible codec for ThirdPartMQTTConfig credential fields."""
 
 import base64
-from collections.abc import Mapping
-from dataclasses import field
 import logging
 import secrets
 from typing import TYPE_CHECKING, Any
@@ -36,6 +34,9 @@ from ..const import (
 )
 from ..util import safe_bool
 from .ble import BLE_AES_IV_LEN, aes_decrypt, aes_encrypt
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _LOGGER = logging.getLogger(__name__)
 

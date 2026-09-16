@@ -1,12 +1,8 @@
 """Shared credential safety contract for Jackery SolarVault."""
 
-from __future__ import annotations
-
 import hashlib
 import logging
-from collections.abc import Mapping
-from dataclasses import field
-from typing import Final, TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import voluptuous as vol
 
