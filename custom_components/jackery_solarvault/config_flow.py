@@ -379,7 +379,7 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
         ),
         CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
             _first_entry_value(
-                CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS
+                CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS,
             ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
@@ -467,7 +467,7 @@ def _merge_local_mqtt_options(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 current.get(
-                    CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
+                    CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME,
                 ),
             )
             or "",
@@ -476,7 +476,7 @@ def _merge_local_mqtt_options(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 current.get(
-                    CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
+                    CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
                 ),
             )
             or "",
@@ -553,7 +553,7 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
     """Handle the Jackery SolarVault options flow."""
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Present or submit the integration options form.
 
@@ -770,7 +770,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             payload_dict = json.loads(payload.decode())
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return self.async_abort(reason="invalid_discovery_info")
 
         # MQTT discovery payloads use "deviceSn" (FIELD_DEVICE_SN), not "devSn"
@@ -866,7 +866,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     field="password",
                     max_length=MAX_PASSWORD_LENGTH,
                 )
-            except KeyError, vol.Invalid, TypeError:
+            except (KeyError, vol.Invalid, TypeError):
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
                 return self.async_show_form(
                     step_id=FLOW_STEP_USER,
@@ -896,7 +896,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
                 _LOGGER.debug(
-                    "Cannot connect to Jackery during setup: %s", redacted_error(err)
+                    "Cannot connect to Jackery during setup: %s", redacted_error(err),
                 )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
@@ -917,7 +917,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Reconfigure an existing config entry.
 
@@ -934,7 +934,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
         return self.async_show_menu(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -945,7 +945,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reconfigure_credentials(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Reconfigure an existing entry by validating credentials and updating data.
 
@@ -973,7 +973,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -984,7 +984,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     user_input[CONF_USERNAME],
                     field="username",
                     max_length=MAX_USERNAME_LENGTH,
-                )
+                ),
             )
             password = credential_text(
                 user_input[CONF_PASSWORD],
@@ -1100,7 +1100,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_accept_shared(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Accept a device shared with the configured Jackery account.
 
@@ -1120,7 +1120,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1142,7 +1142,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason=FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED)
             except JackeryError as err:
                 _LOGGER.debug(
-                    "Cannot accept shared Jackery device: %s", redacted_error(err)
+                    "Cannot accept shared Jackery device: %s", redacted_error(err),
                 )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
@@ -1167,13 +1167,13 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_reauth(
-        self, entry_data: Mapping[str, Any]
+        self, entry_data: Mapping[str, Any],
     ) -> ConfigFlowResult:
         """Handle reauth started by ConfigEntryAuthFailed."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Validate the current password for reauthentication.
 
@@ -1187,7 +1187,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)

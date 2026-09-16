@@ -119,7 +119,7 @@ def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
 
 
 def _description_name(
-    entity: _EntityDeviceLike, description: _DescriptionLike | None, unique_id: str
+    entity: _EntityDeviceLike, description: _DescriptionLike | None, unique_id: str,
 ) -> str:
     """Return a readable, stable discovery name without localization coupling."""
     raw = (
@@ -236,7 +236,7 @@ class JackeryMqttSensorPublisher:
                 raise result
 
     async def _async_publish_entity(
-        self, unique_id: str, entity: _EntityDeviceLike
+        self, unique_id: str, entity: _EntityDeviceLike,
     ) -> None:
         """Publish one entity in config, state, availability order."""
         description = getattr(entity, "entity_description", None)
@@ -318,7 +318,7 @@ class JackeryMqttSensorPublisher:
                         "entity_registry_enabled_default",
                         True,
                     ),
-                )
+                ),
             ),
             "name": _description_name(entity, description, unique_id),
             "origin": {
@@ -338,7 +338,7 @@ class JackeryMqttSensorPublisher:
             "state_class": getattr(description, "state_class", None)
             or getattr(entity, "state_class", None),
             "unit_of_measurement": getattr(
-                description, "native_unit_of_measurement", None
+                description, "native_unit_of_measurement", None,
             )
             or getattr(entity, "native_unit_of_measurement", None),
         }
@@ -449,7 +449,7 @@ class JackeryMqttSensorPublisher:
         except TimeoutError:
             _LOGGER.debug(
                 "Timed out clearing retained Jackery MQTT topics during unload; "
-                "cleanup will continue in the background"
+                "cleanup will continue in the background",
             )
         if self._cleanup_topics and mqtt.is_connected(self._hass):
             self._async_schedule_cleanup_worker()
@@ -462,7 +462,7 @@ def registered_mirror_config_topics(hass: HomeAssistant) -> set[str]:
     for registry_entry in registry.entities.values():
         unique_id = registry_entry.unique_id
         if registry_entry.platform != "mqtt" or not unique_id.startswith(
-            _MIRROR_UNIQUE_ID_PREFIX
+            _MIRROR_UNIQUE_ID_PREFIX,
         ):
             continue
         native_unique_id = unique_id.removeprefix(_MIRROR_UNIQUE_ID_PREFIX)

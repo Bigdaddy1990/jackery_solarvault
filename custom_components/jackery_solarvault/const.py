@@ -1732,7 +1732,7 @@ WORK_MODE_READ_ALIASES: Final = {5: "tariff"}
 TEMP_UNIT_TO_OPTION: Final = {0: "celsius", 1: "fahrenheit"}
 AUTO_OFF_HOURS: Final = (2, 8, 12, 24)
 STORM_MINUTES_DEFAULT: Final = tuple(
-    [hour * 60 for hour in range(1, 25)] + [2880, 4320]
+    [hour * 60 for hour in range(1, 25)] + [2880, 4320],
 )
 # Storm-warning lead-times below this value are treated as firmware sentinels,
 # not real user settings. The Jackery app dropdown starts at 60 minutes
@@ -2723,7 +2723,7 @@ SUBDEVICE_SCAN_NAME_MANUFACTURERS: Final[dict[str, str]] = {
 
 # Set of all known accessory ``scanName`` values.
 SUBDEVICE_SCAN_NAMES: Final[frozenset[str]] = frozenset(
-    SUBDEVICE_SCAN_NAME_DEV_TYPES.keys()
+    SUBDEVICE_SCAN_NAME_DEV_TYPES.keys(),
 )
 
 # ``DeviceJackeryAccessoriesExistApi$SCANTY`` enum values. The Jackery

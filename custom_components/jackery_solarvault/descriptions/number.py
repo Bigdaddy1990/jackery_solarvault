@@ -127,7 +127,7 @@ def first_nonblank_int(value: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
     return None
 
@@ -149,7 +149,7 @@ def safe_float(v: object) -> float | None:
         return None
     try:
         return float(v) if isinstance(v, (bool, int, float, str)) else None
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 

@@ -39,7 +39,7 @@ def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
 
 
 async def async_load_discovery_cache(
-    hass: HomeAssistant, entry_id: str
+    hass: HomeAssistant, entry_id: str,
 ) -> dict[str, dict[str, Any]]:
     """Retrieve the cached device index for the specified config entry.
 
