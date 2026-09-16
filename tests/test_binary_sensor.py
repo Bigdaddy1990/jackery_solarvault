@@ -18,12 +18,12 @@ from custom_components.jackery_solarvault.const import SOLAR_VAULT_HEAD_UNIT_MOD
 class TestBinarySensor:
     """Test binary sensor classes."""
 
-    def _bare_hass(self) -> Any:  # ruff: ignore[any-type, no-self-use]
+    def _bare_hass(self) -> Any:  # ruff: ignore[no-self-use]
         hass = SimpleNamespace()
         hass.data = {}
         return hass
 
-    def _bare_entry(self) -> Any:  # ruff: ignore[any-type, no-self-use]
+    def _bare_entry(self) -> Any:  # ruff: ignore[no-self-use]
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -31,7 +31,7 @@ class TestBinarySensor:
         entry.async_on_unload = MagicMock()
         return entry
 
-    def _bare_coordinator(self, entry: Any) -> Any:  # ruff: ignore[any-type, no-self-use]
+    def _bare_coordinator(self, entry: Any) -> Any:  # ruff: ignore[no-self-use]
         """Create a bare coordinator with the given entry."""
         coordinator = SimpleNamespace()
         coordinator.entry = entry

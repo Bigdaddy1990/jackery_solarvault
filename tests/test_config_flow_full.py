@@ -94,7 +94,7 @@ class TestEntryDataFromApiLogin:
     """Lines 212-250."""
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
+        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"  # ruff: ignore[line-too-long]
     )
     def test_valid_login_returns_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
@@ -108,7 +108,7 @@ class TestEntryDataFromApiLogin:
         assert result["mqtt_session"] == {"broker": "emqx.jackeryapp.com"}
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"
+        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"  # ruff: ignore[line-too-long]
     )
     def test_valid_login_falls_back_to_existing_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
@@ -166,8 +166,10 @@ class TestCoerceLocalMqttPort:
             ["", 1883],
         ],
     )
-    def test_various_inputs_return_correct_port(
-        self, value: Any, expected: int
+    def test_various_inputs_return_correct_port(  # ruff: ignore[undocumented-public-method, no-self-use]
+        self,
+        value: Any,
+        expected: int,
     ) -> None:
         assert _coerce_local_mqtt_port(value) == expected
 
@@ -196,7 +198,7 @@ class TestCoerceLocalMqttQos:
             ["invalid", 0],
         ],
     )
-    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:  # ruff: ignore[any-type, undocumented-public-method, no-self-use]
+    def test_various_inputs_return_correct_qos(self, value: Any, expected: int) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert _coerce_local_mqtt_qos(value) == expected
 
 
@@ -209,7 +211,7 @@ class TestCurrentLocalMqttOptions:
     """Lines 303-394."""
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
     )
     def test_entry_with_options_returns_them(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
@@ -220,7 +222,7 @@ class TestCurrentLocalMqttOptions:
         assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
     )
     def test_entry_without_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
@@ -234,7 +236,7 @@ class TestCurrentLocalMqttOptions:
         )
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
     )
     def test_entry_with_empty_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={})
@@ -243,7 +245,7 @@ class TestCurrentLocalMqttOptions:
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
 
     @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"
+        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
     )
     def test_entry_id_is_ignored(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
@@ -262,7 +264,7 @@ class TestMergeLocalMqttOptions:
     """Lines 394-477."""
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_basic_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1, "b": 2}
@@ -281,7 +283,7 @@ class TestMergeLocalMqttOptions:
         assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_none_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
@@ -305,7 +307,7 @@ class TestMergeLocalMqttOptions:
         )
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_empty_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
@@ -328,7 +330,7 @@ class TestMergeLocalMqttOptions:
         )
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": 1}
@@ -337,7 +339,7 @@ class TestMergeLocalMqttOptions:
         assert result["a"] == 1
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_nested_dict_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": {"x": 1, "y": 2}}
@@ -348,7 +350,7 @@ class TestMergeLocalMqttOptions:
         assert result["a"]["z"] == 3  # ruff: ignore[magic-value-comparison]
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_nested_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         base = {"a": {"x": 1}}
@@ -362,7 +364,7 @@ class TestMergeLocalMqttOptions:
         assert base["a"] == 1
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_new_keys_are_added_but_mqtt_keys_preserved(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         result = _merge_local_mqtt_options({}, {"new": 42})
@@ -393,7 +395,7 @@ class TestReconfigureOptions:
     """Lines 477-530."""
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_basic_reconfigure_returns_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry()
@@ -402,7 +404,7 @@ class TestReconfigureOptions:
         assert result is not None
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_entry_with_data_and_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(data={"key": "val"}, options={"opt": "val"})
@@ -411,7 +413,7 @@ class TestReconfigureOptions:
         assert result is not None
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_entry_with_no_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
@@ -420,7 +422,7 @@ class TestReconfigureOptions:
         assert result is not None
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_entry_with_empty_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={})
@@ -445,7 +447,7 @@ class TestJackeryOptionsFlow:
         assert hasattr(JackeryOptionsFlow, "async_step_init")
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryOptionsFlow()
@@ -477,7 +479,7 @@ class TestJackeryConfigFlow:
         assert hasattr(JackeryConfigFlow, "async_step_accept_shared")
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         flow = JackeryConfigFlow()
@@ -500,7 +502,7 @@ class TestHelperFunctions:
         assert _normalize_account("") == ""  # ruff: ignore[compare-to-empty-string]
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_current_option_values(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={"key": "val"})
@@ -508,14 +510,14 @@ class TestHelperFunctions:
         assert result == {"key": "val"}
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_flow_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         result = _flow_options({"key": "val"})
         assert result == {"key": "val"}
 
     @pytest.mark.skip(
-        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"
+        reason="stale: predates refactor of config_flow helpers (signatures/return-shape changed)"  # ruff: ignore[line-too-long]
     )
     def test_entry_text(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         # pyrefly: ignore [missing-argument]

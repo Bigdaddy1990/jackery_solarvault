@@ -61,7 +61,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  # isort: skip
     """Test coordinator helper functions that exist in coordinator.py."""
 
-    def _bare_entry(self) -> Any:  # ruff: ignore[any-type, no-self-use]  # isort: skip
+    def _bare_entry(self) -> Any:  # ruff: ignore[no-self-use]  # isort: skip
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}

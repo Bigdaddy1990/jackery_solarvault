@@ -187,8 +187,10 @@ class TestJackeryNumber:
         coordinator.async_portable_set_custom_use_battery = AsyncMock()
         return coordinator
 
-    def _create_number(
-        self, coordinator: MagicMock, key="soc_charge_limit_set"
+    def _create_number(  # ruff: ignore[no-self-use]
+        self,
+        coordinator: MagicMock,
+        key="soc_charge_limit_set",  # ruff: ignore[missing-type-function-argument]
     ) -> JackeryNumber:
         """Create a number instance for testing."""
         description = JackeryNumberDescription(

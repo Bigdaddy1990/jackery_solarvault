@@ -153,10 +153,10 @@ async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
     def _ct_stat(
         _device_id: str,
         *,
-        query: Any | None = None,  # ruff: ignore[any-type]  # isort: skip
+        query: Any | None = None,  # isort: skip
         date_type: str | None = None,
         stat_type: int | None = None,
-        **_kwargs: Any,  # ruff: ignore[any-type]  # isort: skip
+        **_kwargs: Any,  # isort: skip
     ) -> dict[str, Any]:
         if query is not None:
             date_type = query.date_type

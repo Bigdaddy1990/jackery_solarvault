@@ -40,11 +40,11 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
-def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]
+def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator)._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
 
 
-def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]
+def _plain_call(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator)._async_publish_command.await_args  # ruff: ignore[private-member-access]
 
 

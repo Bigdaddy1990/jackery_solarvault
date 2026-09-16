@@ -541,7 +541,7 @@ async def test_automatic_bridge_writes_only_after_verified_3047_mismatch() -> No
             FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
         }
 
-    async def _set_config(_device_id: str, **kwargs: Any) -> None:  # ruff: ignore[any-type]
+    async def _set_config(_device_id: str, **kwargs: Any) -> None:
         await asyncio.sleep(0)
         call_order.append("3046")
         assert kwargs["port"] == _LOCAL_MQTT_PORT

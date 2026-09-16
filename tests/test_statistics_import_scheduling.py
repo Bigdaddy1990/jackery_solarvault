@@ -28,8 +28,8 @@ def test_startup_backfill_does_not_slow_current_statistics_imports() -> None:
 
     def _create_background_task(
         coro: Coroutine[Any, Any, Any],
-        **_kwargs: Any,  # ruff: ignore[any-type]
-    ) -> Any:  # ruff: ignore[any-type]
+        **_kwargs: Any,
+    ) -> Any:
         created.append(coro)
         coro.close()
         return MagicMock(done=MagicMock(return_value=False))

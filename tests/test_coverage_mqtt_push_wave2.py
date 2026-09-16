@@ -147,7 +147,7 @@ async def test_cloud_session_subscribes_and_delivers_every_payload(
     broker = _BrokerClient([frame], finish_event=finish_event)
     constructor_kwargs: dict[str, Any] = {}
 
-    def _make_broker(**kwargs: Any) -> _BrokerClient:  # ruff: ignore[any-type]
+    def _make_broker(**kwargs: Any) -> _BrokerClient:
         constructor_kwargs.update(kwargs)
         return broker
 
@@ -244,7 +244,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     broker = _BrokerClient(enter_error=MqttError("network down"))
     calls = 0
 
-    def _make_broker(**_kwargs: Any) -> _BrokerClient:  # ruff: ignore[any-type]
+    def _make_broker(**_kwargs: Any) -> _BrokerClient:
         nonlocal calls
         calls += 1
         return broker

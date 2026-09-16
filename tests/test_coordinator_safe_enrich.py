@@ -16,7 +16,7 @@ from custom_components.jackery_solarvault.coordinator import _safe_enrich  # ruf
 class TestSafeEnrich:
     """Test _safe_enrich helper function."""
 
-    def _bare_entry(self) -> Any:  # ruff: ignore[any-type, no-self-use]
+    def _bare_entry(self) -> Any:  # ruff: ignore[no-self-use]
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -28,7 +28,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         enrich_called = False
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[any-type, unused-async]
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[unused-async]
             nonlocal enrich_called
             enrich_called = True
 
@@ -43,7 +43,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[any-type, unused-async]
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[unused-async]
             raise JackeryAuthError("auth failed")  # ruff: ignore[raise-vanilla-args]
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -58,7 +58,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[any-type, unused-async]
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[unused-async]
             raise TimeoutError("timeout")
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -72,7 +72,7 @@ class TestSafeEnrich:
         entry = self._bare_entry()
         caplog.set_level(logging.DEBUG)
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[any-type, unused-async]
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[unused-async]
             raise JackeryError("api error")  # ruff: ignore[raise-vanilla-args]
 
         await _safe_enrich("device-1", entry, enrich_fn, stale_ok=True)
@@ -83,7 +83,7 @@ class TestSafeEnrich:
         """Test _safe_enrich raises for unexpected exceptions."""
         entry = self._bare_entry()
 
-        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[any-type, unused-async]
+        async def enrich_fn(dev_id: str, entry: Any, stale_ok: bool) -> None:  # ruff: ignore[unused-async]
             raise ValueError("unexpected")
 
         with pytest.raises(ValueError, match="unexpected"):

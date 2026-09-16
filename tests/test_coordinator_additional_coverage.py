@@ -32,7 +32,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorMainPaths:
     """Test main coordinator paths for coverage."""
 
-    def _bare_coordinator(self) -> Any:  # ruff: ignore[any-type, no-self-use]  # isort: skip
+    def _bare_coordinator(self) -> Any:  # ruff: ignore[no-self-use]  # isort: skip
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = cast("Any", coordinator)
         shell._shutdown_started = False  # ruff: ignore[private-member-access]  # isort: skip
