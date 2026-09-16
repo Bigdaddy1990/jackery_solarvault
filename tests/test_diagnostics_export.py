@@ -13,7 +13,6 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
 )
 from custom_components.jackery_solarvault.const import (
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -348,7 +347,9 @@ async def test_export_raw_api_app_chart_import_empty_when_no_devices() -> None:
 async def test_local_mqtt_diagnostics_bridge_disabled() -> None:
     """Neither local nor third-party bridge enabled yields bridge_disabled."""
     coordinator, entry = _diagnostics_rig(
-        options={CONF_LOCAL_MQTT_ENABLE: False, CONF_THIRD_PARTY_MQTT_ENABLE: False},
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: False,
+        },
     )
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
@@ -362,7 +363,7 @@ async def test_local_mqtt_diagnostics_bridge_disabled() -> None:
 async def test_local_mqtt_diagnostics_missing_broker_host() -> None:
     """An enabled bridge with no configured host reports missing_broker_host."""
     coordinator, entry = _diagnostics_rig(
-        options={CONF_LOCAL_MQTT_ENABLE: True},
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: True},
     )
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
@@ -375,7 +376,7 @@ async def test_local_mqtt_diagnostics_redacts_broker_wide_topic() -> None:
     """A user-selected broker-wide topic remains private in diagnostics."""
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "#",
         },
@@ -395,7 +396,7 @@ async def test_local_mqtt_diagnostics_redacts_valid_prefixed_custom_topic() -> N
     """A valid Jackery topic remains private in the shareable export."""
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/app/custom",
         },
@@ -413,7 +414,7 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
     """A device-specific local topic never appears in a diagnostics export."""
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant",
         },
@@ -431,7 +432,7 @@ async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> 
     """A fully valid config with no registered client falls back to client_not_started."""  # ruff: ignore[line-too-long]
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
         },
     )
@@ -451,7 +452,7 @@ async def test_local_mqtt_diagnostics_uses_registered_client_snapshot() -> None:
     client.diagnostics_snapshot.return_value = {"messages_received": 7}
     coordinator, entry = _diagnostics_rig(
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
         },
         hass_data={DOMAIN: {_ENTRY_ID: {LOCAL_MQTT_RUNTIME_KEY: client}}},

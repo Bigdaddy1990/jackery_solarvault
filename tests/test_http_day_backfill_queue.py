@@ -39,7 +39,6 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         config=SimpleNamespace(time_zone="Europe/Berlin"),
     )
     obj.api = SimpleNamespace()
-    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

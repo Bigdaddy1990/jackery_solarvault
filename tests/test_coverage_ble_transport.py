@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from custom_components.jackery_solarvault.client.ble_transport import (
     BleFrameObservation,
     BleListenerStats,
-    _should_log_ble_notification,  # ruff: ignore[import-private-name]
+    _should_log_ble_notification,
 )
 
 

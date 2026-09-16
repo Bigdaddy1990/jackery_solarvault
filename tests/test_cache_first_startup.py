@@ -46,7 +46,6 @@ def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoor
     obj._local_mqtt_client = None
     obj._shutdown_started = False
     obj.data = data or {}
-    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -306,7 +305,6 @@ class TestTransportSupervisorManager:
             enabled_check=lambda e: True,
             start_fn=AsyncMock(),
             stop_fn=AsyncMock(),
-            # pyrefly: ignore [bad-argument-type]
             update_credentials_fn=lambda: update_called.__setitem__("ble", True),
         )
         mqtt_config = SupervisorConfig(
@@ -314,7 +312,6 @@ class TestTransportSupervisorManager:
             enabled_check=lambda e: True,
             start_fn=AsyncMock(),
             stop_fn=AsyncMock(),
-            # pyrefly: ignore [bad-argument-type]
             update_credentials_fn=lambda: update_called.__setitem__("mqtt", True),
         )
 

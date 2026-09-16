@@ -37,7 +37,7 @@ def _coordinator() -> JackerySolarVaultCoordinator:
     obj._apply_local_property_patch = MagicMock()  # ruff: ignore[private-member-access]
     obj._apply_local_system_patch = MagicMock()  # ruff: ignore[private-member-access]
     obj._apply_local_weather_plan_patch = MagicMock()  # ruff: ignore[private-member-access]
-    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+    return coordinator
 
 
 def _ble_call(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]

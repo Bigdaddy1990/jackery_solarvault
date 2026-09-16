@@ -212,11 +212,11 @@ class TestFindDictWithAnyKey:
     """Test find_dict_with_any_key."""
 
     def test_returns_none_for_none_input(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]  # isort: skip
-        result = find_dict_with_any_key(None, {"deviceSn"})  # pyrefly: ignore [bad-argument-type]
+        result = find_dict_with_any_key(None, {"deviceSn"})
         assert result is None
 
     def test_returns_none_for_number_input(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]  # isort: skip
-        result = find_dict_with_any_key(123, {"deviceSn"})  # pyrefly: ignore [bad-argument-type]
+        result = find_dict_with_any_key(123, {"deviceSn"})
         assert result is None
 
 

@@ -181,7 +181,7 @@ class TestAsyncSaveDiscoveryCache:
         # Track the created task so we can await it
         created_tasks = []
 
-        async def run_coro(coro, name=None, eager_start=False):
+        async def run_coro(coro, name=None, eager_start: bool=False):
             task = asyncio.create_task(coro)
             created_tasks.append(task)
             return task
@@ -220,7 +220,7 @@ class TestAsyncSaveDiscoveryCache:
 
         created_tasks = []
 
-        async def run_coro(coro, name=None, eager_start=False):
+        async def run_coro(coro, name=None, eager_start: bool=False):
             task = asyncio.create_task(coro)
             created_tasks.append(task)
             return task
@@ -261,7 +261,7 @@ class TestAsyncSaveDiscoveryCache:
 
         created_tasks = []
 
-        async def run_coro(coro, name=None, eager_start=False):
+        async def run_coro(coro, name=None, eager_start: bool=False):
             task = asyncio.create_task(coro)
             created_tasks.append(task)
             return task
@@ -279,7 +279,6 @@ class TestAsyncSaveDiscoveryCache:
                 mock_store_instance.async_save = AsyncMock()
                 mock_store.return_value = mock_store_instance
 
-                # pyrefly: ignore [bad-argument-type]
                 await async_save_discovery_cache(hass, "test_entry", device_index)
 
                 # Wait for the persist task to complete
@@ -298,7 +297,7 @@ class TestAsyncSaveDiscoveryCache:
 
         created_tasks = []
 
-        async def run_coro(coro, name=None, eager_start=False):
+        async def run_coro(coro, name=None, eager_start: bool=False):
             task = asyncio.create_task(coro)
             created_tasks.append(task)
             return task

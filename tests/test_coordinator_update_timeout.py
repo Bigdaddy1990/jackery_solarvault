@@ -41,7 +41,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     obj._polling_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
     obj._device_registry_observer = None  # ruff: ignore[private-member-access]
-    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+    return coordinator
 
 
 @pytest.mark.asyncio()

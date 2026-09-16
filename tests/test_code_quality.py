@@ -8,7 +8,6 @@ import re
 import sys
 import types
 
-# pyrefly: ignore [untyped-import]
 import yaml
 
 CUSTOM_COMPONENT = pathlib.Path("custom_components/jackery_solarvault")
@@ -215,7 +214,11 @@ def test_manifest_zeroconf_covers_expected_service_types() -> None:
     )
 
     zeroconf_types = {entry["type"] for entry in manifest.get("zeroconf", [])}
-    assert zeroconf_types == {"_api._tcp.local.", "_http._tcp.local."}
+    assert zeroconf_types == {
+        "_api._tcp.local.",
+        "_http._tcp.local.",
+        "_jackery-solarvault._tcp.local.",
+    }
 
 
 def test_manifest_zeroconf_entries_match_expected_structure() -> None:
@@ -233,6 +236,7 @@ def test_manifest_zeroconf_entries_match_expected_structure() -> None:
     expected = {
         "_api._tcp.local.": {"device": "solarvault"},
         "_http._tcp.local.": {"device": "solarvault"},
+        "_jackery-solarvault._tcp.local.": {"device": "solarvault"},
     }
     entries = manifest.get("zeroconf", [])
     actual = {entry["type"]: entry.get("properties", {}) for entry in entries}
@@ -543,7 +547,6 @@ def test_config_entries_do_not_use_internal_version_ladder() -> None:
     # not the required migration function
     assert "_async_clean_entry_config" not in init_source
     assert "version=" not in init_source
-    assert "_async_prune_removed_local_mqtt_tls_options" in init_source
     assert _class_constant_int(config_tree, "JackeryConfigFlow", "VERSION") == 1
 
 

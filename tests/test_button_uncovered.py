@@ -1,5 +1,6 @@
 """Tests for uncovered paths in button.py to increase coverage."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,11 +15,16 @@ from custom_components.jackery_solarvault.button import (
     async_setup_entry,
 )
 
+if TYPE_CHECKING:
+    from custom_components.jackery_solarvault.descriptions.button import (
+        JackeryButtonDescription,
+    )
+
 
 class TestJackeryQueryButton:
     """Test JackeryQueryButton class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -29,7 +35,7 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(self, key="refresh_system_info"):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_query_description(self, key: str = "refresh_system_info") -> JackeryButtonDescription:  # ruff: ignore[no-self-use]
         """Create a query button description for testing."""
         return JackeryQueryButtonDescription(
             key=key,
@@ -48,7 +54,7 @@ class TestJackeryQueryButton:
             coordinator=coordinator, device_id="test_device", description=description
         )
         assert sensor is not None
-        assert sensor._query_description.key == "refresh_system_info"  # ruff: ignore[private-member-access]
+        assert sensor._query_description.key == "refresh_system_info"
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
@@ -66,7 +72,7 @@ class TestJackeryQueryButton:
 class TestJackeryRebootButton:
     """Test JackeryRebootButton class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -81,7 +87,7 @@ class TestJackeryRebootButton:
         coordinator = self._create_coordinator()
         sensor = JackeryRebootButton(coordinator=coordinator, device_id="test_device")
         assert sensor is not None
-        assert sensor._attr_translation_key == "reboot_device"  # ruff: ignore[private-member-access]
+        assert sensor._attr_translation_key == "reboot_device"
 
     @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
@@ -96,7 +102,7 @@ class TestJackeryRebootButton:
 class TestJackeryRefreshWeatherPlanButton:
     """Test JackeryRefreshWeatherPlanButton class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {"test_device": {}}
@@ -114,7 +120,7 @@ class TestJackeryRefreshWeatherPlanButton:
             coordinator=coordinator, device_id="test_device"
         )
         assert sensor is not None
-        assert sensor._attr_translation_key == "refresh_weather_plan"  # ruff: ignore[private-member-access]
+        assert sensor._attr_translation_key == "refresh_weather_plan"
 
     @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
@@ -131,7 +137,7 @@ class TestJackeryRefreshWeatherPlanButton:
 class TestJackeryReadScheduleButton:
     """Test JackeryReadScheduleButton class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -144,33 +150,21 @@ class TestJackeryReadScheduleButton:
     def test_creation(self) -> None:
         """Test read schedule button creation."""
         coordinator = self._create_coordinator()
-        # pyrefly: ignore [missing-argument]
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            # pyrefly: ignore [unexpected-keyword]
-            task_type=1,
-            # pyrefly: ignore [unexpected-keyword]
-            key_suffix="test_schedule",
-            # pyrefly: ignore [unexpected-keyword]
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
         )
         assert sensor is not None
-        assert sensor._task_type == 1  # ruff: ignore[private-member-access]
+        assert sensor._task_type == 1
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
         coordinator = self._create_coordinator()
-        # pyrefly: ignore [missing-argument]
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            # pyrefly: ignore [unexpected-keyword]
-            task_type=1,
-            # pyrefly: ignore [unexpected-keyword]
-            key_suffix="test_schedule",
-            # pyrefly: ignore [unexpected-keyword]
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
             plug_sn="plug123",
         )
         attrs = sensor.extra_state_attributes
@@ -181,16 +175,10 @@ class TestJackeryReadScheduleButton:
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator({"test_device": {}})
-        # pyrefly: ignore [missing-argument]
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            # pyrefly: ignore [unexpected-keyword]
-            task_type=1,
-            # pyrefly: ignore [unexpected-keyword]
-            key_suffix="test_schedule",
-            # pyrefly: ignore [unexpected-keyword]
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
         )
 
         await sensor.async_press()
@@ -202,7 +190,7 @@ class TestJackeryReadScheduleButton:
 class TestJackeryDeleteStormAlertButton:
     """Test JackeryDeleteStormAlertButton class."""
 
-    def _create_coordinator(self, data=None):  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -221,7 +209,7 @@ class TestJackeryDeleteStormAlertButton:
             alert_id="alert123",
         )
         assert sensor is not None
-        assert sensor._alert_id == "alert123"  # ruff: ignore[private-member-access]
+        assert sensor._alert_id == "alert123"
 
     def test_available_property(self) -> None:
         """Test available property."""
@@ -264,7 +252,7 @@ class TestAsyncSetupEntry:
         assert async_setup_entry.__name__ == "async_setup_entry"
         assert callable(async_setup_entry)
         # Check it has the right number of parameters via __code__
-        assert async_setup_entry.__code__.co_argcount == 3  # ruff: ignore[magic-value-comparison]
+        assert async_setup_entry.__code__.co_argcount == 3
         varnames = async_setup_entry.__code__.co_varnames[:3]
         assert "hass" in varnames
         assert "entry" in varnames

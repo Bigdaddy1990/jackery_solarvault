@@ -24,7 +24,7 @@ def _coordinator(*, time_zone: str = "UTC") -> JackerySolarVaultCoordinator:
     obj = cast("Any", coordinator)
     obj.hass = SimpleNamespace(config=SimpleNamespace(time_zone=time_zone))
     obj._device_index = {}  # ruff: ignore[private-member-access]
-    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+    return coordinator
 
 
 # --- _statistics_http_backfill_dates -------------------------------------

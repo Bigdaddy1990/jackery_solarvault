@@ -18,9 +18,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry  # type
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_ENABLE as CONF_LOCAL_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DOMAIN,
@@ -119,8 +117,8 @@ async def test_reconfigure_credentials_preserves_local_mqtt_options(
         domain=DOMAIN,
         data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.1.10",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "jackery/#",
         },
         unique_id=_ACCOUNT,
@@ -137,8 +135,8 @@ async def test_reconfigure_credentials_preserves_local_mqtt_options(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.data[CONF_PASSWORD] == "new-secret"
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
-    assert entry.options[CONF_LOCAL_MQTT_HOST] == "192.168.1.10"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "192.168.1.10"
     assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "jackery/#"
 
 
@@ -176,8 +174,8 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
-    assert entry.options[CONF_LOCAL_MQTT_HOST] == "10.0.0.5"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "10.0.0.5"
     assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == _QOS_EXACTLY_ONCE
     assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/status"
 
@@ -218,7 +216,7 @@ async def test_reconfigure_credentials_reloads_existing_entry(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
-        options={CONF_LOCAL_MQTT_ENABLE: True},
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: True},
         unique_id=_ACCOUNT,
         title="Jackery",
     )
@@ -235,7 +233,7 @@ async def test_reconfigure_credentials_reloads_existing_entry(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.data[CONF_PASSWORD] == "new-secret"
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
     reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
@@ -268,7 +266,7 @@ async def test_reauth_reloads_existing_entry(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: "old-secret"},
-        options={CONF_LOCAL_MQTT_ENABLE: True},
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: True},
         unique_id=_ACCOUNT,
         title="Jackery",
     )
@@ -295,5 +293,5 @@ async def test_reauth_reloads_existing_entry(hass: HomeAssistant) -> None:
     assert result["reason"] == FLOW_ABORT_REAUTH_SUCCESSFUL
     assert entry.data[CONF_USERNAME] == _ACCOUNT
     assert entry.data[CONF_PASSWORD] == "new-secret"
-    assert entry.options[CONF_LOCAL_MQTT_ENABLE] is True
+    assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
     reload_entry.assert_awaited_once_with(entry.entry_id)

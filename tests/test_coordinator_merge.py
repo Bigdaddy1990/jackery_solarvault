@@ -176,6 +176,7 @@ def test_local_mqtt_message_families_keep_main_and_stack_power_separate() -> Non
         await coordinator.async_handle_mqtt_message(
             "hb/device/redacted/status",
             {
+                "deviceId": "dev-1",
                 "type": 2,
                 FIELD_BODY: {
                     FIELD_CMD: MQTT_CMD_QUERY_DEVICE_PROPERTY,
@@ -196,6 +197,7 @@ def test_local_mqtt_message_families_keep_main_and_stack_power_separate() -> Non
         await coordinator.async_handle_mqtt_message(
             "hb/device/redacted/event",
             {
+                "deviceId": "dev-1",
                 "type": 106,
                 FIELD_BODY: {
                     FIELD_CMD: MQTT_CMD_QUERY_COMBINE_DATA,
@@ -217,6 +219,7 @@ def test_local_mqtt_message_families_keep_main_and_stack_power_separate() -> Non
         await coordinator.async_handle_mqtt_message(
             "hb/device/redacted/status",
             {
+                "deviceId": "dev-1",
                 "type": 2,
                 FIELD_BODY: {
                     FIELD_CMD: MQTT_CMD_QUERY_DEVICE_PROPERTY,
@@ -231,6 +234,7 @@ def test_local_mqtt_message_families_keep_main_and_stack_power_separate() -> Non
         await coordinator.async_handle_mqtt_message(
             "hb/device/redacted/event",
             {
+                "deviceId": "dev-1",
                 "type": 106,
                 FIELD_BODY: {
                     FIELD_CMD: MQTT_CMD_QUERY_COMBINE_DATA,

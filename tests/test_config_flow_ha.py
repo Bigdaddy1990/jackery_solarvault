@@ -445,8 +445,10 @@ async def test_options_flow_reloads_for_entity_creation_changes(
     reload_entry.assert_awaited_once_with(entry.entry_id)
 
 
+@pytest.mark.parametrize("topic", ["homeassistant", "hb/device/+/event"])
 async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
     hass: HomeAssistant,
+    topic: str,
 ) -> None:
     """Submitted Local-MQTT topic and QoS remain the next form defaults."""
     entry = MockConfigEntry(
@@ -461,16 +463,25 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
+    defaults = {
+        marker.schema: marker.default()
+        for marker in flow["data_schema"].schema
+        if hasattr(marker, "default")
+    }
+    assert (
+        defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
+        == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
+    )
     result = await hass.config_entries.options.async_configure(
         flow["flow_id"],
         {
-            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/device/+/event",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: topic,
             CONF_THIRD_PARTY_MQTT_QOS: "2",
         },
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/event"
+    assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == topic
     assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == _QOS_EXACTLY_ONCE
 
     reopened = await hass.config_entries.options.async_init(entry.entry_id)
@@ -480,4 +491,4 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
         for marker in reopened["data_schema"].schema
         if hasattr(marker, "default")
     }
-    assert defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/event"
+    assert defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == topic

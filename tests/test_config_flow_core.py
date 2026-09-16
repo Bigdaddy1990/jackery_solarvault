@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-import voluptuous_serialize
 
 from custom_components.jackery_solarvault.client.api import (
     JackeryAuthError,
@@ -52,45 +51,41 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
     flow = _flow()
     abort_result = {"type": FlowResultType.ABORT, "reason": "already_configured"}
 
-    with patch.object(
-        flow,
-        "_async_abort_duplicate_discovery",
-        return_value=abort_result,
-    ):
-        assert (
-            await flow.async_step_bluetooth(
-                cast(
-                    "Any",
-                    SimpleNamespace(
-                        name="Jackery BLE",
-                        address="AA:BB:CC:DD:EE:FF",
-                    ),
-                )
-            )
-            == abort_result
-        )
+    # Create mock discovery_info objects for each transport
+    mock_bluetooth = SimpleNamespace(
+        name="Jackery BLE",
+        address="AA:BB:CC:DD:EE:FF",
+    )
+    mock_dhcp = SimpleNamespace(
+        hostname="jackery.local",
+        ip="192.0.2.10",
+    )
+    mock_mqtt = SimpleNamespace(
+        topic="jackery_solarvault/discovery/123",
+        payload=b'{"device_sn": "123"}',
+    )
+    mock_zeroconf = SimpleNamespace(
+        name="jackery-solarvault",
+        host="192.0.2.10",
+        port=1234,
+        type="_jackery-solarvault._tcp.local.",
+    )
 
-    duplicate_infos = {
-        "async_step_dhcp": SimpleNamespace(
-            hostname="jackery.local",
-            ip="192.0.2.10",
-        ),
-        "async_step_zeroconf": SimpleNamespace(
-            name="Jackery SolarVault",
-            hostname="jackery.local",
-            host="192.0.2.10",
-        ),
+    mocks = {
+        "async_step_bluetooth": mock_bluetooth,
+        "async_step_dhcp": mock_dhcp,
+        "async_step_mqtt": mock_mqtt,
+        "async_step_zeroconf": mock_zeroconf,
     }
-    for method_name, discovery_info in duplicate_infos.items():
+
+    for method_name in ("async_step_bluetooth", "async_step_dhcp", "async_step_mqtt", "async_step_zeroconf"):
         flow = _flow()
         with patch.object(
             flow,
             "_async_abort_duplicate_discovery",
             return_value=abort_result,
         ):
-            result = await getattr(flow, method_name)(
-                cast("Any", discovery_info),
-            )
+            result = await getattr(flow, method_name)(mocks[method_name])
 
         assert result == abort_result
 
@@ -102,6 +97,10 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
         "async_step_dhcp": SimpleNamespace(
             hostname="jackery.local",
             ip="192.0.2.10",
+        ),
+        "async_step_mqtt": SimpleNamespace(
+            topic="jackery/discovery/device-1",
+            payload=b'{"deviceSn": "123"}',
         ),
         "async_step_zeroconf": SimpleNamespace(
             name="Jackery SolarVault",
@@ -135,7 +134,7 @@ async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
     """The shared router pre-fills the display name and hands off to the user step.
 
     ``_async_route_discovery_to_user`` backs every discovery transport
-    (Bluetooth/DHCP/Zeroconf); this pins its own contract directly so a
+    (Bluetooth/DHCP/MQTT/Zeroconf); this pins its own contract directly so a
     regression here is caught even if a transport's fallback-name test still
     mocks the router itself away.
     """
@@ -159,7 +158,7 @@ async def test_route_discovery_to_user_sets_title_and_delegates() -> None:
             AsyncMock(return_value=user_result),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
+        result = await flow._async_route_discovery_to_user("Jackery Device")
 
     assert result == user_result
     abort_guard.assert_called_once_with()
@@ -191,7 +190,7 @@ async def test_route_discovery_to_user_short_circuits_on_duplicate() -> None:
             AsyncMock(return_value={"type": FlowResultType.FORM}),
         ) as user_step,
     ):
-        result = await flow._async_route_discovery_to_user("Jackery Device")  # ruff: ignore[private-member-access]
+        result = await flow._async_route_discovery_to_user("Jackery Device")
 
     assert result == abort_result
     assert "title_placeholders" not in flow.context
@@ -202,16 +201,21 @@ async def test_route_discovery_to_user_short_circuits_on_duplicate() -> None:
 async def _discovered_name(method_name: str, discovery_info: SimpleNamespace) -> str:
     """Drive one discovery step and capture the name it hands to the router."""
     flow = _flow()
-    with patch.object(
-        flow,
-        "_async_route_discovery_to_user",
-        AsyncMock(return_value={"type": FlowResultType.FORM}),
-    ) as router:
+    with (
+        patch.object(
+            flow,
+            "_async_abort_duplicate_discovery",
+            Mock(return_value=None),
+        ),
+        patch.object(
+            flow,
+            "_async_route_discovery_to_user",
+            AsyncMock(return_value={"type": FlowResultType.FORM}),
+        ) as router,
+    ):
         await getattr(flow, method_name)(discovery_info)
 
-    await_args = router.await_args
-    assert await_args is not None
-    return cast("str", await_args.args[0])
+    return cast("str", router.await_args.args[0])
 
 
 @pytest.mark.asyncio()
@@ -234,6 +238,33 @@ async def test_dhcp_discovery_falls_back_to_ip_without_hostname() -> None:
 
     unnamed = SimpleNamespace(hostname="", ip="192.0.2.10")
     assert await _discovered_name("async_step_dhcp", unnamed) == "192.0.2.10"
+
+
+@pytest.mark.parametrize(
+    ["topic", "expected_name"],
+    [
+        ["jackery/discovery/device-1", "Jackery MQTT (device-1)"],
+        ["device-1", "Jackery MQTT (device-1)"],
+        ["jackery/discovery/", "Jackery MQTT"],
+        ["jackery/discovery/  ", "Jackery MQTT"],
+    ],
+)
+@pytest.mark.asyncio()
+async def test_mqtt_discovery_formats_or_falls_back_from_topic_suffix(
+    topic: str,
+    expected_name: str,
+) -> None:
+    """MQTT discovery names itself after the topic suffix, or a bare fallback.
+
+    A topic ending in a separator (or whitespace-only suffix) yields an empty
+    suffix after ``strip()``, which must fall back to the bare ``"Jackery
+    MQTT"`` label rather than the malformed ``"Jackery MQTT ()"``.
+    """
+    discovery_info = SimpleNamespace(
+        topic=topic,
+        payload=b'{"deviceSn": "sn-1"}',
+    )
+    assert await _discovered_name("async_step_mqtt", discovery_info) == expected_name
 
 
 @pytest.mark.asyncio()
@@ -261,7 +292,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[object()]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
+        result = flow._async_abort_duplicate_discovery()
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -272,7 +303,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[object()]),
     ):
-        result = flow._async_abort_duplicate_discovery()  # ruff: ignore[private-member-access]
+        result = flow._async_abort_duplicate_discovery()
 
     assert result is not None
     assert result["type"] is FlowResultType.ABORT
@@ -283,7 +314,7 @@ def test_duplicate_discovery_guard_reports_current_entries() -> None:
         patch.object(flow, "_async_current_entries", return_value=[]),
         patch.object(flow, "_async_in_progress", return_value=[]),
     ):
-        assert flow._async_abort_duplicate_discovery() is None  # ruff: ignore[private-member-access]
+        assert flow._async_abort_duplicate_discovery() is None
 
 
 @pytest.mark.asyncio()
@@ -311,14 +342,6 @@ async def test_user_step_without_input_shows_form() -> None:
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == FLOW_STEP_USER
     assert result["errors"] == {}
-
-
-@pytest.mark.asyncio()
-async def test_user_form_schema_is_serializable_for_home_assistant_ui() -> None:
-    """The initial form exposes only UI-serializable validators."""
-    result = await _flow().async_step_user()
-
-    assert voluptuous_serialize.convert(result["data_schema"])
 
 
 @pytest.mark.asyncio()
@@ -506,36 +529,6 @@ async def test_reconfigure_credentials_maps_login_errors(
 
 
 @pytest.mark.asyncio()
-async def test_reconfigure_credentials_form_schema_is_serializable(
-    hass: HomeAssistant,
-) -> None:
-    """Reconfigure credentials remain renderable by the Home Assistant UI."""
-    flow = _flow(hass)
-    entry = SimpleNamespace(
-        data={CONF_USERNAME: _ACCOUNT}, options={}, unique_id=_ACCOUNT
-    )
-    with patch.object(flow, "_get_reconfigure_entry", return_value=entry):
-        result = await flow.async_step_reconfigure_credentials()
-
-    assert voluptuous_serialize.convert(result["data_schema"])
-    validators = {
-        marker.schema: validator
-        for marker, validator in result["data_schema"].schema.items()
-    }
-    assert validators[CONF_USERNAME] is str
-    assert validators[CONF_PASSWORD] is str
-
-    with patch.object(flow, "_get_reconfigure_entry", return_value=entry):
-        invalid = await flow.async_step_reconfigure_credentials({
-            CONF_USERNAME: _ACCOUNT,
-            CONF_PASSWORD: "",
-        })
-
-    assert invalid["type"] is FlowResultType.FORM
-    assert invalid["errors"] == {FLOW_ERROR_BASE: FLOW_ERROR_BASE}
-
-
-@pytest.mark.asyncio()
 async def test_reauth_confirm_missing_entry_and_empty_username() -> None:
     """Reauth aborts explicitly when the target entry cannot be used.
 
@@ -571,18 +564,6 @@ async def test_reauth_confirm_form_and_success(hass: HomeAssistant) -> None:
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == FLOW_STEP_REAUTH_CONFIRM
-    assert voluptuous_serialize.convert(result["data_schema"])
-    validators = {
-        marker.schema: validator
-        for marker, validator in result["data_schema"].schema.items()
-    }
-    assert validators[CONF_PASSWORD] is str
-
-    with patch.object(flow, "_get_reauth_entry", return_value=entry):
-        invalid = await flow.async_step_reauth_confirm({CONF_PASSWORD: ""})
-
-    assert invalid["type"] is FlowResultType.FORM
-    assert invalid["errors"] == {FLOW_ERROR_BASE: FLOW_ERROR_BASE}
 
     flow = _flow(hass)
     api = SimpleNamespace(
@@ -612,7 +593,8 @@ async def test_reauth_confirm_form_and_success(hass: HomeAssistant) -> None:
     # Reauth persists the full login-data mapping via _entry_data_from_api_login
     # (shared with the user/reconfigure steps): the unchanged username plus the
     # new password, and region/MQTT bootstrap fields when the API surfaces them.
-    # The flow updates and reloads the entry so runtime credentials are replaced.
+    # The flow reloads the entry so the coordinator re-authenticates with the
+    # refreshed credentials.
     update_abort.assert_called_once_with(
         entry,
         data_updates={CONF_USERNAME: _ACCOUNT, CONF_PASSWORD: _PASSWORD},

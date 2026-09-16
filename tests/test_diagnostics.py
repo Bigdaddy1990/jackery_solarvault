@@ -4,12 +4,9 @@ from types import SimpleNamespace
 
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_IP as CONF_LOCAL_MQTT_HOST,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
-    CONF_THIRD_PARTY_MQTT_PASSWORD as CONF_LOCAL_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_USERNAME,
-    CONF_THIRD_PARTY_MQTT_USERNAME as CONF_LOCAL_MQTT_USERNAME,
     REDACT_KEYS,
 )
 from custom_components.jackery_solarvault.util import active_redact_keys
@@ -30,9 +27,9 @@ def test_local_and_third_party_mqtt_credentials_redacted_from_options() -> None:
     """
     entry = SimpleNamespace(
         options={
-            CONF_LOCAL_MQTT_HOST: "192.168.1.50",
-            CONF_LOCAL_MQTT_USERNAME: "mqtt-user",
-            CONF_LOCAL_MQTT_PASSWORD: "super-secret",
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.50",
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt-user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "super-secret",
             CONF_THIRD_PARTY_MQTT_IP: "192.168.1.60",
             CONF_THIRD_PARTY_MQTT_USERNAME: "third-party-user",
             CONF_THIRD_PARTY_MQTT_PASSWORD: "third-party-secret",
@@ -42,9 +39,9 @@ def test_local_and_third_party_mqtt_credentials_redacted_from_options() -> None:
 
     redacted = async_redact_data(dict(entry.options), active_redact_keys())
 
-    assert redacted[CONF_LOCAL_MQTT_HOST] == REDACTED
-    assert redacted[CONF_LOCAL_MQTT_USERNAME] == REDACTED
-    assert redacted[CONF_LOCAL_MQTT_PASSWORD] == REDACTED
+    assert redacted[CONF_THIRD_PARTY_MQTT_IP] == REDACTED
+    assert redacted[CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
+    assert redacted[CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_IP] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED

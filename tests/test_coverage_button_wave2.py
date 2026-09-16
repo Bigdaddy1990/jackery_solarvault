@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 _DEVICE_ID = "device-1"
 
 
-def _description(key: str) -> Any:  # ruff: ignore[any-type]
+def _description(key: str) -> Any:
     """Return the query-button description with the requested key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -147,13 +147,9 @@ async def test_portable_query_mapping_preserves_catalog_command_metadata(
     await description.action(coordinator, _DEVICE_ID)
 
     call = coordinator.async_send_portable_command.await_args
-    # pyrefly: ignore [missing-attribute]
     assert call.args == (_DEVICE_ID,)
-    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["action_id"] == description.action_id
-    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["cmd"] == description.cmd
-    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["body_fields"] == (
         {FIELD_REBOOT: 1}
         if key == "portable_restart"
@@ -168,10 +164,8 @@ async def test_portable_query_mapping_preserves_catalog_command_metadata(
         "portable_refresh_sub_ct",
     }
     if key in keys_with_message_type:
-        # pyrefly: ignore [missing-attribute]
         assert call.kwargs["message_type"] == description.message_type
     else:
-        # pyrefly: ignore [missing-attribute]
         assert "message_type" not in call.kwargs
 
 
@@ -202,7 +196,7 @@ def test_query_descriptions_declare_http_and_layer5_sources_independently() -> N
 
 @pytest.mark.asyncio()
 async def test_setup_home_device_discovers_queries_and_accessory_buttons() -> None:
-    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""  # ruff: ignore[line-too-long]
+    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""
     payload = {
         PAYLOAD_PROPERTIES: {"batSoc": 50, FIELD_REBOOT: 0},
         PAYLOAD_SMART_PLUGS: [{FIELD_DEVICE_SN: "PLUG-1"}],
@@ -299,7 +293,7 @@ async def test_setup_listener_adds_only_newly_discovered_storm_alert() -> None:
     }
     listeners[0]()
 
-    assert len(batches) == 2  # ruff: ignore[magic-value-comparison]
+    assert len(batches) == 2
     assert [entity.unique_id for entity in batches[1]] == [
         f"{_DEVICE_ID}_delete_storm_alert_ALERT-NEW",
     ]
@@ -337,15 +331,11 @@ def _specialized_button(
     if kind == "schedule":
         coordinator.async_read_device_schedule = AsyncMock()
         return (
-            # pyrefly: ignore [missing-argument]
             JackeryReadScheduleButton(
                 coordinator,
                 _DEVICE_ID,
-                # pyrefly: ignore [unexpected-keyword]
                 task_type=TIMER_TASK_TYPE_SMART_PLUG,
-                # pyrefly: ignore [unexpected-keyword]
                 key_suffix="plug_schedule",
-                # pyrefly: ignore [unexpected-keyword]
                 translation_key="read_smart_plug_schedule",
                 plug_sn="PLUG-1",
             ),
