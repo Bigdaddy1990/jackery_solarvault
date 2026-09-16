@@ -573,7 +573,7 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except TimeoutError, OSError:
+            except (TimeoutError, OSError):
                 # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
@@ -613,34 +613,16 @@ class JackeryLocalMqttClient:
 
     async def async_wait_message_queue_idle(self) -> None:
         """Wait until every accepted frame has completed serial delivery."""
-        while True:
-            consumer = self._message_consumer_task
-            if consumer is not None and consumer.done():
-                self._settle_message_consumer(consumer)
-            delivery = self._message_delivery_task
-            if delivery is not None and delivery.done():
-                self._settle_message_delivery(delivery)
-            if (
-                not self._message_queue
-                and self._message_delivery_task is None
-                and self._message_consumer_task is None
-            ):
-                return
-            self._ensure_message_consumer()
-            consumer = self._message_consumer_task
-            delivery = self._message_delivery_task
-            current = asyncio.current_task()
-            if consumer is current or delivery is current:
-                return
-            waiter = consumer or delivery
-            if waiter is None:
-                await asyncio.sleep(0)
-                continue
-            try:
-                await asyncio.shield(waiter)
-            except asyncio.CancelledError:
-                if not waiter.cancelled():
-                    raise
+        from .storage_helpers import async_wait_mqtt_message_queue_idle
+        
+        await async_wait_mqtt_message_queue_idle(
+            message_queue=self._message_queue,
+            message_consumer_task=self._message_consumer_task,
+            message_delivery_task=self._message_delivery_task,
+            settle_consumer=self._settle_message_consumer,
+            settle_delivery=self._settle_message_delivery,
+            ensure_consumer=self._ensure_message_consumer,
+        )
 
     async def _handle_message(
         self, topic: str, payload: bytes | bytearray | str

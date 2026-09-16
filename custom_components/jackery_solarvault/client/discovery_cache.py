@@ -1,7 +1,6 @@
 """Persistent discovery cache for local offline startup."""
 
 
-
 import asyncio
 import copy
 import logging

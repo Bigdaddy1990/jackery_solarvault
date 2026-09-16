@@ -4594,7 +4594,9 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
         self._breaker_id = breaker_id
         self._breaker_key = breaker_key
         # Build the per-breaker device_info once at construction.
-        self._attr_device_info = self._build_breaker_device_info(
+        self._attr_device_info = _build_breaker_device_info(
+            coordinator,
+            device_id,
             breaker_index,
             self._breaker,
             breaker_key,
@@ -4625,33 +4627,6 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
             return None
         return cast("float | int | str | None", self.entity_description.transform(raw))
 
-    def _build_breaker_device_info(
-        self,
-        index: int,
-        breaker: dict[str, Any],
-        breaker_key: str,
-    ) -> DeviceInfo:
-        """Build device registry metadata for one circuit breaker.
-
-        Returns:
-            DeviceInfo: Registry info linking the breaker to the parent device.
-        """
-        base_name = first_nonblank_text(
-            self._system.get(FIELD_DEVICE_NAME),
-            self._discovery.get(FIELD_DEVICE_NAME),
-            self._properties.get(FIELD_WNAME),
-            fallback=f"Jackery {self._device_id}",
-        )
-        name = breaker.get(FIELD_NM) or f"Sicherung {index}"
-        info = DeviceInfo(
-            identifiers={(DOMAIN, f"{self._device_id}_{breaker_key}")},
-            manufacturer=MANUFACTURER,
-            name=f"{base_name} {name}",
-            model="Jackery Sicherung",
-        )
-        self._apply_via_device(info)
-        return info
-
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """The diagnostic state attributes for the breaker.
@@ -4659,19 +4634,66 @@ class JackeryBreakerSensor(JackeryEntity, SensorEntity):
         Returns:
             dict[str, Any]: Mapping of attribute names to their current values.
         """
-        attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
-        for key in (
-            FIELD_NM,
-            FIELD_IDX,
-            FIELD_PC,
-            FIELD_PR,
-            FIELD_SPH,
-            FIELD_SPH_PC,
-            FIELD_SW,
-        ):
-            if key in self._breaker:
-                attrs[key] = self._breaker.get(key)
-        return attrs
+        return _get_breaker_extra_state_attributes(self._breaker, self._breaker_index)
+
+
+def _build_breaker_device_info(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    index: int,
+    breaker: dict[str, Any],
+    breaker_key: str,
+) -> DeviceInfo:
+    """Build device registry metadata for one circuit breaker.
+
+    Returns:
+        DeviceInfo: Registry info linking the breaker to the parent device.
+    """
+    payload = (coordinator.data or {}).get(device_id, {}) or {}
+    system = payload.get(PAYLOAD_SYSTEM) or {}
+    discovery = payload.get(PAYLOAD_DISCOVERY_INFO) or {}
+    properties = payload.get(PAYLOAD_PROPERTY) or {}
+    
+    base_name = first_nonblank_text(
+        system.get(FIELD_DEVICE_NAME),
+        discovery.get(FIELD_DEVICE_NAME),
+        properties.get(FIELD_WNAME),
+        fallback=f"Jackery {device_id}",
+    )
+    name = breaker.get(FIELD_NM) or f"Sicherung {index}"
+    info = DeviceInfo(
+        identifiers={(DOMAIN, f"{device_id}_{breaker_key}")},
+        manufacturer=MANUFACTURER,
+        name=f"{base_name} {name}",
+        model="Jackery Sicherung",
+    )
+    # Apply via_device linkage
+    info["via_device"] = (DOMAIN, device_id)
+    return info
+
+
+def _get_breaker_extra_state_attributes(
+    breaker: dict[str, Any],
+    breaker_index: int,
+) -> dict[str, Any]:
+    """Return diagnostic state attributes for a breaker.
+    
+    Returns:
+        dict[str, Any]: Mapping of attribute names to their current values.
+    """
+    attrs: dict[str, Any] = {"breaker_index": breaker_index}
+    for key in (
+        FIELD_NM,
+        FIELD_IDX,
+        FIELD_PC,
+        FIELD_PR,
+        FIELD_SPH,
+        FIELD_SPH_PC,
+        FIELD_SW,
+    ):
+        if key in breaker:
+            attrs[key] = breaker.get(key)
+    return attrs
 
 
 class JackerySubdeviceAlarmSensor(JackeryEntity, SensorEntity):

@@ -419,7 +419,10 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
         self._breaker_id = breaker_id
         self._breaker_key = breaker_key
         # Build the per-breaker device_info once at construction.
-        self._attr_device_info = self._build_breaker_device_info(
+        from .sensor import _build_breaker_device_info
+        self._attr_device_info = _build_breaker_device_info(
+            coordinator,
+            device_id,
             breaker_index,
             self._breaker,
             breaker_key,
@@ -476,19 +479,8 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Diagnostic state attributes for the breaker."""
-        attrs: dict[str, Any] = {"breaker_index": self._breaker_index}
-        for key in (
-            FIELD_NM,
-            FIELD_IDX,
-            FIELD_PC,
-            FIELD_PR,
-            FIELD_SPH,
-            FIELD_SPH_PC,
-            FIELD_SW,
-        ):
-            if key in self._breaker:
-                attrs[key] = self._breaker.get(key)
-        return attrs
+        from .sensor import _get_breaker_extra_state_attributes
+        return _get_breaker_extra_state_attributes(self._breaker, self._breaker_index)
 
 
 class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
