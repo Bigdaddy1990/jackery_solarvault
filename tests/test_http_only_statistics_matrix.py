@@ -857,7 +857,7 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     active_slow_fetches = 0
     max_active_slow_fetches = 0
 
-    async def _hold_slow_fetch(result: Any) -> Any:  # ruff: ignore[any-type]
+    async def _hold_slow_fetch(result: Any) -> Any:
         nonlocal active_slow_fetches, max_active_slow_fetches
         active_slow_fetches += 1
         max_active_slow_fetches = max(
@@ -872,8 +872,8 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
             active_slow_fetches -= 1
         return result
 
-    def _blocking_endpoint(result: Any) -> AsyncMock:  # ruff: ignore[any-type]
-        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:  # ruff: ignore[any-type]
+    def _blocking_endpoint(result: Any) -> AsyncMock:
+        async def _fetch(*_args: Any, **_kwargs: Any) -> Any:
             return await _hold_slow_fetch(result)
 
         return AsyncMock(side_effect=_fetch)

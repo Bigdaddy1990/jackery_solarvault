@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 _DEVICE_ID = "device-1"
 
 
-def _description(key: str) -> Any:  # ruff: ignore[any-type]
+def _description(key: str) -> Any:
     """Return the query-button description with the requested key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 

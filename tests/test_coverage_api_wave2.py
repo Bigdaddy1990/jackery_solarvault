@@ -71,19 +71,19 @@ class _Session:
             raise result
         return result
 
-    def get(self, url: str, **kwargs: Any) -> _Response:  # ruff: ignore[any-type]
+    def get(self, url: str, **kwargs: Any) -> _Response:
         """Record one GET."""
         return self._request("GET", url, kwargs)
 
-    def put(self, url: str, **kwargs: Any) -> _Response:  # ruff: ignore[any-type]
+    def put(self, url: str, **kwargs: Any) -> _Response:
         """Record one PUT."""
         return self._request("PUT", url, kwargs)
 
-    def post(self, url: str, **kwargs: Any) -> _Response:  # ruff: ignore[any-type]
+    def post(self, url: str, **kwargs: Any) -> _Response:
         """Record one POST."""
         return self._request("POST", url, kwargs)
 
-    def delete(self, url: str, **kwargs: Any) -> _Response:  # ruff: ignore[any-type]
+    def delete(self, url: str, **kwargs: Any) -> _Response:
         """Record one DELETE."""
         return self._request("DELETE", url, kwargs)
 

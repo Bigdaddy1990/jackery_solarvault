@@ -78,7 +78,7 @@ class MockCoordinator:
     async def async_load_local_daily_snapshots(self) -> None:  # ruff: ignore[undocumented-public-method]
         pass
 
-    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # ruff: ignore[any-type, undocumented-public-method]
+    def mark_mqtt_session_cache_loaded(self, persisted: Any) -> bool:  # ruff: ignore[undocumented-public-method]
         self._persisted_mqtt_session = persisted
         self._mqtt_session_cache_loaded = True
         return True

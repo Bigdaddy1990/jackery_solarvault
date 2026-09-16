@@ -29,7 +29,7 @@ class _BlockingMessages:
     def __aiter__(self) -> _BlockingMessages:
         return self
 
-    async def __anext__(self) -> Any:  # ruff: ignore[any-type]
+    async def __anext__(self) -> Any:
         await asyncio.Event().wait()
         raise StopAsyncIteration
 
@@ -37,7 +37,7 @@ class _BlockingMessages:
 class _FakeMqttClient:
     instances: list[_FakeMqttClient] = []  # ruff: ignore[mutable-class-default]
 
-    def __init__(self, **kwargs: Any) -> None:  # ruff: ignore[any-type]
+    def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
         self.messages = _BlockingMessages()
         self.subscriptions: list[tuple[str, int]] = []

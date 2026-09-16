@@ -30,7 +30,7 @@ _DEVICE_ID = "device-1"
 _TARGET_DAY = date(2026, 8, 10)
 
 
-def _bare_coordinator() -> Any:  # ruff: ignore[any-type]
+def _bare_coordinator() -> Any:
     """Return a coordinator shell with only state used by these contracts."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)

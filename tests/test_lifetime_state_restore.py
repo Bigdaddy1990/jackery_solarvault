@@ -81,7 +81,7 @@ async def test_restore_validator_converts_legacy_wh_lifetime_value() -> None:
     assert restored == pytest.approx(108.55)
 
 
-async def _async_value(value: Any) -> Any:  # ruff: ignore[any-type, unused-async]
+async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]
     """Return one value through the same await boundary as RestoreSensor."""
     return value
 

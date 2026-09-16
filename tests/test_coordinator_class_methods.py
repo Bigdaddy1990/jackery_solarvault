@@ -18,7 +18,7 @@ from custom_components.jackery_solarvault.coordinator import (
 class TestCoordinatorClassMethods:
     """Test coordinator class methods."""
 
-    def _bare_coordinator(self) -> Any:  # ruff: ignore[any-type, no-self-use]
+    def _bare_coordinator(self) -> Any:  # ruff: ignore[no-self-use]
         coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         shell = cast("Any", coordinator)
         shell._shutdown_started = False  # ruff: ignore[private-member-access]

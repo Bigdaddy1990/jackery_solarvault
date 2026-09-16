@@ -45,7 +45,7 @@ def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def _api(coordinator: JackerySolarVaultCoordinator) -> Any:  # ruff: ignore[any-type]
+def _api(coordinator: JackerySolarVaultCoordinator) -> Any:
     return cast("Any", coordinator).api
 
 

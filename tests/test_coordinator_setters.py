@@ -22,7 +22,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 _DEVICE = "dev-1"
 
 
-def _coordinator(props: dict[str, Any] | None = None) -> Any:  # ruff: ignore[any-type]
+def _coordinator(props: dict[str, Any] | None = None) -> Any:
     """Bare coordinator with a mocked command-dispatch seam."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
@@ -36,7 +36,7 @@ def _coordinator(props: dict[str, Any] | None = None) -> Any:  # ruff: ignore[an
     return shell
 
 
-def _sent_body(coordinator: Any) -> dict[str, Any]:  # ruff: ignore[any-type]
+def _sent_body(coordinator: Any) -> dict[str, Any]:
     """Return the body_fields the setter asked the dispatcher to send."""
     await_args = coordinator._async_publish_command_ble_first.await_args  # ruff: ignore[private-member-access]
     assert await_args is not None
