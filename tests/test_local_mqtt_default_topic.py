@@ -12,7 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
     _async_start_local_mqtt,  # ruff: ignore[import-private-name]
-    _local_mqtt_snapshot_route,
+    _local_mqtt_snapshot_route,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,

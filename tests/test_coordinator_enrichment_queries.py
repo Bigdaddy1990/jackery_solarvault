@@ -71,30 +71,39 @@ def _device_payload(  # ruff: ignore[too-many-arguments]  # isort: skip
 
         payload[PAYLOAD_PROPERTIES].update(dict.fromkeys(SYSTEM_INFO_KEYS, "value"))
     if has_weather:
+        # pyrefly: ignore [bad-assignment]
         payload["weather_plan"] = {"wpc": 5}
     if has_ct_meter:
+        # pyrefly: ignore [bad-assignment]
         payload["ct_meter"] = {"voltage": 230}
     if has_battery_packs:
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_BATTERY_PACKS] = [{"packSn": "PACK1"}]
         # Also set batNum so battery_packs_need_query returns True
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_PROPERTIES]["batNum"] = 1
     if has_breaker:
         payload[PAYLOAD_SYSTEM] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]
         }
     if has_sub_device:
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_SUBDEVICES] = [{"devType": "generic"}]
     if has_meter_head:
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_METER_HEAD}]
         }
     if has_smart_plug:
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]
         }
     if has_smart_meter:
         # Smart meter uses subType "2" (SUBDEVICE_TYPE_COMBINE) in accessories
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_SUB_TYPE: SUBDEVICE_TYPE_COMBINE}]
         }
     return payload

@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 class TestJackeryEntity:
     """Test JackeryEntity class."""
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -23,9 +23,9 @@ class TestJackeryEntity:
         coordinator.is_entity_source_available = MagicMock(return_value=True)
         return coordinator
 
-    def _create_entity(
+    def _create_entity(  # ruff: ignore[no-self-use]
         self, coordinator: MagicMock, key_suffix: str = "test_key"
-    ) -> JackeryEntity:  # ruff: ignore[no-self-use]
+    ) -> JackeryEntity:
         """Create an entity instance for testing."""
         # Use a simple EntityDescription for testing
         description = EntityDescription(key=key_suffix, name="Test Entity")
@@ -40,7 +40,7 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator()
         entity = self._create_entity(coordinator)
         assert entity is not None
-        assert entity._device_id == "test_device"
+        assert entity._device_id == "test_device"  # ruff: ignore[private-member-access]
 
     def test_unique_id(self) -> None:
         """Test unique_id property."""
@@ -76,8 +76,8 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator({"test_device": {}})
         entity = self._create_entity(coordinator)
 
-        entity._availability_cache_active = True
-        entity._refresh_availability_cache()
+        entity._availability_cache_active = True  # ruff: ignore[private-member-access]
+        entity._refresh_availability_cache()  # ruff: ignore[private-member-access]
         coordinator.is_device_reachable.reset_mock()
 
         assert entity.available is True
@@ -89,8 +89,8 @@ class TestJackeryEntity:
         """A prepared write must bypass JackeryEntity's update hook."""
         coordinator = self._create_coordinator({"test_device": {}})
         entity = self._create_entity(coordinator)
-        entity._availability_cache_active = True
-        entity._refresh_availability_cache()
+        entity._availability_cache_active = True  # ruff: ignore[private-member-access]
+        entity._refresh_availability_cache()  # ruff: ignore[private-member-access]
         coordinator.is_device_reachable.reset_mock()
         write_state = MagicMock()
         monkeypatch.setattr(
@@ -99,7 +99,7 @@ class TestJackeryEntity:
             write_state,
         )
 
-        entity._write_prepared_state()
+        entity._write_prepared_state()  # ruff: ignore[private-member-access]
 
         write_state.assert_called_once_with()
         coordinator.is_device_reachable.assert_not_called()
@@ -131,7 +131,7 @@ class TestJackeryEntity:
             "test_device": {"properties": {"test": "value"}}
         })
         entity = self._create_entity(coordinator)
-        payload = entity._payload
+        payload = entity._payload  # ruff: ignore[private-member-access]
         assert payload == {"properties": {"test": "value"}}
 
     def test_properties_property(self) -> None:
@@ -140,7 +140,7 @@ class TestJackeryEntity:
             "test_device": {"properties": {"test": "value"}}
         })
         entity = self._create_entity(coordinator)
-        props = entity._properties
+        props = entity._properties  # ruff: ignore[private-member-access]
         assert props == {"test": "value"}
 
     def test_device_meta_property(self) -> None:
@@ -149,7 +149,7 @@ class TestJackeryEntity:
             "test_device": {"device": {"model": "Test Model"}}
         })
         entity = self._create_entity(coordinator)
-        meta = entity._device_meta
+        meta = entity._device_meta  # ruff: ignore[private-member-access]
         assert meta == {"model": "Test Model"}
 
     def test_discovery_property(self) -> None:
@@ -158,7 +158,7 @@ class TestJackeryEntity:
             "test_device": {"discovery": {"name": "Test"}}
         })
         entity = self._create_entity(coordinator)
-        disc = entity._discovery
+        disc = entity._discovery  # ruff: ignore[private-member-access]
         assert disc == {"name": "Test"}
 
     def test_system_property(self) -> None:
@@ -167,7 +167,7 @@ class TestJackeryEntity:
             "test_device": {"system": {"online": True}}
         })
         entity = self._create_entity(coordinator)
-        sys = entity._system
+        sys = entity._system  # ruff: ignore[private-member-access]
         assert sys == {"online": True}
 
     def test_online_marker_available(self) -> None:
@@ -176,7 +176,7 @@ class TestJackeryEntity:
             "test_device": {"device": {"onlineStatus": 1}}
         })
         entity = self._create_entity(coordinator)
-        result = entity._online_marker_available(False)
+        result = entity._online_marker_available(False)  # ruff: ignore[private-member-access]
         assert result is True
 
     def test_source_capability_contract(self) -> None:
@@ -184,7 +184,7 @@ class TestJackeryEntity:
         coordinator = self._create_coordinator({"test_device": {}})
         entity = self._create_entity(coordinator)
         supported, data_sources, command_sources, _fields, _supervisor_only = (
-            entity._source_capability_contract()
+            entity._source_capability_contract()  # ruff: ignore[private-member-access]
         )
         assert supported is True
         assert isinstance(data_sources, tuple)

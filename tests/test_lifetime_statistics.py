@@ -143,6 +143,7 @@ def test_guard_prefers_app_system_pv_year_total_over_device_pv_total() -> None:
     assert payload[PAYLOAD_STATISTIC][APP_STAT_TOTAL_GENERATION] == pytest.approx(
         967.89
     )
+    # pyrefly: ignore [bad-index]
     assert payload[PAYLOAD_STATISTIC]["_total_lower_bound_guard"]["corrected"][
         APP_STAT_TOTAL_GENERATION
     ]["current_year_total"] == pytest.approx(967.89)

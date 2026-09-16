@@ -1,4 +1,4 @@
-"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""
+"""Tests for local MQTT client helpers, markers, topic matching, and message handling."""  # ruff: ignore[line-too-long]
 
 import asyncio
 from typing import TYPE_CHECKING, Any, cast
@@ -8,7 +8,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    _local_mqtt_client,
+    _local_mqtt_client,  # ruff: ignore[import-private-name]
 )
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     # A bounded, explicitly configured device topic is the routing boundary.
     # Unknown fields must reach the shared decoder so new firmware payloads are
     # not silently lost merely because their keys are not in a static marker set.
-    await client._handle_message(
+    await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         b'{"temperature": 25}',
     )
@@ -102,27 +102,27 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
 
     # Known Jackery fields follow the same independent async path.
     valid_payload = b'{"devSn": "12345", "batSoc": 95}'
-    await client._handle_message(
+    await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         valid_payload,
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_forwarded"] == 2
-    assert len(forwarded) == 2
+    assert diag["messages_forwarded"] == 2  # ruff: ignore[magic-value-comparison]
+    assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
     assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
 
     # Oversized frames are rejected at the transport boundary before JSON
     # decoding so a broker cannot force unbounded memory/CPU work.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
-    await client._handle_message(
+    await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         large_payload,
     )
     diag = client.diagnostics_snapshot()
     assert diag["messages_dropped"] == 1
     assert diag["messages_oversized"] == 1
-    assert diag["messages_forwarded"] == 2
-    assert len(forwarded) == 2
+    assert diag["messages_forwarded"] == 2  # ruff: ignore[magic-value-comparison]
+    assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.asyncio()
@@ -135,7 +135,7 @@ async def test_local_mqtt_start_stop(hass: HomeAssistant) -> None:
     )
 
     async def _wait_until_cancelled() -> None:
-        client._connected_event.set()
+        client._connected_event.set()  # ruff: ignore[private-member-access]
         await asyncio.Event().wait()
 
     with patch.object(client, "_async_run_forever", _wait_until_cancelled):

@@ -85,6 +85,7 @@ def _service_call(data: dict[str, object]) -> ServiceCall:
     return cast("ServiceCall", _Call(data))
 
 
+# pyrefly: ignore [deprecated]
 @contextmanager
 def _ignore_private() -> Iterator[None]:
     """Mark deliberate private service-helper access in tests.
@@ -1265,6 +1266,7 @@ def test_json_native_body_rejects_non_string_keys() -> None:
 def test_json_native_body_rejects_non_dict_body() -> None:
     """A list body is redacted and rejected."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        # pyrefly: ignore [bad-argument-type]
         services._json_native_body([1], "dev")  # ruff: ignore[private-member-access]
     assert err.value.translation_key == "send_ble_command_failed"
     assert "**REDACTED**" in err.value.translation_placeholders["error"]
@@ -1750,7 +1752,7 @@ def test_loaded_coordinators_keeps_only_typed_runtime_data(
         config_entries=SimpleNamespace(async_loaded_entries=lambda _domain: entries)
     )
     with _ignore_private():
-        result = services._loaded_coordinators(cast("HomeAssistant", hass))
+        result = services._loaded_coordinators(cast("HomeAssistant", hass))  # ruff: ignore[private-member-access]
     assert result == [coordinator]
 
 
@@ -1761,6 +1763,7 @@ async def test_get_share_qr_code_returns_response_envelope(
     coordinator = _fake_coordinator({"dev1": {}})
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, raw: raw)
     monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    # pyrefly: ignore [missing-attribute]
     coordinator.async_get_share_qr_code = AsyncMock(
         return_value={FIELD_QR_CODE_ID: "qr-1", FIELD_USER_ID: "user-1"}
     )
@@ -1786,7 +1789,7 @@ def test_coordinator_for_system_skips_payload_without_system(
     coordinator = _fake_coordinator({"dev1": {}})
     monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
     with _ignore_private():
-        assert services._coordinator_for_system(_test_hass(), "sys1") is None
+        assert services._coordinator_for_system(_test_hass(), "sys1") is None  # ruff: ignore[private-member-access]
 
 
 async def test_setup_services_is_idempotent(

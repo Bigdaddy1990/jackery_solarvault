@@ -50,6 +50,7 @@ def _entity(payload: dict[str, Any]) -> JackeryEntity:
     mutable = cast("Any", entity)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 

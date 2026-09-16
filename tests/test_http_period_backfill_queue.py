@@ -84,7 +84,7 @@ def _coordinator(
     obj._slow_http_request_semaphore = asyncio.Semaphore(2)  # ruff: ignore[private-member-access]
     obj._repair_containment_violations = lambda **_kwargs: set()  # ruff: ignore[private-member-access]
     obj._import_collected_repair_buckets = AsyncMock(return_value=(1, 0))  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 @pytest.mark.asyncio()

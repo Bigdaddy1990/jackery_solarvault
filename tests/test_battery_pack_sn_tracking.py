@@ -56,7 +56,7 @@ def _coordinator(
         _PARENT_ID: {PAYLOAD_BATTERY_PACKS: list(packs or [])},
     }
     shell._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _entry(

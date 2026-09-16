@@ -20,6 +20,7 @@ def _coordinator_with_api(**api_methods: object) -> JackerySolarVaultCoordinator
     """Build the smallest coordinator shell for HTTP shadow fetches."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator.api = cast("Any", SimpleNamespace(**api_methods))
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

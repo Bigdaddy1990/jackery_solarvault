@@ -69,7 +69,7 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._statistics_recorder_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _point(start: datetime, value: float) -> SimpleNamespace:

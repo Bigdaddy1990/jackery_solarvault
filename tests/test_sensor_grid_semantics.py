@@ -72,6 +72,7 @@ _WIRE_HOMEBODY: dict[str, Any] = {
 
 def _getter(key: str) -> Callable[[dict[str, Any]], object]:
     """Return the property getter of a SENSOR_DESCRIPTIONS entry."""
+    # pyrefly: ignore [bad-return]
     return next(
         description for description in SENSOR_DESCRIPTIONS if description.key == key
     ).getter

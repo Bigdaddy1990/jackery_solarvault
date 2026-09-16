@@ -81,6 +81,7 @@ def _switch(key: str, data: dict[str, Any]) -> JackeryDescriptionSwitch:
     mutable.coordinator = _coordinator(data)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -230,7 +231,7 @@ def _smart_plug(plug: dict[str, Any]) -> JackerySmartPlugSwitch:
     mutable._plug_index = 1  # ruff: ignore[private-member-access]
     mutable._plug_sn = str(plug.get(FIELD_DEVICE_SN))  # ruff: ignore[private-member-access]
     mutable._plug_key = "smart_plug_1"  # ruff: ignore[private-member-access]
-    return entity
+    return entity  # pyrefly: ignore [no-any-return-implicit]
 
 
 async def test_local_smart_plug_routes_by_serial() -> None:

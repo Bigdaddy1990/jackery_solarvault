@@ -54,14 +54,19 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
         },
     }
     description = JackeryStatSensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="pv_year_energy",
+        # pyrefly: ignore [unexpected-keyword]
         translation_key="pv_year_energy",
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
         section=section,
         transform=safe_float,
+        # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
         state_class=SensorStateClass.TOTAL,
         reset_period=DATE_TYPE_YEAR,
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     )
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)

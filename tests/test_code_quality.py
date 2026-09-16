@@ -8,6 +8,7 @@ import re
 import sys
 import types
 
+# pyrefly: ignore [untyped-import]
 import yaml
 
 CUSTOM_COMPONENT = pathlib.Path("custom_components/jackery_solarvault")

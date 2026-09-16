@@ -16,9 +16,9 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_ZONE_ID,
 )
 from custom_components.jackery_solarvault.services import (
-    _async_handle_report_device_timezone,
-    _async_handle_set_ac_nickname,
-    _async_handle_unbind_accessories,
+    _async_handle_report_device_timezone,  # ruff: ignore[import-private-name]
+    _async_handle_set_ac_nickname,  # ruff: ignore[import-private-name]
+    _async_handle_unbind_accessories,  # ruff: ignore[import-private-name]
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 
@@ -39,7 +39,7 @@ class _Registry:
     def async_get(self, device_id: str) -> _Device | None:
         return self._devices.get(device_id)
 
-    def async_get_or_create(self, **kwargs) -> Mock:  # ruff: ignore[no-self-use]
+    def async_get_or_create(self, **kwargs) -> Mock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-kwargs]
         return Mock()
 
 
@@ -76,11 +76,11 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_unbind_accessories(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_unbind_accessories handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -111,11 +111,11 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_unbind_accessories_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_unbind_accessories when no coordinator found."""
         hass = _test_hass()
 
@@ -144,17 +144,17 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_unbind_accessories_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_unbind_accessories with auth error."""
         hass = _test_hass()
         coordinator = _Coordinator()
         coordinator.async_unbind_accessories = AsyncMock(
             side_effect=ConfigEntryAuthFailed("auth failed")
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Mock device registry
         registry = _Registry({
@@ -180,11 +180,11 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_set_ac_nickname(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_set_ac_nickname handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -213,15 +213,15 @@ class TestServices:
 
         coordinator.async_set_ac_nickname.assert_called_once_with(
             "test_serial", ac_port=1, name="My AC"
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_set_ac_nickname_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_set_ac_nickname when no coordinator found."""
         hass = _test_hass()
 
@@ -251,19 +251,19 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_set_ac_nickname_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_set_ac_nickname with auth error."""
-        from custom_components.jackery_solarvault.client import JackeryAuthError
+        from custom_components.jackery_solarvault.client import JackeryAuthError  # ruff: ignore[import-outside-top-level]
 
         hass = _test_hass()
         coordinator = _Coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(
             side_effect=JackeryAuthError("auth failed")
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Mock device registry
         registry = _Registry({
@@ -279,7 +279,7 @@ class TestServices:
             lambda h, d: coordinator,
         )
 
-        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)
+        # Call the handler - should raise ConfigEntryAuthFailed (wrapped from JackeryAuthError)  # ruff: ignore[line-too-long]
         call = _service_call({
             SERVICE_FIELD_DEVICE_ID: "test_device",
             SERVICE_FIELD_NICKNAME: "My AC",
@@ -290,11 +290,11 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_report_device_timezone(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_report_device_timezone handler."""
         hass = _test_hass()
         coordinator = _Coordinator()
@@ -323,15 +323,15 @@ class TestServices:
 
         coordinator.async_report_device_timezone.assert_called_once_with(
             "test_serial", zone_id="zone1", time_offset=3600
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_report_device_timezone_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_report_device_timezone when no coordinator found."""
         hass = _test_hass()
 
@@ -361,17 +361,17 @@ class TestServices:
 
     @pytest.mark.asyncio()
     @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"
+        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
     )
     async def test_service_report_device_timezone_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:  # noqa: E501, PLR6301, RUF100
+    ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
         """Test _async_handle_report_device_timezone with auth error."""
         hass = _test_hass()
         coordinator = _Coordinator()
         coordinator.async_report_device_timezone = AsyncMock(
             side_effect=ConfigEntryAuthFailed("auth failed")
-        )  # noqa: E501, RUF100
+        )  # noqa: E501, RUF100, RUF105
 
         # Mock device registry
         registry = _Registry({

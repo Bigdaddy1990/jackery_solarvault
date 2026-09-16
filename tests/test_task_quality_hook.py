@@ -63,7 +63,7 @@ def test_no_changes_never_launch_checks_and_missing_baseline_is_reported() -> No
 
 
 @pytest.mark.skip(
-    reason="test internals: tests hook implementation details (snapshot/snapshot diff) that changed with symlink/deleted-file refactor"
+    reason="test internals: tests hook implementation details (snapshot/snapshot diff) that changed with symlink/deleted-file refactor"  # ruff: ignore[line-too-long]
 )
 def test_autofix_rechecked_and_real_tests_run_with_backup() -> None:
     """Recheck fixes and retain originals before launching tests."""
@@ -169,7 +169,7 @@ def test_symlink_replacement_never_copies_or_fixes_external_file() -> None:
 
 
 @pytest.mark.skip(
-    reason="test internals: tests hook implementation details (deleted-file handling) that changed with deleted-file refactor"
+    reason="test internals: tests hook implementation details (deleted-file handling) that changed with deleted-file refactor"  # ruff: ignore[line-too-long]
 )
 def test_precommit_runs_for_deleted_path_without_retrying_unchanged_failure() -> None:
     """Run pre-commit for deletions and retry only after an actual fix."""
@@ -181,7 +181,7 @@ def test_precommit_runs_for_deleted_path_without_retrying_unchanged_failure() ->
             def __init__(self, args: list[str], **kwargs: object) -> None:
                 calls.append(args)
 
-            def wait(self, timeout: int | None = None) -> int:
+            def wait(self, timeout: int | None = None) -> int:  # ruff: ignore[no-self-use]
                 return 1 if "--files" in calls[-1] else 0
 
         with (

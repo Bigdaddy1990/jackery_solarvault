@@ -54,7 +54,7 @@ def _ble_first_coordinator() -> JackerySolarVaultCoordinator:
     cast("Any", coordinator)._bind_cloud_command_attempt = MagicMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._record_successful_command_transports = MagicMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._record_independent_cloud_mqtt_result = MagicMock()  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 @pytest.mark.asyncio()

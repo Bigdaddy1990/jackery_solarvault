@@ -54,9 +54,13 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["access_token"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["refresh_token"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["token"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["data"]["nested_token"] == "**REDACTED**"
 
     def test_redaction_removes_credentials(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -70,12 +74,18 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["password"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["mqtt_password"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["api_key"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["secret"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["credentials"]["password"] == "**REDACTED**"
         # username is also redacted (REDACT_KEYS contains username-related keys)
+        # pyrefly: ignore [bad-index]
         assert redacted["credentials"]["username"] == "**REDACTED**"
 
     def test_redaction_removes_keys_and_coordinates(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -90,12 +100,18 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["aes_key"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["rsa_key"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["mqtt_mac_id"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["latitude"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["longitude"] == "**REDACTED**"
         # gps is a redacted key, so the entire dict is replaced
+        # pyrefly: ignore [bad-index]
         assert redacted["gps"] == "**REDACTED**"
 
     def test_redaction_removes_account_ids(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -109,10 +125,15 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["user_id"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["account_id"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["device_id"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["device_sn"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["bind_user_id"] == "**REDACTED**"
 
     def test_redaction_preserves_non_sensitive_data(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -130,13 +151,17 @@ class TestPayloadRedaction:
         redacted = _payload_debug_redacted(payload)
 
         # All these should be preserved (not redacted)
+        # pyrefly: ignore [bad-index]
         assert redacted["soc"] == 73  # ruff: ignore[magic-value-comparison]
-        assert redacted["batState"] == 1
+        assert redacted["batState"] == 1  # pyrefly: ignore [bad-index]
+        # pyrefly: ignore [bad-index]
         assert redacted["pvPw"] == 1200  # ruff: ignore[magic-value-comparison]
-        assert redacted["gridPw"] == -500  # ruff: ignore[magic-value-comparison]
-        assert redacted["temperature"] == 25.5  # ruff: ignore[magic-value-comparison, float-equality-comparison]
-        assert redacted["firmware"] == "v1.2.3"
+        assert redacted["gridPw"] == -500  # ruff: ignore[magic-value-comparison]  # pyrefly: ignore [bad-index]
+        assert redacted["temperature"] == 25.5  # ruff: ignore[magic-value-comparison, float-equality-comparison]  # pyrefly: ignore [bad-index]
+        assert redacted["firmware"] == "v1.2.3"  # pyrefly: ignore [bad-index]
+        # pyrefly: ignore [bad-index]
         assert redacted["model"] == "SolarVault 3 Pro Max"
+        # pyrefly: ignore [bad-index]
         assert redacted["onlineState"] == 1
 
     def test_redaction_handles_lists(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -150,11 +175,16 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["devices"][0]["deviceId"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["devices"][0]["token"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["devices"][1]["deviceId"] == "**REDACTED**"
+        # pyrefly: ignore [bad-index]
         assert redacted["devices"][1]["token"] == "**REDACTED**"
         # Chart data preserved (not sensitive)
+        # pyrefly: ignore [bad-index]
         assert redacted["chart_data"] == [1.0, 2.0, 3.0]
 
     def test_redaction_handles_none_and_primitives(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
@@ -168,10 +198,14 @@ class TestPayloadRedaction:
         }
         redacted = _payload_debug_redacted(payload)
 
+        # pyrefly: ignore [bad-index]
         assert redacted["none_val"] is None
+        # pyrefly: ignore [bad-index]
         assert redacted["bool_val"] is True
+        # pyrefly: ignore [bad-index]
         assert redacted["int_val"] == 42  # ruff: ignore[magic-value-comparison]
-        assert redacted["float_val"] == math.pi
+        assert redacted["float_val"] == math.pi  # pyrefly: ignore [bad-index]
+        # pyrefly: ignore [bad-index]
         assert redacted["str_val"] == "hello"
 
 
@@ -246,6 +280,7 @@ class TestQualityScaleSchema:
         """quality_scale.yaml must have top-level rules: schema."""
         from pathlib import Path  # ruff: ignore[import-outside-top-level]
 
+        # pyrefly: ignore [untyped-import]
         import yaml  # ruff: ignore[import-outside-top-level]
 
         qs_path = (

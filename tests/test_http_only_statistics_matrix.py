@@ -103,7 +103,7 @@ def _stat_sensor(
 
     context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
-    return sensor
+    return sensor  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _native_value(sensor_key: str, payload: dict[str, Any]) -> float | None:
@@ -699,7 +699,7 @@ def test_today_battery_flow_preserves_observed_local_zero() -> None:
         PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_ONGRID_TO_BATTERY: 0},
     }
 
-    assert _native_value("device_today_ongrid_to_battery", payload) == 0.0
+    assert _native_value("device_today_ongrid_to_battery", payload) == 0.0  # ruff: ignore[float-equality-comparison]
 
 
 @pytest.mark.parametrize(

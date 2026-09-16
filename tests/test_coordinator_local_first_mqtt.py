@@ -30,7 +30,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _reachability_coordinator() -> JackerySolarVaultCoordinator:
@@ -66,6 +66,7 @@ def test_local_reachability_uses_loaded_ha_bluetooth(
     coordinator = _reachability_coordinator()
     address_present = MagicMock(return_value=True)
     bluetooth_module = ModuleType("homeassistant.components.bluetooth")
+    # pyrefly: ignore [missing-attribute]
     bluetooth_module.async_address_present = address_present
     monkeypatch.setitem(
         sys.modules,

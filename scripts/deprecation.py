@@ -86,6 +86,7 @@ def get_deprecated(
             new_name,
         )
         return config.get(old_name)
+    # pyrefly: ignore [no-any-return-explicit]
     return config.get(new_name, default)
 
 

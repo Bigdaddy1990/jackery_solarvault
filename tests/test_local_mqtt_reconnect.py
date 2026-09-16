@@ -197,7 +197,7 @@ def test_discovery_prefix_also_receives_official_jackery_device_topics(
 ) -> None:
     """Discovery traffic must not be the only subscribed protocol tree."""
     client = _client(topic)
-    assert client._topic_filters == ("homeassistant/#", "hb/device/#")
+    assert client._topic_filters == ("homeassistant/#", "hb/device/#")  # ruff: ignore[private-member-access]
 
 
 def test_explicit_wildcard_local_topic_is_not_broadened() -> None:
