@@ -1,8 +1,11 @@
 """Unit tests for integration service helpers."""
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import sys
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, ClassVar, cast
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import voluptuous as vol
@@ -13,7 +16,13 @@ from custom_components.jackery_solarvault.client.api import (
     JackeryError,
 )
 from custom_components.jackery_solarvault.const import (
+    DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DOMAIN,
+    FIELD_QR_CODE_ID,
+    FIELD_USER_ID,
+    PAYLOAD_DEVICE,
+    PAYLOAD_DISCOVERY,
+    PAYLOAD_DISCOVERY_SOURCE,
     SERVICE_FIELD_ACK_TIMEOUT,
     SERVICE_FIELD_ALERT_ID,
     SERVICE_FIELD_BODY,
@@ -29,6 +38,11 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_FIELD_TOKEN,
     SERVICE_FIELD_USERNAME,
     SERVICE_FIELD_WAIT_FOR_ACK,
+    SERVICE_RESPONSE_QR_CODE_ID,
+    SERVICE_RESPONSE_USER_ID,
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
 )
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -37,6 +51,8 @@ from homeassistant.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from homeassistant.core import HomeAssistant, ServiceCall
 
 
@@ -67,6 +83,17 @@ def _test_hass() -> HomeAssistant:
 def _service_call(data: dict[str, object]) -> ServiceCall:
     """Type a minimal service call at the test boundary."""
     return cast("ServiceCall", _Call(data))
+
+
+@contextmanager
+def _ignore_private() -> Iterator[None]:
+    """Mark deliberate private service-helper access in tests.
+
+    The per-line ``# ruff: ignore[private-member-access]`` comments carry the
+    actual suppression; this scope keeps the assertion body of rejection tests
+    under one readable construct.
+    """
+    yield
 
 
 class _OverflowFloat:
@@ -1086,4 +1113,693 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
     assert err.value.translation_placeholders == {
         "device_id": "dev1",
         "error": "ack_timeout must be a number",
+    }
+
+# ---------------------------------------------------------------------------
+# Pure coercion / validation helpers — exercise every branch
+# ---------------------------------------------------------------------------
+
+
+def _fake_coordinator(data: object) -> object:
+    """Return a coordinator-shaped stub carrying the given payload data."""
+    return SimpleNamespace(data=data)
+
+
+@pytest.mark.parametrize("raw", [True, False])
+def test_coerce_service_int_rejects_bool(raw: object) -> None:
+    """Booleans are never valid service integers."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int(raw)  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_returns_int() -> None:
+    """Plain integers pass through unchanged."""
+    expected = 42
+    assert services._coerce_service_int(expected) == expected  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_returns_whole_float() -> None:
+    """Integral floats are converted without truncation."""
+    expected = 3
+    assert services._coerce_service_int(3.0) == expected  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_rejects_fractional_float() -> None:
+    """Fractional floats must not be silently truncated."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int(3.5)  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_rejects_infinite_float() -> None:
+    """Infinite floats are not whole numbers."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int(float("inf"))  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize(
+    ["raw", "expected"],
+    [[" 7 ", 7], ["+42", 42], ["-42", -42]],
+)
+def test_coerce_service_int_parses_digit_strings(raw: object, expected: int) -> None:
+    """Signed and padded decimal strings parse to integers."""
+    assert services._coerce_service_int(raw) == expected  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_rejects_whitespace_string() -> None:
+    """Whitespace-only strings are not integers."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int("   ")  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_rejects_non_decimal_string() -> None:
+    """Non-ASCII or non-decimal digits are rejected."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int("12a")  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_int_rejects_unsupported_type() -> None:
+    """Containers are never valid integers."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_int([1])  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize("raw", [True, False])
+def test_coerce_service_float_rejects_bool(raw: object) -> None:
+    """Booleans are never valid service floats."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_float(raw)  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_float_rejects_unsupported_type() -> None:
+    """Containers are never valid floats."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_float([])  # ruff: ignore[private-member-access]
+
+
+def test_coerce_service_float_parses_values() -> None:
+    """Ints and numeric strings convert to floats."""
+    expected = 42.0
+    assert services._coerce_service_float(42) == expected  # ruff: ignore[private-member-access]
+    assert services._coerce_service_float("2.5") == 2.5  # ruff: ignore[private-member-access,float-equality-comparison,magic-value-comparison]
+
+
+def test_coerce_service_float_rejects_overflow_object() -> None:
+    """Objects whose __float__ overflows raise vol.Invalid."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_float(_OverflowFloat())  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize("raw", ["inf", "nan", "foo"])
+def test_coerce_service_float_rejects_non_finite(raw: object) -> None:
+    """Non-finite and non-numeric text is rejected."""
+    with pytest.raises(vol.Invalid), _ignore_private():
+        services._coerce_service_float(raw)  # ruff: ignore[private-member-access]
+
+
+def test_json_native_value_passes_scalars() -> None:
+    """JSON scalars round-trip unchanged."""
+    assert services._json_native_value(None) is None  # ruff: ignore[private-member-access]
+    assert services._json_native_value("hello") == "hello"  # ruff: ignore[private-member-access]
+    assert services._json_native_value(True) is True  # ruff: ignore[private-member-access]
+    assert services._json_native_value(1) == 1  # ruff: ignore[private-member-access]
+    assert services._json_native_value(1.5) == 1.5  # ruff: ignore[private-member-access,float-equality-comparison,magic-value-comparison]
+
+
+def test_json_native_value_rejects_non_finite_float() -> None:
+    """Non-finite floats raise ValueError."""
+    with pytest.raises(ValueError, match="finite numbers"), _ignore_private():
+        services._json_native_value(float("inf"))  # ruff: ignore[private-member-access]
+
+
+def test_json_native_value_normalizes_nested_containers() -> None:
+    """Lists and dicts recurse into their children."""
+    assert services._json_native_value([1, "x", None]) == [1, "x", None]  # ruff: ignore[private-member-access]
+    assert services._json_native_value({"a": 1}) == {"a": 1}  # ruff: ignore[private-member-access]
+
+
+def test_json_native_value_rejects_non_string_keys() -> None:
+    """Object keys must be strings."""
+    with pytest.raises(TypeError, match="keys must be strings"), _ignore_private():
+        services._json_native_value({1: "a"})  # ruff: ignore[private-member-access]
+
+
+def test_json_native_value_rejects_unsupported_values() -> None:
+    """Arbitrary objects are not JSON-compatible."""
+    with pytest.raises(ValueError, match="JSON-compatible values"), _ignore_private():
+        services._json_native_value(object())  # ruff: ignore[private-member-access]
+
+
+def test_json_native_body_returns_normalized_dict() -> None:
+    """A JSON-native dict body passes through."""
+    assert services._json_native_body({"a": 1}, "dev") == {"a": 1}  # ruff: ignore[private-member-access]
+
+
+def test_json_native_body_rejects_non_string_keys() -> None:
+    """Non-string keys surface as translated validation errors."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._json_native_body({1: "a"}, "dev")  # ruff: ignore[private-member-access]
+    assert err.value.translation_key == "send_ble_command_failed"
+
+
+def test_json_native_body_rejects_non_dict_body() -> None:
+    """A list body is redacted and rejected."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._json_native_body([1], "dev")  # ruff: ignore[private-member-access]
+    assert err.value.translation_key == "send_ble_command_failed"
+    assert "**REDACTED**" in err.value.translation_placeholders["error"]
+
+
+def test_ble_body_accepts_mapping() -> None:
+    """Dict bodies normalize directly."""
+    assert services._ble_body_from_service({"cmd": 1}, "dev") == {"cmd": 1}  # ruff: ignore[private-member-access]
+
+
+def test_ble_body_accepts_json_object_string() -> None:
+    """JSON object strings parse to dicts."""
+    assert services._ble_body_from_service('{"cmd": 1}', "dev") == {"cmd": 1}  # ruff: ignore[private-member-access]
+
+
+def test_ble_body_rejects_json_array_string() -> None:
+    """Non-object JSON text is rejected."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._ble_body_from_service("[1]", "dev")  # ruff: ignore[private-member-access]
+    assert "body JSON must be an object" in err.value.translation_placeholders["error"]
+
+
+def test_ble_body_rejects_malformed_json() -> None:
+    """Unparseable JSON strings are rejected."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._ble_body_from_service("{", "dev")  # ruff: ignore[private-member-access]
+    assert "body is not valid JSON" in err.value.translation_placeholders["error"]
+
+
+def test_ble_body_rejects_non_container_value() -> None:
+    """Integers are neither mapping nor JSON string."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._ble_body_from_service(42, "dev")  # ruff: ignore[private-member-access]
+    assert "must be a mapping or JSON object string" in (
+        err.value.translation_placeholders["error"]
+    )
+
+
+def test_tou_tasks_accepts_list_body() -> None:
+    """A list of task dicts passes through."""
+    assert len(services._tou_tasks_from_service([{"cmd": 1}], "dev")) == 1  # ruff: ignore[private-member-access]
+
+
+def test_tou_tasks_extracts_tasks_from_dict() -> None:
+    """Dict bodies with a tasks key yield the task list."""
+    assert len(services._tou_tasks_from_service({"tasks": [{"a": 1}]}, "dev")) == 1  # ruff: ignore[private-member-access]
+
+
+def test_tou_tasks_rejects_dict_without_tasks() -> None:
+    """Dicts without a tasks key are rejected."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._tou_tasks_from_service({"foo": 1}, "dev")  # ruff: ignore[private-member-access]
+    assert err.value.translation_key == "save_tou_plan_failed"
+    assert "body must be a tasks list" in err.value.translation_placeholders["error"]
+
+
+def test_tou_tasks_rejects_malformed_json() -> None:
+    """Unparseable JSON strings are rejected."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._tou_tasks_from_service("{bad", "dev")  # ruff: ignore[private-member-access]
+    assert "body is not valid JSON" in err.value.translation_placeholders["error"]
+
+
+def test_tou_tasks_rejects_non_dict_task() -> None:
+    """Tasks must be JSON objects."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._tou_tasks_from_service(["string"], "dev")  # ruff: ignore[private-member-access]
+    assert "each TOU task must be a JSON object" in (
+        err.value.translation_placeholders["error"]
+    )
+
+
+@pytest.mark.parametrize(
+    ["raw", "expected"],
+    [[True, True], [False, False], ["true", True], ["false", False], [1, True]],
+)
+def test_service_bool_parses_boolean_values(raw: object, expected: bool) -> None:
+    """Boolean-ish service values parse to booleans."""
+    assert (
+        services._service_bool(  # ruff: ignore[private-member-access]
+            raw, field_name="f", translation_key="k", device_id="d"
+        )
+        is expected
+    )
+
+
+@pytest.mark.parametrize("raw", [None, "maybe", []])
+def test_service_bool_rejects_non_boolean(raw: object) -> None:
+    """Non-boolean values raise a translated field error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_bool(raw, field_name="f", translation_key="k", device_id="d")  # ruff: ignore[private-member-access]
+    assert "f must be a boolean" in err.value.translation_placeholders["error"]
+
+
+def test_service_required_text_strips_value() -> None:
+    """Required text trims surrounding whitespace."""
+    assert (
+        services._service_required_text(  # ruff: ignore[private-member-access]
+            "  hi  ",
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            max_length=10,
+        )
+        == "hi"
+    )
+
+
+def test_service_required_text_rejects_non_text() -> None:
+    """Non-string required text raises a translated error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_required_text(  # ruff: ignore[private-member-access]
+            1, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+    assert "f must be text" in err.value.translation_placeholders["error"]
+
+
+def test_service_required_text_rejects_blank() -> None:
+    """Blank required text raises a translated error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_required_text(  # ruff: ignore[private-member-access]
+            "", field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+    assert "f must not be empty" in err.value.translation_placeholders["error"]
+
+
+def test_service_required_text_rejects_overlong() -> None:
+    """Text beyond max_length raises a translated error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_required_text(  # ruff: ignore[private-member-access]
+            "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+    assert "f must be at most 10 characters" in (
+        err.value.translation_placeholders["error"]
+    )
+
+
+def test_service_optional_text_defaults_none_to_empty() -> None:
+    """None optional text resolves to the empty string."""
+    assert (
+        services._service_optional_text(  # ruff: ignore[private-member-access]
+            None, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+        == ""  # ruff: ignore[compare-to-empty-string]
+    )
+
+
+def test_service_optional_text_keeps_value() -> None:
+    """Optional text is not stripped."""
+    assert (
+        services._service_optional_text(  # ruff: ignore[private-member-access]
+            "  hi  ",
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            max_length=10,
+        )
+        == "  hi  "
+    )
+
+
+def test_service_optional_text_rejects_non_text() -> None:
+    """Non-string optional text raises a translated error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_optional_text(  # ruff: ignore[private-member-access]
+            1, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+    assert "f must be text" in err.value.translation_placeholders["error"]
+
+
+def test_service_optional_text_rejects_overlong() -> None:
+    """Optional text beyond max_length raises."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_optional_text(  # ruff: ignore[private-member-access]
+            "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
+        )
+    assert "f must be at most 10 characters" in (
+        err.value.translation_placeholders["error"]
+    )
+
+
+def test_service_int_accepts_in_range() -> None:
+    """In-range integers pass through."""
+    expected = 5
+    assert (
+        services._service_int(  # ruff: ignore[private-member-access]
+            expected,
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            bounds=(1, 10),
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize("raw", [0, 11])
+def test_service_int_rejects_out_of_range(raw: object) -> None:
+    """Out-of-range integers raise a translated bound error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_int(  # ruff: ignore[private-member-access]
+            raw, field_name="f", translation_key="k", device_id="d", bounds=(1, 10)
+        )
+    assert "f must be between 1 and 10" in err.value.translation_placeholders["error"]
+
+
+def test_service_int_rejects_non_integer() -> None:
+    """Non-integer input raises a translated type error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_int(  # ruff: ignore[private-member-access]
+            "x", field_name="f", translation_key="k", device_id="d", bounds=(1, 10)
+        )
+    assert "f must be an integer" in err.value.translation_placeholders["error"]
+
+
+def test_service_float_accepts_in_range() -> None:
+    """In-range floats pass through."""
+    assert (
+        services._service_float(  # ruff: ignore[private-member-access,float-equality-comparison]
+            5.5,
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            bounds=(1.0, 10.0),
+        )
+        == 5.5  # ruff: ignore[magic-value-comparison]
+    )
+
+
+@pytest.mark.parametrize("raw", [0.5, 11.0])
+def test_service_float_rejects_out_of_range(raw: object) -> None:
+    """Out-of-range floats raise a translated bound error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_float(  # ruff: ignore[private-member-access]
+            raw,
+            field_name="f",
+            translation_key="k",
+            device_id="d",
+            bounds=(1.0, 10.0),
+        )
+    assert "f must be between 1.0 and 10.0" in (
+        err.value.translation_placeholders["error"]
+    )
+
+
+def test_service_float_rejects_non_number() -> None:
+    """Non-numeric input raises a translated type error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._service_float(  # ruff: ignore[private-member-access]
+            "x", field_name="f", translation_key="k", device_id="d", bounds=(1.0, 10.0)
+        )
+    assert "f must be a number" in err.value.translation_placeholders["error"]
+
+
+def test_reject_json_constant_names_the_constant() -> None:
+    """The constant name is part of the rejection message."""
+    with pytest.raises(ValueError, match="invalid JSON constant: NaN"), (
+        _ignore_private()
+    ):
+        services._reject_json_constant("NaN")  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize(
+    ["raw", "expected"],
+    [["12345", "12345"], ["12345_smart_plug_1", "12345"], ["", ""]],
+)
+def test_strip_jackery_subdevice_suffix(raw: str, expected: str) -> None:
+    """Only digit-rooted ids get their suffix removed."""
+    assert services._strip_jackery_subdevice_suffix(raw) == expected  # ruff: ignore[private-member-access]
+
+
+def test_service_validation_error_sets_placeholders() -> None:
+    """The validation error carries domain, key and base placeholders."""
+    err = services._service_validation_error("key", device_id="d", error="oops")  # ruff: ignore[private-member-access]
+    assert err.translation_domain == DOMAIN
+    assert err.translation_key == "key"
+    assert err.translation_placeholders == {"device_id": "d", "error": "oops"}
+
+
+def test_service_validation_error_merges_extra_placeholders() -> None:
+    """Extra placeholders are merged into the error."""
+    err = services._service_validation_error(  # ruff: ignore[private-member-access]
+        "key", device_id="d", error="oops", extra_placeholders={"alert_id": "a1"}
+    )
+    assert err.translation_placeholders["alert_id"] == "a1"
+
+
+def test_service_action_error_wraps_home_assistant_error() -> None:
+    """The action error is a translated HomeAssistantError."""
+    err = services._service_action_error("key", device_id="d", error="oops")  # ruff: ignore[private-member-access]
+    assert isinstance(err, HomeAssistantError)
+    assert err.translation_domain == DOMAIN
+
+
+def test_service_action_error_merges_extra_placeholders() -> None:
+    """Extra placeholders are merged into action errors too."""
+    err = services._service_action_error(  # ruff: ignore[private-member-access]
+        "key", device_id="d", error="oops", extra_placeholders={"extra": "v"}
+    )
+    assert err.translation_placeholders["extra"] == "v"
+
+
+def test_device_id_from_service_rejects_blank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Whitespace-only device ids raise before registry lookup."""
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, _r: "x")
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._device_id_from_service(_test_hass(), "  ", translation_key="k")  # ruff: ignore[private-member-access]
+    assert "device_id must not be empty" in err.value.translation_placeholders["error"]
+
+
+def test_device_id_from_service_rejects_non_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-string device ids raise a translated type error."""
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, _r: "x")
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._device_id_from_service(_test_hass(), 42, translation_key="k")  # ruff: ignore[private-member-access]
+    assert "device_id must be text" in err.value.translation_placeholders["error"]
+
+
+def test_rename_name_rejects_non_text() -> None:
+    """A non-string new_name raises a translated type error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._rename_name_from_service(42, "123")  # ruff: ignore[private-member-access]
+    assert "new_name must be text" in err.value.translation_placeholders["error"]
+
+
+def test_storm_alert_id_rejects_non_text() -> None:
+    """A non-string alert id raises a translated type error."""
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._storm_alert_id_from_service(42, "dev")  # ruff: ignore[private-member-access]
+    assert "alert_id must be text" in err.value.translation_placeholders["error"]
+
+
+def test_coordinator_for_device_finds_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The coordinator owning the device id is returned."""
+    coordinator = _fake_coordinator({"123": {}})
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    assert services._coordinator_for_device(_test_hass(), "123") is coordinator  # ruff: ignore[private-member-access]
+
+
+def test_coordinator_for_device_skips_non_matching_then_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Coordinators without the device loop past; None when nobody owns it."""
+    other = _fake_coordinator({"other": {}})
+    missing_data = _fake_coordinator(None)
+    monkeypatch.setattr(
+        services, "_loaded_coordinators", lambda _h: [other, missing_data]
+    )
+    assert services._coordinator_for_device(_test_hass(), "123") is None  # ruff: ignore[private-member-access]
+
+
+def test_coordinator_for_system_finds_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The coordinator whose payload declares the system id is returned."""
+    coordinator = _fake_coordinator({"dev1": {"system": {"id": "sys1"}}})
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    assert services._coordinator_for_system(_test_hass(), "sys1") is coordinator  # ruff: ignore[private-member-access]
+
+
+def test_coordinator_for_system_checks_both_id_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SystemId matches via the second documented key."""
+    coordinator = _fake_coordinator({"dev1": {"system": {"systemId": "sys1"}}})
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    assert services._coordinator_for_system(_test_hass(), "sys1") is coordinator  # ruff: ignore[private-member-access]
+
+
+def test_coordinator_for_system_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No coordinator and no payload match yields None."""
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [])
+    assert services._coordinator_for_system(_test_hass(), "sys1") is None  # ruff: ignore[private-member-access]
+
+
+def test_is_portable_device_false_for_home_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Home-payload evidence always outranks portable classification."""
+    monkeypatch.setattr(
+        services, "_payload_has_home_payload_evidence", lambda _p: True
+    )
+    assert services._is_portable_device(_fake_coordinator({}), "dev1") is False  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize("section", [PAYLOAD_DEVICE, PAYLOAD_DISCOVERY])
+def test_is_portable_device_true_for_legacy_bind_list(
+    monkeypatch: pytest.MonkeyPatch, section: str
+) -> None:
+    """Either documented section may carry the legacy bind-list marker."""
+    monkeypatch.setattr(
+        services, "_payload_has_home_payload_evidence", lambda _p: False
+    )
+    coordinator = _fake_coordinator(
+        {"dev1": {section: {PAYLOAD_DISCOVERY_SOURCE: (
+            DISCOVERY_SOURCE_LEGACY_BIND_LIST
+        )}}}
+    )
+    assert services._is_portable_device(coordinator, "dev1") is True  # ruff: ignore[private-member-access]
+
+
+def test_is_portable_device_false_for_other_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A different discovery source does not mark the device portable."""
+    monkeypatch.setattr(
+        services, "_payload_has_home_payload_evidence", lambda _p: False
+    )
+    coordinator = _fake_coordinator(
+        {"dev1": {PAYLOAD_DEVICE: {PAYLOAD_DISCOVERY_SOURCE: "cloud_bind"}}}
+    )
+    assert services._is_portable_device(coordinator, "dev1") is False  # ruff: ignore[private-member-access]
+
+
+def test_is_portable_device_false_for_non_dict_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-dict section payload cannot carry the marker."""
+    monkeypatch.setattr(
+        services, "_payload_has_home_payload_evidence", lambda _p: False
+    )
+    coordinator = _fake_coordinator({"dev1": {PAYLOAD_DEVICE: "not-a-dict"}})
+    assert services._is_portable_device(coordinator, "dev1") is False  # ruff: ignore[private-member-access]
+
+
+def test_is_portable_device_false_for_unknown_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unknown device ids are not portable."""
+    monkeypatch.setattr(
+        services, "_payload_has_home_payload_evidence", lambda _p: False
+    )
+    assert services._is_portable_device(_fake_coordinator({}), "dev1") is False  # ruff: ignore[private-member-access]
+
+
+def test_raise_if_portable_home_service_allows_home_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Home-family devices pass the portable guard untouched."""
+    monkeypatch.setattr(services, "_is_portable_device", lambda _c, _d: False)
+    services._raise_if_portable_home_service(  # ruff: ignore[private-member-access]
+        _fake_coordinator({}), "dev1", translation_key="k", service_name="s"
+    )
+
+
+def test_raise_if_portable_home_service_rejects_portables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Portable devices hit the translated Home-family error."""
+    monkeypatch.setattr(services, "_is_portable_device", lambda _c, _d: True)
+    with pytest.raises(ServiceValidationError) as err, _ignore_private():
+        services._raise_if_portable_home_service(  # ruff: ignore[private-member-access]
+            _fake_coordinator({}),
+            "dev1",
+            translation_key="k",
+            service_name="rename_system",
+        )
+    assert err.value.translation_key == "k"
+    assert "rename_system" in err.value.translation_placeholders["error"]
+
+
+def test_loaded_coordinators_keeps_only_typed_runtime_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Entries without a coordinator runtime_data are skipped."""
+    coordinator = Mock(spec=JackerySolarVaultCoordinator)
+    entries = [
+        SimpleNamespace(runtime_data=coordinator),
+        SimpleNamespace(runtime_data=object()),
+        SimpleNamespace(),
+    ]
+    hass = SimpleNamespace(
+        config_entries=SimpleNamespace(
+            async_loaded_entries=lambda _domain: entries
+        )
+    )
+    with _ignore_private():
+        result = services._loaded_coordinators(cast("HomeAssistant", hass))
+    assert result == [coordinator]
+
+
+async def test_get_share_qr_code_returns_response_envelope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The QR service returns the qrCodeId/userId envelope after notifying."""
+    coordinator = _fake_coordinator({"dev1": {}})
+    monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, raw: raw)
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    coordinator.async_get_share_qr_code = AsyncMock(
+        return_value={FIELD_QR_CODE_ID: "qr-1", FIELD_USER_ID: "user-1"}
+    )
+    notify = AsyncMock()
+    monkeypatch.setattr(services, "_notify_share_qr_code", notify)
+
+    response = await services._async_handle_get_share_qr_code(  # ruff: ignore[private-member-access]
+        _test_hass(),
+        _service_call({SERVICE_FIELD_DEVICE_ID: "dev1"}),
+    )
+
+    assert response == {
+        SERVICE_RESPONSE_QR_CODE_ID: "qr-1",
+        SERVICE_RESPONSE_USER_ID: "user-1",
+    }
+    notify.assert_awaited_once()
+
+
+def test_coordinator_for_system_skips_payload_without_system(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Payloads lacking a system section cannot match any system id."""
+    coordinator = _fake_coordinator({"dev1": {}})
+    monkeypatch.setattr(services, "_loaded_coordinators", lambda _h: [coordinator])
+    with _ignore_private():
+        assert services._coordinator_for_system(_test_hass(), "sys1") is None
+
+
+async def test_setup_services_is_idempotent(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second setup keeps the first registration instead of re-adding it."""
+    monkeypatch.setattr(services, "async_setup_services", services.async_setup_services)
+    await services.async_setup_services(hass)  # ruff: ignore[private-member-access]
+    registered = {
+        service
+        for service in hass.services.async_services().get(DOMAIN, {})
+    }
+    await services.async_setup_services(hass)  # ruff: ignore[private-member-access]
+    assert registered
+    assert registered == {
+        service
+        for service in hass.services.async_services().get(DOMAIN, {})
     }

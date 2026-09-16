@@ -50,7 +50,7 @@ def _bare_coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     coordinator._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     coordinator._layer5_stop_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     coordinator._layer5_stop_tasks = {}  # ruff: ignore[private-member-access]
-    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+    return coordinator
 
 
 async def test_concurrent_layer5_stop_callers_share_one_successful_result(
@@ -95,7 +95,6 @@ async def test_layer5_stop_is_hard_bounded_and_single_flight(
     release = asyncio.Event()
     transport = _CancellationResistantTransport(entered, release)
     coordinator = _bare_coordinator(hass)
-    # pyrefly: ignore [bad-assignment]
     coordinator._mqtt = transport  # ruff: ignore[private-member-access]
     monkeypatch.setattr(
         coordinator_module,
@@ -130,7 +129,6 @@ async def test_primary_shutdown_does_not_fail_on_supplemental_stop_error(
 ) -> None:
     """Primary shutdown defers Layer 5 without waiting or discarding ownership."""
     coordinator = _bare_coordinator(hass)
-    # pyrefly: ignore [bad-assignment]
     coordinator._mqtt = object()  # ruff: ignore[private-member-access]
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]
@@ -383,8 +381,6 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
     assert errors == ["MQTT stop task creation failed: task factory rejected"]
     assert coordinator._mqtt is transport  # ruff: ignore[private-member-access]
     assert created_wrapper is not None
-    # pyrefly: ignore [missing-attribute]
     assert created_wrapper.cr_frame is None
     assert transport.operation is not None
-    # pyrefly: ignore [missing-attribute]
     assert transport.operation.cr_frame is None

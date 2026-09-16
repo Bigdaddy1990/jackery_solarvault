@@ -8,7 +8,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    _local_mqtt_client,  # ruff: ignore[import-private-name]
+    _local_mqtt_client,
 )
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
@@ -47,9 +47,7 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
         "topic_filter": "jackery/device/#",
         "qos": 2,
     }
-    # pyrefly: ignore [bad-argument-type]
     assert client.matches_configuration(**configuration)
-    # pyrefly: ignore [bad-argument-type]
     assert not client.matches_configuration(**(configuration | {"host": "other"}))
     redacted = client.diagnostics_snapshot()
     plain = client.diagnostics_snapshot(redact=False)
@@ -58,7 +56,7 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
     assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
     assert redacted["topic_filter"] == REDACTED_VALUE
     assert plain["topic_filter"] == "jackery/device/#"
-    assert plain["qos"] == 2  # ruff: ignore[magic-value-comparison]
+    assert plain["qos"] == 2
     assert plain["broker_connected"] is plain["connected"]
 
 
@@ -67,17 +65,17 @@ def test_coordinator_reports_consistent_local_mqtt_connection(
 ) -> None:
     """Coordinator diagnostics preserve connection and filtered-message counters."""
     client = JackeryLocalMqttClient(hass)
-    client._connected = True  # ruff: ignore[private-member-access]
-    client._messages_filtered = 7  # ruff: ignore[private-member-access]
+    client._connected = True
+    client._messages_filtered = 7
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator._local_mqtt_client = client  # ruff: ignore[private-member-access]
-    coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_client = client
+    coordinator._local_mqtt_device_traffic_observed = False
 
     observations = coordinator.local_mqtt_observations()
 
     assert observations["connected"] is True
     assert observations["broker_connected"] is True
-    assert observations["messages_filtered"] == 7  # ruff: ignore[magic-value-comparison]
+    assert observations["messages_filtered"] == 7
 
 
 @pytest.mark.parametrize("qos", [-1, 3])
@@ -96,7 +94,7 @@ async def test_message_without_sink_is_counted_as_dropped(
     """Missing shared ingest cannot be reported as a forwarded frame."""
     client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
 
-    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
+    await client._handle_message("jackery/device", b"{}")
 
     diagnostics = client.diagnostics_snapshot(redact=False)
     assert diagnostics["messages_received"] == 1
@@ -110,14 +108,14 @@ async def test_sink_rejection_and_failure_are_distinguished(
     """Semantic rejection and sink exceptions keep separate diagnostics."""
     rejecting_sink = AsyncMock(return_value=False)
     rejected = JackeryLocalMqttClient(hass, sink=rejecting_sink, topic_filter="#")
-    await rejected._handle_message("foreign/topic", b'{"id": 1}')  # ruff: ignore[private-member-access]
+    await rejected._handle_message("foreign/topic", b'{"id": 1}')
     rejected_diagnostics = rejected.diagnostics_snapshot(redact=False)
     assert rejected_diagnostics["messages_rejected_by_sink"] == 1
     assert rejected_diagnostics["messages_dropped"] == 1
 
     failing_sink = AsyncMock(side_effect=RuntimeError("bad frame"))
     failed = JackeryLocalMqttClient(hass, sink=failing_sink, topic_filter="#")
-    await failed._handle_message("jackery/topic", b"opaque")  # ruff: ignore[private-member-access]
+    await failed._handle_message("jackery/topic", b"opaque")
     failed_diagnostics = failed.diagnostics_snapshot(redact=False)
     assert failed_diagnostics["sink_errors"] == 1
     assert failed_diagnostics["last_sink_error"] == "RuntimeError: bad frame"
@@ -131,19 +129,19 @@ async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
-    await client._handle_message(  # ruff: ignore[private-member-access]
+    await client._handle_message(
         "jackery/oversized",
         b"x" * (LOCAL_MQTT_MAX_PAYLOAD_BYTES + 1),
     )
     retained = MagicMock(retain=True, topic="jackery/retained", payload=b"{}")
 
-    async def messages():  # ruff: ignore[missing-return-type-private-function]
+    async def messages():
         await asyncio.sleep(0)
         yield retained
 
     broker = MagicMock(messages=messages())
     broker.subscribe = AsyncMock()
-    await client._async_consume_session(broker, ["#"])  # ruff: ignore[private-member-access]
+    await client._async_consume_session(broker, ["#"])
     await client.async_wait_message_queue_idle()
 
     sink.assert_awaited_once_with("jackery/retained", {}, b"{}")
@@ -166,13 +164,13 @@ async def test_stop_cancels_direct_broker_reconnect_supervisor(
         await asyncio.Event().wait()
 
     runner_task = asyncio.create_task(runner())
-    client._runner_task = runner_task  # ruff: ignore[private-member-access]
+    client._runner_task = runner_task
     await runner_started.wait()
 
     await client.async_stop()
 
     assert runner_task.cancelled()
-    assert client._runner_task is None  # ruff: ignore[private-member-access]
+    assert client._runner_task is None
     assert client.is_connected is False
 
 
@@ -201,7 +199,7 @@ def test_utc_timestamp_is_timezone_aware(hass: HomeAssistant) -> None:
     """Diagnostics timestamps are ISO-8601 UTC values."""
     client = JackeryLocalMqttClient(hass)
 
-    value = client._utc_now_iso()  # ruff: ignore[private-member-access]
+    value = client._utc_now_iso()
 
     assert "T" in value
     assert value.endswith("+00:00")

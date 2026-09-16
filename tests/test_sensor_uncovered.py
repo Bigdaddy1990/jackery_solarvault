@@ -4,6 +4,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.jackery_solarvault.descriptions.sensor import (
+    JackerySavingsDetailSensorDescription,
+    JackerySensorDescription,
+    JackeryStatSensorDescription,
+)
 from custom_components.jackery_solarvault.sensor import (
     SAVINGS_DETAIL_SENSOR_DESCRIPTIONS,
     JackeryBatteryPackSensor,
@@ -15,15 +20,12 @@ from custom_components.jackery_solarvault.sensor import (
     JackeryLocalMqttSensor,
     JackeryRawPropertiesSensor,
     JackerySavingsDetailSensor,
-    JackerySavingsDetailSensorDescription,
     JackerySensor,
-    JackerySensorDescription,
     JackeryStatSensor,
-    JackeryStatSensorDescription,
-    _StatCacheSnapshot,  # ruff: ignore[import-private-name]
-    _StatRefreshBatch,  # ruff: ignore[import-private-name]
-    _StatRefreshRequest,  # ruff: ignore[import-private-name]
-    _StatRefreshResult,  # ruff: ignore[import-private-name]
+    _StatCacheSnapshot,
+    _StatRefreshBatch,
+    _StatRefreshRequest,
+    _StatRefreshResult,
     async_setup_entry,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -32,7 +34,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 class TestSensorCreation:
     """Test sensor creation and basic properties."""
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -41,24 +43,19 @@ class TestSensorCreation:
         coordinator.config_entry.runtime_data = MagicMock()
         return coordinator
 
-    def _create_sensor(self, coordinator, **kwargs) -> JackerySensor:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument, missing-type-kwargs]
+    def _create_sensor(self, coordinator: MagicMock, **kwargs) -> JackerySensor:  # ruff: ignore[no-self-use]
         """Create a sensor instance for testing."""
         description = JackerySensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="test_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Test Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="power",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="measurement",
             getter=lambda props: props.get("test_key"),
         )
         return JackerySensor(
             coordinator=coordinator, device_id="test_device", description=description
-        )  # noqa: E501, RUF100, RUF105
+        )  # noqa: E501, RUF100
 
     def test_jackery_sensor_base(self) -> None:
         """Test JackerySensor base class."""
@@ -73,8 +70,8 @@ class TestSensorCreation:
         """A standard sensor must not re-enter base cache preparation on write."""
         coordinator = self._create_coordinator({"test_device": {}})
         sensor = self._create_sensor(coordinator)
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._availability_cache_active = True  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._availability_cache_active = True
         refresh_value = MagicMock()
         refresh_availability = MagicMock()
         write_state = MagicMock()
@@ -86,7 +83,7 @@ class TestSensorCreation:
             write_state,
         )
 
-        sensor._handle_coordinator_update()  # ruff: ignore[private-member-access]
+        sensor._handle_coordinator_update()
 
         refresh_value.assert_called_once_with()
         refresh_availability.assert_called_once_with()
@@ -96,21 +93,16 @@ class TestSensorCreation:
         """Test JackeryStatSensor."""
         coordinator = self._create_coordinator()
         description = JackeryStatSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="stat_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Stat Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="energy",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="total_increasing",
             stat_key="pv",
         )
         sensor = JackeryStatSensor(
             coordinator=coordinator, device_id="test_device", description=description
-        )  # noqa: E501, RUF100, RUF105
+        )  # noqa: E501, RUF100
         assert sensor is not None
 
     def test_stat_update_defers_availability_until_snapshot_application(
@@ -119,20 +111,15 @@ class TestSensorCreation:
         """Only the completed statistic snapshot may prepare availability."""
         coordinator = self._create_coordinator({"test_device": {}})
         description = JackeryStatSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="stat_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Stat Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="energy",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="total",
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
         prepare = MagicMock()
         batch = MagicMock()
         monkeypatch.setattr(sensor, "_refresh_availability_cache", prepare)
@@ -141,7 +128,7 @@ class TestSensorCreation:
             MagicMock(return_value=batch),
         )
 
-        sensor._handle_coordinator_update()  # ruff: ignore[private-member-access]
+        sensor._handle_coordinator_update()
 
         prepare.assert_not_called()
         batch.request.assert_called_once_with(sensor, write_state=True)
@@ -153,24 +140,19 @@ class TestSensorCreation:
         coordinator = self._create_coordinator({"test_device": {"statistic": {}}})
         coordinator.is_device_reachable = MagicMock(return_value=True)
         description = JackeryStatSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="stat_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Stat Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="energy",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="total",
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._availability_cache_active = True  # ruff: ignore[private-member-access]
-        sensor._cache_generation = 1  # ruff: ignore[private-member-access]
-        sensor._cached_native_value = None  # ruff: ignore[private-member-access]
-        sensor._cached_available = False  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._availability_cache_active = True
+        sensor._cache_generation = 1
+        sensor._cached_native_value = None
+        sensor._cached_available = False
         write = MagicMock()
         monkeypatch.setattr(sensor, "_write_cached_state", write)
         request = _StatRefreshRequest(
@@ -189,7 +171,7 @@ class TestSensorCreation:
             ),
         )
 
-        _StatRefreshBatch()._apply_result(result)  # ruff: ignore[private-member-access]
+        _StatRefreshBatch()._apply_result(result)
 
         assert sensor.available is True
         write.assert_called_once_with()
@@ -201,24 +183,19 @@ class TestSensorCreation:
         coordinator = self._create_coordinator({})
         coordinator.is_device_reachable = MagicMock(return_value=False)
         description = JackeryStatSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="stat_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Stat Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="energy",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="total",
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._availability_cache_active = True  # ruff: ignore[private-member-access]
-        sensor._cache_generation = 1  # ruff: ignore[private-member-access]
-        sensor._cached_native_value = 1.0  # ruff: ignore[private-member-access]
-        sensor._cached_available = True  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._availability_cache_active = True
+        sensor._cache_generation = 1
+        sensor._cached_native_value = 1.0
+        sensor._cached_available = True
         write = MagicMock()
         monkeypatch.setattr(sensor, "_write_cached_state", write)
         result = _StatRefreshResult(
@@ -231,7 +208,7 @@ class TestSensorCreation:
             error=RuntimeError("test statistic failure"),
         )
 
-        _StatRefreshBatch()._apply_result(result)  # ruff: ignore[private-member-access]
+        _StatRefreshBatch()._apply_result(result)
 
         assert sensor.available is False
         write.assert_called_once_with()
@@ -240,27 +217,18 @@ class TestSensorCreation:
         """Test JackeryBatteryPackSensor."""
         coordinator = self._create_coordinator()
         description = JackerySensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="pack_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Pack Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="power",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="measurement",
             getter=lambda props: props.get("pack_key"),
         )
-        # pyrefly: ignore [missing-argument]
         sensor = JackeryBatteryPackSensor(
             coordinator=coordinator,
             device_id="test_device",
-            # pyrefly: ignore [unexpected-keyword]
             pack_index=1,
-            # pyrefly: ignore [unexpected-keyword]
             pack_sn="test_sn",
-            # pyrefly: ignore [unexpected-keyword]
             pack_key="pack_1",
             description=description,
         )
@@ -270,15 +238,10 @@ class TestSensorCreation:
         """Test JackerySavingsDetailSensor."""
         coordinator = self._create_coordinator()
         description = JackerySavingsDetailSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="savings_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Savings Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="EUR",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="monetary",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="total",
             path=("savings", "value"),
         )
@@ -315,7 +278,7 @@ class TestSensorCreation:
 
         assert sensor.native_value == pytest.approx(-7.6)
         assert sensor.last_reset is None
-        assert sensor._attr_translation_key == "savings_battery_balance_year_energy"  # ruff: ignore[private-member-access]
+        assert sensor._attr_translation_key == "savings_battery_balance_year_energy"
         assert sensor.extra_state_attributes["source_path"] == (
             "source_energy.battery_charge_discharge_balance_year_kwh"
         )
@@ -387,29 +350,24 @@ class TestSensorCreation:
 class TestSensorState:
     """Test sensor state handling."""
 
-    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:  # ruff: ignore[missing-type-function-argument, missing-type-kwargs]
+    def _create_sensor_with_data(self, data, **kwargs) -> JackerySensor:
         """Create a sensor with specific coordinator data."""
         coordinator = self._create_coordinator(data)
         description = JackerySensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="test_key",
-            # pyrefly: ignore [unexpected-keyword]
             name="Test Sensor",
-            # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
-            # pyrefly: ignore [unexpected-keyword]
             device_class="power",
-            # pyrefly: ignore [unexpected-keyword]
             state_class="measurement",
             getter=lambda props: props.get("test_key"),
         )
         return JackerySensor(
             coordinator=coordinator, device_id="test_device", description=description
-        )  # noqa: E501, RUF100, RUF105
+        )  # noqa: E501, RUF100
 
-    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]
         """Create a mock coordinator."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES  # ruff: ignore[import-outside-top-level]
+        from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
 
         coordinator = MagicMock()
         # The sensor uses device_id as key in coordinator.data, and the payload
@@ -418,7 +376,7 @@ class TestSensorState:
             {"test_device": {PAYLOAD_PROPERTIES: data}}
             if data
             else {"test_device": {PAYLOAD_PROPERTIES: {}}}
-        )  # noqa: E501, RUF100, RUF105
+        )  # noqa: E501, RUF100
         coordinator.config_entry = MagicMock()
         coordinator.config_entry.entry_id = "test_entry"
         coordinator.config_entry.runtime_data = MagicMock()
@@ -427,7 +385,7 @@ class TestSensorState:
     def test_native_value_with_data(self) -> None:
         """Test native_value property with valid data."""
         sensor = self._create_sensor_with_data({"test_key": 1234})
-        assert sensor.native_value == 1234  # ruff: ignore[magic-value-comparison]
+        assert sensor.native_value == 1234
 
     def test_native_value_none_when_missing(self) -> None:
         """Test native_value property when key is missing."""
@@ -439,20 +397,20 @@ class TestSensorState:
         # Some sensors convert units - test the base behavior
         sensor = self._create_sensor_with_data({"test_key": 1234567})
         # Base sensor just returns the value as-is
-        assert sensor.native_value == 1234567  # ruff: ignore[magic-value-comparison]
+        assert sensor.native_value == 1234567
 
     def test_standard_sensor_reads_cached_payload_during_state_write(self) -> None:
         """A state write must not re-evaluate the potentially stale payload."""
         sensor = self._create_sensor_with_data({"test_key": 1})
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._refresh_cache()
         sensor.coordinator.data["test_device"]["properties"]["test_key"] = 2
 
         assert sensor.native_value == 1
         assert sensor.extra_state_attributes["merged_raw_value"] == 1
 
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
-        assert sensor.native_value == 2  # ruff: ignore[magic-value-comparison]
+        sensor._refresh_cache()
+        assert sensor.native_value == 2
 
     def test_activation_sensor_reads_cached_payload_during_state_write(self) -> None:
         """Activation diagnostics use one snapshot for a synchronous state write."""
@@ -468,8 +426,8 @@ class TestSensorState:
             }
         }
         sensor = JackeryDeviceActivationSensor(coordinator, "test_device")
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._refresh_cache()
         coordinator.data["test_device"]["device"] = {
             "activated": 0,
             "isCloud": 0,
@@ -485,7 +443,7 @@ class TestSensorState:
             "device_sn": "before",
         }
 
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._refresh_cache()
         assert sensor.native_value == 0
 
     def test_savings_sensor_reads_cached_calculation_during_state_write(self) -> None:
@@ -502,15 +460,13 @@ class TestSensorState:
             }
         }
         description = JackerySavingsDetailSensorDescription(
-            # pyrefly: ignore [unexpected-keyword]
             key="cached_savings",
-            # pyrefly: ignore [unexpected-keyword]
             name="Cached savings",
             path=("detail", "value"),
         )
         sensor = JackerySavingsDetailSensor(coordinator, "test_device", description)
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._refresh_cache()
         coordinator.data["test_device"]["statistic"]["_savings_calculation"]["detail"][
             "value"
         ] = 2.5
@@ -518,7 +474,7 @@ class TestSensorState:
         assert sensor.native_value == pytest.approx(1.5)
         assert sensor.extra_state_attributes["method"] == "test_method"
 
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._refresh_cache()
         assert sensor.native_value == pytest.approx(2.5)
 
     def test_http_api_sensor_reads_cached_observation_during_state_write(self) -> None:
@@ -526,8 +482,8 @@ class TestSensorState:
         coordinator = self._create_coordinator()
         coordinator.http_api_observations.return_value = {"requests_total": 4}
         sensor = JackeryHttpApiSensor(coordinator, "test_device")
-        sensor._cache_refresh_active = True  # ruff: ignore[private-member-access]
-        sensor._refresh_cache()  # ruff: ignore[private-member-access]
+        sensor._cache_refresh_active = True
+        sensor._refresh_cache()
 
 
 class TestAsyncSetupEntry:

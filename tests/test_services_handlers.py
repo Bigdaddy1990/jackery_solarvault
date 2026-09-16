@@ -637,7 +637,7 @@ async def _call(
     case: _HandlerCase,
     coordinator: SimpleNamespace,
 ) -> object:
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",
@@ -719,7 +719,7 @@ async def test_service_rejects_unowned_device(
     case: _HandlerCase,
 ) -> None:
     """A device no loaded account owns surfaces a translated validation error."""
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",
@@ -881,7 +881,7 @@ async def _call_rename(
     hass: HomeAssistant,
     coordinator: SimpleNamespace,
 ) -> None:
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with patch(
         "custom_components.jackery_solarvault.services._loaded_coordinators",
         return_value=[coordinator],
@@ -907,7 +907,7 @@ async def test_rename_forwards_to_system_owner(hass: HomeAssistant) -> None:
 @pytest.mark.asyncio()
 async def test_rename_rejects_unowned_system(hass: HomeAssistant) -> None:
     """A system id no account owns surfaces a translated validation error."""
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",
@@ -1078,7 +1078,7 @@ async def test_get_share_qr_code_rejects_unowned_device(
     hass: HomeAssistant,
 ) -> None:
     """The QR read surfaces a validation error when no account owns the device."""
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",
@@ -1108,7 +1108,7 @@ async def test_get_share_qr_code_maps_backend_error_to_home_assistant_error(
         data={_DEVICE_ID: {}},
         async_get_share_qr_code=AsyncMock(side_effect=JackeryError("boom")),
     )
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",
@@ -1139,7 +1139,7 @@ async def test_get_share_qr_code_maps_auth_error_to_reauth(
         config_entry=SimpleNamespace(async_start_reauth=Mock()),
         async_get_share_qr_code=AsyncMock(side_effect=JackeryAuthError("nope")),
     )
-    async_setup_services(hass)
+    await async_setup_services(hass)
     with (
         patch(
             "custom_components.jackery_solarvault.services._loaded_coordinators",

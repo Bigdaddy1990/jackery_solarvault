@@ -112,6 +112,53 @@ async def test_broker_refused_subscription_is_not_reported_as_healthy() -> None:
 
 
 @pytest.mark.asyncio()
+async def test_broker_acl_refusal_marks_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A SUBACK refusal is a configuration error, not a transient failure.
+
+    The session reports ``False`` with the configuration flag set so the
+    reconnect supervisor stops instead of retrying an ACL denial forever.
+    """
+    client = _client("homeassistant/#")
+    broker = MagicMock()
+    broker.__aenter__ = AsyncMock(
+        side_effect=MqttError("broker refused the subscription to 'x'")
+    )
+    broker.__aexit__ = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.MqttClient",
+        MagicMock(return_value=broker),
+    )
+
+    connected = await client._async_run_session()  # ruff: ignore[private-member-access]
+
+    assert connected is False
+    assert client._configuration_error is True  # ruff: ignore[private-member-access]
+    assert str(client._last_error).startswith("CONFIG_ERROR")  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_configuration_error_breaks_reconnect_loop() -> None:
+    """The supervisor stops after a session flagged a configuration error."""
+    client = _client()
+    client._configuration_error = True  # ruff: ignore[private-member-access]
+    calls = 0
+
+    async def _session() -> bool:
+        nonlocal calls
+        await asyncio.sleep(0)
+        calls += 1
+        return False
+
+    cast("Any", client)._async_run_session = _session  # ruff: ignore[private-member-access]
+
+    await client._async_run_forever()  # ruff: ignore[private-member-access]
+
+    assert calls == 1
+
+
+@pytest.mark.asyncio()
 async def test_granted_subscription_starts_the_session() -> None:
     """A normal SUBACK (granted QoS 0) keeps the session running."""
     client = _client("homeassistant/#")
@@ -142,6 +189,15 @@ def test_concrete_local_topic_is_not_silently_broadened(topic: str) -> None:
     client = _client(topic)
 
     assert client._topic_filters == (topic,)  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.parametrize("topic", ["homeassistant", "homeassistant/#"])
+def test_discovery_prefix_also_receives_official_jackery_device_topics(
+    topic: str,
+) -> None:
+    """Discovery traffic must not be the only subscribed protocol tree."""
+    client = _client(topic)
+    assert client._topic_filters == ("homeassistant/#", "hb/device/#")
 
 
 def test_explicit_wildcard_local_topic_is_not_broadened() -> None:

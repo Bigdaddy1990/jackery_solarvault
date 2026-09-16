@@ -14,8 +14,8 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
     LocalMqttConnectionSettings,
 )
 from custom_components.jackery_solarvault.const import (
-    CONF_LOCAL_MQTT_ENABLE,
     CONF_SCAN_INTERVAL,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PORT,
     DOMAIN,
@@ -64,7 +64,7 @@ async def test_local_mqtt_listener_disabled_by_option(hass: HomeAssistant) -> No
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={},
-        options={CONF_LOCAL_MQTT_ENABLE: False},
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: False},
         entry_id="local-mqtt-disabled",
     )
     entry.add_to_hass(hass)
@@ -86,7 +86,7 @@ async def test_entry_wires_the_configured_direct_broker(hass: HomeAssistant) -> 
         domain=DOMAIN,
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_SCAN_INTERVAL: 15,
             CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
             CONF_THIRD_PARTY_MQTT_PORT: 1884,

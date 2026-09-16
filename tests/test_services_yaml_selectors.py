@@ -15,8 +15,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-
-# pyrefly: ignore [untyped-import]
 import yaml
 
 from homeassistant.helpers import selector as sel

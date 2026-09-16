@@ -24,13 +24,13 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         task.cancelled.return_value = False
         task.cancel.return_value = None
 
-        def _create(coro: Coroutine[object, object, object], **_kwargs: object):  # ruff: ignore[missing-return-type-private-function]
+        def _create(coro: Coroutine[object, object, object], **_kwargs: object) -> MagicMock:
             coro.close()
             return task
 
         return MagicMock(side_effect=_create)
 
-    def _create_client(self, generation=0):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_client(self, generation: int = 0) -> JackeryMqttPushClient:
         """Create a basic client for testing."""
         hass = MagicMock()
         hass.data = {}
@@ -47,10 +47,10 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             hass=hass,
             message_callback=mock_message_callback,
         )
-        client._session_generation = generation  # ruff: ignore[private-member-access]
+        client._session_generation = generation
         return client
 
-    def _create_client_with_tls_ca_missing(self, generation=0):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
+    def _create_client_with_tls_ca_missing(self, generation: int = 0) -> JackeryMqttPushClient:
         """Create a client with missing TLS CA file."""
         hass = MagicMock()
         hass.data = {}
@@ -67,15 +67,15 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             hass=hass,
             message_callback=mock_message_callback,
         )
-        client._session_generation = generation  # ruff: ignore[private-member-access]
+        client._session_generation = generation
         return client
 
     def test_creation(self) -> None:
         """Test client creation."""
         client = self._create_client()
         assert client is not None
-        assert client._connected is False  # ruff: ignore[private-member-access]
-        assert client._session_generation == 0  # ruff: ignore[private-member-access]
+        assert client._connected is False
+        assert client._session_generation == 0
 
     def test_connected_property(self) -> None:
         """Test connected property."""
@@ -90,7 +90,7 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
     def test_generation_property(self) -> None:
         """Test session_generation property."""
         client = self._create_client(generation=5)
-        assert client.session_generation == 5  # ruff: ignore[magic-value-comparison]
+        assert client.session_generation == 5
 
     def test_responses_correlated_property(self) -> None:
         """Test responses_correlated property."""
@@ -145,7 +145,7 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             mock_client.subscribe = AsyncMock()
             # messages needs to be an async iterator
 
-            async def mock_messages():  # ruff: ignore[unused-async]  # ruff: ignore[missing-return-type-private-function]
+            async def mock_messages():  # ruff: ignore[unused-async]
                 return
                 yield  # pragma: no cover
 
@@ -159,9 +159,9 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
 
             # Mock the background task creation to return our mock task
             with patch.object(  # ruff: ignore[multiple-with-statements]
-                client._hass,  # ruff: ignore[private-member-access]
+                client._hass,
                 "async_create_background_task",
-                side_effect=_create_task,  # noqa: E501, RUF100, RUF105, SLF001
+                side_effect=_create_task,  # noqa: E501, RUF100, SLF001
             ):
                 # Mock the SSL context creation
                 with patch.object(
@@ -177,15 +177,15 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             # The runner task should be started
             assert client.is_started is True
             # Verify the fingerprint was set
-            assert client._fingerprint is not None  # ruff: ignore[private-member-access]
-            assert client._connect_attempts == 1  # ruff: ignore[private-member-access]
+            assert client._fingerprint is not None
+            assert client._connect_attempts == 1
 
     @pytest.mark.asyncio()
     async def test_stop(self) -> None:
         """Test stop method."""
         client = self._create_client()
-        client._connected = True  # ruff: ignore[private-member-access]
-        client._client = AsyncMock()  # ruff: ignore[private-member-access]
+        client._connected = True
+        client._client = AsyncMock()
 
         await client.async_stop()
         assert client.is_connected is False
@@ -193,11 +193,11 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
     def test_handle_message_valid(self) -> None:
         """Test _handle_message with valid message."""
         client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()  # ruff: ignore[private-member-access]
+        client._message_callback = AsyncMock()
 
         # _handle_message signature: (topic, payload, generation=None, runner_task=None)
         # It schedules the callback but doesn't return a coroutine
-        client._handle_message(  # ruff: ignore[private-member-access]
+        client._handle_message(
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
@@ -205,40 +205,39 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         )
         # The callback is scheduled as a background task, not awaited directly
         # Just verify the message was processed (messages_seen incremented)
-        assert client._messages_seen == 1  # ruff: ignore[private-member-access]
+        assert client._messages_seen == 1
 
     def test_handle_message_wrong_generation(self) -> None:
         """Test _handle_message with wrong generation."""
         client = self._create_client(generation=1)
-        client._message_callback = AsyncMock()  # ruff: ignore[private-member-access]
+        client._message_callback = AsyncMock()
 
-        client._handle_message(  # ruff: ignore[private-member-access]
+        client._handle_message(
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
             runner_task=None,
         )
         # Message should be ignored due to wrong generation
-        assert client._messages_seen == 0  # ruff: ignore[private-member-access]
+        assert client._messages_seen == 0
 
     @pytest.mark.asyncio()
     async def test_handle_message_no_body_field_fallback(  # ruff: ignore[no-self-use]
-        self,
-        hass,  # ruff: ignore[missing-type-function-argument]
+        self, hass
     ) -> None:
         """Test _handle_message without body field (falls back to data)."""
         callback = AsyncMock()
         client = JackeryMqttPushClient(hass, callback)
-        client._session_generation = 0  # ruff: ignore[private-member-access]
+        client._session_generation = 0
 
-        client._handle_message(  # ruff: ignore[private-member-access]
+        client._handle_message(
             "jackery/device/123/status",
             b'{"generation": 0, "data": {"soc": 80}}',
             generation=0,
             runner_task=None,
         )
         await client.async_wait_message_queue_idle()
-        assert client._messages_seen == 1  # ruff: ignore[private-member-access]
+        assert client._messages_seen == 1
         callback.assert_awaited_once()
         callback_call = callback.await_args
         assert callback_call is not None
@@ -247,17 +246,17 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
     def test_handle_message_invalid_json(self) -> None:
         """Test _handle_message with invalid JSON."""
         client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()  # ruff: ignore[private-member-access]
+        client._message_callback = AsyncMock()
 
-        client._handle_message(  # ruff: ignore[private-member-access]
+        client._handle_message(
             "jackery/device/123/status",
             b"invalid json",
             generation=0,
             runner_task=None,
         )
         # Invalid JSON should be dropped
-        assert client._messages_seen == 0  # ruff: ignore[private-member-access]
-        assert client._messages_dropped == 1  # ruff: ignore[private-member-access]
+        assert client._messages_seen == 0
+        assert client._messages_dropped == 1
 
     @pytest.mark.asyncio()
     async def test_schedule_coroutine(self) -> None:
@@ -275,41 +274,43 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         async def dummy_coro() -> str:  # ruff: ignore[unused-async]
             return "done"
 
-        client._hass.async_create_background_task = _create_task  # ruff: ignore[private-member-access]
-        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # ruff: ignore[line-too-long]
+        client._hass.async_create_background_task = _create_task
+        # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks
         # It schedules the coroutine but returns None (task is tracked internally)
-        client._schedule_coroutine(dummy_coro, "test")  # ruff: ignore[private-member-access]
+        client._schedule_coroutine(dummy_coro, "test")
         await asyncio.gather(*scheduled)
         # Verify it doesn't raise an error
         assert True
 
     @pytest.mark.asyncio()
     async def test_publish(self) -> None:
-        """Test publish method."""
+        """Publish compact Unicode JSON using the real runtime serializer."""
         client = self._create_client()
-        client._connected = True  # ruff: ignore[private-member-access]
-        client._client = AsyncMock()  # ruff: ignore[private-member-access]
+        client._connected = True
+        client._client = AsyncMock()
 
-        await client.async_publish_json("test/topic", {"key": "value"})
-        client._client.publish.assert_called_once()  # ruff: ignore[private-member-access]
+        await client.async_publish_json("test/topic", {"key": "Lädt"})
+        client._client.publish.assert_awaited_once_with(
+            "test/topic", '{"key":"Lädt"}', qos=0, retain=False
+        )
 
     @pytest.mark.asyncio()
     async def test_publish_not_connected(self) -> None:
         """Test publish when not connected."""
         client = self._create_client()
-        client._connected = False  # ruff: ignore[private-member-access]
+        client._connected = False
 
-        with pytest.raises(Exception):  # ruff: ignore[assert-raises-exception]  # ruff: ignore[pytest-raises-too-broad]
+        with pytest.raises(Exception):  # ruff: ignore[assert-raises-exception]
             await client.async_publish_json("test/topic", {"key": "value"})
 
     def test_credential_fingerprint(self) -> None:  # ruff: ignore[no-self-use]
         """Test _credential_fingerprint static method."""
-        fp1 = JackeryMqttPushClient._credential_fingerprint("client1", "user1", "pass1")  # ruff: ignore[private-member-access]
-        fp2 = JackeryMqttPushClient._credential_fingerprint("client1", "user1", "pass1")  # ruff: ignore[private-member-access]
-        fp3 = JackeryMqttPushClient._credential_fingerprint("client2", "user1", "pass1")  # ruff: ignore[private-member-access]
+        fp1 = JackeryMqttPushClient._credential_fingerprint("client1", "user1", "pass1")
+        fp2 = JackeryMqttPushClient._credential_fingerprint("client1", "user1", "pass1")
+        fp3 = JackeryMqttPushClient._credential_fingerprint("client2", "user1", "pass1")
         assert fp1 == fp2
         assert fp1 != fp3
-        assert len(fp1) == 64  # SHA-256 hex  # ruff: ignore[magic-value-comparison]
+        assert len(fp1) == 64  # SHA-256 hex
 
     def test_extract_mqtt_code(self) -> None:  # ruff: ignore[no-self-use]
         """Test _extract_mqtt_code static method."""
@@ -319,8 +320,8 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             rc = 5
 
         err = MockError()
-        code = JackeryMqttPushClient._extract_mqtt_code(err)  # ruff: ignore[private-member-access]
-        assert code == 5  # ruff: ignore[magic-value-comparison]
+        code = JackeryMqttPushClient._extract_mqtt_code(err)
+        assert code == 5
 
         # Test with rc.value
         class MockError2:
@@ -330,52 +331,52 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
             rc = RC()
 
         err2 = MockError2()
-        code2 = JackeryMqttPushClient._extract_mqtt_code(err2)  # ruff: ignore[private-member-access]
-        assert code2 == 135  # ruff: ignore[magic-value-comparison]
+        code2 = JackeryMqttPushClient._extract_mqtt_code(err2)
+        assert code2 == 135
 
     def test_is_connect_auth_failure_rc(self) -> None:  # ruff: ignore[no-self-use]
         """Test _is_connect_auth_failure_rc static method."""
         # Auth failure codes: 4, 5, 134, 135
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(4) is True  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(5) is True  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(134) is True  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(135) is True  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(0) is False  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_auth_failure_rc(1) is False  # ruff: ignore[private-member-access]
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(4) is True
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(5) is True
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(134) is True
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(135) is True
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(0) is False
+        assert JackeryMqttPushClient._is_connect_auth_failure_rc(1) is False
 
     def test_is_connect_failure_error(self) -> None:  # ruff: ignore[no-self-use]
         """Test _is_connect_failure_error static method."""
         assert (
-            JackeryMqttPushClient._is_connect_failure_error("connect rc=5 (auth)")  # ruff: ignore[private-member-access]
+            JackeryMqttPushClient._is_connect_failure_error("connect rc=5 (auth)")
             is True
         )
         assert (
-            JackeryMqttPushClient._is_connect_failure_error("connect failed: timeout")  # ruff: ignore[private-member-access]
+            JackeryMqttPushClient._is_connect_failure_error("connect failed: timeout")
             is True
         )
         assert (
-            JackeryMqttPushClient._is_connect_failure_error("disconnect: error")  # ruff: ignore[private-member-access]
+            JackeryMqttPushClient._is_connect_failure_error("disconnect: error")
             is False
-        )  # noqa: E501, RUF100, RUF105, SLF001
-        assert JackeryMqttPushClient._is_connect_failure_error(None) is False  # ruff: ignore[private-member-access]
-        assert JackeryMqttPushClient._is_connect_failure_error("") is False  # ruff: ignore[private-member-access]
+        )  # noqa: E501, RUF100, SLF001
+        assert JackeryMqttPushClient._is_connect_failure_error(None) is False
+        assert JackeryMqttPushClient._is_connect_failure_error("") is False
 
     def test_redact_topic(self) -> None:  # ruff: ignore[no-self-use]
         """Test _redact_topic static method."""
         topic = f"{MQTT_TOPIC_PREFIX}/user123/status"
-        redacted = JackeryMqttPushClient._redact_topic(topic)  # ruff: ignore[private-member-access]
+        redacted = JackeryMqttPushClient._redact_topic(topic)
         assert redacted is not None
         assert REDACTED_VALUE in redacted
         assert "user123" not in redacted
 
         # Non-matching topic
         topic2 = "other/prefix/user123/status"
-        redacted2 = JackeryMqttPushClient._redact_topic(topic2)  # ruff: ignore[private-member-access]
+        redacted2 = JackeryMqttPushClient._redact_topic(topic2)
         assert redacted2 is not None
         assert redacted2 == topic2
 
         # None
-        assert JackeryMqttPushClient._redact_topic(None) is None  # ruff: ignore[private-member-access]
+        assert JackeryMqttPushClient._redact_topic(None) is None
 
 
 if __name__ == "__main__":

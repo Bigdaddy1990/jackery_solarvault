@@ -48,7 +48,6 @@ def _bare_coordinator(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         lambda: _NOW,
     )
-    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 

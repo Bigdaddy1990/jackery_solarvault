@@ -31,7 +31,7 @@ _TEST_HTTP_DATA = {
 }
 
 
-def _background_task_mock(*args, **_kwargs):  # ruff: ignore[missing-type-args, missing-type-kwargs, missing-return-type-private-function]  # isort: skip
+def _background_task_mock(*args, **_kwargs) -> MagicMock:  # ruff: ignore[missing-type-args, missing-type-kwargs]  # isort: skip
     """Consume coroutines scheduled by MagicMock HA/entry objects."""
     for arg in args:
         if asyncio.iscoroutine(arg):
@@ -113,7 +113,6 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
         # Manually initialize since we're not going through HA setup
         coordinator._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
 
-    # pyrefly: ignore [bad-argument-type]
     return _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
 
 
@@ -164,7 +163,6 @@ def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
 
-    # pyrefly: ignore [bad-argument-type]
     return _finalize_coordinator(coordinator, multi_device_data)
 
 
@@ -283,7 +281,6 @@ class TestCoordinatorErrorHandling:
             coordinator = JackerySolarVaultCoordinator(
                 hass, entry, api, update_interval
             )
-            # pyrefly: ignore [bad-argument-type]
             _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
             coordinator._async_update_data_with_timeout = AsyncMock(  # ruff: ignore[private-member-access]  # isort: skip
                 side_effect=UpdateFailed("API Error")

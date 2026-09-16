@@ -1,15 +1,11 @@
 """Unit tests for local_mqtt_opt_in function."""
 
-from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
-import custom_components.jackery_solarvault as integration
 from custom_components.jackery_solarvault.config_flow import _current_local_mqtt_options  # ruff: ignore[import-private-name]
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
 )
 from custom_components.jackery_solarvault.util import local_mqtt_opt_in
@@ -30,15 +26,15 @@ class MockConfigEntry:
 
 
 def test_local_mqtt_opt_in_legacy_true() -> None:
-    """Explicit local_mqtt_enable=True should return True."""
+    """Retired configuration keys cannot activate the listener."""
     entry = MockConfigEntry(options={"local_mqtt_enable": True})
-    assert local_mqtt_opt_in(entry) is True
+    assert local_mqtt_opt_in(entry) is False
 
 
 def test_local_mqtt_opt_in_explicit_false_respected() -> None:
     """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""  # ruff: ignore[line-too-long]
     entry = MockConfigEntry(
-        options={"local_mqtt_enable": False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
     )
     # Explicit False in options means user chose to disable local MQTT
     assert local_mqtt_opt_in(entry) is False
@@ -64,7 +60,7 @@ def test_local_mqtt_opt_in_no_legacy_fallback_to_third_party_false() -> None:  #
 
 def test_local_mqtt_defaults_have_one_canonical_value() -> None:
     """Runtime and OptionsFlow cannot disagree for an unconfigured entry."""
-    assert DEFAULT_LOCAL_MQTT_ENABLE is DEFAULT_THIRD_PARTY_MQTT_ENABLE
+    assert DEFAULT_THIRD_PARTY_MQTT_ENABLE is False
 
 
 def test_local_mqtt_opt_in_empty_entry_matches_options_flow() -> None:
@@ -136,20 +132,3 @@ def test_canonical_option_overrides_stale_legacy_option() -> None:
     )
 
     assert local_mqtt_opt_in(entry) is False
-
-
-def test_legacy_migration_preserves_existing_canonical_disable() -> None:
-    """Migration removes the legacy key without re-enabling Local MQTT."""
-    hass = MagicMock()
-    entry = SimpleNamespace(
-        options={
-            CONF_THIRD_PARTY_MQTT_ENABLE: False,
-            "local_mqtt_enable": True,
-        }
-    )
-
-    integration._async_migrate_legacy_local_mqtt_options(hass, entry)  # ruff: ignore[private-member-access]
-
-    migrated = hass.config_entries.async_update_entry.call_args.kwargs["options"]
-    assert migrated[CONF_THIRD_PARTY_MQTT_ENABLE] is False
-    assert "local_mqtt_enable" not in migrated

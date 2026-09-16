@@ -36,6 +36,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_STACK_OUT_PW,
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
+    PAYLOAD_HTTP_PROPERTIES,
     PAYLOAD_PROPERTIES,
 )
 from custom_components.jackery_solarvault.coordinator import (
@@ -90,7 +91,6 @@ def _sensor_coordinator(
     """Build the smallest real coordinator shell used by sensor properties."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     cast("Any", coordinator).data = data
-    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -221,6 +221,51 @@ def test_portable_power_uses_primary_then_nested_ac_fallback(
     properties[primary_key] = 123
 
     assert entity.native_value == 123  # ruff: ignore[magic-value-comparison]
+
+
+@pytest.mark.parametrize(
+    ["sensor_key", "field"],
+    [
+        ["battery_charge_power", FIELD_BAT_IN_PW],
+        ["battery_discharge_power", FIELD_BAT_OUT_PW],
+    ],
+)
+@pytest.mark.parametrize(
+    ["merged_value", "http_value", "expected"],
+    [
+        pytest.param(0, 99, 0, id="valid-zero-beats-http-fallback"),
+        pytest.param(5, 0, 5, id="merged-nonzero-beats-http-zero"),
+        pytest.param(None, 99, 99, id="merged-missing-falls-back-to-http"),
+        pytest.param(0, None, 0, id="valid-zero-with-no-http-fallback"),
+        pytest.param(None, None, None, id="both-missing-is-none"),
+    ],
+)
+def test_battery_power_preserves_a_valid_zero_over_http_fallback(
+    sensor_key: str,
+    field: str,
+    merged_value: int | None,
+    http_value: int | None,
+    expected: int | None,
+) -> None:
+    """CR-03 regression: an `or`-cascade previously discarded a valid ``0``.
+
+    ``batInPw``/``batOutPw`` == 0 is a real, meaningful state (not charging/not
+    discharging). The old `_get_prop(...) or _get_payload_http_prop(...)`
+    cascade treated that 0 as falsy and fell through to the HTTP snapshot,
+    silently replacing a correct live value with a stale or unrelated one.
+    """
+    description = next(item for item in SENSOR_DESCRIPTIONS if item.key == sensor_key)
+    merged_properties = {} if merged_value is None else {field: merged_value}
+    http_properties = {} if http_value is None else {field: http_value}
+    coordinator = _sensor_coordinator({
+        _DEVICE_ID: {
+            PAYLOAD_PROPERTIES: merged_properties,
+            PAYLOAD_HTTP_PROPERTIES: http_properties,
+        },
+    })
+    entity = JackerySensor(coordinator, _DEVICE_ID, description)
+
+    assert entity.native_value == expected
 
 
 @pytest.mark.parametrize(

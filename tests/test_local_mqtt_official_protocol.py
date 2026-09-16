@@ -10,6 +10,7 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+    TransportSource,
 )
 
 _DEVICE_ID = "device-1"
@@ -35,19 +36,38 @@ def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_device_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
-    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+    return coordinator
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"body": {"name": "ESP32 IP Adresse", "stat_t": "esp32/sensor/ip/state"}},
+        {"deviceId": "foreign-device", "body": {"soc": 10}},
+        {"type": 2, "body": {"soc": 10}},
+    ],
+)
+def test_unidentified_local_frames_cannot_claim_the_only_jackery(
+    payload: dict[str, Any],
+) -> None:
+    """A shared broker cannot assign unrelated traffic to the sole known host."""
+    coordinator = _coordinator_shell()
+    assert coordinator._mqtt_route_context(
+        "homeassistant/sensor/esp32/ip/config", payload, TransportSource.LOCAL_MQTT
+    ) is None
 
 
 @pytest.mark.asyncio()
 async def test_topic_serial_is_injected_before_shared_ingest() -> None:
-    """Flat status frames are bound to the host serial carried by the topic."""
+    """Flat status frames are bound to the host serial carried in the payload."""
     coordinator = _coordinator_shell()
     handler = AsyncMock(return_value=_DEVICE_ID)
     coordinator.async_handle_mqtt_message = handler
 
+    # New protocol: topic is hb/app/<userId>/device, serial in payload
     assert await coordinator.async_handle_local_mqtt_message(
-        f"hb/device/{_DEVICE_SN}/status",
-        {"batSoc": 55},
+        "hb/app/user123/device",
+        {"batSoc": 55, "deviceSn": _DEVICE_SN},
     )
 
     assert handler.await_args is not None
@@ -64,8 +84,8 @@ async def test_plural_topic_serial_is_injected_before_shared_ingest() -> None:
     coordinator.async_handle_mqtt_message = handler
 
     assert await coordinator.async_handle_local_mqtt_message(
-        f"hb/devices/{_DEVICE_SN}/event",
-        {"batSoc": 55},
+        "hb/app/user123/device",
+        {"batSoc": 55, "deviceSn": _DEVICE_SN},
     )
 
     assert handler.await_args is not None
@@ -114,7 +134,7 @@ async def test_unchanged_official_response_refreshes_local_mqtt_liveness() -> No
     )
 
     assert await coordinator.async_handle_local_mqtt_message(
-        f"hb/device/{_DEVICE_SN}/event",
+        "hb/app/user123/device",
         {
             "deviceSn": _DEVICE_SN,
             "type": 101,
@@ -144,7 +164,7 @@ async def test_unchanged_type_23_lifetime_snapshot_is_accepted(
     raw_coordinator.async_handle_mqtt_message = AsyncMock(return_value=None)
 
     assert await coordinator.async_handle_local_mqtt_message(
-        f"hb/device/{_DEVICE_SN}/event",
+        "hb/app/user123/device",
         {
             "deviceSn": _DEVICE_SN,
             "type": 23,
@@ -170,8 +190,8 @@ async def test_topic_serial_is_not_used_as_broker_filter() -> None:
     coordinator.async_handle_mqtt_message = handler
 
     assert await coordinator.async_handle_local_mqtt_message(
-        "hb/device/OTHER-SERIAL/event",
-        {"type": 107, "body": {"soc": 10}},
+        "hb/app/user123/device",
+        {"type": 107, "body": {"soc": 10}, "deviceSn": _DEVICE_SN},
     )
     handler.assert_awaited_once()
     assert getattr(coordinator, "_local_mqtt_rejection_reasons", {}) == {}
@@ -187,15 +207,15 @@ async def test_local_poll_publishes_official_request_family() -> None:
     cast("Any", client).async_publish = publish
     coordinator._local_mqtt_client = client  # ruff: ignore[private-member-access]
 
-    sent = await coordinator.async_poll_local_mqtt_devices("hb")
+    sent = await coordinator.async_poll_local_mqtt_devices("hb/app/user123")
 
-    assert sent == 6  # ruff: ignore[magic-value-comparison]
+    assert sent == 7  # ruff: ignore[magic-value-comparison]
     calls = publish.await_args_list
     assert {call.args[1]["type"] for call in calls} == {2, 25, 100, 105}
     assert [
         call.args[1]["body"]["devType"]
         for call in calls
         if call.args[1]["type"] == 100  # ruff: ignore[magic-value-comparison]
-    ] == [1, 2, 6]
-    assert all(call.args[0] == f"hb/device/{_DEVICE_SN}/action" for call in calls)
+    ] == [1, 2, 5, 6]
+    assert all(call.args[0] == f"hb/app/user123/device/{_DEVICE_SN}/action" for call in calls)
     assert all(call.args[1]["token"] == _TOKEN for call in calls)

@@ -7,6 +7,7 @@ from custom_components.jackery_solarvault.__init__ import (
     _async_prime_entry_bootstrap_mqtt_session,  # ruff: ignore[import-private-name]
     _entry_bootstrap_mqtt_session,  # ruff: ignore[import-private-name]
 )
+from custom_components.jackery_solarvault.client import mqtt_session_cache
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.client.mqtt_session_store import (
     normalize_mqtt_session_snapshot,
@@ -17,6 +18,20 @@ from custom_components.jackery_solarvault.const import (
     MQTT_SESSION_SEED_B64,
     MQTT_SESSION_USER_ID,
 )
+
+
+def test_legacy_mqtt_session_cache_uses_current_clock() -> None:
+    """Validate persisted sessions with the real clock when no time is injected."""
+    raw = {
+        MQTT_SESSION_USER_ID: "user123",
+        MQTT_SESSION_SEED_B64: "A" * 43 + "=",
+        MQTT_SESSION_MAC_ID: "mac456",
+    }
+    assert mqtt_session_cache.normalize_mqtt_session_snapshot(raw) == raw
+    assert (
+        mqtt_session_cache.normalize_mqtt_session_snapshot({**raw, "expires_at": 1.0})
+        is None
+    )
 
 
 class MockHass:
@@ -236,9 +251,7 @@ async def test_coordinator_api_hydrated_before_layer5_start() -> None:  # ruff: 
     # Verify API is hydrated
     assert api.mqtt_session_snapshot() is not None
     snapshot = api.mqtt_session_snapshot()
-    # pyrefly: ignore [unsupported-operation]
     assert snapshot[MQTT_SESSION_USER_ID] == "user123"
-    # pyrefly: ignore [unsupported-operation]
     assert snapshot[MQTT_SESSION_MAC_ID] == "mac456"
 
     # Verify credentials can be derived

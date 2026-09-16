@@ -13,12 +13,12 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 )
 from custom_components.jackery_solarvault.const import (
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_THIRD_PARTY_MQTT_IP,
     FIELD_THIRD_PARTY_MQTT_PASSWORD,
@@ -220,11 +220,11 @@ async def test_automatic_bridge_preserves_stable_app_token() -> None:
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
             CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
         },
     )
@@ -265,11 +265,11 @@ async def test_one_devices_traffic_does_not_confirm_every_device() -> None:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     options = {
-        CONF_LOCAL_MQTT_ENABLE: True,
-        CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-        CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-        CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-        CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+        CONF_THIRD_PARTY_MQTT_ENABLE: True,
+        CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+        CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+        CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+        CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
     }
     obj.entry = SimpleNamespace(data={}, options=options)
@@ -338,11 +338,11 @@ async def test_automatic_bridge_generates_and_persists_missing_app_token() -> No
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     update_entry = MagicMock()
@@ -391,11 +391,11 @@ async def test_automatic_bridge_skips_write_when_3047_matches() -> None:
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     obj.hass = SimpleNamespace(
@@ -440,7 +440,7 @@ async def test_automatic_bridge_skips_write_when_3047_matches() -> None:
     client.async_publish = AsyncMock()  # type: ignore[method-assign]
     obj._local_mqtt_client = client  # ruff: ignore[private-member-access]
 
-    assert await coordinator.async_poll_local_mqtt_devices("hb") == 6  # ruff: ignore[magic-value-comparison]
+    assert await coordinator.async_poll_local_mqtt_devices("hb") == 7  # ruff: ignore[magic-value-comparison]
     assert {call.args[1]["token"] for call in client.async_publish.await_args_list} == {
         "123456789"
     }
@@ -461,11 +461,11 @@ async def test_matching_readback_without_traffic_still_rearms_the_bridge() -> No
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     obj.hass = SimpleNamespace(
@@ -511,11 +511,11 @@ async def test_automatic_bridge_writes_only_after_verified_3047_mismatch() -> No
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     obj.hass = SimpleNamespace(
