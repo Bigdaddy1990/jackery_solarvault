@@ -429,8 +429,7 @@ def _get_ct_meter(entity: JackeryEntity) -> dict[str, Any]:
 
 
 def _smart_meter_value_fn(
-    entity: JackeryEntity,
-    description: JackerySmartMeterSensorDescription,
+    entity: JackeryEntity, description: JackerySmartMeterSensorDescription
 ) -> StateType:
     """Get smart meter value from CT meter payload using description logic."""
     ct = _get_ct_meter(entity)
@@ -475,9 +474,7 @@ def _get_payload_http_prop(entity: JackeryEntity, key: str) -> StateType:
 
 
 def _get_first_list_count(
-    entity: JackeryEntity,
-    section: str,
-    *keys: str,
+    entity: JackeryEntity, section: str, *keys: str
 ) -> int | None:
     """Get count of first list in payload section."""
     payload = entity.payload.get(section)
@@ -693,7 +690,7 @@ class JackerySensorDescription(_JackerySensorEntityDescription):
                 property_data_sources(
                     *app_fields,
                     layer5_proven=bool(
-                        getattr(self.getter, "layer5_data_source", False),
+                        getattr(self.getter, "layer5_data_source", False)
                     ),
                 ),
             )
@@ -1108,9 +1105,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_SOC_CHARGE_LIMIT, FIELD_SOC_CHG_LIMIT),
         key="soc_charge_limit",
         value_fn=lambda e: _get_prop_any(
-            e,
-            FIELD_SOC_CHG_LIMIT,
-            FIELD_SOC_CHARGE_LIMIT,
+            e, FIELD_SOC_CHG_LIMIT, FIELD_SOC_CHARGE_LIMIT
         ),
         translation_key="soc_charge_limit",
         native_unit_of_measurement=PERCENTAGE,
@@ -1120,9 +1115,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_SOC_DISCHARGE_LIMIT, FIELD_SOC_DISCHG_LIMIT),
         key="soc_discharge_limit",
         value_fn=lambda e: _get_prop_any(
-            e,
-            FIELD_SOC_DISCHG_LIMIT,
-            FIELD_SOC_DISCHARGE_LIMIT,
+            e, FIELD_SOC_DISCHG_LIMIT, FIELD_SOC_DISCHARGE_LIMIT
         ),
         translation_key="soc_discharge_limit",
         native_unit_of_measurement=PERCENTAGE,
@@ -1221,10 +1214,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_GRID_STAT, FIELD_GRID_STATE, FIELD_GRID_STATE_ALT),
         key="grid_state",
         value_fn=lambda e: _get_prop_any(
-            e,
-            FIELD_GRID_STATE,
-            FIELD_GRID_STATE_ALT,
-            FIELD_GRID_STAT,
+            e, FIELD_GRID_STATE, FIELD_GRID_STATE_ALT, FIELD_GRID_STAT
         ),
         translation_key="grid_state",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1241,8 +1231,8 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
             7
             if safe_int(
                 ((e.payload or {}).get(PAYLOAD_PRICE) or {}).get(
-                    FIELD_DYNAMIC_OR_SINGLE,
-                ),
+                    FIELD_DYNAMIC_OR_SINGLE
+                )
             )
             == 1
             else None,
@@ -1349,8 +1339,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         value_fn=lambda e: _first_non_none_state(
             _get_prop(e, FIELD_OFF_GRID_DOWN),
             _task_plan_value(
-                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {},
-                FIELD_OFF_GRID_DOWN,
+                (e.payload or {}).get(PAYLOAD_TASK_PLAN) or {}, FIELD_OFF_GRID_DOWN
             ),
         ),
         translation_key="off_grid_shutdown_state",
@@ -1393,9 +1382,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TODAY_LOAD,
         section=PAYLOAD_STATISTIC,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_STATISTIC,
-            APP_STAT_TODAY_LOAD,
+            e, PAYLOAD_STATISTIC, APP_STAT_TODAY_LOAD
         ),
         translation_key="today_load",
         device_class=SensorDeviceClass.ENERGY,
@@ -1408,9 +1395,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_GENERATION,
         section=PAYLOAD_STATISTIC,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_STATISTIC,
-            APP_STAT_TOTAL_GENERATION,
+            e, PAYLOAD_STATISTIC, APP_STAT_TOTAL_GENERATION
         ),
         translation_key="total_generation",
         device_class=SensorDeviceClass.ENERGY,
@@ -1422,9 +1407,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_REVENUE,
         section=PAYLOAD_STATISTIC,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_STATISTIC,
-            APP_STAT_TOTAL_REVENUE,
+            e, PAYLOAD_STATISTIC, APP_STAT_TOTAL_REVENUE
         ),
         translation_key="total_revenue",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -1435,9 +1418,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_CARBON,
         section=PAYLOAD_STATISTIC,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_STATISTIC,
-            APP_STAT_TOTAL_CARBON,
+            e, PAYLOAD_STATISTIC, APP_STAT_TOTAL_CARBON
         ),
         translation_key="total_carbon_saved",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -1448,7 +1429,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_DEVICE_STAT_BATTERY_CHARGE,
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
-            _get_payload_section(e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_CHARGE),
+            _get_payload_section(e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_CHARGE)
         ),
         transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
         translation_key="battery_charge_energy",
@@ -1463,10 +1444,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
             _get_payload_section(
-                e,
-                PAYLOAD_PROPERTIES,
-                APP_DEVICE_STAT_BATTERY_DISCHARGE,
-            ),
+                e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_DISCHARGE
+            )
         ),
         transform=_div(100),
         translation_key="battery_discharge_energy",
@@ -1480,7 +1459,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_DEVICE_STAT_BATTERY_CHARGE,
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
-            _get_payload_section(e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_CHARGE),
+            _get_payload_section(e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_CHARGE)
         ),
         transform=_div(100),
         translation_key="main_battery_charge_energy",
@@ -1495,10 +1474,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
             _get_payload_section(
-                e,
-                PAYLOAD_PROPERTIES,
-                APP_DEVICE_STAT_BATTERY_DISCHARGE,
-            ),
+                e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_DISCHARGE
+            )
         ),
         transform=_div(100),
         translation_key="main_battery_discharge_energy",
@@ -1512,9 +1489,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_SOLAR_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_SOLAR_ENERGY
         ),
         translation_key="pv_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1527,9 +1502,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_TOTAL_SOLAR_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}", APP_STAT_TOTAL_SOLAR_ENERGY
         ),
         translation_key="pv_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1542,9 +1515,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_SOLAR_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_SOLAR_ENERGY
         ),
         translation_key="pv_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1557,9 +1528,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
         section=PAYLOAD_PV_TRENDS,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_PV_TRENDS,
-            APP_STAT_TOTAL_SOLAR_REVENUE,
+            e, PAYLOAD_PV_TRENDS, APP_STAT_TOTAL_SOLAR_REVENUE
         ),
         translation_key="pv_revenue_day",
         device_class=SensorDeviceClass.MONETARY,
@@ -1624,9 +1593,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_PV1_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_PV1_ENERGY
         ),
         translation_key="device_pv1_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1639,9 +1606,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_PV1_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}", APP_STAT_PV1_ENERGY
         ),
         translation_key="device_pv1_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1654,9 +1619,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_PV1_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}", APP_STAT_PV1_ENERGY
         ),
         translation_key="device_pv1_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1669,9 +1632,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_PV1_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}", APP_STAT_PV1_ENERGY
         ),
         translation_key="device_pv1_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1684,9 +1645,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_PV2_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_PV2_ENERGY
         ),
         translation_key="device_pv2_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1699,9 +1658,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_PV2_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}", APP_STAT_PV2_ENERGY
         ),
         translation_key="device_pv2_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1714,9 +1671,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_PV2_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}", APP_STAT_PV2_ENERGY
         ),
         translation_key="device_pv2_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1729,9 +1684,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_PV2_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}", APP_STAT_PV2_ENERGY
         ),
         translation_key="device_pv2_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1744,9 +1697,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_PV3_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_PV3_ENERGY
         ),
         translation_key="device_pv3_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1759,9 +1710,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_PV3_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}", APP_STAT_PV3_ENERGY
         ),
         translation_key="device_pv3_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1774,9 +1723,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_PV3_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}", APP_STAT_PV3_ENERGY
         ),
         translation_key="device_pv3_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1789,9 +1736,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_PV3_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}", APP_STAT_PV3_ENERGY
         ),
         translation_key="device_pv3_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1804,9 +1749,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_PV4_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_PV4_ENERGY
         ),
         translation_key="device_pv4_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1819,9 +1762,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_PV4_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}", APP_STAT_PV4_ENERGY
         ),
         translation_key="device_pv4_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1834,9 +1775,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_PV4_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}", APP_STAT_PV4_ENERGY
         ),
         translation_key="device_pv4_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1849,9 +1788,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_PV4_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}", APP_STAT_PV4_ENERGY
         ),
         translation_key="device_pv4_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1864,9 +1801,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_HOME_ENERGY,
         section=PAYLOAD_HOME_TRENDS,
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_HOME_TRENDS,
-            APP_STAT_TOTAL_HOME_ENERGY,
+            e, PAYLOAD_HOME_TRENDS, APP_STAT_TOTAL_HOME_ENERGY
         ),
         transform=safe_float,
         translation_key="home_day_energy",
@@ -1880,9 +1815,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_HOME_ENERGY,
         section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_HOME_ENERGY,
+            e, f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_HOME_ENERGY
         ),
         translation_key="home_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -1910,9 +1843,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_HOME_ENERGY,
         section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_HOME_ENERGY,
+            e, f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_HOME_ENERGY
         ),
         translation_key="home_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2021,9 +1952,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
             ),
         ),
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_CT_INPUT_ENERGY,
+            e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
         translation_key="ct_input_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2042,9 +1971,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
             ),
         ),
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_CT_INPUT_ENERGY,
+            e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
         translation_key="ct_input_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2084,9 +2011,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
             ),
         ),
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_CT_INPUT_ENERGY,
+            e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
         translation_key="ct_input_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2105,9 +2030,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
             ),
         ),
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
+            e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CT_OUTPUT_ENERGY
         ),
         translation_key="ct_output_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2183,9 +2106,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_CHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_CHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_CHARGE
         ),
         translation_key="battery_charge_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2198,9 +2119,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_CHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_TOTAL_CHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}", APP_STAT_TOTAL_CHARGE
         ),
         translation_key="battery_charge_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2213,9 +2132,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_CHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_CHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_CHARGE
         ),
         translation_key="battery_charge_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2228,9 +2145,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_DISCHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_DISCHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_DISCHARGE
         ),
         translation_key="battery_discharge_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2243,9 +2158,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_DISCHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_TOTAL_DISCHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_MONTH}", APP_STAT_TOTAL_DISCHARGE
         ),
         translation_key="battery_discharge_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2258,9 +2171,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_DISCHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_DISCHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_DISCHARGE
         ),
         translation_key="battery_discharge_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2273,9 +2184,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_IN_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_IN_EPS_ENERGY
         ),
         translation_key="eps_input_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2288,9 +2197,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_IN_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_IN_EPS_ENERGY
         ),
         translation_key="eps_input_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2303,9 +2210,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_MONTH}",
-            APP_STAT_TOTAL_IN_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_MONTH}", APP_STAT_TOTAL_IN_EPS_ENERGY
         ),
         translation_key="eps_input_month_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2318,9 +2223,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_IN_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_IN_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_IN_EPS_ENERGY
         ),
         translation_key="eps_input_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2333,9 +2236,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_OUT_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_OUT_EPS_ENERGY
         ),
         translation_key="eps_output_day_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2348,9 +2249,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}",
-            APP_STAT_TOTAL_OUT_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_OUT_EPS_ENERGY
         ),
         translation_key="eps_output_week_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2378,9 +2277,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_OUT_EPS_ENERGY,
         section=f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}",
-            APP_STAT_TOTAL_OUT_EPS_ENERGY,
+            e, f"{APP_SECTION_EPS_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_OUT_EPS_ENERGY
         ),
         translation_key="eps_output_year_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2393,9 +2290,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TODAY_SOLAR_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
         value_fn=lambda e: _get_payload_section(
-            e,
-            APP_SECTION_TODAY_ENERGY,
-            APP_STAT_TODAY_SOLAR_ENERGY,
+            e, APP_SECTION_TODAY_ENERGY, APP_STAT_TODAY_SOLAR_ENERGY
         ),
         transform=safe_float,
         translation_key="today_solar_energy",
@@ -2409,9 +2304,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TODAY_GRID_IMPORT_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
         value_fn=lambda e: _get_payload_section(
-            e,
-            APP_SECTION_TODAY_ENERGY,
-            APP_STAT_TODAY_GRID_IMPORT_ENERGY,
+            e, APP_SECTION_TODAY_ENERGY, APP_STAT_TODAY_GRID_IMPORT_ENERGY
         ),
         transform=safe_float,
         translation_key="today_grid_import_energy",
@@ -2426,9 +2319,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         section=APP_SECTION_TODAY_ENERGY,
         fallback_sources=((PAYLOAD_HOME_TRENDS, APP_STAT_TOTAL_HOME_ENERGY),),
         value_fn=lambda e: _get_payload_section(
-            e,
-            APP_SECTION_TODAY_ENERGY,
-            APP_STAT_TODAY_HOME_LOAD_ENERGY,
+            e, APP_SECTION_TODAY_ENERGY, APP_STAT_TODAY_HOME_LOAD_ENERGY
         ),
         transform=safe_float,
         translation_key="today_home_load_energy",
@@ -2443,9 +2334,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         section=APP_SECTION_TODAY_ENERGY,
         fallback_sources=((PAYLOAD_STATISTIC, APP_STAT_TODAY_BATTERY_DISCHARGE),),
         value_fn=lambda e: _get_payload_section(
-            e,
-            APP_SECTION_TODAY_ENERGY,
-            APP_STAT_TODAY_BATTERY_ENERGY,
+            e, APP_SECTION_TODAY_ENERGY, APP_STAT_TODAY_BATTERY_ENERGY
         ),
         transform=safe_float,
         translation_key="today_battery_energy",
@@ -2469,9 +2358,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_SOLAR_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_SOLAR_ENERGY,
+            e, f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_SOLAR_ENERGY
         ),
         translation_key="device_today_pv_energy",
         device_class=SensorDeviceClass.ENERGY,
@@ -2484,9 +2371,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_CHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_CHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CHARGE
         ),
         translation_key="device_today_battery_charge",
         device_class=SensorDeviceClass.ENERGY,
@@ -2499,9 +2384,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_DISCHARGE,
         section=f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_DISCHARGE,
+            e, f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_DISCHARGE
         ),
         translation_key="device_today_battery_discharge",
         device_class=SensorDeviceClass.ENERGY,
@@ -2514,9 +2397,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=APP_STAT_TOTAL_IN_GRID_ENERGY,
         section=f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
-            APP_STAT_TOTAL_IN_GRID_ENERGY,
+            e, f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_IN_GRID_ENERGY
         ),
         translation_key="device_today_ongrid_input",
         device_class=SensorDeviceClass.ENERGY,
@@ -2552,10 +2433,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
             _get_payload_section(
-                e,
-                PAYLOAD_LOCAL_DAILY_ENERGY,
-                APP_DEVICE_STAT_ONGRID_TO_BATTERY,
-            ),
+                e, PAYLOAD_LOCAL_DAILY_ENERGY, APP_DEVICE_STAT_ONGRID_TO_BATTERY
+            )
         ),
         transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
         data_sources=ALL_LIVE_DATA_SOURCES,
@@ -2578,10 +2457,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
             _get_payload_section(
-                e,
-                PAYLOAD_LOCAL_DAILY_ENERGY,
-                APP_DEVICE_STAT_PV_TO_BATTERY,
-            ),
+                e, PAYLOAD_LOCAL_DAILY_ENERGY, APP_DEVICE_STAT_PV_TO_BATTERY
+            )
         ),
         transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
         data_sources=ALL_LIVE_DATA_SOURCES,
@@ -2604,10 +2481,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
             _get_payload_section(
-                e,
-                PAYLOAD_LOCAL_DAILY_ENERGY,
-                APP_DEVICE_STAT_BATTERY_TO_GRID,
-            ),
+                e, PAYLOAD_LOCAL_DAILY_ENERGY, APP_DEVICE_STAT_BATTERY_TO_GRID
+            )
         ),
         transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
         data_sources=ALL_LIVE_DATA_SOURCES,
@@ -2622,9 +2497,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=FIELD_TOTAL_P,
         section=f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}",
-            FIELD_TOTAL_P,
+            e, f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}", FIELD_TOTAL_P
         ),
         translation_key="symmetry_total_positive",
         device_class=SensorDeviceClass.ENERGY,
@@ -2637,9 +2510,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         stat_key=FIELD_TOTAL_N,
         section=f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
-            e,
-            f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}",
-            FIELD_TOTAL_N,
+            e, f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}", FIELD_TOTAL_N
         ),
         translation_key="symmetry_total_negative",
         device_class=SensorDeviceClass.ENERGY,
@@ -2662,9 +2533,7 @@ SMART_MODE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         key="smart_mode_time_difference",
         translation_key="smart_mode_time_difference",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_SMART_MODE,
-            "timeDifference",
+            e, PAYLOAD_SMART_MODE, "timeDifference"
         ),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -2712,9 +2581,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TODAY_LOW,),
         key="dynamic_price_today_low",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_TODAY_LOW,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_TODAY_LOW
         ),
         translation_key="dynamic_price_today_low",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2723,9 +2590,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TODAY_HIGH,),
         key="dynamic_price_today_high",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_TODAY_HIGH,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_TODAY_HIGH
         ),
         translation_key="dynamic_price_today_high",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2734,9 +2599,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_NEXTDAY_LOW,),
         key="dynamic_price_nextday_low",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_NEXTDAY_LOW,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_NEXTDAY_LOW
         ),
         translation_key="dynamic_price_nextday_low",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2745,9 +2608,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_NEXTDAY_HIGH,),
         key="dynamic_price_nextday_high",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_NEXTDAY_HIGH,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_NEXTDAY_HIGH
         ),
         translation_key="dynamic_price_nextday_high",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2756,9 +2617,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PRICE_COMPANY_NAME,),
         key="dynamic_price_provider",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_PRICE_COMPANY_NAME,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_PRICE_COMPANY_NAME
         ),
         translation_key="dynamic_price_provider",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -2767,9 +2626,7 @@ DYNAMIC_PRICE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_IS_CONTRACT_AUTH,),
         key="dynamic_price_contract_auth",
         value_fn=lambda e: _get_payload_section(
-            e,
-            PAYLOAD_DYNAMIC_PRICE,
-            FIELD_IS_CONTRACT_AUTH,
+            e, PAYLOAD_DYNAMIC_PRICE, FIELD_IS_CONTRACT_AUTH
         ),
         translation_key="dynamic_price_contract_auth",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -3497,8 +3354,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
 )
 
 SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
-    JackerySavingsDetailSensorDescription,
-    ...,
+    JackerySavingsDetailSensorDescription, ...
 ] = (
     JackerySavingsDetailSensorDescription(
         key="savings_calculated_total",
@@ -3537,7 +3393,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
             e.get_savings_value((
                 "source_energy",
                 "battery_charge_discharge_balance_year_kwh",
-            )),
+            ))
         ),
     ),
     JackerySavingsDetailSensorDescription(
@@ -3548,7 +3404,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         state_class=SensorStateClass.TOTAL,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda e: safe_float(
-            e.get_savings_value(("source_energy", "conversion_loss_year_kwh")),
+            e.get_savings_value(("source_energy", "conversion_loss_year_kwh"))
         ),
     ),
     JackerySavingsDetailSensorDescription(
@@ -3562,7 +3418,7 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
             e.get_savings_value((
                 "source_energy",
                 "pv_residual_after_self_consumption_year_kwh",
-            )),
+            ))
         ),
     ),
 )
@@ -3645,7 +3501,7 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         entity_registry_enabled_default=False,
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
-            safe_float(_get_prop(e, FIELD_IN_EGY)),
+            safe_float(_get_prop(e, FIELD_IN_EGY))
         ),
     ),
     JackeryBatteryPackSensorDescription(
@@ -3658,7 +3514,7 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         entity_registry_enabled_default=False,
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
-            safe_float(_get_prop(e, FIELD_OUT_EGY)),
+            safe_float(_get_prop(e, FIELD_OUT_EGY))
         ),
     ),
 )
@@ -3814,8 +3670,7 @@ BREAKER_SENSOR_DESCRIPTIONS: tuple[JackeryBreakerSensorDescription, ...] = (
 )
 
 SUBDEVICE_ALARM_SENSOR_DESCRIPTIONS: tuple[
-    JackerySubdeviceAlarmSensorDescription,
-    ...,
+    JackerySubdeviceAlarmSensorDescription, ...
 ] = (
     JackerySubdeviceAlarmSensorDescription(
         key="alert_count",
@@ -4363,10 +4218,7 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda e: _get_prop_any(
-            e,
-            FIELD_MAC,
-            FIELD_DEVICE_SN,
-            FIELD_DEVICE_ID,
+            e, FIELD_MAC, FIELD_DEVICE_SN, FIELD_DEVICE_ID
         ),
     ),
     JackerySmartMeterSensorDescription(

@@ -23,9 +23,7 @@ class TestJackeryEntity:
         coordinator.is_entity_source_available = MagicMock(return_value=True)
         return coordinator
 
-    def _create_entity(
-        self, coordinator: MagicMock, key_suffix: str = "test_key"
-    ) -> JackeryEntity:  # ruff: ignore[no-self-use]
+    def _create_entity(self, coordinator: MagicMock, key_suffix: str = "test_key") -> JackeryEntity:  # ruff: ignore[no-self-use]
         """Create an entity instance for testing."""
         # Use a simple EntityDescription for testing
         description = EntityDescription(key=key_suffix, name="Test Entity")

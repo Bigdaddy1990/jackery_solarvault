@@ -273,7 +273,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                 "platformCompanyId",
             )
             applies = bool(
-                _price_sources_from_payload(payload),
+                _price_sources_from_payload(payload)
             ) or current_company not in {None, ""}
         elif key == "ct_phase_select":
             applies = isinstance(payload.get(PAYLOAD_CT_METER), dict)

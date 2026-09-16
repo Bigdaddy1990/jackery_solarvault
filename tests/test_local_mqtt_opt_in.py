@@ -1,5 +1,6 @@
 """Unit tests for local_mqtt_opt_in function."""
 
+
 import pytest
 
 from custom_components.jackery_solarvault.config_flow import _current_local_mqtt_options  # ruff: ignore[import-private-name]
@@ -33,8 +34,7 @@ def test_local_mqtt_opt_in_legacy_true() -> None:
 def test_local_mqtt_opt_in_explicit_false_respected() -> None:
     """local_mqtt_enable=False (explicit) should be respected as user choice to disable."""  # ruff: ignore[line-too-long]
     entry = MockConfigEntry(
-        options={CONF_THIRD_PARTY_MQTT_ENABLE: False},
-        data={CONF_THIRD_PARTY_MQTT_ENABLE: True},
+        options={CONF_THIRD_PARTY_MQTT_ENABLE: False}, data={CONF_THIRD_PARTY_MQTT_ENABLE: True}
     )
     # Explicit False in options means user chose to disable local MQTT
     assert local_mqtt_opt_in(entry) is False

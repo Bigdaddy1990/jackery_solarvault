@@ -5,6 +5,8 @@ constants live one level up in ``..util`` and ``..const`` so the integration
 maintains a single source of truth — there is no separate, standalone copy.
 """
 
+from __future__ import annotations
+
 from importlib import import_module
 from typing import cast
 

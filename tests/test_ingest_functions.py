@@ -62,9 +62,7 @@ class TestLocalPeriodTotalSupersedesCloud:
         assert local_period_total_supersedes_cloud(10.0, 10.5, tolerance=0.1) is True
 
     def test_local_within_tolerance_returns_false(self) -> None:
-        assert (
-            local_period_total_supersedes_cloud(10.0, 10.005, tolerance=0.01) is False
-        )
+        assert local_period_total_supersedes_cloud(10.0, 10.005, tolerance=0.01) is False
 
     def test_local_equals_cloud_returns_false(self) -> None:
         assert local_period_total_supersedes_cloud(10.0, 10.0) is False
@@ -377,10 +375,7 @@ class TestAllowPeriodicSectionFromSource:
     @pytest.mark.parametrize("source", list(DataSource))
     def test_all_sources_allowed_for_periodic_section(self, source: DataSource) -> None:
         assert allow_periodic_section_from_source(source, APP_SECTION_PV_STAT) is True
-        assert (
-            allow_periodic_section_from_source(source, f"{APP_SECTION_PV_STAT}_day")
-            is True
-        )
+        assert allow_periodic_section_from_source(source, f"{APP_SECTION_PV_STAT}_day") is True
 
     @pytest.mark.parametrize("source", list(DataSource))
     def test_non_periodic_section_rejected(self, source: DataSource) -> None:

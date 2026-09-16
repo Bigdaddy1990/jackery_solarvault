@@ -2,6 +2,7 @@
 
 Focus on the uncovered lines from services.py coverage report.
 """
+from __future__ import annotations
 
 from datetime import UTC
 from types import SimpleNamespace
@@ -58,18 +59,11 @@ def _make_hass() -> SimpleNamespace:
     hass.data = {}
     # Device registry mock - needed for _resolve_jackery_device_id
     from homeassistant.helpers import device_registry as dr
-
     mock_registry = SimpleNamespace()
-    mock_registry.async_get = Mock(
-        return_value=None
-    )  # registry.async_get(device_id) returns None
+    mock_registry.async_get = Mock(return_value=None)  # registry.async_get(device_id) returns None
     mock_registry.devices = {}
-    mock_registry.async_load = (
-        AsyncMock()
-    )  # needed by pytest-homeassistant-custom-component
-    mock_registry.async_wait_loaded = (
-        AsyncMock()
-    )  # needed by entity_registry async_load
+    mock_registry.async_load = AsyncMock()  # needed by pytest-homeassistant-custom-component
+    mock_registry.async_wait_loaded = AsyncMock()  # needed by entity_registry async_load
     # dr.async_get(hass) returns the registry
     dr.async_get = Mock(return_value=mock_registry)
     hass.data[dr.DATA_REGISTRY] = mock_registry
@@ -92,56 +86,40 @@ class TestServiceBindCurrency:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_bind_currency = AsyncMock(return_value=None)
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
-            await handler(
-                _make_service_call({"device_id": "test_device", "currency": "EUR"})
-            )
+            await handler(_make_service_call({"device_id": "test_device", "currency": "EUR"}))
 
-            coordinator.async_bind_currency.assert_called_once_with(
-                "test_device", "EUR"
-            )
+            coordinator.async_bind_currency.assert_called_once_with("test_device", "EUR")
 
     @pytest.mark.asyncio()
     async def test_bind_currency_auth_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_bind_currency = AsyncMock(
-            side_effect=JackeryAuthError("auth failed")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_bind_currency = AsyncMock(side_effect=JackeryAuthError("auth failed"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
             with pytest.raises(ConfigEntryAuthFailed):
-                await handler(
-                    _make_service_call({"device_id": "test_device", "currency": "EUR"})
-                )
+                await handler(_make_service_call({"device_id": "test_device", "currency": "EUR"}))
 
     @pytest.mark.asyncio()
     async def test_bind_currency_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_bind_currency = AsyncMock(side_effect=JackeryError("error"))
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
-                await handler(
-                    _make_service_call({"device_id": "test_device", "currency": "EUR"})
-                )
+                await handler(_make_service_call({"device_id": "test_device", "currency": "EUR"}))
 
     @pytest.mark.asyncio()
     async def test_bind_currency_no_coordinator(self) -> None:
@@ -152,9 +130,7 @@ class TestServiceBindCurrency:
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
-                await handler(
-                    _make_service_call({"device_id": "test_device", "currency": "EUR"})
-                )
+                await handler(_make_service_call({"device_id": "test_device", "currency": "EUR"}))
 
 
 class TestServiceCheckSystemBound:
@@ -165,20 +141,20 @@ class TestServiceCheckSystemBound:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(return_value=True)
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
             result: ServiceResponse = await handler(
-                _make_service_call({
-                    "device_id": "test_device",
-                    "bind_key": "bk",
-                    "device_sn": "sn",
-                    "guid": "guid",
-                })
+                _make_service_call(
+                    {
+                        "device_id": "test_device",
+                        "bind_key": "bk",
+                        "device_sn": "sn",
+                        "guid": "guid",
+                    }
+                )
             )
 
             coordinator.async_check_system_bound.assert_called_once_with(
@@ -191,20 +167,20 @@ class TestServiceCheckSystemBound:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_check_system_bound = AsyncMock(return_value=False)
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
             result: ServiceResponse = await handler(
-                _make_service_call({
-                    "device_id": "test_device",
-                    "bind_key": "bk",
-                    "device_sn": "sn",
-                    "guid": "guid",
-                })
+                _make_service_call(
+                    {
+                        "device_id": "test_device",
+                        "bind_key": "bk",
+                        "device_sn": "sn",
+                        "guid": "guid",
+                    }
+                )
             )
 
             coordinator.async_check_system_bound.assert_called_once_with(
@@ -216,48 +192,44 @@ class TestServiceCheckSystemBound:
     async def test_check_system_bound_auth_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_check_system_bound = AsyncMock(
-            side_effect=JackeryAuthError("auth failed")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_check_system_bound = AsyncMock(side_effect=JackeryAuthError("auth failed"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
             with pytest.raises(ConfigEntryAuthFailed):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "bind_key": "bk",
-                        "device_sn": "sn",
-                        "guid": "guid",
-                    })
+                    _make_service_call(
+                        {
+                            "device_id": "test_device",
+                            "bind_key": "bk",
+                            "device_sn": "sn",
+                            "guid": "guid",
+                        }
+                    )
                 )
 
     @pytest.mark.asyncio()
     async def test_check_system_bound_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_check_system_bound = AsyncMock(
-            side_effect=JackeryError("error")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_check_system_bound = AsyncMock(side_effect=JackeryError("error"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "bind_key": "bk",
-                        "device_sn": "sn",
-                        "guid": "guid",
-                    })
+                    _make_service_call(
+                        {
+                            "device_id": "test_device",
+                            "bind_key": "bk",
+                            "device_sn": "sn",
+                            "guid": "guid",
+                        }
+                    )
                 )
 
 
@@ -269,9 +241,7 @@ class TestServiceUnbindAccessories:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_unbind_accessories = AsyncMock(return_value={"ok": True})
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
@@ -287,44 +257,30 @@ class TestServiceUnbindAccessories:
     async def test_unbind_accessories_auth_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_unbind_accessories = AsyncMock(
-            side_effect=JackeryAuthError("auth failed")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_unbind_accessories = AsyncMock(side_effect=JackeryAuthError("auth failed"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
 
             with pytest.raises(ConfigEntryAuthFailed):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "bind_ids": ["1", "2"],
-                    })
+                    _make_service_call({"device_id": "test_device", "bind_ids": ["1", "2"]})
                 )
 
     @pytest.mark.asyncio()
     async def test_unbind_accessories_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_unbind_accessories = AsyncMock(
-            side_effect=JackeryError("error")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_unbind_accessories = AsyncMock(side_effect=JackeryError("error"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "bind_ids": ["1", "2"],
-                    })
+                    _make_service_call({"device_id": "test_device", "bind_ids": ["1", "2"]})
                 )
 
 
@@ -336,19 +292,15 @@ class TestServiceSetAcNickname:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(return_value=None)
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
             await handler(
-                _make_service_call({
-                    "device_id": "test_device",
-                    "ac_port": 1,
-                    "nickname": "Kueche",
-                })
+                _make_service_call(
+                    {"device_id": "test_device", "ac_port": 1, "nickname": "Kueche"}
+                )
             )
 
             coordinator.async_set_ac_nickname.assert_called_once_with(
@@ -359,23 +311,17 @@ class TestServiceSetAcNickname:
     async def test_set_ac_nickname_auth_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_set_ac_nickname = AsyncMock(
-            side_effect=JackeryAuthError("auth failed")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_set_ac_nickname = AsyncMock(side_effect=JackeryAuthError("auth failed"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
             with pytest.raises(ConfigEntryAuthFailed):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "ac_port": 1,
-                        "nickname": "Kueche",
-                    })
+                    _make_service_call(
+                        {"device_id": "test_device", "ac_port": 1, "nickname": "Kueche"}
+                    )
                 )
 
     @pytest.mark.asyncio()
@@ -383,20 +329,16 @@ class TestServiceSetAcNickname:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_set_ac_nickname = AsyncMock(side_effect=JackeryError("error"))
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "ac_port": 1,
-                        "nickname": "Kueche",
-                    })
+                    _make_service_call(
+                        {"device_id": "test_device", "ac_port": 1, "nickname": "Kueche"}
+                    )
                 )
 
 
@@ -408,19 +350,19 @@ class TestServiceReportDeviceTimezone:
         hass = _make_hass()
         coordinator = _make_coordinator()
         coordinator.async_report_device_timezone = AsyncMock(return_value=None)
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
             await handler(
-                _make_service_call({
-                    "device_id": "test_device",
-                    "zone_id": "Europe/Berlin",
-                    "timezone_offset": 7200,
-                })
+                _make_service_call(
+                    {
+                        "device_id": "test_device",
+                        "zone_id": "Europe/Berlin",
+                        "timezone_offset": 7200,
+                    }
+                )
             )
 
             coordinator.async_report_device_timezone.assert_called_once_with(
@@ -434,41 +376,39 @@ class TestServiceReportDeviceTimezone:
         coordinator.async_report_device_timezone = AsyncMock(
             side_effect=JackeryAuthError("auth failed")
         )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
             with pytest.raises(ConfigEntryAuthFailed):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "zone_id": "Europe/Berlin",
-                        "timezone_offset": 7200,
-                    })
+                    _make_service_call(
+                        {
+                            "device_id": "test_device",
+                            "zone_id": "Europe/Berlin",
+                            "timezone_offset": 7200,
+                        }
+                    )
                 )
 
     @pytest.mark.asyncio()
     async def test_report_device_timezone_error(self) -> None:
         hass = _make_hass()
         coordinator = _make_coordinator()
-        coordinator.async_report_device_timezone = AsyncMock(
-            side_effect=JackeryError("error")
-        )
-        with patch.object(
-            services, "_coordinator_for_device", return_value=coordinator
-        ):
+        coordinator.async_report_device_timezone = AsyncMock(side_effect=JackeryError("error"))
+        with patch.object(services, "_coordinator_for_device", return_value=coordinator):
             await services.async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
             with pytest.raises(HomeAssistantError):
                 await handler(
-                    _make_service_call({
-                        "device_id": "test_device",
-                        "zone_id": "Europe/Berlin",
-                        "timezone_offset": 7200,
-                    })
+                    _make_service_call(
+                        {
+                            "device_id": "test_device",
+                            "zone_id": "Europe/Berlin",
+                            "timezone_offset": 7200,
+                        }
+                    )
                 )

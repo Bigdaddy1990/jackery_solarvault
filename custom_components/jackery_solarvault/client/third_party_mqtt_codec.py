@@ -43,7 +43,7 @@ class ThirdPartyMqttCodecError(ValueError):
         """Build an error for an invalid decoded Bluetooth-key length."""
         return cls(
             "third-party MQTT codec requires a 16-byte decoded bluetoothKey "
-            f"for {operation}, got {length} bytes",
+            f"for {operation}, got {length} bytes"
         )
 
     @classmethod
@@ -150,8 +150,7 @@ def third_party_mqtt_config_from_options(
     if not token.strip() and generated_token is not None:
         token = generated_token
     enabled_value = options.get(
-        CONF_THIRD_PARTY_MQTT_ENABLE,
-        DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+        CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE
     )
     parsed_enabled = safe_bool(enabled_value)
     enabled = (
@@ -165,15 +164,13 @@ def third_party_mqtt_config_from_options(
         FIELD_THIRD_PARTY_MQTT_PORT: _broker_port(options),
         FIELD_THIRD_PARTY_MQTT_USERNAME: str(
             options.get(
-                CONF_THIRD_PARTY_MQTT_USERNAME,
-                DEFAULT_THIRD_PARTY_MQTT_USERNAME,
+                CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
             )
             or "",
         ),
         FIELD_THIRD_PARTY_MQTT_PASSWORD: str(
             options.get(
-                CONF_THIRD_PARTY_MQTT_PASSWORD,
-                DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
+                CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
             )
             or "",
         ),
@@ -260,8 +257,10 @@ def decode_third_party_mqtt_config_body(
             continue
         try:
             config[key] = decode_third_party_mqtt_field(value, bluetooth_key)
-        except ValueError:
-            _LOGGER.debug("failed to decode third-party MQTT credential field")
+        except ValueError as err:
+            _LOGGER.debug(
+                "failed to decode third-party MQTT credential field %s: %s", key, err
+            )
             failed_fields.append(key)
             continue
         decoded_fields.add(key)

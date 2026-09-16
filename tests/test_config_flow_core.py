@@ -78,12 +78,7 @@ async def test_discovery_steps_abort_duplicate_or_route_to_user() -> None:
         "async_step_zeroconf": mock_zeroconf,
     }
 
-    for method_name in (
-        "async_step_bluetooth",
-        "async_step_dhcp",
-        "async_step_mqtt",
-        "async_step_zeroconf",
-    ):
+    for method_name in ("async_step_bluetooth", "async_step_dhcp", "async_step_mqtt", "async_step_zeroconf"):
         flow = _flow()
         with patch.object(
             flow,

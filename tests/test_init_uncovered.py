@@ -149,8 +149,10 @@ class TestInitModule:
                                                 with patch(
                                                     "custom_components.jackery_solarvault._entry_runtime_bucket"
                                                 ):
-                                                    result = await async_setup_entry(
-                                                        hass, config_entry
+                                                    result = (
+                                                        await async_setup_entry(
+                                                            hass, config_entry
+                                                        )
                                                     )
                                                     assert result is True
 

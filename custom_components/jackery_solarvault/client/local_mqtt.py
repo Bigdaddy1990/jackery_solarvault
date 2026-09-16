@@ -1,5 +1,7 @@
 """Direct local-broker MQTT transport for Jackery telemetry."""
 
+from __future__ import annotations
+
 import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -310,7 +312,7 @@ class JackeryLocalMqttClient:
                 _LOGGER.error(
                     "Jackery local MQTT configuration error detected (broker ACL). "
                     "Stopping reconnect supervisor. Fix broker ACL and restart "
-                    "integration.",
+                    "integration."
                 )
                 break
             await self._async_reconnect_sleep(reconnect_delay)
@@ -350,7 +352,7 @@ class JackeryLocalMqttClient:
                 _LOGGER.exception(
                     "Jackery local MQTT broker ACL denied subscription. "
                     "Check broker ACL for read access on topic tree. "
-                    "Stopping reconnect attempts.",
+                    "Stopping reconnect attempts."
                 )
                 # Mark as configuration error - don't reconnect
                 self._configuration_error = True
@@ -391,7 +393,7 @@ class JackeryLocalMqttClient:
         self._client = client
         for topic in topics:
             refused = subscription_refusals(
-                await client.subscribe(topic, qos=self._qos),
+                await client.subscribe(topic, qos=self._qos)
             )
             if refused:
                 msg = (
@@ -549,7 +551,7 @@ class JackeryLocalMqttClient:
             self._last_sink_error = "CancelledError: sink cancelled before completion"
             _LOGGER.error(
                 "Local Jackery MQTT sink was cancelled before completing an "
-                "accepted frame",
+                "accepted frame"
             )
             return
         try:
@@ -606,7 +608,7 @@ class JackeryLocalMqttClient:
             if self._message_queue or self._message_delivery_task is not None:
                 _LOGGER.warning(
                     "Local Jackery MQTT FIFO actor was cancelled with accepted "
-                    "delivery still pending",
+                    "delivery still pending"
                 )
         except Exception:
             _LOGGER.exception("Local Jackery MQTT FIFO consumer failed")
@@ -643,9 +645,7 @@ class JackeryLocalMqttClient:
                     raise
 
     async def _handle_message(
-        self,
-        topic: str,
-        payload: bytes | bytearray | str,
+        self, topic: str, payload: bytes | bytearray | str
     ) -> None:
         """Process one direct call unless lifecycle stop blocks new ingress."""
         if self._stopping:
@@ -653,9 +653,7 @@ class JackeryLocalMqttClient:
         await self._process_message(topic, payload)
 
     async def _process_message(
-        self,
-        topic: str,
-        payload: bytes | bytearray | str,
+        self, topic: str, payload: bytes | bytearray | str
     ) -> None:
         """Decode and forward one frame that already crossed acceptance."""
         raw = (
@@ -884,7 +882,7 @@ class JackeryLocalMqttClient:
             "broker_connected": self._connected,
             "started": self.is_started,
             "reconnect_supervisor_active": bool(
-                self._runner_task is not None and not self._runner_task.done(),
+                self._runner_task is not None and not self._runner_task.done()
             ),
             "subscription_retry_active": self.is_started and not self._connected,
             "subscription_filter_count": len(self._subscribed_topics),
@@ -893,7 +891,7 @@ class JackeryLocalMqttClient:
             # cadence; the one-shot flag remains separate for diagnostics.
             "periodic_requests_active": bool(
                 self._periodic_snapshot_task is not None
-                and not self._periodic_snapshot_task.done(),
+                and not self._periodic_snapshot_task.done()
             ),
             "snapshot_request_active": self._snapshot_task is not None,
             "topic_filter": REDACTED_VALUE if redact else self._topic_filter,
@@ -929,11 +927,11 @@ class JackeryLocalMqttClient:
             "message_queue_depth": len(self._message_queue),
             "message_consumer_running": bool(
                 self._message_consumer_task is not None
-                and not self._message_consumer_task.done(),
+                and not self._message_consumer_task.done()
             ),
             "message_delivery_running": bool(
                 self._message_delivery_task is not None
-                and not self._message_delivery_task.done(),
+                and not self._message_delivery_task.done()
             ),
         }
 
@@ -972,8 +970,7 @@ _LOCAL_MQTT_RUNTIME_KEY = "local_mqtt_client"
 
 
 def _local_mqtt_client(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> JackeryLocalMqttClient | None:
     """Return the local MQTT adapter stored for a config entry."""
     coordinator = getattr(entry, "runtime_data", None)

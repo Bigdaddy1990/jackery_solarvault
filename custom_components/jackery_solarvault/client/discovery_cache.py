@@ -1,6 +1,7 @@
 """Persistent discovery cache for local offline startup."""
 
 
+from __future__ import annotations
 
 import asyncio
 import copy

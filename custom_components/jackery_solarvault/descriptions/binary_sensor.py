@@ -86,8 +86,7 @@ class JackerySubdeviceAlarmBinarySensorDescription(BinarySensorEntityDescription
 
 
 BINARY_SENSOR_DESCRIPTIONS: tuple[
-    JackeryBinaryDescription | JackerySubdeviceAlarmBinarySensorDescription,
-    ...,
+    JackeryBinaryDescription | JackerySubdeviceAlarmBinarySensorDescription, ...
 ] = (
     JackeryBinaryDescription(
         key="online",

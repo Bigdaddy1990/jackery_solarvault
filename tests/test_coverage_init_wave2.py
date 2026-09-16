@@ -59,7 +59,9 @@ async def test_setup_adopts_confirmed_device_mqtt_config_in_place(
     local_enabled: bool | None,
 ) -> None:
     """Device readback may update a listener only after the user opted in."""
-    initial_options: dict[str, Any] = {CONF_LOCAL_MQTT_TOPIC: "jackery/local/device"}
+    initial_options: dict[str, Any] = {
+        CONF_LOCAL_MQTT_TOPIC: "jackery/local/device"
+    }
     if local_enabled is not None:
         initial_options[CONF_THIRD_PARTY_MQTT_ENABLE] = local_enabled
     entry = _entry(
