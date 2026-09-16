@@ -5,8 +5,7 @@ annotated-types>=0.8.0
 annotatedyaml>=0.4.5
 attrs>=24.2.0
 autotyping>=24.9.0
-coverage
-coverage[toml]
+coverage[toml]>=7.6.0
 homeassistant-stubs
 hypothesis>=6.167.1
 ifaddr>=0.2.0

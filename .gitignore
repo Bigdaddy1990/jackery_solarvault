@@ -2,27 +2,22 @@
 # Dependencies
 *.egg-info/
 *.egg
-*.pyc
-__pycache__/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Build/dist directories
-build/
+*.whl
 dist/
-*.egg-info/
-
-# Logs
-*.log
-
-# Environment files
+build/
+.coverage
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
 .env
 .env.local
-*.env.*
-
-# Test requirements - since requirements-test.txt was modified
-requirements-test.txt.bak
+.env.*
 ```
