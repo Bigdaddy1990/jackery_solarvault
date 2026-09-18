@@ -92,8 +92,7 @@ def test_wire_format_constants_match_smali() -> None:
     assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
-    # A SolarVault 3 Pro Max payload uses a 16-byte key
-    # ("0123456789abcdef" → AES-128), so the helpers must accept that too.
+    # A synthetic 16-byte key exercises the AES-128 compatibility path.
     assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
     assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
@@ -518,14 +517,13 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
     key = base64.b64decode(_SYNTHETIC_KEY_B64)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
+    with pytest.raises(ValueError, match="notify too short"):
         decrypt_binary_notify(b"too short", key)
 
 
 def test_decrypt_binary_notify_rejects_unknown_version() -> None:
     """Frames with an unknown protocol version raise ``ValueError``."""
-    # pyrefly: ignore [unknown-name]
-    key = base64.b64decode(_LIVE_KEY_B64)  # ruff: ignore[undefined-name]
+    key = base64.b64decode(_SYNTHETIC_KEY_B64)
     plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
     mutated = plain[:2] + b"\x99\x99" + plain[4:]
     blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
@@ -2343,7 +2341,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
     async def _run() -> None:
         """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
 
-        Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
+        Builds a bare listener configured with the synthetic AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
         """  # noqa: E501, RUF105
         key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
