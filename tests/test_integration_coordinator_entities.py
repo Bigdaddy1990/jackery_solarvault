@@ -31,21 +31,57 @@ _TEST_HTTP_DATA = {
 }
 
 
-def _make_coordinator() -> JackerySolarVaultCoordinator:
-    """Create a coordinator instance with mocked dependencies."""
+def _background_task_mock(*args, **_kwargs) -> MagicMock:  # ruff: ignore[missing-type-args, missing-type-kwargs]  # isort: skip
+    """Consume coroutines scheduled by MagicMock HA/entry objects."""
+    for arg in args:
+        if asyncio.iscoroutine(arg):
+            arg.close()
+    task = MagicMock()
+    task.done.return_value = False
+    return task
+
+
+def _make_hass_entry_api() -> tuple[MagicMock, MagicMock, MagicMock]:
+    """Create mocked constructor dependencies."""
     hass = MagicMock()
-    loop = asyncio.new_event_loop()
-    hass.loop = loop
+    hass.loop = asyncio.get_running_loop()
+    hass.data = {}
+    hass.config = MagicMock()
+    hass.config.path = MagicMock(return_value="/config")
+    hass.async_create_background_task = MagicMock(side_effect=_background_task_mock)
+    hass.async_create_task = MagicMock(side_effect=_background_task_mock)
 
     entry = MagicMock()
     entry.entry_id = "test-entry"
+    entry.title = "Test Entry"
     entry.data = {"username": "user@example.com", "password": "pass"}
     entry.options = {}
     entry.runtime_data = None
+    entry.async_create_background_task = MagicMock(side_effect=_background_task_mock)
 
     api = MagicMock()
     api.mqtt_session_snapshot = MagicMock(return_value=None)
 
+    return hass, entry, api
+
+
+def _finalize_coordinator(
+    coordinator: JackerySolarVaultCoordinator,
+    data: dict[str, dict[str, object]],
+) -> JackerySolarVaultCoordinator:
+    """Set the current wrapper seam and clean constructor background hooks."""
+    poll_unsub = getattr(coordinator, "_poll_watchdog_unsub", None)
+    if poll_unsub is not None:
+        poll_unsub()
+        coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator.data = data
+    coordinator._async_update_data_with_timeout = AsyncMock(return_value=data)  # ruff: ignore[private-member-access]  # isort: skip
+    return coordinator
+
+
+def _make_coordinator() -> JackerySolarVaultCoordinator:
+    """Create a coordinator instance with mocked dependencies."""
+    hass, entry, api = _make_hass_entry_api()
     update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
     with (
@@ -69,21 +105,16 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
             AsyncMock(return_value=None),
         ),
         patch(
-            "custom_components.jackery_solarvault.coordinator."
-            "JackerySolarVaultCoordinator._async_update_data",
-            return_value=_TEST_HTTP_DATA,
-        ),
-        patch(
             "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
             AsyncMock(return_value=None),
         ),
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
         # Manually initialize since we're not going through HA setup
-        coordinator.data = _TEST_HTTP_DATA
-        coordinator._device_registry_synced = True  # noqa: RUF105, SLF001
+        coordinator._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
 
-    return coordinator
+    # pyrefly: ignore [bad-argument-type]
+    return _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
 
 
 def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
@@ -103,19 +134,7 @@ def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
         },
     }
 
-    hass = MagicMock()
-    loop = asyncio.new_event_loop()
-    hass.loop = loop
-
-    entry = MagicMock()
-    entry.entry_id = "test-entry"
-    entry.data = {"username": "user@example.com", "password": "pass"}
-    entry.options = {}
-    entry.runtime_data = None
-
-    api = MagicMock()
-    api.mqtt_session_snapshot = MagicMock(return_value=None)
-
+    hass, entry, api = _make_hass_entry_api()
     update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
     with (
@@ -139,26 +158,21 @@ def _make_multi_device_coordinator() -> JackerySolarVaultCoordinator:
             AsyncMock(return_value=None),
         ),
         patch(
-            "custom_components.jackery_solarvault.coordinator."
-            "JackerySolarVaultCoordinator._async_update_data",
-            return_value=multi_device_data,
-        ),
-        patch(
             "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
             AsyncMock(return_value=None),
         ),
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
-        coordinator.data = multi_device_data
 
-    return coordinator
+    # pyrefly: ignore [bad-argument-type]
+    return _finalize_coordinator(coordinator, multi_device_data)
 
 
 class TestCoordinatorEntityManagement:
     """Test coordinator entity management logic."""
 
-    @pytest.mark.asyncio
-    async def test_coordinator_initialization(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_initialization(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator initializes with correct defaults."""
         coordinator = _make_coordinator()
 
@@ -167,35 +181,35 @@ class TestCoordinatorEntityManagement:
         assert coordinator.update_interval == timedelta(
             seconds=DEFAULT_SCAN_INTERVAL_SEC
         )
-        assert coordinator._device_registry_synced is True  # noqa: RUF105, SLF001
+        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
-    @pytest.mark.asyncio
-    async def test_coordinator_async_update_data_returns_data(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_async_update_data_returns_data(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """_async_update_data returns device data correctly."""
         coordinator = _make_coordinator()
 
-        data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+        data = await coordinator._async_update_data()  # ruff: ignore[private-member-access]  # isort: skip
         assert data == _TEST_HTTP_DATA
 
-    @pytest.mark.asyncio
-    async def test_coordinator_device_registry_sync(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_device_registry_sync(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator syncs device registry on first poll."""
         coordinator = _make_coordinator()
 
         # Should have device registry sync flag set
-        assert coordinator._device_registry_synced is True  # noqa: RUF105, SLF001
+        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
-    @pytest.mark.asyncio
-    async def test_coordinator_handles_multiple_devices(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_handles_multiple_devices(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator handles multiple device data."""
         coordinator = _make_multi_device_coordinator()
 
-        assert len(coordinator.data) == 2
+        assert len(coordinator.data) == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
         assert "device-1" in coordinator.data
         assert "device-2" in coordinator.data
 
-    @pytest.mark.asyncio
-    async def test_coordinator_data_structure(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_data_structure(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator data has expected structure."""
         coordinator = _make_coordinator()
 
@@ -205,52 +219,40 @@ class TestCoordinatorEntityManagement:
         assert device[FIELD_DEVICE_ID] == "test-device"
         assert device[FIELD_DEVICE_SN] == "TEST-SERIAL"
         assert device[FIELD_DEVICE_NAME] == "Test SolarVault"
-        assert device[FIELD_MODEL_CODE] == 3002
+        assert device[FIELD_MODEL_CODE] == 3002  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 class TestCoordinatorUpdateCycle:
     """Test coordinator update cycle behavior."""
 
-    @pytest.mark.asyncio
-    async def test_update_interval(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_update_interval(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator uses correct update interval."""
         coordinator = _make_coordinator()
         assert coordinator.update_interval == timedelta(
             seconds=DEFAULT_SCAN_INTERVAL_SEC
         )
 
-    @pytest.mark.asyncio
-    async def test_multiple_updates(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_multiple_updates(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Multiple updates work correctly."""
         coordinator = _make_coordinator()
 
         for _ in range(3):
-            data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+            data = await coordinator._async_update_data()  # ruff: ignore[private-member-access]  # isort: skip
             assert data == _TEST_HTTP_DATA
 
 
 class TestCoordinatorErrorHandling:
     """Test coordinator error handling."""
 
-    @pytest.mark.asyncio
-    async def test_coordinator_handles_api_error(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_handles_api_error(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator handles API errors gracefully."""
-        from homeassistant.helpers.update_coordinator import UpdateFailed  # noqa: I001, PLC0415, RUF105
+        from homeassistant.helpers.update_coordinator import UpdateFailed  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-        # Create coordinator with error-raising _async_update_data
-        hass = MagicMock()
-        loop = asyncio.new_event_loop()
-        hass.loop = loop
-
-        entry = MagicMock()
-        entry.entry_id = "test-entry"
-        entry.data = {"username": "user@example.com", "password": "pass"}
-        entry.options = {}
-        entry.runtime_data = None
-
-        api = MagicMock()
-        api.mqtt_session_snapshot = MagicMock(return_value=None)
-
+        # Create coordinator with error-raising wrapped update path.
+        hass, entry, api = _make_hass_entry_api()
         update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL_SEC)
 
         with (
@@ -274,29 +276,29 @@ class TestCoordinatorErrorHandling:
                 AsyncMock(return_value=None),
             ),
             patch(
-                "custom_components.jackery_solarvault.coordinator."
-                "JackerySolarVaultCoordinator._async_update_data",
-                side_effect=Exception("API Error"),
-            ),
-            patch(
                 "custom_components.jackery_solarvault._async_prime_entry_bootstrap_mqtt_session",
                 AsyncMock(return_value=None),
             ),
         ):
             coordinator = JackerySolarVaultCoordinator(
                 hass, entry, api, update_interval
-            )  # noqa: E501, RUF100
+            )
+            # pyrefly: ignore [bad-argument-type]
+            _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
+            coordinator._async_update_data_with_timeout = AsyncMock(  # ruff: ignore[private-member-access]  # isort: skip
+                side_effect=UpdateFailed("API Error")
+            )
 
-            # Should raise UpdateFailed
+            # Current wrapper propagates UpdateFailed raised by the wrapped path.
             with pytest.raises(UpdateFailed):
-                await coordinator._async_update_data()  # noqa: RUF105, SLF001
+                await coordinator._async_update_data()  # ruff: ignore[private-member-access]  # isort: skip
 
 
 class TestCoordinatorDeviceDataIntegrity:
     """Test device data integrity in coordinator."""
 
-    @pytest.mark.asyncio
-    async def test_device_data_contains_required_fields(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_device_data_contains_required_fields(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Device data contains all required fields."""
         coordinator = _make_coordinator()
         data = coordinator.data
@@ -308,22 +310,22 @@ class TestCoordinatorDeviceDataIntegrity:
             assert FIELD_MODEL_CODE in device
             assert device[FIELD_DEVICE_ID] == dev_id
 
-    @pytest.mark.asyncio
-    async def test_coordinator_preserves_device_identity(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_coordinator_preserves_device_identity(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Coordinator preserves device identity across updates."""
         coordinator = _make_coordinator()
 
         # Initial data
-        initial_data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+        initial_data = await coordinator._async_update_data()  # ruff: ignore[private-member-access]  # isort: skip
         initial_id = initial_data["test-device"][FIELD_DEVICE_ID]
 
         # Simulate multiple updates
         for _ in range(5):
-            data = await coordinator._async_update_data()  # noqa: RUF105, SLF001
+            data = await coordinator._async_update_data()  # ruff: ignore[private-member-access]  # isort: skip
             assert data["test-device"][FIELD_DEVICE_ID] == initial_id
 
-    @pytest.mark.asyncio
-    async def test_multi_device_isolation(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_multi_device_isolation(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Each device maintains independent data."""
         coordinator = _make_multi_device_coordinator()
         data = coordinator.data
@@ -332,7 +334,7 @@ class TestCoordinatorDeviceDataIntegrity:
         assert data["device-2"][FIELD_DEVICE_SN] == "SERIAL-2"
         assert (
             data["device-1"][FIELD_DEVICE_NAME] != data["device-2"][FIELD_DEVICE_NAME]
-        )  # noqa: E501, RUF100
+        )
 
 
 if __name__ == "__main__":

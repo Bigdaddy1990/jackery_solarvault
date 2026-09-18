@@ -9,11 +9,9 @@ Home Assistant local timezone (read from ``hass.config.time_zone``); everything
 else is real production logic, so nothing internal is mocked.
 """
 
-from datetime import UTC, date, datetime  # ruff:ignore[unused-import]
+from datetime import date
 from types import SimpleNamespace
 from typing import Any, cast
-
-import pytest  # ruff:ignore[unused-import]
 
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -26,7 +24,7 @@ def _coordinator(*, time_zone: str = "UTC") -> JackerySolarVaultCoordinator:
     obj = cast("Any", coordinator)
     obj.hass = SimpleNamespace(config=SimpleNamespace(time_zone=time_zone))
     obj._device_index = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 # --- _statistics_http_backfill_dates -------------------------------------

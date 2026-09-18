@@ -18,12 +18,12 @@ from custom_components.jackery_solarvault.const import SOLAR_VAULT_HEAD_UNIT_MOD
 class TestBinarySensor:
     """Test binary sensor classes."""
 
-    def _bare_hass(self) -> Any:  # noqa: PLR6301, RUF105
+    def _bare_hass(self) -> Any:  # ruff: ignore[no-self-use]
         hass = SimpleNamespace()
         hass.data = {}
         return hass
 
-    def _bare_entry(self) -> Any:  # noqa: PLR6301, RUF105
+    def _bare_entry(self) -> Any:  # ruff: ignore[no-self-use]
         entry = SimpleNamespace()
         entry.options = {}
         entry.data = {}
@@ -31,7 +31,7 @@ class TestBinarySensor:
         entry.async_on_unload = MagicMock()
         return entry
 
-    def _bare_coordinator(self, entry: Any) -> Any:  # noqa: PLR6301, RUF105
+    def _bare_coordinator(self, entry: Any) -> Any:  # ruff: ignore[no-self-use]
         """Create a bare coordinator with the given entry."""
         coordinator = SimpleNamespace()
         coordinator.entry = entry
@@ -55,7 +55,7 @@ class TestBinarySensor:
         entry.runtime_data = coordinator
         return coordinator
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_setup_entry(self) -> None:
         """Test async_setup_entry."""
         hass = self._bare_hass()
@@ -75,12 +75,14 @@ class TestBinarySensor:
         """Test JackeryBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (  # noqa: PLC0415, RUF105
+        from custom_components.jackery_solarvault.binary_sensor import (  # ruff: ignore[import-outside-top-level]
             JackeryBinaryDescription,
         )
 
         description = JackeryBinaryDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="test_binary",
+            # pyrefly: ignore [unexpected-keyword]
             name="Test Binary",
             getter=lambda props, meta: True,
         )
@@ -108,21 +110,21 @@ class TestBinarySensor:
         """Test JackerySubdeviceAlarmBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (  # noqa: PLC0415, RUF105
+        from custom_components.jackery_solarvault.binary_sensor import (  # ruff: ignore[import-outside-top-level]
             JackerySubdeviceAlarmBinarySensorDescription,
         )
 
         description = JackerySubdeviceAlarmBinarySensorDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="test_alarm",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="test_alarm",
             field="test_field",
         )
         sensor = JackerySubdeviceAlarmBinarySensor(
             coordinator=coordinator,
             device_id="test-device",
-            sub_device_index=1,
-            sub_device_sn="sub-device-1",
-            sub_device_key="sub_key_1",
+            identity=(1, "sub-device-1", "sub_key_1"),
             description=description,
         )
         assert sensor is not None

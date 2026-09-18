@@ -29,7 +29,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     """Register the `asyncio_mode` ini option used for running async tests when pytest plugins are not autoloaded.
 
     Registers the ini option named `asyncio_mode` with a default value of `"strict"`, so source-only test runs (when `pytest-asyncio` is not auto-loaded) still expose the configuration key.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     parser.addini(
         "asyncio_mode",
         "asyncio mode for plugin-free source-only tests",
@@ -45,7 +45,7 @@ def _pytest_asyncio_loaded(config: pytest.Config) -> bool:
 
     Returns:
         bool: `True` if the pytest-asyncio plugin is present, `False` otherwise.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     pluginmanager = config.pluginmanager
     return any(
         pluginmanager.hasplugin(name)
@@ -68,32 +68,12 @@ def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
     return True
 
 
-try:
-    from pytest_homeassistant_custom_component.common import (  # type: ignore[import-not-found]
-        enable_custom_integrations as _enable_custom_integrations,  # noqa: F401, RUF105
-    )
-
-    @pytest.fixture(autouse=True)
-    def auto_enable_custom_integrations(
-        enable_custom_integrations: None,
-    ) -> None:
-        """Auto-enable the custom_components dir for every HA fixture test.
-
-        Without this, ``await async_setup_component`` cannot find the
-        integration. The fixture itself comes from
-        ``pytest-homeassistant-custom-component``; we just opt in for the
-        whole HA suite by making it autouse.
-        """
-
-except ImportError:
-    # pytest-homeassistant-custom-component not available (e.g., on Windows without fcntl)  # noqa: RUF105
-    @pytest.fixture(autouse=True)
-    def auto_enable_custom_integrations() -> None:
-        """No-op when HA test plugin is not available."""
-        return
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
+    """Enable loading integrations from ``custom_components`` for every test."""
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_jackery_login() -> Generator[None]:
     """Stub Jackery auth and discovery calls across the test.
 
@@ -102,7 +82,7 @@ def mock_jackery_login() -> Generator[None]:
     cloud I/O.
     """
 
-    async def _fake_login(api: Any) -> str:  # ruff: ignore[unused-async]  # noqa: RUF105
+    async def _fake_login(api: Any) -> str:  # ruff: ignore[unused-async]
         """Set test authentication and MQTT attributes on a Jackery API instance and return the assigned token.
 
         Parameters:
@@ -110,7 +90,7 @@ def mock_jackery_login() -> Generator[None]:
 
         Returns:
             str: The authentication token assigned to the API instance.
-        """  # noqa: RUF105
+        """  # ruff: ignore[line-too-long]
         api._token = "test-token"  # ruff: ignore[private-member-access]
         api._mqtt_user_id = "test-user"  # ruff: ignore[private-member-access]
         api._mqtt_seed_b64 = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="  # ruff: ignore[private-member-access]

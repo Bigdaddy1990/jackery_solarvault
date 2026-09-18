@@ -34,7 +34,7 @@ def _read(name: str) -> str:
 
     Returns:
         str: File contents decoded as UTF-8.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     base = CLIENT_COMPONENT if name == "mqtt_push.py" else INTEGRATION_COMPONENT
     return (base / name).read_text(encoding="utf-8")
 
@@ -63,13 +63,15 @@ def test_mqtt_client_disables_internal_reconnect_loop() -> None:
 def test_mqtt_client_fingerprint_does_not_retain_raw_secret() -> None:
     """Ensure the MQTT client's credential-change detection does not retain raw password data.
 
-    Verifies the module computes and stores a hashed credential fingerprint (using `hashlib.sha256` and `_credential_fingerprint`) and exposes a `_fingerprint` member, and asserts the source does not contain a stored tuple of raw credentials `(client_id, username, password)`.
-    """  # noqa: RUF105
+    Verifies the module delegates to the shared length-delimited credential
+    fingerprint helper, stores only the digest, and never stores a tuple of raw
+    credentials.
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
-    assert "import hashlib" in src, src
+    assert "from .credentials import credential_fingerprint" in src, src
     assert "self._fingerprint: str | None = None" in src, src
     assert "def _credential_fingerprint(" in src, src
-    assert "hashlib.sha256()" in src, src
+    assert "return credential_fingerprint({" in src, src
     assert "fingerprint = self._credential_fingerprint(" in src, src
     assert "fingerprint = (client_id, username, password)" not in src, src
 
@@ -78,10 +80,10 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     """Ensure the broker CONNACK failure reason is preserved when the broker rejects the connection and closes the socket.
 
     Asserts that the disconnect handler does not overwrite an actionable CONNACK reason (the `"connect rc=..."` signature) and that the connect-failure mapper exposes broker CONNACK reasons via `MQTT_CONNACK_REASONS` and formats them as `f"connect rc={rc}"`.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
     on_disc_match = re.search(
-        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # noqa: RUF105
+        r"def _handle_disconnect_error\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -94,7 +96,7 @@ def test_connack_reason_preserved_across_post_reject_disconnect() -> None:
     # And the connect-failure mapper itself must produce the rc=… signature
     # so ``_is_connect_failure_error`` can detect it.
     fail_match = re.search(
-        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # noqa: RUF105
+        r"def _handle_connect_failure\(self.*?(?=\n    @staticmethod|\n    def |\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -119,10 +121,10 @@ def test_diagnostics_exposes_stale_subscription_signals() -> None:
 
     Raises:
         AssertionError: If the diagnostics_snapshot method is missing or either key/flag is not present.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     src = _read("mqtt_push.py")
     diag_match = re.search(
-        r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",  # noqa: RUF105
+        r"def diagnostics_snapshot\(self.*?(?=\n    @property\n    def diagnostics|\nclass )",  # ruff: ignore[line-too-long]
         src,
         re.DOTALL,
     )
@@ -153,7 +155,7 @@ def test_silent_threshold_constant_is_sane() -> None:
     threshold = int(match.group(1))
     # Real Jackery heartbeats every ~30 s; we want to flag silence
     # well after that but before users complain about stale data.
-    assert 60 <= threshold <= 1800, threshold
+    assert 60 <= threshold <= 1800, threshold  # ruff: ignore[magic-value-comparison]
 
 
 def test_seconds_since_last_message_handles_no_messages() -> None:
@@ -255,7 +257,7 @@ def test_optional_background_jobs_are_not_setup_tracked() -> None:
     - statistics import scheduler
     - MQTT poll queries scheduler
     - battery pack OTA enrichment scheduler
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     src = _read("coordinator.py")
 
     schedule_import = re.search(
@@ -264,7 +266,7 @@ def test_optional_background_jobs_are_not_setup_tracked() -> None:
         re.DOTALL,
     )
     assert schedule_import is not None
-    assert "async_create_background_task(" in schedule_import.group(0)
+    assert "_create_entry_background_task(" in schedule_import.group(0)
     assert "async_create_task(" not in schedule_import.group(0)
 
     schedule_mqtt = re.search(
@@ -273,7 +275,7 @@ def test_optional_background_jobs_are_not_setup_tracked() -> None:
         re.DOTALL,
     )
     assert schedule_mqtt is not None
-    assert "async_create_background_task(" in schedule_mqtt.group(0)
+    assert "_create_entry_background_task(" in schedule_mqtt.group(0)
     assert "async_create_task(" not in schedule_mqtt.group(0)
 
     schedule_ota = re.search(
@@ -282,7 +284,7 @@ def test_optional_background_jobs_are_not_setup_tracked() -> None:
         re.DOTALL,
     )
     assert schedule_ota is not None
-    assert "async_create_background_task(" in schedule_ota.group(0)
+    assert "_create_entry_background_task(" in schedule_ota.group(0)
     assert "async_create_task(" not in schedule_ota.group(0)
 
 
@@ -290,7 +292,7 @@ def test_mqtt_ensure_uses_stable_client_handle_across_awaits() -> None:
     """Ensure the coordinator preserves a stable MQTT client reference across awaits to avoid NoneType errors during reload or shutdown.
 
     Asserts that the `_async_ensure_mqtt` implementation captures `self._mqtt` into a local `mqtt` variable, checks for replacement (`if self._mqtt is not mqtt:`), awaits lifecycle calls on the local handle (`async_start`, `async_wait_until_connected`), reads diagnostics via `mqtt.diagnostics.get`, and does not call `self._mqtt.async_wait_until_connected` directly.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     src = _read("coordinator.py")
     match = re.search(
         r"async def _async_ensure_mqtt\(.*?(?=\n    async def )",

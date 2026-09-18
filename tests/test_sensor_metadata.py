@@ -83,6 +83,38 @@ def test_default_power_is_a_disabled_diagnostic() -> None:
     assert description.entity_category == EntityCategory.DIAGNOSTIC
 
 
+def test_all_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
+    """Every diagnostic description avoids recorder load until explicitly enabled."""
+    groups = (
+        sensor_module.SENSOR_DESCRIPTIONS,
+        sensor_module.PORTABLE_SENSOR_DESCRIPTIONS,
+        sensor_module.STAT_DESCRIPTIONS,
+        sensor_module.SMART_MODE_SENSOR_DESCRIPTIONS,
+        sensor_module.SMART_SCHEDULE_SENSOR_DESCRIPTIONS,
+        sensor_module.DYNAMIC_PRICE_SENSOR_DESCRIPTIONS,
+        sensor_module.TOU_PLAN_SENSOR_DESCRIPTIONS,
+        sensor_module.SAVINGS_DETAIL_SENSOR_DESCRIPTIONS,
+        sensor_module.BATTERY_PACK_SENSOR_DESCRIPTIONS,
+        sensor_module.SMART_PLUG_SENSOR_DESCRIPTIONS,
+        sensor_module.METER_HEAD_SENSOR_DESCRIPTIONS,
+        sensor_module.BREAKER_SENSOR_DESCRIPTIONS,
+        sensor_module.SUBDEVICE_ALARM_SENSOR_DESCRIPTIONS,
+        sensor_module.SMART_METER_SENSOR_DESCRIPTIONS,
+    )
+    diagnostics = [
+        description
+        for group in groups
+        for description in group
+        if description.entity_category is EntityCategory.DIAGNOSTIC
+    ]
+
+    assert diagnostics
+    assert all(
+        description.entity_registry_enabled_default is False
+        for description in diagnostics
+    )
+
+
 async def _setup_grid_standard_entities(
     value: object,
     *,
@@ -100,7 +132,7 @@ async def _setup_grid_standard_entities(
     }
     coordinator.last_update_success = True
     coordinator.async_add_listener.return_value = lambda: None
-    coordinator._has_smart_meter_accessory.return_value = False  # ruff: ignore[private-member-access]
+    coordinator.has_smart_meter_accessory.return_value = False
     entry = SimpleNamespace(
         data={},
         options={},

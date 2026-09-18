@@ -1,7 +1,6 @@
 """Behavior coverage for Jackery button mappings and discovery gates."""
 
-from collections.abc import Callable, Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -39,13 +38,17 @@ from custom_components.jackery_solarvault.entity import (
     LAYER5_COMMAND_SOURCES,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from homeassistant.helpers.entity import Entity
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 _DEVICE_ID = "device-1"
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     """Return the query-button description with the requested key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -99,7 +102,7 @@ def _entity_collector(target: list[Any]) -> AddEntitiesCallback:
         ["refresh_subdevice_combo", "async_query_subdevice_combo"],
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_home_query_mapping_calls_its_independent_coordinator_action(
     key: str,
     method_name: str,
@@ -132,7 +135,7 @@ async def test_home_query_mapping_calls_its_independent_coordinator_action(
         "portable_refresh_sub_ct",
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_portable_query_mapping_preserves_catalog_command_metadata(
     key: str,
 ) -> None:
@@ -144,9 +147,13 @@ async def test_portable_query_mapping_preserves_catalog_command_metadata(
     await description.action(coordinator, _DEVICE_ID)
 
     call = coordinator.async_send_portable_command.await_args
+    # pyrefly: ignore [missing-attribute]
     assert call.args == (_DEVICE_ID,)
+    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["action_id"] == description.action_id
+    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["cmd"] == description.cmd
+    # pyrefly: ignore [missing-attribute]
     assert call.kwargs["body_fields"] == (
         {FIELD_REBOOT: 1}
         if key == "portable_restart"
@@ -161,12 +168,14 @@ async def test_portable_query_mapping_preserves_catalog_command_metadata(
         "portable_refresh_sub_ct",
     }
     if key in keys_with_message_type:
+        # pyrefly: ignore [missing-attribute]
         assert call.kwargs["message_type"] == description.message_type
     else:
+        # pyrefly: ignore [missing-attribute]
         assert "message_type" not in call.kwargs
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_portable_time_zone_uses_its_dedicated_setter() -> None:
     """Portable time-zone sync remains independent of generic portable commands."""
     coordinator = _coordinator()
@@ -191,9 +200,9 @@ def test_query_descriptions_declare_http_and_layer5_sources_independently() -> N
             assert description.command_sources == LAYER5_COMMAND_SOURCES
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_setup_home_device_discovers_queries_and_accessory_buttons() -> None:
-    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""  # noqa: RUF105
+    """Home discovery adds only Home commands plus schedules, plug, alert, and reboot."""  # ruff: ignore[line-too-long]
     payload = {
         PAYLOAD_PROPERTIES: {"batSoc": 50, FIELD_REBOOT: 0},
         PAYLOAD_SMART_PLUGS: [{FIELD_DEVICE_SN: "PLUG-1"}],
@@ -228,7 +237,7 @@ async def test_setup_home_device_discovers_queries_and_accessory_buttons() -> No
     entry.async_on_unload.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_setup_portable_device_excludes_home_and_accessory_buttons() -> None:
     """Legacy portable discovery exposes only the portable command family."""
     payload = {
@@ -253,7 +262,7 @@ async def test_setup_portable_device_excludes_home_and_accessory_buttons() -> No
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_setup_listener_adds_only_newly_discovered_storm_alert() -> None:
     """An unchanged signature is ignored and a new alert creates one entity."""
     payload = {
@@ -290,13 +299,13 @@ async def test_setup_listener_adds_only_newly_discovered_storm_alert() -> None:
     }
     listeners[0]()
 
-    assert len(batches) == 2
+    assert len(batches) == 2  # ruff: ignore[magic-value-comparison]
     assert [entity.unique_id for entity in batches[1]] == [
         f"{_DEVICE_ID}_delete_storm_alert_ALERT-NEW",
     ]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_non_http_query_runs_without_http_refresh() -> None:
     """A query without an HTTP equivalent uses its own Layer-5 action only."""
     coordinator = _coordinator()
@@ -328,12 +337,15 @@ def _specialized_button(
     if kind == "schedule":
         coordinator.async_read_device_schedule = AsyncMock()
         return (
+            # pyrefly: ignore [missing-argument]
             JackeryReadScheduleButton(
                 coordinator,
                 _DEVICE_ID,
-                task_type=TIMER_TASK_TYPE_SMART_PLUG,
-                key_suffix="plug_schedule",
-                translation_key="read_smart_plug_schedule",
+                config=(
+                    TIMER_TASK_TYPE_SMART_PLUG,
+                    "plug_schedule",
+                    "read_smart_plug_schedule",
+                ),
                 plug_sn="PLUG-1",
             ),
             coordinator.async_read_device_schedule,
@@ -350,7 +362,7 @@ def _specialized_button(
 
 
 @pytest.mark.parametrize("kind", ["reboot", "weather", "schedule", "delete"])
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_specialized_buttons_convert_jackery_auth_to_reauth(kind: str) -> None:
     """All specialized buttons convert HTTP auth loss into HA reauthentication."""
     button, action = _specialized_button(kind, _coordinator())
@@ -361,7 +373,7 @@ async def test_specialized_buttons_convert_jackery_auth_to_reauth(kind: str) -> 
 
 
 @pytest.mark.parametrize("kind", ["reboot", "weather", "schedule", "delete"])
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_specialized_buttons_preserve_translated_ha_errors(kind: str) -> None:
     """All specialized buttons preserve an already translated domain error."""
     button, action = _specialized_button(kind, _coordinator())
@@ -378,7 +390,7 @@ async def test_specialized_buttons_preserve_translated_ha_errors(kind: str) -> N
 
 
 @pytest.mark.parametrize("kind", ["reboot", "weather", "schedule", "delete"])
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_specialized_buttons_wrap_transport_errors(kind: str) -> None:
     """All specialized buttons expose a translated failure for transport errors."""
     button, action = _specialized_button(kind, _coordinator())
@@ -394,7 +406,7 @@ async def test_specialized_buttons_wrap_transport_errors(kind: str) -> None:
     assert placeholders["error"] == "transport timeout"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_unavailable_accessory_buttons_do_not_send_commands() -> None:
     """Unavailable schedule, weather, and deleted-alert buttons reject a press."""
     coordinator = _coordinator({PAYLOAD_WEATHER_PLAN: {FIELD_STORM: []}})

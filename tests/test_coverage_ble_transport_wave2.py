@@ -2,21 +2,30 @@
 
 import asyncio
 import base64
-from collections.abc import Awaitable, Callable, Coroutine
+import inspect
 import sys
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.jackery_solarvault.client import ble
+from custom_components.jackery_solarvault.client import (
+    ble,
+    ble_transport as ble_transport_module,
+)
 from custom_components.jackery_solarvault.client.ble_transport import (
-    BleFrameObservation,
     JackeryBleListener,
     _GattSession,  # ruff: ignore[import-private-name]
     _body_is_complete_json_object,  # ruff: ignore[import-private-name]
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Coroutine
+
+    from custom_components.jackery_solarvault.client.ble_transport import (
+        BleFrameObservation,
+    )
 
 
 class _HassStub:
@@ -59,8 +68,6 @@ def _listener(
         connect_backoff_remaining=lambda _device_id, _now: 0.0,
         connect_backoff_note_failure=lambda _device_id, _now: 1.0,
         connect_backoff_note_success=lambda _device_id: None,
-        keep_alive_msg_id=None,
-        keep_alive_ble_msg_type=None,
     )
 
 
@@ -77,7 +84,7 @@ def _attach_session(
     )
 
 
-def _frame(
+def _frame(  # ruff: ignore[too-many-arguments]
     *,
     index: int = 1,
     count: int = 1,
@@ -112,11 +119,11 @@ def test_complete_json_object_detection(body: bytes, expected: bool) -> None:
     assert _body_is_complete_json_object(body) is expected
 
 
-@pytest.mark.asyncio
-async def test_async_start_registers_matcher_and_uses_cached_address(
+@pytest.mark.asyncio()
+async def test_async_start_registers_matcher_without_eager_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Startup registers HA discovery and starts only cache-resolved identities."""
+    """Startup binds cached identities but waits for a fresh advertisement."""
     registered: dict[str, object] = {}
     spawned: list[str] = []
 
@@ -151,7 +158,7 @@ async def test_async_start_registers_matcher_and_uses_cached_address(
     await listener.async_start([" dev ", "", "dev"])
 
     assert listener.address_for_device_id("dev") == "AA:BB:CC:DD:EE:FF"
-    assert spawned == ["dev"]
+    assert spawned == []
     assert registered["matcher"] == {
         "service_uuid": ble.BLE_SERVICE_UUID,
         "manufacturer_id": ble.BLE_MANUFACTURER_ID,
@@ -159,6 +166,13 @@ async def test_async_start_registers_matcher_and_uses_cached_address(
     assert registered["scanning_mode"] == "active"
     await listener.async_stop()
     assert registered["unregistered"] is True
+
+
+def test_connection_runner_does_not_schedule_periodic_ble_writes() -> None:
+    """A notify subscription stays read-only until an explicit command arrives."""
+    source = inspect.getsource(JackeryBleListener._async_run_connection)  # ruff: ignore[private-member-access]
+
+    assert "_async_keep_alive_loop" not in source
 
 
 def test_address_binding_rejects_foreign_and_ambiguous_devices() -> None:
@@ -197,11 +211,11 @@ def test_negotiated_mtu_is_owned_by_current_session() -> None:
         cast("Any", client),
         session=current,
     )
-    assert listener.mtu_for_device("dev") == 247
+    assert listener.mtu_for_device("dev") == 247  # ruff: ignore[magic-value-comparison]
     assert listener._mtu_owners["dev"] is current  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence() -> (
     None
 ):
@@ -225,28 +239,118 @@ async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence()
     assert assembled is not None
     assert assembled.body == b'{"hello":"world}'
     assert assembled.trailer == b"\x00\x00\x00\x00"
-    assert sequence == 11
+    assert sequence == 11  # ruff: ignore[magic-value-comparison]
     assert listener.stats_for("dev").multi_chunk_messages_assembled == 1
 
 
-@pytest.mark.asyncio
-async def test_reassembly_drops_conflicting_duplicate_chunk() -> None:
-    """A duplicate chunk with different bytes invalidates the assembly."""
+@pytest.mark.asyncio()
+async def test_reassembly_restarts_after_conflicting_duplicate_chunk() -> None:
+    """A replaced fragment can complete a new out-of-order message."""
     await asyncio.sleep(0)
     listener = _listener()
     listener._reassemble_frame(  # ruff: ignore[private-member-access]
         "dev",
-        _frame(index=2, count=2, body=b"first"),
+        _frame(index=2, count=3, body=b"old-2"),
     )
 
-    with pytest.raises(ValueError, match="conflicting duplicate BLE chunk"):
-        listener._reassemble_frame(  # ruff: ignore[private-member-access]
-            "dev",
-            _frame(index=2, count=2, body=b"changed"),
-        )
+    incomplete, sequence = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=2, count=3, body=b"new-2"),
+    )
 
+    assert incomplete is None
+    assert sequence is None
+    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=1, count=3, body=b"new-1"),
+    )
+    assembled, sequence = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=3, count=3, body=b"new-3"),
+    )
+
+    assert assembled is not None
+    assert assembled.body == b"new-1new-2new-3"
+    assert sequence is None
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1
-    assert listener._frame_assemblies.get("dev") == {}  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_new_client_is_disconnected_when_session_installation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A connected client never leaks when its ownership token is rejected."""
+
+    class _Client:
+        is_connected = True
+
+        def __init__(self) -> None:
+            self.disconnect_calls = 0
+
+        async def disconnect(self) -> None:
+            self.disconnect_calls += 1
+            self.is_connected = False
+
+    client = _Client()
+
+    async def _establish_connection(**_kwargs: object) -> _Client:  # ruff: ignore[unused-async]
+        return client
+
+    listener = _listener()
+    listener._ha_bluetooth = SimpleNamespace(  # ruff: ignore[private-member-access]
+        async_ble_device_from_address=lambda *_args, **_kwargs: object(),
+    )
+    monkeypatch.setattr(
+        ble_transport_module,
+        "establish_connection",
+        _establish_connection,
+    )
+
+    def _reject_install(
+        _device_id: str,
+        _client: object,
+        _generation: int,
+    ) -> _GattSession:
+        raise RuntimeError("retained session still owns the device")  # ruff: ignore[raise-vanilla-args]
+
+    monkeypatch.setattr(listener, "_install_session", _reject_install)
+
+    await listener._async_run_connection("dev", "AA:BB:CC:DD:EE:FF")  # ruff: ignore[private-member-access]
+
+    assert client.disconnect_calls == 1
+    assert client.is_connected is False
+
+
+@pytest.mark.asyncio()
+async def test_connection_task_factory_rejection_closes_runner_and_stays_local() -> (  # ruff: ignore[unused-async]
+    None
+):
+    """A synchronous advertisement callback cannot leak or raise a coroutine."""
+    rejected: Coroutine[Any, Any, None] | None = None
+
+    class _RejectingHass(_HassStub):
+        def async_create_background_task(  # ruff: ignore[no-self-use]
+            self,
+            target: Coroutine[Any, Any, None],
+            *,
+            name: str,
+        ) -> asyncio.Task[None]:
+            del name
+            nonlocal rejected
+            rejected = target
+            raise RuntimeError("task factory rejected")  # ruff: ignore[raise-vanilla-args]
+
+    listener = _listener()
+    listener._hass = cast("Any", _RejectingHass())  # ruff: ignore[private-member-access]
+    listener._device_addresses["dev"] = "AA:BB:CC:DD:EE:FF"  # ruff: ignore[private-member-access]
+
+    listener._spawn_connection_if_ready("dev")  # ruff: ignore[private-member-access]
+
+    assert "dev" not in listener._connections  # ruff: ignore[private-member-access]
+    assert rejected is not None
+    assert getattr(rejected, "cr_frame", object()) is None
+    assert "task factory rejected" in str(listener.stats_for("dev").last_error)
+    assert "dev" not in listener._frame_assemblies  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.parametrize(
@@ -257,18 +361,18 @@ async def test_reassembly_drops_conflicting_duplicate_chunk() -> None:
         _frame(index=3, count=2),
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reassembly_rejects_impossible_chunk_headers(
     frame: ble.BleBinaryFrame,
 ) -> None:
     """Malformed chunk headers are rejected before buffering state."""
     await asyncio.sleep(0)
     listener = _listener()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]
         listener._reassemble_frame("dev", frame)  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     """A proxy's base64-wrapped encrypted notify still reaches the sink decoded."""
     key = b"k" * 16
@@ -304,7 +408,7 @@ async def test_notification_base64_fallback_forwards_decoded_frame() -> None:
     assert stats.frames_decode_failed == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_notification_without_key_records_decode_failure_and_forwards_raw() -> (
     None
 ):
@@ -329,17 +433,20 @@ async def test_notification_without_key_records_decode_failure_and_forwards_raw(
     assert stats.last_decode_error == "notify: no bluetoothKey for device"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_sink_failure_is_recorded_and_successful_frame_clears_it() -> None:
-    """Sink errors remain BLE-local and clear only after confirmed processing."""
-    fail = True
+    """A transient sink error retries the same frame and clears after processing."""
+    attempts = 0
 
-    async def _sink(  # ruff: ignore[unused-async]
+    async def _sink(
         _device_id: str,
         _observation: BleFrameObservation,
     ) -> bool:
-        if fail:
-            raise RuntimeError("merge failed")
+        nonlocal attempts
+        await asyncio.sleep(0)
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("merge failed")  # ruff: ignore[raise-vanilla-args]
         return True
 
     key = b"k" * 16
@@ -352,16 +459,35 @@ async def test_sink_failure_is_recorded_and_successful_frame_clears_it() -> None
 
     await listener._handle_notification("dev", raw)  # ruff: ignore[private-member-access]
     stats = listener.stats_for("dev")
-    assert stats.last_sink_error == "sink failed: merge failed"
-    assert stats.last_error == stats.last_sink_error
-
-    fail = False
-    await listener._handle_notification("dev", raw)  # ruff: ignore[private-member-access]
+    assert attempts == 2  # ruff: ignore[magic-value-comparison]
     assert stats.last_sink_error is None
     assert stats.last_error is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+async def test_sink_originated_cancelled_error_retries_without_spinning() -> None:
+    """A callback-originated cancellation retries the observation exactly once."""
+    attempts = 0
+
+    async def _sink(
+        _device_id: str,
+        _observation: BleFrameObservation,
+    ) -> bool:
+        nonlocal attempts
+        await asyncio.sleep(0)
+        attempts += 1
+        if attempts == 1:
+            raise asyncio.CancelledError
+        return True
+
+    listener = _listener(key=None, sink=_sink)
+    await asyncio.wait_for(listener._handle_notification("dev", b"opaque"), 1.0)  # ruff: ignore[private-member-access]
+
+    assert attempts == 2  # ruff: ignore[magic-value-comparison]
+    assert listener.stats_for("dev").last_sink_error is None
+
+
+@pytest.mark.asyncio()
 async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> None:
     """Late notifications from an replaced GATT generation cannot alter live data."""
     sink = AsyncMock(return_value=True)
@@ -382,7 +508,7 @@ async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> 
     assert listener.stats_for("dev").frames_received == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> None:
     """A timed-out GATT write releases its ACK registration for fallback routing."""
 
@@ -400,7 +526,8 @@ async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> 
             await asyncio.Event().wait()
 
     listener = _listener()
-    _attach_session(listener, "dev", _Client())
+    session = _attach_session(listener, "dev", _Client())
+    session.notify_started = True
 
     with pytest.raises(RuntimeError, match="BLE write to dev timed out"):
         await listener.async_send_command(
@@ -415,11 +542,18 @@ async def test_write_timeout_becomes_transport_error_without_stranding_ack() -> 
     assert "dev" not in listener._pending_acks  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_stop_clears_session_owned_state_and_pending_ack() -> None:
     """Unload invalidates sessions, MTU, assemblies, and ACK waiters atomically."""
     listener = _listener()
-    client = SimpleNamespace(is_connected=True)
+
+    class _ConnectedClient:
+        is_connected = True
+
+        async def disconnect(self) -> None:
+            self.is_connected = False
+
+    client = _ConnectedClient()
     session = _attach_session(listener, "dev", client)
     listener._mtu["dev"] = 247  # ruff: ignore[private-member-access]
     listener._mtu_owners["dev"] = session  # ruff: ignore[private-member-access]

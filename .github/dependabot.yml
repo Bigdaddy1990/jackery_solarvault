@@ -1,73 +1,104 @@
 version: 2
 updates:
-  # Python dependencies
+  # Python packages declared in requirements*.txt and pyproject.toml.
   - package-ecosystem: "pip"
     directory: "/"
+    target-branch: "main"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
     labels:
       - "dependencies"
       - "python"
     commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
-    ignore:
-      # Ignore major version updates for stable dependencies
-      - dependency-name: "homeassistant"
-        update-types: ["version-update:semver-major"]
-
-    # Group updates
+      prefix: "deps"
+      prefix-development: "deps"
+      include: "scope"
     groups:
-      testing:
-        patterns:
-          - "pytest*"
-          - "hypothesis"
-          - "coverage"
-          - "codecov"
-          - "codefactor"
-          - "mypy"
-          - "pre-commit"
-          - "ruff"
       security:
+        applies-to: "security-updates"
         patterns:
-          - "bandit"
-          - "safety"
-      linting:
+          - "*"
+      production:
+        applies-to: "version-updates"
         patterns:
-          - "ruff"
+          - "aiohttp"
+          - "aiomqtt"
+          - "bleak-retry-connector"
+          - "cryptography"
+          - "segno"
+          - "voluptuous"
+      home-assistant:
+        applies-to: "version-updates"
+        patterns:
+          - "homeassistant"
+          - "pytest-homeassistant-custom-component"
+          - "pytest-homeassistant"
+          - "homeassistant-stubs"
+      testing:
+        applies-to: "version-updates"
+        patterns:
+          - "coverage"
+          - "hypothesis"
+          - "pytest*"
+      tooling:
+        applies-to: "version-updates"
+        patterns:
+          - "annotatedyaml"
+          - "jinja2"
           - "mypy"
+          - "packaging"
+          - "pip"
           - "pre-commit"
-          - "typing*"
+          - "pyrefly"
+          - "pylint"
+          - "pyyaml"
+          - "ruff"
+          - "types-*"
+          - "typing-extensions"
 
-  # GitHub Actions
+  # The repository root includes workflows and any local or nested actions.
   - package-ecosystem: "github-actions"
-    directory: ".github/workflows/"
+    directory: "/"
+    target-branch: "main"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
-      prefix: "⬆️ [actions]"
-  - package-ecosystem: "pre-commit" # See documentation for possible values
-    directory: "/" # Location of package manifests
+      prefix: "deps"
+      include: "scope"
+    groups:
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      actions:
+        applies-to: "version-updates"
+        patterns:
+          - "*"
+
+  # Hooks declared in .pre-commit-config.yaml.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    target-branch: "main"
     schedule:
       interval: "daily"
+    rebase-strategy: "auto"
     labels:
       - "dependencies"
       - "python"
     commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
-  - package-ecosystem: "uv" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "daily"
-    labels:
-      - "dependencies"
-      - "python"
-    commit-message:
-      prefix: "⬆️"
-      prefix-development: "⬆️ [dev]"
+      prefix: "deps"
+      include: "scope"
+    groups:
+      security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+      tooling:
+        applies-to: "version-updates"
+        patterns:
+          - "*"

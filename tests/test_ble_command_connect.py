@@ -6,8 +6,7 @@ the BLE leg still must use a bounded connection wait before the GATT write.
 """
 
 import asyncio
-from collections.abc import Coroutine
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -18,9 +17,13 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from homeassistant.exceptions import HomeAssistantError
 
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
 _DEVICE_ID = "573702884982521856"
-_ACTION_ID = 3022
-_CMD = 107
+# 3001/1 is a state-changing command with an ACK-capable BLE mapping.
+_ACTION_ID = 3001
+_CMD = 1
 
 
 class _ImmediateBackgroundEntry:
@@ -51,10 +54,10 @@ def _ble_first_coordinator() -> JackerySolarVaultCoordinator:
     cast("Any", coordinator)._bind_cloud_command_attempt = MagicMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._record_successful_command_transports = MagicMock()  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._record_independent_cloud_mqtt_result = MagicMock()  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ble_first_ensures_connection_before_write() -> None:
     """The BLE leg passes a positive connect timeout while MQTT also starts."""
     coordinator = _ble_first_coordinator()
@@ -80,7 +83,29 @@ async def test_ble_first_ensures_connection_before_write() -> None:
     publish_mqtt.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+async def test_query_command_never_opens_or_writes_ble() -> None:
+    """Query/data frames are excluded from the ACK-dependent BLE leg."""
+    coordinator = _ble_first_coordinator()
+    cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=106)  # ruff: ignore[private-member-access]
+    send_ble = AsyncMock(return_value=True)
+    cast("Any", coordinator).async_send_ble_command = send_ble
+    publish_mqtt = AsyncMock()
+    cast("Any", coordinator)._async_publish_command = publish_mqtt  # ruff: ignore[private-member-access]
+
+    await coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        message_type="QueryDeviceProperty",
+        action_id=3011,
+        cmd=106,
+        body_fields={},
+    )
+
+    send_ble.assert_not_awaited()
+    publish_mqtt.assert_awaited_once()
+
+
+@pytest.mark.asyncio()
 async def test_ble_write_unavailable_does_not_block_mqtt() -> None:
     """A BLE write that reports "not sent" (False) does not block MQTT.
 
@@ -111,7 +136,7 @@ async def test_ble_write_unavailable_does_not_block_mqtt() -> None:
     assert publish_mqtt.await_args.kwargs["ensure_mqtt"] is True
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ble_error_and_mqtt_failure_both_raise() -> None:
     """When BLE and MQTT both fail, an error propagates after both are attempted.
 

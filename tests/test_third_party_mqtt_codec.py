@@ -5,12 +5,13 @@ import pytest
 from custom_components.jackery_solarvault.client import third_party_mqtt_codec as codec
 from custom_components.jackery_solarvault.client.ble import BLE_AES_IV_LEN
 from custom_components.jackery_solarvault.const import (
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
+    DEFAULT_THIRD_PARTY_MQTT_PORT,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_THIRD_PARTY_MQTT_IP,
     FIELD_THIRD_PARTY_MQTT_PASSWORD,
@@ -27,6 +28,24 @@ _DEVICE_PORT = 8883
 
 
 # --- field codec ---------------------------------------------------------
+
+
+def test_canonical_config_ignores_conflicting_retired_local_fields() -> None:
+    """Only the shared bridge settings may select the broker and token."""
+    config = codec.third_party_mqtt_config_from_options(
+        {
+            "third_party_mqtt_enable": False,
+            "local_mqtt_enable": True,
+            "third_party_mqtt_ip": "broker.example",
+            "local_mqtt_host": "retired.example",
+            "third_party_mqtt_token": "app-token",
+            "local_mqtt_token": "retired-token",
+        },
+        None,
+    )
+    assert config[FIELD_THIRD_PARTY_MQTT_ENABLE] == 0
+    assert config[FIELD_THIRD_PARTY_MQTT_IP] == "broker.example"
+    assert config[FIELD_THIRD_PARTY_MQTT_TOKEN] == "app-token"
 
 
 def test_encode_decode_round_trips() -> None:
@@ -145,11 +164,11 @@ def test_stable_token_reuses_existing_opaque_device_token() -> None:
 def test_config_from_options_prefers_local_listener_values() -> None:
     """Local MQTT options win over the legacy third-party fields."""
     options = {
-        CONF_LOCAL_MQTT_ENABLE: True,
-        CONF_LOCAL_MQTT_HOST: "10.0.0.5",
-        CONF_LOCAL_MQTT_PORT: _LOCAL_PORT,
-        CONF_LOCAL_MQTT_USERNAME: "user",
-        CONF_LOCAL_MQTT_PASSWORD: "pass",
+        CONF_THIRD_PARTY_MQTT_ENABLE: True,
+        CONF_THIRD_PARTY_MQTT_IP: "10.0.0.5",
+        CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_PORT,
+        CONF_THIRD_PARTY_MQTT_USERNAME: "user",
+        CONF_THIRD_PARTY_MQTT_PASSWORD: "pass",
         CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
     }
 
@@ -171,6 +190,26 @@ def test_config_from_options_uses_device_token_when_empty() -> None:
     )
 
     assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "555555555"
+
+
+def test_config_from_options_preserves_existing_token_verbatim() -> None:
+    """Device-issued tokens must not be normalized before encryption."""
+    result = codec.third_party_mqtt_config_from_options(
+        {CONF_THIRD_PARTY_MQTT_TOKEN: " device-token "},
+        None,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == " device-token "
+
+
+def test_config_from_options_uses_default_for_invalid_port() -> None:
+    """Malformed broker ports fall back to the documented MQTT default."""
+    result = codec.third_party_mqtt_config_from_options(
+        {CONF_THIRD_PARTY_MQTT_PORT: "not-a-port"},
+        None,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
 
 
 # --- decode body ----------------------------------------------------------
@@ -237,3 +276,30 @@ def test_plaintext_merges_device_reported_values() -> None:
     assert result[FIELD_THIRD_PARTY_MQTT_IP] == "192.168.1.9"
     assert result[FIELD_THIRD_PARTY_MQTT_PORT] == _DEVICE_PORT
     assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "dev-user"
+
+
+def test_plaintext_merge_keeps_unverified_credential_options() -> None:
+    """Failed or absent credential decodes never replace configured plaintext."""
+    device = {
+        PAYLOAD_THIRD_PARTY_MQTT_CONFIG: {
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "device-user",
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: "device-password",
+            FIELD_THIRD_PARTY_MQTT_TOKEN: "device-token",
+            "_decoded_fields": [FIELD_THIRD_PARTY_MQTT_USERNAME],
+            "_decode_failed_fields": [FIELD_THIRD_PARTY_MQTT_PASSWORD],
+        },
+    }
+
+    result = codec.third_party_mqtt_config_plaintext(
+        {
+            CONF_THIRD_PARTY_MQTT_USERNAME: "configured-user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "configured-password",
+            CONF_THIRD_PARTY_MQTT_TOKEN: "configured-token",
+        },
+        None,
+        device,
+    )
+
+    assert result[FIELD_THIRD_PARTY_MQTT_USERNAME] == "device-user"
+    assert result[FIELD_THIRD_PARTY_MQTT_PASSWORD] == "configured-password"
+    assert result[FIELD_THIRD_PARTY_MQTT_TOKEN] == "configured-token"

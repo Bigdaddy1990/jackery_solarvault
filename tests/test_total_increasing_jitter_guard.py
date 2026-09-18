@@ -36,7 +36,9 @@ def _smart_meter_sensor(key: str) -> JackerySmartMeterSensor:
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
-    return sensor
+    # Mirrors __init__: _sync_device_mac_connection reads this on every refresh.
+    mutable._registered_identity = None  # ruff: ignore[private-member-access]
+    return sensor  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _set_ct_counter(sensor: JackerySmartMeterSensor, value_wh: int) -> None:
@@ -74,8 +76,8 @@ def test_smart_meter_small_counter_regression_keeps_last_state(
     assert sensor.native_value == pytest.approx(expected)
 
 
-def test_smart_meter_large_counter_reset_is_not_hidden() -> None:
-    """A material reset remains visible so HA can start a new counter cycle."""
+def test_smart_meter_non_reset_counter_regression_keeps_last_state() -> None:
+    """A nonzero 10% dip is held instead of being sent to HA as a counter reset."""
     sensor = _smart_meter_sensor("lifetime_import_energy")
     _set_ct_counter(sensor, 10_000)
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
@@ -83,7 +85,22 @@ def test_smart_meter_large_counter_reset_is_not_hidden() -> None:
     _set_ct_counter(sensor, 9_000)
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
 
-    assert sensor.native_value == pytest.approx(9.0)
+    assert sensor.native_value == pytest.approx(10.0)
+
+
+def test_smart_meter_deep_or_zero_regression_keeps_lifetime_total() -> None:
+    """A lifetime counter must not reset statistics on partial or zero frames."""
+    sensor = _smart_meter_sensor("lifetime_import_energy")
+    _set_ct_counter(sensor, 10_000)
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    _set_ct_counter(sensor, 8_990)
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(10.0)
+
+    _set_ct_counter(sensor, 0)
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(10.0)
 
 
 def test_missing_smart_meter_sample_keeps_jitter_anchor() -> None:

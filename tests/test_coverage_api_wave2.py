@@ -1,11 +1,9 @@
 """Behavioral coverage for Jackery HTTP validation and endpoint wrappers."""
 
-from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 from unittest.mock import AsyncMock, call, patch
 
-import aiohttp
 import pytest
 
 from custom_components.jackery_solarvault import const
@@ -15,6 +13,11 @@ from custom_components.jackery_solarvault.client.api import (
     JackeryApiError,
     JackeryAuthError,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import aiohttp
 
 
 class _Response:
@@ -29,6 +32,8 @@ class _Response:
         json_error: Exception | None = None,
     ) -> None:
         self.status = status
+        self.headers = {"Content-Type": "application/json"}
+        self.content = object()
         self._body = body
         self._raw_text = raw_text
         self._json_error = json_error
@@ -66,19 +71,19 @@ class _Session:
             raise result
         return result
 
-    def get(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def get(self, url: str, **kwargs: Any) -> _Response:
         """Record one GET."""
         return self._request("GET", url, kwargs)
 
-    def put(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def put(self, url: str, **kwargs: Any) -> _Response:
         """Record one PUT."""
         return self._request("PUT", url, kwargs)
 
-    def post(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def post(self, url: str, **kwargs: Any) -> _Response:
         """Record one POST."""
         return self._request("POST", url, kwargs)
 
-    def delete(self, url: str, **kwargs: Any) -> _Response:  # noqa: RUF105
+    def delete(self, url: str, **kwargs: Any) -> _Response:
         """Record one DELETE."""
         return self._request("DELETE", url, kwargs)
 
@@ -93,7 +98,7 @@ def _api(responses: list[_Response | BaseException] | None = None) -> JackeryApi
     return client
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["status", "expected_error"],
     [
@@ -113,7 +118,7 @@ async def test_login_response_rejects_non_ok_statuses(
         await JackeryApi._decode_login_response(response)  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> None:
     """A successful login status still rejects malformed response JSON."""
     response = cast(
@@ -125,11 +130,11 @@ async def test_login_response_reports_invalid_json_with_bounded_raw_text() -> No
         ),
     )
 
-    with pytest.raises(JackeryApiError, match="invalid JSON.*not-json"):  # noqa: RUF105
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(response redacted\)"):
         await JackeryApi._decode_login_response(response)  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> None:
     """GET uses the active token, honors its timeout override, and emits metadata."""
     client = _api([
@@ -151,7 +156,7 @@ async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> Non
     assert url.endswith("/v1/example")
     assert kwargs["params"] == {"deviceId": "42"}
     assert kwargs["headers"][const.FIELD_TOKEN] == "token-1"
-    assert kwargs["timeout"].total == 3
+    assert kwargs["timeout"].total == 3  # ruff: ignore[magic-value-comparison]
     payload_debug.assert_awaited_once()
     assert payload_debug.await_args is not None
     event_factory = payload_debug.await_args.args[0]
@@ -160,7 +165,7 @@ async def test_get_json_uses_token_custom_timeout_and_emits_debug_event() -> Non
     assert client.diagnostics_snapshot()["requests_total"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> None:
     """Malformed success JSON and network timeout remain distinct API failures."""
     invalid = _api([
@@ -170,7 +175,7 @@ async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> Non
             raw_text="broken",
         )
     ])
-    with pytest.raises(JackeryApiError, match="GET /broken returned invalid JSON"):
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(redacted\)"):
         await invalid._get_json("/broken")  # ruff: ignore[private-member-access]
 
     timed_out = _api([TimeoutError()])
@@ -185,7 +190,7 @@ async def test_get_json_rejects_invalid_success_body_and_counts_timeout() -> Non
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["method_name", "http_method"],
     [
@@ -211,13 +216,11 @@ async def test_json_write_helpers_reject_invalid_success_json(
         getattr(client, method_name),
     )
 
-    with pytest.raises(
-        JackeryApiError, match=f"{http_method} /write returned invalid JSON"
-    ):
+    with pytest.raises(JackeryApiError, match=r"invalid JSON \(redacted\)"):
         await writer("/write", {"value": 1})
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_non_json_error_response_is_classified_without_decoder_leak() -> None:
     """A malformed non-200 response is converted into a normal HTTP API error."""
     client = _api([
@@ -277,7 +280,7 @@ def test_mqtt_session_cache_and_credentials_cover_invalid_and_valid_seeds() -> N
     assert client.get_cached_mqtt_credentials() is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> None:
     """Thin GET wrappers preserve app field names and normalize response shapes."""
     client = _api()
@@ -288,7 +291,6 @@ async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> N
             {const.FIELD_DATA: [{"id": 1}, None]},
             {const.FIELD_DATA: {"latest": "2.4.1"}},
             {const.FIELD_DATA: {"alarm": "detail"}},
-            {const.FIELD_DATA: {"offline": 3}},
         ]
     )
 
@@ -306,14 +308,12 @@ async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> N
             version_name="2.4.0",
         )
         alarm = await client.async_get_alarm_detail(alarm_key="A-1")
-        offline = await client.async_get_offline_statistics()
 
     assert currency == {"currency": "EUR"}
     assert currencies == [{"currency": "EUR"}]
     assert notifications == [{"id": 1}]
     assert version == {"latest": "2.4.1"}
     assert alarm == {"alarm": "detail"}
-    assert offline == {"offline": 3}
     assert get_json.await_args_list == [
         call(
             const.DEVICE_CURRENCY_PATH,
@@ -334,11 +334,10 @@ async def test_read_endpoint_wrappers_normalize_shapes_and_request_fields() -> N
             params={"type": "android", "versionName": "2.4.0"},
         ),
         call(const.ALARM_DETAIL_PATH, params={"alarmKey": "A-1"}),
-        call(const.OFFLINE_STAT_PATH),
     ]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_write_wrappers_validate_and_preserve_app_payloads() -> None:
     """Public writers reject invalid values and serialize IDs at their boundary."""
     client = _api()

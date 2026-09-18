@@ -8,6 +8,7 @@ native id (``5c...``) with cloud ``code=10600`` on every poll cycle. The
 on the legacy path.
 """
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock
@@ -48,7 +49,7 @@ def _discovery_coordinator(
     mutable = cast("Any", coordinator)
     mutable._async_save_discovery_cache = AsyncMock()  # ruff: ignore[private-member-access]
     mutable._schedule_background_once = lambda *_args, **_kwargs: None  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() -> None:
@@ -60,7 +61,7 @@ def test_shelly_textual_device_type_uses_scan_name_without_schema_rejection() ->
         rejection_callback=rejection_reasons.append,
     )
 
-    assert dev_type == 3
+    assert dev_type == 3  # ruff: ignore[magic-value-comparison]
     assert rejection_reasons == []
 
 
@@ -77,7 +78,7 @@ def test_unknown_textual_device_type_is_not_a_numeric_schema_rejection() -> None
     assert rejection_reasons == []
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_legacy_shelly_is_not_a_property_device() -> None:
     """A bound Shelly (bindKey=0, no model metadata) stays out of the index."""
     shelly = {FIELD_BIND_KEY: 0, FIELD_DEV_SN: "5c013b048e3c"}
@@ -94,7 +95,7 @@ async def test_legacy_shelly_is_not_a_property_device() -> None:
     assert "portable-1" in coordinator._device_index  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_legacy_real_portable_still_discovered() -> None:
     """A genuine Jackery portable from bind/list is still indexed as a device."""
     portable = {
@@ -109,7 +110,7 @@ async def test_legacy_real_portable_still_discovered() -> None:
     assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     """Explicit empty outer lists are valid fallback, not removal evidence."""
     portable = {
@@ -135,3 +136,34 @@ async def test_empty_discovery_cycle_keeps_previous_populated_index() -> None:
     await coordinator.async_discover()
 
     assert list(coordinator._device_index) == ["explorer-9"]  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_system_and_legacy_discovery_requests_start_concurrently() -> None:
+    """A cold poll must not serialize its two independent discovery endpoints."""
+    system_started = asyncio.Event()
+    legacy_started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def system_list() -> list[dict[str, Any]]:
+        system_started.set()
+        await release.wait()
+        return []
+
+    async def legacy_list() -> list[dict[str, Any]]:
+        legacy_started.set()
+        await release.wait()
+        return []
+
+    coordinator = _discovery_coordinator(systems=[], legacy=[])
+    mutable = cast("Any", coordinator)
+    mutable.api.async_get_system_list = system_list
+    mutable.api.async_list_devices_legacy = legacy_list
+
+    task = asyncio.create_task(coordinator.async_discover())
+    await asyncio.wait_for(system_started.wait(), timeout=0.1)
+    try:
+        await asyncio.wait_for(legacy_started.wait(), timeout=0.1)
+    finally:
+        release.set()
+        await task

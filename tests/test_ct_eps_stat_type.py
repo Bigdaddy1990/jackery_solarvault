@@ -1,4 +1,4 @@
-"""Unit tests for CT/EPS stat type parameter handling."""
+"""Unit tests for the CT-only stat type request parameter."""
 
 from typing import Any
 
@@ -14,7 +14,6 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_YEAR,
     DEVICE_CT_STAT_PATH,
     DEVICE_EPS_STAT_PATH,
-    EPS_STAT_TYPE_L1,
     FIELD_DEVICE_ID,
     FIELD_SYSTEM_ID,
 )
@@ -23,8 +22,8 @@ from custom_components.jackery_solarvault.const import (
 class MockJackeryApi(JackeryApi):
     """Mock JackeryApi with captured parameters."""
 
-    def __init__(self) -> None:  # noqa: D107, RUF105
-        from unittest.mock import AsyncMock  # noqa: PLC0415, RUF105
+    def __init__(self) -> None:  # ruff: ignore[undocumented-public-init]
+        from unittest.mock import AsyncMock  # ruff: ignore[import-outside-top-level]
 
         super().__init__(
             session=AsyncMock(),
@@ -33,13 +32,14 @@ class MockJackeryApi(JackeryApi):
         )
         self.captured_params: dict[str, dict[str, str]] = {}
 
+    # pyrefly: ignore [bad-override]
     async def _get_json(self, path: str, params: dict[str, str]) -> dict[str, Any]:
         self.captured_params[path] = params
         return {"code": 0, "data": {"x": [], "y": [], "y1": [], "y2": []}}
 
 
 async def test_async_get_device_ct_stat_defaults_to_l1() -> None:
-    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: RUF105
+    """async_get_device_ct_stat defaults to CT_STAT_TYPE_L1 (0) when stat_type not provided."""  # ruff: ignore[line-too-long]
     api = MockJackeryApi()
 
     await api.async_get_device_ct_stat(
@@ -144,8 +144,8 @@ async def test_async_get_device_ct_stat_year_type() -> None:
     assert params["dateType"] == DATE_TYPE_YEAR
 
 
-async def test_async_get_device_eps_stat_defaults_to_l1() -> None:
-    """async_get_device_eps_stat defaults to EPS_STAT_TYPE_L1 (0) when stat_type not provided."""  # noqa: RUF105
+async def test_async_get_device_eps_stat_has_no_type_parameter() -> None:
+    """EpsStatApi has no CT-style ``type`` request field."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -156,28 +156,12 @@ async def test_async_get_device_eps_stat_defaults_to_l1() -> None:
     )
 
     params = api.captured_params[DEVICE_EPS_STAT_PATH]
-    assert params[APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
+    assert APP_REQUEST_STAT_TYPE not in params
     assert params[FIELD_DEVICE_ID] == "dev1"
 
 
-async def test_async_get_device_eps_stat_explicit_l1() -> None:
-    """async_get_device_eps_stat accepts explicit EPS_STAT_TYPE_L1."""
-    api = MockJackeryApi()
-
-    await api.async_get_device_eps_stat(
-        device_id="dev1",
-        date_type=DATE_TYPE_DAY,
-        begin_date="2026-01-01",
-        end_date="2026-01-01",
-        stat_type=EPS_STAT_TYPE_L1,
-    )
-
-    params = api.captured_params[DEVICE_EPS_STAT_PATH]
-    assert params[APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
-
-
 async def test_async_get_device_eps_stat_week_type() -> None:
-    """async_get_device_eps_stat works with week date_type and stat_type."""
+    """async_get_device_eps_stat works with week date_type."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -185,16 +169,15 @@ async def test_async_get_device_eps_stat_week_type() -> None:
         date_type=DATE_TYPE_WEEK,
         begin_date="2026-01-05",
         end_date="2026-01-11",
-        stat_type=EPS_STAT_TYPE_L1,
     )
 
     params = api.captured_params[DEVICE_EPS_STAT_PATH]
-    assert params[APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
+    assert APP_REQUEST_STAT_TYPE not in params
     assert params["dateType"] == DATE_TYPE_WEEK
 
 
 async def test_async_get_device_eps_stat_month_type() -> None:
-    """async_get_device_eps_stat works with month date_type and stat_type."""
+    """async_get_device_eps_stat works with month date_type."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -202,16 +185,15 @@ async def test_async_get_device_eps_stat_month_type() -> None:
         date_type=DATE_TYPE_MONTH,
         begin_date="2026-01-01",
         end_date="2026-01-31",
-        stat_type=EPS_STAT_TYPE_L1,
     )
 
     params = api.captured_params[DEVICE_EPS_STAT_PATH]
-    assert params[APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
+    assert APP_REQUEST_STAT_TYPE not in params
     assert params["dateType"] == DATE_TYPE_MONTH
 
 
 async def test_async_get_device_eps_stat_year_type() -> None:
-    """async_get_device_eps_stat works with year date_type and stat_type."""
+    """async_get_device_eps_stat works with year date_type."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -219,11 +201,10 @@ async def test_async_get_device_eps_stat_year_type() -> None:
         date_type=DATE_TYPE_YEAR,
         begin_date="2026-01-01",
         end_date="2026-12-31",
-        stat_type=EPS_STAT_TYPE_L1,
     )
 
     params = api.captured_params[DEVICE_EPS_STAT_PATH]
-    assert params[APP_REQUEST_STAT_TYPE] == str(EPS_STAT_TYPE_L1)
+    assert APP_REQUEST_STAT_TYPE not in params
     assert params["dateType"] == DATE_TYPE_YEAR
 
 
@@ -244,11 +225,11 @@ async def test_ct_stat_type_parameter_in_request_meta() -> None:
     stored = api.last_device_period_stat_responses[f"{DEVICE_CT_STAT_PATH}:dev1:day"]
     assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(
         CT_STAT_TYPE_L2
-    )  # noqa: E501, RUF100
+    )
 
 
-async def test_eps_stat_type_parameter_in_request_meta() -> None:
-    """EPS stat request metadata includes the stat_type parameter."""
+async def test_eps_stat_request_meta_omits_ct_only_type_parameter() -> None:
+    """EPS request metadata mirrors the App contract without ``type``."""
     api = MockJackeryApi()
 
     await api.async_get_device_eps_stat(
@@ -256,11 +237,7 @@ async def test_eps_stat_type_parameter_in_request_meta() -> None:
         date_type=DATE_TYPE_DAY,
         begin_date="2026-01-01",
         end_date="2026-01-01",
-        stat_type=EPS_STAT_TYPE_L1,
     )
 
-    # Check that request metadata in stored response includes stat_type
     stored = api.last_device_period_stat_responses[f"{DEVICE_EPS_STAT_PATH}:dev1:day"]
-    assert stored[APP_REQUEST_META]["params"][APP_REQUEST_STAT_TYPE] == str(
-        EPS_STAT_TYPE_L1
-    )  # noqa: E501, RUF100
+    assert APP_REQUEST_STAT_TYPE not in stored[APP_REQUEST_META]["params"]

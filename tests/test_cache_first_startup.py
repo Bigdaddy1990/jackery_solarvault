@@ -1,3 +1,4 @@
+# ruff: noqa: E501, SLF001
 """Tests for cache-first startup and independent transport supervisors.
 
 Task 6: Load caches first and start independent transport supervisors.
@@ -10,13 +11,15 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from custom_components.jackery_solarvault import _async_run_primary_http_startup
 from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
-from custom_components.jackery_solarvault.transport_supervisor import (
+from custom_components.jackery_solarvault.client.transport_supervisor import (
     SupervisorState,
     TransportSupervisor,
     TransportSupervisorManager,
     SupervisorConfig,
 )
+from homeassistant.config_entries import ConfigEntryState
 
 
 def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoordinator:
@@ -43,6 +46,7 @@ def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoor
     obj._local_mqtt_client = None
     obj._shutdown_started = False
     obj.data = data or {}
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -248,7 +252,10 @@ class TestTransportSupervisorManager:
     async def test_manager_continues_on_individual_failure(self) -> None:
         """One supervisor's failure doesn't block others."""
         hass = SimpleNamespace(
-            async_create_background_task=Mock(return_value=Mock()),
+            async_create_background_task=lambda coro, name=None: asyncio.create_task(
+                coro,
+                name=name,
+            ),
         )
         entry = SimpleNamespace(entry_id="test", data={}, options={})
         coordinator = Mock()
@@ -299,6 +306,7 @@ class TestTransportSupervisorManager:
             enabled_check=lambda e: True,
             start_fn=AsyncMock(),
             stop_fn=AsyncMock(),
+            # pyrefly: ignore [bad-argument-type]
             update_credentials_fn=lambda: update_called.__setitem__("ble", True),
         )
         mqtt_config = SupervisorConfig(
@@ -306,6 +314,7 @@ class TestTransportSupervisorManager:
             enabled_check=lambda e: True,
             start_fn=AsyncMock(),
             stop_fn=AsyncMock(),
+            # pyrefly: ignore [bad-argument-type]
             update_credentials_fn=lambda: update_called.__setitem__("mqtt", True),
         )
 
@@ -365,7 +374,7 @@ class TestCacheFirstStartup:
 
         # Mock the MQTT session cache loading
         with patch(
-            "custom_components.jackery_solarvault.client.mqtt_session_cache.async_load_mqtt_session"
+            "custom_components.jackery_solarvault.client.mqtt_session_store.async_load_mqtt_session"
         ) as mock_load_mqtt:
             mock_load_mqtt.return_value = {"user_id": "123", "seed_b64": "abc", "mac_id": "def"}
             coordinator.api.hydrate_mqtt_session = Mock()
@@ -397,17 +406,35 @@ class TestCacheFirstStartup:
             cache_ready = False
 
         # HTTP fails
-        http_failed = True
-        try:
+        with pytest.raises(Exception, match="HTTP unavailable"):
             await coordinator.api.async_login()
-            http_failed = False
-        except Exception:
-            pass
 
         # With cache_ready=True and http_failed, setup should continue
         assert cache_ready is True
-        assert http_failed is True
         # The coordinator would continue with cached data
+
+    @pytest.mark.asyncio
+    async def test_loaded_cache_startup_requests_regular_refresh(self) -> None:
+        """A loaded entry never invokes HA's setup-only first-refresh API."""
+        coordinator = _coordinator(data={"device": {}})
+        coordinator.async_persist_http_mqtt_session = AsyncMock()
+        coordinator.async_discover = AsyncMock()
+        coordinator.async_config_entry_first_refresh = AsyncMock()
+        coordinator.async_request_refresh = AsyncMock()
+        entry = SimpleNamespace(state=ConfigEntryState.LOADED)
+
+        with patch(
+            "custom_components.jackery_solarvault._async_authenticate_api_layer",
+            AsyncMock(),
+        ):
+            await _async_run_primary_http_startup(
+                cast("Any", coordinator.hass),
+                cast("Any", entry),
+                coordinator,
+            )
+
+        coordinator.async_request_refresh.assert_awaited_once_with()
+        coordinator.async_config_entry_first_refresh.assert_not_awaited()
 
 
 if __name__ == "__main__":

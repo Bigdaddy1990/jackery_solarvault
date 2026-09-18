@@ -6,13 +6,20 @@ from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, OptionsFlow, UnknownEntry
+from homeassistant.components.mqtt.util import valid_subscribe_topic
+from homeassistant.config_entries import ConfigFlow, OptionsFlowWithReload, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
 
+from . import _async_entry_updated
 from .client import JackeryApi, JackeryAuthError, JackeryError
+from .client.credentials import (
+    MAX_PASSWORD_LENGTH,
+    MAX_USERNAME_LENGTH,
+    credential_text,
+    redacted_error,
+)
 from .const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS,
@@ -32,6 +39,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOKEN,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
@@ -45,6 +53,7 @@ from .const import (
     DEFAULT_THIRD_PARTY_MQTT_IP,
     DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
+    DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_THIRD_PARTY_MQTT_USERNAME,
@@ -70,7 +79,7 @@ from .const import (
     FLOW_STEP_USER,
     MAX_SCAN_INTERVAL_SEC,
     MIN_SCAN_INTERVAL_SEC,
-    REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS,
+    _ENTITY_CREATING_OPTION_KEYS,
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
 )
@@ -87,6 +96,7 @@ if TYPE_CHECKING:
     from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
     from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+    from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
     from .coordinator import JackerySolarVaultCoordinator
@@ -140,6 +150,19 @@ def _normalize_account(value: str) -> str:
         The account identifier with leading and trailing whitespace removed.
     """
     return value.strip()
+
+
+def _mqtt_discovery_name(topic: str) -> str:
+    """Build the display name for an MQTT discovery topic.
+
+    The trailing topic segment names the device; an empty or whitespace-only
+    segment falls back to the bare label so the title never renders as
+    ``"Jackery MQTT ()"``.
+    """
+    suffix = topic.rsplit("/", 1)[-1].strip() if topic else ""
+    if not suffix:
+        return "Jackery MQTT"
+    return f"Jackery MQTT ({suffix})"
 
 
 def _current_option_values(entry: ConfigEntry) -> dict[str, Any]:
@@ -265,6 +288,31 @@ def _coerce_local_mqtt_port(value: object) -> int:
         return DEFAULT_THIRD_PARTY_MQTT_PORT
 
 
+def _coerce_local_mqtt_qos(value: object) -> int:
+    """Return a supported MQTT QoS level from stored options or form input."""
+    try:
+        qos = int(cast("Any", value))
+    except (TypeError, ValueError) as err:
+        _LOGGER.debug(
+            "Local MQTT QoS %r is invalid; using default %d: %s",
+            value,
+            DEFAULT_THIRD_PARTY_MQTT_QOS,
+            err,
+        )
+        return DEFAULT_THIRD_PARTY_MQTT_QOS
+    if qos not in {0, 1, 2}:
+        _LOGGER.debug(
+            "Local MQTT QoS %r is outside 0..2; using default %d",
+            value,
+            DEFAULT_THIRD_PARTY_MQTT_QOS,
+        )
+        return DEFAULT_THIRD_PARTY_MQTT_QOS
+    return qos
+
+
+type _ConfigScalar = bool | int | float | str | None
+
+
 def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     """Normalize and return local MQTT option values from a ConfigEntry.
 
@@ -273,7 +321,8 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
     - CONF_THIRD_PARTY_MQTT_ENABLE: bool — whether local MQTT is enabled (falls back
     to the third-party bridge default unless explicitly stored)
     - CONF_THIRD_PARTY_MQTT_IP: str — MQTT host (empty string when not set)
-    - CONF_THIRD_PARTY_MQTT_PORT: int — MQTT port (defaults to DEFAULT_THIRD_PARTY_MQTT_PORT)
+    - CONF_THIRD_PARTY_MQTT_PORT: int — MQTT port (defaults to
+      DEFAULT_THIRD_PARTY_MQTT_PORT)
     - CONF_THIRD_PARTY_MQTT_USERNAME: str — MQTT username (empty string when not set)
     - CONF_THIRD_PARTY_MQTT_PASSWORD: str — MQTT password (empty string when not set)
     - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str — exact topic trimmed of surrounding
@@ -283,16 +332,22 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
         dict[str, Any]: Normalized local MQTT option values suitable for storing in
         entry options or using in configuration logic.
     """
-    options: Mapping[str, Any] = entry.options
-    data: Mapping[str, Any] = entry.data
+    options: Mapping[str, object] = entry.options
+    data: Mapping[str, object] = entry.data
 
-    def _entry_value(key: str, default: Any = None) -> Any:
+    def _entry_value(
+        key: str,
+        default: _ConfigScalar = None,
+    ) -> _ConfigScalar:
         value = options.get(key)
         if value is None:
             value = data.get(key, default)
-        return value
+        return value if isinstance(value, (bool, int, float, str)) else default
 
-    def _first_entry_value(*keys: str, default: Any = "") -> Any:
+    def _first_entry_value(
+        *keys: str,
+        default: _ConfigScalar = "",
+    ) -> _ConfigScalar:
         for key in keys:
             value = _entry_value(key)
             if value not in {None, ""}:
@@ -320,6 +375,11 @@ def _current_local_mqtt_options(entry: ConfigEntry) -> dict[str, Any]:
                 CONF_THIRD_PARTY_MQTT_PORT,
                 CONF_THIRD_PARTY_MQTT_PORT,
                 default=None,
+            ),
+        ),
+        CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
+            _first_entry_value(
+                CONF_THIRD_PARTY_MQTT_QOS, default=DEFAULT_THIRD_PARTY_MQTT_QOS
             ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
@@ -373,52 +433,41 @@ def _merge_local_mqtt_options(
             - CONF_THIRD_PARTY_MQTT_PASSWORD (str)
             - CONF_THIRD_PARTY_MQTT_TOPIC_FILTER (str)
     """
-    # The options/reconfigure forms expose these fields under the legacy
-    # ``third_party_mqtt_*`` keys, while the stored option + coordinator read the
-    # ``local_mqtt_*`` keys (``_current_local_mqtt_options`` resolves either).
-    # Read the ``local_*`` key first (direct/newer forms), then fall back to the
-    # form's ``third_party_*`` key, then the current value. Without the middle
-    # fallback the submitted switch/host/port/credentials were silently dropped
-    # and the toggle appeared to do nothing. ``local_*`` precedence also avoids
-    # the reconfigure form's ``bool``-typed ``third_party_mqtt_ip`` field.
     enable_value = user_input.get(
         CONF_THIRD_PARTY_MQTT_ENABLE,
-        user_input.get(
-            CONF_THIRD_PARTY_MQTT_ENABLE,
-            current[CONF_THIRD_PARTY_MQTT_ENABLE],
-        ),
+        current.get(CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE),
     )
     parsed_enable = safe_bool(enable_value)
     return {
         CONF_THIRD_PARTY_MQTT_ENABLE: (
-            current[CONF_THIRD_PARTY_MQTT_ENABLE]
+            current.get(CONF_THIRD_PARTY_MQTT_ENABLE, DEFAULT_THIRD_PARTY_MQTT_ENABLE)
             if parsed_enable is None
             else parsed_enable
         ),
         CONF_THIRD_PARTY_MQTT_IP: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_IP,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_IP, current[CONF_THIRD_PARTY_MQTT_IP]
-                ),
+                current.get(CONF_THIRD_PARTY_MQTT_IP, DEFAULT_THIRD_PARTY_MQTT_IP),
             )
             or "",
         ).strip(),
         CONF_THIRD_PARTY_MQTT_PORT: _coerce_local_mqtt_port(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_PORT,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_PORT,
-                    current[CONF_THIRD_PARTY_MQTT_PORT],
-                ),
+                current.get(CONF_THIRD_PARTY_MQTT_PORT, DEFAULT_THIRD_PARTY_MQTT_PORT),
+            ),
+        ),
+        CONF_THIRD_PARTY_MQTT_QOS: _coerce_local_mqtt_qos(
+            user_input.get(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                current.get(CONF_THIRD_PARTY_MQTT_QOS, DEFAULT_THIRD_PARTY_MQTT_QOS),
             ),
         ),
         CONF_THIRD_PARTY_MQTT_USERNAME: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_USERNAME,
-                    current[CONF_THIRD_PARTY_MQTT_USERNAME],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_USERNAME, DEFAULT_THIRD_PARTY_MQTT_USERNAME
                 ),
             )
             or "",
@@ -426,9 +475,8 @@ def _merge_local_mqtt_options(
         CONF_THIRD_PARTY_MQTT_PASSWORD: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
-                user_input.get(
-                    CONF_THIRD_PARTY_MQTT_PASSWORD,
-                    current[CONF_THIRD_PARTY_MQTT_PASSWORD],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_PASSWORD, DEFAULT_THIRD_PARTY_MQTT_PASSWORD
                 ),
             )
             or "",
@@ -436,7 +484,10 @@ def _merge_local_mqtt_options(
         CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: str(
             user_input.get(
                 CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-                current[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
+                current.get(
+                    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                    DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+                ),
             )
             or DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
         ).strip(),
@@ -460,9 +511,10 @@ def _reconfigure_options(
     """
     current_local_mqtt = _current_local_mqtt_options(entry)
     merged = dict(entry.options)
+    # Cloud credentials have one owner: entry.data. Remove legacy duplicates.
+    merged.pop(CONF_USERNAME, None)
+    merged.pop(CONF_PASSWORD, None)
     merged.pop("enable_unredacted_diagnostics", None)
-    for key in REMOVED_LOCAL_MQTT_TLS_OPTION_KEYS:
-        merged.pop(key, None)
     current_options = _current_option_values(entry)
     merged.update(
         _flow_options(
@@ -475,9 +527,9 @@ def _reconfigure_options(
     return merged
 
 
-USER_SCHEMA = vol.Schema({
-    vol.Required(CONF_USERNAME): vol.All(str, vol.Length(min=1)),
-    vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+USER_SCHEMA: vol.Schema = vol.Schema({
+    vol.Required(CONF_USERNAME): str,
+    vol.Required(CONF_PASSWORD): str,
     vol.Optional(
         CONF_CREATE_SMART_METER_DERIVED_SENSORS,
         default=DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
@@ -497,7 +549,7 @@ USER_SCHEMA = vol.Schema({
 })
 
 
-class JackeryOptionsFlow(OptionsFlow):
+class JackeryOptionsFlow(OptionsFlowWithReload):
     """Handle the Jackery SolarVault options flow."""
 
     async def async_step_init(
@@ -520,10 +572,39 @@ class JackeryOptionsFlow(OptionsFlow):
         """
         current_options = _current_option_values(self.config_entry)
         current_local_mqtt = _current_local_mqtt_options(self.config_entry)
+        errors: dict[str, str] = {}
         if user_input is not None:
+            # Validate the value that is actually stored. A bare "" fallback
+            # rejected submissions that merely omit the field, and the resulting
+            # error discarded *every* option in the form, not just the topic.
             merged = _flow_options(user_input, current_options)
             merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
-            return self.async_create_entry(title="", data=merged)
+            try:
+                if merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]:
+                    valid_subscribe_topic(merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER])
+            except vol.Invalid:
+                errors[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = FLOW_ERROR_BASE
+            else:
+                previous = _flow_options({}, current_options)
+                previous.update(_merge_local_mqtt_options({}, current_local_mqtt))
+                changed_keys = {
+                    key
+                    for key in previous.keys() | merged.keys()
+                    if previous.get(key) != merged.get(key)
+                }
+                if not (changed_keys & _ENTITY_CREATING_OPTION_KEYS):
+                    self.automatic_reload = False
+                    self.hass.config_entries.async_update_entry(
+                        self.config_entry,
+                        options=merged,
+                    )
+                    if changed_keys:
+                        await _async_entry_updated(
+                            self.hass,
+                            self.config_entry,
+                            previous_options_override=previous,
+                        )
+                return self.async_create_entry(title="", data=merged)
 
         current_create_derived = current_options[
             CONF_CREATE_SMART_METER_DERIVED_SENSORS
@@ -540,9 +621,6 @@ class JackeryOptionsFlow(OptionsFlow):
         current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
-        ]
-        current_enable_payload_debug_log = current_options[
-            CONF_ENABLE_PAYLOAD_DEBUG_LOG
         ]
         schema = vol.Schema({
             vol.Optional(
@@ -586,7 +664,7 @@ class JackeryOptionsFlow(OptionsFlow):
             ): bool,
             vol.Optional(
                 CONF_ENABLE_PAYLOAD_DEBUG_LOG,
-                default=current_enable_payload_debug_log,
+                default=current_options[CONF_ENABLE_PAYLOAD_DEBUG_LOG],
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -600,6 +678,10 @@ class JackeryOptionsFlow(OptionsFlow):
                 CONF_THIRD_PARTY_MQTT_PORT,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
@@ -622,7 +704,11 @@ class JackeryOptionsFlow(OptionsFlow):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER],
             ): str,
         })
-        return self.async_show_form(step_id=FLOW_STEP_INIT, data_schema=schema)
+        return self.async_show_form(
+            step_id=FLOW_STEP_INIT,
+            data_schema=schema,
+            errors=errors,
+        )
 
 
 class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -664,16 +750,15 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         self,
         discovery_info: MqttServiceInfo,
     ) -> ConfigFlowResult:
-        """Handle a discovered MQTT device and route to the user configuration step if not a duplicate.
+        """Handle an MQTT discovery and route a new device to configuration.
 
-        Validates that the MQTT payload contains a Jackery device identity (`devSn`).
-        Aborts when a configured entry already exists, another in-progress flow is present,
-        or the payload is not a valid Jackery discovery message; otherwise delegates to
-        `async_step_user()`.
+        Validate that the payload contains a Jackery device identity. Abort when a
+        configured entry already exists, another flow is active, or the payload is
+        invalid; otherwise delegate to ``async_step_user``.
 
         Returns:
-            ConfigFlowResult: An abort result when the discovery is a duplicate, invalid,
-            or another flow is in progress; otherwise the result returned by `async_step_user()`.
+            An abort result for duplicate or invalid discovery; otherwise the user
+            step result.
         """
         if (abort_result := self._async_abort_duplicate_discovery()) is not None:
             return abort_result
@@ -693,7 +778,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         if not isinstance(dev_sn, str) or not dev_sn:
             return self.async_abort(reason="invalid_discovery_info")
 
-        return await self.async_step_user()
+        discovered_name = _mqtt_discovery_name(discovery_info.topic)
+        return await self._async_route_discovery_to_user(discovered_name)
 
     async def async_step_bluetooth(
         self,
@@ -769,6 +855,24 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            try:
+                credential_text(
+                    user_input[CONF_USERNAME],
+                    field="username",
+                    max_length=MAX_USERNAME_LENGTH,
+                )
+                credential_text(
+                    user_input[CONF_PASSWORD],
+                    field="password",
+                    max_length=MAX_PASSWORD_LENGTH,
+                )
+            except KeyError, vol.Invalid, TypeError:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
+                return self.async_show_form(
+                    step_id=FLOW_STEP_USER,
+                    data_schema=USER_SCHEMA,
+                    errors=errors,
+                )
             account = _normalize_account(user_input[CONF_USERNAME])
             if not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
@@ -791,7 +895,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             except JackeryAuthError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
             except JackeryError as err:
-                _LOGGER.debug("Cannot connect to Jackery during setup: %s", err)
+                _LOGGER.debug(
+                    "Cannot connect to Jackery during setup: %s", redacted_error(err)
+                )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
             else:
                 return self.async_create_entry(
@@ -873,8 +979,21 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            account = _normalize_account(user_input[CONF_USERNAME])
-            if not account:
+            account = _normalize_account(
+                credential_text(
+                    user_input[CONF_USERNAME],
+                    field="username",
+                    max_length=MAX_USERNAME_LENGTH,
+                )
+            )
+            password = credential_text(
+                user_input[CONF_PASSWORD],
+                field="password",
+                max_length=MAX_PASSWORD_LENGTH,
+            )
+            if not password:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
+            elif not account:
                 errors[CONF_USERNAME] = FLOW_ERROR_ACCOUNT_REQUIRED
             elif account.lower() != str(entry.unique_id or "").lower():
                 return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ACCOUNT_MISMATCH)
@@ -885,7 +1004,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 api = JackeryApi(
                     session=session,
                     account=account,
-                    password=user_input[CONF_PASSWORD],
+                    password=password,
                     mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
                     region_code=entry.data.get(CONF_REGION_CODE),
                 )
@@ -895,7 +1014,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
                 except JackeryError as err:
                     _LOGGER.debug(
-                        "Cannot connect to Jackery during reconfigure: %s", err
+                        "Cannot connect to Jackery during reconfigure: %s",
+                        redacted_error(err),
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
@@ -905,11 +1025,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     # the sensor-toggle keys and wiped local_mqtt_* /
                     # third_party_mqtt_* on every credentials submit
                     # (P8 regression 2026-07-03).
-                    return self.async_update_and_abort(
+                    return self.async_update_reload_and_abort(
                         entry,
                         data_updates=_entry_data_from_api_login(
                             account,
-                            user_input[CONF_PASSWORD],
+                            password,
                             api,
                             entry,
                         ),
@@ -920,10 +1040,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
         schema = vol.Schema({
-            vol.Required(
-                CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")
-            ): vol.All(str, vol.Length(min=1)),
-            vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1)),
+            vol.Required(CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")): str,
+            vol.Required(CONF_PASSWORD): str,
             vol.Optional(
                 CONF_ENABLE_BLE_TRANSPORT,
                 default=current_options[CONF_ENABLE_BLE_TRANSPORT],
@@ -948,6 +1066,10 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_THIRD_PARTY_MQTT_PORT,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            vol.Optional(
+                CONF_THIRD_PARTY_MQTT_QOS,
+                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
+            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
@@ -1019,7 +1141,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 # next refresh, which triggers the standard reauth flow.
                 return self.async_abort(reason=FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED)
             except JackeryError as err:
-                _LOGGER.debug("Cannot accept shared Jackery device: %s", err)
+                _LOGGER.debug(
+                    "Cannot accept shared Jackery device: %s", redacted_error(err)
+                )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
                 coordinator = cast(
@@ -1071,38 +1195,47 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
 
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-            api = JackeryApi(
-                session=session,
-                account=stored_username,
-                password=user_input[CONF_PASSWORD],
-                mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
-                region_code=entry.data.get(CONF_REGION_CODE),
+            password = credential_text(
+                user_input[CONF_PASSWORD],
+                field="password",
+                max_length=MAX_PASSWORD_LENGTH,
             )
-            try:
-                await api.async_login()
-            except JackeryAuthError:
-                errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
-            except JackeryError as err:
-                _LOGGER.debug("Cannot connect to Jackery during reauth: %s", err)
-                errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+            if not password:
+                errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
             else:
-                return self.async_update_and_abort(
-                    entry,
-                    data_updates=_entry_data_from_api_login(
-                        stored_username,
-                        user_input[CONF_PASSWORD],
-                        api,
-                        entry,
-                    ),
-                    reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
+                session = async_get_clientsession(self.hass)
+                api = JackeryApi(
+                    session=session,
+                    account=stored_username,
+                    password=password,
+                    mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
+                    region_code=entry.data.get(CONF_REGION_CODE),
                 )
+                try:
+                    await api.async_login()
+                except JackeryAuthError:
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_INVALID_AUTH
+                except JackeryError as err:
+                    _LOGGER.debug(
+                        "Cannot connect to Jackery during reauth: %s",
+                        redacted_error(err),
+                    )
+                    errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates=_entry_data_from_api_login(
+                            stored_username,
+                            password,
+                            api,
+                            entry,
+                        ),
+                        reason=FLOW_ABORT_REAUTH_SUCCESSFUL,
+                    )
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
-            data_schema=vol.Schema({
-                vol.Required(CONF_PASSWORD): vol.All(str, vol.Length(min=1))
-            }),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             description_placeholders={
                 "username": entry.data[CONF_USERNAME],
             },

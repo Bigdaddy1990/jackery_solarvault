@@ -1,5 +1,6 @@
 """Tests for uncovered paths in button.py to increase coverage."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,11 +15,16 @@ from custom_components.jackery_solarvault.button import (
     async_setup_entry,
 )
 
+if TYPE_CHECKING:
+    from custom_components.jackery_solarvault.descriptions.button import (
+        JackeryButtonDescription,
+    )
+
 
 class TestJackeryQueryButton:
     """Test JackeryQueryButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -29,11 +35,16 @@ class TestJackeryQueryButton:
         coordinator.async_refresh_documented_http_read = AsyncMock(return_value=True)
         return coordinator
 
-    def _create_query_description(self, key="refresh_system_info"):  # noqa: PLR6301, RUF105
+    def _create_query_description(  # ruff: ignore[no-self-use]
+        self, key: str = "refresh_system_info"
+    ) -> JackeryButtonDescription:
         """Create a query button description for testing."""
         return JackeryQueryButtonDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key=key,
+            # pyrefly: ignore [unexpected-keyword]
             translation_key=key,
+            # pyrefly: ignore [bad-argument-type]
             action=lambda c, d: None,
             message_type="test_type",
             action_id=1,
@@ -48,7 +59,7 @@ class TestJackeryQueryButton:
             coordinator=coordinator, device_id="test_device", description=description
         )
         assert sensor is not None
-        assert sensor._query_description.key == "refresh_system_info"  # noqa: RUF105, SLF001
+        assert sensor._query_description.key == "refresh_system_info"  # ruff: ignore[private-member-access]
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
@@ -66,7 +77,7 @@ class TestJackeryQueryButton:
 class TestJackeryRebootButton:
     """Test JackeryRebootButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -81,9 +92,9 @@ class TestJackeryRebootButton:
         coordinator = self._create_coordinator()
         sensor = JackeryRebootButton(coordinator=coordinator, device_id="test_device")
         assert sensor is not None
-        assert sensor._attr_translation_key == "reboot_device"  # noqa: RUF105, SLF001
+        assert sensor._attr_translation_key == "reboot_device"  # ruff: ignore[private-member-access]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator()
@@ -96,7 +107,7 @@ class TestJackeryRebootButton:
 class TestJackeryRefreshWeatherPlanButton:
     """Test JackeryRefreshWeatherPlanButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {"test_device": {}}
@@ -114,9 +125,9 @@ class TestJackeryRefreshWeatherPlanButton:
             coordinator=coordinator, device_id="test_device"
         )
         assert sensor is not None
-        assert sensor._attr_translation_key == "refresh_weather_plan"  # noqa: RUF105, SLF001
+        assert sensor._attr_translation_key == "refresh_weather_plan"  # ruff: ignore[private-member-access]
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator()
@@ -131,7 +142,7 @@ class TestJackeryRefreshWeatherPlanButton:
 class TestJackeryReadScheduleButton:
     """Test JackeryReadScheduleButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -147,12 +158,10 @@ class TestJackeryReadScheduleButton:
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            task_type=1,
-            key_suffix="test_schedule",
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
         )
         assert sensor is not None
-        assert sensor._task_type == 1  # noqa: RUF105, SLF001
+        assert sensor._task_type == 1  # ruff: ignore[private-member-access]
 
     def test_extra_state_attributes(self) -> None:
         """Test extra_state_attributes property."""
@@ -160,25 +169,21 @@ class TestJackeryReadScheduleButton:
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            task_type=1,
-            key_suffix="test_schedule",
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
             plug_sn="plug123",
         )
         attrs = sensor.extra_state_attributes
         assert attrs["taskType"] == 1
         assert attrs["deviceSn"] == "plug123"
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator({"test_device": {}})
         sensor = JackeryReadScheduleButton(
             coordinator=coordinator,
             device_id="test_device",
-            task_type=1,
-            key_suffix="test_schedule",
-            translation_key="test_schedule",
+            config=(1, "test_schedule", "test_schedule"),
         )
 
         await sensor.async_press()
@@ -190,7 +195,7 @@ class TestJackeryReadScheduleButton:
 class TestJackeryDeleteStormAlertButton:
     """Test JackeryDeleteStormAlertButton class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -209,7 +214,7 @@ class TestJackeryDeleteStormAlertButton:
             alert_id="alert123",
         )
         assert sensor is not None
-        assert sensor._alert_id == "alert123"  # noqa: RUF105, SLF001
+        assert sensor._alert_id == "alert123"  # ruff: ignore[private-member-access]
 
     def test_available_property(self) -> None:
         """Test available property."""
@@ -223,7 +228,7 @@ class TestJackeryDeleteStormAlertButton:
         )
         assert sensor.available is True
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_press(self) -> None:
         """Test async_press method."""
         coordinator = self._create_coordinator({
@@ -244,7 +249,7 @@ class TestJackeryDeleteStormAlertButton:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
+    def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry function signature and structure."""
         # This test validates the function signature and basic structure
         # Full integration test is complex due to signature caching logic
@@ -252,7 +257,7 @@ class TestAsyncSetupEntry:
         assert async_setup_entry.__name__ == "async_setup_entry"
         assert callable(async_setup_entry)
         # Check it has the right number of parameters via __code__
-        assert async_setup_entry.__code__.co_argcount == 3
+        assert async_setup_entry.__code__.co_argcount == 3  # ruff: ignore[magic-value-comparison]
         varnames = async_setup_entry.__code__.co_varnames[:3]
         assert "hass" in varnames
         assert "entry" in varnames

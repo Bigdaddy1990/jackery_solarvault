@@ -1,7 +1,7 @@
 """Regression tests for transport-independent entities and ordered live merges."""
 
 import asyncio
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 import logging
 from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -17,8 +17,17 @@ from custom_components.jackery_solarvault.const import (
     ACTION_ID_PORTABLE_OUTPUT_AC,
     FIELD_ACCESSORIES,
     FIELD_ACTION_ID,
+    FIELD_BODY,
     FIELD_CHARGE_PLAN_PW,
+    FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_A_PHASE_ENERGY,
+    FIELD_CT_B_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_B_PHASE_ENERGY,
+    FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_C_PHASE_ENERGY,
     FIELD_CT_POWER,
+    FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
+    FIELD_CT_TOTAL_PHASE_ENERGY,
     FIELD_CT_VOLT,
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
@@ -32,6 +41,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_PV_PW,
     FIELD_SW_EPS,
     FIELD_SW_EPS_STATE,
+    FIELD_TIMESTAMP,
     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -46,11 +56,13 @@ from custom_components.jackery_solarvault.const import (
     SUBDEVICE_DEV_TYPE_METER_HEAD,
     SUBDEVICE_DEV_TYPE_SMOKE,
     SUBDEVICE_DEV_TYPE_SOCKET,
+    SUBDEVICE_FIELD_LAST_SEEN_AT,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     _serialize_mqtt_messages_by_device,  # regression-tests callback ordering wrapper  # ruff: ignore[import-private-name]
     merge_shelly_cloud_item,
+    mqtt_payload_observed_at,
     normalize_local_mqtt_payload,
     normalize_shelly_cloud_payload,
 )
@@ -89,7 +101,7 @@ class _ImmediateBackgroundEntry:
         return asyncio.create_task(coro, name=name)
 
 
-def _set_test_attr(target: object, name: str, value: Any) -> None:  # noqa: RUF105
+def _set_test_attr(target: object, name: str, value: Any) -> None:
     """Set private coordinator seams used by narrow regression test doubles."""
     setattr(target, name, value)
 
@@ -105,7 +117,7 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
             PAYLOAD_SYSTEM: {},
         },
     }
-    coordinator._has_smart_meter_accessory.return_value = True  # ruff: ignore[private-member-access]
+    coordinator.has_smart_meter_accessory.return_value = True
     coordinator.async_add_listener.return_value = lambda: None
     entry = SimpleNamespace(
         data={},
@@ -131,6 +143,14 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     assert "dev-1_smart_meter_grid_import_energy" in unique_ids
     assert "dev-1_smart_meter_phase_3_lifetime_import_energy" in unique_ids
     assert "dev-1_home_consumption_power" in unique_ids
+    unsupported_voltage = next(
+        entity
+        for entity in added
+        if entity.unique_id == "dev-1_smart_meter_phase_1_voltage"
+    )
+    unsupported_voltage._refresh_cache()  # ruff: ignore[private-member-access]
+    assert unsupported_voltage.native_value is None
+    assert unsupported_voltage.available is False
 
 
 async def test_discovered_accessory_sensors_register_before_live_push() -> None:
@@ -161,7 +181,7 @@ async def test_discovered_accessory_sensors_register_before_live_push() -> None:
             },
         },
     }
-    coordinator._has_smart_meter_accessory.return_value = False  # ruff: ignore[private-member-access]
+    coordinator.has_smart_meter_accessory.return_value = False
     coordinator.async_add_listener.return_value = lambda: None
     entry = SimpleNamespace(
         data={},
@@ -283,7 +303,64 @@ def _source_priority_coordinator() -> JackerySolarVaultCoordinator:
     _set_test_attr(coordinator, "_live_property_received_monotonic", {})
     _set_test_attr(coordinator, "_live_ct_received_monotonic", {})
     coordinator._last_property_push_monotonic = float("-inf")  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+
+
+def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
+    """Every accepted BLE frame reaches HA instead of replacing a pending frame."""
+    coordinator = _source_priority_coordinator()
+    coordinator.data = {
+        "dev-1": {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 0}},
+    }
+    coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
+    observed: list[int] = []
+
+    def _capture_committed_value() -> None:
+        observed.append(
+            coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW],
+        )
+
+    coordinator._listeners = {"test-listener": (_capture_committed_value, None)}  # ruff: ignore[private-member-access]
+
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 596}},
+    )
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {PAYLOAD_PROPERTIES: {FIELD_PV_PW: 609}},
+    )
+
+    assert observed == [596, 609]
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == 609  # ruff: ignore[magic-value-comparison]
+
+
+def test_ble_freshness_metadata_alone_does_not_wake_all_entities() -> None:
+    """An unchanged CT sample updates transport freshness without a HA state storm."""
+    coordinator = _source_priority_coordinator()
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_CT_METER: {
+                FIELD_CT_VOLT: _CT_VOLTAGE_V,
+                SUBDEVICE_FIELD_LAST_SEEN_AT: "2026-08-23T00:00:00+00:00",
+            },
+        },
+    }
+    coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
+    listener = MagicMock()
+    coordinator._listeners = {"test-listener": (listener, None)}  # ruff: ignore[private-member-access]
+
+    coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
+        "dev-1",
+        {
+            PAYLOAD_CT_METER: {
+                FIELD_CT_VOLT: _CT_VOLTAGE_V,
+                SUBDEVICE_FIELD_LAST_SEEN_AT: "2026-08-23T00:00:01+00:00",
+            },
+        },
+    )
+
+    listener.assert_not_called()
 
 
 def _command_coordinator() -> JackerySolarVaultCoordinator:
@@ -305,6 +382,7 @@ def _command_coordinator() -> JackerySolarVaultCoordinator:
         "_record_independent_cloud_mqtt_result",
         MagicMock(),
     )
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -419,6 +497,40 @@ def test_layer5_ct_arrival_order_while_cloud_fills_missing_fields(
     assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _LIVE_CT_POWER_W
 
 
+def test_ble_ct_energy_is_normalized_to_shelly_wh_scale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """BLE deci-Wh counters must agree with equivalent Shelly-Cloud Wh values."""
+    monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: 100.0)
+    coordinator = _source_priority_coordinator()
+    updated: dict[str, Any] = {}
+    cloud_energy = {
+        FIELD_CT_A_PHASE_ENERGY: 10_000,
+        FIELD_CT_B_PHASE_ENERGY: 20_000,
+        FIELD_CT_C_PHASE_ENERGY: 30_000,
+        FIELD_CT_TOTAL_PHASE_ENERGY: 60_000,
+        FIELD_CT_A_NEGATIVE_PHASE_ENERGY: 1_000,
+        FIELD_CT_B_NEGATIVE_PHASE_ENERGY: 2_000,
+        FIELD_CT_C_NEGATIVE_PHASE_ENERGY: 3_000,
+        FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY: 6_000,
+    }
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
+        updated,
+        cloud_energy,
+        device_id="dev-1",
+        source_transport=TransportSource.CLOUD_MQTT,
+    )
+    coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
+        updated,
+        {field: value / 10 for field, value in cloud_energy.items()},
+        device_id="dev-1",
+        source_transport=TransportSource.BLE,
+    )
+
+    for field, value in cloud_energy.items():
+        assert updated[PAYLOAD_CT_METER][field] == value
+
+
 async def test_cloud_subdevice_frame_is_ingested_once(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -435,12 +547,13 @@ async def test_cloud_subdevice_frame_is_ingested_once(
         source_transport=TransportSource.LOCAL_MQTT,
     )
     coordinator.data = {"dev-1": current}
-    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_device_index", {"dev-1": {}})
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
 
     def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
-        coordinator.data = new_data
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
 
     _set_test_attr(coordinator, "_push_partial_update", _capture)
 
@@ -448,7 +561,7 @@ async def test_cloud_subdevice_frame_is_ingested_once(
         logging.DEBUG,
         logger="custom_components.jackery_solarvault.coordinator",
     ):
-        accepted = await coordinator._async_handle_mqtt_message(  # ruff: ignore[private-member-access]
+        accepted = await coordinator.async_handle_mqtt_message(
             "hb/app/user/device",
             {
                 FIELD_DEVICE_ID: "dev-1",
@@ -467,6 +580,38 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     assert coordinator.data["dev-1"][PAYLOAD_CT_METER][FIELD_CT_POWER] == (
         _SHELLY_CT_POWER_W
     )
+
+
+async def test_stale_first_cloud_mqtt_snapshot_preserves_cached_state() -> None:
+    """A six-hour-old retained cloud frame cannot replace cached live state."""
+    coordinator = _source_priority_coordinator()
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {FIELD_PV_PW: _LIVE_PV_W},
+            PAYLOAD_DEVICE: {},
+        }
+    }
+    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
+
+    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
+
+    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    accepted = await coordinator.async_handle_mqtt_message(
+        "hb/app/user/device",
+        {
+            FIELD_DEVICE_ID: "dev-1",
+            FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            FIELD_TIMESTAMP: (datetime.now(UTC) - timedelta(hours=6)).timestamp(),
+            FIELD_BODY: {FIELD_PV_PW: 900},
+        },
+    )
+
+    assert accepted == "dev-1"
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == _LIVE_PV_W
 
 
 async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
@@ -586,6 +731,46 @@ def test_local_metadata_does_not_hide_top_level_live_body() -> None:
 
     assert normalized[FIELD_DEVICE_ID] == "dev-1"
     assert normalized["body"][FIELD_PV_PW] == _LIVE_PV_W
+
+
+def test_local_ts_is_promoted_to_protocol_observation_time() -> None:
+    """LAN ``ts`` orders body-only and enveloped frames in shared ingest."""
+    raw_ts = 1_787_424_795
+    body_only = normalize_local_mqtt_payload({
+        "ts": raw_ts,
+        FIELD_DEVICE_ID: "dev-1",
+        FIELD_PV_PW: _LIVE_PV_W,
+    })
+    enveloped = normalize_local_mqtt_payload({
+        "ts": raw_ts,
+        FIELD_DEVICE_ID: "dev-1",
+        "body": {FIELD_PV_PW: _LIVE_PV_W},
+    })
+
+    assert body_only[FIELD_TIMESTAMP] == raw_ts
+    assert enveloped[FIELD_TIMESTAMP] == raw_ts
+    assert mqtt_payload_observed_at(body_only) is not None
+    assert mqtt_payload_observed_at(enveloped) is not None
+
+
+def test_invalid_local_ts_never_blocks_live_payload_normalization() -> None:
+    """Malformed JSON timestamp containers cannot discard the live body."""
+    for invalid_ts in ({}, []):
+        body_only = normalize_local_mqtt_payload({
+            "ts": invalid_ts,
+            FIELD_DEVICE_ID: "dev-1",
+            FIELD_PV_PW: _LIVE_PV_W,
+        })
+        enveloped = normalize_local_mqtt_payload({
+            "ts": invalid_ts,
+            FIELD_DEVICE_ID: "dev-1",
+            "body": {FIELD_PV_PW: _LIVE_PV_W},
+        })
+
+        assert FIELD_TIMESTAMP not in body_only
+        assert FIELD_TIMESTAMP not in enveloped
+        assert body_only["body"][FIELD_PV_PW] == _LIVE_PV_W
+        assert enveloped["body"][FIELD_PV_PW] == _LIVE_PV_W
 
 
 async def test_body_only_local_mqtt_routes_each_live_control_and_pv_field() -> None:

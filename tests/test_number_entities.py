@@ -34,7 +34,7 @@ from custom_components.jackery_solarvault.number import (
     JackeryNumber,
     async_setup_entry,
 )
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, ServiceValidationError
 
 _DEVICE_ID = "dev-1"
 
@@ -49,7 +49,7 @@ _ASYNC_METHODS = (
 )
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     return next(desc for desc in NUMBER_DESCRIPTIONS if desc.key == key)
 
 
@@ -77,6 +77,7 @@ def _number(key: str, data: dict[str, Any]) -> JackeryNumber:
     mutable.coordinator = _coordinator(data)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = _description(key)
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -110,7 +111,7 @@ def test_integer_value_description_rounds_to_int() -> None:
 
     value = entity.native_value
 
-    assert value == 1883
+    assert value == 1883  # ruff: ignore[magic-value-comparison]
     assert isinstance(value, int)
 
 
@@ -207,7 +208,7 @@ async def test_portable_setter_forwards_action_and_field() -> None:
     _args, kwargs = entity.coordinator.async_portable_set_number.call_args
     assert kwargs["action_id"] == ACTION_ID_PORTABLE_SET_CHARGE_POWER
     assert kwargs["field"] == "csc"
-    assert kwargs["value"] == 600
+    assert kwargs["value"] == 600  # ruff: ignore[magic-value-comparison]
 
 
 def test_portable_charge_power_reads_csc_the_field_its_setter_writes() -> None:
@@ -247,7 +248,7 @@ async def test_out_of_range_value_raises_translated_error() -> None:
         {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_SOC_CHG_LIMIT: 50}}},
     )
 
-    with pytest.raises(HomeAssistantError) as err:
+    with pytest.raises(ServiceValidationError) as err:
         await entity.async_set_native_value(150.0)
 
     assert err.value.translation_key == "invalid_number_range"
@@ -261,7 +262,7 @@ async def test_disallowed_discrete_value_raises_translated_error() -> None:
         {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_MAX_OUT_PW: 2500}}},
     )
 
-    with pytest.raises(HomeAssistantError) as err:
+    with pytest.raises(ServiceValidationError) as err:
         await entity.async_set_native_value(1650.0)
 
     assert err.value.translation_key == "invalid_number_allowed_values"

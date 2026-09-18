@@ -1,4 +1,5 @@
-"""Tests for client discovery cache and mqtt session cache."""
+# ruff: noqa: E501, SLF001
+"""Tests for persistent discovery, MQTT-session, and daily-energy state."""
 
 import asyncio
 import time
@@ -9,28 +10,26 @@ import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.jackery_solarvault.client import (
-    discovery_cache as discovery_cache_module,
+    daily_energy as local_daily_cache_module,
+    discovery_store as discovery_cache_module,
+    mqtt_session_store as mqtt_session_cache_module,
 )
-from custom_components.jackery_solarvault.client import (
-    mqtt_session_cache as mqtt_session_cache_module,
-)
-from custom_components.jackery_solarvault.client import (
-    local_daily_cache as local_daily_cache_module,
-)
-from custom_components.jackery_solarvault.client.discovery_cache import (
+from custom_components.jackery_solarvault.client.discovery_store import (
     async_load_discovery_cache,
     async_save_discovery_cache,
 )
-from custom_components.jackery_solarvault.client.mqtt_session_cache import (
+from custom_components.jackery_solarvault.client.mqtt_session_store import (
     async_clear_mqtt_session,
     async_load_mqtt_session,
     async_save_mqtt_session,
 )
-from custom_components.jackery_solarvault.client.local_daily_cache import (
+from custom_components.jackery_solarvault.client.daily_energy import (
     async_load_daily_cache,
     async_save_daily_cache,
 )
 from custom_components.jackery_solarvault.const import (
+    MQTT_SESSION_CACHE_CACHED_AT_KEY,
+    MQTT_SESSION_CACHE_EXPIRES_AT_KEY,
     MQTT_SESSION_MAC_ID,
     MQTT_SESSION_MAC_ID_SOURCE,
     MQTT_SESSION_SEED_B64,
@@ -113,7 +112,7 @@ class _BlockingStore:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("cache_kind", ["discovery", "mqtt", "daily"])
+@pytest.mark.parametrize("cache_kind", ["discovery", "mqtt"])
 async def test_cache_mutation_survives_caller_cancellation(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
@@ -134,20 +133,10 @@ async def test_cache_mutation_survives_caller_cancellation(
         save_coro = async_save_mqtt_session(
             hass,
             "entry_cancel",
-            user_id="user",
-            seed_b64=_VALID_SEED_B64,
-            mac_id="AABBCCDDEEFF",
-        )
-    else:
-        module = local_daily_cache_module
-        save_coro = async_save_daily_cache(
-            hass,
-            "entry_cancel",
-            snapshots={
-                "device": {
-                    "day": "2026-07-29",
-                    "values": {"pvEgy": 123},
-                },
+            {
+                MQTT_SESSION_USER_ID: "user",
+                MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+                MQTT_SESSION_MAC_ID: "AABBCCDDEEFF",
             },
         )
     monkeypatch.setattr(module, "_store", lambda _hass: store)
@@ -166,6 +155,37 @@ async def test_cache_mutation_survives_caller_cancellation(
 
 
 @pytest.mark.asyncio
+async def test_daily_anchor_write_cancels_with_entry_task(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cancelled entry task cannot leave an unowned Store writer behind."""
+    store = _BlockingStore()
+    monkeypatch.setattr(local_daily_cache_module, "_store", lambda _hass: store)
+    caller = hass.async_create_task(
+        async_save_daily_cache(
+            hass,
+            "entry_cancel",
+            snapshots={
+                "device": {
+                    "day": "2026-07-29",
+                    "values": {"pvEgy": 123},
+                },
+            },
+        )
+    )
+    await store.save_started.wait()
+    caller.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await caller
+    store.release_save.set()
+    await hass.async_block_till_done()
+
+    assert store.data is None
+
+
+@pytest.mark.asyncio
 async def test_mqtt_session_cache_flow(hass: HomeAssistant) -> None:
     """Test save, load, and clear MQTT session cache."""
     # Initially None
@@ -176,11 +196,13 @@ async def test_mqtt_session_cache_flow(hass: HomeAssistant) -> None:
     await async_save_mqtt_session(
         hass,
         "entry_mqtt",
-        user_id="user_abc",
-        seed_b64=_VALID_SEED_B64,
-        mac_id="AA:BB:CC:DD:EE:FF",
-        mac_id_source="cloud",
-        cached_at=1700000000.0,
+        {
+            MQTT_SESSION_USER_ID: "user_abc",
+            MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+            MQTT_SESSION_MAC_ID: "AA:BB:CC:DD:EE:FF",
+            MQTT_SESSION_MAC_ID_SOURCE: "cloud",
+            MQTT_SESSION_CACHE_CACHED_AT_KEY: 1700000000.0,
+        },
     )
 
     # Load session
@@ -208,10 +230,12 @@ async def test_mqtt_session_cache_survives_runtime_lock_recreation(
     await async_save_mqtt_session(
         hass,
         "entry_restart",
-        user_id="user_abc",
-        seed_b64=_VALID_SEED_B64,
-        mac_id="AA:BB:CC:DD:EE:FF",
-        mac_id_source="http_login",
+        {
+            MQTT_SESSION_USER_ID: "user_abc",
+            MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+            MQTT_SESSION_MAC_ID: "AA:BB:CC:DD:EE:FF",
+            MQTT_SESSION_MAC_ID_SOURCE: "http_login",
+        },
     )
 
     hass.data.pop(mqtt_session_cache_module._LOCK_KEY, None)
@@ -238,9 +262,11 @@ async def test_mqtt_session_cache_rejects_invalid_aes_seed(
     await async_save_mqtt_session(
         hass,
         entry_id,
-        user_id="user",
-        seed_b64=seed_b64,
-        mac_id="AABBCCDDEEFF",
+        {
+            MQTT_SESSION_USER_ID: "user",
+            MQTT_SESSION_SEED_B64: seed_b64,
+            MQTT_SESSION_MAC_ID: "AABBCCDDEEFF",
+        },
     )
 
     assert await async_load_mqtt_session(hass, entry_id) is None
@@ -254,11 +280,13 @@ async def test_mqtt_session_cache_rejects_explicit_expiry(
     await async_save_mqtt_session(
         hass,
         "expired-session",
-        user_id="user",
-        seed_b64=_VALID_SEED_B64,
-        mac_id="AABBCCDDEEFF",
-        cached_at=time.time() - 3600,
-        expires_at=time.time() - 1,
+        {
+            MQTT_SESSION_USER_ID: "user",
+            MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+            MQTT_SESSION_MAC_ID: "AABBCCDDEEFF",
+            MQTT_SESSION_CACHE_CACHED_AT_KEY: time.time() - 3600,
+            MQTT_SESSION_CACHE_EXPIRES_AT_KEY: time.time() - 1,
+        },
     )
 
     assert await async_load_mqtt_session(hass, "expired-session") is None
@@ -275,10 +303,12 @@ async def test_mqtt_session_cache_rejects_invalid_cache_timestamp(
         await async_save_mqtt_session(
             hass,
             f"invalid-time-{cached_at}",
-            user_id="user",
-            seed_b64=_VALID_SEED_B64,
-            mac_id="AABBCCDDEEFF",
-            cached_at=cached_at,
+            {
+                MQTT_SESSION_USER_ID: "user",
+                MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+                MQTT_SESSION_MAC_ID: "AABBCCDDEEFF",
+                MQTT_SESSION_CACHE_CACHED_AT_KEY: cached_at,
+            },
         )
 
     assert await async_load_mqtt_session(hass, f"invalid-time-{cached_at}") is None
@@ -292,10 +322,12 @@ async def test_legacy_mqtt_session_has_no_invented_max_age(
     await async_save_mqtt_session(
         hass,
         "legacy-session",
-        user_id="user",
-        seed_b64=_VALID_SEED_B64,
-        mac_id="AABBCCDDEEFF",
-        cached_at=1700000000.0,
+        {
+            MQTT_SESSION_USER_ID: "user",
+            MQTT_SESSION_SEED_B64: _VALID_SEED_B64,
+            MQTT_SESSION_MAC_ID: "AABBCCDDEEFF",
+            MQTT_SESSION_CACHE_CACHED_AT_KEY: 1700000000.0,
+        },
     )
 
     assert await async_load_mqtt_session(hass, "legacy-session") is not None

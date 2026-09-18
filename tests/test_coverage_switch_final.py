@@ -1,8 +1,7 @@
 """Additional behavioural branch tests for the Jackery switch platform."""
 
-from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -26,7 +25,11 @@ from custom_components.jackery_solarvault.switch import (
     JackerySmartPlugSwitch,
     JackerySwitchDescription,
 )
+from custom_components.jackery_solarvault.util import payload_has_home_payload_evidence
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _DEVICE_ID = "device-1"
 
@@ -66,6 +69,7 @@ def _description_switch(
     mutable.coordinator = _coordinator({_DEVICE_ID: payload or {}})
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -83,10 +87,9 @@ def _plug_switch(
     )
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable._plug_index = 1  # ruff: ignore[private-member-access]
-    mutable._plug_sn = str(  # ruff: ignore[private-member-access]
-        plug.get("deviceSn") or "bound-sn"
-    )
+    mutable._plug_sn = str(plug.get("deviceSn") or "bound-sn")  # ruff: ignore[private-member-access]
     mutable._plug_key = "smart_plug_1"  # ruff: ignore[private-member-access]
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -100,6 +103,7 @@ def _breaker_switch(breakers: list[dict[str, Any]]) -> JackeryBreakerSwitch:
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable._breaker_index = 1  # ruff: ignore[private-member-access]
     mutable._breaker_id = "3"  # ruff: ignore[private-member-access]
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
@@ -119,16 +123,13 @@ def test_payload_family_detection_prefers_home_evidence() -> None:
         is False
     )
     assert (
-        switch_mod._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
-            {PAYLOAD_SYSTEM: {"systemId": "system-1"}}
-        )
+        # pyrefly: ignore [missing-attribute]
+        payload_has_home_payload_evidence({PAYLOAD_SYSTEM: {"systemId": "system-1"}})
         is True
     )
     assert (
-        switch_mod._payload_has_home_payload_evidence(  # ruff: ignore[private-member-access]
-            {"http_properties": {"batSoc": 50}}
-        )
-        is True
+        # pyrefly: ignore [missing-attribute]
+        payload_has_home_payload_evidence({"http_properties": {"batSoc": 50}}) is True
     )
     assert switch_mod._is_portable_payload({}) is False  # ruff: ignore[private-member-access]
 
@@ -136,16 +137,19 @@ def test_payload_family_detection_prefers_home_evidence() -> None:
 def test_description_resolves_app_and_transport_sources() -> None:
     """Descriptions infer app, read, and command capabilities from their fields."""
     writable = JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="writable",
         source_keys=("field",),
         setter=switch_mod._set_eps,  # ruff: ignore[private-member-access]
     )
     http_only = JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="http_only",
         source_keys=("weather",),
         source_section=PAYLOAD_WEATHER_PLAN,
     )
     smali_only = JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="smali_only",
         source_keys=(),
         smali_field="smaliField",
@@ -190,9 +194,7 @@ async def test_third_party_mqtt_helper_encodes_boolean() -> None:
     """The third-party bridge setter encodes HA booleans as app integers."""
     coordinator = _coordinator()
 
-    await switch_mod._set_third_party_mqtt_enabled(  # ruff: ignore[private-member-access]
-        coordinator, _DEVICE_ID, False
-    )
+    await switch_mod._set_third_party_mqtt_enabled(coordinator, _DEVICE_ID, False)  # ruff: ignore[private-member-access]
 
     coordinator.async_update_third_party_mqtt_config.assert_awaited_once_with(
         _DEVICE_ID,
@@ -263,6 +265,7 @@ async def test_portable_setter_helpers_preserve_protocol_mapping(
 def test_description_state_fallback_order_and_unknown_transform() -> None:
     """Fallback section precedes task plan and transform may report unknown."""
     description = JackerySwitchDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="fallback",
         source_keys=("flag",),
         fallback_section=PAYLOAD_WEATHER_PLAN,
@@ -287,12 +290,15 @@ def test_description_state_fallback_order_and_unknown_transform() -> None:
 
 
 async def test_description_no_setter_and_error_passthrough_branches() -> None:
-    """Read-only switches no-op and translated/auth errors retain HA semantics."""
+    """Read-only switches and transport errors retain HA semantics."""
     no_setter = _description_switch(
+        # pyrefly: ignore [unexpected-keyword]
         JackerySwitchDescription(key="readonly", source_keys=("flag",)),
     )
-    await no_setter.async_turn_on()
-    await no_setter.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await no_setter.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await no_setter.async_turn_off()
 
     translated = HomeAssistantError(
         translation_domain="jackery_solarvault",
@@ -301,6 +307,7 @@ async def test_description_no_setter_and_error_passthrough_branches() -> None:
     translated_setter = AsyncMock(side_effect=translated)
     entity = _description_switch(
         JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="translated",
             source_keys=("flag",),
             setter=translated_setter,
@@ -312,6 +319,7 @@ async def test_description_no_setter_and_error_passthrough_branches() -> None:
 
     auth = _description_switch(
         JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="auth",
             source_keys=("flag",),
             setter=AsyncMock(side_effect=ConfigEntryAuthFailed),

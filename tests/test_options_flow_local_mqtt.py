@@ -22,12 +22,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.jackery_solarvault.config_flow import JackeryOptionsFlow
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     DOMAIN,
 )
@@ -213,5 +215,40 @@ async def test_untouched_submit_preserves_disabled_bridge(
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
     assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is False
+
+    await _async_unload_entry(hass, entry)
+
+
+async def test_submit_without_topic_field_keeps_stored_topic(
+    hass: HomeAssistant,
+) -> None:
+    """A submit that omits the topic field must not discard every option.
+
+    The options schema normally supplies a default, so the HA UI always sends
+    the field. The validation used a bare "" fallback regardless, and
+    ``valid_subscribe_topic("")`` raises, which pushed the flow into the error
+    branch and dropped *all* submitted options -- not just the topic. Validate
+    the effective merged value instead, exactly like the value that is stored.
+    """
+    entry = await _async_setup_entry(
+        hass,
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "homeassistant",
+        },
+    )
+
+    flow = JackeryOptionsFlow()
+    flow.hass = hass
+    flow.handler = entry.entry_id
+
+    result = await flow.async_step_init({CONF_THIRD_PARTY_MQTT_PORT: _BRIDGE_PORT})
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    # The omitted topic keeps its stored value instead of failing validation.
+    assert result["data"][CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "homeassistant"
+    # The other submitted option survives, which the "" fallback prevented.
+    assert result["data"][CONF_THIRD_PARTY_MQTT_PORT] == _BRIDGE_PORT
 
     await _async_unload_entry(hass, entry)

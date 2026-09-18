@@ -44,12 +44,12 @@ def _entity(payload: dict[str, object]) -> JackeryEntity:
 
     Returns:
         JackeryEntity: An entity whose data contains the given payload under the "dev1" key and that uses "dev1" as both the entity key and identifier.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     coordinator = cast("Any", SimpleNamespace(data={"dev1": payload}))
     return JackeryEntity(coordinator, "dev1", "test")
 
 
-def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # noqa: RUF105
+def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     """Create and initialize an instance of the given sensor class for tests using the provided device payload.
 
     Parameters:
@@ -58,7 +58,7 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:  # noqa: 
 
     Returns:
         Any: An instance of `cls` initialized with the given payload.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     entity = cast("Any", cls).__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
         entity,
@@ -147,7 +147,7 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
 
     info = entity.device_info
 
-    assert info["name"] == "Main Name Zusatzbatterie 1"
+    assert info["name"] == "Main Name Battery pack 1"
     assert info["model"] == "Battery Model"
     assert info["serial_number"] == "Pack SN"
     assert info["sw_version"] == "2.3.4"

@@ -33,7 +33,7 @@ from custom_components.jackery_solarvault.coordinator import (
 _Coordinator = JackerySolarVaultCoordinator
 
 
-def _bare() -> Any:  # noqa: RUF105
+def _bare() -> Any:
     """Return an uninitialised coordinator shell for attribute injection."""
     return cast("Any", _Coordinator.__new__(_Coordinator))
 
@@ -73,6 +73,22 @@ def test_endpoint_backoff_diagnostics_reports_only_active_non_energy(
     }
     assert "pv_stat" not in diagnostics["active"]
     assert "expired" not in diagnostics["active"]
+
+
+def test_endpoint_backoff_diagnostics_reports_unsupported_energy_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A suppressed unsupported PV endpoint remains observable in diagnostics."""
+    monkeypatch.setattr(co.time, "monotonic", lambda: 1_000.0)
+    coordinator = _bare()
+    coordinator._endpoint_backoff = {  # ruff: ignore[private-member-access]
+        "pv_stat": {"until": 1_030.0, "code": 10600, "level": 0, "unsupported": True}
+    }
+
+    diagnostics = coordinator.endpoint_backoff_diagnostics()
+
+    assert diagnostics["active_count"] == 1
+    assert diagnostics["active"]["pv_stat"]["unsupported"] is True
 
 
 def test_endpoint_backoff_active_count_ignores_energy_keys(
@@ -118,7 +134,7 @@ def test_statistics_backfill_diagnostics_redacts_device_ids() -> None:
     diagnostics = coordinator.statistics_backfill_diagnostics
 
     assert diagnostics["loaded"] is True
-    assert diagnostics["tracked_devices"] == 2
+    assert diagnostics["tracked_devices"] == 2  # ruff: ignore[magic-value-comparison]
     # Sorted by device id: SN-A first.
     assert diagnostics["devices"]["device_1"] == {"last_repair_date": "2026-01-01"}
     assert diagnostics["devices"]["device_2"] == {"last_repair_date": "2026-01-02"}
@@ -139,11 +155,12 @@ def test_statistics_backfill_diagnostics_tolerates_missing_devices() -> None:
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_statistics_import_job_awaits_repair_wrapper() -> None:
     """The current import job awaits current import and schedules backfill."""
     coordinator = _bare()
     coordinator._statistics_import_task = None  # ruff: ignore[private-member-access]
+    coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
     repair = AsyncMock()
     coordinator._async_import_and_repair_app_chart_statistics = repair  # ruff: ignore[private-member-access]
     scheduler = MagicMock()
@@ -240,7 +257,7 @@ def test_polling_diagnostics_returns_defensive_copy() -> None:
     exported = coordinator.polling_diagnostics
     exported["last_cycle_seconds"] = 999
 
-    assert internal["last_cycle_seconds"] == 12
+    assert internal["last_cycle_seconds"] == 12  # ruff: ignore[magic-value-comparison]
 
 
 def test_statistics_import_diagnostics_returns_defensive_copy() -> None:
@@ -252,7 +269,7 @@ def test_statistics_import_diagnostics_returns_defensive_copy() -> None:
     exported = coordinator.statistics_import_diagnostics
     exported["last_import_device_count"] = 0
 
-    assert internal["last_import_device_count"] == 3
+    assert internal["last_import_device_count"] == 3  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------

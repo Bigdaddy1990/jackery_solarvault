@@ -8,12 +8,14 @@ All types are runtime-resolvable — no ``from __future__ import annotations``
 (ruff TID251).
 """
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
 from enum import StrEnum
 import logging
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from datetime import datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +31,16 @@ class DataSource(StrEnum):
     CLOUD_MQTT = "cloud_mqtt"
     LOCAL_MQTT = "local_mqtt"
     BLE = "ble"
+
+
+class BleProcessDisposition(StrEnum):
+    """Explicit downstream outcome for one accepted BLE notification."""
+
+    CONFIRMED = "confirmed"
+    RETRY = "retry"
+    FRAGMENT = "fragment"
+    UNROUTED = "unrouted"
+    INVALID = "invalid"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1077,7 +1089,8 @@ class FaultData(TypedDict):
 
 
 # =============================================================================
-# Device Share / Bind — topicList (from source-of-truth jackery_http_model_fields_v2.csv)
+# Device Share / Bind — topicList
+# Source: source-of-truth jackery_http_model_fields_v2.csv
 # =============================================================================
 
 

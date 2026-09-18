@@ -27,7 +27,6 @@ from custom_components.jackery_solarvault.number import (
     JackeryNumber,
     JackeryNumberDescription,
     _is_portable_payload as number_is_portable_payload,  # ruff: ignore[import-private-name]
-    _payload_has_home_payload_evidence as number_has_home_evidence,  # ruff: ignore[import-private-name]
     _set_max_feed_grid,  # ruff: ignore[import-private-name]
     _wire_float,  # ruff: ignore[import-private-name]
     _wire_int,  # ruff: ignore[import-private-name]
@@ -37,6 +36,9 @@ from custom_components.jackery_solarvault.text import (
     JackeryGridStandardText,
     JackerySystemNameText,
     JackeryThirdPartyMqttText,
+)
+from custom_components.jackery_solarvault.util import (
+    payload_has_home_payload_evidence as number_has_home_evidence,
 )
 from homeassistant.components.text import TextMode
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -75,10 +77,11 @@ def _number(
     })
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.entity_description = description
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
-def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:  # noqa: RUF105
+def _text_entity(entity_type: type[Any], data: dict[str, Any]) -> Any:
     """Build a real text entity with a mocked transport boundary."""
     entity = object.__new__(entity_type)
     mutable = cast("Any", entity)
@@ -152,6 +155,7 @@ def test_number_description_resolves_smali_and_explicit_capabilities() -> None:
     """Description post-init preserves explicit sources and derives missing fields."""
     explicit_sources = ("explicit",)
     description = JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="smali",
         smali_field="wireField",
         data_sources=explicit_sources,
@@ -159,11 +163,13 @@ def test_number_description_resolves_smali_and_explicit_capabilities() -> None:
         setter=AsyncMock(),
     )
     third_party = JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="third_party",
         source_keys=("port",),
         source_section=PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     )
     http_only = JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="http",
         source_keys=("price",),
         source_section="price",
@@ -177,7 +183,7 @@ def test_number_description_resolves_smali_and_explicit_capabilities() -> None:
 
 
 @pytest.mark.parametrize("parser", [_wire_int, _wire_float])
-def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:  # noqa: RUF105
+def test_number_wire_parsers_reject_non_numeric_input(parser: Any) -> None:
     """Wire values fail closed instead of silently coercing invalid input."""
     with pytest.raises(HomeAssistantError, match="invalid number value"):
         parser("not-a-number")
@@ -195,10 +201,14 @@ async def test_max_feed_grid_low_capability_writes_800_watts() -> None:
 def test_number_static_fallbacks_and_non_numeric_native_value() -> None:
     """Static description metadata and malformed telemetry produce safe values."""
     description = JackeryNumberDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="static",
         source_keys=("value",),
+        # pyrefly: ignore [unexpected-keyword]
         native_min_value=0,
+        # pyrefly: ignore [unexpected-keyword]
         native_max_value=42,
+        # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement="widgets",
         allowed_values=(1.0, 2.0),
         display_precision=2,
@@ -208,29 +218,36 @@ def test_number_static_fallbacks_and_non_numeric_native_value() -> None:
     assert entity.native_value is None
     assert entity.native_max_value == pytest.approx(42)
     assert entity.native_unit_of_measurement == "widgets"
-    assert entity.suggested_display_precision == 2
+    assert entity.suggested_display_precision == 2  # ruff: ignore[magic-value-comparison]
     assert entity._allowed_values() == (1.0, 2.0)  # ruff: ignore[private-member-access]
 
 
 def test_number_empty_description_has_safe_defaults() -> None:
     """Descriptions without limits or discrete values expose empty defaults."""
+    # pyrefly: ignore [unexpected-keyword]
     entity = _number(JackeryNumberDescription(key="empty"))
 
     assert entity.native_max_value == pytest.approx(0)
     assert entity._allowed_values() == ()  # ruff: ignore[private-member-access]
 
 
-async def test_number_without_setter_validates_then_performs_no_write() -> None:
-    """A read-only description returns cleanly after range validation."""
+async def test_number_without_setter_raises_translated_action_error() -> None:
+    """A read-only description reports that the entity is not writable."""
     entity = _number(
         JackeryNumberDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="readonly",
+            # pyrefly: ignore [unexpected-keyword]
             native_min_value=0,
+            # pyrefly: ignore [unexpected-keyword]
             native_max_value=10,
         ),
     )
 
-    await entity.async_set_native_value(5)
+    with pytest.raises(HomeAssistantError) as raised:
+        await entity.async_set_native_value(5)
+
+    assert raised.value.translation_key == "entity_action_failed"
 
 
 @pytest.mark.parametrize(
@@ -255,8 +272,11 @@ async def test_number_preserves_structured_setter_errors(
     setter = AsyncMock(side_effect=error)
     entity = _number(
         JackeryNumberDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="structured",
+            # pyrefly: ignore [unexpected-keyword]
             native_min_value=0,
+            # pyrefly: ignore [unexpected-keyword]
             native_max_value=10,
             setter=setter,
         ),
@@ -267,24 +287,6 @@ async def test_number_preserves_structured_setter_errors(
 
     if isinstance(error, HomeAssistantError):
         assert caught.value is error
-
-
-async def test_optional_number_setter_ignores_transport_failure() -> None:
-    """An explicitly optional write logs a transport failure without masking HA."""
-    setter = AsyncMock(side_effect=TimeoutError("offline"))
-    entity = _number(
-        JackeryNumberDescription(
-            key="optional",
-            native_min_value=0,
-            native_max_value=10,
-            setter=setter,
-            raise_on_setter_error=False,
-        ),
-    )
-
-    await entity.async_set_native_value(5)
-
-    setter.assert_awaited_once()
 
 
 def test_device_and_system_name_native_fallbacks() -> None:
@@ -440,20 +442,24 @@ def _third_party() -> JackeryThirdPartyMqttText:
     mutable._field = FIELD_THIRD_PARTY_MQTT_IP  # ruff: ignore[private-member-access]
     mutable._attr_translation_key = "third_party_mqtt_ip"  # ruff: ignore[private-member-access]
     mutable._attr_mode = TextMode.TEXT  # ruff: ignore[private-member-access]
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
 def test_third_party_native_value_none_and_constructor_pattern_branch() -> None:
     """Missing plaintext remains unavailable and optional patterns are installed."""
     entity = _third_party()
+    # pyrefly: ignore [missing-argument]
     constructed = JackeryThirdPartyMqttText(
         entity.coordinator,
         _DEVICE_ID,
-        key_suffix="token",
-        translation_key="third_party_mqtt_token",
-        field="token",
-        mode=TextMode.TEXT,
-        pattern=r"^\d+$",
+        config=(
+            "token",
+            "third_party_mqtt_token",
+            "token",
+            TextMode.TEXT,
+            r"^\d+$",
+        ),
     )
 
     assert entity.native_value is None
@@ -491,7 +497,7 @@ async def test_third_party_maps_all_write_error_families(
         await entity.async_set_value(" broker ")
 
     if isinstance(error, ConfigEntryAuthFailed) or (
-        isinstance(error, HomeAssistantError) and error.translation_key
+        isinstance(error, HomeAssistantError) and error.translation_key  # pyrefly: ignore [missing-attribute]
     ):
         assert caught.value is error
     elif not isinstance(error, text_mod.JackeryAuthError):

@@ -15,7 +15,14 @@ from custom_components.jackery_solarvault.const import (
     APP_CHART_SERIES_Y,
     APP_CHART_SERIES_Y1,
     APP_CHART_SERIES_Y2,
+    APP_CHART_SERIES_Y3,
+    APP_CHART_SERIES_Y4,
+    APP_CHART_SERIES_Y5,
+    APP_CHART_STAT_METRICS,
     APP_CHART_STAT_PERIODS,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_REQUEST_BEGIN_DATE_ALT,
     APP_REQUEST_DATE_TYPE_ALT,
     APP_REQUEST_END_DATE_ALT,
@@ -41,7 +48,6 @@ from custom_components.jackery_solarvault.const import (
     APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
     APP_STAT_UNIT,
     APP_UNIT_KWH,
-    CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATE_TYPE_DAY,
@@ -136,15 +142,6 @@ def test_config_entry_int_option_returns_default_on_bad_value() -> None:
     )
 
 
-def test_entry_bool_option_delegates() -> None:
-    """The thin alias resolves the same value as the underlying reader."""
-    entry = _entry(options={CONF_ENABLE_PAYLOAD_DEBUG_LOG: "yes"})
-    resolved = util.entry_bool_option(
-        entry, CONF_ENABLE_PAYLOAD_DEBUG_LOG, default=False
-    )
-    assert resolved is True
-
-
 # ---------------------------------------------------------------------------
 # subdevice branding / online state / text helpers
 # ---------------------------------------------------------------------------
@@ -169,13 +166,11 @@ def test_first_nonblank_text_and_fallback() -> None:
     assert util.first_nonblank_text(None, fallback="fb") == "fb"
 
 
-def test_first_nonblank_and_int() -> None:
-    """Text/int variants of the first-nonblank helpers coerce as documented."""
+def test_first_nonblank_int() -> None:
+    """The first whole nonblank value is returned."""
     expected_twelve = 12
     expected_three = 3
     expected_one = 1
-    assert util.first_nonblank(None, "  ", "y") == "y"
-    assert util.first_nonblank() is None
     assert util.first_nonblank_int(None, "  ", "12") == expected_twelve
     assert util.first_nonblank_int(3.0) == expected_three
     assert util.first_nonblank_int(3.5) is None
@@ -1039,6 +1034,27 @@ def test_chart_series_key_for_stat_all_sections() -> None:
         )
         == APP_CHART_SERIES_Y2
     )
+
+
+def test_battery_flow_period_series_are_registered_for_recorder() -> None:
+    """Every non-total battery curve delivered by Cloud has a Recorder metric."""
+    expected = {
+        APP_DEVICE_STAT_ONGRID_TO_BATTERY: APP_CHART_SERIES_Y3,
+        APP_DEVICE_STAT_BATTERY_TO_AC: APP_CHART_SERIES_Y4,
+        APP_DEVICE_STAT_BATTERY_TO_GRID: APP_CHART_SERIES_Y5,
+    }
+    registered = {
+        stat_key
+        for section, stat_key, _metric_key, _label in APP_CHART_STAT_METRICS
+        if section == APP_SECTION_BATTERY_STAT
+    }
+
+    assert expected.keys() <= registered
+    for stat_key, series_key in expected.items():
+        assert (
+            util._chart_series_key_for_stat(APP_SECTION_BATTERY_STAT, stat_key)  # ruff: ignore[private-member-access]
+            == series_key
+        )
 
 
 def test_day_power_series_key_signed_battery_discharge() -> None:

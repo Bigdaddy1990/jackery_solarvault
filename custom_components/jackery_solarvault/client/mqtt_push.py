@@ -1,21 +1,25 @@
 """Async MQTT push client for Jackery SolarVault cloud broker."""
 
 import asyncio
+from collections import deque
+from dataclasses import dataclass
 from datetime import UTC, datetime
-import hashlib
+from enum import StrEnum
 import json
 import logging
 from pathlib import Path
 import ssl
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import aiomqtt
 from aiomqtt import MqttError
 from aiomqtt.exceptions import MqttCodeError
 
 from ..const import (
+    FIELD_ACTION_ID,
     FIELD_BODY,
     FIELD_DATA,
+    FIELD_ID,
     MQTT_AUTH_FAILURE_RCS,
     MQTT_AUTH_FAILURE_TOLERANCE,
     MQTT_CLIENT_LIBRARY,
@@ -24,18 +28,20 @@ from ..const import (
     MQTT_KEEPALIVE_SEC,
     MQTT_PORT,
     MQTT_SILENT_THRESHOLD_SEC,
+    MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
+from .credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Coroutine
 
     from aiomqtt import Client as MQTTClient
 
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
-
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -43,10 +49,88 @@ _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
 # level; enabling integration DEBUG must expose every aiomqtt connection,
 # subscription, publish and teardown record.
 _MQTT_STOP_TIMEOUT_SEC = 5.0
-_MAX_PENDING_MESSAGE_TASKS = 32
+_MQTT_OPERATION_TIMEOUT_SEC = 4.0
 # Getter response correlation constants
 _MAX_PENDING_RESPONSES = 100
 _MQTT_RESPONSE_TIMEOUT_SEC = 10.0
+_MQTT_TOPIC_REDACTION_MIN_PARTS = 4
+
+
+class MqttSessionState(StrEnum):
+    """Lifecycle state of the currently owned broker session."""
+
+    CONNECTING = "connecting"
+    SUBSCRIBED = "subscribed"
+    ONLINE = "online"
+    RECONNECTING = "reconnecting"
+    OFFLINE = "offline"
+
+
+class MqttMessageType(StrEnum):
+    """Jackery MQTT message classes with protocol-defined delivery settings."""
+
+    SUBSCRIPTION = "subscription"
+    COMMAND = "command"
+    BIRTH = "birth"
+
+
+@dataclass(frozen=True, slots=True)
+class MqttMessageSpec:
+    """Delivery contract for one Jackery MQTT message class."""
+
+    topic_suffixes: tuple[str, ...]
+    qos: int
+    retain: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _MqttSessionConfig:
+    """Immutable inputs for one owned broker session generation."""
+
+    client_id: str
+    username: str
+    password: str
+    ssl_context: ssl.SSLContext
+    topics: tuple[str, ...]
+    generation: int
+
+
+@dataclass(slots=True)
+class _MqttSessionRunState:
+    """Mutable connection evidence retained across session cleanup."""
+
+    broker_connected: bool = False
+    subscription_error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _MqttStopPlan:
+    """Owned MQTT tasks captured before state invalidation."""
+
+    runner_task: asyncio.Task[None] | None
+    runner_protocol_wait: bool
+    lifecycle_tasks: frozenset[asyncio.Task[None]]
+    owned_tasks: frozenset[asyncio.Task[None]]
+
+
+# Jackery uses clean sessions and does not permit an LWT or retained presence.
+JACKERY_MQTT_SUPPORTS_LWT: Final = False
+JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE: Final = False
+MQTT_MESSAGE_SPECS: Final = {
+    MqttMessageType.SUBSCRIPTION: MqttMessageSpec(
+        topic_suffixes=MQTT_TOPIC_SUFFIXES, qos=0, retain=False
+    ),
+    MqttMessageType.COMMAND: MqttMessageSpec(
+        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False
+    ),
+    MqttMessageType.BIRTH: MqttMessageSpec(
+        topic_suffixes=(MQTT_TOPIC_COMMAND,), qos=0, retain=False
+    ),
+}
+
+
+class JackeryMqttTransportError(RuntimeError):
+    """An RPC was interrupted because its MQTT session ended."""
 
 
 class JackeryMqttPushClient:
@@ -64,6 +148,7 @@ class JackeryMqttPushClient:
         message_callback: Callable[[str, dict[str, Any]], Awaitable[object]],
         connect_callback: Callable[[], Awaitable[None]] | None = None,
         disconnect_callback: Callable[[], Awaitable[None]] | None = None,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         """Initialize the MQTT push client and its lifecycle callbacks.
 
@@ -80,12 +165,14 @@ class JackeryMqttPushClient:
             disconnects.
         """
         self._hass = hass
+        self._config_entry = config_entry
         self._message_callback = message_callback
         self._connect_callback = connect_callback
         self._disconnect_callback = disconnect_callback
         self._lock = asyncio.Lock()
         self._client: MQTTClient | None = None
         self._runner_task: asyncio.Task[None] | None = None
+        self._runner_protocol_wait = False
         self._stopping = False
         self._session_generation = 0
         self._fingerprint: str | None = None
@@ -93,6 +180,7 @@ class JackeryMqttPushClient:
         self._subscribed_topics: list[str] = []
         self._connected_event = asyncio.Event()
         self._connected = False
+        self._session_state = MqttSessionState.OFFLINE
         self._messages_seen = 0
         self._messages_dropped = 0
         self._last_error: str | None = None
@@ -109,7 +197,9 @@ class JackeryMqttPushClient:
         self._tls_certificate_source = "jackery_ca.crt"
         self._tls_x509_strict_disabled = False
         # Getter response correlation (bounded session state)
-        self._pending_responses: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self._pending_responses: dict[
+            tuple[int, int, str | int | None], asyncio.Future[dict[str, Any]]
+        ] = {}
         self._responses_correlated = 0
         self._responses_expired = 0
         # "Birth" = the on-connect app-snapshot publish the broker expects
@@ -125,7 +215,16 @@ class JackeryMqttPushClient:
         self._birth_publish_failed = 0
         self._birth_not_connected_logged = False
         self._last_birth_at: str | None = None
+        self._birth_generation: int | None = None
+        self._message_queue: deque[tuple[str, dict[str, Any]]] = deque()
+        self._message_consumer_task: asyncio.Task[None] | None = None
+        self._message_delivery_task: asyncio.Task[None] | None = None
+        self._message_delivery_item: tuple[str, dict[str, Any]] | None = None
+        # Compatibility tracking used by diagnostics and bounded shutdown. A
+        # FIFO client owns at most one message-consumer task at a time.
         self._message_tasks: set[asyncio.Task[None]] = set()
+        self._messages_delivered = 0
+        self._message_handler_errors = 0
         self._lifecycle_tasks: dict[asyncio.Task[None], object] = {}
 
     async def async_start(
@@ -143,9 +242,8 @@ class JackeryMqttPushClient:
         and the client is already connected, this returns immediately. Otherwise it
         stops any existing session, prepares the user-scoped subscription topics, builds
         an SSLContext, records the credential fingerprint and connection attempt, and
-        starts the session runner as a background task. After starting the runner, waits
-        up to 12 seconds for the client to report connected; a timeout is suppressed (no
-        exception).
+        starts the session runner as a background task. Connection waiting is owned by
+        the coordinator so authentication and backoff handling live in one place.
 
         Parameters:
             client_id (str): MQTT client identifier for the session.
@@ -168,6 +266,11 @@ class JackeryMqttPushClient:
             self._stopping = False
             self._session_generation += 1
             generation = self._session_generation
+            self._session_state = (
+                MqttSessionState.RECONNECTING
+                if self._connect_attempts
+                else MqttSessionState.CONNECTING
+            )
 
             self._topics = [
                 f"{MQTT_TOPIC_PREFIX}/{user_id}/{suffix}"
@@ -194,27 +297,21 @@ class JackeryMqttPushClient:
                 MQTT_PORT,
                 self._tls_certificate_source,
             )
-            self._runner_task = self._hass.async_create_background_task(
+            self._runner_task = self._create_background_task(
                 self._async_run_session(
-                    client_id=client_id,
-                    username=username,
-                    password=password,
-                    ssl_context=ssl_context,
-                    topics=session_topics,
-                    generation=generation,
+                    _MqttSessionConfig(
+                        client_id=client_id,
+                        username=username,
+                        password=password,
+                        ssl_context=ssl_context,
+                        topics=session_topics,
+                        generation=generation,
+                    )
                 ),
                 name="jackery_mqtt_runner",
-                eager_start=False,
             )
 
-        if wait_connected:
-            try:
-                await asyncio.wait_for(self._connected_event.wait(), timeout=30.0)
-            except TimeoutError:
-                _LOGGER.warning(
-                    "Jackery cloud MQTT: broker did not confirm the connection "
-                    "within 30s; continuing without it",
-                )
+        del wait_connected
 
     @staticmethod
     def _credential_fingerprint(client_id: str, username: str, password: str) -> str:
@@ -228,12 +325,11 @@ class JackeryMqttPushClient:
         Returns:
             str: Hexadecimal SHA-256 digest of the provided credentials.
         """
-        hasher = hashlib.sha256()
-        for value in (client_id, username, password):
-            encoded = value.encode()
-            hasher.update(len(encoded).to_bytes(4, "big"))
-            hasher.update(encoded)
-        return hasher.hexdigest()
+        return credential_fingerprint({
+            "client_id": client_id,
+            "username": username,
+            "password": password,
+        })
 
     async def async_stop(self) -> None:
         """Stop the MQTT runner and disconnect the client.
@@ -249,8 +345,9 @@ class JackeryMqttPushClient:
         topic: str,
         payload: dict[str, Any],
         *,
-        qos: int = 0,
-        retain: bool = False,
+        qos: int | None = None,
+        retain: bool | None = None,
+        message_type: MqttMessageType = MqttMessageType.COMMAND,
     ) -> None:
         """Publish a mapping as compact UTF-8 JSON to the given MQTT topic.
 
@@ -271,6 +368,9 @@ class JackeryMqttPushClient:
         Raises:
                 RuntimeError: If the MQTT client is not running or the publish fails.
         """
+        spec = MQTT_MESSAGE_SPECS[message_type]
+        publish_qos = spec.qos if qos is None else qos
+        publish_retain = spec.retain if retain is None else retain
         text = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         generation = self._session_generation
         owner_task = self._runner_task
@@ -284,7 +384,7 @@ class JackeryMqttPushClient:
             msg = "MQTT client is not running"
             raise RuntimeError(msg)
         try:
-            await client.publish(topic, text, qos=qos, retain=retain)
+            await client.publish(topic, text, qos=publish_qos, retain=publish_retain)
         except asyncio.CancelledError:
             raise
         except MqttError as err:
@@ -292,6 +392,8 @@ class JackeryMqttPushClient:
                 self._connected = False
                 self._connected_event.clear()
                 self._last_error = f"publish failed: {err}"
+                self._session_state = MqttSessionState.RECONNECTING
+                self._fail_pending_responses("MQTT publish disconnected the session")
             msg = f"MQTT publish failed: {err}"
             raise RuntimeError(msg) from err
         if not self._session_is_current(generation, owner_task):
@@ -315,18 +417,7 @@ class JackeryMqttPushClient:
         await self._async_wait_connected(timeout_sec=timeout_sec)
 
     async def _async_wait_connected(self, timeout_sec: float) -> None:
-        """Wait until connected or raise ``RuntimeError`` on failure.
-
-        Waits up to `timeout_sec` seconds for the internal connected event. If the wait
-        times out, sets `self._last_error` to
-        "publish timeout waiting for MQTT connect" when there is no prior error and then raises `RuntimeError("MQTT not connected yet")`.
-        If a prior error exists or the event completes but the client is not marked
-        connected, raises `RuntimeError` including
-        the current `self._last_error`.
-
-        Parameters:
-            timeout_sec (float): Maximum number of seconds to wait for the connection.
-        """
+        """Wait for current-session connection evidence within the timeout."""
         generation = self._session_generation
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=timeout_sec)
@@ -359,6 +450,56 @@ class JackeryMqttPushClient:
             and (runner_task is None or self._runner_task is runner_task)
         )
 
+    def _mqtt_stop_plan(self) -> _MqttStopPlan:
+        """Capture all tasks owned by the current session except this caller."""
+        current_task = asyncio.current_task()
+        lifecycle_tasks = frozenset(
+            task for task in self._lifecycle_tasks if task is not current_task
+        )
+        runner_task = self._runner_task
+        owned_tasks = set(lifecycle_tasks)
+        if runner_task is not None and runner_task is not current_task:
+            owned_tasks.add(runner_task)
+        return _MqttStopPlan(
+            runner_task=runner_task,
+            runner_protocol_wait=self._runner_protocol_wait,
+            lifecycle_tasks=lifecycle_tasks,
+            owned_tasks=frozenset(owned_tasks),
+        )
+
+    @staticmethod
+    def _cancel_mqtt_stop_tasks(plan: _MqttStopPlan) -> None:
+        """Cancel tasks except an in-flight connect/SUBSCRIBE protocol wait."""
+        for task in plan.owned_tasks:
+            if task is plan.runner_task and plan.runner_protocol_wait:
+                continue
+            if not task.done():
+                task.cancel()
+
+    def _settle_mqtt_stop_tasks(
+        self,
+        plan: _MqttStopPlan,
+        done: set[asyncio.Task[None]],
+    ) -> None:
+        """Observe completed task failures and release exact owned handles."""
+        for task in done:
+            try:
+                task.result()
+            except asyncio.CancelledError:
+                continue
+            except Exception as err:  # ruff: ignore[blind-except]
+                _LOGGER.warning(
+                    "Jackery cloud MQTT task %s failed during stop: %s",
+                    task.get_name(),
+                    err,
+                )
+        if plan.runner_task in done and self._runner_task is plan.runner_task:
+            self._runner_task = None
+        for task in done & plan.lifecycle_tasks:
+            token = self._lifecycle_tasks.get(task)
+            if token is not None and self._lifecycle_tasks.get(task) is token:
+                self._lifecycle_tasks.pop(task, None)
+
     async def _async_stop_locked(self) -> None:
         """Stop the current runner task and clear internal connection state.
 
@@ -369,202 +510,232 @@ class JackeryMqttPushClient:
         """
         self._stopping = True
         self._session_generation += 1
-        current_task = asyncio.current_task()
-        runner_task = self._runner_task
-        runner_session_entered = self._client is not None
-        lifecycle_tasks = {
-            pending for pending in self._lifecycle_tasks if pending is not current_task
-        }
-        message_tasks = {
-            pending for pending in self._message_tasks if pending is not current_task
-        }
-        owned_tasks = set(lifecycle_tasks | message_tasks)
-        if runner_task is not None and runner_task is not current_task:
-            owned_tasks.add(runner_task)
+        self._fail_pending_responses("MQTT client stopped")
+        plan = self._mqtt_stop_plan()
         self._client = None
         self._fingerprint = None
         self._topics = []
         self._subscribed_topics = []
         self._connected = False
+        self._session_state = MqttSessionState.OFFLINE
         # Wake callers already blocked on a connection attempt. They observe the
         # invalidated generation and fail immediately; a new start clears the event.
         self._connected_event.set()
-        for pending in owned_tasks:
-            # aiomqtt 2.5.1 does not unwind a cancelled ``__aenter__`` cleanly.
-            # Let an in-progress connect finish or time out; once the context
-            # has been entered, normal cancellation runs ``__aexit__``.
-            if pending is runner_task and not runner_session_entered:
-                continue
-            if not pending.done():
-                pending.cancel()
-        if not owned_tasks:
-            return
-        done, still_pending = await asyncio.wait(
-            owned_tasks,
-            timeout=_MQTT_STOP_TIMEOUT_SEC,
-        )
-        for completed in done:
-            try:
-                completed.result()
-            except asyncio.CancelledError:
-                continue
-            except Exception as err:  # ruff: ignore[blind-except]
-                _LOGGER.warning(
-                    "Jackery cloud MQTT task %s failed during stop: %s",
-                    completed.get_name(),
-                    err,
-                )
-        if runner_task in done and self._runner_task is runner_task:
-            self._runner_task = None
-        for completed in done & lifecycle_tasks:
-            token = self._lifecycle_tasks.get(completed)
-            if token is not None and self._lifecycle_tasks.get(completed) is token:
-                self._lifecycle_tasks.pop(completed, None)
-        self._message_tasks.difference_update(done)
+        for future in self._pending_responses.values():
+            if not future.done():
+                future.cancel()
+        self._pending_responses.clear()
+        self._cancel_mqtt_stop_tasks(plan)
+        done: set[asyncio.Task[None]] = set()
+        still_pending: set[asyncio.Task[None]] = set()
+        if plan.owned_tasks:
+            done, still_pending = await asyncio.wait(
+                plan.owned_tasks,
+                timeout=_MQTT_STOP_TIMEOUT_SEC,
+            )
+        self._settle_mqtt_stop_tasks(plan, done)
         if still_pending:
-            runner_count = int(runner_task in still_pending)
-            lifecycle_count = len(still_pending & lifecycle_tasks)
-            message_count = len(still_pending & message_tasks)
+            runner_count = int(plan.runner_task in still_pending)
+            lifecycle_count = len(still_pending & plan.lifecycle_tasks)
+            accepted_backlog = len(self._message_queue) + int(
+                self._message_delivery_item is not None
+            )
             msg = (
                 "Jackery MQTT stop timed out after "
                 f"{_MQTT_STOP_TIMEOUT_SEC:.1f}s "
                 f"(runner={runner_count}, lifecycle={lifecycle_count}, "
-                f"messages={message_count})"
+                f"messages={accepted_backlog})"
             )
             raise RuntimeError(msg)
-
-    async def _async_run_session(
-        self,
-        *,
-        client_id: str,
-        username: str,
-        password: str,
-        ssl_context: ssl.SSLContext,
-        topics: tuple[str, ...],
-        generation: int,
-    ) -> None:
-        """Connect, subscribe, process messages, and maintain session state.
-
-        On successful connection, sets internal connection flags and timestamps,
-        subscribes to topics in self._topics, and forwards incoming messages to the
-        internal message handler. If configured, schedules the connect callback once
-        connected and schedules the disconnect callback when a previously established
-        session ends. On errors, updates internal error state and sets or clears the
-        connected event to reflect whether the termination was a connect failure.
-        """
-        runner_task = asyncio.current_task()
-        broker_connected = False
-        subscription_error: str | None = None
-        try:  # ruff: ignore[too-many-statements-in-try-clause] - this owns one complete broker session
-            raw_client = aiomqtt.Client(
-                hostname=MQTT_HOST,
-                port=MQTT_PORT,
-                identifier=client_id,
-                username=username,
-                password=password,
-                tls_context=ssl_context,
-                keepalive=MQTT_KEEPALIVE_SEC,
-                clean_session=True,
-                logger=_AIOMQTT_LOGGER,
+        try:
+            await self.async_wait_message_queue_idle(timeout_sec=_MQTT_STOP_TIMEOUT_SEC)
+        except TimeoutError as err:
+            accepted_backlog = len(self._message_queue) + int(
+                self._message_delivery_item is not None
             )
-            async with raw_client as client:
-                if not self._session_is_current(generation, runner_task):
-                    return
-                self._client = client
-                broker_connected = True
-                self._last_connect_failure_signature = None
-                self._consecutive_auth_failures = 0
-                _LOGGER.info(
-                    "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
-                    len(topics),
-                    self._tls_certificate_source,
+            msg = (
+                "Jackery MQTT stop timed out after "
+                f"{_MQTT_STOP_TIMEOUT_SEC:.1f}s while draining accepted messages "
+                f"(messages={accepted_backlog})"
+            )
+            raise RuntimeError(msg) from err
+
+    async def _async_subscribe_session(
+        self,
+        client: MQTTClient,
+        config: _MqttSessionConfig,
+        runner_task: asyncio.Task[None] | None,
+        state: _MqttSessionRunState,
+    ) -> bool:
+        """Subscribe every configured topic while ownership remains current."""
+        for topic in config.topics:
+            if not self._session_is_current(config.generation, runner_task):
+                return False
+            try:
+                await client.subscribe(
+                    topic,
+                    qos=MQTT_MESSAGE_SPECS[MqttMessageType.SUBSCRIPTION].qos,
                 )
-                for topic in topics:
-                    if not self._session_is_current(generation, runner_task):
-                        return
-                    try:
-                        await client.subscribe(topic, qos=0)
-                    except MqttError as err:
-                        if not self._session_is_current(generation, runner_task):
-                            return
-                        subscription_error = f"subscribe failed for {topic}: {err}"
-                        self._last_error = subscription_error
-                        _LOGGER.warning(
-                            "Jackery MQTT subscribe failed for %s: %s", topic, err
-                        )
-                        raise
-                    if not self._session_is_current(generation, runner_task):
-                        return
-                    self._subscribed_topics.append(topic)
-                if not self._session_is_current(generation, runner_task):
-                    return
-                self._connected = True
-                self._last_connect_at = self._utc_now_iso()
-                self._connected_event.set()
-                self._last_error = None
-                # Fresh session: the next not-connected birth failure is
-                # news again.
-                self._birth_not_connected_logged = False
-                if self._connect_callback is not None:
-                    self._schedule_birth_snapshot(
-                        self._connect_callback,
-                        generation=generation,
-                    )
-                async for message in client.messages:
-                    if not self._session_is_current(generation, runner_task):
-                        return
-                    self._handle_message(
-                        str(message.topic),
-                        message.payload,
-                        generation=generation,
-                        runner_task=runner_task,
-                    )
+            except MqttError as err:
+                if not self._session_is_current(config.generation, runner_task):
+                    return False
+                state.subscription_error = (
+                    f"subscribe failed for {topic}: {redacted_error(err)}"
+                )
+                self._last_error = state.subscription_error
+                _LOGGER.warning(
+                    "Jackery MQTT subscribe failed for %s: %s",
+                    topic,
+                    redacted_error(err),
+                )
+                raise
+            self._subscribed_topics.append(topic)
+        return self._session_is_current(config.generation, runner_task)
+
+    def _mark_session_connected(self, config: _MqttSessionConfig) -> None:
+        """Publish current-session connection evidence after all SUBACKs."""
+        self._session_state = MqttSessionState.SUBSCRIBED
+        self._connected = True
+        self._last_connect_at = self._utc_now_iso()
+        self._connected_event.set()
+        self._last_error = None
+        self._birth_not_connected_logged = False
+        if self._connect_callback is not None:
+            self._schedule_birth_snapshot(
+                self._connect_callback,
+                generation=config.generation,
+            )
+        else:
+            self._session_state = MqttSessionState.ONLINE
+
+    async def _async_consume_session_messages(
+        self,
+        client: MQTTClient,
+        config: _MqttSessionConfig,
+        runner_task: asyncio.Task[None] | None,
+    ) -> None:
+        """Feed every broker message into the serial delivery queue."""
+        async for message in client.messages:
+            if not self._session_is_current(config.generation, runner_task):
+                return
+            self._handle_message(
+                str(message.topic),
+                message.payload,
+                generation=config.generation,
+                runner_task=runner_task,
+            )
+
+    def _finalize_session(
+        self,
+        config: _MqttSessionConfig,
+        runner_task: asyncio.Task[None] | None,
+        state: _MqttSessionRunState,
+    ) -> None:
+        """Release one session generation and schedule independent recovery."""
+        self._runner_protocol_wait = False
+        is_current = self._session_is_current(config.generation, runner_task)
+        if not is_current:
+            return
+        self._client = None
+        self._connected = False
+        self._session_state = (
+            MqttSessionState.OFFLINE
+            if self._stopping or not state.broker_connected
+            else MqttSessionState.RECONNECTING
+        )
+        self._fail_pending_responses("MQTT session disconnected")
+        if state.broker_connected:
+            self._last_disconnect_at = self._utc_now_iso()
+        if state.subscription_error or self._is_connect_failure_error(self._last_error):
+            self._connected_event.set()
+        else:
+            self._connected_event.clear()
+        self._runner_task = None
+        if not self._stopping and self._disconnect_callback is not None:
+            self._schedule_lifecycle_callback(
+                self._disconnect_callback,
+                "disconnect-recover",
+                generation=config.generation,
+            )
+
+    async def _async_open_session(
+        self,
+        config: _MqttSessionConfig,
+        runner_task: asyncio.Task[None] | None,
+        state: _MqttSessionRunState,
+    ) -> None:
+        """Open the broker context and run its subscribed message stream."""
+        raw_client = aiomqtt.Client(
+            hostname=MQTT_HOST,
+            port=MQTT_PORT,
+            identifier=config.client_id,
+            username=config.username,
+            password=config.password,
+            tls_context=config.ssl_context,
+            keepalive=MQTT_KEEPALIVE_SEC,
+            clean_session=True,
+            logger=_AIOMQTT_LOGGER,
+            timeout=_MQTT_OPERATION_TIMEOUT_SEC,
+        )
+        async with raw_client as client:
+            if not self._session_is_current(config.generation, runner_task):
+                return
+            self._client = client
+            state.broker_connected = True
+            self._last_connect_failure_signature = None
+            self._consecutive_auth_failures = 0
+            _LOGGER.info(
+                "Jackery MQTT connected; subscribing to %d topic(s) [TLS source=%s]",
+                len(config.topics),
+                self._tls_certificate_source,
+            )
+            if not await self._async_subscribe_session(
+                client,
+                config,
+                runner_task,
+                state,
+            ):
+                return
+            self._runner_protocol_wait = False
+            if not self._session_is_current(config.generation, runner_task):
+                return
+            self._mark_session_connected(config)
+            await self._async_consume_session_messages(client, config, runner_task)
+
+    async def _async_run_session(self, config: _MqttSessionConfig) -> None:
+        """Own one connect, subscribe, message, and disconnect lifecycle."""
+        runner_task = asyncio.current_task()
+        state = _MqttSessionRunState()
+        self._runner_protocol_wait = True
+        try:
+            await self._async_open_session(config, runner_task, state)
         except MqttCodeError as err:
-            if self._session_is_current(generation, runner_task):
-                if subscription_error is not None:
-                    self._handle_disconnect_error(subscription_error, broker_connected)
+            if self._session_is_current(config.generation, runner_task):
+                if state.subscription_error is not None:
+                    self._handle_disconnect_error(
+                        state.subscription_error,
+                        state.broker_connected,
+                    )
                 else:
                     self._handle_connect_failure(self._extract_mqtt_code(err))
         except MqttError as err:
-            if self._session_is_current(generation, runner_task):
+            if self._session_is_current(config.generation, runner_task):
                 self._handle_disconnect_error(
-                    subscription_error or str(err), broker_connected
+                    state.subscription_error or redacted_error(err),
+                    state.broker_connected,
                 )
         except asyncio.CancelledError:
             raise
-        except Exception as err:
-            if self._session_is_current(generation, runner_task):
-                self._last_error = f"connect failed: {err}"
+        except Exception as err:  # ruff: ignore[blind-except]
+            if self._session_is_current(config.generation, runner_task):
+                self._last_error = f"connect failed: {redacted_error(err)}"
                 self._connected_event.set()
                 _LOGGER.debug(
-                    "Jackery MQTT connect setup failed: %s", err, exc_info=True
+                    "Jackery MQTT connect setup failed: %s",
+                    redacted_error(err),
                 )
         finally:
-            was_connected = broker_connected
-            is_current = self._session_is_current(generation, runner_task)
-            if is_current:
-                self._client = None
-                self._connected = False
-            if was_connected and is_current:
-                self._last_disconnect_at = self._utc_now_iso()
-            if is_current and (
-                subscription_error or self._is_connect_failure_error(self._last_error)
-            ):
-                self._connected_event.set()
-            elif is_current:
-                self._connected_event.clear()
-            if is_current:
-                self._runner_task = None
-            if (
-                is_current
-                and not self._stopping
-                and self._disconnect_callback is not None
-            ):
-                self._schedule_lifecycle_callback(
-                    self._disconnect_callback,
-                    "disconnect-recover",
-                    generation=generation,
-                )
+            self._finalize_session(config, runner_task, state)
 
     def _handle_connect_failure(self, rc: int) -> None:
         """Record an MQTT CONNACK failure and notify connection waiters.
@@ -605,9 +776,16 @@ class JackeryMqttPushClient:
                 )
             return
         self._last_connect_failure_signature = message
-        if self._is_connect_auth_failure_rc(rc):
+        if (
+            self._is_connect_auth_failure_rc(rc)
+            and self._consecutive_auth_failures >= MQTT_AUTH_FAILURE_TOLERANCE
+        ):
             # Auth rejections are actionable (wrong credentials / shared
-            # session) — surface them at WARNING so the user can act.
+            # session) — but only once they persist. A single rejection at
+            # startup is the expected race between the MQTT connect and the
+            # HTTP login that mints its credentials; it self-heals on the next
+            # attempt, so honour the same tolerance the repeat branch uses
+            # instead of raising a WARNING on every restart.
             _LOGGER.warning("Jackery MQTT connect failed: %s", message)
         else:
             # Transient broker refusals are expected noise on an optional
@@ -634,7 +812,7 @@ class JackeryMqttPushClient:
             _LOGGER.debug("Jackery MQTT connect setup failed: %s", error)
 
     @staticmethod
-    def _extract_mqtt_code(err: MqttCodeError) -> int:
+    def _extract_mqtt_code(err: object) -> int:
         """Extract the integer MQTT return code from a `MqttCodeError`.
 
         Parameters:
@@ -667,32 +845,11 @@ class JackeryMqttPushClient:
 
     @staticmethod
     def _is_connect_failure_error(error: str | None) -> bool:
-        """Detects whether an error message represents an MQTT connection failure.
-
-        Parameters:
-            error (str | None): Error text to evaluate; `None` is treated as an empty
-            string.
-
-        Returns:
-            bool: `True` if the text starts with "connect rc=" or "connect failed:", `False` otherwise.
-        """
+        """Return whether text has a known connection-failure prefix."""
         return str(error or "").startswith(("connect rc=", "connect failed:"))
 
     def _build_ssl_context_blocking(self) -> ssl.SSLContext:
-        """Create an SSL context that verifies the MQTT broker certificate.
-
-        Attempts to load an optional custom CA bundle from the integration directory; on
-        success sets
-        `self._tls_custom_ca_loaded = True`. Records the certificate source descriptor
-        in
-        `self._tls_certificate_source` (e.g. "system_default+jackery_ca:<path>"). Always enables hostname
-        verification and requires certificate validation; sets a minimum TLS version of
-        1.2 when available.
-
-        Returns:
-            ssl.SSLContext: Configured context with `check_hostname = True` and
-            `verify_mode = ssl.CERT_REQUIRED`.
-        """
+        """Create a validating TLS context with the optional Jackery CA."""
         ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
         source_parts = ["system_default"]
         self._tls_custom_ca_loaded = False
@@ -708,7 +865,9 @@ class JackeryMqttPushClient:
                 ctx.load_verify_locations(cafile=str(ca_path))
             except (OSError, ssl.SSLError) as err:
                 _LOGGER.warning(
-                    "Jackery MQTT CA file %s could not be loaded: %s", ca_path, err
+                    "Jackery MQTT CA file %s could not be loaded: %s",
+                    ca_path,
+                    redacted_error(err),
                 )
             else:
                 self._tls_custom_ca_loaded = True
@@ -760,6 +919,8 @@ class JackeryMqttPushClient:
                 `_last_message_error`, and schedules the configured message callback
                 with `(topic, data)`.
         """
+        if self._stopping:
+            return
         if generation is not None and not self._session_is_current(
             generation, runner_task
         ):
@@ -812,13 +973,230 @@ class JackeryMqttPushClient:
             sorted(str(key) for key in data)[:24],
             body_keys,
         )
-        self._schedule_coroutine(
-            lambda: self._message_callback(topic, data),
-            "message",
-            generation=generation,
-            runner_task=runner_task,
-            tracked_tasks=self._message_tasks,
+        # The session check above is the acceptance boundary. Once a valid live
+        # frame is accepted, later reconnects or unload must not invalidate it.
+        # A single unbounded FIFO consumer preserves broker order without a
+        # debounce window, coalescing, deduplication, or backlog drop policy.
+        self._message_queue.append((topic, data))
+        self._ensure_message_consumer()
+
+    def _create_background_task(
+        self,
+        operation: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        """Create long-lived work owned by the config entry when available."""
+        if self._config_entry is not None:
+            return cast(  # ty: ignore[redundant-cast]
+                "asyncio.Task[None]",
+                self._config_entry.async_create_background_task(
+                    self._hass,
+                    operation,
+                    name=name,
+                    eager_start=False,
+                ),
+            )
+        return self._hass.async_create_background_task(
+            operation,
+            name=name,
+            eager_start=False,
         )
+
+    def _create_message_task(
+        self,
+        operation: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        """Create finite message work owned by the config entry when available."""
+        if self._config_entry is not None:
+            return cast(  # ty: ignore[redundant-cast]
+                "asyncio.Task[None]",
+                self._config_entry.async_create_task(
+                    self._hass,
+                    operation,
+                    name=name,
+                    eager_start=False,
+                ),
+            )
+        return self._hass.async_create_task(operation, name=name, eager_start=False)
+
+    def _ensure_message_consumer(self) -> None:
+        """Start the sole FIFO consumer when accepted frames are waiting."""
+        if not self._message_queue and self._message_delivery_task is None:
+            return
+        current = self._message_consumer_task
+        if current is not None and not current.done():
+            return
+        task = self._create_message_task(
+            self._async_consume_messages(),
+            name="jackery_mqtt_message_fifo",
+        )
+        self._message_consumer_task = task
+        self._message_tasks.add(task)
+
+        def _consumer_done(done: asyncio.Task[None]) -> None:
+            self._settle_message_consumer(done)
+            if not self._stopping and (
+                self._message_queue or self._message_delivery_task is not None
+            ):
+                self._ensure_message_consumer()
+
+        task.add_done_callback(_consumer_done)
+
+    async def _async_consume_messages(self) -> None:
+        """Deliver every accepted cloud frame serially in broker order."""
+        while self._message_queue or self._message_delivery_task is not None:
+            delivery_task = self._message_delivery_task
+            if delivery_task is not None:
+                if not delivery_task.done():
+                    try:
+                        await asyncio.shield(delivery_task)
+                    except asyncio.CancelledError:
+                        if not delivery_task.cancelled():
+                            raise
+                self._settle_message_delivery(delivery_task)
+                continue
+            if not self._message_queue:
+                return
+            item = self._message_queue.popleft()
+            self._message_delivery_item = item
+            self._message_delivery_task = self._create_message_task(
+                self._async_deliver_message(item),
+                name="jackery_mqtt_message_delivery",
+            )
+
+    async def _async_deliver_message(
+        self,
+        item: tuple[str, dict[str, Any]],
+    ) -> None:
+        """Deliver one cloud frame exactly once despite owner cancellation."""
+        topic, data = item
+
+        async def _invoke_callback() -> None:
+            await self._message_callback(topic, data)
+
+        callback_task: asyncio.Task[None] = self._hass.async_create_task(
+            _invoke_callback(),
+            name="jackery_mqtt_message_callback",
+            eager_start=False,
+        )
+        if await self._async_wait_delivery_task(callback_task):
+            self._message_handler_errors += 1
+            self._last_message_error = (
+                "message callback cancelled before completing accepted frame"
+            )
+            _LOGGER.error(
+                "Jackery MQTT message callback was cancelled before completing "
+                "an accepted frame"
+            )
+            return
+        try:
+            callback_task.result()
+        except Exception:
+            self._message_handler_errors += 1
+            _LOGGER.exception("Jackery MQTT message handler failed")
+        else:
+            self._messages_delivered += 1
+
+    @staticmethod
+    async def _async_wait_delivery_task(task: asyncio.Task[None]) -> bool:
+        """Await a started callback once while swallowing cancellation of its owner."""
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+                break
+            except asyncio.CancelledError:
+                if task.done():
+                    break
+                current = asyncio.current_task()
+                if current is not None:
+                    while current.cancelling():
+                        current.uncancel()
+            except Exception:  # ruff:ignore[blind-except]  # callback outcome is inspected by the caller
+                break
+        return task.cancelled()
+
+    def _settle_message_delivery(self, task: asyncio.Task[None]) -> None:
+        """Finish one delivery and requeue it only when cancelled."""
+        if self._message_delivery_task is not task:
+            return
+        item = self._message_delivery_item
+        self._message_delivery_task = None
+        self._message_delivery_item = None
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            if item is not None:
+                self._message_queue.appendleft(item)
+        except Exception:
+            _LOGGER.exception("Jackery MQTT delivery task failed")
+
+    def _settle_message_consumer(self, task: asyncio.Task[None]) -> None:
+        """Consume one actor outcome exactly once and clear its identity safely."""
+        if task not in self._message_tasks and self._message_consumer_task is not task:
+            return
+        self._message_tasks.discard(task)
+        if self._message_consumer_task is task:
+            self._message_consumer_task = None
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            if self._message_queue or self._message_delivery_task is not None:
+                _LOGGER.warning(
+                    "Jackery MQTT FIFO actor was cancelled with accepted delivery "
+                    "still pending"
+                )
+        except Exception:
+            _LOGGER.exception("Jackery MQTT FIFO consumer failed")
+
+    async def async_wait_message_queue_idle(
+        self,
+        *,
+        timeout_sec: float | None = None,
+    ) -> None:
+        """Wait until every accepted frame has completed serial delivery."""
+
+        async def _wait_until_idle() -> None:
+            while (
+                self._message_queue
+                or self._message_delivery_task is not None
+                or self._message_consumer_task is not None
+            ):
+                consumer = self._message_consumer_task
+                if consumer is not None and consumer.done():
+                    self._settle_message_consumer(consumer)
+                delivery = self._message_delivery_task
+                if delivery is not None and delivery.done():
+                    self._settle_message_delivery(delivery)
+                if (
+                    not self._message_queue
+                    and self._message_delivery_task is None
+                    and self._message_consumer_task is None
+                ):
+                    return
+                self._ensure_message_consumer()
+                consumer = self._message_consumer_task
+                delivery = self._message_delivery_task
+                current = asyncio.current_task()
+                if consumer is current or delivery is current:
+                    return
+                waiter = consumer or delivery
+                if waiter is None:
+                    await asyncio.sleep(0)
+                    continue
+                try:
+                    await asyncio.shield(waiter)
+                except asyncio.CancelledError:
+                    if not waiter.cancelled():
+                        raise
+
+        if timeout_sec is None:
+            await _wait_until_idle()
+            return
+        async with asyncio.timeout(timeout_sec):
+            await _wait_until_idle()
 
     def _schedule_coroutine(
         self,
@@ -841,10 +1219,9 @@ class JackeryMqttPushClient:
                 return
             await coro_factory()
 
-        task = self._hass.async_create_background_task(
+        task = self._create_background_task(
             _runner(),
             name=f"jackery_mqtt_{label}",
-            eager_start=False,
         )
         if tracked_tasks is not None:
             tracked_tasks.add(task)
@@ -877,10 +1254,9 @@ class JackeryMqttPushClient:
                 return
             await callback()
 
-        task = self._hass.async_create_background_task(
+        task = self._create_background_task(
             _runner(),
             name=f"jackery_mqtt_{label}",
-            eager_start=False,
         )
         token = object()
         self._lifecycle_tasks[task] = token
@@ -907,7 +1283,7 @@ class JackeryMqttPushClient:
 
         The snapshot publish is the Jackery protocol "birth" (MQTT_PROTOCOL.md
         §3): there is no Last Will, so presence is asserted by this publish. The
-        attempt is counted and timestamped eagerly; failures are recorded so the
+        successful operation is counted and timestamped; failures are recorded so
         birth/availability diagnostics stay accurate. Taking the CALLABLE (not a
         coroutine) lets a dead session skip without ever creating the publish
         coroutine, and "not connected" failures — expected while the broker
@@ -919,11 +1295,12 @@ class JackeryMqttPushClient:
             generation: Session generation captured by the connection callback;
                 the current generation is used when omitted.
         """
-        self._birth_publishes += 1
-        self._last_birth_at = self._utc_now_iso()
         callback_generation = (
             self._session_generation if generation is None else generation
         )
+        if self._birth_generation == callback_generation:
+            return
+        self._birth_generation = callback_generation
         if not self._connected or self._stopping:
             self._birth_publish_failed += 1
             if not self._birth_not_connected_logged:
@@ -949,6 +1326,11 @@ class JackeryMqttPushClient:
                         )
                     return
                 _LOGGER.exception("Jackery MQTT birth snapshot handler failed")
+            else:
+                if self._session_is_current(callback_generation):
+                    self._birth_publishes += 1
+                    self._last_birth_at = self._utc_now_iso()
+                    self._session_state = MqttSessionState.ONLINE
 
         self._schedule_lifecycle_callback(
             _publish,
@@ -981,19 +1363,42 @@ class JackeryMqttPushClient:
         if topic is None:
             return None
         parts = topic.split("/")
-        if len(parts) >= 4 and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX:
+        if (
+            len(parts) >= _MQTT_TOPIC_REDACTION_MIN_PARTS
+            and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX
+        ):
             parts[2] = REDACTED_VALUE
         return "/".join(parts)
 
     # Getter response correlation (bounded session state)
+    @staticmethod
+    def _normalize_response_type(value: object) -> str | int | None:
+        """Canonicalize numeric protocol types while preserving named types."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        return int(normalized) if normalized.isdecimal() else normalized
+
     async def _wait_for_response(
-        self, request_id: int, timeout_sec: float = _MQTT_RESPONSE_TIMEOUT_SEC
+        self,
+        request_id: int,
+        timeout_sec: float = _MQTT_RESPONSE_TIMEOUT_SEC,
+        *,
+        expected_response_type: str | int | None = None,
     ) -> dict[str, Any]:
         """Wait for a response to a getter request.
 
         Args:
             request_id: The request ID to wait for.
             timeout_sec: Maximum seconds to wait for response.
+            expected_response_type: Response type to disambiguate keyed lookups
+                when multiple response types can share a request_id/generation.
 
         Returns:
             The response data dictionary.
@@ -1006,15 +1411,23 @@ class JackeryMqttPushClient:
             msg = "MQTT getter response queue full"
             raise RuntimeError(msg)
 
-        future: asyncio.Future[dict[str, Any]] = asyncio.Future()
-        self._pending_responses[request_id] = future
+        generation = self._session_generation
+        key = (
+            generation,
+            request_id,
+            self._normalize_response_type(expected_response_type),
+        )
+        future: asyncio.Future[dict[str, Any]] = (
+            asyncio.get_running_loop().create_future()
+        )
+        self._pending_responses[key] = future
         try:
             return await asyncio.wait_for(future, timeout=timeout_sec)
         except TimeoutError:
             self._responses_expired += 1
             raise
         finally:
-            self._pending_responses.pop(request_id, None)
+            self._pending_responses.pop(key, None)
 
     def _resolve_pending_response(self, data: dict[str, Any]) -> None:
         """Resolve a pending getter response from an incoming message.
@@ -1022,12 +1435,37 @@ class JackeryMqttPushClient:
         Args:
             data: The parsed MQTT message data containing request_id and response.
         """
-        request_id = data.get("request_id")
-        if isinstance(request_id, int) and request_id in self._pending_responses:
-            future = self._pending_responses.pop(request_id)
+        raw_request_id = data.get("request_id", data.get(FIELD_ID))
+        if not isinstance(raw_request_id, (str, int)) or isinstance(
+            raw_request_id, bool
+        ):
+            return
+        try:
+            request_id = int(raw_request_id)
+        except TypeError, ValueError:
+            return
+        response_type = self._normalize_response_type(
+            data.get("response_type", data.get(FIELD_ACTION_ID))
+        )
+        keys = (
+            (self._session_generation, request_id, response_type),
+            (self._session_generation, request_id, None),
+        )
+        for key in dict.fromkeys(keys):
+            future = self._pending_responses.pop(key, None)
+            if future is None:
+                continue
             if not future.done():
                 future.set_result(data)
                 self._responses_correlated += 1
+            return
+
+    def _fail_pending_responses(self, reason: str) -> None:
+        """Fail and remove all RPC waiters owned by any ending session."""
+        pending, self._pending_responses = self._pending_responses, {}
+        for future in pending.values():
+            if not future.done():
+                future.set_exception(JackeryMqttTransportError(reason))
 
     @property
     def responses_correlated(self) -> int:
@@ -1040,28 +1478,7 @@ class JackeryMqttPushClient:
         return self._responses_expired
 
     def diagnostics_snapshot(self) -> dict[str, Any]:
-        """Provide a snapshot of the client's current diagnostics and computed metrics.
-
-        Returns:
-            dict[str, Any]: Mapping containing connection state, counters, timestamps,
-            broker configuration,
-            TLS information, and computed diagnostics. Notable keys include:
-              - "connected": whether the client is currently connected
-              - "started": whether the client runner task exists
-              - "messages_seen", "messages_dropped": message counters
-              - "topics": list of subscribed topics with identifying segments redacted
-              - "topic_count": number of subscribed topics
-              - "last_error", "last_message_error": last observed error strings
-              - "last_published_topic", "last_connect_at", "last_disconnect_at",
-                "last_message_at", "last_publish_at": last-seen topic/timestamps (ISO strings or None)
-              - "seconds_since_last_message": seconds elapsed since last message (float) or None
-              - "mqtt_silent_for_too_long": whether the connection has been silent past the threshold
-              - "host", "port": broker connection constants
-              - "connect_attempts", "consecutive_auth_failures", "last_connect_failure_signature"
-              - "tls_insecure", "tls_x509_strict_disabled", "tls_custom_ca_loaded",
-                "tls_certificate_source": TLS and certificate source flags
-              - "library": identifier of the MQTT client library
-        """
+        """Return redacted connection, FIFO, TLS, and error diagnostics."""
 
         def topic_value(topic: str | None) -> str | None:
             """Produce a topic with its user-specific segment redacted.
@@ -1079,12 +1496,28 @@ class JackeryMqttPushClient:
 
         return {
             "connected": self._connected,
+            "session_state": self._session_state,
+            "session_generation": self._session_generation,
             "started": self.is_started,
             "stopping": self._stopping,
             "messages_seen": self._messages_seen,
             "messages_dropped": self._messages_dropped,
             "pending_message_tasks": len(self._message_tasks),
-            "max_pending_message_tasks": _MAX_PENDING_MESSAGE_TASKS,
+            # Compatibility field: ``None`` explicitly means the old fixed
+            # backlog cap no longer exists.
+            "max_pending_message_tasks": None,
+            "message_queue_unbounded": True,
+            "message_queue_depth": len(self._message_queue),
+            "message_consumer_running": bool(
+                self._message_consumer_task is not None
+                and not self._message_consumer_task.done()
+            ),
+            "message_delivery_running": bool(
+                self._message_delivery_task is not None
+                and not self._message_delivery_task.done()
+            ),
+            "messages_delivered": self._messages_delivered,
+            "message_handler_errors": self._message_handler_errors,
             "topics": subscribed_topics,
             "topic_count": len(self._subscribed_topics),
             "requested_topics": requested_topics,
@@ -1215,6 +1648,11 @@ class JackeryMqttPushClient:
             True if the client is connected to the MQTT broker, False otherwise.
         """
         return self._connected
+
+    @property
+    def session_state(self) -> MqttSessionState:
+        """Explicit lifecycle state of the owned MQTT session."""
+        return self._session_state
 
     @property
     def session_generation(self) -> int:

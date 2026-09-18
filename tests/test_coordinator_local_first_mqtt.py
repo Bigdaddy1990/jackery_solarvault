@@ -30,7 +30,7 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_last_device_message_monotonic = {}  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _reachability_coordinator() -> JackerySolarVaultCoordinator:
@@ -66,7 +66,8 @@ def test_local_reachability_uses_loaded_ha_bluetooth(
     coordinator = _reachability_coordinator()
     address_present = MagicMock(return_value=True)
     bluetooth_module = ModuleType("homeassistant.components.bluetooth")
-    setattr(bluetooth_module, "async_address_present", address_present)  # ruff:ignore[set-attr-with-constant]
+    # pyrefly: ignore [missing-attribute]
+    bluetooth_module.async_address_present = address_present
     monkeypatch.setitem(
         sys.modules,
         "homeassistant.components.bluetooth",
@@ -147,7 +148,7 @@ def _live_local_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> None:
     """A live local MQTT channel must NOT gate the cloud MQTT channel.
 
@@ -170,7 +171,7 @@ async def test_cloud_mqtt_connect_is_suppressed_while_local_mqtt_is_live() -> No
     mgr.should_skip_reconnect.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     """Command publishes (force=True) must keep the MQTT fallback working.
 
@@ -186,7 +187,7 @@ async def test_forced_connect_bypasses_the_local_first_pause() -> None:
     cast("Any", coordinator._mqtt_mgr).should_skip_reconnect.assert_called_once()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_connected_but_silent_local_client_does_not_pause_cloud(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -212,12 +213,12 @@ async def test_connected_but_silent_local_client_does_not_pause_cloud(
     cast("Any", coordinator._mqtt).async_stop.assert_not_awaited()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_local_mqtt_message_marks_local_channel_live() -> None:
     """HA/local MQTT frames count as local activity even without direct-client state."""
     coordinator = _bare_coordinator()
     handler = AsyncMock(return_value="device-1")
-    cast("Any", coordinator)._async_handle_mqtt_message = handler  # ruff: ignore[private-member-access]
+    coordinator.async_handle_mqtt_message = handler
 
     assert (
         await coordinator.async_handle_local_mqtt_message(

@@ -10,11 +10,14 @@ import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
 from custom_components.jackery_solarvault.const import (
+    APP_SECTION_CT_STAT,
     APP_SECTION_PV_STAT,
     APP_STAT_TOTAL_SOLAR_ENERGY,
     CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_WEEK_STATISTICS,
     CONF_ENABLE_YEAR_STATISTICS,
+    CT_STAT_TYPE_L1,
+    CT_STAT_TYPE_L2,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
@@ -22,7 +25,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from tests._update_cycle_fixture import SYSTEM_ID  # ruff:ignore[banned-api]
+from tests._update_cycle_fixture import SYSTEM_ID  # ruff: ignore[banned-api]
 
 _DEVICE_ID = "device-1"
 _TODAY = date(2026, 7, 23)
@@ -46,7 +49,7 @@ def _coordinator(
     obj = cast("Any", coordinator)
     obj.entry = SimpleNamespace(options=options, data={})
     obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    obj._statistics_backfill_state = {  # noqa: RUF105, SLF001
+    obj._statistics_backfill_state = {  # ruff: ignore[private-member-access]
         "devices": {
             _DEVICE_ID: {
                 "http_period_backfill": {
@@ -77,14 +80,14 @@ def _coordinator(
     obj._statistics_backfill_state_loaded = True  # ruff: ignore[private-member-access]
     obj._async_save_statistics_backfill_state = AsyncMock()  # ruff: ignore[private-member-access]
     obj._local_today = lambda: today  # ruff: ignore[private-member-access]
-    obj._device_index = {_DEVICE_ID: {"id": SYSTEM_ID, "systemId": SYSTEM_ID}}  # noqa: RUF105, SLF001
+    obj._device_index = {_DEVICE_ID: {"id": SYSTEM_ID, "systemId": SYSTEM_ID}}  # ruff: ignore[private-member-access]
     obj._slow_http_request_semaphore = asyncio.Semaphore(2)  # ruff: ignore[private-member-access]
     obj._repair_containment_violations = lambda **_kwargs: set()  # ruff: ignore[private-member-access]
     obj._import_collected_repair_buckets = AsyncMock(return_value=(1, 0))  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_period_backfill_shares_slow_http_concurrency_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -137,7 +140,51 @@ def _source(period_start: date) -> dict[str, object]:
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+async def test_ct_period_retries_l2_when_l1_chart_is_empty() -> None:
+    """Closed CT backfill periods follow the App's L2 path if L1 is empty."""
+    coordinator = _coordinator()
+    raw = cast("Any", coordinator)
+    raw.api = SimpleNamespace(
+        async_get_device_ct_stat=AsyncMock(
+            side_effect=[
+                {
+                    "unit": "kWh",
+                    "x": [],
+                    "y1": [],
+                    "y2": [],
+                    "totalInCtEnergy": 0,
+                    "totalOutCtEnergy": 0,
+                },
+                {
+                    "unit": "kWh",
+                    "x": ["2026-04-15"],
+                    "y1": [4.0],
+                    "y2": [0.5],
+                    "totalInCtEnergy": 4.0,
+                    "totalOutCtEnergy": 0.5,
+                },
+            ],
+        ),
+    )
+
+    source = await coordinator._async_fetch_historical_app_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        system_id=SYSTEM_ID,
+        ct_device_id="ct-device-1",
+        section_prefix=APP_SECTION_CT_STAT,
+        date_type=DATE_TYPE_MONTH,
+        period_start=date(2026, 4, 1),
+    )
+
+    assert source["totalInCtEnergy"] == pytest.approx(4.0)
+    assert [
+        call.kwargs["query"].stat_type
+        for call in raw.api.async_get_device_ct_stat.await_args_list
+    ] == [CT_STAT_TYPE_L1, CT_STAT_TYPE_L2]
+
+
+@pytest.mark.asyncio()
 async def test_closed_months_then_weeks_skip_open_periods(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -173,7 +220,7 @@ async def test_closed_months_then_weeks_skip_open_periods(
     assert DATE_TYPE_YEAR not in {date_type for date_type, _start in requested}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_disabled_periods_are_never_queued(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -202,7 +249,7 @@ async def test_disabled_periods_are_never_queued(
     assert call.kwargs["date_type"] == DATE_TYPE_WEEK
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_all_period_opt_outs_make_no_http_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -231,7 +278,7 @@ async def test_all_period_opt_outs_make_no_http_request(
     fetch.assert_not_awaited()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_new_calendar_period_is_added_incrementally(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -277,11 +324,11 @@ async def test_new_calendar_period_is_added_incrementally(
     assert requested == [date(2026, 1, 1)]
 
 
-@pytest.mark.asyncio
-async def test_period_transport_failure_uses_retry_cooldown(
+@pytest.mark.asyncio()
+async def test_period_transport_failure_remains_available_to_next_fill(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A transient period failure finishes bootstrap but remains retryable."""
+    """A transient failure stays visible without hiding the period behind a cooldown."""
     monkeypatch.setattr(
         coordinator_module,
         "APP_CHART_STAT_METRICS",
@@ -310,13 +357,14 @@ async def test_period_transport_failure_uses_retry_cooldown(
     ]["http_period_backfill"]["sources"][APP_SECTION_PV_STAT][DATE_TYPE_MONTH][
         "2026-01-01"
     ]
-    assert bucket_state["status"] == "retryable"
-    assert bucket_state["retry_after_epoch"] > 0
+    assert bucket_state["status"] == "pending"
+    assert "retry_after_epoch" not in bucket_state
+    assert bucket_state["last_error"] == "transport_error"
     assert result["pending_sources"] == 1
-    assert result["actionable_sources"] == 0
+    assert result["actionable_sources"] == 1
 
     immediate_retry = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
         {_DEVICE_ID: {}},
         request_budget=1,
     )
-    assert immediate_retry["requests"] == 0
+    assert immediate_retry["requests"] == 1

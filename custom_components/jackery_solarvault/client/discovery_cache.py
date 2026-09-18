@@ -1,12 +1,16 @@
 """Persistent discovery cache for local offline startup."""
 
 
+
 import asyncio
 import copy
 import logging
-from typing import TYPE_CHECKING, Any, Final
+from collections.abc import Mapping
+from typing import Any, Final, TYPE_CHECKING
 
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+
 from ..const import (
     CACHE_ENTRIES_KEY,
     CACHE_STORAGE_VERSION,

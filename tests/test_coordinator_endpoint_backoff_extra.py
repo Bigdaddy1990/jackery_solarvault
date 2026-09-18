@@ -9,22 +9,22 @@ freshness only — a merely-connected broker with no frames must not pause the
 cloud channel.
 """
 
+import inspect
 import time
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApiError
-from custom_components.jackery_solarvault.const import MQTT_LIVE_THRESHOLD_SEC
+from custom_components.jackery_solarvault.const import (
+    MQTT_LIVE_THRESHOLD_SEC,
+    PAYLOAD_DYNAMIC_PRICE,
+)
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
-    SYSTEM_ID,
-    make_update_cycle_api,
-    setup_update_cycle_coordinator,
-)
+from tests._update_cycle_fixture import SYSTEM_ID  # ruff: ignore[banned-api]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -41,6 +41,15 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     coordinator._endpoint_backoff = {}  # ruff: ignore[private-member-access]
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+
+
+def _due_coordinator() -> JackerySolarVaultCoordinator:
+    """Create a coordinator shell for slow-cache due-policy helpers."""
+    coordinator = _bare_coordinator()
+    coordinator._slow_metrics_interval_sec = 120  # ruff: ignore[private-member-access]
+    coordinator._price_config_interval_sec = 600  # ruff: ignore[private-member-access]
+    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -63,6 +72,28 @@ def test_energy_key_is_never_suppressed_even_while_windowed(
     coordinator._endpoint_backoff_note_failure(_ENERGY_KEY, _BACKOFF_ERROR)  # ruff: ignore[private-member-access]
 
     assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is False  # ruff: ignore[private-member-access]
+
+
+def test_unsupported_energy_endpoint_is_suppressed_while_windowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cloud 10600 verdict prevents repeated unsupported PV trend calls."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _bare_coordinator()
+    coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
+        _ENERGY_KEY,
+        JackeryApiError("cloud says code=10600"),
+    )
+
+    assert coordinator._endpoint_backoff_active(_ENERGY_KEY, _NOW) is True  # ruff: ignore[private-member-access]
+
+
+def test_unsupported_energy_endpoint_uses_terminal_retry_window() -> None:
+    """A 10600 verdict does not use the normal short energy retry ladder."""
+    assert JackerySolarVaultCoordinator._endpoint_backoff_delays_for_key(  # ruff: ignore[private-member-access]
+        _ENERGY_KEY,
+        10600,
+    ) == (21600,)
 
 
 def test_diagnostic_key_suppressed_only_inside_window(
@@ -95,6 +126,99 @@ def test_active_count_excludes_energy_and_expired(
 
     assert coordinator._endpoint_backoff_active_count(_NOW) == 1  # ruff: ignore[private-member-access]
     assert coordinator._endpoint_backoff_active_count(_NOW + 10_000.0) == 0  # ruff: ignore[private-member-access]
+
+
+def test_slow_cache_slot_due_respects_its_own_ttl() -> None:
+    """Slow and price slots become due only at their individual deadline."""
+    coordinator = _due_coordinator()
+    cache = {
+        "slow": (_NOW - 119, {}),
+        "price": (_NOW - 599, {}),
+    }
+
+    assert not coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
+        cache,
+        "slow",
+        120,
+        now=_NOW,
+    )
+    assert coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
+        cache,
+        "slow",
+        120,
+        now=_NOW + 1,
+    )
+    assert not coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
+        cache,
+        "price",
+        600,
+        now=_NOW,
+    )
+    assert coordinator._slow_cache_slot_refresh_due(  # ruff: ignore[private-member-access]
+        cache,
+        "price",
+        600,
+        now=_NOW + 1,
+    )
+
+
+def test_system_due_ignores_cold_dynamic_price_during_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unsupported cold price slot cannot launch a no-op system worker."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _due_coordinator()
+    specs = coordinator._system_slow_cache_refresh_specs(SYSTEM_ID)  # ruff: ignore[private-member-access]
+    cache = {key: (_NOW, {}) for key, _ttl, _backoff in specs}
+    dynamic_spec = next(spec for spec in specs if spec[0] == PAYLOAD_DYNAMIC_PRICE)
+    cache[dynamic_spec[0]] = (0.0, {})
+    coordinator._slow_cache[SYSTEM_ID] = cache  # ruff: ignore[private-member-access]
+    assert dynamic_spec[2] is not None
+    coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
+        dynamic_spec[2],
+        JackeryApiError("cloud says code=10600"),
+    )
+
+    assert not coordinator._system_slow_cache_refresh_due(  # ruff: ignore[private-member-access]
+        SYSTEM_ID,
+        now=_NOW,
+    )
+
+
+def test_device_due_ignores_backed_off_symmetry_and_foreign_cache_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unsupported symmetry and separately-owned cache rows launch no worker."""
+    _freeze(monkeypatch, _NOW)
+    coordinator = _due_coordinator()
+    device_id = "device-1"
+    specs = coordinator._device_slow_cache_refresh_specs(  # ruff: ignore[private-member-access]
+        device_id,
+        device_sn="serial-1",
+        system_id=SYSTEM_ID,
+    )
+    cache = {key: (_NOW, {}) for key, _ttl, _backoff in specs}
+    symmetry_specs = [
+        spec for spec in specs if spec[2] is not None and ":symmetry_stat:" in spec[2]
+    ]
+    assert len(symmetry_specs) == 4  # ruff: ignore[magic-value-comparison]
+    for cache_key, _ttl, backoff_key in symmetry_specs:
+        cache[cache_key] = (0.0, {})
+        assert backoff_key is not None
+        coordinator._endpoint_backoff_note_failure(  # ruff: ignore[private-member-access]
+            backoff_key,
+            JackeryApiError("cloud says code=10600"),
+        )
+    cache["home_trends_month_2026_04"] = (0.0, {})
+    cache["pack_ota:pack-1"] = (0.0, {})
+    coordinator._slow_cache[f"dev:{device_id}"] = cache  # ruff: ignore[private-member-access]
+
+    assert not coordinator._device_slow_cache_refresh_due(  # ruff: ignore[private-member-access]
+        device_id,
+        device_sn="serial-1",
+        system_id=SYSTEM_ID,
+        now=_NOW,
+    )
 
 
 # --- endpoint backoff note failure / success -------------------------------
@@ -155,7 +279,7 @@ def test_diagnostics_reports_only_live_diagnostic_windows(
     assert payload["active_count"] == 1
     assert _DIAG_KEY in payload["active"]
     assert _ENERGY_KEY not in payload["active"]
-    assert payload["active"][_DIAG_KEY]["code"] == 10422
+    assert payload["active"][_DIAG_KEY]["code"] == 10422  # ruff: ignore[magic-value-comparison]
 
 
 # --- local MQTT liveness ---------------------------------------------------
@@ -266,54 +390,79 @@ def test_dynamic_price_backs_off_on_unsupported_code(
 # cycle.
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_dynamic_price_backoff_suppresses_background_refresh_retry(
     hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A cold post-boot dynamic-price failure backs off in the background."""
-    # Keep monotonic time below the price TTL. A cold-cache timestamp of 0.0
-    # must still trigger the off-path refresh immediately after HA starts.
-    _freeze(monkeypatch, 10.0)
-    api = make_update_cycle_api()
-    api.async_get_dynamic_price = AsyncMock(
+    coordinator = _bare_coordinator()
+    coordinator.hass = hass
+    coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
+    coordinator._slow_metrics_bg_task = None  # ruff: ignore[private-member-access]
+    coordinator._slow_metrics_interval_sec = 120  # ruff: ignore[private-member-access]
+    coordinator._price_config_interval_sec = 600  # ruff: ignore[private-member-access]
+    coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
+    coordinator._last_stat_import_monotonic = 0.0  # ruff: ignore[private-member-access]
+    coordinator._trend_query_kwargs = MagicMock(return_value={})  # ruff: ignore[private-member-access]
+    coordinator._app_period_section = MagicMock(  # ruff: ignore[private-member-access]
+        side_effect=lambda section, period: f"{section}:{period}"
+    )
+    coordinator.api = MagicMock()
+    dynamic_price = AsyncMock(
         side_effect=JackeryApiError(
             "GET /v1/device/dynamic/v2/dynamicPrice code=10600 msg=unsupported",
         ),
     )
-    coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
+    coordinator.api.async_get_dynamic_price = dynamic_price
 
-    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-    # The background slow-metric refresh runs as an ``async_create_background_task``
-    # (excluded from the default ``async_block_till_done`` wait set), so it must
-    # be waited for explicitly here.
-    slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
-    assert slow_metrics_task is not None
-    await slow_metrics_task
-    await hass.async_block_till_done(wait_background_tasks=True)
+    async def get_with_ttl(  # ruff: ignore[missing-return-type-private-function]
+        system_id: str,
+        cache_key: str,
+        _ttl: int,
+        fetcher,  # ruff: ignore[missing-type-function-argument]
+        default,  # ruff: ignore[missing-type-function-argument]
+        *,
+        backoff_key: str | None = None,
+    ):
+        """Model the guarded fetch seam used by the background launcher."""
+        if cache_key != PAYLOAD_DYNAMIC_PRICE:
+            return default
+        if backoff_key and coordinator._endpoint_backoff_active(  # ruff: ignore[private-member-access]
+            backoff_key,
+            time.monotonic(),
+        ):
+            return default
+        try:
+            return await fetcher(system_id)
+        except JackeryApiError as err:
+            assert backoff_key is not None
+            coordinator._endpoint_backoff_note_failure(backoff_key, err)  # ruff: ignore[private-member-access]
+            return default
+
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)  # ruff: ignore[private-member-access]
+    first_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+    assert first_task is not None
+    await first_task
 
     # The cold slow-metric cache is served stale_ok on the foreground path
     # (no fetch attempted there), so the failure above only came from the
     # background refresh — proving its call now carries the backoff key too.
     assert f"dynamic_price:{SYSTEM_ID}" in coordinator._endpoint_backoff  # ruff: ignore[private-member-access]
-    calls_after_first_cycle = api.async_get_dynamic_price.call_count
+    calls_after_first_cycle = dynamic_price.call_count
     assert calls_after_first_cycle >= 1
 
-    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-    slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
-    assert slow_metrics_task is not None
-    await slow_metrics_task
-    await hass.async_block_till_done(wait_background_tasks=True)
+    coordinator._launch_background_slow_refresh({SYSTEM_ID}, get_with_ttl)  # ruff: ignore[private-member-access]
+    second_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+    assert second_task is not None
+    assert second_task is not first_task
+    await second_task
 
     # The system's slow-metric cache never advances its timestamp on a
     # permanent failure, so it re-enters "needs refresh" every cycle. Without
     # the backoff key on the background call this re-invokes (and re-logs)
     # the endpoint every cycle; with it, the open backoff window suppresses
     # the retry.
-    assert api.async_get_dynamic_price.call_count == calls_after_first_cycle
-
-    await hass.config_entries.async_unload(entry.entry_id)
-    await hass.async_block_till_done(wait_background_tasks=True)
+    assert dynamic_price.call_count == calls_after_first_cycle
 
 
 # --- Shelly realtime timeout backoff (codeless failure must still back off) ---
@@ -345,6 +494,14 @@ def test_shelly_realtime_timeout_is_backoffable() -> None:
         )
         is True
     )
+
+
+def test_update_cycle_never_polls_shelly_realtime_power() -> None:
+    """Shelly live power is push-driven and has no coordinator cadence."""
+    source = inspect.getsource(JackerySolarVaultCoordinator._async_update_data_guarded)  # ruff: ignore[private-member-access]
+
+    assert "async_get_shelly_realtime_power" not in source
+    assert "_enrich_shelly_cloud_realtime" not in source
 
 
 def test_non_shelly_timeout_is_not_backoffable() -> None:

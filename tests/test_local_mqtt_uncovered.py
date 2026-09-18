@@ -1,240 +1,207 @@
-"""Tests for uncovered paths in local_mqtt.py to increase coverage."""
+"""Regression tests for less common local MQTT adapter branches."""
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    _local_mqtt_client,  # noqa: PLC2701, RUF105
+    _local_mqtt_client,  # ruff: ignore[import-private-name]
+)
+from custom_components.jackery_solarvault.const import (
+    DOMAIN,
+    LOCAL_MQTT_MAX_PAYLOAD_BYTES,
+    REDACTED_VALUE,
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
 )
 
-
-class TestJackeryLocalMqttClient:
-    """Test JackeryLocalMqttClient class."""
-
-    def _create_client(self) -> JackeryLocalMqttClient:  # noqa: PLR6301, RUF105
-        """Create a basic client for testing."""
-        hass = SimpleNamespace()
-        hass.data = {}
-        hass.config = SimpleNamespace()
-        hass.config.path = MagicMock(return_value="/config")
-
-        def mock_create_task(coro, name=None):  # noqa: RUF105
-            return MagicMock()
-
-        hass.async_create_task = mock_create_task
-
-        def mock_schedule(coro_factory, name, eager_start=False):  # noqa: RUF105
-            return MagicMock()
-
-        hass.async_create_background_task = mock_schedule
-
-        return JackeryLocalMqttClient(
-            hass=hass,
-            host="localhost",
-            port=1883,
-            username="user",
-            password="pass",
-            client_id="test_client",
-            sink=None,
-            topic_filter="test/topic",
-        )
-
-    def test_creation(self) -> None:
-        """Test client creation."""
-        client = self._create_client()
-        assert client is not None
-        assert client._connected is False  # noqa: RUF105, SLF001
-        assert client._messages_received == 0  # noqa: RUF105, SLF001
-        assert client._messages_dropped == 0  # noqa: RUF105, SLF001
-        assert client._last_error is None  # noqa: RUF105, SLF001
-
-    def test_is_connected_false_initially(self) -> None:
-        """Test is_connected property returns False initially."""
-        client = self._create_client()
-        assert client.is_connected is False
-
-    def test_is_started_false_initially(self) -> None:
-        """Test is_started property returns False initially."""
-        client = self._create_client()
-        assert client.is_started is False
-
-    def test_diagnostics_snapshot(self) -> None:
-        """Test diagnostics_snapshot method."""
-        client = self._create_client()
-        snapshot = client.diagnostics_snapshot()
-        assert isinstance(snapshot, dict)
-        assert "connected" in snapshot
-        assert "started" in snapshot
-        assert "messages_received" in snapshot
-        assert "messages_dropped" in snapshot
-
-    def test_diagnostics_snapshot_redact(self) -> None:
-        """Test diagnostics_snapshot with redact=False."""
-        client = self._create_client()
-        snapshot = client.diagnostics_snapshot(redact=False)
-        assert isinstance(snapshot, dict)
-
-    @pytest.mark.asyncio
-    async def test_async_start_success(self) -> None:
-        """Test async_start method success."""
-        client = self._create_client()
-
-        with patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.aiomqtt"
-        ) as mock_aiomqtt:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_aiomqtt.Client.return_value = mock_client
-
-            mock_client.subscribe = AsyncMock()
-            # Create an async iterator for messages
-
-            async def mock_messages():  # noqa: RUF029, RUF105
-                return
-                yield  # pragma: no cover - make it an async generator
-
-            mock_client.messages = mock_messages()
-
-            await client.async_start()
-            # Note: is_connected may not be True immediately due to async nature
-            # but the runner task should be started
-            assert client.is_started is True
-
-    @pytest.mark.asyncio
-    async def test_async_stop(self) -> None:
-        """Test async_stop method."""
-        client = self._create_client()
-        client._runner_task = MagicMock()  # noqa: RUF105, SLF001
-        client._runner_task.done = MagicMock(return_value=False)  # noqa: RUF105, SLF001
-
-        with patch(
-            "custom_components.jackery_solarvault.client.local_mqtt.aiomqtt"
-        ) as mock_aiomqtt:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=None)
-            mock_aiomqtt.Client.return_value = mock_client
-
-            await client.async_stop()
-            assert client._connected is False  # noqa: RUF105, SLF001
-
-    def test_handle_message(self) -> None:
-        """Test _handle_message method."""
-        client = self._create_client()
-        client._sink = AsyncMock()  # noqa: RUF105, SLF001
-
-        # Call _handle_message directly
-        client._handle_message("test/topic", b'{"key": "value"}')  # noqa: RUF105, SLF001
-
-        # Since sink is async, it gets scheduled as a task
-        # We can verify messages_received was incremented
-        assert client._messages_received == 1  # noqa: RUF105, SLF001
-        assert client._last_topic == "test/topic"  # noqa: RUF105, SLF001
-
-    def test_handle_message_with_sink(self) -> None:
-        """Test _handle_message forwards to sink."""
-        client = self._create_client()
-        sink_mock = AsyncMock()
-        client._sink = sink_mock  # noqa: RUF105, SLF001
-
-        client._handle_message("test/topic", b'{"key": "value"}')  # noqa: RUF105, SLF001
-
-        # The sink should have been scheduled
-        # Since we can't easily await the scheduled task in test,
-        # verify the message was counted
-        assert client._messages_received == 1  # noqa: RUF105, SLF001
-        assert client._messages_forwarded == 1  # noqa: RUF105, SLF001
-
-    def test_handle_message_non_json(self) -> None:
-        """Test _handle_message with non-JSON payload."""
-        client = self._create_client()
-        client._sink = AsyncMock()  # noqa: RUF105, SLF001
-
-        client._handle_message("test/topic", b"not json")  # noqa: RUF105, SLF001
-
-        assert client._messages_received == 1  # noqa: RUF105, SLF001
-        assert client._messages_forwarded == 1  # noqa: RUF105, SLF001
-        # data should be None for non-JSON
-        # We can't easily test the sink call, but forward count should increment
-
-    def test_handle_message_oversized_payload(self) -> None:
-        """Test _handle_message with oversized payload."""
-        client = self._create_client()
-        client._sink = AsyncMock()  # noqa: RUF105, SLF001
-
-        # Create payload larger than LOCAL_MQTT_MAX_PAYLOAD_BYTES (128KB)
-        large_payload = b"x" * (128 * 1024 + 1)
-        client._handle_message("test/topic", large_payload)  # noqa: RUF105, SLF001
-
-        assert client._payload_too_large_count == 1  # noqa: RUF105, SLF001
-        assert client._messages_received == 1  # noqa: RUF105, SLF001
-
-    def test_topic_tracking(self) -> None:
-        """Test topic tracking in _handle_message."""
-        client = self._create_client()
-        client._sink = AsyncMock()  # noqa: RUF105, SLF001
-
-        # First message on topic
-        client._handle_message("topic1", b"{}")  # noqa: RUF105, SLF001
-        assert client._topics_seen == ["topic1"]  # noqa: RUF105, SLF001
-        assert len(client._topics_seen) == 1  # noqa: RUF105, SLF001
-
-        # Second message on same topic
-        client._handle_message("topic1", b"{}")  # noqa: RUF105, SLF001
-        assert client._topics_seen == ["topic1"]  # noqa: RUF105, SLF001
-        assert len(client._topics_seen) == 1  # noqa: RUF105, SLF001
-
-        # Message on new topic
-        client._handle_message("topic2", b"{}")  # noqa: RUF105, SLF001
-        assert client._topics_seen == ["topic1", "topic2"]  # noqa: RUF105, SLF001
-        assert len(client._topics_seen) == 2  # noqa: RUF105, SLF001
-
-    def test_utc_now_iso(self) -> None:  # noqa: PLR6301, RUF105
-        """Test _utc_now_iso static method."""
-        result = JackeryLocalMqttClient._utc_now_iso()  # noqa: RUF105, SLF001
-        assert isinstance(result, str)
-        assert "T" in result
-        assert "+" in result or result.endswith("Z")
-
-    def test_extract_mqtt_code(self) -> None:  # noqa: PLR6301, RUF105
-        """Test _extract_mqtt_code static method."""
-
-        class MockError:
-            rc = 5
-
-        err = MockError()
-        code = JackeryLocalMqttClient._extract_mqtt_code(err)  # noqa: RUF105, SLF001
-        assert code == 5
-
-    def test_local_mqtt_client_retrieval(self) -> None:  # noqa: PLR6301, RUF105
-        """Test _local_mqtt_client function."""
-        hass = MagicMock()
-        entry = MagicMock()
-        entry.entry_id = "test_entry"
-
-        # No client
-        result = _local_mqtt_client(hass, entry)
-        assert result is None
-
-        # With client
-        client = MagicMock(spec=JackeryLocalMqttClient)
-        hass.data = {
-            "jackery_solarvault": {"test_entry": {"local_mqtt_client": client}}
-        }  # noqa: E501, RUF100
-        result = _local_mqtt_client(hass, entry)
-        assert result is client
-
-        # Wrong type
-        hass.data = {
-            "jackery_solarvault": {"test_entry": {"local_mqtt_client": "not_a_client"}}
-        }  # noqa: E501, RUF100
-        result = _local_mqtt_client(hass, entry)
-        assert result is None
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+def test_constructor_and_diagnostics_use_direct_broker_transport(
+    hass: HomeAssistant,
+) -> None:
+    """The direct client matches and redacts its complete broker configuration."""
+    client = JackeryLocalMqttClient(
+        hass,
+        host="192.0.2.10",
+        port=1884,
+        username="user",
+        password="secret",
+        topic_filter="jackery/device/#",
+        qos=2,
+    )
+
+    assert client.is_connected is False
+    assert client.is_started is False
+    configuration = {
+        "host": "192.0.2.10",
+        "port": 1884,
+        "username": "user",
+        "password": "secret",
+        "topic_filter": "jackery/device/#",
+        "qos": 2,
+    }
+    # pyrefly: ignore [bad-argument-type]
+    assert client.matches_configuration(**configuration)
+    # pyrefly: ignore [bad-argument-type]
+    assert not client.matches_configuration(**(configuration | {"host": "other"}))
+    redacted = client.diagnostics_snapshot()
+    plain = client.diagnostics_snapshot(redact=False)
+    assert redacted["transport"] == "direct_mqtt"
+    assert redacted["configured_target"]["host"] == REDACTED_VALUE
+    assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
+    assert redacted["topic_filter"] == REDACTED_VALUE
+    assert plain["topic_filter"] == "jackery/device/#"
+    assert plain["qos"] == 2  # ruff: ignore[magic-value-comparison]
+    assert plain["broker_connected"] is plain["connected"]
+
+
+def test_coordinator_reports_consistent_local_mqtt_connection(
+    hass: HomeAssistant,
+) -> None:
+    """Coordinator diagnostics preserve connection and filtered-message counters."""
+    client = JackeryLocalMqttClient(hass)
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._messages_filtered = 7  # ruff: ignore[private-member-access]
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator._local_mqtt_client = client  # ruff: ignore[private-member-access]
+    coordinator._local_mqtt_device_traffic_observed = False  # ruff: ignore[private-member-access]
+
+    observations = coordinator.local_mqtt_observations()
+
+    assert observations["connected"] is True
+    assert observations["broker_connected"] is True
+    assert observations["messages_filtered"] == 7  # ruff: ignore[magic-value-comparison]
+
+
+@pytest.mark.parametrize("qos", [-1, 3])
+def test_constructor_rejects_invalid_qos(
+    hass: HomeAssistant,
+    qos: int,
+) -> None:
+    """Only MQTT QoS levels supported by HA are accepted."""
+    with pytest.raises(ValueError, match="QoS"):
+        JackeryLocalMqttClient(hass, qos=qos)  # type: ignore[arg-type]
+
+
+async def test_message_without_sink_is_counted_as_dropped(
+    hass: HomeAssistant,
+) -> None:
+    """Missing shared ingest cannot be reported as a forwarded frame."""
+    client = JackeryLocalMqttClient(hass, topic_filter="jackery/#")
+
+    await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
+
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["messages_received"] == 1
+    assert diagnostics["messages_dropped"] == 1
+    assert diagnostics["messages_forwarded"] == 0
+
+
+async def test_sink_rejection_and_failure_are_distinguished(
+    hass: HomeAssistant,
+) -> None:
+    """Semantic rejection and sink exceptions keep separate diagnostics."""
+    rejecting_sink = AsyncMock(return_value=False)
+    rejected = JackeryLocalMqttClient(hass, sink=rejecting_sink, topic_filter="#")
+    await rejected._handle_message("foreign/topic", b'{"id": 1}')  # ruff: ignore[private-member-access]
+    rejected_diagnostics = rejected.diagnostics_snapshot(redact=False)
+    assert rejected_diagnostics["messages_rejected_by_sink"] == 1
+    assert rejected_diagnostics["messages_dropped"] == 0
+
+    failing_sink = AsyncMock(side_effect=RuntimeError("bad frame"))
+    failed = JackeryLocalMqttClient(hass, sink=failing_sink, topic_filter="#")
+    await failed._handle_message("jackery/topic", b"opaque")  # ruff: ignore[private-member-access]
+    failed_diagnostics = failed.diagnostics_snapshot(redact=False)
+    assert failed_diagnostics["sink_errors"] == 1
+    assert failed_diagnostics["last_sink_error"] == "RuntimeError: bad frame"
+    assert failed_diagnostics["messages_dropped"] == 1
+
+
+async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
+    hass: HomeAssistant,
+) -> None:
+    """Broker-selected retained telemetry follows the same no-drop FIFO."""
+    sink = AsyncMock(return_value=True)
+    client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
+
+    await client._handle_message(  # ruff: ignore[private-member-access]
+        "jackery/oversized",
+        b"x" * (LOCAL_MQTT_MAX_PAYLOAD_BYTES + 1),
+    )
+    retained = MagicMock(retain=True, topic="jackery/retained", payload=b"{}")
+
+    async def messages():  # ruff: ignore[missing-return-type-private-function]
+        await asyncio.sleep(0)
+        yield retained
+
+    broker = MagicMock(messages=messages())
+    broker.subscribe = AsyncMock()
+    await client._async_consume_session(broker, ["#"])  # ruff: ignore[private-member-access]
+    await client.async_wait_message_queue_idle()
+
+    sink.assert_awaited_once_with("jackery/retained", {}, b"{}")
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["payload_too_large_count"] == 1
+    assert diagnostics["retained_messages_dropped"] == 0
+    assert diagnostics["messages_dropped"] == 1
+    assert diagnostics["messages_forwarded"] == 1
+
+
+async def test_stop_cancels_direct_broker_reconnect_supervisor(
+    hass: HomeAssistant,
+) -> None:
+    """Entry unload cancels the sole direct-broker reconnect supervisor."""
+    client = JackeryLocalMqttClient(hass)
+    runner_started = asyncio.Event()
+
+    async def runner() -> None:
+        runner_started.set()
+        await asyncio.Event().wait()
+
+    runner_task = asyncio.create_task(runner())
+    client._runner_task = runner_task  # ruff: ignore[private-member-access]
+    await runner_started.wait()
+
+    await client.async_stop()
+
+    assert runner_task.cancelled()
+    assert client._runner_task is None  # ruff: ignore[private-member-access]
+    assert client.is_connected is False
+
+
+def test_local_mqtt_client_prefers_runtime_then_entry_bucket(
+    hass: HomeAssistant,
+) -> None:
+    """Lookup follows the coordinator-owned runtime before the HA data fallback."""
+    runtime_client = JackeryLocalMqttClient(hass, topic_filter="runtime/#")
+    bucket_client = JackeryLocalMqttClient(hass, topic_filter="bucket/#")
+    entry = MagicMock(entry_id="test-entry")
+    entry.runtime_data = MagicMock(local_mqtt_client=runtime_client)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "local_mqtt_client": bucket_client,
+    }
+
+    assert _local_mqtt_client(hass, entry) is runtime_client
+
+    entry.runtime_data.local_mqtt_client = None
+    assert _local_mqtt_client(hass, entry) is bucket_client
+
+    hass.data[DOMAIN][entry.entry_id]["local_mqtt_client"] = "not-a-client"
+    assert _local_mqtt_client(hass, entry) is None
+
+
+def test_utc_timestamp_is_timezone_aware(hass: HomeAssistant) -> None:
+    """Diagnostics timestamps are ISO-8601 UTC values."""
+    client = JackeryLocalMqttClient(hass)
+
+    value = client._utc_now_iso()  # ruff: ignore[private-member-access]
+
+    assert "T" in value
+    assert value.endswith("+00:00")

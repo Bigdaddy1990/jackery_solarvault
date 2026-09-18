@@ -1,7 +1,7 @@
 """Unit tests for services coverage gaps."""
 
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import voluptuous as vol
@@ -11,12 +11,7 @@ from custom_components.jackery_solarvault.const import DOMAIN, SERVICE_FIELD_DEV
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.exceptions import ServiceValidationError
 
-from .test_services import (  # ruff: ignore[banned-api]
-    _Call,
-    _Coordinator,
-    _Device,
-    _Registry,
-)
+from .test_services import _Call, _Coordinator, _Device, _Registry  # ruff: ignore[banned-api]
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, ServiceCall
@@ -27,6 +22,17 @@ def _translation_error(error: ServiceValidationError) -> str:
     placeholders = error.translation_placeholders
     assert placeholders is not None
     return placeholders["error"]
+
+
+async def test_global_service_registration_is_idempotent(hass: HomeAssistant) -> None:
+    """Repeated setup preserves the registered domain service handlers."""
+    await services.async_setup_services(hass)
+    registrations = services._service_registrations()  # ruff: ignore[private-member-access]
+    assert all(hass.services.has_service(DOMAIN, item.name) for item in registrations)
+
+    before = dict(hass.services.async_services()[DOMAIN])
+    await services.async_setup_services(hass)
+    assert hass.services.async_services()[DOMAIN] == before
 
 
 def test_loaded_coordinators_finds_valid_coordinator(
@@ -83,14 +89,14 @@ def test_storm_alert_id_from_service_rejects_non_string() -> None:
 def test_json_native_body_rejects_non_dict_normalization() -> None:
     """Test _json_native_body rejects a string body after normalization."""
     with pytest.raises(ServiceValidationError) as exc:
-        services._json_native_body(  # ruff: ignore[private-member-access]
-            cast("dict[Any, Any]", [1, 2, 3]), "dev1"
-        )
-    assert "Expected dict body" in _translation_error(exc.value)
+        services._json_native_body(cast("dict[Any, Any]", [1, 2, 3]), "dev1")  # ruff: ignore[private-member-access]
+    error = _translation_error(exc.value)
+    assert error == "TypeError: **REDACTED**"
+    assert "Expected dict body" not in error
 
 
 def test_ble_body_from_service_rejects_invalid_types() -> None:
-    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""  # noqa: RUF105
+    """Test _ble_body_from_service rejects strings that are lists and non-string/non-dicts."""  # ruff: ignore[line-too-long]
     with pytest.raises(ServiceValidationError) as exc:
         services._ble_body_from_service("[1, 2, 3]", "dev1")  # ruff: ignore[private-member-access]
     assert "must be an object" in _translation_error(exc.value)
@@ -128,8 +134,7 @@ def test_service_float_rejects_invalid() -> None:
             field_name="f",
             translation_key="k",
             device_id="d",
-            min_value=0,
-            max_value=100,
+            bounds=(0, 100),
         )
     assert "must be a number" in _translation_error(exc.value)
 
@@ -139,8 +144,7 @@ def test_service_float_rejects_invalid() -> None:
             field_name="f",
             translation_key="k",
             device_id="d",
-            min_value=0,
-            max_value=100,
+            bounds=(0, 100),
         )
     assert "must be between 0 and 100" in _translation_error(exc2.value)
 
@@ -150,8 +154,7 @@ def test_service_float_rejects_invalid() -> None:
             field_name="f",
             translation_key="k",
             device_id="d",
-            min_value=0,
-            max_value=100,
+            bounds=(0, 100),
         )
     assert "must be between 0 and 100" in _translation_error(exc3.value)
 
@@ -176,10 +179,8 @@ async def test_async_handle_get_share_qr_code_success(
         "homeassistant.helpers.device_registry.async_get", lambda h: registry
     )
 
-    from unittest.mock import AsyncMock  # ruff: ignore[import-outside-top-level]
-
     coordinator = _Coordinator(True)
-    cast(Any, coordinator).async_get_share_qr_code = AsyncMock(return_value={})
+    cast("Any", coordinator).async_get_share_qr_code = AsyncMock(return_value={})
 
     def mock_coordinator_for_device(h: HomeAssistant, d: str) -> _Coordinator:
         return coordinator
@@ -190,7 +191,8 @@ async def test_async_handle_get_share_qr_code_success(
     )
 
     monkeypatch.setattr(
-        "custom_components.jackery_solarvault.services._notify_share_qr_code", Mock()
+        "custom_components.jackery_solarvault.services._notify_share_qr_code",
+        AsyncMock(),
     )
 
     res = await services._async_handle_get_share_qr_code(hass, mock_call)  # ruff: ignore[private-member-access]
@@ -207,7 +209,7 @@ def test_service_integer_parser_rejects_bools() -> None:
 
 def test_service_integer_parser_accepts_whole_floats() -> None:
     """Test integer parser accepts whole floats."""
-    assert services._coerce_service_int(42.0) == 42  # ruff: ignore[private-member-access]
+    assert services._coerce_service_int(42.0) == 42  # ruff: ignore[magic-value-comparison, private-member-access]
     with pytest.raises(vol.Invalid, match="expected integer"):
         services._coerce_service_int(42.5)  # ruff: ignore[private-member-access]
 

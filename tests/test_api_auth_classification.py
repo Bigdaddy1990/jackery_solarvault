@@ -19,6 +19,7 @@ from unittest.mock import Mock
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.const import (
+    CODE_SESSION_REPLACED,
     CODE_TOKEN_EXPIRED,
     FIELD_CODE,
     FIELD_MSG,
@@ -47,6 +48,17 @@ def test_token_expired_code_is_classified_as_auth_failure() -> None:
     """The real backend auth-failure code still triggers the auth-failure path."""
     api = _make_api()
     data = {FIELD_CODE: CODE_TOKEN_EXPIRED, FIELD_MSG: "token expired"}
+
+    assert api._is_auth_failure_response(200, data) is True  # ruff: ignore[private-member-access]
+
+
+def test_session_replaced_code_is_classified_as_auth_failure() -> None:
+    """Code 10403 must rotate the session and MQTT credentials."""
+    api = _make_api()
+    data = {
+        FIELD_CODE: CODE_SESSION_REPLACED,
+        FIELD_MSG: "account logged in on another device",
+    }
 
     assert api._is_auth_failure_response(200, data) is True  # ruff: ignore[private-member-access]
 

@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coord_mod
+from custom_components.jackery_solarvault.client import JackeryApiError
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
@@ -19,15 +20,17 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
 
-# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)  # noqa: RUF105
-CONF_LOCAL_MQTT_ENABLE = CONF_THIRD_PARTY_MQTT_ENABLE
-CONF_LOCAL_MQTT_HOST = CONF_THIRD_PARTY_MQTT_IP
+# Alias used in this test file for clarity (coordinator imports it as THIRD_PARTY_MQTT_ENABLE)  # ruff: ignore[line-too-long]
+# pyrefly: ignore [bad-assignment]
+CONF_THIRD_PARTY_MQTT_ENABLE = CONF_THIRD_PARTY_MQTT_ENABLE  # ruff: ignore[self-assigning-variable]
+# pyrefly: ignore [bad-assignment]
+CONF_THIRD_PARTY_MQTT_IP = CONF_THIRD_PARTY_MQTT_IP  # ruff: ignore[self-assigning-variable]
 
 _DEVICE_ID = "device-1"
 _TARGET_DAY = date(2026, 8, 10)
 
 
-def _bare_coordinator() -> Any:  # noqa: RUF105
+def _bare_coordinator() -> Any:
     """Return a coordinator shell with only state used by these contracts."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     shell = cast("Any", coordinator)
@@ -65,7 +68,7 @@ def test_polling_timeout_incident_is_counted_once_and_recovers() -> None:
     assert diagnostics["last_timeout_recovery_duration_sec"] == pytest.approx(30.0)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_background_scheduler_reuses_active_task_then_allows_replay() -> None:
     """One logical operation never overlaps, but can run again after completion."""
     coordinator = _bare_coordinator()
@@ -109,8 +112,9 @@ async def test_background_scheduler_reuses_active_task_then_allows_replay() -> N
         operation,
         name="refresh-three",
     )
-    assert replay is not None and replay is not first
-    assert await replay == 2
+    assert replay is not None
+    assert replay is not first
+    assert await replay == 2  # ruff: ignore[magic-value-comparison]
 
 
 def test_stale_live_property_is_rejected_without_blocking_http_configuration() -> None:
@@ -126,7 +130,7 @@ def test_stale_live_property_is_rejected_without_blocking_http_configuration() -
         observed_at=stale_at,
     )
 
-    assert merged["soc"] == 83
+    assert merged["soc"] == 83  # ruff: ignore[magic-value-comparison]
     assert merged["temperatureUnit"] == 1
 
 
@@ -140,13 +144,13 @@ def test_stale_accessory_frame_keeps_identity_but_not_old_telemetry() -> None:
         "battery_packs",
         "pack-1",
         {"deviceSn": "pack-1", "soc": 11},
-        TransportSource.LOCAL_MQTT,
+        source=TransportSource.LOCAL_MQTT,
         current={"deviceSn": "pack-1", "soc": 72},
         observed_at=stale_at,
     )
 
     assert merged["deviceSn"] == "pack-1"
-    assert merged["soc"] == 72
+    assert merged["soc"] == 72  # ruff: ignore[magic-value-comparison]
 
 
 def test_system_info_cache_fills_only_missing_values_until_expiry() -> None:
@@ -183,7 +187,7 @@ def test_transport_supervisors_are_independent_and_configuration_visible() -> No
     coordinator.entry = SimpleNamespace(
         options={
             coord_mod.CONF_ENABLE_BLE_TRANSPORT: True,
-            CONF_LOCAL_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
         },
         data={},
     )
@@ -238,7 +242,7 @@ def test_historical_sources_include_system_routes_only_with_system_id() -> None:
     assert coord_mod.APP_SECTION_HOME_TRENDS in with_system
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["section", "api_method"],
     [
@@ -274,12 +278,12 @@ async def test_historical_http_sources_route_independently(
     method.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["failure", "expected_status"],
     [
         [coord_mod.JackeryAuthError("rejected"), "auth_error"],
-        [coord_mod.JackeryApiError("code=10426 busy"), "rate_limited"],
+        [JackeryApiError("code=10426 busy"), "rate_limited"],
         [TimeoutError(), "transport_error"],
         [RuntimeError("unexpected"), "transport_error"],
     ],

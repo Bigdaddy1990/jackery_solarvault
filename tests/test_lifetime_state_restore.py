@@ -47,7 +47,7 @@ def test_live_main_and_pack_counters_use_hundredths_of_kwh() -> None:
     assert pack.transform(26_779) == pytest.approx(267.79)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_restore_validator_accepts_nonnegative_kwh_lifetime_value() -> None:
     """HA's stored native kWh value remains usable while Layer 5 is absent."""
     entity = SimpleNamespace(
@@ -64,7 +64,24 @@ async def test_restore_validator_accepts_nonnegative_kwh_lifetime_value() -> Non
     assert restored == pytest.approx(54.25)
 
 
-async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_restore_validator_converts_legacy_wh_lifetime_value() -> None:
+    """A prior Wh state becomes the equivalent native kWh lifetime anchor."""
+    entity = SimpleNamespace(
+        async_get_last_sensor_data=lambda: _async_value(
+            SensorExtraStoredData(108_550, UnitOfEnergy.WATT_HOUR)
+        )
+    )
+
+    restored = await _async_restored_lifetime_energy_value(
+        cast("Any", entity),
+        UnitOfEnergy.KILO_WATT_HOUR,
+    )
+
+    assert restored == pytest.approx(108.55)
+
+
+async def _async_value(value: Any) -> Any:  # ruff: ignore[unused-async]
     """Return one value through the same await boundary as RestoreSensor."""
     return value
 
@@ -132,17 +149,17 @@ def test_pack_lifetime_restore_is_replaced_by_real_transport_value() -> None:
 
 def test_smart_meter_lifetime_restore_is_replaced_by_real_transport_value() -> None:
     """A CT lifetime total survives a gap and yields to the next real frame."""
-    sensor = JackerySmartMeterSensor.__new__(JackerySmartMeterSensor)
-    mutable = cast("Any", sensor)
-    mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: {PAYLOAD_CT_METER: {}}})
-    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
-    mutable.entity_description = next(
+    description = next(
         item
         for item in SMART_METER_SENSOR_DESCRIPTIONS
         if item.key == "lifetime_import_energy"
     )
-    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
-    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    sensor = JackerySmartMeterSensor(
+        cast("Any", SimpleNamespace(data={_DEVICE_ID: {PAYLOAD_CT_METER: {}}})),
+        _DEVICE_ID,
+        description,
+    )
+    mutable = cast("Any", sensor)
     mutable._restored_lifetime_value = 77.92  # ruff: ignore[private-member-access]
 
     sensor._refresh_cache()  # ruff: ignore[private-member-access]

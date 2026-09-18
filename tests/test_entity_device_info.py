@@ -14,8 +14,14 @@ from custom_components.jackery_solarvault.binary_sensor import (
 )
 from custom_components.jackery_solarvault.const import (
     DEFAULT_DEVICE_MODEL_FALLBACK,
+    DOMAIN,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_ID,
     FIELD_DEV_MODEL,
+    FIELD_MAC,
+    PAYLOAD_CT_METER,
     PAYLOAD_DISCOVERY,
+    PAYLOAD_PROPERTIES,
 )
 from custom_components.jackery_solarvault.entity import JackeryEntity
 from custom_components.jackery_solarvault.sensor import (
@@ -27,6 +33,7 @@ from custom_components.jackery_solarvault.sensor import (
 )
 from custom_components.jackery_solarvault.switch import JackeryBreakerSwitch
 from custom_components.jackery_solarvault.util import stable_subdevice_key
+from homeassistant.helpers import device_registry as dr
 
 _DEVICE_ID = "home-power-3002"
 
@@ -43,10 +50,11 @@ def _entity(payload: dict[str, Any]) -> JackeryEntity:
     mutable = cast("Any", entity)
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
     mutable.coordinator = SimpleNamespace(data={_DEVICE_ID: payload})
+    # pyrefly: ignore [no-any-return-implicit]
     return entity
 
 
-def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:  # noqa: RUF105
+def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:
     """Instantiate any ``JackeryEntity`` subclass bound to a coordinator snapshot.
 
     Mirrors ``_entity()`` above for the subdevice sensor/switch/binary_sensor
@@ -79,6 +87,15 @@ def test_device_info_model_uses_reported_model_when_present() -> None:
     assert _entity(payload).device_info["model"] == "HTH0132500A"
 
 
+def test_parent_device_info_exposes_normalized_mac_connection() -> None:
+    """The native and MQTT registry entries share the parent device MAC."""
+    payload = {PAYLOAD_PROPERTIES: {FIELD_MAC: "AA-BB-CC-11-22-33"}}
+
+    assert _entity(payload).device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
+    }
+
+
 def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     """Blank name fields yield a "Jackery {device_id}" prefix, not "SolarVault"."""
     info = _entity({})._build_smart_plug_device_info(1, {})  # ruff: ignore[private-member-access]
@@ -87,6 +104,16 @@ def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:
     assert name is not None
     assert name.startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in name
+
+
+def test_smart_plug_device_info_exposes_mac_connection() -> None:
+    """Accessory MACs are HA device-registry connections, not just names."""
+    info = _entity({})._build_smart_plug_device_info(  # ruff: ignore[private-member-access]
+        1,
+        {FIELD_MAC: "AA-BB-CC-11-22-33"},
+    )
+
+    assert info["connections"] == {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")}
 
 
 def test_breaker_switch_falls_back_to_jackery() -> None:
@@ -106,7 +133,7 @@ def test_subdevice_alarm_binary_sensor_falls_back_to_jackery() -> None:
     info = entity._build_sub_device_device_info(0, {}, "sub_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
-    assert info["model"] == "Jackery Zubehör"
+    assert info["model"] == "Jackery accessory"
     assert "SolarVault" not in info["name"]
     assert "SolarVault" not in str(info["model"])
 
@@ -123,7 +150,7 @@ def test_battery_pack_sensor_falls_back_to_jackery() -> None:
     info = entity.device_info
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
-    assert info["model"] == "Jackery Zusatzbatterie"
+    assert info["model"] == "Jackery battery pack"
     assert "SolarVault" not in info["name"]
     assert "SolarVault" not in str(info["model"])
 
@@ -145,7 +172,7 @@ def test_subdevice_alarm_sensor_falls_back_to_jackery() -> None:
     info = entity._build_sub_device_device_info(0, {}, "sub_0")  # ruff: ignore[private-member-access]
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
-    assert info["model"] == "Jackery Zubehör"
+    assert info["model"] == "Jackery accessory"
     assert "SolarVault" not in info["name"]
     assert "SolarVault" not in str(info["model"])
 
@@ -172,3 +199,58 @@ def test_smart_meter_sensor_base_name_falls_back_to_jackery() -> None:
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in info["name"]
+
+
+def test_smart_meter_device_info_exposes_mac_connection() -> None:
+    """A Shelly/CT MAC lets HA merge the Jackery accessory device entry."""
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_MAC: "AABBCC445566"}},
+    )
+
+    assert entity.device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:44:55:66")
+    }
+
+
+def test_smart_meter_device_info_uses_device_sn_as_mac_fallback() -> None:
+    """A MAC-shaped deviceSn identifies current CT payloads without FIELD_MAC."""
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_DEVICE_SN: "5c013b048e3c"}},
+    )
+
+    assert entity.device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "5c:01:3b:04:8e:3c")
+    }
+
+
+def test_smart_meter_device_info_uses_dev_id_as_mac_fallback() -> None:
+    """A MAC-shaped devId must identify a CT without deviceSn or mac."""
+    dev_id = "5c013b048e3c"
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_DEV_ID: dev_id}},
+    )
+
+    assert entity.device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, "5c:01:3b:04:8e:3c")
+    }
+    # The identifier is keyed on the accessory identity and must match the
+    # target built by ``async_migrate_smart_meter_devices``. The constant
+    # ``_smart_meter`` suffix is the legacy form that migration deletes, so
+    # emitting it here would drop and re-create the device on every start.
+    expected_key = stable_subdevice_key("smart_meter", dev_id, 1)
+    assert entity.device_info["identifiers"] == {
+        (DOMAIN, f"{_DEVICE_ID}_{expected_key}")
+    }
+
+
+def test_smart_meter_device_info_rejects_non_mac_serial_fallback() -> None:
+    """An ordinary device serial must not be registered as a MAC connection."""
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_DEVICE_SN: "CT-SERIAL-123"}},
+    )
+
+    assert "connections" not in entity.device_info
