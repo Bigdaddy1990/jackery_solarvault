@@ -93,8 +93,8 @@ def test_wire_format_constants_match_smali() -> None:
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
     # A synthetic 16-byte key exercises the AES-128 compatibility path.
-    assert BLE_AES_KEY_LEN_AES128 == 16
-    assert BLE_AES_KEY_LEN_AES256 == 32
+    assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
+    assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
     # The legacy single-value alias points at AES-128 because that is the
     # observed wild-type for SolarVault.
@@ -196,7 +196,7 @@ def test_aes_round_trip_with_synthetic_aes128_key() -> None:
     accepting both key lengths.
     """
     key = base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16
+    assert len(key) == BLE_AES_KEY_LEN_AES128
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
@@ -512,13 +512,13 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
     key = base64.b64decode(_TEST_KEY_B64)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="notify too short"):
         decrypt_binary_notify(b"too short", key)
 
 
 def test_decrypt_binary_notify_rejects_unknown_version() -> None:
     """Frames with an unknown protocol version raise ``ValueError``."""
-    key = base64.b64decode(_LIVE_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
     mutated = plain[:2] + b"\x99\x99" + plain[4:]
     blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
@@ -2334,10 +2334,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             raise RuntimeError("simulated GATT failure")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
-
-        Builds a bare listener configured with the synthetic AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """  # noqa: RUF105
+        """Clear pending ACKs after a simulated GATT write failure."""
         key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
@@ -2578,14 +2575,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
             raise AssertionError("invalid MTU must not write to GATT")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
-
-        Constructs a bare listener with a fake client and a resolved AES key, then calls
-        `async_send_command` with a non-integer `mtu_override` to assert input validation.
-
-        Raises:
-            ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """  # noqa: RUF105
+        """Reject a non-integer MTU override before attempting a write."""
         key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
@@ -2652,10 +2642,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     )
 
     async def _run() -> None:
-        """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
-
-        This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """  # noqa: RUF105
+        """Decode a synthetic notify and clear the previous frame error."""
         key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")

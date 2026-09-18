@@ -34,6 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           # Install your dependencies; adjust the following lines as needed
           pip install -r requirements-test.txt
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Install Pyrefly
         run: |
