@@ -1,5 +1,4 @@
 """Plugin for checking sorted platforms list."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -11,7 +10,7 @@ class HassEnforceSortedPlatformsChecker(BaseChecker):
 
     name = "hass_enforce_sorted_platforms"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7451": (
             "Platforms must be sorted alphabetically",
             "hass-enforce-sorted-platforms",

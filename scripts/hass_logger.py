@@ -1,5 +1,4 @@
 """Plugin for logger invocations."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -14,7 +13,7 @@ class HassLoggerFormatChecker(BaseChecker):
 
     name = "hass_logger"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7401": (
             "User visible logger messages must not end with a period",
             "hass-logger-period",

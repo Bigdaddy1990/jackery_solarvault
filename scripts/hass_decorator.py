@@ -1,5 +1,4 @@
 """Plugin to check decorators."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -11,7 +10,7 @@ class HassDecoratorChecker(BaseChecker):
 
     name = "hass_decorator"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7471": (
             "A coroutine function should not be decorated with @callback",
             "hass-async-callback-decorator",

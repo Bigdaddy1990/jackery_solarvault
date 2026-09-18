@@ -1,6 +1,5 @@
 """Plugin to enforce type hints on specific functions."""
 import re
-from typing import ClassVar
 
 from astroid import nodes  # noqa: TC002
 from pylint.checkers import BaseChecker
@@ -25,7 +24,7 @@ class HassInheritanceChecker(BaseChecker):
 
     name = "hass_inheritance"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7411": (
             "Invalid inheritance: %s",
             "hass-invalid-inheritance",

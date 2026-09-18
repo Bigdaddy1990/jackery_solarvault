@@ -1,5 +1,4 @@
 """Plugin for checking if class is in correct module."""
-from typing import ClassVar
 
 from astroid import nodes  # noqa: TC002
 from homeassistant.const import Platform
@@ -110,7 +109,7 @@ class HassEnforceClassModule(BaseChecker):
 
     name = "hass_enforce_class_module"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "C7461": (
             "Derived %s is recommended to be placed in the '%s' module",
             "hass-enforce-class-module",

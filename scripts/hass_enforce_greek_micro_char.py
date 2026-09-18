@@ -1,5 +1,4 @@
 """Plugin for checking preferred coding of μ is used."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -11,7 +10,7 @@ class HassEnforceGreekMicroCharChecker(BaseChecker):
 
     name = "hass-enforce-greek-micro-char"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7452": (
             (
                 "Constants with a micro unit prefix must encode the "
