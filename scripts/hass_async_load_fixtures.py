@@ -1,5 +1,4 @@
 """Plugin for logger invocations."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -17,7 +16,7 @@ class HassLoadFixturesChecker(BaseChecker):
 
     name = "hass_async_load_fixtures"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7481": (
             "Test fixture files should be loaded asynchronously",
             "hass-async-load-fixtures",

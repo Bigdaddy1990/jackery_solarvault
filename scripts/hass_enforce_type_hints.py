@@ -2,7 +2,7 @@
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 from astroid import nodes
 from astroid.exceptions import NameInferenceError
@@ -3236,7 +3236,7 @@ class HassTypeHintChecker(BaseChecker):
 
     name = "hass_enforce_type_hints"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7431": (
             "Argument %s should be of type %s in %s",
             "hass-argument-type",

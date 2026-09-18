@@ -1,7 +1,6 @@
 """Plugin for checking imports."""
 import re
 from dataclasses import dataclass
-from typing import ClassVar
 
 from astroid import nodes  # noqa: TC002
 from pylint.checkers import BaseChecker
@@ -186,7 +185,7 @@ class HassImportsFormatChecker(BaseChecker):
 
     name = "hass_imports"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7421": (
             "Relative import should be used",
             "hass-relative-import",

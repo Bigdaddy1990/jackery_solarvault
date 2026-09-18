@@ -1,5 +1,4 @@
 """Plugin for checking super calls."""
-from typing import ClassVar
 
 from astroid import nodes
 from pylint.checkers import BaseChecker
@@ -16,7 +15,7 @@ class HassEnforceSuperCallChecker(BaseChecker):
 
     name = "hass_enforce_super_call"
     priority = -1
-    msgs: ClassVar = {
+    msgs = {  # noqa: RUF012
         "W7441": (
             "Missing call to: super().%s",
             "hass-missing-super-call",
