@@ -1,4 +1,4 @@
 aiomqtt==2.5.1
-cryptography
 bleak-retry-connector>=3.5.0
+cryptography
 segno>=1.6.0
