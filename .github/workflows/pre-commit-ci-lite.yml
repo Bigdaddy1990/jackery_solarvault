@@ -56,10 +56,6 @@ jobs:
           uv pip install --python .venv/bin/python -r requirements.txt -r requirements-test.txt
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - uses: astral-sh/ruff-action@v4.1.0
-      - run: ruff check . --fix
-      - run: ruff format .
-      - run: ruff check . --fix --preview --unsafe-fixes --target-version py314 || true
-      - run: ruff format . || true
       - uses: pre-commit/action@v3.0.1
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()
