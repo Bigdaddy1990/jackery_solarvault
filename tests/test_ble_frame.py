@@ -1531,7 +1531,7 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
                 assert connectable is True
                 lookup_calls += 1
 
-        cast("Any", listener)._teardown_session = _retry_teardown
+        cast("Any", listener)._teardown_session = _retry_teardown  # noqa: SLF001
         listener._ha_bluetooth = cast("Any", _BluetoothModule())  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(
@@ -1936,7 +1936,7 @@ def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
             await release_second.wait()
             second_finished.set()
 
-        cast("Any", listener)._teardown_session = _teardown
+        cast("Any", listener)._teardown_session = _teardown  # noqa: SLF001
         stop_task = asyncio.create_task(listener._async_stop_impl())  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
         await asyncio.sleep(0)
