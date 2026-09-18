@@ -1,5 +1,4 @@
 """Block regressions that instantiate dedicated aiohttp sessions."""
-
 import ast
 from collections.abc import Iterable
 from pathlib import Path

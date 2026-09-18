@@ -11,11 +11,10 @@ default        Sync existing translation files only.
 --check        Validate only; exit non-zero on any mismatch or missing file.
 --list-missing   Print languages that have no translation file and exit.
 """
-
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 # Resolve project root independent of CWD

@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Helper script to bump the current version."""
-
 import argparse
-from copy import replace
-from pathlib import Path
 import re
 import subprocess  # noqa: S404
+from copy import replace
+from pathlib import Path
 
 import packaging
-from packaging.version import Version
-
 from homeassistant import const
 from homeassistant.util import dt as dt_util
+from packaging.version import Version
 
 _PACKAGING_VERSION_BELOW_26 = Version(packaging.__version__) < Version("26.0dev0")
 

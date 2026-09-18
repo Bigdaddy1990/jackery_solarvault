@@ -1,6 +1,4 @@
 """Verify Python 3.14 multi-exception handler syntax."""
-
-
 import ast
 from pathlib import Path
 
