@@ -115,6 +115,7 @@ class TestMqttCredentialCanonical:
     @pytest.mark.asyncio()
     async def test_no_direct_decoding_duplication_in_rsa_encrypt(self) -> None:  # ruff: ignore[no-self-use]
         """RSA encrypt uses base64.b64decode but handles exact exception."""
+        # ruff: ignore[import-outside-top-level,import-private-name]
         from custom_components.jackery_solarvault.client.api import (
             _rsa_pkcs1v15_encrypt,
         )
