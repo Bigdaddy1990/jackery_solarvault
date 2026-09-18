@@ -36,7 +36,7 @@ def test_numeric_normalizers_reject_ambiguous_and_non_finite_values() -> None:
     assert util.safe_float("nan") is None
     assert util.safe_float(float("inf")) is None
     assert util.safe_float(True) is None
-    assert util.safe_int(4.0) == 4
+    assert util.safe_int(4.0) == 4  # ruff: ignore[magic-value-comparison]
     assert util.safe_int(4.5) is None
     assert util.safe_int(False) is None
 
@@ -60,10 +60,10 @@ def test_config_option_helpers_use_defaults_for_missing_or_bad_values() -> None:
     )
 
     assert util.config_entry_bool_option(empty_entry, "enabled", True) is True
-    assert util.config_entry_int_option(empty_entry, "count", 7) == 7
+    assert util.config_entry_int_option(empty_entry, "count", 7) == 7  # ruff: ignore[magic-value-comparison]
     assert util.config_entry_str_option(empty_entry, "name", "fallback") == "fallback"
     assert util.config_entry_bool_option(invalid_entry, "enabled", False) is False
-    assert util.config_entry_int_option(invalid_entry, "count", 7) == 7
+    assert util.config_entry_int_option(invalid_entry, "count", 7) == 7  # ruff: ignore[magic-value-comparison]
     assert util.config_entry_str_option(invalid_entry, "name", "fallback") == "fallback"
 
 
@@ -100,15 +100,44 @@ def test_payload_debug_writer_emits_one_redacted_json_line(tmp_path: Path) -> No
 
     util.append_payload_debug_line(
         debug_path,
-        {"password": "mqtt-secret", "when": date(2026, 8, 10)},
+        {
+            "password": "mqtt-secret",
+            "local_key": "legacy-local-secret",
+            "localKey": "camel-local-secret",
+            "when": date(2026, 8, 10),
+        },
     )
 
     lines = debug_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
     assert json.loads(lines[0]) == {
         "password": REDACTED_VALUE,
+        "local_key": REDACTED_VALUE,
+        "localKey": REDACTED_VALUE,
         "when": "2026-08-10",
     }
+
+
+def test_payload_debug_batch_writer_preserves_every_redacted_event(
+    tmp_path: Path,
+) -> None:
+    """One batched disk write retains every ordered payload-debug event."""
+    debug_path = tmp_path / "nested" / "payload.jsonl"
+
+    util.append_payload_debug_lines(
+        debug_path,
+        [
+            {"sequence": 1, "token": "first-secret"},
+            {"sequence": 2, "password": "second-secret"},
+        ],
+    )
+
+    assert [
+        json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()
+    ] == [
+        {"sequence": 1, "token": REDACTED_VALUE},
+        {"password": REDACTED_VALUE, "sequence": 2},
+    ]
 
 
 def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
@@ -121,13 +150,36 @@ def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
         APP_REQUEST_META: request,
     })
 
-    assert result[APP_CHART_SERIES_Y]["raw_count"] == 4
+    assert result[APP_CHART_SERIES_Y]["raw_count"] == 4  # ruff: ignore[magic-value-comparison]
     assert result[APP_CHART_SERIES_Y]["parsed_sum"] == pytest.approx(3.5)
     assert result[APP_CHART_SERIES_Y]["items"][1]["parsed_float"] is None
     assert "y1" not in result
     assert result["labels"] == ["Mon", "Tue"]
     assert result["request"] is request
     assert util.chart_series_debug([]) == {}
+
+
+def test_payload_debug_rotation_ignores_file_removed_during_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A concurrent rotation cannot turn a debug write into a warning."""
+    debug_path = tmp_path / "payload.jsonl"
+    debug_path.write_text("old payload", encoding="utf-8")
+    monkeypatch.setattr(util, "PAYLOAD_DEBUG_LOG_MAX_BYTES", 1)
+
+    def _remove_then_fail(self: Path, _backup: Path) -> Path:
+        self.unlink()
+        raise FileNotFoundError
+
+    monkeypatch.setattr(Path, "replace", _remove_then_fail)
+    util.append_payload_debug_line(debug_path, {"event": "current"})
+
+    assert "could not rotate payload debug log" not in caplog.text
+    assert [
+        json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()
+    ] == [{"event": "current"}]
 
 
 def test_calendar_bucket_iterators_return_empty_for_reversed_ranges() -> None:
@@ -188,7 +240,7 @@ def test_smart_meter_modes_keep_total_and_phase_requirements_separate() -> None:
 
     assert util.smart_meter_net_power(totals_only) == pytest.approx(-150)
     assert util.calculated_smart_meter_power(totals_only, "net_import") == 0
-    assert util.calculated_smart_meter_power(totals_only, "net_export") == 150
+    assert util.calculated_smart_meter_power(totals_only, "net_export") == 150  # ruff: ignore[magic-value-comparison]
     assert util.calculated_smart_meter_power(totals_only, "gross_flow") is None
 
     phases: dict[str, float] = {}
@@ -206,7 +258,7 @@ def test_grid_net_power_requires_both_grid_side_measurements() -> None:
             FIELD_IN_GRID_SIDE_PW: "200",
             FIELD_OUT_GRID_SIDE_PW: "75",
         })
-        == 125
+        == 125  # ruff: ignore[magic-value-comparison]
     )
 
 

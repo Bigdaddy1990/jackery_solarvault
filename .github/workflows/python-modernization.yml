@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
@@ -37,7 +37,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -r requirements-test.txt
-          python -m pip install --upgrade pre-commit mypy
+          python -m pip install --upgrade pre-commit pyrefly
 
       - name: Initial modernization checks
         id: initial_checks
@@ -46,7 +46,7 @@ jobs:
           set -e
           pre-commit run --all-files
           pre-commit run --hook-stage manual python-typing-update --all-files || true
-          python -m mypy custom_components/jackery_solarvault
+          python -m pyrefly custom_components/jackery_solarvault
 
       - name: Determine auto-fix eligibility
         if: steps.initial_checks.outcome == 'failure'
@@ -87,7 +87,7 @@ jobs:
         run: |
           pre-commit run --all-files
           pre-commit run --hook-stage manual python-typing-update --all-files
-          python -m mypy custom_components/jackery_solarvault
+          python -m pyrefly custom_components/jackery_solarvault
 
       - name: Enforce strict failure when checks did not pass
         if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix != 'true'

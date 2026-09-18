@@ -10,7 +10,7 @@ from custom_components.jackery_solarvault.switch import (
     JackerySmartPlugPrioritySwitch,
     JackerySmartPlugSwitch,
     JackerySwitchDescription,
-    _standby_is_on,  # noqa: PLC2701, RUF105
+    _standby_is_on,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
 from homeassistant.helpers.entity import EntityCategory
@@ -19,23 +19,23 @@ from homeassistant.helpers.entity import EntityCategory
 class TestStandbyIsOn:
     """Test _standby_is_on helper function."""
 
-    def test_none_returns_none(self) -> None:  # noqa: PLR6301, RUF105
+    def test_none_returns_none(self) -> None:  # ruff: ignore[no-self-use]
         """Test None returns None."""
         assert _standby_is_on(None) is None
 
-    def test_one_returns_true(self) -> None:  # noqa: PLR6301, RUF105
+    def test_one_returns_true(self) -> None:  # ruff: ignore[no-self-use]
         """Test 1 returns True."""
         assert _standby_is_on(1) is True
 
-    def test_zero_returns_false(self) -> None:  # noqa: PLR6301, RUF105
+    def test_zero_returns_false(self) -> None:  # ruff: ignore[no-self-use]
         """Test 0 returns False."""
         assert _standby_is_on(0) is False
 
-    def test_true_returns_true(self) -> None:  # noqa: PLR6301, RUF105
+    def test_true_returns_true(self) -> None:  # ruff: ignore[no-self-use]
         """Test True returns True."""
         assert _standby_is_on(True) is True
 
-    def test_false_returns_false(self) -> None:  # noqa: PLR6301, RUF105
+    def test_false_returns_false(self) -> None:  # ruff: ignore[no-self-use]
         """Test False returns False."""
         assert _standby_is_on(False) is False
 
@@ -43,7 +43,7 @@ class TestStandbyIsOn:
 class TestJackeryDescriptionSwitch:
     """Test JackeryDescriptionSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -65,10 +65,14 @@ class TestJackeryDescriptionSwitch:
         """Test description switch creation."""
         coordinator = self._create_coordinator()
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
         )
         sensor = JackeryDescriptionSwitch(
@@ -83,10 +87,14 @@ class TestJackeryDescriptionSwitch:
             "test_device": {"properties": {"swEps": 1}}
         })
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
         )
         sensor = JackeryDescriptionSwitch(
@@ -100,10 +108,14 @@ class TestJackeryDescriptionSwitch:
             "test_device": {"properties": {"swEps": 0}}
         })
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
         )
         sensor = JackeryDescriptionSwitch(
@@ -115,10 +127,14 @@ class TestJackeryDescriptionSwitch:
         """Test is_on property when key is missing."""
         coordinator = self._create_coordinator({"test_device": {"properties": {}}})
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
+            # pyrefly: ignore [bad-argument-type]
             setter=lambda c, d, v: None,
         )
         sensor = JackeryDescriptionSwitch(
@@ -126,14 +142,17 @@ class TestJackeryDescriptionSwitch:
         )
         assert sensor.is_on is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_turn_on(self) -> None:
         """Test async_turn_on method."""
         coordinator = self._create_coordinator()
         mock_setter = AsyncMock()
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
             setter=mock_setter,
@@ -145,14 +164,17 @@ class TestJackeryDescriptionSwitch:
         await sensor.async_turn_on()
         mock_setter.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_turn_off(self) -> None:
         """Test async_turn_off method."""
         coordinator = self._create_coordinator()
         mock_setter = AsyncMock()
         description = JackerySwitchDescription(
+            # pyrefly: ignore [unexpected-keyword]
             key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             translation_key="eps_output",
+            # pyrefly: ignore [unexpected-keyword]
             entity_category=EntityCategory.CONFIG,
             source_keys=("swEps",),
             setter=mock_setter,
@@ -168,7 +190,7 @@ class TestJackeryDescriptionSwitch:
 class TestJackerySmartPlugSwitch:
     """Test JackerySmartPlugSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -196,7 +218,7 @@ class TestJackerySmartPlugSwitch:
             plug_key="test_key",
         )
         assert sensor is not None
-        assert sensor._plug_sn == "plug123"  # noqa: RUF105, SLF001
+        assert sensor._plug_sn == "plug123"  # ruff: ignore[private-member-access]
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
@@ -246,7 +268,7 @@ class TestJackerySmartPlugSwitch:
 class TestJackeryBreakerSwitch:
     """Test JackeryBreakerSwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -258,7 +280,7 @@ class TestJackeryBreakerSwitch:
 
     def test_creation(self) -> None:
         """Test breaker switch creation."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # ruff: ignore[import-outside-top-level]
 
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 1}]}
@@ -271,11 +293,11 @@ class TestJackeryBreakerSwitch:
             breaker_key="test_key",
         )
         assert sensor is not None
-        assert sensor._breaker_id == "br1"  # noqa: RUF105, SLF001
+        assert sensor._breaker_id == "br1"  # ruff: ignore[private-member-access]
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # ruff: ignore[import-outside-top-level]
 
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 1}]}
@@ -291,7 +313,7 @@ class TestJackeryBreakerSwitch:
 
     def test_is_on_false_with_data(self) -> None:
         """Test is_on property with false data."""
-        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import PAYLOAD_CIRCUIT_PROPERTY  # ruff: ignore[import-outside-top-level]
 
         coordinator = self._create_coordinator({
             "test_device": {PAYLOAD_CIRCUIT_PROPERTY: [{"id": "br1", "sw": 0}]}
@@ -305,7 +327,7 @@ class TestJackeryBreakerSwitch:
         )
         assert sensor.is_on is False
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_turn_on(self) -> None:
         """Test async_turn_on method."""
         coordinator = self._create_coordinator()
@@ -322,7 +344,7 @@ class TestJackeryBreakerSwitch:
             "test_device", "br1", True
         )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio()
     async def test_async_turn_off(self) -> None:
         """Test async_turn_off method."""
         coordinator = self._create_coordinator()
@@ -343,7 +365,7 @@ class TestJackeryBreakerSwitch:
 class TestJackerySmartPlugPrioritySwitch:
     """Test JackerySmartPlugPrioritySwitch class."""
 
-    def _create_coordinator(self, data=None):  # noqa: PLR6301, RUF105
+    def _create_coordinator(self, data=None) -> MagicMock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-function-argument]
         """Create a mock coordinator."""
         coordinator = MagicMock()
         coordinator.data = data or {}
@@ -366,7 +388,7 @@ class TestJackerySmartPlugPrioritySwitch:
             plug_key="test_key",
         )
         assert sensor is not None
-        assert sensor._plug_sn == "plug123"  # noqa: RUF105, SLF001
+        assert sensor._plug_sn == "plug123"  # ruff: ignore[private-member-access]
 
     def test_is_on_with_data(self) -> None:
         """Test is_on property with data."""
@@ -400,8 +422,8 @@ class TestJackerySmartPlugPrioritySwitch:
 class TestAsyncSetupEntry:
     """Test async_setup_entry function."""
 
-    @pytest.mark.asyncio
-    async def test_async_setup_entry(self) -> None:  # noqa: PLR6301, RUF105
+    @pytest.mark.asyncio()
+    async def test_async_setup_entry(self) -> None:  # ruff: ignore[no-self-use]
         """Test async_setup_entry creates switch entities."""
         hass = MagicMock()
         config_entry = MagicMock()
@@ -412,7 +434,7 @@ class TestAsyncSetupEntry:
 
         # Mock coordinator (entry.runtime_data IS the coordinator)
         coordinator = MagicMock()
-        from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             PAYLOAD_CIRCUIT_PROPERTY,
             PAYLOAD_SMART_PLUGS,
         )

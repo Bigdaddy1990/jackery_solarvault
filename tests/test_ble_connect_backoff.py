@@ -20,10 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault.client.ble_transport import (
-    BleFrameObservation,
-    JackeryBleListener,
-)
+from custom_components.jackery_solarvault.client.ble_transport import JackeryBleListener
 from custom_components.jackery_solarvault.const import (
     BLE_CONNECT_BACKOFF_INITIAL_SEC,
     BLE_CONNECT_BACKOFF_MAX_SEC,
@@ -32,6 +29,10 @@ from custom_components.jackery_solarvault.coordinator import BleConnectBackoff
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
+
+    from custom_components.jackery_solarvault.client.ble_transport import (
+        BleFrameObservation,
+    )
 
 _NOW = 1_000.0
 _DEVICE_ID = "573702884982521856"
@@ -51,7 +52,7 @@ def test_fresh_backoff_allows_immediate_attempt() -> None:
 
 
 def test_first_failure_blocks_for_initial_window() -> None:
-    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""  # noqa: RUF105
+    """After one failed connect the next attempt waits the initial delay (±25% jitter)."""  # ruff: ignore[line-too-long]
     backoff = BleConnectBackoff()
 
     applied = backoff.record_failure(_NOW)
@@ -176,8 +177,6 @@ def _make_listener(
             lambda _device_id, now: backoff.record_failure(now)
         ),
         connect_backoff_note_success=lambda _device_id: backoff.record_success(),
-        keep_alive_msg_id=None,
-        keep_alive_ble_msg_type=None,
     )
     listener._device_addresses[_DEVICE_ID] = _ADDRESS  # ruff: ignore[private-member-access]
     return listener

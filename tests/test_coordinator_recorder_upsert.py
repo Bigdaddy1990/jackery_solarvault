@@ -15,12 +15,12 @@ divergent bucket.
 """
 
 import asyncio
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 import itertools
 import operator
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_homeassistant_custom_component.components.recorder.common import (
@@ -41,10 +41,11 @@ from homeassistant.components.recorder.statistics import (
     adjust_statistics,
     statistics_during_period,
 )
-from homeassistant.components.recorder.tasks import SynchronizeTask
 from homeassistant.const import UnitOfEnergy
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from homeassistant.components.recorder import Recorder
     from homeassistant.core import HomeAssistant
 
@@ -68,7 +69,7 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._statistics_recorder_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _point(start: datetime, value: float) -> SimpleNamespace:
@@ -129,7 +130,7 @@ def _assert_monotonic(rows: list[dict[str, Any]]) -> None:
         assert later >= earlier - 1e-6, f"sum went backwards: {sums}"
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_recorder_before_hass(recorder_db_url: str) -> None:
     """Prepare the recorder database before Home Assistant starts."""
     del recorder_db_url
@@ -170,114 +171,40 @@ async def test_corrected_bucket_sum_is_updated_not_dropped(
     _assert_monotonic(rows)
 
 
-async def test_import_uses_fifo_recorder_barrier(
+async def test_import_waits_for_public_recorder_commit_before_success(
     recorder_mock: Recorder,
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verification does not use the racy queue-empty commit-future probe."""
+    """A queued external statistic is not successful until Recorder commits it."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
-    monkeypatch.setattr(
-        recorder_mock,
-        "async_block_till_done",
-        lambda: pytest.fail("racy recorder queue probe was used"),
-    )
-
-    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
-        device_id=_DEVICE_ID,
-        name_prefix="Jackery",
-        metric_key="fifo_barrier_energy",
-        label="FIFO barrier energy",
-        bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-        bucket_label="Day (hourly)",
-        points=[_point(datetime(2026, 7, 1, 15, tzinfo=UTC), 1.25)],
-    )
-
-    assert ok is True
-    assert count == 1
-
-
-async def test_import_waits_for_delayed_recorder_visibility(
-    recorder_mock: Recorder,
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A bounded verifier outlives three stale post-import database reads."""
-    await hass.config.async_set_time_zone("UTC")
-    coordinator = _coordinator(hass)
-    real_reader = cast(
-        "Callable[..., object]",
-        coordinator_module.statistics_during_period,
-    )
-    read_count = 0
-
-    def delayed_reader(*args: object, **kwargs: object) -> object:
-        nonlocal read_count
-        read_count += 1
-        # Read 1 is the pre-import prefix lookup. Simulate three stale reads on
-        # the separate verification connection before the committed row appears.
-        if 2 <= read_count <= 4:
-            return {}
-        return real_reader(*args, **kwargs)
-
+    queued_import = MagicMock()
+    recorder_commit = AsyncMock()
+    recorder = get_instance(hass)
+    assert recorder is recorder_mock
     monkeypatch.setattr(
         coordinator_module,
-        "statistics_during_period",
-        delayed_reader,
+        "async_add_external_statistics",
+        queued_import,
     )
+    monkeypatch.setattr(recorder, "async_block_till_done", recorder_commit)
+    kwargs = {
+        "device_id": _DEVICE_ID,
+        "name_prefix": "Jackery",
+        "metric_key": "queued_live_energy",
+        "label": "Queued live energy",
+        "bucket": EXTERNAL_STAT_BUCKET_DAY_HOURLY,
+        "bucket_label": "Day (hourly)",
+        "points": [_point(datetime(2026, 7, 1, 18, tzinfo=UTC), 4.5)],
+    }
+    first = await coordinator._async_add_app_chart_statistics(**kwargs)  # ruff: ignore[private-member-access]
+    duplicate = await coordinator._async_add_app_chart_statistics(**kwargs)  # ruff: ignore[private-member-access]
 
-    ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
-        device_id=_DEVICE_ID,
-        name_prefix="Jackery",
-        metric_key="delayed_visibility_energy",
-        label="Delayed visibility energy",
-        bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-        bucket_label="Day (hourly)",
-        points=[_point(datetime(2026, 7, 1, 16, tzinfo=UTC), 2.5)],
-    )
-
-    assert ok is True
-    assert count == 1
-    assert read_count >= 5
-
-
-async def test_import_deadline_bounds_stalled_recorder_barrier(
-    recorder_mock: Recorder,
-    hass: HomeAssistant,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A recorder that never completes the FIFO barrier cannot hold the lock."""
-    await hass.config.async_set_time_zone("UTC")
-    coordinator = _coordinator(hass)
-    recorder_any = cast("Any", recorder_mock)
-    real_queue_task = recorder_any.queue_task
-
-    def queue_without_sync(task: object) -> None:
-        if isinstance(task, SynchronizeTask):
-            return
-        real_queue_task(task)
-
-    monkeypatch.setattr(
-        coordinator_module,
-        "_STATISTICS_RECORDER_VERIFICATION_TIMEOUT_SEC",
-        0.01,
-    )
-    monkeypatch.setattr(recorder_mock, "queue_task", queue_without_sync)
-
-    async with asyncio.timeout(0.5):
-        ok, count = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
-            device_id=_DEVICE_ID,
-            name_prefix="Jackery",
-            metric_key="stalled_barrier_energy",
-            label="Stalled barrier energy",
-            bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-            bucket_label="Day (hourly)",
-            points=[_point(datetime(2026, 7, 1, 17, tzinfo=UTC), 3.5)],
-        )
-
-    assert ok is False
-    assert count == 0
+    assert first == (True, 1)
+    assert duplicate == (True, 0)
+    assert queued_import.call_count == 1
+    recorder_commit.assert_awaited_once_with()
 
 
 async def test_mid_series_insertion_keeps_sum_monotonic(
@@ -371,6 +298,100 @@ async def test_earlier_day_correction_rebases_later_day(
     assert day1_last == pytest.approx(12.0)
     assert day2_first == pytest.approx(16.0)
     assert day1_last <= day2_first
+
+
+async def test_downward_cloud_correction_preserves_later_interval_energy(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+) -> None:
+    """Revising an old bucket must not invent energy in the following day."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    d1 = datetime(2026, 7, 20, 10, tzinfo=UTC)
+    d2 = d1 + timedelta(days=1)
+
+    await _import(
+        coordinator, hass, [_point(d1, 6.0), _point(d1 + timedelta(hours=1), 1.0)]
+    )
+    await _import(coordinator, hass, [_point(d2, 2.0)])
+
+    # The cloud now reports a *smaller* value for the already imported day.
+    await _import(
+        coordinator, hass, [_point(d1, 1.0), _point(d1 + timedelta(hours=1), 1.0)]
+    )
+
+    rows = await _read_rows(hass)
+    _assert_monotonic(rows)
+    assert _row_at(rows, d1 + timedelta(hours=1))["sum"] == pytest.approx(2.0)
+    assert _row_at(rows, d2)["sum"] == pytest.approx(4.0)
+
+
+async def test_late_historical_day_rebases_already_imported_future_day(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+) -> None:
+    """A late historical day must rebase an already imported later day."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    d0 = datetime(2026, 7, 8, 10, tzinfo=UTC)
+    d1 = d0 + timedelta(days=1)
+    d2 = d1 + timedelta(days=1)
+
+    await _import(coordinator, hass, [_point(d0, 100.0)])
+    await _import(
+        coordinator,
+        hass,
+        [_point(d2, 4.0), _point(d2 + timedelta(hours=1), 5.0)],
+    )
+    await _import(
+        coordinator,
+        hass,
+        [_point(d1, 10.0), _point(d1 + timedelta(hours=1), 2.0)],
+    )
+
+    rows = await _read_rows(hass)
+    assert [row["sum"] for row in rows] == pytest.approx([
+        100.0,
+        110.0,
+        112.0,
+        116.0,
+        121.0,
+    ])
+    _assert_monotonic(rows)
+
+
+@pytest.mark.parametrize(
+    "failed_query", ["_load_offset", "statistics_during_period", "_load_future"]
+)
+async def test_recorder_read_failure_preserves_rows_and_allows_retry(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+    failed_query: str,
+) -> None:
+    """A failed read must not become an empty baseline or acknowledge an import."""
+    await hass.config.async_set_time_zone("UTC")
+    coordinator = _coordinator(hass)
+    start = datetime(2026, 7, 10, 10, tzinfo=UTC)
+    await _import(coordinator, hass, [_point(start, 10.0)])
+    await _import(coordinator, hass, [_point(start + timedelta(days=1), 2.0)])
+    before = await _read_rows(hass)
+    execute = recorder_mock.async_add_executor_job
+
+    async def fail_read(target: Callable[..., object], *args: object) -> object:
+        if getattr(target, "__name__", None) == failed_query:
+            message = "recorder read unavailable"
+            raise RuntimeError(message)
+        return await execute(target, *args)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(recorder_mock, "async_add_executor_job", fail_read)
+        result = await _import(coordinator, hass, [_point(start, 3.0)])
+
+    assert result == (False, 0)
+    assert await _read_rows(hass) == before
+    assert (await _import(coordinator, hass, [_point(start, 3.0)]))[0]
+    assert [row["sum"] for row in await _read_rows(hass)] == pytest.approx([3.0, 5.0])
 
 
 async def test_user_adjusted_prior_sums_are_preserved(

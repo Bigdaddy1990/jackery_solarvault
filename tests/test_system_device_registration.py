@@ -35,7 +35,7 @@ def test_obsolete_system_parent_is_removed_and_head_is_detached(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, _DEVICE_ID)},
         name="SolarVault 3 Pro Max",
-        via_device=parent_identifier,
+        via_device_id=parent.id,
     )
     assert head.via_device_id == parent.id
 
@@ -47,16 +47,19 @@ def test_obsolete_system_parent_is_removed_and_head_is_detached(
     migrated_head = registry.async_get(head.id)
     assert migrated_head is not None
     assert migrated_head.via_device_id is None
-    obsolete_parent = registry.async_get_device(identifiers={parent_identifier})
+    obsolete_parent = registry.async_get_device_by_identifier(
+        parent_identifier,
+        entry.entry_id,
+    )
     assert (
         obsolete_parent is None or entry.entry_id not in obsolete_parent.config_entries
     )
 
 
-async def test_layer5_start_is_scheduled_after_platform_registry_setup(
+async def test_cached_reload_starts_layer5_before_primary_http_finishes(
     hass: HomeAssistant,
 ) -> None:
-    """Optional transports start after platforms without creating a system parent."""
+    """Cached transports resume while the primary HTTP refresh is still blocked."""
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={CONF_USERNAME: "tester@example.com", CONF_PASSWORD: "secret"},
@@ -68,38 +71,45 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     api.payload_debug_callback = None
     api.auth_rejection_callback = None
     events: list[str] = []
+    http_started = asyncio.Event()
+    release_http = asyncio.Event()
+    layer5_started = asyncio.Event()
 
     async def _prepare_http(
         _hass: HomeAssistant,
         _entry: MockConfigEntry,
-        coordinator: Any,  # noqa: RUF105
+        coordinator: Any,
     ) -> None:
-        await asyncio.sleep(0)
+        http_started.set()
+        await release_http.wait()
         coordinator.data = {}
 
-    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:  # noqa: RUF105
+    async def _forward_platforms(*_args: Any, **_kwargs: Any) -> None:
         await asyncio.sleep(0)
         events.append("platforms")
 
     # Mock Layer-5 startup tasks to track execution order
-    async def mock_start_mqtt() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_mqtt() -> None:  # ruff: ignore[unused-async]
         events.append("layer5")
+        layer5_started.set()
 
-    async def mock_start_local_mqtt_listener() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_local_mqtt_listener(  # ruff: ignore[unused-async]
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> None:
         return None
 
-    async def mock_start_ble_transport() -> None:  # noqa: RUF029, RUF105
+    async def mock_start_ble_transport() -> None:  # ruff: ignore[unused-async]
         return None
 
-    async def mock_apply_mqtt_config() -> None:  # noqa: RUF029, RUF105
-        return None
+    direct_mqtt_config = AsyncMock()
 
     with (
         patch.object(integration, "JackeryApi", return_value=api),
         patch.object(
             integration,
             "_async_load_entry_caches",
-            AsyncMock(return_value=False),
+            AsyncMock(return_value=True),
         ),
         patch.object(
             integration,
@@ -114,6 +124,11 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
         ),
         patch.object(
             integration,
+            "_async_start_local_mqtt",
+            side_effect=mock_start_local_mqtt_listener,
+        ) as start_local_mqtt,
+        patch.object(
+            integration,
             "JackerySolarVaultCoordinator",
             autospec=True,
         ) as mock_coordinator_class,
@@ -125,16 +140,25 @@ async def test_layer5_start_is_scheduled_after_platform_registry_setup(
     ):
         # Configure the mock coordinator to track Layer-5 startup
         mock_coordinator = mock_coordinator_class.return_value
+        # `data` is a real mapping on the coordinator; autospec would
+        # otherwise hand out a MagicMock that setup code cannot iterate.
+        mock_coordinator.data = {}
         mock_coordinator.async_start_mqtt = mock_start_mqtt
-        mock_coordinator.async_start_local_mqtt_listener = (
-            mock_start_local_mqtt_listener  # noqa: E501, RUF100
-        )
         mock_coordinator.async_start_ble_transport = mock_start_ble_transport
-        mock_coordinator.async_apply_local_mqtt_config_to_devices = (
-            mock_apply_mqtt_config  # noqa: E501, RUF100
-        )
-        mock_coordinator.async_start_statistics_imports = AsyncMock(return_value=None)
+        mock_coordinator.async_apply_local_mqtt_config_to_devices = direct_mqtt_config
+        mock_coordinator.async_start_statistics_imports = MagicMock(return_value=None)
 
-        assert await integration.async_setup_entry(hass, entry)
+        setup_task = asyncio.create_task(integration.async_setup_entry(hass, entry))
+        await http_started.wait()
+        await asyncio.wait_for(layer5_started.wait(), timeout=1)
+        assert not release_http.is_set()
+        assert events.count("layer5") == 1
 
-    assert events == ["platforms", "layer5"]
+        release_http.set()
+        assert await setup_task
+
+    assert events.count("layer5") == 1
+    assert events.count("platforms") == 1
+    start_local_mqtt.assert_awaited_once_with(hass, entry, mock_coordinator)
+    direct_mqtt_config.assert_not_awaited()
+    mock_coordinator.async_schedule_local_mqtt_device_config.assert_called_once_with()

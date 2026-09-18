@@ -18,7 +18,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy
 
 
-def _by_key(key: str) -> Any:  # noqa: RUF105
+def _by_key(key: str) -> Any:
     return cast("Any", next(d for d in SMART_METER_SENSOR_DESCRIPTIONS if d.key == key))
 
 

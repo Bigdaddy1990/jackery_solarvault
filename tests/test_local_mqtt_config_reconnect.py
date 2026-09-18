@@ -8,14 +8,17 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
+from custom_components.jackery_solarvault.client.local_mqtt import (
+    JackeryLocalMqttClient,
+)
 from custom_components.jackery_solarvault.const import (
     ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
-    CONF_LOCAL_MQTT_ENABLE,
-    CONF_LOCAL_MQTT_HOST,
-    CONF_LOCAL_MQTT_PASSWORD,
-    CONF_LOCAL_MQTT_PORT,
-    CONF_LOCAL_MQTT_USERNAME,
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_THIRD_PARTY_MQTT_IP,
     FIELD_THIRD_PARTY_MQTT_PASSWORD,
@@ -51,7 +54,7 @@ class _TaskHass:
         return asyncio.create_task(coro, name=name)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_reconnect_during_config_push_replays_without_overlap() -> None:
     """A second cloud connect coalesces one post-flight 3046/BLE-113 retry."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -118,7 +121,7 @@ async def test_reconnect_during_config_push_replays_without_overlap() -> None:
     mqtt_mgr.record_connect_success.assert_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_failed_config_push_retries_without_cloud_reconnect() -> None:
     """A transient 3046/BLE-113 failure retries without requiring reconnect."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -144,7 +147,7 @@ async def test_failed_config_push_retries_without_cloud_reconnect() -> None:
     retry_sleep.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_confirmed_config_retries_until_device_traffic_is_observed() -> None:
     """A successful 3046 without a device PUBLISH is not terminal health."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -162,9 +165,9 @@ async def test_confirmed_config_retries_until_device_traffic_is_observed() -> No
     async def _apply() -> bool:
         await asyncio.sleep(0)
         attempts = retry_sleep.await_count
-        obj._local_mqtt_config_diagnostics[  # ruff: ignore[private-member-access]
-            "last_status"
-        ] = "config_confirmed_awaiting_device_traffic" if attempts == 0 else "success"
+        obj._local_mqtt_config_diagnostics["last_status"] = (  # ruff: ignore[private-member-access]
+            "config_confirmed_awaiting_device_traffic" if attempts == 0 else "success"
+        )
         return True
 
     obj.async_apply_local_mqtt_config_to_devices = _apply
@@ -176,7 +179,7 @@ async def test_confirmed_config_retries_until_device_traffic_is_observed() -> No
     retry_sleep.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_confirmed_config_without_traffic_stops_after_bounded_retries() -> None:
     """A silent device cannot trigger an infinite 3046 command loop."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
@@ -190,9 +193,9 @@ async def test_confirmed_config_without_traffic_stops_after_bounded_retries() ->
     obj._async_local_mqtt_config_retry_sleep = retry_sleep  # ruff: ignore[private-member-access]
 
     def _apply() -> bool:
-        obj._local_mqtt_config_diagnostics[  # ruff: ignore[private-member-access]
-            "last_status"
-        ] = "config_confirmed_awaiting_device_traffic"
+        obj._local_mqtt_config_diagnostics["last_status"] = (  # ruff: ignore[private-member-access]
+            "config_confirmed_awaiting_device_traffic"
+        )
         return True
 
     apply = AsyncMock(side_effect=_apply)
@@ -207,7 +210,7 @@ async def test_confirmed_config_without_traffic_stops_after_bounded_retries() ->
     assert "last_retry_exhausted_at" in obj._local_mqtt_config_diagnostics  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_automatic_bridge_preserves_stable_app_token() -> None:
     """The automatic bridge reuses its hidden persisted App-style token."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -217,11 +220,11 @@ async def test_automatic_bridge_preserves_stable_app_token() -> None:
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
             CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
         },
     )
@@ -256,17 +259,17 @@ async def test_automatic_bridge_preserves_stable_app_token() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_one_devices_traffic_does_not_confirm_every_device() -> None:
     """Each configured device must publish before the shared config is healthy."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     options = {
-        CONF_LOCAL_MQTT_ENABLE: True,
-        CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-        CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-        CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-        CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+        CONF_THIRD_PARTY_MQTT_ENABLE: True,
+        CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+        CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+        CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+        CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         CONF_THIRD_PARTY_MQTT_TOKEN: "123456789",
     }
     obj.entry = SimpleNamespace(data={}, options=options)
@@ -291,15 +294,13 @@ async def test_one_devices_traffic_does_not_confirm_every_device() -> None:
         ("device-1", "device-2"),
     )
     obj._local_mqtt_device_traffic_observed = True  # ruff: ignore[private-member-access]
-    obj._local_mqtt_device_traffic_observed_ids = {  # ruff: ignore[private-member-access]
-        "device-1"
-    }
+    obj._local_mqtt_device_traffic_observed_ids = {"device-1"}  # ruff: ignore[private-member-access]
     setter = AsyncMock(return_value=None)
     obj.async_set_third_party_mqtt_config = setter
 
     assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
 
-    assert setter.await_count == 2
+    assert setter.await_count == 2  # ruff: ignore[magic-value-comparison]
     assert obj._local_mqtt_config_diagnostics["last_status"] == (  # ruff: ignore[private-member-access]
         "config_confirmed_awaiting_device_traffic"
     )
@@ -327,7 +328,7 @@ def test_blank_setter_token_reuses_persisted_token_after_restart() -> None:
     update_entry.assert_not_called()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_automatic_bridge_generates_and_persists_missing_app_token() -> None:
     """A missing device/options token gets one stable App-style fallback."""
     coordinator = JackerySolarVaultCoordinator.__new__(
@@ -337,11 +338,11 @@ async def test_automatic_bridge_generates_and_persists_missing_app_token() -> No
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     update_entry = MagicMock()
@@ -365,7 +366,7 @@ async def test_automatic_bridge_generates_and_persists_missing_app_token() -> No
     await_args = setter.await_args
     assert await_args is not None
     sent_token = await_args.kwargs["token"]
-    assert len(sent_token) == 9
+    assert len(sent_token) == 9  # ruff: ignore[magic-value-comparison]
     assert sent_token.isdecimal()
     update_entry.assert_called_once()
     assert (
@@ -374,9 +375,15 @@ async def test_automatic_bridge_generates_and_persists_missing_app_token() -> No
     )
 
 
-@pytest.mark.asyncio
-async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
-    """The App-compatible automatic path reuses 3047 before sending 3046."""
+@pytest.mark.asyncio()
+async def test_automatic_bridge_skips_write_when_3047_matches() -> None:
+    """A matching readback skips the write once device traffic proved the bridge.
+
+    The read-back alone is not sufficient: it only shows what the device has
+    stored. Live, a device answered 3047 with a perfect match while publishing
+    nothing, so the write was skipped forever and the bridge never came up.
+    Observed traffic is what licenses the skip.
+    """
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
@@ -384,11 +391,11 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
     obj.entry = SimpleNamespace(
         data={},
         options={
-            CONF_LOCAL_MQTT_ENABLE: True,
-            CONF_LOCAL_MQTT_HOST: "192.168.2.212",
-            CONF_LOCAL_MQTT_PORT: _LOCAL_MQTT_PORT,
-            CONF_LOCAL_MQTT_USERNAME: "mqtt_user",
-            CONF_LOCAL_MQTT_PASSWORD: "mqtt_password",
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
         },
     )
     obj.hass = SimpleNamespace(
@@ -398,8 +405,12 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
     obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._local_mqtt_no_host_warned = False  # ruff: ignore[private-member-access]
     obj._generated_third_party_mqtt_token = None  # ruff: ignore[private-member-access]
-    obj._device_index = {"device-1": {}}  # ruff: ignore[private-member-access]
-    obj.data = {"device-1": {}}
+    obj._device_index = {  # ruff: ignore[private-member-access]
+        "device-1": {"device_meta": {"deviceSn": "SV3PM123456"}},
+    }
+    obj.data = {"device-1": {"device": {"deviceSn": "SV3PM123456"}}}
+    # The device has already delivered frames, so its read-back is trustworthy.
+    obj._local_mqtt_head_traffic_observed_ids = {"device-1"}  # ruff: ignore[private-member-access]
     call_order: list[str] = []
 
     def _readback(_device_id: str) -> dict[str, Any]:
@@ -413,8 +424,127 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
             FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
         }
 
-    def _set_config(_device_id: str, **kwargs: Any) -> None:
+    obj._async_query_third_party_mqtt_config_readback = AsyncMock(  # ruff: ignore[private-member-access]
+        side_effect=_readback,
+    )
+    obj.async_set_third_party_mqtt_config = AsyncMock()
+
+    assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
+    assert call_order == ["3047"]
+    obj.async_set_third_party_mqtt_config.assert_not_awaited()
+    assert obj._local_mqtt_config_diagnostics["last_status"] == "already_configured"  # ruff: ignore[private-member-access]
+    obj.hass.config_entries.async_update_entry.assert_not_called()
+
+    client = JackeryLocalMqttClient.__new__(JackeryLocalMqttClient)
+    client._connected = True  # ruff: ignore[private-member-access]
+    client.async_publish = AsyncMock()  # type: ignore[method-assign]
+    obj._local_mqtt_client = client  # ruff: ignore[private-member-access]
+
+    assert await coordinator.async_poll_local_mqtt_devices("hb") == 7  # ruff: ignore[magic-value-comparison]
+    assert {call.args[1]["token"] for call in client.async_publish.await_args_list} == {
+        "123456789"
+    }
+
+
+@pytest.mark.asyncio()
+async def test_matching_readback_without_traffic_still_rearms_the_bridge() -> None:
+    """A silent device gets a fresh 3046 even though its 3047 read-back matches.
+
+    Live regression: the device answered 3047 with an exact match on every
+    attempt, so ``write_count`` stayed 0 and ``last_status`` stuck on
+    ``already_configured`` — while it published nothing. Because the retry
+    ladder only engages on ``config_confirmed_awaiting_device_traffic``, which
+    requires a write, the bridge could never recover on its own.
+    """
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    obj = cast("Any", coordinator)
+    obj.entry = SimpleNamespace(
+        data={},
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
+        },
+    )
+    obj.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(async_update_entry=MagicMock()),
+    )
+    obj._local_mqtt_config_applied_signature = None  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_no_host_warned = False  # ruff: ignore[private-member-access]
+    obj._generated_third_party_mqtt_token = None  # ruff: ignore[private-member-access]
+    obj._device_index = {  # ruff: ignore[private-member-access]
+        "device-1": {"device_meta": {"deviceSn": "SV3PM123456"}},
+    }
+    obj.data = {"device-1": {"device": {"deviceSn": "SV3PM123456"}}}
+    # No frame has ever arrived from this device.
+    obj._local_mqtt_head_traffic_observed_ids = set()  # ruff: ignore[private-member-access]
+
+    obj._async_query_third_party_mqtt_config_readback = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value={
+            FIELD_THIRD_PARTY_MQTT_ENABLE: 1,
+            FIELD_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            FIELD_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
+            FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
+        },
+    )
+    obj.async_set_third_party_mqtt_config = AsyncMock()
+
+    assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
+
+    obj.async_set_third_party_mqtt_config.assert_awaited_once()
+    diagnostics = obj._local_mqtt_config_diagnostics  # ruff: ignore[private-member-access]
+    assert diagnostics["write_count"] == 1
+    # This status is what the bounded retry ladder waits on.
+    assert diagnostics["last_status"] == "config_confirmed_awaiting_device_traffic"
+
+
+@pytest.mark.asyncio()
+async def test_automatic_bridge_writes_only_after_verified_3047_mismatch() -> None:
+    """A real field mismatch still performs one ordered corrective write."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    obj = cast("Any", coordinator)
+    obj.entry = SimpleNamespace(
+        data={},
+        options={
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            CONF_THIRD_PARTY_MQTT_PORT: _LOCAL_MQTT_PORT,
+            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
+        },
+    )
+    obj.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(async_update_entry=MagicMock()),
+    )
+    obj._local_mqtt_config_applied_signature = None  # ruff: ignore[private-member-access]
+    obj._local_mqtt_config_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._local_mqtt_no_host_warned = False  # ruff: ignore[private-member-access]
+    obj._generated_third_party_mqtt_token = None  # ruff: ignore[private-member-access]
+    obj._device_index = {"device-1": {}}  # ruff: ignore[private-member-access]
+    obj.data = {"device-1": {}}
+    call_order: list[str] = []
+
+    async def _readback(_device_id: str) -> dict[str, Any]:
+        await asyncio.sleep(0)
+        call_order.append("3047")
+        return {
+            FIELD_THIRD_PARTY_MQTT_ENABLE: 1,
+            FIELD_THIRD_PARTY_MQTT_IP: "192.168.2.212",
+            FIELD_THIRD_PARTY_MQTT_PORT: 1884,
+            FIELD_THIRD_PARTY_MQTT_USERNAME: "mqtt_user",
+            FIELD_THIRD_PARTY_MQTT_PASSWORD: "mqtt_password",
+            FIELD_THIRD_PARTY_MQTT_TOKEN: "123456789",
+        }
+
+    async def _set_config(_device_id: str, **kwargs: Any) -> None:
+        await asyncio.sleep(0)
         call_order.append("3046")
+        assert kwargs["port"] == _LOCAL_MQTT_PORT
         assert kwargs["token"] == "123456789"
 
     obj._async_query_third_party_mqtt_config_readback = AsyncMock(  # ruff: ignore[private-member-access]
@@ -424,7 +554,7 @@ async def test_automatic_bridge_reads_device_token_before_first_write() -> None:
 
     assert await coordinator.async_apply_local_mqtt_config_to_devices() is True
     assert call_order == ["3047", "3046"]
-    obj.hass.config_entries.async_update_entry.assert_not_called()
+    assert obj._local_mqtt_config_diagnostics["write_count"] == 1  # ruff: ignore[private-member-access]
 
 
 def _rediscovery_coordinator(*, connected: bool) -> tuple[Any, MagicMock]:
@@ -442,7 +572,7 @@ def _rediscovery_coordinator(*, connected: bool) -> tuple[Any, MagicMock]:
     return obj, schedule
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_runtime_discovery_pushes_config_to_new_device_when_connected() -> None:
     """A device added after startup receives 3046/BLE-113 without reconnect."""
     coordinator, schedule = _rediscovery_coordinator(connected=True)
@@ -459,7 +589,7 @@ async def test_runtime_discovery_pushes_config_to_new_device_when_connected() ->
     schedule.assert_called_once_with()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_runtime_discovery_schedules_config_while_cloud_disconnected() -> None:
     """BLE can configure a newly discovered device without Cloud-MQTT state."""
     coordinator, schedule = _rediscovery_coordinator(connected=False)
@@ -476,7 +606,7 @@ async def test_runtime_discovery_schedules_config_while_cloud_disconnected() -> 
     schedule.assert_called_once_with()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_runtime_discovery_without_new_device_does_not_push_config() -> None:
     """An unchanged discovery snapshot does not emit redundant cmd=113 work."""
     coordinator, schedule = _rediscovery_coordinator(connected=True)
@@ -545,9 +675,10 @@ def test_incomplete_3047_echo_does_not_resolve_readback_waiter() -> None:
 
     waiter.set_result.assert_called_once_with(complete)
     observer.assert_not_called()
+    assert obj._local_mqtt_device_tokens == {"device-1": "123456789"}  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_third_party_mqtt_write_retries_stale_complete_readback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

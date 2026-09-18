@@ -55,7 +55,7 @@ _LIVE_PACK_SOC = 80
 _SYSTEM_ENERGY_PLAN_POWER = 725
 
 
-def _description(key: str) -> Any:  # noqa: RUF105
+def _description(key: str) -> Any:
     """Return one query-button description by key."""
     return next(item for item in QUERY_BUTTON_DESCRIPTIONS if item.key == key)
 
@@ -84,15 +84,15 @@ def _bare_coordinator(entry: dict[str, Any]) -> JackerySolarVaultCoordinator:
     shell._pending_device_removals = []  # ruff: ignore[private-member-access]
     shell._device_index = {}  # ruff: ignore[private-member-access]
     shell._device_registry_observer = None  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
-def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:  # noqa: RUF105
+def _mock_api(coordinator: JackerySolarVaultCoordinator) -> Any:
     """Return the API test double behind the coordinator's typed boundary."""
     return cast("Any", coordinator.api)
 
 
-def _button(coordinator: Any, key: str) -> JackeryQueryButton:  # noqa: RUF105
+def _button(coordinator: Any, key: str) -> JackeryQueryButton:
     """Create a query button against a lightweight coordinator double."""
     coordinator.data = {_DEVICE_ID: {}}
     coordinator.last_update_success = True
@@ -124,7 +124,7 @@ def test_only_documented_refresh_buttons_enable_http_reads() -> None:
     assert actual == expected
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_button_succeeds_when_http_read_fills_failed_query_transport() -> None:
     """A usable HTTP read makes a failed BLE/cloud-MQTT query non-fatal."""
     coordinator = MagicMock()
@@ -140,7 +140,7 @@ async def test_button_succeeds_when_http_read_fills_failed_query_transport() -> 
     coordinator.async_refresh_documented_http_read.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_button_succeeds_when_query_works_and_http_read_fails() -> None:
     """The existing BLE/cloud-MQTT query remains independently sufficient."""
     coordinator = MagicMock()
@@ -153,7 +153,7 @@ async def test_button_succeeds_when_query_works_and_http_read_fails() -> None:
     await button.async_press()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
     """A priority-suppressed valid HTTP response is still transport success."""
     plug_sn = "PLUG-1"
@@ -198,7 +198,7 @@ async def test_valid_http_noop_still_recovers_failed_query_transport() -> None:
     coordinator_mock._push_partial_update.assert_not_called()  # ruff: ignore[private-member-access]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_button_never_swallows_cancellation() -> None:
     """Task cancellation wins even if the other refresh transport succeeds."""
     coordinator = MagicMock()
@@ -212,7 +212,7 @@ async def test_button_never_swallows_cancellation() -> None:
         await button.async_press()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_device_property_http_read_preserves_fresh_live_value() -> None:
     """Raw HTTP is recorded without replaying a pre-await live snapshot."""
     entry = {
@@ -264,7 +264,7 @@ async def test_device_property_http_read_preserves_fresh_live_value() -> None:
     assert updated[PAYLOAD_PROPERTIES]["pvPw"] == _NEWER_LIVE_PV_POWER
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_shadow_http_read_surfaces_system_info() -> None:
     """The system-info button can fill SystemBody-only fields without MQTT."""
     entry = {
@@ -293,7 +293,7 @@ async def test_system_shadow_http_read_surfaces_system_info() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
     """Pack refresh runs pack/list and known type-1 subShadow in parallel."""
     pack_sn = "PACK-1"
@@ -390,7 +390,7 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
         ],
     ],
 )
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_known_subdevice_refresh_uses_documented_sub_shadow(
     dev_type: int,
     serial: str,

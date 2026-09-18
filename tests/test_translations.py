@@ -4,14 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+# pyrefly: ignore [untyped-import]
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 TRANSLATION_ROOT = ROOT / "custom_components" / "jackery_solarvault"
-LANGUAGES = ("en", "de", "es", "fr")
+LANGUAGES = ("en", "en-GB", "de", "es", "fr")
 
 
-def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # noqa: RUF105
+def _leaf_paths(value: Any, prefix: str = "") -> set[str]:
     """Return the set of dotted "leaf" key paths from a nested dictionary structure.
 
     Parameters:
@@ -22,7 +23,7 @@ def _leaf_paths(value: Any, prefix: str = "") -> set[str]:  # noqa: RUF105
     Returns:
         set[str]: A set of dotted key paths representing all leaf nodes found
         (the prefix itself is a leaf when `value` is not a dict).
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]
     if not isinstance(value, dict):
         return {prefix}
 
@@ -50,6 +51,22 @@ def test_language_files_cover_all_string_keys() -> None:
             )
         )
         assert _leaf_paths(translated) == base_paths, lang
+
+
+def test_british_english_meter_and_balance_names_match_sensor_semantics() -> None:
+    """Regional English must not retain obsolete meter phases or loss labels."""
+    source = json.loads((TRANSLATION_ROOT / "strings.json").read_text(encoding="utf-8"))
+    translated = json.loads(
+        (TRANSLATION_ROOT / "translations/en-GB.json").read_text(encoding="utf-8")
+    )
+    for key, description in source["entity"]["sensor"].items():
+        if (
+            key.startswith("smart_meter_")
+            or key == "savings_battery_balance_year_energy"
+        ):
+            assert translated["entity"]["sensor"][key]["name"] == description["name"], (
+                key
+            )
 
 
 def test_service_actions_use_translation_files() -> None:
@@ -127,7 +144,7 @@ def test_max_grid_standard_power_has_a_base_translation() -> None:
 
 
 def _assert_keys_sorted(
-    value: Any,  # noqa: RUF105
+    value: Any,
     path: str = "",
 ) -> None:
     """Recursively assert every JSON object in ``value`` has alphabetically sorted keys.

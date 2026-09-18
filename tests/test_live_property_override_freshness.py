@@ -48,6 +48,7 @@ def _bare_coordinator(
         "custom_components.jackery_solarvault.coordinator.time.monotonic",
         lambda: _NOW,
     )
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -112,7 +113,7 @@ def test_work_model_is_protected_as_live_telemetry(
         source=TransportSource.HTTP,
     )
 
-    assert merged[FIELD_WORK_MODEL] == 7
+    assert merged[FIELD_WORK_MODEL] == 7  # ruff: ignore[magic-value-comparison]
 
 
 def test_config_only_push_does_not_refresh_live_push_diagnostics(

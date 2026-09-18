@@ -14,7 +14,12 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 import custom_components.jackery_solarvault as _init_module
-from custom_components.jackery_solarvault.const import DOMAIN, PAYLOAD_BATTERY_PACKS
+from custom_components.jackery_solarvault.const import (
+    DOMAIN,
+    FIELD_BAT_NUM,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_PROPERTIES,
+)
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     battery_pack_serial,
@@ -24,7 +29,10 @@ from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 _async_migrate_battery_pack_identities = (
-    _init_module._async_migrate_battery_pack_identities  # noqa: RUF105, SLF001
+    _init_module._async_migrate_battery_pack_identities  # ruff: ignore[private-member-access]
+)
+_async_remove_phantom_battery_pack_devices = (
+    _init_module._async_remove_phantom_battery_pack_devices  # ruff: ignore[private-member-access]
 )
 
 if TYPE_CHECKING:
@@ -48,7 +56,7 @@ def _coordinator(
         _PARENT_ID: {PAYLOAD_BATTERY_PACKS: list(packs or [])},
     }
     shell._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
-    return coordinator
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
 def _entry(
@@ -83,12 +91,17 @@ def _pack_device(
     serial_number: str | None = None,
 ) -> dr.DeviceEntry:
     """Create one battery-pack registry device under the test parent."""
+    parent = registry.async_get_device_by_identifier(
+        (DOMAIN, _PARENT_ID),
+        entry.entry_id,
+    )
+    assert parent is not None, "parent device must be registered first"
     return registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, identifier)},
         name="Battery pack",
         serial_number=serial_number,
-        via_device=(DOMAIN, _PARENT_ID),
+        via_device_id=parent.id,
     )
 
 
@@ -262,14 +275,19 @@ def test_registry_migration_rekeys_pack_and_preserves_entity_id(
     _async_migrate_battery_pack_identities(hass, entry)
 
     new_identifier = _serial_identifier(_SN_A)
-    migrated_pack = device_registry.async_get_device(
-        identifiers={(DOMAIN, new_identifier)},
+    migrated_pack = device_registry.async_get_device_by_identifier(
+        (DOMAIN, new_identifier),
+        entry.entry_id,
     )
     assert migrated_pack is not None
     assert migrated_pack.id == pack.id
     assert migrated_pack.serial_number == _SN_A
     assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, old_identifier)}) is None
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, old_identifier),
+            entry.entry_id,
+        )
+        is None
     )
     migrated_entity = entity_registry.async_get(entity_id)
     assert migrated_entity is not None
@@ -280,6 +298,127 @@ def test_registry_migration_rekeys_pack_and_preserves_entity_id(
         _PARENT_ID: {PAYLOAD_BATTERY_PACKS: [{"deviceSn": _SN_B}]},
     }
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
+
+
+def test_existing_serial_target_removes_only_duplicate_numeric_device(
+    hass: HomeAssistant,
+) -> None:
+    """A serial target makes its same-serial numeric fallback removable."""
+    coordinator = _coordinator([{"deviceSn": _SN_A}])
+    cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_PROPERTIES] = {
+        FIELD_BAT_NUM: 1,
+    }
+    entry = _entry(hass, coordinator)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    _parent_device(device_registry, entry)
+
+    serial_identifier = _serial_identifier(_SN_A)
+    serial_device = _pack_device(
+        device_registry,
+        entry,
+        serial_identifier,
+        serial_number=_SN_A,
+    )
+    serial_entity = _pack_entity(
+        entity_registry,
+        entry,
+        serial_device,
+        f"{serial_identifier}_state_of_charge",
+    )
+
+    numeric_identifier = f"{_PARENT_ID}_battery_pack_1"
+    numeric_device = _pack_device(
+        device_registry,
+        entry,
+        numeric_identifier,
+        serial_number=_SN_A,
+    )
+    numeric_entity = _pack_entity(
+        entity_registry,
+        entry,
+        numeric_device,
+        f"{numeric_identifier}_state_of_charge",
+    )
+    user_entity = entity_registry.async_get_or_create(
+        "sensor",
+        "manual",
+        "user-owned-pack-note",
+        config_entry=None,
+        device_id=numeric_device.id,
+        suggested_object_id="user_pack_note",
+    )
+
+    _async_migrate_battery_pack_identities(hass, entry)
+    _async_remove_phantom_battery_pack_devices(hass, entry)
+
+    surviving_target = device_registry.async_get(serial_device.id)
+    assert surviving_target is not None
+    assert entry.entry_id in surviving_target.config_entries
+    removed_fallback = device_registry.async_get(numeric_device.id)
+    assert removed_fallback is None or entry.entry_id not in (
+        removed_fallback.config_entries
+    )
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
+    assert entity_registry.async_get(serial_entity.entity_id) == serial_entity
+    assert entity_registry.async_get(numeric_entity.entity_id) is None
+    preserved_user_entity = entity_registry.async_get(user_entity.entity_id)
+    assert preserved_user_entity is not None
+    assert preserved_user_entity.entity_id == user_entity.entity_id
+    assert preserved_user_entity.unique_id == user_entity.unique_id
+
+    _async_migrate_battery_pack_identities(hass, entry)
+    _async_remove_phantom_battery_pack_devices(hass, entry)
+
+    assert device_registry.async_get(serial_device.id) == surviving_target
+    assert entity_registry.async_get(user_entity.entity_id) == preserved_user_entity
+
+
+def test_duplicate_legacy_serial_targets_keep_one_canonical_pack(
+    hass: HomeAssistant,
+) -> None:
+    """Two old numeric entries for one serial collapse to one serial device."""
+    coordinator = _coordinator([{"deviceSn": _SN_A}, {"deviceSn": _SN_A}])
+    cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_PROPERTIES] = {
+        FIELD_BAT_NUM: 2,
+    }
+    entry = _entry(hass, coordinator)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    _parent_device(device_registry, entry)
+
+    first_identifier = f"{_PARENT_ID}_battery_pack_1"
+    second_identifier = f"{_PARENT_ID}_battery_pack_2"
+    first_device = _pack_device(
+        device_registry, entry, first_identifier, serial_number=_SN_A
+    )
+    second_device = _pack_device(
+        device_registry, entry, second_identifier, serial_number=_SN_A
+    )
+    first_entity = _pack_entity(
+        entity_registry, entry, first_device, f"{first_identifier}_state_of_charge"
+    )
+    second_entity = _pack_entity(
+        entity_registry, entry, second_device, f"{second_identifier}_state_of_charge"
+    )
+
+    _async_migrate_battery_pack_identities(hass, entry)
+    _async_remove_phantom_battery_pack_devices(hass, entry)
+
+    serial_identifier = _serial_identifier(_SN_A)
+    serial_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, serial_identifier),
+        entry.entry_id,
+    )
+    assert serial_device is not None
+    assert serial_device.id in {first_device.id, second_device.id}
+    serial_entity_id = entity_registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{serial_identifier}_state_of_charge"
+    )
+    assert serial_entity_id in {first_entity.entity_id, second_entity.entity_id}
+    duplicate_id = ({first_device.id, second_device.id} - {serial_device.id}).pop()
+    duplicate = device_registry.async_get(duplicate_id)
+    assert duplicate is None or entry.entry_id not in duplicate.config_entries
 
 
 def test_registry_migration_skips_stored_live_serial_conflict(
@@ -303,8 +442,9 @@ def test_registry_migration_skips_stored_live_serial_conflict(
 
     _async_migrate_battery_pack_identities(hass, entry)
 
-    preserved_pack = device_registry.async_get_device(
-        identifiers={(DOMAIN, old_identifier)},
+    preserved_pack = device_registry.async_get_device_by_identifier(
+        (DOMAIN, old_identifier),
+        entry.entry_id,
     )
     assert preserved_pack is not None
     assert preserved_pack.id == pack.id
@@ -338,13 +478,18 @@ def test_registry_migration_entity_collision_has_no_partial_writes(
 
     _async_migrate_battery_pack_identities(hass, entry)
 
-    preserved_pack = device_registry.async_get_device(
-        identifiers={(DOMAIN, old_identifier)},
+    preserved_pack = device_registry.async_get_device_by_identifier(
+        (DOMAIN, old_identifier),
+        entry.entry_id,
     )
     assert preserved_pack is not None
     assert preserved_pack.id == pack.id
     assert (
-        device_registry.async_get_device(identifiers={(DOMAIN, new_identifier)}) is None
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, new_identifier),
+            entry.entry_id,
+        )
+        is None
     )
     preserved_entity = entity_registry.async_get(entity.entity_id)
     assert preserved_entity is not None
@@ -380,11 +525,13 @@ def test_parent_attached_serialless_packs_keep_distinct_index_devices(
 
     _async_migrate_battery_pack_identities(hass, entry)
 
-    first_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, f"{_PARENT_ID}_battery_pack_1")},
+    first_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, f"{_PARENT_ID}_battery_pack_1"),
+        entry.entry_id,
     )
-    second_device = device_registry.async_get_device(
-        identifiers={(DOMAIN, f"{_PARENT_ID}_battery_pack_2")},
+    second_device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, f"{_PARENT_ID}_battery_pack_2"),
+        entry.entry_id,
     )
     assert first_device is not None
     assert second_device is not None

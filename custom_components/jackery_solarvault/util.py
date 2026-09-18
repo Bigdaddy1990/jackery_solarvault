@@ -22,6 +22,9 @@ from .const import (
     APP_CHART_SERIES_Y5,
     APP_CHART_SERIES_Y6,
     APP_CHART_STAT_PERIODS,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_TO_BATTERY,
     APP_HOME_GRID_SERIES_KEYS,
     APP_PERIOD_DATE_TYPES,
     APP_REQUEST_BEGIN_DATE,
@@ -73,8 +76,8 @@ from .const import (
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
-    DEFAULT_LOCAL_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
+    DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     FIELD_ACCESSORIES,
     FIELD_CURRENT_VERSION,
     FIELD_DEVICE_ID,
@@ -107,6 +110,7 @@ from .const import (
     PAYLOAD_DISCOVERY,
     PAYLOAD_DISCOVERY_SOURCE,
     PAYLOAD_HOME_TRENDS,
+    PAYLOAD_HTTP_PROPERTIES,
     PAYLOAD_METER_HEADS,
     PAYLOAD_OTA,
     PAYLOAD_PRICE,
@@ -140,7 +144,7 @@ _MIN_REDACT_LITERAL_LENGTH: Final = 4
 
 # Calendar / time bounds used in validation guards.
 _MONTHS_PER_YEAR: Final = 12
-_MAX_MONTH_BUCKETS: Final = 31
+_MAC_HEX_LENGTH: Final = 12
 _HOURS_PER_DAY: Final = 24
 _MAX_HOUR: Final = 23
 _MAX_MINUTE: Final = 59
@@ -155,6 +159,7 @@ _MAX_CARBON_FACTOR: Final = 5
 _APP_UNIT_WATT: Final = "w"
 _DAY_POWER_SAMPLE_MINUTES: Final = 5
 _MINUTES_PER_HOUR: Final = 60
+_MINUTES_PER_DAY: Final = _HOURS_PER_DAY * _MINUTES_PER_HOUR
 _WATTS_PER_KILOWATT: Final = 1000
 WHOLE_INT_TEXT_RE = re.compile(r"[+-]?\d+(?:\.0+)?\Z")
 
@@ -164,14 +169,11 @@ def local_mqtt_opt_in(entry: object) -> bool:
 
     Single source for the opt-in so the options flow and the runtime start path
     cannot disagree. ``config_flow._current_local_mqtt_options`` documents the
-    same precedence: an explicit ``local_mqtt_enable=True`` wins, an explicit
-    ``local_mqtt_enable=False`` wins (user choice respected), otherwise the
-    app-synchronised ``third_party_mqtt_enable`` acts as the fallback opt-in.
-    Reading only ``local_mqtt_enable`` at runtime made entries that carry just
-    the third-party keys look disabled, so the receiver never started and its
-    message counter stayed at zero.
+    same precedence. The canonical ``third_party_mqtt_enable`` option is the
+    only form value; retired ``local_mqtt_enable`` copies are ignored.
 
-    Default is True to match 123/ baseline (DEFAULT_LOCAL_MQTT_ENABLE = True).
+    With no explicit choice, the receiver stays disabled exactly like the
+    options flow's canonical third-party MQTT switch.
     """
     # Kein ``isinstance(..., Mapping)``: ``Mapping`` ist hier nur ein
     # TYPE_CHECKING-Import. ``in`` funktioniert fuer jedes Mapping, auch fuer
@@ -179,39 +181,21 @@ def local_mqtt_opt_in(entry: object) -> bool:
     options = getattr(entry, "options", {}) or {}
     data = getattr(entry, "data", {}) or {}
 
-    # Check legacy local_mqtt_enable first - explicit True enables, explicit False disables,
-    # missing falls through to third_party_mqtt_enable
-    if "local_mqtt_enable" in options:
-        value = options["local_mqtt_enable"]
-        parsed = safe_bool(value)
-        if parsed is True:
-            return True
-        if parsed is False:
-            return False
-        # parsed is None -> fall through to third_party_mqtt_enable
-    elif "local_mqtt_enable" in data:
-        value = data["local_mqtt_enable"]
-        parsed = safe_bool(value)
-        if parsed is True:
-            return True
-        if parsed is False:
-            return False
-        # parsed is None -> fall through to third_party_mqtt_enable
+    # Current options are authoritative. In particular, a canonical False may
+    # never be overturned by a stale legacy True left in the same mapping.
+    if CONF_THIRD_PARTY_MQTT_ENABLE in options:
+        parsed = safe_bool(options[CONF_THIRD_PARTY_MQTT_ENABLE])
+        if parsed is not None:
+            return parsed
 
-    # No explicit local_mqtt_enable (True or False) - check if third_party_mqtt_enable
-    # is explicitly set. If explicitly True -> opt in. If explicitly False -> opt out
-    # (user choice respected). If not set at all -> fall back to DEFAULT_LOCAL_MQTT_ENABLE.
-    options = getattr(entry, "options", {}) or {}
-    data = getattr(entry, "data", {}) or {}
-    if CONF_THIRD_PARTY_MQTT_ENABLE in options or CONF_THIRD_PARTY_MQTT_ENABLE in data:
-        return config_entry_bool_option(
-            entry,
-            CONF_THIRD_PARTY_MQTT_ENABLE,
-            DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-        )
+    # Config-entry data is older than options, but its canonical key still wins
+    # over the retired alias within that storage layer.
+    if CONF_THIRD_PARTY_MQTT_ENABLE in data:
+        parsed = safe_bool(data[CONF_THIRD_PARTY_MQTT_ENABLE])
+        if parsed is not None:
+            return parsed
 
-    # third_party_mqtt_enable not set anywhere - fall back to DEFAULT_LOCAL_MQTT_ENABLE
-    return DEFAULT_LOCAL_MQTT_ENABLE
+    return DEFAULT_THIRD_PARTY_MQTT_ENABLE
 
 
 def app_energy_unit_scale(source: Mapping[str, Any]) -> float | None:
@@ -360,13 +344,33 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _datetime_from_timestamp(value: float | str) -> datetime:
+    """Return one finite seconds-or-milliseconds timestamp in UTC."""
+    try:
+        timestamp = float(value)
+    except (OverflowError, ValueError) as err:
+        msg = f"invalid UTC timestamp: {value!r}"
+        raise ValueError(msg) from err
+    if not math.isfinite(timestamp):
+        msg = f"invalid UTC timestamp: {value!r}"
+        raise ValueError(msg)
+    if abs(timestamp) >= _MILLIS_TIMESTAMP_THRESHOLD:
+        timestamp /= 1000
+    try:
+        return datetime.fromtimestamp(timestamp, UTC)
+    except (OSError, OverflowError, ValueError) as err:
+        msg = f"invalid UTC timestamp: {value!r}"
+        raise ValueError(msg) from err
+
+
 def parse_utc_datetime(
     value: float | str | datetime,
 ) -> datetime:  # parsed timestamp types
-    """Parse various timestamp representations and return a timezone-aware UTC datetime.
+    """Parse timestamp representations into a timezone-aware UTC datetime.
 
     Parameters:
-        value (Any): A datetime, a numeric timestamp (seconds; milliseconds are accepted and will be converted), or a string containing either a numeric timestamp or an ISO-8601 datetime (trailing "Z" is accepted). Empty strings and unsupported types are rejected.
+        value: Datetime, seconds/milliseconds timestamp, numeric string or ISO-8601
+            string. A trailing ``Z`` is accepted.
 
     Returns:
         datetime: The parsed datetime normalized to UTC with tzinfo set.
@@ -378,38 +382,22 @@ def parse_utc_datetime(
     if isinstance(value, datetime):
         parsed = value
     elif isinstance(value, (int, float)) and not isinstance(value, bool):
-        try:
-            timestamp = float(value)
-        except (OverflowError, ValueError) as err:
-            msg = f"invalid UTC timestamp: {value!r}"
-            raise ValueError(msg) from err
-        if not math.isfinite(timestamp):
-            msg = f"invalid UTC timestamp: {value!r}"
-            raise ValueError(msg)
-        if abs(timestamp) >= _MILLIS_TIMESTAMP_THRESHOLD:
-            timestamp /= 1000
-        try:
-            parsed = datetime.fromtimestamp(timestamp, UTC)
-        except (OSError, OverflowError, ValueError) as err:
-            msg = f"invalid UTC timestamp: {value!r}"
-            raise ValueError(msg) from err
+        parsed = _datetime_from_timestamp(value)
     elif isinstance(value, str):
         normalized = value.strip()
         if not normalized:
             msg = "timestamp must not be empty"
             raise ValueError(msg)
-        with contextlib.suppress(ValueError, OSError, OverflowError):
-            timestamp = float(normalized)
-            if abs(timestamp) >= _MILLIS_TIMESTAMP_THRESHOLD:
-                timestamp /= 1000
-            return datetime.fromtimestamp(timestamp, UTC)
-        if normalized.endswith("Z"):
-            normalized = f"{normalized[:-1]}+00:00"
         try:
-            parsed = datetime.fromisoformat(normalized)
-        except ValueError as err:
-            msg = f"invalid UTC timestamp: {value!r}"
-            raise ValueError(msg) from err
+            parsed = _datetime_from_timestamp(normalized)
+        except ValueError:
+            if normalized.endswith("Z"):
+                normalized = f"{normalized[:-1]}+00:00"
+            try:
+                parsed = datetime.fromisoformat(normalized)
+            except ValueError as err:
+                msg = f"invalid UTC timestamp: {value!r}"
+                raise ValueError(msg) from err
     else:
         msg = f"unsupported UTC timestamp: {value!r}"
         raise TypeError(msg)
@@ -887,7 +875,7 @@ def iter_calendar_months(start_date: date, end_date: date) -> list[date]:
     months: list[date] = []
     while cursor <= end_month:
         months.append(cursor)
-        if cursor.month == 12:
+        if cursor.month == _MONTHS_PER_YEAR:
             cursor = cursor.replace(year=cursor.year + 1, month=1)
         else:
             cursor = cursor.replace(month=cursor.month + 1)
@@ -1195,20 +1183,20 @@ def chart_series_debug(source: object) -> dict[str, Any]:
     return result
 
 
-def append_payload_debug_line(
+def append_payload_debug_lines(
     path: str | Path,
-    event: dict[str, Any],
+    events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
 ) -> None:
-    """Write one mandatorily redacted JSONL event and rotate oversized output.
-
-    Parameters:
-        path (str | Path): Path to the JSONL file to append. Parent directories will be
-            created if missing.
-        event (dict[str, Any]): Event payload to redact and serialize.
-    """
+    """Write every redacted JSONL event using one file open and rotation check."""
+    if not events:
+        return
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
-    if debug_path.exists() and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES:
+    try:
+        rotate_needed = debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES
+    except FileNotFoundError:
+        rotate_needed = False
+    if rotate_needed:
         backup = debug_path.with_name(debug_path.name + PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX)
         try:
             backup.unlink(missing_ok=True)
@@ -1220,51 +1208,61 @@ def append_payload_debug_line(
             )
         try:
             debug_path.replace(backup)
+        except FileNotFoundError:
+            pass
         except OSError as err:
             _LOGGER.warning(
                 "Jackery: could not rotate payload debug log %s: %s",
                 debug_path,
                 err,
             )
-    redacted = redacted_json_safe_payload(event)
     with debug_path.open("a", encoding="utf-8") as file:
-        file.write(
-            json.dumps(redacted, ensure_ascii=False, sort_keys=True, default=str)
-        )
-        file.write("\n")
+        for event in events:
+            file.write(
+                json.dumps(
+                    redacted_json_safe_payload(event),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                )
+            )
+            file.write("\n")
+
+
+def append_payload_debug_line(
+    path: str | Path,
+    event: dict[str, Any],
+) -> None:
+    """Write one mandatorily redacted JSONL event for compatibility."""
+    append_payload_debug_lines(path, (event,))
 
 
 def safe_bool(
-    value: bool | float | str | None,
-) -> (
-    bool | None
-):  # boolean payload value; flat type-dispatch guard chain is clearest as-is
+    value: object,
+) -> bool | None:
     """Interpret a payload value as a boolean.
 
     Returns:
         `True` if the value represents a true state, `False` if it represents a false
         state, `None` if the value is `None` or cannot be interpreted.
     """
-    if value is None:
-        return None
+    result: bool | None = None
     if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return value != 0
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            return None
-        return int(value) != 0
-    if isinstance(value, str):
+        result = value
+    elif isinstance(value, int):
+        result = value != 0
+    elif isinstance(value, float):
+        result = int(value) != 0 if math.isfinite(value) else None
+    elif isinstance(value, str):
         val = value.strip().lower()
         if val in {"1", "true", "on", "yes"}:
-            return True
-        if val in {"0", "false", "off", "no"}:
-            return False
-    try:
-        return int(value) != 0
-    except TypeError, ValueError:
-        return None
+            result = True
+        elif val in {"0", "false", "off", "no"}:
+            result = False
+        else:
+            with contextlib.suppress(ValueError):
+                result = int(value) != 0
+    return result
 
 
 def smart_plug_serial(plug: object) -> str | None:
@@ -1288,6 +1286,21 @@ def smart_plug_serial(plug: object) -> str | None:
         plug.get(FIELD_DEVICE_ID),
         plug.get(FIELD_ID),
         plug.get(FIELD_DEV_ID),
+    )
+
+
+def normalize_mac_address(value: object) -> str | None:
+    """Return a lowercase colon-separated MAC address, if the value is one."""
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    compact = re.sub(r"[^0-9a-f]", "", text)
+    if len(compact) != _MAC_HEX_LENGTH:
+        return None
+    return ":".join(
+        compact[index : index + 2] for index in range(0, _MAC_HEX_LENGTH, 2)
     )
 
 
@@ -1558,9 +1571,6 @@ def is_day_period_payload(source: dict[str, Any], section: str) -> bool:
     )
 
 
-_is_day_period_payload = is_day_period_payload
-
-
 def _is_non_day_period(section: str) -> bool:
     return section.endswith((
         f"_{DATE_TYPE_WEEK}",
@@ -1635,7 +1645,7 @@ def _prefer_raw_year_series_for_real_payload(
     if (
         not section.startswith(APP_SECTION_PV_STAT)
         or direct_total is None
-        or len(raw_values) < 12
+        or len(raw_values) < _MONTHS_PER_YEAR
     ):
         return False
     numeric_values = [value for value in raw_values if value is not None]
@@ -1660,7 +1670,8 @@ def expanded_year_series_values(
     Returns:
         list[float | None] | None: Per-bucket numeric values/placeholders when a
         chart series is present.
-            - If a documented scalar total (`stat_key`) is present, returns the expanded list only when its sum matches
+            - With a documented scalar total, returns the expanded list only when
+              its sum matches.
               the documented total within a small tolerance; otherwise returns the raw
               series values.
             - If the series key is missing or the series is not a list, returns `None`.
@@ -1854,7 +1865,8 @@ def year_payload_appears_current_month_only(
 
     Check whether a payload contains non-zero values only for the current month.
 
-    Checks series values for the provided `stat_keys` within the given year `section`. Only considers payloads with unit `"kwh"` (or no unit) and requires `current_month` > 1.
+    Check the requested year series only for kWh/unspecified units and when the
+    current month is after January.
 
     Parameters:
         source (dict[str, Any]): The payload section containing chart series and
@@ -2006,11 +2018,12 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
     Returns:
         dict: Mapping with keys:
             - `method` (str): Descriptor of how savings were computed.
-            - `calculated_total` (float): Savings monetary total (rounded to 2 decimals).
+            - `calculated_total`: Savings monetary total rounded to 2 decimals.
             - `energy_kwh` (float): Savings energy in kWh (rounded to 2 decimals).
             - `price` (float): Price used per kWh (rounded to 5 decimals).
             - `price_source` (str): Source label for the price (configured or derived).
-            - `source_energy` (dict): Rounded kWh diagnostics including `pv_year_kwh`, device grid input/output, home consumption, CT public export, battery charge/discharge, conversion loss, and residual PV not counted as savings.
+            - `source_energy`: Rounded kWh diagnostics for PV, grid, home, CT,
+              battery, conversion loss and residual PV.
         None: If required inputs are missing (no usable device/home/CT totals or no
         configured/derivable price).
     """
@@ -2075,9 +2088,9 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
         APP_SECTION_BATTERY_STAT,
         APP_STAT_TOTAL_DISCHARGE,
     )
-    battery_gap = None
+    battery_balance = None
     if battery_charge is not None and battery_discharge is not None:
-        battery_gap = max(0.0, battery_charge - battery_discharge)
+        battery_balance = battery_charge - battery_discharge
 
     conversion_loss_energy = None
     conversion_loss_energy_signed = None
@@ -2121,7 +2134,9 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
             "ct_public_export_year_kwh_present": public_export_present,
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
-            "battery_charge_discharge_gap_kwh": _round_stat_value(battery_gap),
+            "battery_charge_discharge_balance_year_kwh": _round_stat_value(
+                battery_balance
+            ),
             "conversion_loss_year_kwh": _round_stat_value(conversion_loss_energy),
             "conversion_loss_year_kwh_signed": _round_stat_value(
                 conversion_loss_energy_signed,
@@ -2193,10 +2208,11 @@ def _backfill_pv_revenue(
         month_sources (dict[int, dict[str, Any]]): Mapping of 1-based month index to
         month payloads used to derive monthly revenue values; months outside 1-12 are
         ignored.
-        meta (dict[str, Any]): Mutable metadata dictionary; when a correction is applied, `meta["corrected"]["totalSolarRevenue"]` is set with keys `raw_total`, `corrected_total`, and `months`.
+        meta: Mutable correction metadata. Revenue correction records raw total,
+            corrected total and contributing months.
 
     Side effects:
-        - May set `out["totalSolarRevenue"]`, `out["pvProfit"]`, and `out[APP_CHART_SERIES_Y6]`.
+        - May set total revenue, PV profit and chart series ``y6``.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
     """
     revenue_values = [0.0 for _ in range(12)]
@@ -2231,7 +2247,7 @@ def _backfill_pv_revenue(
     }
 
 
-def backfill_year_payload_from_months(  # per-month aggregation dispatch; branch chain mirrors the section shape
+def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
     year_source: dict[str, Any],
     section_prefix: str,
     stat_keys: tuple[str, ...],
@@ -2243,13 +2259,14 @@ def backfill_year_payload_from_months(  # per-month aggregation dispatch; branch
 
     For each requested statistic key this function:
     - Collects up to 12 monthly values from provided month_sources.
-    - If at least one month is present and the summed monthly total exceeds the existing year total beyond a tolerance, replaces the year's chart-series and scalar stat with the monthly-derived values and records correction metadata.
-    - Adds lightweight aliases for well-known stat keys (PV/in/out/discharge) when corrected.
+    - Replaces an incomplete year total only when monthly data exceed it beyond
+      tolerance, then records correction metadata.
+    - Adds aliases for corrected PV, grid and discharge totals.
 
     Behavior notes:
-    - No changes are made and the original `year_source` is returned when `year_source` is not a dict, `month_sources` is empty, the year unit is present and not `"kwh"`, no monthly data is found for any stat_key, or monthly totals do not exceed the documented year total within tolerance.
-    - When corrections are applied, the returned payload includes `APP_YEAR_BACKFILL_META` describing the correction method, source/target periods, per-statistic raw and corrected totals, the series key used, and the months found.
-    - If the section_prefix indicates PV data, PV revenue backfill is attempted and its results are recorded in the same metadata.
+    - Returns the original payload when no reliable monthly correction is proven.
+    - Corrected payloads include method, periods, totals, series key and months.
+    - PV sections also attempt a revenue correction from the same month sources.
 
     Parameters:
         year_source: The original year-period payload (expected dictionary shape).
@@ -2348,7 +2365,7 @@ def apply_year_month_backfill(
     payloads when monthly data are available and a backfill is performed.
 
     Parameters:
-        payload (dict[str, Any]): The full app payload to update; year-section keys (e.g. "<prefix>_year") may be replaced.
+        payload: App payload whose ``<prefix>_year`` sections may be replaced.
         month_history (dict[str, dict[int, dict[str, Any]]]): Mapping from section
         prefix to a mapping of 1-based month index -> month payload dict used to
         reconstruct year-series values.
@@ -2402,12 +2419,19 @@ def attach_calculated_savings_metadata(payload: dict[str, Any]) -> None:
     if not isinstance(statistic, dict):
         return
     raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    pv_year = payload.get(_period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR))
+    pv_year_section = _period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR)
+    pv_year = payload.get(pv_year_section)
+    if not isinstance(pv_year, dict):
+        # Older/non-system devices may only expose PvStatApi. Keep that endpoint
+        # as a compatibility fallback, but SysPvStatApi is the value rendered by
+        # the current App's PV chart and therefore the primary savings basis.
+        pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+        pv_year = payload.get(pv_year_section)
     if not isinstance(pv_year, dict):
         return
     year_generation = effective_period_total_value(
         pv_year,
-        _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR),
+        pv_year_section,
         APP_STAT_TOTAL_SOLAR_ENERGY,
     )
     year_revenue = _pv_revenue_value(pv_year)
@@ -2453,8 +2477,11 @@ def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetim
     if not isinstance(statistic, dict):
         return
 
-    pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+    pv_year_section = _period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR)
     pv_year = payload.get(pv_year_section)
+    if not isinstance(pv_year, dict):
+        pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
+        pv_year = payload.get(pv_year_section)
     year_generation = (
         effective_period_total_value(
             pv_year,
@@ -2589,17 +2616,18 @@ def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetim
     }
 
 
-def compact_json(value: object) -> str:
-    """Produce a compact JSON string of the given value suitable for diagnostics.
+def _trend_bucket_start(begin: date, date_type: str | None, index: int) -> date | None:
+    """Map one app series index to its calendar bucket."""
+    if date_type == DATE_TYPE_YEAR:
+        month = index + 1
+        if month <= _MONTHS_PER_YEAR:
+            return begin.replace(month=month, day=1)
+    elif date_type in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
+        return begin + timedelta(days=index)
+    return None
 
-    Returns:
-        compact (str): JSON string with non-ASCII characters preserved and without
-        unnecessary whitespace.
-    """
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
-
-def trend_series_points(  # trend-series parsing dispatches over unit/label/series shapes
+def trend_series_points(
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2631,14 +2659,6 @@ def trend_series_points(  # trend-series parsing dispatches over unit/label/seri
     if not isinstance(series, list) or not series:
         return []
     series_values = cast("list[Any]", series)
-    if not any(
-        (numeric := safe_float(value)) is not None and abs(numeric) > _NEAR_ZERO_EPSILON
-        for value in series_values
-    ):
-        # A single all-zero HTTP chart is an unconfirmed no-data shape, not a
-        # Recorder series.  Zero buckets remain valid when another bucket in
-        # the same chart proves that the period contains real activity.
-        return []
 
     request = source.get(APP_REQUEST_META)
     begin = None
@@ -2662,14 +2682,8 @@ def trend_series_points(  # trend-series parsing dispatches over unit/label/seri
     for index, value in enumerate(series_values):
         if value is None:
             continue
-        if date_type == DATE_TYPE_YEAR:
-            month = index + 1
-            if month < 1 or month > _MONTHS_PER_YEAR:
-                continue
-            bucket_start = begin.replace(month=month, day=1)
-        elif date_type in {DATE_TYPE_WEEK, DATE_TYPE_MONTH}:
-            bucket_start = begin + timedelta(days=index)
-        else:
+        bucket_start = _trend_bucket_start(begin, date_type, index)
+        if bucket_start is None:
             continue
 
         if (end is not None and bucket_start > end) or bucket_start > today:
@@ -2716,7 +2730,7 @@ def _day_power_sample_minute(
     Use an optional label list before falling back to the sample index.
 
     Parameters:
-        labels (list[Any] | None): Optional list of sample labels (e.g., "H:MM"); when present and the label at `index` can be parsed to minutes, that value is used.
+        labels: Optional sample labels such as ``H:MM``.
         index (int): Zero-based sample index; used as a fallback to compute minute =
         index * 5.
 
@@ -2855,7 +2869,7 @@ def _resolve_day_request_window(
     return begin, now
 
 
-def day_power_energy_points(  # ruff: ignore[too-many-locals] - cohesive day-curve-to-kWh bucketing pipeline
+def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals]
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2883,7 +2897,7 @@ def day_power_energy_points(  # ruff: ignore[too-many-locals] - cohesive day-cur
         present.
         bucket_minutes (int): Size of each output bucket in minutes; must evenly divide
         24*60. Defaults to 60.
-        today (date | None): Reference date for "today" comparisons; defaults to the current local date.
+        today: Reference date; defaults to the current local date.
         now (datetime | None): Reference time for limiting samples when the request
         begins today; defaults to current time.
 
@@ -2894,32 +2908,32 @@ def day_power_energy_points(  # ruff: ignore[too-many-locals] - cohesive day-cur
         unsupported units, out-of-range request dates, or when scaling rules prevent
         producing buckets.
     """
-    if bucket_minutes <= 0 or 24 * 60 % bucket_minutes != 0:
-        return []
     series_key = day_power_series_key(source, section, stat_key)
-    if not series_key:
-        return []
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     # App 2.4.x returns dateType=day curves as documented five-minute watt
     # observations. Convert each real sample by duration (W * h / 1000) rather
     # than summing watts. A missing/unknown unit cannot establish the quantity.
-    if unit not in {_APP_UNIT_WATT, APP_UNIT_KWH}:
-        return []
-
     window = _resolve_day_request_window(source, today=today, now=now)
-    if window is None:
+    series = source.get(series_key) if series_key else None
+    if bucket_minutes <= 0 or _MINUTES_PER_DAY % bucket_minutes != 0 or not series_key:
+        return []
+    if (
+        unit not in {_APP_UNIT_WATT, APP_UNIT_KWH}
+        or window is None
+        or not isinstance(series, list)
+        or not series
+    ):
         return []
     begin, now = window
 
     labels = source.get(APP_CHART_LABELS)
     parsed_labels = labels if isinstance(labels, list) else None
     current_day_limit_minute = (
-        now.hour * 60 + now.minute if begin == now.date() else 24 * 60 - 1
+        now.hour * _MINUTES_PER_HOUR + now.minute
+        if begin == now.date()
+        else _MINUTES_PER_DAY - 1
     )
-    series = source.get(series_key)
     scalar_total = effective_period_total_value(source, section, stat_key)
-    if not isinstance(series, list) or not series:
-        return []
 
     buckets: dict[int, float] = {}
     last_bucket_minute: int | None = None
@@ -3081,7 +3095,7 @@ def _period_source(
     return section, source
 
 
-def _period_warning(
+def _period_warning(  # ruff: ignore[too-many-arguments]
     *,
     reason: str,
     metric_key: str,
@@ -3331,7 +3345,7 @@ def smart_meter_net_power(ct: dict[str, Any]) -> float | None:
     return sum(phases) if phases is not None else None
 
 
-def calculated_smart_meter_power(  # flat guard chain over CT calculation variants; clearest as-is
+def calculated_smart_meter_power(
     ct: dict[str, Any],
     calculation: str,
 ) -> float | None:
@@ -3342,12 +3356,8 @@ def calculated_smart_meter_power(  # flat guard chain over CT calculation varian
     Parameters:
         ct (dict): CT/meter payload used to derive signed net and per-phase power
         values.
-        calculation (str): One of: "net_import", "net_export", "gross_import", "gross_export", "gross_flow".
-                - "net_import": positive portion of net power (grid import).
-                - "net_export": positive portion of negated net power (grid export).
-                - "gross_import": sum of positive per-phase powers.
-                - "gross_export": sum of per-phase exports (absolute negative phase contributions).
-                - "gross_flow": sum of absolute per-phase powers.
+        calculation: ``net_import``, ``net_export``, ``gross_import``,
+            ``gross_export`` or ``gross_flow``.
 
     Returns:
         float | None: Calculated power in the same units as the input values, or `None`
@@ -3356,21 +3366,18 @@ def calculated_smart_meter_power(  # flat guard chain over CT calculation varian
     net = smart_meter_net_power(ct)
     phases = signed_phase_power_values(ct)
 
-    if calculation == "net_import":
-        return None if net is None else max(net, 0.0)
-    if calculation == "net_export":
-        return None if net is None else max(-net, 0.0)
-
-    if phases is None:
-        return None
-
-    if calculation == "gross_import":
-        return sum(max(value, 0.0) for value in phases)
-    if calculation == "gross_export":
-        return sum(max(-value, 0.0) for value in phases)
-    if calculation == "gross_flow":
-        return sum(abs(value) for value in phases)
-    return None
+    result: float | None = None
+    if calculation == "net_import" and net is not None:
+        result = max(net, 0.0)
+    elif calculation == "net_export" and net is not None:
+        result = max(-net, 0.0)
+    elif calculation == "gross_import" and phases is not None:
+        result = sum(max(value, 0.0) for value in phases)
+    elif calculation == "gross_export" and phases is not None:
+        result = sum(max(-value, 0.0) for value in phases)
+    elif calculation == "gross_flow" and phases is not None:
+        result = sum(abs(value) for value in phases)
+    return result
 
 
 class HomeConsumptionPower(NamedTuple):
@@ -3545,11 +3552,11 @@ def jackery_corrected_home_consumption_power(
 
     Returns:
         HomeConsumptionPower | None: A NamedTuple with fields
-            - `value`: corrected home consumption power (kW or W as provided by inputs) clamped to >= 0.0,
-            - `smart_meter_net_power`: the smart-meter net power (or `None` if not available),
+            - `value`: corrected non-negative home consumption power.
+            - `smart_meter_net_power`: smart-meter net power when available.
             - `jackery_input_power`: Jackery grid-side input power,
             - `jackery_output_power`: Jackery grid-side output power,
-            - `source`: string indicating which data was used (`FIELD_OTHER_LOAD_PW` when reported, otherwise `"smart_meter_net_minus_input_plus_output"`).
+            - `source`: reported other-load field or the smart-meter calculation.
         Returns `None` when insufficient inputs are available to compute a corrected
         consumption.
     """
@@ -3583,9 +3590,7 @@ def jackery_corrected_home_consumption_power(
 # ---------------------------------------------------------------------------
 # Trend/statistic helpers
 # ---------------------------------------------------------------------------
-def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mapping table
-    section: str, stat_key: str
-) -> str | None:
+def _chart_series_key_for_stat(section: str, stat_key: str) -> str | None:
     """Map an app section and statistic key to the corresponding chart-series key.
 
     Parameters:
@@ -3598,54 +3603,71 @@ def _chart_series_key_for_stat(  # exhaustive section/stat → series-key mappin
         `APP_CHART_SERIES_Y1`, ...) associated with the given section/stat pair, or
         `None` if no mapping exists.
     """
+    if stat_key == APP_STAT_TOTAL_SOLAR_REVENUE:
+        return None
     if section.startswith((APP_SECTION_PV_TRENDS, APP_SECTION_HOME_TRENDS)):
         return APP_CHART_SERIES_Y
 
-    if section.startswith(APP_SECTION_PV_STAT):
-        mapping = {
-            APP_STAT_TOTAL_SOLAR_ENERGY: APP_CHART_SERIES_Y,
-            APP_STAT_PV1_ENERGY: APP_CHART_SERIES_Y1,
-            APP_STAT_PV2_ENERGY: APP_CHART_SERIES_Y2,
-            APP_STAT_PV3_ENERGY: APP_CHART_SERIES_Y3,
-            APP_STAT_PV4_ENERGY: APP_CHART_SERIES_Y4,
-        }
-        return mapping.get(stat_key)
+    # The EPS day view exposes one unlabeled x/y curve and cannot safely back
+    # either directional total. Other period shapes have documented mappings.
+    if section.startswith(APP_SECTION_EPS_STAT) and section.endswith(
+        f"_{DATE_TYPE_DAY}"
+    ):
+        return None
 
-    if section.startswith(APP_SECTION_HOME_STAT):
-        if stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
-            return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
-            return APP_CHART_SERIES_Y2
-
-    if section.startswith(APP_SECTION_CT_STAT):
-        if stat_key == APP_STAT_TOTAL_CT_INPUT_ENERGY:
-            return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_CT_OUTPUT_ENERGY:
-            return APP_CHART_SERIES_Y2
-
-    if section.startswith(APP_SECTION_EPS_STAT):
-        # App 2.4.x renders the EPS day view as one unlabeled AREA_SPLINE from
-        # ``x/y``. It does not identify that single curve as input or output,
-        # so it cannot safely back either directional energy total. The
-        # mirrored period chart and captured totals prove y1=input/y2=output.
-        if section.endswith(f"_{DATE_TYPE_DAY}"):
-            return None
-        if stat_key == APP_STAT_TOTAL_IN_EPS_ENERGY:
-            return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_OUT_EPS_ENERGY:
-            return APP_CHART_SERIES_Y2
-
-    if section.startswith(APP_SECTION_BATTERY_TRENDS):
-        if stat_key == APP_STAT_TOTAL_TREND_CHARGE_ENERGY:
-            return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY:
-            return APP_CHART_SERIES_Y2
-
-    if section.startswith(APP_SECTION_BATTERY_STAT):
-        if stat_key == APP_STAT_TOTAL_CHARGE:
-            return APP_CHART_SERIES_Y1
-        if stat_key == APP_STAT_TOTAL_DISCHARGE:
-            return APP_CHART_SERIES_Y2
+    mappings = (
+        (
+            APP_SECTION_PV_STAT,
+            {
+                APP_STAT_TOTAL_SOLAR_ENERGY: APP_CHART_SERIES_Y,
+                APP_STAT_PV1_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_PV2_ENERGY: APP_CHART_SERIES_Y2,
+                APP_STAT_PV3_ENERGY: APP_CHART_SERIES_Y3,
+                APP_STAT_PV4_ENERGY: APP_CHART_SERIES_Y4,
+            },
+        ),
+        (
+            APP_SECTION_HOME_STAT,
+            {
+                APP_STAT_TOTAL_IN_GRID_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_OUT_GRID_ENERGY: APP_CHART_SERIES_Y2,
+            },
+        ),
+        (
+            APP_SECTION_CT_STAT,
+            {
+                APP_STAT_TOTAL_CT_INPUT_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_CT_OUTPUT_ENERGY: APP_CHART_SERIES_Y2,
+            },
+        ),
+        (
+            APP_SECTION_EPS_STAT,
+            {
+                APP_STAT_TOTAL_IN_EPS_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_OUT_EPS_ENERGY: APP_CHART_SERIES_Y2,
+            },
+        ),
+        (
+            APP_SECTION_BATTERY_TRENDS,
+            {
+                APP_STAT_TOTAL_TREND_CHARGE_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY: APP_CHART_SERIES_Y2,
+            },
+        ),
+        (
+            APP_SECTION_BATTERY_STAT,
+            {
+                APP_STAT_TOTAL_CHARGE: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_DISCHARGE: APP_CHART_SERIES_Y2,
+                APP_DEVICE_STAT_ONGRID_TO_BATTERY: APP_CHART_SERIES_Y3,
+                APP_DEVICE_STAT_BATTERY_TO_AC: APP_CHART_SERIES_Y4,
+                APP_DEVICE_STAT_BATTERY_TO_GRID: APP_CHART_SERIES_Y5,
+            },
+        ),
+    )
+    for prefix, mapping in mappings:
+        if section.startswith(prefix):
+            return mapping.get(stat_key)
 
     return None
 
@@ -3700,7 +3722,7 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
     (:func:`effective_trend_series_values` returns ``None`` for day payloads).
 
     Returns:
-        str: The chart-series key (for example `"y"`, `"y1"`, `"y2"`, etc.), or `None` when the section is not a period payload or no mapping exists.
+        Chart-series key, or ``None`` when no documented mapping exists.
     """
     if not section.endswith((
         f"_{DATE_TYPE_DAY}",
@@ -3727,6 +3749,14 @@ def day_power_series_key(
     """
     if not is_day_period_payload(source, section):
         return None
+    if section.startswith(APP_SECTION_EPS_STAT):
+        key = {
+            APP_STAT_TOTAL_IN_EPS_ENERGY: APP_CHART_SERIES_Y1,
+            APP_STAT_TOTAL_OUT_EPS_ENERGY: APP_CHART_SERIES_Y2,
+        }.get(stat_key)
+        # Explicit directional arrays can be used even when an older app view
+        # only labels its combined y curve. Never infer a direction from y alone.
+        return key if key is not None and isinstance(source.get(key), list) else None
     if section.startswith((
         APP_SECTION_BATTERY_STAT,
         APP_SECTION_BATTERY_TRENDS,
@@ -3754,7 +3784,7 @@ def day_power_series_key(
     return _chart_series_key_for_stat(section, stat_key)
 
 
-def trend_series_total(  # flat guard chain over series/total shapes; clearest as-is
+def trend_series_total(  # ruff: ignore[too-many-return-statements]
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3766,8 +3796,8 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     For non-day sections it requires a mapped chart-series key and that the section unit
     is `kwh`.
     If the chart-series list is missing the function applies guarded fallbacks:
-    - For home-stat sections: returns `0.0` when the server total equals `0.0` but grid-related series lists are present.
-    - For CT/EPS-stat sections: returns the server-reported total when present and unit is valid (including zero).
+    - Home-stat zero totals remain valid when grid series are present.
+    - CT/EPS totals remain valid with a compatible unit, including zero.
 
     Returns:
         float: The period total rounded to 2 decimals, or `None` when a reliable total
@@ -3827,7 +3857,7 @@ def trend_series_total(  # flat guard chain over series/total shapes; clearest a
     return round(sum(valid_values) * unit_scale, 2)
 
 
-def trend_series_has_value(  # flat guard chain over series/value shapes; clearest as-is
+def trend_series_has_value(  # ruff: ignore[too-many-return-statements]
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -3858,8 +3888,7 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
             return False
 
         if is_ct_eps_day:
-            # For CT/EPS day periods: valid if unit is kWh and total is explicitly provided (>= 0)
-            # A zero total with valid unit means the device reported 0 energy for that period
+            # CT/EPS day totals are valid when explicitly non-negative in kWh.
             return (
                 unit_scale is not None
                 and server_total is not None
@@ -3871,7 +3900,7 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
     if not series_key:
         return False
 
-    # Explicitly reject "W" (watts) for CT/EPS periods - it's a power unit, not an energy unit
+    # CT/EPS period totals cannot use watts, which is a power unit.
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
     if is_ct_eps and unit == "w":
         return False
@@ -3897,25 +3926,27 @@ def trend_series_has_value(  # flat guard chain over series/value shapes; cleare
             and any(isinstance(source.get(k), list) for k in APP_HOME_GRID_SERIES_KEYS)
         ):
             return True
-        # For CT/EPS: valid if unit is kWh and total is explicitly provided (>= 0)
+        # An explicit non-negative total with a known unit is a real reading,
+        # even without a curve: Jackery serves the series as an empty *string*
+        # for young devices (``device_pv_stat_month`` with ``y: ''`` and
+        # ``totalSolarEnergy: '0'``, see docs/DIAGNOSE_2026-09-02 §D). Only the
+        # empty envelope from ``code=0`` stays discarded — it carries neither a
+        # unit nor a total, per docs/CODEMAPS/data.md.
         return bool(
-            is_ct_eps
-            and unit_scale is not None
-            and server_total is not None
-            and server_total >= 0
+            unit_scale is not None and server_total is not None and server_total >= 0
         )
 
     if any(safe_float(item) is not None for item in series):
         return True
 
-    # Empty series but valid unit: check if server total is explicitly provided (including zero)
+    # An all-empty curve may still carry an explicit non-negative total. A
+    # freshly commissioned device legitimately reports zeros (observed:
+    # ``device_battery_stat_month`` with ``y1: []`` and ``totalDischarge:
+    # '0.01'``), and discarding those left the period sensors unavailable.
+    # The bare ``code=0`` envelope carries no unit and no total, so it stays
+    # discarded per docs/CODEMAPS/data.md.
     stat_value = safe_float(source.get(stat_key))
-    return bool(
-        is_ct_eps
-        and unit_scale is not None
-        and stat_value is not None
-        and stat_value >= 0
-    )
+    return bool(unit_scale is not None and stat_value is not None and stat_value >= 0)
 
 
 def task_plan_value(
@@ -3982,39 +4013,30 @@ def trend_payload_has_value(
     return safe_float(source.get(stat_key)) is not None
 
 
-def first_nonblank(*values: Any) -> str | None:
-    """Return the first value that still has content after stripping."""
-    for value in values:
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return None
-
-
-def first_nonblank_int(*values: Any) -> int | None:
+def first_nonblank_int(*values: object) -> int | None:
     """Return the first nonblank value parsed as an integer."""
+    result: int | None = None
     for value in values:
         if value is None:
             continue
         if isinstance(value, bool):
-            return None
+            break
         if isinstance(value, int):
-            return value
+            result = value
+            break
         if isinstance(value, float):
-            return int(value) if value.is_integer() else None
+            result = int(value) if value.is_integer() else None
+            break
         text = str(value).strip()
         if not text:
             continue
         if not WHOLE_INT_TEXT_RE.fullmatch(text):
-            return None
+            break
         whole, _dot, _fraction = text.partition(".")
-        try:
-            return int(whole)
-        except ValueError:
-            return None
-    return None
+        with contextlib.suppress(ValueError):
+            result = int(whole)
+        break
+    return result
 
 
 def _is_signed_battery_energy_curve(section: str, stat_key: str) -> bool:
@@ -4043,6 +4065,62 @@ def normalize_account(value: str) -> str:
     return value.strip()
 
 
-def entry_bool_option(entry: Any, key: str, default: bool) -> bool:
-    """Return a config-entry boolean option with safe legacy value parsing."""
-    return config_entry_bool_option(entry, key, default)
+# Home/Portable payload classification. Previously copied verbatim into all
+# seven platform modules (button, number, select, sensor, services, switch,
+# text); the copies had already drifted in signature and docstrings.
+HOME_PAYLOAD_EVIDENCE_KEYS: Final = frozenset({
+    "autoStandby",
+    "batInPw",
+    "batOutPw",
+    "batSoc",
+    "defaultPw",
+    "gridInPw",
+    "isAutoStandby",
+    "isFollowMeterPw",
+    "maxGridStdPw",
+    "maxInvStdPw",
+    "maxIotNum",
+    "maxOutPw",
+    "pvPw",
+    "swEps",
+    "tempUnit",
+    "workModel",
+})
+
+
+def has_home_payload_evidence(props: dict[str, Any]) -> bool:
+    """Return True when props carry Home/System-body-only fields."""
+    return any(key in props for key in HOME_PAYLOAD_EVIDENCE_KEYS)
+
+
+def payload_has_home_payload_evidence(
+    payload: dict[str, Any],
+    props: dict[str, Any] | None = None,
+) -> bool:
+    """Return True when merged or raw payload props identify a Home/System body."""
+    if props is not None and has_home_payload_evidence(props):
+        return True
+    if isinstance(payload.get(PAYLOAD_SYSTEM), dict) and payload[PAYLOAD_SYSTEM]:
+        return True
+    for section in (PAYLOAD_PROPERTIES, PAYLOAD_HTTP_PROPERTIES):
+        raw = payload.get(section) or {}
+        if isinstance(raw, dict) and has_home_payload_evidence(raw):
+            return True
+    return False
+
+
+def is_portable_payload(
+    payload: dict[str, Any],
+    props: dict[str, Any] | None = None,
+) -> bool:
+    """Return True for Explorer/Portable payloads without Home/System evidence."""
+    if payload_has_home_payload_evidence(payload, props):
+        return False
+    for section in (PAYLOAD_DEVICE, PAYLOAD_DISCOVERY):
+        meta = payload.get(section) or {}
+        if (
+            isinstance(meta, dict)
+            and meta.get(PAYLOAD_DISCOVERY_SOURCE) == DISCOVERY_SOURCE_LEGACY_BIND_LIST
+        ):
+            return True
+    return False

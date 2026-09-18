@@ -5,17 +5,21 @@ independent lifecycle, reconnect logic, and credential management.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass
 from enum import StrEnum
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,10 +57,10 @@ class TransportSupervisor:
         coordinator: DataUpdateCoordinator,
         config: SupervisorConfig,
     ) -> None:
-        self.hass = hass
-        self.entry = entry
-        self.coordinator = coordinator
-        self.config = config
+        self.hass: HomeAssistant = hass
+        self.entry: ConfigEntry = entry
+        self.coordinator: DataUpdateCoordinator = coordinator
+        self.config: SupervisorConfig = config
         self._state = SupervisorState.STOPPED
         self._task: asyncio.Task[Any] | None = None
         self._reconnect_task: asyncio.Task[Any] | None = None
@@ -234,9 +238,9 @@ class TransportSupervisorManager:
         entry: ConfigEntry,
         coordinator: DataUpdateCoordinator,
     ) -> None:
-        self.hass = hass
-        self.entry = entry
-        self.coordinator = coordinator
+        self.hass: HomeAssistant = hass
+        self.entry: ConfigEntry = entry
+        self.coordinator: DataUpdateCoordinator = coordinator
         self._supervisors: dict[str, TransportSupervisor] = {}
 
     def register(

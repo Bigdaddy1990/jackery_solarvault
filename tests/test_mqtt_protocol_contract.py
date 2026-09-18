@@ -2,9 +2,12 @@
 
 import ast
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import pytest
+from custom_components.jackery_solarvault.const import DOMAIN
+
+if TYPE_CHECKING:
+    import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
@@ -40,7 +43,7 @@ def _function_source(path: Path, name: str) -> str:
 
     Raises:
         AssertionError: If the named function is not found in the given file.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]  # isort: skip
     source = _read(path)
     tree = ast.parse(source)
     lines = source.splitlines()
@@ -51,7 +54,7 @@ def _function_source(path: Path, name: str) -> str:
         ):
             assert node.end_lineno is not None
             return "\n".join(lines[node.lineno - 1 : node.end_lineno])
-    raise AssertionError(f"{name} not found in {path}")
+    raise AssertionError(f"{name} not found in {path}")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
 
 def test_mqtt_setter_commands_match_app_protocol() -> None:
@@ -67,6 +70,7 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
     Earlier packet captures had 3022/3023 and the SOC actionIds wrong; the
     smali is the source of truth.
     """
+    assert DOMAIN == "jackery_solarvault"
     eps = _function_source(COORDINATOR_PATH, "async_set_eps")
     assert "action_id=ACTION_ID_EPS_ENABLED" in eps
     assert "FIELD_SW_EPS" in eps
@@ -113,9 +117,9 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
 
 def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
     """Third-party MQTT config responses belong in their own payload bucket."""
-    import asyncio  # ruff: ignore[import-outside-top-level]
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
         FIELD_ACTION_ID,
         FIELD_BODY,
@@ -131,7 +135,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         PAYLOAD_PROPERTIES,
         PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
@@ -145,7 +149,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 
         Raises:
             AssertionError: If any of the expected storage or sanitization conditions are not met.
-        """  # noqa: RUF105
+        """  # ruff: ignore[line-too-long]  # isort: skip
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"soc": 40}}}
         self._device_index = {"dev": {}}
@@ -157,12 +161,12 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         self._cloud_mqtt_command_attempts = {}
         captured: dict[str, object] = {}
 
-        async def _debug_event(_event_or_factory: object) -> None:  # ruff: ignore[unused-async]
+        async def _debug_event(_event_or_factory: object) -> None:  # ruff: ignore[unused-async]  # isort: skip
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
-            """  # noqa: RUF105
+            """  # ruff: ignore[line-too-long]  # isort: skip
             return
 
         def _push_partial_update(
@@ -172,15 +176,13 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
 
             Parameters:
                 new_data (dict[str, object]): Partial update payload to capture under the key "data".
-            """  # noqa: RUF105
+            """  # ruff: ignore[line-too-long]  # isort: skip
             captured["data"] = new_data
 
         raw_self = cast("Any", self)
-        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]
-        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]
-        raw_self._schedule_battery_pack_ota_enrichment = (  # ruff: ignore[private-member-access]
-            lambda _device_id: None
-        )
+        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]  # isort: skip
+        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]  # isort: skip
+        raw_self._schedule_battery_pack_ota_enrichment = lambda _device_id: None  # ruff: ignore[private-member-access]  # isort: skip
 
         body = {
             FIELD_CMD: MQTT_CMD_QUERY_THIRD_PARTY_MQTT_CONFIG,
@@ -190,7 +192,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
             FIELD_THIRD_PARTY_MQTT_USERNAME: "user",
             FIELD_THIRD_PARTY_MQTT_PASSWORD: "secret",
         }
-        await JackerySolarVaultCoordinator._async_handle_mqtt_message(  # ruff: ignore[private-member-access]
+        await JackerySolarVaultCoordinator.async_handle_mqtt_message(
             self,
             "hb/app/user/device",
             {
@@ -212,7 +214,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == {
             key: value for key, value in body.items() if key != FIELD_CMD
         }
-        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # ruff: ignore[private-member-access]
+        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # ruff: ignore[private-member-access]  # isort: skip
 
     asyncio.run(_run())
 
@@ -268,7 +270,7 @@ def test_meter_head_subdevice_protocol_is_wired() -> None:
     assert "FIELD_DEVICE_ID" in panel
     assert "_get_json" in panel
 
-    merge = _function_source(COORDINATOR_PATH, "_merge_subdevice_data")
+    merge = _function_source(COORDINATOR_PATH, "_merge_meter_head_updates")
     # The HomeSubBody.CollectorBody array key is ``collectors`` (verified
     # against the Jackery app smali); the integration looks it up via the
     # named ``FIELD_COLLECTORS`` constant.
@@ -277,9 +279,7 @@ def test_meter_head_subdevice_protocol_is_wired() -> None:
     assert "PAYLOAD_METER_HEADS" in merge
     assert "_merge_subdevice_lists_by_sn" in merge
 
-    query_backfill = _function_source(
-        COORDINATOR_PATH, "_async_query_subdevices_for_missing"
-    )
+    query_backfill = _function_source(COORDINATOR_PATH, "_subdevice_query_operations")
     assert "_has_meter_head_accessory" in query_backfill
     assert "async_query_meter_heads" in query_backfill
 
@@ -334,30 +334,17 @@ def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
     )
 
 
-def test_mqtt_action_id_routing_uses_shared_integer_parser() -> None:
-    """MQTT actionId routing should accept text IDs without raw int casts."""
-    handler = _function_source(COORDINATOR_PATH, "_async_handle_mqtt_message")
-    subdevice = _function_source(COORDINATOR_PATH, "_is_subdevice_payload")
-
-    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in handler
-    assert "cmd = first_nonblank_int(body.get(FIELD_CMD))" in handler
-    assert "action_id = first_nonblank_int(payload.get(FIELD_ACTION_ID))" in subdevice
-    assert "action_id = payload.get(FIELD_ACTION_ID)" not in handler
-    assert "body.get(FIELD_CMD) ==" not in handler
-    assert "int(action_id)" not in subdevice
-
-
 def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
     """MQTT command routing tolerates text cmd IDs from payloads."""
-    import asyncio  # ruff: ignore[import-outside-top-level]
+    import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_BODY,
         FIELD_CMD,
         MQTT_CMD_QUERY_DEVICE_PROPERTY,
         PAYLOAD_PROPERTIES,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
@@ -365,19 +352,19 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
         """Run a minimal coordinator test that sends an MQTT action message containing a text-form command and verifies the device property update is applied.
 
         This helper constructs a minimal JackerySolarVaultCoordinator instance with stubbed debug and push callbacks, delivers an MQTT "action" payload whose `FIELD_CMD` is a text string (e.g., "{MQTT_CMD_QUERY_DEVICE_PROPERTY}.0") and a body containing a `new` property, and asserts the coordinator merges that `new` value into the device's `PAYLOAD_PROPERTIES` and that a partial update was pushed.
-        """  # noqa: RUF105
+        """  # ruff: ignore[line-too-long]  # isort: skip
         self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
         self.data = {"dev": {PAYLOAD_PROPERTIES: {"old": 1}}}
         self._device_index = {"dev": {}}
         self._property_overrides = {}
         captured: dict[str, object] = {}
 
-        async def _debug_event(_event_or_factory: object) -> None:  # ruff: ignore[unused-async]
+        async def _debug_event(_event_or_factory: object) -> None:  # ruff: ignore[unused-async]  # isort: skip
             """Act as a no-op placeholder for emitting or producing debug events.
 
             Parameters:
                 _event_or_factory (object): An event object or a zero-argument factory callable that would produce an event when the debug mechanism is active. This function currently ignores the argument and returns without side effects.
-            """  # noqa: RUF105
+            """  # ruff: ignore[line-too-long]  # isort: skip
             return
 
         def _push_partial_update(
@@ -387,17 +374,15 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
             Parameters:
                 new_data (dict[str, object]): Partial update payload to capture under the key "data".
-            """  # noqa: RUF105
+            """  # ruff: ignore[line-too-long]  # isort: skip
             captured["data"] = new_data
 
         raw_self = cast("Any", self)
-        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]
-        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]
-        raw_self._schedule_battery_pack_ota_enrichment = (  # ruff: ignore[private-member-access]
-            lambda _device_id: None
-        )
+        raw_self._async_payload_debug_event = _debug_event  # ruff: ignore[private-member-access]  # isort: skip
+        raw_self._push_partial_update = _push_partial_update  # ruff: ignore[private-member-access]  # isort: skip
+        raw_self._schedule_battery_pack_ota_enrichment = lambda _device_id: None  # ruff: ignore[private-member-access]  # isort: skip
 
-        await JackerySolarVaultCoordinator._async_handle_mqtt_message(  # ruff: ignore[private-member-access]
+        await JackerySolarVaultCoordinator.async_handle_mqtt_message(
             self,
             "hb/app/user/action",
             {
@@ -410,7 +395,7 @@ def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
 
         data = captured["data"]
         assert isinstance(data, dict)
-        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2
+        assert data["dev"][PAYLOAD_PROPERTIES]["new"] == 2  # ruff: ignore[magic-value-comparison]  # isort: skip
 
     asyncio.run(_run())
 
@@ -419,27 +404,25 @@ def test_subdevice_payload_accepts_text_action_id_and_rejects_bad_values() -> No
     """Verify _is_subdevice_payload accepts numeric action IDs provided as strings and rejects invalid non-numeric values.
 
     Asserts that string forms `"3032"` and `"3032.0"` are treated as valid subdevice action IDs, while `True` and `float('nan')` are rejected.
-    """  # noqa: RUF105
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
-        FIELD_ACTION_ID,
-    )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    """  # ruff: ignore[line-too-long]  # isort: skip
+    from custom_components.jackery_solarvault.const import FIELD_ACTION_ID  # ruff: ignore[import-outside-top-level]  # isort: skip
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
 
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]  # isort: skip
         {FIELD_ACTION_ID: "3032"},
         {},
     )
-    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]
+    assert JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]  # isort: skip
         {FIELD_ACTION_ID: "3032.0"},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]  # isort: skip
         {FIELD_ACTION_ID: True},
         {},
     )
-    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]
+    assert not JackerySolarVaultCoordinator._is_subdevice_payload(  # ruff: ignore[private-member-access]  # isort: skip
         {FIELD_ACTION_ID: float("nan")},
         {},
     )
@@ -461,21 +444,19 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Stale HTTP property snapshots must not create SOC spikes."""
-    from datetime import timedelta  # ruff: ignore[import-outside-top-level]
-    import time  # ruff: ignore[import-outside-top-level]
+    from datetime import timedelta  # ruff: ignore[import-outside-top-level]  # isort: skip
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
-    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_BAT_OUT_PW,
         FIELD_BAT_SOC,
         FIELD_SOC,
         FIELD_WNAME,
     )
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         JackerySolarVaultCoordinator,
     )
-    from custom_components.jackery_solarvault.ingest import (  # ruff: ignore[import-outside-top-level]
-        TransportSource,
-    )
+    from custom_components.jackery_solarvault.ingest import TransportSource  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     self = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     self._configured_update_interval = timedelta(seconds=15)
@@ -506,9 +487,9 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http(
         source=TransportSource.HTTP,
     )
 
-    assert guarded[FIELD_SOC] == 49
-    assert guarded[FIELD_BAT_SOC] == 51
-    assert guarded[FIELD_BAT_OUT_PW] == 300
+    assert guarded[FIELD_SOC] == 49  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert guarded[FIELD_BAT_SOC] == 51  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert guarded[FIELD_BAT_OUT_PW] == 300  # ruff: ignore[magic-value-comparison]  # isort: skip
     assert guarded[FIELD_WNAME] == "new-wifi"
 
     monkeypatch.setattr(time, "monotonic", lambda: now + 120.0)
@@ -523,21 +504,22 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http(
         source=TransportSource.HTTP,
     )
 
-    assert unguarded[FIELD_SOC] == 78
-    assert unguarded[FIELD_BAT_SOC] == 74
-    assert unguarded[FIELD_BAT_OUT_PW] == 163
+    assert unguarded[FIELD_SOC] == 78  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert unguarded[FIELD_BAT_SOC] == 74  # ruff: ignore[magic-value-comparison]  # isort: skip
+    assert unguarded[FIELD_BAT_OUT_PW] == 163  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
 def test_mqtt_uses_captured_qos_zero() -> None:
     """Verify MQTT publish and subscribe usage is configured to QoS 0.
 
     Asserts that the mqtt_push module declares a captured QoS of 0, that subscriptions use `qos=0`, and that the coordinator publishes JSON messages with `qos=0` and `retain=False`.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]  # isort: skip
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
 
-    assert "qos: int = 0" in mqtt_source
-    assert "subscribe(topic, qos=0)" in mqtt_source
+    assert "MqttMessageSpec(" in mqtt_source
+    assert "topic_suffixes=MQTT_TOPIC_SUFFIXES, qos=0, retain=False" in mqtt_source
+    assert "qos=MQTT_MESSAGE_SPECS[MqttMessageType.SUBSCRIPTION].qos" in mqtt_source
     assert (
         "async_publish_json(topic, payload, qos=0, retain=False)" in coordinator_source
     )
@@ -556,7 +538,7 @@ def test_mqtt_payload_data_field_is_normalized_to_body() -> None:
     """Verify MQTT payloads using the 'data' field are normalized to the 'body' field across the codebase.
 
     Asserts that the relevant constants for `data`/`body` and the ControlCombine message/cmd exist in const.py, and that mqtt_push and the coordinator normalize `FIELD_DATA` into `FIELD_BODY` by reading `data.get(FIELD_DATA)` and assigning it to `data[FIELD_BODY]` / `payload[FIELD_DATA]`.
-    """  # noqa: RUF105
+    """  # ruff: ignore[line-too-long]  # isort: skip
     mqtt_source = _read(MQTT_PUSH_PATH)
     coordinator_source = _read(COORDINATOR_PATH)
     const_source = _read(CONST_PATH)
@@ -602,11 +584,15 @@ def test_mqtt_connect_requests_full_app_snapshot() -> None:
     """On reconnect the integration asks the app protocol for a fresh snapshot."""
     connected = _function_source(COORDINATOR_PATH, "_async_mqtt_connected")
     assert "async_schedule_local_mqtt_device_config" in connected
-    assert "_async_query_system_info_for_missing" in connected
-    assert "_async_query_weather_plan_for_missing" in connected
-    assert "_async_query_subdevices_for_missing" in connected
-    assert "force=True" in connected
-    assert "ensure_mqtt=False" in connected
+    assert "_async_mqtt_poll_queries" in connected
+
+    shared_poll = _function_source(COORDINATOR_PATH, "_async_mqtt_poll_queries")
+    assert "_async_query_third_party_mqtt_configs" in shared_poll
+    assert "_async_query_system_info_for_missing" in shared_poll
+    assert "_async_query_weather_plan_for_missing" in shared_poll
+    assert "_async_query_subdevices_for_missing" in shared_poll
+    assert "force=force_birth_snapshot" in shared_poll
+    assert "ensure_mqtt=False" in shared_poll
 
     layer5 = _function_source(
         ROOT / "custom_components" / "jackery_solarvault" / "__init__.py",

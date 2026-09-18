@@ -27,7 +27,7 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_WIFI_CONFIG,
     PAYLOAD_WIFI_LIST,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
+from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]
     DEVICE_ID,
     make_update_cycle_api,
     setup_update_cycle_coordinator,
@@ -48,11 +48,11 @@ async def _teardown(hass: HomeAssistant, entry_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_mqtt_only_sections_survive_http_rebuild(hass: HomeAssistant) -> None:
     """WiFi/MQTT-connect/electricity-strategy/battery-boundary sections survive.
 
-    These sections are only ever written by ``_async_handle_mqtt_message``
+    These sections are only ever written by ``async_handle_mqtt_message``
     (coordinator.py) — no HTTP endpoint ever populates them — so the fresh
     per-device ``entry`` dict built on every HTTP poll never sets them itself.
     Unless they are preserved from the previous cycle's cached data, they
@@ -81,7 +81,7 @@ async def test_mqtt_only_sections_survive_http_rebuild(hass: HomeAssistant) -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_mqtt_pushed_alarm_survives_http_rebuild(hass: HomeAssistant) -> None:
     """An MQTT-pushed alarm section must survive the next HTTP poll cycle."""
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
@@ -99,7 +99,7 @@ async def test_mqtt_pushed_alarm_survives_http_rebuild(hass: HomeAssistant) -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     hass: HomeAssistant,
 ) -> None:
@@ -131,7 +131,10 @@ async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     coordinator.data = {DEVICE_ID: dict(shadow_buckets)}
 
     result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-    await hass.async_block_till_done(wait_background_tasks=True)
+    # The coordinator owns long-lived watchdog/retry background tasks. The
+    # preservation result is complete when the foreground HTTP cycle returns;
+    # waiting for every background task would intentionally never quiesce.
+    await hass.async_block_till_done()
 
     for key, value in shadow_buckets.items():
         assert result[DEVICE_ID][key] == value

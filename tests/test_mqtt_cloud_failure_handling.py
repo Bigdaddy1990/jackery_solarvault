@@ -102,7 +102,7 @@ def test_unexpected_message_id_remains_visible_by_default(
         if "Unexpected message ID" in record.getMessage()
         or "Caught exception in on_" in record.getMessage()
     ]
-    assert len(noisy) == 2
+    assert len(noisy) == 2  # ruff: ignore[magic-value-comparison]
     assert all(record.levelno == logging.ERROR for record in noisy)
 
 
@@ -176,7 +176,7 @@ async def test_birth_snapshot_not_dispatched_when_connection_lost(
 
     callback.assert_not_awaited()
     snapshot = client.diagnostics_snapshot()
-    assert snapshot["birth_publishes"] == 1
+    assert snapshot["birth_publishes"] == 0
     assert snapshot["birth_publish_failed"] == 1
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
@@ -200,7 +200,8 @@ async def test_birth_snapshot_not_connected_error_is_debug_and_deduplicated(
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
     debug_records = [r for r in caplog.records if "birth snapshot" in r.getMessage()]
     assert len(debug_records) == 1
-    assert client.diagnostics_snapshot()["birth_publish_failed"] == _TWO_ATTEMPTS
+    callback.assert_awaited_once()
+    assert client.diagnostics_snapshot()["birth_publish_failed"] == 1
 
 
 async def test_birth_snapshot_unexpected_error_still_logged_as_error(

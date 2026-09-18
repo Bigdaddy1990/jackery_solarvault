@@ -5,7 +5,7 @@ These drive `_async_query_system_info_for_missing`, `_async_query_weather_plan_f
 and `_async_query_subdevices_for_missing` through their state transitions with a
 stubbed coordinator, asserting business outcomes (which devices are queried,
 which queries are skipped by throttle/conditions) — never call order.
-"""  # noqa: RUF105
+"""  # ruff: ignore[line-too-long]  # isort: skip
 
 import time
 from typing import Any
@@ -20,20 +20,21 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_DEVICE,
     PAYLOAD_PROPERTIES,
 )
-from tests._update_cycle_fixture import (  # ruff:ignore[banned-api]
+
+from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]  # isort: skip
     DEVICE_ID,
     make_update_cycle_api,
     setup_update_cycle_coordinator,
 )
 
 
-async def _teardown(hass, entry_id) -> None:  # noqa: RUF105
+async def _teardown(hass, entry_id) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Unload the entry and drain background tasks."""
     await hass.config_entries.async_unload(entry_id)
     await hass.async_block_till_done()
 
 
-def _device_payload(  # noqa: RUF105
+def _device_payload(  # ruff: ignore[too-many-arguments]  # isort: skip
     *,
     has_system_info: bool = False,
     has_weather: bool = False,
@@ -46,7 +47,7 @@ def _device_payload(  # noqa: RUF105
     has_smart_meter: bool = False,
 ) -> dict[str, Any]:
     """Build a minimal device payload with selected enrichment sections."""
-    from custom_components.jackery_solarvault.const import (  # noqa: PLC0415, RUF105
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_ACCESSORIES,
         FIELD_DEV_TYPE,
         FIELD_SUB_TYPE,
@@ -66,41 +67,50 @@ def _device_payload(  # noqa: RUF105
     }
     if has_system_info:
         # Populate with actual SYSTEM_INFO_KEYS fields so has_all check passes
-        from custom_components.jackery_solarvault.const import SYSTEM_INFO_KEYS  # noqa: I001, PLC0415, RUF105
+        from custom_components.jackery_solarvault.const import SYSTEM_INFO_KEYS  # ruff: ignore[import-outside-top-level]  # isort: skip
 
         payload[PAYLOAD_PROPERTIES].update(dict.fromkeys(SYSTEM_INFO_KEYS, "value"))
     if has_weather:
+        # pyrefly: ignore [bad-assignment]
         payload["weather_plan"] = {"wpc": 5}
     if has_ct_meter:
+        # pyrefly: ignore [bad-assignment]
         payload["ct_meter"] = {"voltage": 230}
     if has_battery_packs:
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_BATTERY_PACKS] = [{"packSn": "PACK1"}]
         # Also set batNum so battery_packs_need_query returns True
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_PROPERTIES]["batNum"] = 1
     if has_breaker:
         payload[PAYLOAD_SYSTEM] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BREAKER}]
         }
     if has_sub_device:
+        # pyrefly: ignore [unsupported-operation]
         payload[PAYLOAD_SUBDEVICES] = [{"devType": "generic"}]
     if has_meter_head:
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_METER_HEAD}]
         }
     if has_smart_plug:
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_SOCKET}]
         }
     if has_smart_meter:
         # Smart meter uses subType "2" (SUBDEVICE_TYPE_COMBINE) in accessories
         payload[PAYLOAD_SYSTEM_META] = {
+            # pyrefly: ignore [bad-assignment]
             FIELD_ACCESSORIES: [{FIELD_SUB_TYPE: SUBDEVICE_TYPE_COMBINE}]
         }
     return payload
 
 
-@pytest.fixture
-async def coordinator(hass):  # noqa: RUF105
+@pytest.fixture()
+async def coordinator(hass):  # ruff: ignore[missing-type-function-argument, missing-return-type-undocumented-public-function]  # isort: skip
     """Yield a coordinator with mocked api for enrichment query tests."""
     api = make_update_cycle_api()
     coord, entry, _api = await setup_update_cycle_coordinator(
@@ -110,9 +120,9 @@ async def coordinator(hass):  # noqa: RUF105
     # Most cases below exercise transport and error behavior, not the scheduler
     # window, so neutralize that setup throttle.  The dedicated throttle cases
     # explicitly restore non-zero intervals before asserting the gate.
-    coord._system_info_query_interval_sec = 0  # ruff: ignore[private-member-access]
-    coord._weather_plan_query_interval_sec = 0  # ruff: ignore[private-member-access]
-    coord._subdevice_query_interval_sec = 0  # ruff: ignore[private-member-access]
+    coord._system_info_query_interval_sec = 0  # ruff: ignore[private-member-access]  # isort: skip
+    coord._weather_plan_query_interval_sec = 0  # ruff: ignore[private-member-access]  # isort: skip
+    coord._subdevice_query_interval_sec = 0  # ruff: ignore[private-member-access]  # isort: skip
     yield coord
     await _teardown(hass, entry.entry_id)
 
@@ -122,37 +132,53 @@ async def coordinator(hass):  # noqa: RUF105
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> None:  # noqa: RUF105
-    """A BLE-only enrichment pass dispatches without Cloud-MQTT startup."""
-    coordinator._ble_listener = MagicMock()  # noqa: RUF105, SLF001
-    coordinator._mqtt = None  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_generation = 1  # noqa: RUF105, SLF001
-    coordinator._mqtt_birth_snapshot_pending = False  # noqa: RUF105, SLF001
-    coordinator._async_query_subdevices_for_missing = AsyncMock()  # noqa: RUF105, SLF001
-    coordinator._async_query_system_info_for_missing = AsyncMock()  # noqa: RUF105, SLF001
-    coordinator._async_query_weather_plan_for_missing = AsyncMock()  # noqa: RUF105, SLF001
+@pytest.mark.asyncio()
+async def test_ble_background_getters_do_not_issue_automatic_writes(
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
+) -> None:
+    """A BLE-only runtime never turns the MQTT poller into a GATT poller."""
+    coordinator._ble_listener = MagicMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_generation = 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_birth_snapshot_pending = False  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_subdevices_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_system_info_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_weather_plan_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_start_mqtt = AsyncMock()
     snapshot = {DEVICE_ID: _device_payload()}
 
-    await coordinator._async_mqtt_poll_queries(snapshot)  # noqa: RUF105, SLF001
+    await coordinator._async_mqtt_poll_queries(snapshot)  # ruff: ignore[private-member-access]  # isort: skip
 
-    coordinator._async_query_subdevices_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
-    coordinator._async_query_system_info_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
-    coordinator._async_query_weather_plan_for_missing.assert_awaited_once_with(  # noqa: RUF105, SLF001
-        force=False,
-        snapshot=snapshot,
-        ensure_mqtt=False,
-    )
+    coordinator._async_query_subdevices_for_missing.assert_not_awaited()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_system_info_for_missing.assert_not_awaited()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_weather_plan_for_missing.assert_not_awaited()  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_start_mqtt.assert_not_awaited()
+
+
+@pytest.mark.asyncio()
+async def test_cloud_background_getters_explicitly_disable_ble(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
+    """Connected Cloud MQTT polling never mirrors its reads over GATT."""
+    coordinator._mqtt = MagicMock(is_connected=True)  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_generation = 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_birth_snapshot_pending = False  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_subdevices_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_system_info_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._async_query_weather_plan_for_missing = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
+    snapshot = {DEVICE_ID: _device_payload()}
+
+    await coordinator._async_mqtt_poll_queries(snapshot)  # ruff: ignore[private-member-access]  # isort: skip
+
+    for query in (
+        coordinator._async_query_subdevices_for_missing,  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._async_query_system_info_for_missing,  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._async_query_weather_plan_for_missing,  # ruff: ignore[private-member-access]  # isort: skip
+    ):
+        query.assert_awaited_once_with(
+            force=False,
+            snapshot=snapshot,
+            ensure_mqtt=False,
+            allow_ble=False,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -160,33 +186,39 @@ async def test_ble_background_getters_never_start_cloud_mqtt(coordinator) -> Non
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_skipped_without_transport(coordinator) -> None:  # noqa: RUF105
-    """No BLE and no Cloud MQTT: query is a no-op."""
-    coordinator._ble_listener = None  # noqa: RUF105, SLF001
-    coordinator._mqtt = None  # noqa: RUF105, SLF001
+@pytest.mark.asyncio()
+async def test_system_info_query_skipped_without_transport(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
+    """No usable Cloud MQTT session: the query is a no-op.
+
+    `ensure_mqtt=False` is what makes this "no transport": with the default
+    `ensure_mqtt=True` the cloud branch would be built and connect on demand,
+    so the absence of a live session alone would not skip anything. BLE cannot
+    stand in here because cmd 106/120 are in `_BLE_UNSUPPORTED_MSG_TYPES`.
+    """
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_device_info.assert_not_awaited()
     coordinator.async_query_system_info.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Connected Cloud MQTT enables the query path."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
-    coordinator._ble_listener = None  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
@@ -196,42 +228,42 @@ async def test_system_info_query_runs_when_mqtt_ready(coordinator) -> None:  # n
     )
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_runs_when_ble_ready(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Live BLE listener enables the query path."""
-    coordinator._ble_listener = MagicMock()  # noqa: RUF105, SLF001
-    coordinator._mqtt = None  # noqa: RUF105, SLF001
+    coordinator._ble_listener = MagicMock()  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
     # Prevent actual BLE command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once()
     coordinator.async_query_system_info.assert_awaited_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_info_query_refreshes_complete_data_when_periodic_due(
-    coordinator,  # noqa: RUF105
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
 ) -> None:
     """Complete data is refreshed after the periodic getter interval."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
-    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
-    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 61  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+    coordinator._system_info_query_interval_sec = 60  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 61  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_actions_seen.update({  # ruff: ignore[private-member-access]  # isort: skip
         (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
         (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
     })
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
@@ -241,138 +273,138 @@ async def test_system_info_query_refreshes_complete_data_when_periodic_due(
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_info_query_skips_complete_data_before_periodic_due(
-    coordinator,  # noqa: RUF105
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
 ) -> None:
     """Complete data remains throttled until the periodic interval expires."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
-    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
-    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+    coordinator._system_info_query_interval_sec = 60  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_actions_seen.update({  # ruff: ignore[private-member-access]  # isort: skip
         (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
         (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
     })
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_not_awaited()
     coordinator.async_query_system_info.assert_not_awaited()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_system_info_query_force_true_runs_even_with_complete_data(
-    coordinator,  # noqa: RUF105
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
 ) -> None:
     """force=True overrides the completeness check."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_system_info=True)}
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once()
     coordinator.async_query_system_info.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_respects_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """A recent query for the same device is throttled."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
-    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._system_info_query_interval_sec = 60  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_not_awaited()
     coordinator.async_query_system_info.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_force_true_bypasses_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """force=True ignores the throttle window."""
-    import time  # noqa: PLC0415, RUF105
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
-    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._system_info_query_interval_sec = 60  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once()
     coordinator.async_query_system_info.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_handles_device_info_failure(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_handles_device_info_failure(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """DeviceInfo error is caught, system-info query still runs."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_device_info = AsyncMock(side_effect=TimeoutError("timeout"))
     coordinator.async_query_system_info = AsyncMock()
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_system_info.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_handles_system_info_failure(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_handles_system_info_failure(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """SystemInfo error is caught and logged."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock(side_effect=TimeoutError("timeout"))
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_system_info_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """A caller-provided snapshot overrides coordinator.data."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     snapshot = {DEVICE_ID: _device_payload(has_system_info=True)}
-    coordinator._system_info_query_interval_sec = 60  # noqa: RUF105, SLF001
-    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_actions_seen.update({  # noqa: RUF105, SLF001
+    coordinator._system_info_query_interval_sec = 60  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._last_system_info_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_actions_seen.update({  # ruff: ignore[private-member-access]  # isort: skip
         (DEVICE_ID, ACTION_ID_QUERY_DEVICE_PROPERTY),
         (DEVICE_ID, ACTION_ID_QUERY_COMBINE_DATA),
     })
     coordinator.async_query_device_info = AsyncMock()
     coordinator.async_query_system_info = AsyncMock()
 
-    await coordinator._async_query_system_info_for_missing(snapshot=snapshot)  # noqa: RUF105, SLF001
+    await coordinator._async_query_system_info_for_missing(snapshot=snapshot)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_device_info.assert_not_awaited()
 
@@ -382,126 +414,128 @@ async def test_system_info_query_uses_snapshot_when_provided(coordinator) -> Non
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_weather_plan_query_skipped_without_mqtt(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_weather_plan_query_skipped_without_mqtt(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """No Cloud MQTT: weather plan query is a no-op."""
-    coordinator._mqtt = None  # noqa: RUF105, SLF001
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_weather_plan_query_runs_when_mqtt_connected(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Connected Cloud MQTT enables the query."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_weather_plan = AsyncMock()
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_weather_plan_query_refreshes_minutes_when_periodic_due(
-    coordinator,  # noqa: RUF105
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
 ) -> None:
     """Existing lead-time fields are refreshed after the periodic interval."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
-    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
-    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 301  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_actions_seen.add(  # noqa: RUF105, SLF001
-        (DEVICE_ID, ACTION_ID_QUERY_WEATHER_PLAN)
-    )
+    coordinator._weather_plan_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 301  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_actions_seen.add((  # ruff: ignore[private-member-access]  # isort: skip
+        DEVICE_ID,
+        ACTION_ID_QUERY_WEATHER_PLAN,
+    ))
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_weather_plan_query_skips_minutes_before_periodic_due(
-    coordinator,  # noqa: RUF105
+    coordinator,  # ruff: ignore[missing-type-function-argument]  # isort: skip
 ) -> None:
     """Existing lead-time fields remain throttled before the interval expires."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
-    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
-    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._mqtt_session_actions_seen.add(  # noqa: RUF105, SLF001
-        (DEVICE_ID, ACTION_ID_QUERY_WEATHER_PLAN)
-    )
+    coordinator._weather_plan_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._mqtt_session_actions_seen.add((  # ruff: ignore[private-member-access]  # isort: skip
+        DEVICE_ID,
+        ACTION_ID_QUERY_WEATHER_PLAN,
+    ))
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_weather_plan_query_force_true_bypasses_completeness(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_weather_plan_query_force_true_bypasses_completeness(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """force=True ignores existing lead-time fields."""
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload(has_weather=True)}
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_weather_plan_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_weather_plan_query_respects_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """A recent query for the same device is throttled."""
-    import time  # noqa: PLC0415, RUF105
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
-    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._weather_plan_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """force=True ignores the throttle window."""
-    import time  # noqa: PLC0415, RUF105
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     mqtt = MagicMock()
     mqtt.is_connected = True
-    coordinator._mqtt = mqtt  # noqa: RUF105, SLF001
+    coordinator._mqtt = mqtt  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.data = {DEVICE_ID: _device_payload()}
-    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._weather_plan_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_weather_plan_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._weather_plan_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_weather_plan = AsyncMock()
 
-    await coordinator._async_query_weather_plan_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_weather_plan_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_weather_plan.assert_awaited_once()
 
@@ -511,8 +545,8 @@ async def test_weather_plan_query_force_true_bypasses_throttle(coordinator) -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """No accessory flags: query is a no-op."""
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -521,7 +555,7 @@ async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_not_awaited()
     coordinator.async_query_subdevice_combo.assert_not_awaited()
@@ -530,8 +564,8 @@ async def test_subdevice_query_skipped_when_no_accessories(coordinator) -> None:
     coordinator.async_query_smart_plugs.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_battery_packs_when_present(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_battery_packs_when_present(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Battery pack accessory triggers pack query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -540,15 +574,15 @@ async def test_subdevice_query_battery_packs_when_present(coordinator) -> None: 
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Breaker accessory triggers combo query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_breaker=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -557,15 +591,15 @@ async def test_subdevice_query_combo_when_breaker_present(coordinator) -> None: 
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_subdevice_combo.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Smart meter accessory triggers meter query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_smart_meter=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -574,15 +608,15 @@ async def test_subdevice_query_smart_meter_when_present(coordinator) -> None:  #
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_smart_meter.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """CT meter in payload triggers smart meter query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_ct_meter=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -591,13 +625,13 @@ async def test_subdevice_query_ct_meter_triggers_meter_query(coordinator) -> Non
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_smart_meter.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Meter head accessory triggers meter head query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_meter_head=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -606,15 +640,15 @@ async def test_subdevice_query_meter_head_when_present(coordinator) -> None:  # 
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_meter_heads.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Smart plug accessory triggers smart plug query."""
     coordinator.data = {DEVICE_ID: _device_payload(has_smart_plug=True)}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -623,15 +657,15 @@ async def test_subdevice_query_smart_plug_when_present(coordinator) -> None:  # 
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_smart_plugs.assert_awaited_once_with(
         DEVICE_ID, ensure_mqtt=True
     )
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """force=True triggers all subdevice query types for the device."""
     coordinator.data = {DEVICE_ID: _device_payload()}
     coordinator.async_query_battery_packs = AsyncMock()
@@ -640,7 +674,7 @@ async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> No
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_awaited_once()
     coordinator.async_query_subdevice_combo.assert_awaited_once()
@@ -649,52 +683,52 @@ async def test_subdevice_query_force_true_runs_all_for_device(coordinator) -> No
     coordinator.async_query_smart_plugs.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_respects_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_respects_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """A recent query for the same device is throttled."""
-    import time  # noqa: PLC0415, RUF105
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
-    coordinator._last_subdevice_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._subdevice_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_subdevice_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._subdevice_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_battery_packs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_force_true_bypasses_throttle(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_force_true_bypasses_throttle(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """force=True ignores the throttle window."""
-    import time  # noqa: PLC0415, RUF105
+    import time  # ruff: ignore[import-outside-top-level]  # isort: skip
 
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
-    coordinator._last_subdevice_query[DEVICE_ID] = time.monotonic() - 1  # noqa: RUF105, SLF001
-    coordinator._subdevice_query_interval_sec = 300  # noqa: RUF105, SLF001
+    coordinator._last_subdevice_query[DEVICE_ID] = time.monotonic() - 1  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._subdevice_query_interval_sec = 300  # ruff: ignore[private-member-access]  # isort: skip
     coordinator.async_query_battery_packs = AsyncMock()
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_subdevices_for_missing(force=True)  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing(force=True)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_awaited_once()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_uses_snapshot_when_provided(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_uses_snapshot_when_provided(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """A caller-provided snapshot overrides coordinator.data."""
     coordinator.data = {DEVICE_ID: _device_payload(has_battery_packs=True)}
     snapshot = {DEVICE_ID: _device_payload()}
     coordinator.async_query_battery_packs = AsyncMock()
 
-    await coordinator._async_query_subdevices_for_missing(snapshot=snapshot)  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing(snapshot=snapshot)  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_battery_packs.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_subdevice_query_handles_battery_pack_failure(coordinator) -> None:  # noqa: RUF105
+@pytest.mark.asyncio()
+async def test_subdevice_query_handles_battery_pack_failure(coordinator) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Battery pack error is caught, other queries still run."""
     coordinator.data = {
         DEVICE_ID: _device_payload(has_battery_packs=True, has_breaker=True)
@@ -707,8 +741,8 @@ async def test_subdevice_query_handles_battery_pack_failure(coordinator) -> None
     coordinator.async_query_meter_heads = AsyncMock()
     coordinator.async_query_smart_plugs = AsyncMock()
     # Prevent actual MQTT command execution
-    coordinator._async_publish_command_ble_first = AsyncMock()  # noqa: RUF105, SLF001
+    coordinator._async_publish_command_ble_first = AsyncMock()  # ruff: ignore[private-member-access]  # isort: skip
 
-    await coordinator._async_query_subdevices_for_missing()  # noqa: RUF105, SLF001
+    await coordinator._async_query_subdevices_for_missing()  # ruff: ignore[private-member-access]  # isort: skip
 
     coordinator.async_query_subdevice_combo.assert_awaited_once()

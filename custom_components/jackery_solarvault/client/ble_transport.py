@@ -23,10 +23,8 @@ Goal of this first revision: read-only diagnostic listener. The listener:
      the raw bytes when decryption fails) so the integration can expose
      last-seen metadata in diagnostics.
 
-The setter side (chunked writes to ``0xEE01``) is intentionally out of
-scope here. Once Phase 3a has shown the listener decodes real frames
-correctly, the same chunking/encrypt path from :mod:`.ble` will be
-plumbed into :meth:`async_write_frames`.
+Explicit setter commands use the same session owner to serialize encrypted,
+chunked writes to ``0xEE01``. No unsolicited keep-alive command is emitted.
 
 Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
@@ -36,15 +34,17 @@ Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
 import asyncio
 import base64
 import binascii
+from collections import deque
 from collections.abc import Awaitable, Callable
-import contextlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import importlib
+from itertools import starmap
 import json
 import logging
 import random
-import sys
-from typing import TYPE_CHECKING, Any
+import time
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
@@ -53,12 +53,41 @@ from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
+
+    from bleak.backends.device import BLEDevice
+
     from homeassistant.components.bluetooth import (
         BluetoothCallbackMatcher,
         BluetoothChange,
+        BluetoothScanningMode as HABluetoothScanningMode,
         BluetoothServiceInfoBleak,
     )
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+
+
+class _BluetoothModule(Protocol):
+    """Typed surface of the optional Home Assistant Bluetooth module."""
+
+    BluetoothScanningMode: type[HABluetoothScanningMode]
+
+    def async_register_callback(
+        self,
+        hass: HomeAssistant,
+        callback: Callable[[BluetoothServiceInfoBleak, BluetoothChange], None],
+        matcher: BluetoothCallbackMatcher,
+        mode: HABluetoothScanningMode,
+    ) -> Callable[[], None]: ...
+
+    def async_ble_device_from_address(
+        self,
+        hass: HomeAssistant,
+        address: str,
+        *,
+        connectable: bool,
+    ) -> BLEDevice | None: ...
+
 
 _LOGGER = logging.getLogger(__name__)
 _BLE_NOTIFICATION_LOG_SAMPLE_EVERY = 256
@@ -91,7 +120,6 @@ def _body_is_complete_json_object(body: bytes) -> bool:
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 
 #: Minimum time between (re)connect attempts when the device drops the link.
-_RECONNECT_BACKOFF_SEC: float = 30.0
 
 #: A GATT link must keep notify ownership this long before it resets the
 #: escalating ESPHome-proxy protection backoff.
@@ -103,24 +131,19 @@ _STABLE_SESSION_SEC: float = 60.0
 #: ``async_unload_entry``) — keep this well below that so the listener
 #: never becomes the reason a shutdown logs "tasks still pending".
 _STOP_TIMEOUT_SEC: float = 5.0
-
-#: How often to write a no-op query frame to keep the GATT session
-#: warm. The SolarVault peripheral closes idle GATT sessions after
-#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
-#: every 6-20 s without traffic). 15 s sits comfortably below that and
-#: doubles as a property-refresh — the device answers each ``cmd=106``
-#: with a ``DevicePropertyChange`` notify that the sink merges into
-#: ``coordinator.data`` via the existing cmd=107 path.
-_KEEPALIVE_INTERVAL_SEC: float = 15.0
+_COOPERATIVE_STOP_GRACE_SEC: float = 0.25
+_SINK_RETRY_INITIAL_SEC: float = 0.01
+_SINK_RETRY_MAX_SEC: float = 1.0
 
 # Notify chunks are ordered on a GATT connection, but an interrupted link may
 # leave an incomplete logical message behind. Bound both lifetime and memory so
 # supplemental BLE traffic can never grow coordinator-owned state indefinitely.
 _REASSEMBLY_TIMEOUT_SEC: float = 10.0
+_MIN_MULTI_CHUNK_COUNT: int = 2
 _REASSEMBLY_MAX_CHUNKS: int = 128
 _REASSEMBLY_MAX_BODY_BYTES: int = 256 * 1024
 _REASSEMBLY_MAX_MESSAGES_PER_DEVICE: int = 8
-_NOTIFY_QUEUE_MAX_FRAMES: int = _REASSEMBLY_MAX_CHUNKS
+_NOTIFY_QUEUE_WARN_FRAMES: int = _REASSEMBLY_MAX_CHUNKS
 _UINT16_MAX: int = 0xFFFF
 
 
@@ -144,6 +167,9 @@ class BleFrameObservation:
     base64_encoded: str
     parsed: ble.BleBinaryFrame | None
     decode_error: str | None = None
+    session_generation: int | None = None
+    notify_sequence: int | None = None
+    delivery_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -160,10 +186,14 @@ class BleListenerStats:
     multi_chunk_messages_assembled: int = 0
     multi_chunk_assemblies_dropped: int = 0
     notify_frames_dropped: int = 0
+    notify_queue_depth: int = 0
+    notify_queue_high_watermark: int = 0
+    notify_queue_bytes: int = 0
+    notify_queue_high_watermark_bytes: int = 0
+    notify_queue_oldest_age_sec: float = 0.0
     acks_received: int = 0
     acks_timed_out: int = 0
     last_error: str | None = None
-    last_keep_alive_error: str | None = None
     last_decode_error: str | None = None
     last_sink_error: str | None = None
     last_connect_at: datetime | None = None
@@ -175,11 +205,6 @@ class BleListenerStats:
     # how much BLE telemetry is still unconsumed (cmd=120 system /
     # per-device / CT variants currently — see coordinator sink).
     unrouted_frames_by_cmd: dict[int, int] = field(default_factory=dict)
-    # Keep-alive health counters (P3-3).
-    keep_alive_writes_attempted: int = 0
-    keep_alive_writes_succeeded: int = 0
-    keep_alive_writes_failed: int = 0
-    consecutive_keep_alive_failures: int = 0
 
 
 @dataclass(slots=True)
@@ -201,6 +226,19 @@ class _PendingAck:
     failure_reason: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _BleCommand:
+    """One validated logical write and its optional ACK contract."""
+
+    msg_id: int
+    ble_msg_type: int
+    body: bytes
+    timeout_sec: float
+    wait_for_ack: bool
+    ack_timeout_sec: float
+    mtu_override: int | None
+
+
 @dataclass(slots=True)
 class _PendingFrameAssembly:
     """Bounded set of decoded chunks for one logical BLE message."""
@@ -216,15 +254,24 @@ class _GattSession:
     """Ownership token for one per-device GATT connection."""
 
     generation: int
-    client: Any
+    client: BleakClient
     active: bool = True
+    accepting_notifications: bool = True
+    notify_started: bool = False
     write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     notify_sequence: int = 0
-    notify_queue: asyncio.Queue[tuple[int, bytes]] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=_NOTIFY_QUEUE_MAX_FRAMES)
+    # Bleak's notification callback is synchronous and therefore cannot apply
+    # backpressure. Keep accepted frames in a lossless FIFO; queue depth and its
+    # high-water mark are surfaced in diagnostics instead of deleting telemetry.
+    notify_queue: asyncio.Queue[tuple[int, bytes, datetime]] = field(
+        default_factory=asyncio.Queue
     )
+    notify_pending_metadata: deque[tuple[float, int]] = field(default_factory=deque)
+    notify_pending_bytes: int = 0
+    notify_inflight: tuple[int, bytes, datetime] | None = None
     notify_task: asyncio.Task[None] | None = None
     notify_tasks: set[asyncio.Task[None]] = field(default_factory=set)
+    teardown_task: asyncio.Task[None] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +298,8 @@ class JackeryBleListener:
     after the first successful HTTP discovery).
     """
 
-    def __init__(
+    # Injected resolvers keep coordinator state out of the transport boundary.
+    def __init__(  # ruff: ignore[too-many-arguments]
         self,
         hass: HomeAssistant,
         sink: FrameSink,
@@ -261,9 +309,8 @@ class JackeryBleListener:
         connect_backoff_remaining: Callable[[str, float], float],
         connect_backoff_note_failure: Callable[[str, float], float],
         connect_backoff_note_success: Callable[[str], None],
-        keep_alive_msg_id: int | None,
-        keep_alive_ble_msg_type: int | None,
         serial_resolver: Callable[[str], str | None] | None = None,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         """Construct a Jackery BLE notification listener.
 
@@ -284,16 +331,15 @@ class JackeryBleListener:
             with unmapped serials are logged but not associated.
         """
         self._hass = hass
+        self._config_entry = config_entry
         self._sink = sink
         self._key_resolver = key_resolver
         self._ble_address_resolver = ble_address_resolver
         self._connect_backoff_remaining = connect_backoff_remaining
         self._connect_backoff_note_failure = connect_backoff_note_failure
         self._connect_backoff_note_success = connect_backoff_note_success
-        self._keep_alive_msg_id = keep_alive_msg_id
-        self._keep_alive_ble_msg_type = keep_alive_ble_msg_type
         self._serial_resolver = serial_resolver
-        self._ha_bluetooth: Any | None = None
+        self._ha_bluetooth: _BluetoothModule | None = None
         self._stats: dict[str, BleListenerStats] = {}
         self._unregister_callbacks: list[Callable[[], None]] = []
         self._connections: dict[str, asyncio.Task[None]] = {}
@@ -301,6 +347,9 @@ class JackeryBleListener:
         self._sessions: dict[str, _GattSession] = {}
         self._notify_tasks: set[asyncio.Task[None]] = set()
         self._stop_event = asyncio.Event()
+        self._stop_task: asyncio.Task[None] | None = None
+        self._unavailable_connections: set[str] = set()
+        self._delivery_namespace = f"{random.getrandbits(128):032x}"
         # Cache of (device_id -> BLE MAC) populated on first matching
         # advertisement. The coordinator's ``_ble_address_for_device``
         # reads back through :meth:`address_for_device_id`.
@@ -312,7 +361,7 @@ class JackeryBleListener:
         # Active GATT clients per device id, populated by the connection
         # runner. ``async_send_command`` reads from this dict to write to
         # the open session without re-establishing the connect.
-        self._clients: dict[str, Any] = {}
+        self._clients: dict[str, BleakClient] = {}
         # Pending ACK registrations per device id. ``_handle_notification``
         # resolves the matching futures when a decoded frame arrives. Each
         # device can have multiple in-flight writes (rare in practice for
@@ -351,6 +400,73 @@ class JackeryBleListener:
             and self._clients.get(device_id) is session.client
         )
 
+    def _notification_session_owns_connection(
+        self,
+        device_id: str,
+        session: _GattSession,
+    ) -> bool:
+        """Return whether a callback still belongs to the installed GATT owner.
+
+        Listener shutdown deliberately does not participate in this check. Bleak
+        may synchronously invoke the callback until stop_notify or disconnect has
+        completed; every frame received before that physical cutoff remains owned.
+        """
+        current = self._sessions.get(device_id)
+        return (
+            current is session
+            and current.generation == session.generation
+            and current.client is session.client
+            and self._clients.get(device_id) is session.client
+        )
+
+    def _create_owned_task(
+        self,
+        target: Coroutine[Any, Any, None],
+        *,
+        name: str,
+    ) -> asyncio.Task[None]:
+        """Create listener work through Home Assistant's tracked task factory."""
+        try:
+            if self._config_entry is not None:
+                return cast(  # ty: ignore[redundant-cast]
+                    "asyncio.Task[None]",
+                    self._config_entry.async_create_background_task(
+                        self._hass,
+                        target,
+                        name=name,
+                    ),
+                )
+            return cast(  # ty: ignore[redundant-cast]
+                "asyncio.Task[None]",
+                self._hass.async_create_background_task(
+                    target,
+                    name=name,
+                ),
+            )
+        except Exception:
+            target.close()
+            raise
+
+    def _accepted_notification_session_owns_connection(
+        self,
+        device_id: str,
+        session: _GattSession,
+    ) -> bool:
+        """Return whether an accepted FIFO item still belongs to this session.
+
+        Physical disconnect and listener shutdown fence new callbacks by changing
+        ``active``/``accepting_notifications``.  They must not invalidate bytes
+        that the synchronous Bleak callback already appended to the session FIFO.
+        Map identity remains the ownership fence until teardown drains the FIFO.
+        """
+        current = self._sessions.get(device_id)
+        return (
+            current is session
+            and current.generation == session.generation
+            and current.client is session.client
+            and self._clients.get(device_id) is session.client
+        )
+
     def _reset_backoff_after_stable_session(
         self,
         device_id: str,
@@ -363,6 +479,39 @@ class JackeryBleListener:
             return False
         self._connect_backoff_note_success(device_id)
         return True
+
+    def _log_connection_unavailable(
+        self,
+        device_id: str,
+        message: str,
+        *args: object,
+    ) -> None:
+        """Log one unavailable warning per BLE outage."""
+        first_failure = device_id not in self._unavailable_connections
+        self._unavailable_connections.add(device_id)
+        logger = _LOGGER.warning if first_failure else _LOGGER.debug
+        logger(message, *args)
+
+    def _log_connection_available(
+        self,
+        device_id: str,
+        notify_characteristic: str,
+    ) -> None:
+        """Log initial BLE availability or recovery from one outage."""
+        recovered = device_id in self._unavailable_connections
+        self._unavailable_connections.discard(device_id)
+        if recovered:
+            _LOGGER.info(
+                "Jackery BLE %s connection restored; subscribing to notify %s",
+                device_id,
+                notify_characteristic,
+            )
+            return
+        _LOGGER.info(
+            "Jackery BLE %s: connected; subscribing to notify %s",
+            device_id,
+            notify_characteristic,
+        )
 
     def _connection_is_current(
         self,
@@ -379,13 +528,17 @@ class JackeryBleListener:
     def _install_session(
         self,
         device_id: str,
-        client: Any,
+        client: BleakClient,
         generation: int,
     ) -> _GattSession:
-        """Invalidate the prior session and install a new owned GATT session."""
+        """Install a GATT session only after prior ownership was released."""
         previous = self._sessions.get(device_id)
         if previous is not None:
-            previous.active = False
+            msg = (
+                f"Jackery BLE {device_id}: generation {previous.generation} "
+                "still owns the GATT session"
+            )
+            raise RuntimeError(msg)
         session = _GattSession(generation=generation, client=client)
         self._sessions[device_id] = session
         self._clients[device_id] = client
@@ -406,72 +559,65 @@ class JackeryBleListener:
         return len(assemblies) if assemblies is not None else 0
 
     async def _cancel_notify_tasks(self, session: _GattSession) -> None:
-        """Cancel and drain notification tasks owned by a device session."""
+        """Release completed notification tasks after their FIFO was drained."""
         tasks = tuple(session.notify_tasks)
-        for task in tasks:
-            if not task.done():
-                task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         session.notify_tasks.difference_update(tasks)
         self._notify_tasks.difference_update(tasks)
         session.notify_task = None
-        while True:
-            try:
-                session.notify_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-            session.notify_queue.task_done()
 
-    @staticmethod
-    async def _async_cancel_keep_alive(
-        device_id: str,
-        keep_alive_task: asyncio.Task[None] | None,
-    ) -> None:
-        """Cancel the keep-alive task and surface any failure it carried."""
-        if keep_alive_task is None or keep_alive_task.done():
-            return
-        keep_alive_task.cancel()
-        try:
-            await keep_alive_task
-        except asyncio.CancelledError:
-            return
-        except Exception as err:  # ruff: ignore[blind-except]
-            _LOGGER.warning(
-                "Jackery BLE keep-alive task for %s failed: %s",
-                device_id,
-                err,
-            )
-
-    def _invalidate_session(self, device_id: str) -> None:
-        """Invalidate the current session for a device to force reconnection.
-
-        Called by the keep-alive loop when consecutive failures exceed the
-        threshold. This wakes the connection runner which will back off and
-        re-establish a fresh GATT session.
-        """
-        session = self._sessions.get(device_id)
-        if session is not None:
-            session.active = False
-        if self._sessions.get(device_id) is session:
-            self._sessions.pop(device_id, None)
-        if self._clients.get(device_id) is not None:
-            self._clients.pop(device_id, None)
-        if self._mtu_owners.get(device_id) is session:
-            self._mtu_owners.pop(device_id, None)
-            self._mtu.pop(device_id, None)
-        self._clear_frame_assemblies(device_id, session)
-        # Note: we do NOT cancel notify tasks here - the connection runner
-        # owns the session lifecycle and will clean up when it detects the
-        # invalidated session. This avoids a race between the keep-alive
-        # task and the runner's finally block.
-
-    async def _teardown_session(
+    async def _async_wait_for_notification_drain(
         self,
         device_id: str,
         session: _GattSession,
     ) -> None:
-        """Release session-owned state and disconnect its GATT client."""
+        """Wait until every notification accepted by ``session`` reached its sink."""
+        if session.notify_inflight is not None or not session.notify_queue.empty():
+            self._start_notification_drain(device_id, session)
+        await session.notify_queue.join()
+        current = session.notify_task
+        if current is not None and not current.done():
+            await asyncio.shield(current)
+
+    async def _async_teardown_session_impl(
+        self,
+        device_id: str,
+        session: _GattSession,
+    ) -> None:
+        """Quiesce ingress, drain accepted frames, then release GATT ownership."""
+        client = session.client
+        disconnected = not bool(getattr(client, "is_connected", False))
+        if not disconnected and session.notify_started:
+            stop_notify = getattr(client, "stop_notify", None)
+            if callable(stop_notify):
+                try:
+                    await asyncio.wait_for(
+                        stop_notify(ble.BLE_NOTIFY_CHAR_UUID),
+                        timeout=5.0,
+                    )
+                except Exception:  # ruff: ignore[blind-except] -- disconnect is the transport fallback
+                    if bool(getattr(client, "is_connected", False)):
+                        await asyncio.wait_for(client.disconnect(), timeout=5.0)
+                    disconnected = True
+                else:
+                    session.notify_started = False
+            else:
+                await asyncio.wait_for(client.disconnect(), timeout=5.0)
+                disconnected = True
+        elif not disconnected:
+            await asyncio.wait_for(client.disconnect(), timeout=5.0)
+            disconnected = True
+
+        # The physical notify source is now quiescent. Only at this confirmed
+        # cutoff may synchronous Bleak callbacks be rejected.
+        session.notify_started = False
+        session.accepting_notifications = False
+        await self._async_wait_for_notification_drain(device_id, session)
+
+        if not disconnected and bool(getattr(client, "is_connected", False)):
+            await asyncio.wait_for(client.disconnect(), timeout=5.0)
+
         session.active = False
         if self._sessions.get(device_id) is session:
             self._sessions.pop(device_id, None)
@@ -485,27 +631,74 @@ class JackeryBleListener:
             self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
         self._cancel_session_pending_acks(device_id, session)
         await self._cancel_notify_tasks(session)
-        # Handle BLE client disconnect more gracefully - the client may not be
-        # in a connected state or may be in HOST_RESOLVED state
-        client = session.client
-        if client is not None:
+
+    async def _teardown_session(
+        self,
+        device_id: str,
+        session: _GattSession,
+    ) -> None:
+        """Finish a session teardown even when its connection runner is cancelled."""
+        cleanup = session.teardown_task
+        if (
+            cleanup is not None
+            and cleanup.done()
+            and (cleanup.cancelled() or cleanup.exception() is not None)
+        ):
+            cleanup = None
+        if cleanup is None:
+            cleanup = self._create_owned_task(
+                self._async_teardown_session_impl(device_id, session),
+                name=f"jackery_ble_teardown_{device_id}_{session.generation}",
+            )
+            session.teardown_task = cleanup
+        cancellation_requested = False
+        while True:
             try:
-                # Check if client is actually connected before attempting disconnect
-                if getattr(client, "is_connected", False):
-                    await asyncio.wait_for(client.disconnect(), timeout=5.0)
-                else:
-                    # Client not connected, no need to disconnect - just log at debug
-                    _LOGGER.debug(
-                        "Jackery BLE %s: client not connected (state: %s), skipping disconnect",
-                        device_id,
-                        getattr(client, "state", "unknown"),
+                await asyncio.shield(cleanup)
+                break
+            except asyncio.CancelledError:
+                if cleanup.done():
+                    if cleanup.cancelled():
+                        raise
+                    cleanup.result()
+                    break
+                cancellation_requested = True
+                current_task = asyncio.current_task()
+                if current_task is not None:
+                    current_task.uncancel()
+        if cancellation_requested:
+            raise asyncio.CancelledError
+
+    async def _async_wait_for_notification_delivery(
+        self,
+        device_id: str,
+        delivery: asyncio.Task[None],
+    ) -> bool:
+        """Shield one delivery and report whether its FIFO owner was cancelled."""
+        cancellation_requested = False
+        while True:
+            try:
+                await asyncio.shield(delivery)
+            except asyncio.CancelledError:
+                cancellation_requested = True
+                current_task = asyncio.current_task()
+                if current_task is not None:
+                    current_task.uncancel()
+                if not delivery.done():
+                    continue
+                if delivery.cancelled():
+                    error = (
+                        "notification delivery task was cancelled before the "
+                        "accepted frame reached its sink"
                     )
-            except Exception as err:  # ruff: ignore[blind-except]
-                _LOGGER.debug(
-                    "Jackery BLE: disconnect during teardown of %s failed (non-critical): %s",
-                    device_id,
-                    err,
-                )
+                    stats = self.stats_for(device_id)
+                    stats.last_sink_error = error
+                    stats.last_error = error
+                    raise RuntimeError(error) from None
+                delivery.result()
+                return cancellation_requested
+            else:
+                return cancellation_requested
 
     async def _drain_notifications(
         self,
@@ -513,62 +706,74 @@ class JackeryBleListener:
         session: _GattSession,
     ) -> None:
         """Process queued notifications in connection order for one session."""
-        while self._session_is_current(device_id, session):
+        cancellation_requested = False
+        while True:
+            if session.notify_inflight is None:
+                try:
+                    session.notify_inflight = session.notify_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+            notify_sequence, raw, received_at = session.notify_inflight
+            delivery_coro = self._handle_notification(
+                device_id,
+                raw,
+                session=session,
+                notify_sequence=notify_sequence,
+                received_at=received_at,
+                accepted=True,
+            )
             try:
-                notify_sequence, raw = session.notify_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return
-            try:
-                await self._handle_notification(
-                    device_id,
-                    raw,
-                    session=session,
-                    notify_sequence=notify_sequence,
+                delivery = self._create_owned_task(
+                    delivery_coro,
+                    name=(
+                        f"jackery_ble_notify_delivery_{device_id}_"
+                        f"{session.generation}_{notify_sequence}"
+                    ),
                 )
+            except Exception:
+                delivery_coro.close()
+                raise
+            delivered = False
+            try:
+                cancellation_requested |= (
+                    await self._async_wait_for_notification_delivery(
+                        device_id,
+                        delivery,
+                    )
+                )
+                delivered = True
             finally:
-                session.notify_queue.task_done()
+                if delivered:
+                    session.notify_queue.task_done()
+                    session.notify_inflight = None
+                    if session.notify_pending_metadata:
+                        _, delivered_bytes = session.notify_pending_metadata.popleft()
+                        session.notify_pending_bytes = max(
+                            0,
+                            session.notify_pending_bytes - delivered_bytes,
+                        )
+                    self._refresh_notification_queue_stats(device_id)
+        if cancellation_requested:
+            raise asyncio.CancelledError
 
-    def _schedule_notification(
+    def _start_notification_drain(
         self,
         device_id: str,
         session: _GattSession,
-        raw: bytes,
     ) -> None:
-        """Queue a notification for ordered session-owned processing."""
-        if not self._session_is_current(device_id, session):
-            return
-        session.notify_sequence += 1
-        queued_notification = (session.notify_sequence, raw)
-        if session.notify_queue.full():
-            self._cancel_session_pending_acks(
-                device_id,
-                session,
-                reason=f"BLE notification continuity lost on {device_id}",
-            )
-            dropped_frames = 0
-            while True:
-                try:
-                    session.notify_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-                session.notify_queue.task_done()
-                dropped_frames += 1
-            stats = self.stats_for(device_id)
-            stats.notify_frames_dropped += dropped_frames
-            # Once an ordered backlog is discarded, every incomplete logical
-            # message may be missing a chunk. Drop all session-owned assemblies
-            # atomically instead of letting unrelated later chunks complete them.
-            dropped_assemblies = self._clear_frame_assemblies(device_id, session)
-            if dropped_assemblies:
-                stats.multi_chunk_assemblies_dropped += dropped_assemblies
-        session.notify_queue.put_nowait(queued_notification)
+        """Ensure exactly one ordered consumer owns a session notification FIFO."""
         current = session.notify_task
         if current is not None and not current.done():
             return
-        task = self._hass.async_create_background_task(
-            self._drain_notifications(device_id, session),
-            name=f"jackery_ble_notify_{device_id}_{session.generation}",
-        )
+        drain_coro = self._drain_notifications(device_id, session)
+        try:
+            task = self._create_owned_task(
+                drain_coro,
+                name=f"jackery_ble_notify_{device_id}_{session.generation}",
+            )
+        except Exception:
+            drain_coro.close()
+            raise
         session.notify_task = task
         session.notify_tasks.add(task)
         self._notify_tasks.add(task)
@@ -589,8 +794,52 @@ class JackeryBleListener:
                     completed.get_name(),
                     notify_err,
                 )
+                if (
+                    session.notify_inflight is not None
+                    or not session.notify_queue.empty()
+                ):
+                    asyncio.get_running_loop().call_soon(
+                        self._start_notification_drain,
+                        device_id,
+                        session,
+                    )
 
         task.add_done_callback(_task_done)
+
+    def _schedule_notification(
+        self,
+        device_id: str,
+        session: _GattSession,
+        raw: bytes,
+    ) -> None:
+        """Queue a notification for ordered session-owned processing."""
+        if (
+            not session.accepting_notifications
+            or not self._notification_session_owns_connection(device_id, session)
+        ):
+            return
+        session.notify_sequence += 1
+        queued_notification = (session.notify_sequence, raw, datetime.now(UTC))
+        session.notify_pending_metadata.append((time.monotonic(), len(raw)))
+        session.notify_pending_bytes += len(raw)
+        session.notify_queue.put_nowait(queued_notification)
+        stats = self.stats_for(device_id)
+        self._refresh_notification_queue_stats(device_id, stats)
+        depth = stats.notify_queue_depth
+        if depth > stats.notify_queue_high_watermark:
+            stats.notify_queue_high_watermark = depth
+            if depth == _NOTIFY_QUEUE_WARN_FRAMES:
+                _LOGGER.warning(
+                    "Jackery BLE %s notification FIFO reached %d pending frames; "
+                    "preserving all accepted telemetry",
+                    device_id,
+                    depth,
+                )
+        stats.notify_queue_high_watermark_bytes = max(
+            stats.notify_queue_high_watermark_bytes,
+            stats.notify_queue_bytes,
+        )
+        self._start_notification_drain(device_id, session)
 
     def address_for_device_id(self, device_id: str) -> str | None:
         """Get the cached BLE MAC address for the given device id.
@@ -668,13 +917,13 @@ class JackeryBleListener:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
 
-    async def async_ensure_connected(  # flat transport guard chain; the connect-backoff gate is the 7th early exit
+    async def async_ensure_connected(
         self,
         device_id: str,
         *,
         timeout_sec: float = DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
     ) -> bool:
-        """Wait for an active BLE client, starting a reconnect when possible."""
+        """Wait for a current BLE session with its notification channel ready."""
         if self._stop_event.is_set():
             return False
         client = self._clients.get(device_id)
@@ -682,7 +931,9 @@ class JackeryBleListener:
         if (
             client is not None
             and getattr(client, "is_connected", False)
-            and (session is None or self._session_is_current(device_id, session))
+            and session is not None
+            and session.notify_started
+            and self._session_is_current(device_id, session)
         ):
             return True
         address = self._device_addresses.get(device_id)
@@ -706,120 +957,28 @@ class JackeryBleListener:
                     wait_sec,
                 )
                 return False
-            self._connections[device_id] = self._hass.async_create_background_task(
-                self._async_run_connection(device_id, address),
-                name=f"jackery_ble_{device_id}",
-            )
-        if timeout_sec <= 0:
+            self._spawn_connection_if_ready(device_id)
+        if timeout_sec <= 0 or device_id not in self._connections:
             return False
         deadline = asyncio.get_running_loop().time() + timeout_sec
+        connected = False
         while not self._stop_event.is_set():
             client = self._clients.get(device_id)
-            if client is not None and getattr(client, "is_connected", False):
-                return True
+            session = self._sessions.get(device_id)
+            if (
+                client is not None
+                and getattr(client, "is_connected", False)
+                and session is not None
+                and session.notify_started
+                and self._session_is_current(device_id, session)
+            ):
+                connected = True
+                break
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                return False
+                break
             await asyncio.sleep(min(0.25, remaining))
-        return False
-
-    async def _async_keep_alive_loop(
-        self,
-        device_id: str,
-        session: _GattSession | None = None,
-    ) -> None:
-        """Periodically write a no-op query frame to keep the GATT session warm.
-
-        The SolarVault peripheral closes idle GATT sessions after
-        roughly 20 s (observed 2026-05-17 production log: BLE
-        disconnects every 6-20 s without traffic). Sending a ``cmd=106``
-        :data:`.const.MQTT_CMD_QUERY_DEVICE_PROPERTY` query at
-        :data:`_KEEPALIVE_INTERVAL_SEC` keeps the session warm and
-        yields a fresh ``DevicePropertyChange`` notify response, which
-        the sink merges into ``coordinator.data`` via the normal
-        ``cmd=107`` path.
-
-        Robustness: consecutive keep-alive failures trigger a session
-        invalidation so the connection runner reconnects. This prevents
-        silent session death when the peripheral stops acknowledging writes.
-
-        Cancellation contract: the parent connection runner cancels
-        this task in its ``finally`` block on disconnect / shutdown.
-        ``CancelledError`` propagates so the cancel sees a clean exit;
-        write errors are caught and DEBUG-logged so a single missed
-        keep-alive does not abort the loop.
-        """
-        if self._keep_alive_msg_id is None or self._keep_alive_ble_msg_type is None:
-            return
-
-        # Track consecutive keep-alive failures for this device.
-        # 3 consecutive failures -> invalidate session to force reconnect.
-        max_keepalive_failures = 3
-        consecutive_failures = 0
-
-        while not self._stop_event.is_set():
-            # Add ±2s jitter to desynchronize keep-alives across devices.
-            jittered_interval = _KEEPALIVE_INTERVAL_SEC + random.uniform(-2.0, 2.0)
-            if await self._async_stop_requested_within(jittered_interval):
-                return
-            if session is not None:
-                if not self._session_is_current(device_id, session):
-                    return
-            elif device_id not in self._clients:
-                return
-            stats = self.stats_for(device_id)
-            try:
-                # HomeControlFormat injects bleMsgType as "cmd" in the JSON body.
-                stats.keep_alive_writes_attempted += 1
-                sent = await self.async_send_command(
-                    device_id,
-                    msg_id=self._keep_alive_msg_id,
-                    ble_msg_type=self._keep_alive_ble_msg_type,
-                    body=(f'{{"cmd":{self._keep_alive_ble_msg_type}}}'.encode()),
-                    wait_for_ack=False,
-                )
-            except (RuntimeError, ValueError) as err:
-                self._record_keep_alive_error(stats, device_id, str(err))
-                stats.keep_alive_writes_failed += 1
-                stats.consecutive_keep_alive_failures += 1
-                consecutive_failures += 1
-                if consecutive_failures >= max_keepalive_failures:
-                    _LOGGER.warning(
-                        "Jackery BLE %s: %d consecutive keep-alive failures; "
-                        "invalidating session to force reconnect",
-                        device_id,
-                        consecutive_failures,
-                    )
-                    self._invalidate_session(device_id)
-                    return
-                continue
-            if not sent:
-                self._record_keep_alive_error(
-                    stats, device_id, "no current connected GATT session"
-                )
-                stats.keep_alive_writes_failed += 1
-                stats.consecutive_keep_alive_failures += 1
-                consecutive_failures += 1
-                if consecutive_failures >= max_keepalive_failures:
-                    _LOGGER.warning(
-                        "Jackery BLE %s: %d consecutive keep-alive failures; "
-                        "invalidating session to force reconnect",
-                        device_id,
-                        consecutive_failures,
-                    )
-                    self._invalidate_session(device_id)
-                    return
-                continue
-            # Success: reset consecutive failure counter and clear error.
-            stats.keep_alive_writes_succeeded += 1
-            stats.consecutive_keep_alive_failures = 0
-            consecutive_failures = 0
-            previous_error = stats.last_keep_alive_error
-            if previous_error is not None:
-                stats.last_keep_alive_error = None
-                if stats.last_error == previous_error:
-                    stats.last_error = stats.last_sink_error or stats.last_decode_error
-                _LOGGER.info("Jackery BLE %s: keep-alive writes recovered", device_id)
+        return connected
 
     async def _async_stop_requested_within(self, delay: float) -> bool:
         """Return whether listener shutdown is requested before ``delay`` expires."""
@@ -829,49 +988,36 @@ class JackeryBleListener:
             return False
         return True
 
-    @staticmethod
-    def _record_keep_alive_error(
-        stats: BleListenerStats, device_id: str, detail: str
-    ) -> None:
-        """Record one keep-alive failure without aborting the connection runner."""
-        error = f"keep-alive write failed: {detail}"
-        if stats.last_keep_alive_error is None:
-            _LOGGER.warning("Jackery BLE %s: %s", device_id, error)
-        stats.last_keep_alive_error = error
-        stats.last_error = error
-
     async def _async_write_command_chunks(
         self,
         device_id: str,
         session: _GattSession,
-        client: BleakClient,
         chunks: list[bytes],
         *,
         key: bytes,
-        msg_id: int,
-        ble_msg_type: int,
-        timeout_sec: float,
+        command: _BleCommand,
     ) -> None:
         """Encrypt and write every chunk for one current GATT session."""
+        client = session.client
         chunk_count = len(chunks)
         for idx, chunk in enumerate(chunks, start=1):
             if not self._session_is_current(device_id, session):
                 msg = f"BLE session for {device_id} changed during write"
                 raise RuntimeError(msg)
             plain = ble.build_binary_frame(
-                cmd=ble_msg_type,
+                cmd=command.ble_msg_type,
                 body=chunk,
-                flags=msg_id,
+                flags=command.msg_id,
                 frame_index=idx,
                 chunk_count=chunk_count,
             )
             blob = ble.encrypt_binary_notify(plain, key)
             await asyncio.wait_for(
                 client.write_gatt_char(ble.BLE_WRITE_CHAR_UUID, blob, response=False),
-                timeout=timeout_sec,
+                timeout=command.timeout_sec,
             )
 
-    async def async_send_command(
+    async def async_send_command(  # ruff: ignore[too-many-arguments]
         self,
         device_id: str,
         *,
@@ -889,17 +1035,14 @@ class JackeryBleListener:
 
         Parameters:
             device_id (str): Target device identifier.
-            cmd (int): Logical command identifier to send.
+            msg_id (int): App action identifier stored in the frame flags.
+            ble_msg_type (int): BLE command identifier stored in the frame command.
             body (bytes): Command payload bytes.
-            flags (int): Frame flags included in the sent binary frame.
             timeout_sec (float): Per-GATT-write timeout in seconds.
             wait_for_ack (bool): If True, wait for a matching decoded notify frame
             before returning.
             ack_timeout_sec (float): Timeout in seconds to wait for the ACK when
             `wait_for_ack` is True.
-            ack_cmds (tuple[int, ...] | None): Optional set of `cmd` values that qualify
-            as the ACK; when omitted, any decoded frame from the same device within the
-            window qualifies.
             mtu_override (int | None): Optional MTU to use instead of the negotiated or
             default MTU (used for tests/diagnostics).
 
@@ -912,22 +1055,54 @@ class JackeryBleListener:
             GATT-layer failures (including write timeouts), or when an ACK wait times
             out.
         """
+        command = _BleCommand(
+            msg_id=msg_id,
+            ble_msg_type=ble_msg_type,
+            body=body,
+            timeout_sec=timeout_sec,
+            wait_for_ack=wait_for_ack,
+            ack_timeout_sec=ack_timeout_sec,
+            mtu_override=mtu_override,
+        )
+        self._validate_command(command)
+        return await self._async_send_command(device_id, command)
+
+    @staticmethod
+    def _validate_command(command: _BleCommand) -> None:
+        """Validate one command before any GATT or ACK state is touched."""
         if (
-            isinstance(msg_id, bool)
-            or not isinstance(msg_id, int)
-            or not 1 <= msg_id <= _UINT16_MAX
+            isinstance(command.msg_id, bool)
+            or not isinstance(command.msg_id, int)
+            or not 1 <= command.msg_id <= _UINT16_MAX
         ):
             msg = "msg_id must be an integer in range 1..65535"
             raise ValueError(msg)
         if (
-            isinstance(ble_msg_type, bool)
-            or not isinstance(ble_msg_type, int)
-            or not 0 <= ble_msg_type <= _UINT16_MAX
+            isinstance(command.ble_msg_type, bool)
+            or not isinstance(command.ble_msg_type, int)
+            or not 0 <= command.ble_msg_type <= _UINT16_MAX
         ):
             msg = "ble_msg_type must be an integer in range 0..65535"
             raise ValueError(msg)
+        if command.mtu_override is not None and (
+            isinstance(command.mtu_override, bool)
+            or not isinstance(command.mtu_override, int)
+        ):
+            msg = "mtu_override must be an integer"
+            raise ValueError(msg)
+
+    async def _async_send_command(
+        self,
+        device_id: str,
+        command: _BleCommand,
+    ) -> bool:
+        """Write one validated command through the current session owner."""
         session = self._sessions.get(device_id)
-        if session is None or not self._session_is_current(device_id, session):
+        if (
+            session is None
+            or not session.notify_started
+            or not self._session_is_current(device_id, session)
+        ):
             return False
         client = session.client
         if not getattr(client, "is_connected", False):
@@ -936,24 +1111,19 @@ class JackeryBleListener:
         if key is None:
             msg = f"no bluetoothKey available for device {device_id}"
             raise RuntimeError(msg)
-        # Resolve the effective MTU: explicit override wins (used by
-        # tests and the service for diagnostics), then the per-device
-        # cached negotiated value, then the Android-app default.
-        if mtu_override is not None:
-            if isinstance(mtu_override, bool) or not isinstance(mtu_override, int):
-                msg = "mtu_override must be an integer"
-                raise ValueError(msg)
-            mtu = mtu_override
-        else:
-            mtu = self.mtu_for_device(device_id)
+        mtu = (
+            command.mtu_override
+            if command.mtu_override is not None
+            else self.mtu_for_device(device_id)
+        )
         try:
-            chunks = ble.split_body_for_mtu(body, mtu)
+            chunks = ble.split_body_for_mtu(command.body, mtu)
         except ValueError as err:
             msg = f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
             raise RuntimeError(msg) from err
         # The protocol has no transaction id. Keep one logical write (all chunks
         # plus its optional explicit ACK wait) under the session lock so concurrent
-        # service calls and keep-alives cannot interleave.
+        # service calls cannot interleave.
         async with session.write_lock:
             if not self._session_is_current(device_id, session) or not getattr(
                 client, "is_connected", False
@@ -962,42 +1132,39 @@ class JackeryBleListener:
             # Register the ACK *before* the write — otherwise a fast-echoing
             # peripheral could deliver the notify before the future exists.
             pending: _PendingAck | None = None
-            if wait_for_ack:
+            if command.wait_for_ack:
                 pending = self._register_pending_ack(
-                    device_id, session, msg_id, ble_msg_type
+                    device_id,
+                    session,
+                    command.msg_id,
+                    command.ble_msg_type,
                 )
             try:
                 await self._async_write_command_chunks(
                     device_id,
                     session,
-                    client,
                     chunks,
                     key=key,
-                    msg_id=msg_id,
-                    ble_msg_type=ble_msg_type,
-                    timeout_sec=timeout_sec,
+                    command=command,
                 )
             except TimeoutError as err:
-                if pending is not None:
-                    self._discard_pending_ack(device_id, pending)
-                msg = f"BLE write to {device_id} timed out after {timeout_sec}s"
+                self._discard_optional_pending_ack(device_id, pending)
+                msg = f"BLE write to {device_id} timed out after {command.timeout_sec}s"
                 raise RuntimeError(msg) from err
             except asyncio.CancelledError:
-                if pending is not None:
-                    self._discard_pending_ack(device_id, pending)
+                self._discard_optional_pending_ack(device_id, pending)
                 raise
             except Exception as err:  # bleak surfaces BleakError + variants
-                if pending is not None:
-                    self._discard_pending_ack(device_id, pending)
+                self._discard_optional_pending_ack(device_id, pending)
                 msg = f"BLE write to {device_id} failed: {err}"
                 raise RuntimeError(msg) from err
             if pending is not None:
                 await self._await_pending_ack(
                     device_id,
                     pending,
-                    msg_id=msg_id,
-                    ble_msg_type=ble_msg_type,
-                    ack_timeout_sec=ack_timeout_sec,
+                    msg_id=command.msg_id,
+                    ble_msg_type=command.ble_msg_type,
+                    ack_timeout_sec=command.ack_timeout_sec,
                 )
         return True
 
@@ -1104,6 +1271,15 @@ class JackeryBleListener:
         if not pending.future.done():
             pending.future.cancel()
 
+    def _discard_optional_pending_ack(
+        self,
+        device_id: str,
+        pending: _PendingAck | None,
+    ) -> None:
+        """Discard an ACK registration when the command created one."""
+        if pending is not None:
+            self._discard_pending_ack(device_id, pending)
+
     def _cancel_session_pending_acks(
         self,
         device_id: str,
@@ -1174,11 +1350,37 @@ class JackeryBleListener:
         if stats is None:
             stats = BleListenerStats()
             self._stats[device_id] = stats
+        self._refresh_notification_queue_stats(device_id, stats)
         return stats
 
     def all_stats(self) -> dict[str, BleListenerStats]:
         """Return the per-device stats map (mutating it is undefined)."""
+        for device_id in self._sessions:
+            self.stats_for(device_id)
         return self._stats
+
+    def _refresh_notification_queue_stats(
+        self,
+        device_id: str,
+        stats: BleListenerStats | None = None,
+    ) -> None:
+        """Refresh lossless notification backlog pressure diagnostics."""
+        if stats is None:
+            stats = self._stats.get(device_id)
+            if stats is None:
+                return
+        session = self._sessions.get(device_id)
+        if session is None:
+            stats.notify_queue_depth = 0
+            stats.notify_queue_bytes = 0
+            stats.notify_queue_oldest_age_sec = 0.0
+            return
+        metadata = session.notify_pending_metadata
+        stats.notify_queue_depth = len(metadata)
+        stats.notify_queue_bytes = session.notify_pending_bytes
+        stats.notify_queue_oldest_age_sec = (
+            max(0.0, time.monotonic() - metadata[0][0]) if metadata else 0.0
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -1195,6 +1397,16 @@ class JackeryBleListener:
             will be created lazily for a device the first time an advertisement matching
             the listener's BLE matcher is seen.
         """
+        stop_task = self._stop_task
+        if stop_task is not None and not stop_task.done():
+            msg = "Jackery BLE listener teardown is still in progress"
+            raise RuntimeError(msg)
+        if stop_task is not None:
+            if stop_task.cancelled():
+                msg = "Jackery BLE listener teardown was cancelled"
+                raise RuntimeError(msg)
+            stop_task.result()
+            self._stop_task = None
         self._stop_event.clear()
         self._configured_device_ids = frozenset(
             normalized
@@ -1202,12 +1414,14 @@ class JackeryBleListener:
             if (normalized := str(device_id).strip())
         )
 
-        bluetooth_module: Any = sys.modules.get(
-            "homeassistant.components.bluetooth",
-        )
-        if bluetooth_module is None:
-            msg = "Home Assistant Bluetooth is not loaded"
-            raise RuntimeError(msg)
+        try:
+            bluetooth_module = cast(
+                "_BluetoothModule",
+                importlib.import_module("homeassistant.components.bluetooth"),
+            )
+        except ImportError as err:
+            msg = "Home Assistant Bluetooth is not available"
+            raise RuntimeError(msg) from err
         self._ha_bluetooth = bluetooth_module
 
         matcher: BluetoothCallbackMatcher = {
@@ -1231,31 +1445,6 @@ class JackeryBleListener:
             if isinstance(address, str) and address.strip():
                 self._bind_device_address(device_id, address)
 
-        # HA may have seen the advertisement before the integration registered
-        # its callback. Replaying the current discovery cache is therefore
-        # required for a restart to connect without waiting for a new broadcast.
-        discovered_service_info = getattr(
-            bluetooth_module,
-            "async_discovered_service_info",
-            None,
-        )
-        if callable(discovered_service_info):
-            try:
-                known_advertisements = discovered_service_info(
-                    self._hass,
-                    connectable=True,
-                )
-            except TypeError:
-                # Compatibility with older HA test doubles / APIs that expose
-                # only the hass positional argument.
-                known_advertisements = discovered_service_info(self._hass)
-            for service_info in known_advertisements or ():
-                self._device_id_from_service_info(service_info)
-
-        # Connection runners are background-owned and never awaited here, so a
-        # blocked Bluetooth proxy cannot delay HTTP or either MQTT supervisor.
-        for device_id in self._configured_device_ids:
-            self._spawn_connection_if_ready(device_id)
         _LOGGER.info(
             "Jackery BLE listener started for %d device(s); waiting for "
             "advertisements with service %s",
@@ -1303,12 +1492,43 @@ class JackeryBleListener:
         existing = self._connections.get(device_id)
         if existing is not None and not existing.done():
             return
-        self._connections[device_id] = self._hass.async_create_background_task(
-            self._async_run_connection(device_id, address),
-            name=f"jackery_ble_{device_id}",
-        )
+        runner = self._async_run_connection(device_id, address)
+        try:
+            task = self._create_owned_task(
+                runner,
+                name=f"jackery_ble_{device_id}",
+            )
+        except Exception as err:  # ruff: ignore[blind-except]
+            error = f"runner task creation: {err}"
+            stats = self.stats_for(device_id)
+            stats.last_error = error
+            _LOGGER.warning(
+                "Jackery BLE %s connection runner was not accepted by Home "
+                "Assistant: %s",
+                device_id,
+                err,
+            )
+            return
+        self._connections[device_id] = task
 
     async def async_stop(self) -> None:
+        """Stop the listener through one cancellation-safe teardown owner."""
+        stop_task = self._stop_task
+        if (
+            stop_task is not None
+            and stop_task.done()
+            and (stop_task.cancelled() or stop_task.exception() is not None)
+        ):
+            stop_task = None
+        if stop_task is None:
+            stop_task = self._create_owned_task(
+                self._async_stop_impl(),
+                name="jackery_ble_listener_stop",
+            )
+            self._stop_task = stop_task
+        await asyncio.shield(stop_task)
+
+    async def _async_stop_impl(self) -> None:
         """Stop the BLE listener and release its resources.
 
         Signals the listener to stop, unregisters Bluetooth advertisement callbacks,
@@ -1320,10 +1540,14 @@ class JackeryBleListener:
         session_items: tuple[tuple[str, _GattSession], ...] = tuple(
             self._sessions.items(),
         )
-        for _, session in session_items:
-            # Invalidate the callback guard before cancellation gives the
-            # event loop another chance to deliver a late Bleak notification.
-            session.active = False
+        self._fence_callbacks_and_ack_waiters()
+        await self._async_teardown_sessions(session_items)
+        connection_items = await self._async_stop_connections()
+        self._discard_stopped_state(session_items, connection_items)
+        _LOGGER.info("Jackery BLE listener stopped")
+
+    def _fence_callbacks_and_ack_waiters(self) -> None:
+        """Reject new callbacks and release every pending command waiter."""
         for unregister in self._unregister_callbacks:
             try:
                 unregister()
@@ -1332,90 +1556,131 @@ class JackeryBleListener:
                     "Jackery BLE: callback unregister failed: %s", err, exc_info=True
                 )
         self._unregister_callbacks.clear()
-        # Inactive sessions cannot resolve writes. Cancel ACK waiters before the
-        # bounded task drain so outer cancellation cannot strand callers.
-        pending_acks: dict[str, list[_PendingAck]] = getattr(self, "_pending_acks", {})
-        for bucket in pending_acks.values():
+        for bucket in self._pending_acks.values():
             for pending in bucket:
                 if not pending.future.done():
                     pending.future.cancel()
-        pending_acks.clear()
-        # Cancel both connection runners and listener-owned notify tasks.
+        self._pending_acks.clear()
+
+    async def _async_teardown_sessions(
+        self,
+        session_items: tuple[tuple[str, _GattSession], ...],
+    ) -> None:
+        """Finish every accepted notification stream before stopping runners."""
+        if not session_items:
+            return
+        results = await asyncio.gather(
+            *starmap(self._teardown_session, session_items),
+            return_exceptions=True,
+        )
+        errors = [result for result in results if isinstance(result, BaseException)]
+        if not errors:
+            return
+        cancelled = next(
+            (error for error in errors if isinstance(error, asyncio.CancelledError)),
+            None,
+        )
+        if cancelled is not None:
+            raise cancelled
+        detail = "; ".join(str(error) for error in errors)
+        msg = f"Jackery BLE session teardown failed: {detail}"
+        raise RuntimeError(msg)
+
+    async def _async_stop_connections(
+        self,
+    ) -> list[tuple[str, asyncio.Task[None]]]:
+        """Stop runner ownership and retain it when bounded teardown cannot finish."""
         current_task = asyncio.current_task()
         connection_items = list(self._connections.items())
-        connection_tasks = [
-            task
-            for _, task in connection_items
-            if not task.done() and task is not current_task
-        ]
-        notify_tasks = [
-            task
-            for task in self._notify_tasks
-            if not task.done() and task is not current_task
-        ]
-        current_task_owned = current_task is not None and (
-            any(task is current_task for _, task in connection_items)
-            or current_task in self._notify_tasks
+        tasks = list(
+            dict.fromkeys(
+                task
+                for _, task in connection_items
+                if not task.done() and task is not current_task
+            )
         )
-        tasks = list(dict.fromkeys((*connection_tasks, *notify_tasks)))
-        for task in tasks:
-            task.cancel()
-        still_pending: set[asyncio.Task[None]] = set()
-        if tasks:
-            done, still_pending = await asyncio.wait(
-                tasks,
-                timeout=_STOP_TIMEOUT_SEC,
-            )
-            for completed in done:
-                try:
-                    completed.result()
-                except asyncio.CancelledError:
-                    continue
-                except Exception as err:  # ruff: ignore[blind-except]
-                    _LOGGER.warning(
-                        "Jackery BLE task %s failed during stop: %s",
-                        completed.get_name(),
-                        err,
-                    )
-        if still_pending or current_task_owned:
-            remaining_count = len(still_pending) + int(current_task_owned)
-            _LOGGER.warning(
-                "Jackery BLE: %d transport task(s) remain after %ss; retaining "
-                "listener ownership for a later teardown retry",
-                remaining_count,
-                _STOP_TIMEOUT_SEC,
-            )
-            msg = (
-                f"{remaining_count} Jackery BLE transport task(s) did not complete "
-                "teardown"
-            )
-            raise RuntimeError(msg)
+        current_task_owned = current_task is not None and any(
+            task is current_task for _, task in connection_items
+        )
+        still_pending = await self._async_stop_connection_tasks(tasks)
+        if not still_pending and not current_task_owned:
+            return connection_items
+        remaining_count = len(still_pending) + int(current_task_owned)
+        _LOGGER.warning(
+            "Jackery BLE: %d transport task(s) remain after %ss; retaining "
+            "listener ownership for a later teardown retry",
+            remaining_count,
+            _STOP_TIMEOUT_SEC,
+        )
+        msg = (
+            f"{remaining_count} Jackery BLE transport task(s) did not complete teardown"
+        )
+        raise RuntimeError(msg)
+
+    def _discard_stopped_state(
+        self,
+        session_items: tuple[tuple[str, _GattSession], ...],
+        connection_items: list[tuple[str, asyncio.Task[None]]],
+    ) -> None:
+        """Discard state only after physical session and runner ownership ended."""
         for device_id, task in connection_items:
             if self._connections.get(device_id) is task:
                 self._connections.pop(device_id, None)
         for device_id, session in session_items:
+            session.active = False
             dropped = self._clear_frame_assemblies(device_id, session)
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
-            if self._sessions.get(device_id) is session:
-                self._sessions.pop(device_id, None)
-                if self._clients.get(device_id) is session.client:
-                    self._clients.pop(device_id, None)
-                if self._mtu_owners.get(device_id) is session:
-                    self._mtu_owners.pop(device_id, None)
-                    self._mtu.pop(device_id, None)
+            if self._sessions.get(device_id) is not session:
+                continue
+            self._sessions.pop(device_id, None)
+            if self._clients.get(device_id) is session.client:
+                self._clients.pop(device_id, None)
+            if self._mtu_owners.get(device_id) is session:
+                self._mtu_owners.pop(device_id, None)
+                self._mtu.pop(device_id, None)
         for device_id, owner in list(self._frame_assembly_owners.items()):
             dropped = self._clear_frame_assemblies(device_id, owner)
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
-        # Assemblies created by direct diagnostic calls have no session owner;
-        # they are safe to discard only after the listener-wide stop guard is set.
         for device_id in list(self._frame_assemblies):
-            if device_id not in self._frame_assembly_owners:
-                dropped = self._clear_frame_assemblies(device_id)
-                if dropped:
-                    self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
-        _LOGGER.info("Jackery BLE listener stopped")
+            if device_id in self._frame_assembly_owners:
+                continue
+            dropped = self._clear_frame_assemblies(device_id)
+            if dropped:
+                self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
+
+    @staticmethod
+    async def _async_stop_connection_tasks(
+        tasks: list[asyncio.Task[None]],
+    ) -> set[asyncio.Task[None]]:
+        """Let runners stop cooperatively, then cancel only those still stuck."""
+        if not tasks:
+            return set()
+        completed, pending = await asyncio.wait(
+            tasks,
+            timeout=_COOPERATIVE_STOP_GRACE_SEC,
+        )
+        if pending:
+            for task in pending:
+                task.cancel()
+            cancelled_done, pending = await asyncio.wait(
+                pending,
+                timeout=_STOP_TIMEOUT_SEC - _COOPERATIVE_STOP_GRACE_SEC,
+            )
+            completed.update(cancelled_done)
+        for task in completed:
+            try:
+                task.result()
+            except asyncio.CancelledError:
+                continue
+            except Exception as err:  # ruff: ignore[blind-except]
+                _LOGGER.warning(
+                    "Jackery BLE task %s failed during stop: %s",
+                    task.get_name(),
+                    err,
+                )
+        return pending
 
     # ------------------------------------------------------------------
     # Advertisement -> connect orchestration
@@ -1489,15 +1754,19 @@ class JackeryBleListener:
             )
         return device_id
 
-    async def _async_run_connection(self, device_id: str, address: str) -> None:
+    # One cancellation boundary must own connect, notify, teardown and retry.
+    async def _async_run_connection(  # ruff: ignore[complex-structure, too-many-return-statements, too-many-branches, too-many-statements]
+        self,
+        device_id: str,
+        address: str,
+    ) -> None:
         """Maintain a persistent BLE GATT session for one device.
 
         The session subscribes to notifications and reconnects on link loss.
 
         This coroutine opens and publishes a Bleak client for the given address,
-        subscribes to the notify characteristic, runs a keep-alive while connected, and
-        tears down and retries the session on disconnect until the listener is stopped
-        or the task is cancelled.
+        subscribes to the notify characteristic, monitors the link, and tears down and
+        retries the session on disconnect until the listener stops or the task cancels.
 
         Raises:
             asyncio.CancelledError: if the task is cancelled during shutdown.
@@ -1506,6 +1775,31 @@ class JackeryBleListener:
         runner_task = asyncio.current_task()
         try:  # ruff: ignore[too-many-statements-in-try-clause] - the try deliberately owns the runner lifecycle
             while not self._stop_event.is_set():
+                retained_session = self._sessions.get(device_id)
+                if retained_session is not None:
+                    try:
+                        await self._teardown_session(device_id, retained_session)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as err:  # ruff: ignore[blind-except]
+                        stats.last_error = f"retained teardown: {err}"
+                        delay = self._connect_backoff_note_failure(
+                            device_id,
+                            asyncio.get_running_loop().time(),
+                        )
+                        self._log_connection_unavailable(
+                            device_id,
+                            "Jackery BLE %s retained GATT teardown failed: %s; "
+                            "retrying in %ss",
+                            device_id,
+                            err,
+                            delay,
+                        )
+                        if self._stop_event.is_set() or (
+                            await self._async_stop_requested_within(delay)
+                        ):
+                            return
+                        continue
                 remaining = self._connect_backoff_remaining(
                     device_id,
                     asyncio.get_running_loop().time(),
@@ -1545,7 +1839,8 @@ class JackeryBleListener:
                     delay = self._connect_backoff_note_failure(
                         device_id, asyncio.get_running_loop().time()
                     )
-                    _LOGGER.info(
+                    self._log_connection_unavailable(
+                        device_id,
                         "Jackery BLE %s: cached peripheral is not connectable right "
                         "now; retrying in %ss",
                         device_id,
@@ -1558,7 +1853,7 @@ class JackeryBleListener:
                 generation = self._next_session_generation(device_id)
 
                 def _disconnected_callback(
-                    disconnected_client: Any,
+                    disconnected_client: BleakClient,
                     _generation: int = generation,
                 ) -> None:
                     """Record a disconnect for this session generation."""
@@ -1588,7 +1883,8 @@ class JackeryBleListener:
                     delay = self._connect_backoff_note_failure(
                         device_id, asyncio.get_running_loop().time()
                     )
-                    _LOGGER.info(
+                    self._log_connection_unavailable(
+                        device_id,
                         "Jackery BLE %s connect failed: %s; retrying in %ss",
                         device_id,
                         err,
@@ -1612,13 +1908,22 @@ class JackeryBleListener:
                         )
                     return
 
-                session = self._install_session(device_id, client, generation)
+                try:
+                    session = self._install_session(device_id, client, generation)
+                except BaseException:
+                    # The physical connection exists, but ownership was never
+                    # published. Release that exact client before propagating.
+                    try:
+                        await asyncio.wait_for(client.disconnect(), timeout=5.0)
+                    except Exception as disconnect_err:  # ruff: ignore[blind-except]
+                        _LOGGER.warning(
+                            "Jackery BLE: disconnect of unowned connection to %s "
+                            "failed: %s",
+                            device_id,
+                            disconnect_err,
+                        )
+                    raise
                 stats.last_connect_at = datetime.now(UTC)
-                _LOGGER.info(
-                    "Jackery BLE %s: connected; subscribing to notify %s",
-                    device_id,
-                    ble.BLE_NOTIFY_CHAR_UUID,
-                )
 
                 def _notify_callback(
                     _characteristic: object,
@@ -1628,12 +1933,16 @@ class JackeryBleListener:
                     """Copy a Bleak notification into the ordered session queue."""
                     self._schedule_notification(device_id, _session, bytes(data))
 
-                keep_alive_task: asyncio.Task[None] | None = None
                 stable_session_started_at: float | None = None
                 backoff_reset = False
                 try:  # ruff: ignore[too-many-statements-in-try-clause] - this owns subscribe, monitor, and teardown state
                     await client.start_notify(
                         ble.BLE_NOTIFY_CHAR_UUID, _notify_callback
+                    )
+                    session.notify_started = True
+                    self._log_connection_available(
+                        device_id,
+                        ble.BLE_NOTIFY_CHAR_UUID,
                     )
                     stable_session_started_at = asyncio.get_running_loop().time()
                     # Cache the negotiated MTU so ``async_send_command``
@@ -1641,15 +1950,6 @@ class JackeryBleListener:
                     # bleak backends expose this via ``mtu_size`` (int)
                     # or sometimes ``mtu``; both are best-effort.
                     self._record_negotiated_mtu(device_id, client, session=session)
-                    # Start the keep-alive heartbeat. The SolarVault
-                    # peripheral closes idle GATT sessions after ~20s.
-                    # ``_async_keep_alive_loop`` writes a no-op cmd=106
-                    # query every ``_KEEPALIVE_INTERVAL_SEC`` so the
-                    # session stays warm.
-                    keep_alive_task = self._hass.async_create_background_task(
-                        self._async_keep_alive_loop(device_id, session),
-                        name=f"jackery_ble_keepalive_{device_id}",
-                    )
                     # Park the connection until the device drops it or we are
                     # asked to stop. We poll ``client.is_connected`` (a bleak
                     # property with no awaitable) alongside the stop event: the
@@ -1683,7 +1983,6 @@ class JackeryBleListener:
                             started_at=stable_session_started_at,
                             now=asyncio.get_running_loop().time(),
                         )
-                    await self._async_cancel_keep_alive(device_id, keep_alive_task)
                     await self._teardown_session(device_id, session)
                     stats.last_disconnect_at = datetime.now(UTC)
 
@@ -1698,7 +1997,8 @@ class JackeryBleListener:
                     device_id,
                     asyncio.get_running_loop().time(),
                 )
-                _LOGGER.info(
+                self._log_connection_unavailable(
+                    device_id,
                     "Jackery BLE %s: lost link, backoff %ss before retry",
                     device_id,
                     delay,
@@ -1744,7 +2044,7 @@ class JackeryBleListener:
         device_id: str,
         *,
         generation: int | None = None,
-        client: Any | None = None,
+        client: BleakClient | None = None,
     ) -> None:
         """Handle a peripheral disconnect for the given device.
 
@@ -1764,36 +2064,41 @@ class JackeryBleListener:
             ):
                 return
             session.active = False
-            dropped = self._clear_frame_assemblies(device_id, session)
-            if dropped:
-                self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
+            session.accepting_notifications = False
+            session.notify_started = False
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now(UTC)
-        if generation is None and client is None:
-            dropped = self._clear_frame_assemblies(device_id)
-            if dropped:
-                stats.multi_chunk_assemblies_dropped += dropped
         # Promoted from DEBUG to INFO: peripheral disconnects are the
         # primary symptom of BLE silence and must be visible in default
-        # HA logs so the user can correlate them with the keep-alive /
-        # reconnect-backoff timing in PROTOCOL.md §4.
+        # HA logs so the user can correlate them with reconnect backoff.
         _LOGGER.info("Jackery BLE %s: peripheral disconnected", device_id)
 
     # ------------------------------------------------------------------
     # Notification handler
     # ------------------------------------------------------------------
 
-    def _reassemble_frame(  # ruff: ignore[complex-structure, too-many-locals] - bounded protocol state machine
+    # Splitting this bounded state machine would fragment its ownership transaction.
+    def _reassemble_frame(  # ruff: ignore[complex-structure, too-many-locals, too-many-branches, too-many-statements]
         self,
         device_id: str,
         frame: ble.BleBinaryFrame,
         *,
         session: _GattSession | None = None,
         notify_sequence: int | None = None,
+        accepted: bool = False,
     ) -> tuple[ble.BleBinaryFrame | None, int | None]:
         """Return a complete frame and its earliest queued notification sequence."""
-        if session is not None and not self._session_is_current(device_id, session):
-            return None, None
+        if session is not None:
+            owns_session = (
+                self._accepted_notification_session_owns_connection(
+                    device_id,
+                    session,
+                )
+                if accepted
+                else self._session_is_current(device_id, session)
+            )
+            if not owns_session:
+                return None, None
         stats = self.stats_for(device_id)
         now = self._hass.loop.time()
         if session is not None:
@@ -1830,7 +2135,7 @@ class JackeryBleListener:
                 )
                 raise ValueError(msg)
             return frame, notify_sequence
-        if not 2 <= frame.chunk_count <= _REASSEMBLY_MAX_CHUNKS:
+        if not _MIN_MULTI_CHUNK_COUNT <= frame.chunk_count <= _REASSEMBLY_MAX_CHUNKS:
             msg = f"BLE chunk_count {frame.chunk_count} is outside the supported range"
             raise ValueError(msg)
         if not 1 <= frame.frame_index <= frame.chunk_count:
@@ -1883,11 +2188,14 @@ class JackeryBleListener:
             if prior.body != frame.body or prior.trailer != frame.trailer:
                 assemblies.pop(key, None)
                 stats.multi_chunk_assemblies_dropped += 1
-                msg = (
-                    "conflicting duplicate BLE chunk "
-                    f"{frame.frame_index}/{frame.chunk_count} for cmd={frame.cmd}"
+                assembly = _PendingFrameAssembly(
+                    chunk_count=frame.chunk_count,
+                    frames={frame.frame_index: frame},
+                    updated_at=now,
+                    first_notify_sequence=notify_sequence,
                 )
-                raise ValueError(msg)
+                assemblies[key] = assembly
+                stats.multi_chunk_frames_buffered += 1
         else:
             assembly.frames[frame.frame_index] = frame
             stats.multi_chunk_frames_buffered += 1
@@ -1928,13 +2236,129 @@ class JackeryBleListener:
         stats.multi_chunk_messages_assembled += 1
         return combined, first_notify_sequence
 
-    async def _handle_notification(
+    @staticmethod
+    def _record_sink_failure(
+        device_id: str,
+        stats: BleListenerStats,
+        detail: str,
+    ) -> None:
+        """Record a transient sink failure without declaring the frame delivered."""
+        error = f"sink failed: {detail}"
+        if stats.last_sink_error is None:
+            _LOGGER.warning("Jackery BLE %s: %s", device_id, error)
+        stats.last_sink_error = error
+        stats.last_error = error
+
+    async def _async_deliver_observation(
+        self,
+        device_id: str,
+        observation: BleFrameObservation,
+        stats: BleListenerStats,
+    ) -> bool:
+        """Deliver one accepted observation losslessly with bounded retry pacing."""
+        retry_delay = _SINK_RETRY_INITIAL_SEC
+        while True:
+            try:
+                sink_processed = await self._sink(device_id, observation)
+            except asyncio.CancelledError:
+                current_task = asyncio.current_task()
+                if current_task is None or current_task.cancelling():
+                    raise
+                self._record_sink_failure(
+                    device_id,
+                    stats,
+                    "callback raised CancelledError before accepting frame",
+                )
+            except Exception as err:  # ruff: ignore[blind-except]
+                self._record_sink_failure(device_id, stats, str(err))
+            else:
+                previous_sink_error = stats.last_sink_error
+                if sink_processed and previous_sink_error is not None:
+                    stats.last_sink_error = None
+                    if stats.last_error == previous_sink_error:
+                        stats.last_error = stats.last_decode_error
+                    _LOGGER.info(
+                        "Jackery BLE %s: coordinator sink recovered",
+                        device_id,
+                    )
+                return sink_processed
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, _SINK_RETRY_MAX_SEC)
+
+    def _notification_session_is_valid(
+        self,
+        device_id: str,
+        session: _GattSession | None,
+        *,
+        accepted: bool,
+    ) -> bool:
+        """Return whether a notification may still use this session owner."""
+        return (
+            session is None or accepted or self._session_is_current(device_id, session)
+        )
+
+    def _decode_notification_payload(
+        self,
+        device_id: str,
+        raw: bytes,
+    ) -> tuple[ble.BleBinaryFrame | None, str | None]:
+        """Decode raw or proxy-base64-wrapped bytes without discarding either path."""
+        key = self._key_resolver(device_id)
+        if key is None:
+            return None, "no bluetoothKey for device"
+        try:
+            return ble.decrypt_binary_notify(raw, key), None
+        except ValueError as first_error:
+            try:
+                decoded = base64.b64decode(raw, validate=False)
+                return ble.decrypt_binary_notify(decoded, key), None
+            except ValueError, binascii.Error:
+                return None, str(first_error)
+
+    @staticmethod
+    def _record_decode_recovery(
+        device_id: str,
+        stats: BleListenerStats,
+    ) -> None:
+        """Count a decoded frame and clear only the matching stale error."""
+        stats.frames_decoded += 1
+        previous_error = stats.last_decode_error
+        if previous_error is None:
+            return
+        stats.last_decode_error = None
+        if stats.last_error == previous_error:
+            stats.last_error = stats.last_sink_error
+        _LOGGER.info("Jackery BLE %s: notification decoding recovered", device_id)
+
+    @staticmethod
+    def _record_decode_failure(
+        device_id: str,
+        stats: BleListenerStats,
+        decode_error: str | None,
+    ) -> None:
+        """Count a failed frame and log only the first consecutive failure."""
+        stats.frames_decode_failed += 1
+        if decode_error is None:
+            return
+        error = f"notify: {decode_error}"
+        if stats.last_decode_error is None:
+            _LOGGER.warning(
+                "Jackery BLE %s notification decode failed: %s",
+                device_id,
+                decode_error,
+            )
+        stats.last_decode_error = error
+        stats.last_error = error
+
+    async def _handle_notification(  # ruff: ignore[too-many-arguments]
         self,
         device_id: str,
         raw: bytes,
         *,
         session: _GattSession | None = None,
         notify_sequence: int | None = None,
+        received_at: datetime | None = None,
+        accepted: bool = False,
     ) -> None:
         """Process one BLE notification.
 
@@ -1951,8 +2375,20 @@ class JackeryBleListener:
         and increments decode-related counters; when parsing fails it increments the
         decode-failure counter.
         """
-        if session is not None and not self._session_is_current(device_id, session):
+        if not self._notification_session_is_valid(
+            device_id,
+            session,
+            accepted=accepted,
+        ):
             return
+        observed_at = received_at or datetime.now(UTC)
+        session_generation = session.generation if session is not None else None
+        delivery_id = (
+            f"{self._delivery_namespace}:{device_id}:"
+            f"{session_generation}:{notify_sequence}"
+            if session_generation is not None and notify_sequence is not None
+            else None
+        )
         stats = self.stats_for(device_id)
         stats.frames_received += 1
         b64 = base64.b64encode(raw).decode("ascii")
@@ -1964,25 +2400,8 @@ class JackeryBleListener:
                 len(raw),
             )
 
-        parsed: ble.BleBinaryFrame | None = None
-        decode_error: str | None = None
+        parsed, decode_error = self._decode_notification_payload(device_id, raw)
         ack_notify_sequence = notify_sequence
-
-        key = self._key_resolver(device_id)
-        if key is None:
-            decode_error = "no bluetoothKey for device"
-        else:
-            try:
-                parsed = ble.decrypt_binary_notify(raw, key)
-            except ValueError as err:
-                decode_error = str(err)
-                # Fallback: maybe the peripheral wrapped the wire payload
-                # in base64 (some BLE proxies do). Try once more with the
-                # base64-decoded blob before giving up.
-                with contextlib.suppress(ValueError, binascii.Error):
-                    decoded = base64.b64decode(raw, validate=False)
-                    parsed = ble.decrypt_binary_notify(decoded, key)
-                    decode_error = None
 
         if parsed is not None:
             assembled: ble.BleBinaryFrame | None
@@ -1995,34 +2414,27 @@ class JackeryBleListener:
                         parsed,
                         session=session,
                         notify_sequence=notify_sequence,
+                        accepted=accepted,
                     )
                 except ValueError as err:
                     parsed = None
                     assembled = None
                     decode_error = f"reassembly: {err}"
             if parsed is not None:
-                stats.frames_decoded += 1
-                previous_decode_error = stats.last_decode_error
-                if previous_decode_error is not None:
-                    stats.last_decode_error = None
-                    if stats.last_error == previous_decode_error:
-                        stats.last_error = (
-                            stats.last_sink_error or stats.last_keep_alive_error
-                        )
-                    _LOGGER.info(
-                        "Jackery BLE %s: notification decoding recovered",
-                        device_id,
-                    )
+                self._record_decode_recovery(device_id, stats)
                 if assembled is None:
                     observation = BleFrameObservation(
-                        received_at=datetime.now(UTC),
+                        received_at=observed_at,
                         raw_bytes=raw,
                         base64_encoded=b64,
                         parsed=parsed,
+                        session_generation=session_generation,
+                        notify_sequence=notify_sequence,
+                        delivery_id=delivery_id,
                     )
                     stats.last_frame = observation
-                    # A true byte fragment that never completes leaves no
-                    # other trace: it resolves no ACK and reaches no sink.
+                    # A fragment reaches diagnostics immediately but resolves no
+                    # ACK until the complete body has been assembled.
                     _LOGGER.debug(
                         "Jackery BLE %s buffered: cmd=%d frame=%d/%d "
                         "(awaiting remaining chunk(s))",
@@ -2031,15 +2443,23 @@ class JackeryBleListener:
                         parsed.frame_index,
                         parsed.chunk_count,
                     )
+                    await self._async_deliver_observation(
+                        device_id,
+                        observation,
+                        stats,
+                    )
                     return
                 parsed = assembled
 
         observation = BleFrameObservation(
-            received_at=datetime.now(UTC),
+            received_at=observed_at,
             raw_bytes=raw,
             base64_encoded=b64,
             parsed=parsed,
             decode_error=decode_error,
+            session_generation=session_generation,
+            notify_sequence=notify_sequence,
+            delivery_id=delivery_id,
         )
         stats.last_frame = observation
         if parsed is not None:
@@ -2062,39 +2482,14 @@ class JackeryBleListener:
                 notify_sequence=ack_notify_sequence,
             )
         else:
-            stats.frames_decode_failed += 1
-            if decode_error is not None:
-                error = f"notify: {decode_error}"
-                if stats.last_decode_error is None:
-                    _LOGGER.warning(
-                        "Jackery BLE %s notification decode failed: %s",
-                        device_id,
-                        decode_error,
-                    )
-                stats.last_decode_error = error
-                stats.last_error = error
-        if session is not None and not self._session_is_current(device_id, session):
+            self._record_decode_failure(device_id, stats, decode_error)
+        if not self._notification_session_is_valid(
+            device_id,
+            session,
+            accepted=accepted,
+        ):
             return
-        try:
-            sink_processed = await self._sink(device_id, observation)
-        except Exception as err:  # pragma: no cover — sink misbehaviour
-            error = f"sink failed: {err}"
-            if stats.last_sink_error is None:
-                _LOGGER.warning("Jackery BLE %s: %s", device_id, error, exc_info=True)
-            stats.last_sink_error = error
-            stats.last_error = error
-        else:
-            previous_sink_error = stats.last_sink_error
-            if sink_processed and previous_sink_error is not None:
-                stats.last_sink_error = None
-                if stats.last_error == previous_sink_error:
-                    stats.last_error = (
-                        stats.last_decode_error or stats.last_keep_alive_error
-                    )
-                _LOGGER.info(
-                    "Jackery BLE %s: coordinator sink recovered",
-                    device_id,
-                )
+        await self._async_deliver_observation(device_id, observation, stats)
 
 
 __all__ = [

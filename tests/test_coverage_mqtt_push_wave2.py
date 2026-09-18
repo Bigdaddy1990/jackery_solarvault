@@ -1,7 +1,6 @@
 """Behavioral coverage for the independent Jackery Cloud-MQTT client."""
 
 import asyncio
-from collections.abc import AsyncIterator
 import contextlib
 import ssl
 from types import SimpleNamespace
@@ -12,7 +11,14 @@ from aiomqtt import MqttError
 import pytest
 
 from custom_components.jackery_solarvault.client import mqtt_push
-from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
+from custom_components.jackery_solarvault.client.mqtt_push import (
+    JACKERY_MQTT_SUPPORTS_LWT,
+    JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE,
+    MQTT_MESSAGE_SPECS,
+    JackeryMqttPushClient,
+    JackeryMqttTransportError,
+    MqttSessionState,
+)
 from custom_components.jackery_solarvault.const import (
     FIELD_BODY,
     MQTT_KEEPALIVE_SEC,
@@ -21,6 +27,8 @@ from custom_components.jackery_solarvault.const import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from homeassistant.core import HomeAssistant
 
 
@@ -108,12 +116,14 @@ async def _run_owned_session(
     generation = client._session_generation  # ruff: ignore[private-member-access]
     task = asyncio.create_task(
         client._async_run_session(  # ruff: ignore[private-member-access]
-            client_id="cloud-client",
-            username="cloud-user",
-            password="cloud-password",
-            ssl_context=ssl.create_default_context(),
-            topics=topics,
-            generation=generation,
+            mqtt_push._MqttSessionConfig(  # ruff: ignore[private-member-access]
+                client_id="cloud-client",
+                username="cloud-user",
+                password="cloud-password",
+                ssl_context=ssl.create_default_context(),
+                topics=topics,
+                generation=generation,
+            )
         )
     )
     client._runner_task = task  # ruff: ignore[private-member-access]
@@ -137,7 +147,7 @@ async def test_cloud_session_subscribes_and_delivers_every_payload(
     broker = _BrokerClient([frame], finish_event=finish_event)
     constructor_kwargs: dict[str, Any] = {}
 
-    def _make_broker(**kwargs: Any) -> _BrokerClient:  # noqa: RUF105
+    def _make_broker(**kwargs: Any) -> _BrokerClient:
         constructor_kwargs.update(kwargs)
         return broker
 
@@ -178,10 +188,51 @@ async def test_cloud_subscription_failure_is_reported_and_wakes_waiters(
     await _run_owned_session(client, topics=("hb/app/user/device",))
 
     assert client.is_connected is False
-    assert client.diagnostics_snapshot()["last_error"] == (
-        "disconnect: subscribe failed for hb/app/user/device: denied"
+    last_error = client.diagnostics_snapshot()["last_error"]
+    assert last_error == (
+        "disconnect: subscribe failed for hb/app/user/device: MqttError: **REDACTED**"
     )
+    assert "denied" not in last_error
     assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
+
+
+async def test_stop_does_not_cancel_pending_cloud_subscription(
+    hass: HomeAssistant,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unload lets SUBACK settle so aiomqtt keeps its message-id waiter."""
+    subscribe_started = asyncio.Event()
+    release_subscribe = asyncio.Event()
+    subscribe_cancelled = asyncio.Event()
+
+    class _SlowBroker(_BrokerClient):
+        @override
+        async def subscribe(self, topic: str, *, qos: int) -> None:
+            subscribe_started.set()
+            try:
+                await release_subscribe.wait()
+            except asyncio.CancelledError:
+                subscribe_cancelled.set()
+                raise
+            await super().subscribe(topic, qos=qos)
+
+    broker = _SlowBroker()
+    monkeypatch.setattr(mqtt_push.aiomqtt, "Client", lambda **_kwargs: broker)
+    client = _client(hass)
+    session = asyncio.create_task(
+        _run_owned_session(client, topics=("hb/app/user/device",))
+    )
+    await asyncio.wait_for(subscribe_started.wait(), timeout=5.0)
+
+    stop = asyncio.create_task(client.async_stop())
+    await asyncio.sleep(0)
+    assert not stop.done()
+    release_subscribe.set()
+    await stop
+    await session
+
+    assert not subscribe_cancelled.is_set()
+    assert client.is_started is False
 
 
 async def test_cloud_connect_failure_is_reported_without_local_retry(
@@ -193,7 +244,7 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     broker = _BrokerClient(enter_error=MqttError("network down"))
     calls = 0
 
-    def _make_broker(**_kwargs: Any) -> _BrokerClient:  # noqa: RUF105
+    def _make_broker(**_kwargs: Any) -> _BrokerClient:
         nonlocal calls
         calls += 1
         return broker
@@ -203,7 +254,9 @@ async def test_cloud_connect_failure_is_reported_without_local_retry(
     await _run_owned_session(client, topics=("hb/app/user/device",))
 
     assert calls == 1
-    assert client.diagnostics_snapshot()["last_error"] == "connect failed: network down"
+    last_error = client.diagnostics_snapshot()["last_error"]
+    assert last_error == "connect failed: MqttError: **REDACTED**"
+    assert "network down" not in last_error
     assert client._connected_event.is_set()  # ruff: ignore[private-member-access]
 
 
@@ -241,7 +294,7 @@ async def test_publish_error_invalidates_only_current_cloud_session(
         async def publish(
             self, topic: str, payload: str, *, qos: int, retain: bool
         ) -> None:
-            raise MqttError("socket lost")
+            raise MqttError("socket lost")  # ruff: ignore[raise-vanilla-args]
 
     client = _client(hass)
     client._client = cast("Any", _FailingPublisher())  # ruff: ignore[private-member-access]
@@ -295,6 +348,44 @@ async def test_response_correlation_keeps_normal_ingest_callback(
     message_callback.assert_awaited_once_with("hb/app/user/action", response)
 
 
+async def test_response_correlation_accepts_app_envelope_id(
+    hass: HomeAssistant,
+) -> None:
+    """App responses correlate via envelope ``id`` plus ``actionId``."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(1776548805134, 1.0, expected_response_type=3047)  # ruff: ignore[private-member-access]
+    )
+    await asyncio.sleep(0)
+
+    response = {
+        "id": 1776548805134,
+        "actionId": 3047,
+        "body": {"enable": 1},
+    }
+    client._resolve_pending_response(response)  # ruff: ignore[private-member-access]
+
+    assert await waiter == response
+    assert client.responses_correlated == 1
+
+
+async def test_response_correlation_normalizes_numeric_string_id(
+    hass: HomeAssistant,
+) -> None:
+    """A JSON string ID still resolves the integer-keyed RPC waiter."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(42, 1.0, expected_response_type=3047)  # ruff: ignore[private-member-access]
+    )
+    await asyncio.sleep(0)
+
+    response = {"id": "42", "actionId": "3047", "body": {"enable": 1}}
+    client._resolve_pending_response(response)  # ruff: ignore[private-member-access]
+
+    assert await asyncio.wait_for(waiter, timeout=0.1) == response
+    assert client.responses_correlated == 1
+
+
 async def test_response_timeout_expires_and_removes_waiter(
     hass: HomeAssistant,
 ) -> None:
@@ -308,27 +399,111 @@ async def test_response_timeout_expires_and_removes_waiter(
     assert client._pending_responses == {}  # ruff: ignore[private-member-access]
 
 
-async def test_stop_cancels_owned_callbacks_and_clears_cloud_state(
+async def test_rpc_disconnect_fails_waiter_with_transport_error(
     hass: HomeAssistant,
 ) -> None:
-    """Stopping Cloud MQTT quiesces its tasks without touching other transports."""
+    """Disconnect completes every open RPC rather than leaking its future."""
     client = _client(hass)
+    waiter = asyncio.create_task(client._wait_for_response(8))  # ruff: ignore[private-member-access]
+    await asyncio.sleep(0)
+
+    client._fail_pending_responses("connection lost")  # ruff: ignore[private-member-access]
+
+    with pytest.raises(JackeryMqttTransportError, match="connection lost"):
+        await waiter
+    assert client._pending_responses == {}  # ruff: ignore[private-member-access]
+
+
+async def test_late_or_wrong_kind_response_cannot_cross_session(
+    hass: HomeAssistant,
+) -> None:
+    """RPC matching includes generation, request ID and response kind."""
+    client = _client(hass)
+    waiter = asyncio.create_task(
+        client._wait_for_response(9, expected_response_type=3031)  # ruff: ignore[private-member-access]
+    )
+    await asyncio.sleep(0)
+
+    client._resolve_pending_response({"request_id": 9, "actionId": 3032})  # ruff: ignore[private-member-access]
+    assert not waiter.done()
+    client._session_generation += 1  # ruff: ignore[private-member-access]
+    client._resolve_pending_response({"request_id": 9, "actionId": 3031})  # ruff: ignore[private-member-access]
+    assert not waiter.done()
+    client._fail_pending_responses("new session")  # ruff: ignore[private-member-access]
+    with pytest.raises(JackeryMqttTransportError):
+        await waiter
+
+
+def test_protocol_delivery_contract_disables_presence_features() -> None:
+    """Jackery explicitly uses QoS 0 without retained presence or an LWT."""
+    assert JACKERY_MQTT_SUPPORTS_LWT is False
+    assert JACKERY_MQTT_SUPPORTS_RETAINED_PRESENCE is False
+    assert all(spec.qos == 0 for spec in MQTT_MESSAGE_SPECS.values())
+    assert all(spec.retain is False for spec in MQTT_MESSAGE_SPECS.values())
+
+
+async def test_birth_once_per_generation_and_rebirth_next_generation(
+    hass: HomeAssistant,
+) -> None:
+    """Birth succeeds once in each fully subscribed broker generation."""
+    birth = AsyncMock()
+    client = _client(hass)
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._session_state = MqttSessionState.SUBSCRIBED  # ruff: ignore[private-member-access]
+
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=0)  # ruff: ignore[private-member-access]
+    await hass.async_block_till_done()
+    assert birth.await_count == 1
+    assert client.diagnostics_snapshot()["birth_publishes"] == 1
+
+    client._session_generation = 1  # ruff: ignore[private-member-access]
+    client._schedule_birth_snapshot(birth, generation=1)  # ruff: ignore[private-member-access]
+    await hass.async_block_till_done()
+    assert birth.await_count == 2  # ruff: ignore[magic-value-comparison]
+    assert client.diagnostics_snapshot()["session_state"] == "online"
+
+
+async def test_stop_cancels_lifecycle_but_drains_messages_and_clears_cloud_state(
+    hass: HomeAssistant,
+) -> None:
+    """Stopping Cloud MQTT cancels lifecycle work but drains accepted frames."""
+    message_started = asyncio.Event()
+    release_message = asyncio.Event()
+    delivered: list[int] = []
+
+    async def _message_callback(_topic: str, data: dict[str, Any]) -> None:
+        message_started.set()
+        await release_message.wait()
+        delivered.append(int(data[FIELD_BODY]["seq"]))
+
+    client = _client(hass, AsyncMock(side_effect=_message_callback))
     runner = asyncio.create_task(asyncio.sleep(60))
-    message_task = asyncio.create_task(asyncio.sleep(60))
     lifecycle_task = asyncio.create_task(asyncio.sleep(60))
     client._runner_task = runner  # ruff: ignore[private-member-access]
     client._client = cast("Any", _BrokerClient())  # ruff: ignore[private-member-access]
     client._connected = True  # ruff: ignore[private-member-access]
     client._fingerprint = "secret-free-hash"  # ruff: ignore[private-member-access]
-    client._message_tasks.add(message_task)  # ruff: ignore[private-member-access]
     client._lifecycle_tasks[lifecycle_task] = object()  # ruff: ignore[private-member-access]
+    client._handle_message("device/property", b'{"body":{"seq":1}}')  # ruff: ignore[private-member-access]
+    message_task = client._message_consumer_task  # ruff: ignore[private-member-access]
+    assert message_task is not None
+    await message_started.wait()
 
-    await client.async_stop()
+    stop_task = asyncio.create_task(client.async_stop())
+    await asyncio.sleep(0)
+    assert not stop_task.done()
+    assert not message_task.cancelled()
+
+    release_message.set()
+    await stop_task
 
     await asyncio.sleep(0)
     assert runner.cancelled()
-    assert message_task.cancelled()
+    assert message_task.done()
+    assert not message_task.cancelled()
     assert lifecycle_task.cancelled()
+    assert delivered == [1]
     assert client.is_started is False
     assert client.is_connected is False
     snapshot = client.diagnostics_snapshot()

@@ -3,6 +3,9 @@
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -13,6 +16,7 @@ from .const import (
     FIELD_DEVICE_NAME,
     FIELD_DEVICE_SN,
     FIELD_DEV_MODEL,
+    FIELD_MAC,
     FIELD_MODEL,
     FIELD_MODEL_NAME,
     FIELD_ONLINE_STATE,
@@ -46,6 +50,7 @@ from .util import (
     first_nonblank_text,
     jackery_online_state,
     nonblank_text,
+    normalize_mac_address,
     smart_plug_serial,
     stable_subdevice_key,
     subdevice_branding,
@@ -102,12 +107,12 @@ def payload_properties_for_sources(
     and BLE all contribute to the same non-blank property snapshot.
     """
     del data_sources
-    props = payload.get(PAYLOAD_PROPERTIES) or {}
-    merged_props = props if isinstance(props, dict) else {}
-    if merged_props:
-        return merged_props
     http_props = payload.get(PAYLOAD_HTTP_PROPERTIES) or {}
-    return http_props if isinstance(http_props, dict) else {}
+    resolved = dict(http_props) if isinstance(http_props, dict) else {}
+    props = payload.get(PAYLOAD_PROPERTIES) or {}
+    if isinstance(props, dict):
+        resolved.update(props)
+    return resolved
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -130,10 +135,71 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         super().__init__(coordinator)
         self._device_id = device_id
         self._attr_unique_id = f"{device_id}_{key_suffix}"
+        self._availability_cache_active = False
+        self._cached_available = False
+
+    def _apply_via_device(self, info: DeviceInfo) -> None:
+        """Link a subdevice DeviceInfo to its parent main device.
+
+        HA 2026.9 removed ``DeviceInfo["via_device"]`` (an identifier tuple) in
+        favour of ``via_device_id``, which must be a real device-registry id.
+        ``_async_register_main_devices`` registers every main device during
+        setup, before any entity is added, so this lookup resolves. If it ever
+        misses, the link is omitted rather than guessed — an invented id would
+        be rejected by the registry.
+        """
+        # `self.hass` is only bound once the platform adds the entity, while
+        # `device_info` is read earlier, so resolve through the coordinator.
+        # Both attributes are read defensively: `device_info` must stay a pure,
+        # always-callable property, and an unresolvable parent only costs the
+        # hierarchy link, never the device itself.
+        hass = getattr(self.coordinator, "hass", None)
+        config_entry = getattr(self.coordinator, "config_entry", None)
+        if hass is None or config_entry is None:
+            return
+        parent = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, self._device_id),
+            config_entry.entry_id,
+        )
+        if parent is not None:
+            info["via_device_id"] = parent.id
 
     @property
     def _payload(self) -> dict[str, Any]:
         return (self.coordinator.data or {}).get(self._device_id, {}) or {}
+
+    @property
+    def device_id(self) -> str:
+        """The coordinator device identifier for this entity."""
+        return self._device_id
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        """This entity's complete coordinator payload."""
+        return self._payload
+
+    @property
+    def merged_properties(self) -> dict[str, Any]:
+        """The transport-merged device properties."""
+        return self._merged_properties
+
+    @property
+    def http_properties(self) -> dict[str, Any]:
+        """The HTTP-only device properties."""
+        return self._http_properties
+
+    @property
+    def device_meta(self) -> dict[str, Any]:
+        """The device metadata section."""
+        return self._device_meta
+
+    def payload_section_for_sources(
+        self,
+        section: str,
+        data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES,
+    ) -> dict[str, Any]:
+        """Return one payload section resolved for the requested sources."""
+        return self._payload_section_for_sources(section, data_sources)
 
     @property
     def _properties(self) -> dict[str, Any]:
@@ -281,7 +347,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             self._discovery.get(FIELD_DEVICE_SN),
         )
 
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             manufacturer=MANUFACTURER,
             name=str(name),
@@ -289,6 +355,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             serial_number=sn,
             sw_version=sw_version,
         )
+        parent_mac = normalize_mac_address(
+            first_nonblank_text(
+                self._properties.get(FIELD_MAC),
+                self._system.get(FIELD_MAC),
+                self._discovery.get(FIELD_MAC),
+                self._device_meta.get(FIELD_MAC),
+            )
+        )
+        if parent_mac is not None:
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
+        return info
 
     def _build_smart_plug_device_info(
         self,
@@ -340,15 +417,18 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             plug.get(FIELD_VERSION),
             plug.get(FIELD_CURRENT_VERSION),
         )
-        return DeviceInfo(
+        info = DeviceInfo(
             identifiers={(DOMAIN, f"{self._device_id}_{stable_key}")},
             manufacturer=manufacturer_brand or MANUFACTURER,
             name=f"{base_name} {display_name}",
             model=str(model),
             serial_number=str(sn) if sn else None,
             sw_version=str(version) if version else None,
-            via_device=(DOMAIN, self._device_id),
         )
+        self._apply_via_device(info)
+        if mac := normalize_mac_address(plug.get(FIELD_MAC)):
+            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+        return info
 
     def _source_capability_contract(
         self,
@@ -425,15 +505,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             return parsed_online or transport_reachable
         return transport_reachable or self._device_id in (self.coordinator.data or {})
 
-    @property
-    def available(self) -> bool:
-        """Availability for the entity's product, fields and transports.
-
-        Explicit product support and source-specific freshness are checked before
-        the parent device's online marker. A fresh independent transport remains
-        authoritative when a stale cloud marker incorrectly reports the device
-        offline.
-        """
+    def _calculate_available(self) -> bool:
+        """Calculate availability before Home Assistant writes entity state."""
         if self._device_id not in (self.coordinator.data or {}):
             return False
         supported, data_sources, command_sources, fields, supervisor_only = (
@@ -462,14 +535,53 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             transport_reachable = self.coordinator.is_device_reachable(
                 self._device_id,
             )
-        if not super().available and not transport_reachable:
+        if not super().available or not transport_reachable:
             return False
-        return self._online_marker_available(transport_reachable)
+        if not self._online_marker_available(transport_reachable):
+            return False
+        return not isinstance(self, SensorEntity) or self.native_value is not None
+
+    @callback
+    def _refresh_availability_cache(self) -> None:
+        """Prepare availability outside Home Assistant's synchronous state write."""
+        self._cached_available = self._calculate_available()
+
+    @property
+    def available(self) -> bool:
+        """Availability prepared for the current coordinator snapshot."""
+        if getattr(self, "_availability_cache_active", False):
+            return self._cached_available
+        return self._calculate_available()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Prepare common availability before listeners write entity states."""
+        if self._availability_cache_active:
+            self._refresh_availability_cache()
+        self._write_prepared_state()
+
+    @callback
+    def _write_prepared_state(self) -> None:
+        """Write a state after subclasses have prepared every synchronous value.
+
+        CoordinatorEntity._handle_coordinator_update performs Home Assistant's
+        synchronous state write. Calling the public update hook after an
+        asynchronous/prepared cache would re-enter this class and calculate
+        availability a second time in that measured write path.
+        """
+        super()._handle_coordinator_update()
 
     async def async_added_to_hass(self) -> None:
-        """Run when entity is added to Home Assistant."""
-        await super().async_added_to_hass()
+        """Prime availability before Home Assistant performs the first state write."""
+        self._availability_cache_active = True
+        self._refresh_availability_cache()
+        try:
+            await super().async_added_to_hass()
+        except Exception:
+            self._availability_cache_active = False
+            raise
 
     async def async_will_remove_from_hass(self) -> None:
-        """Run when entity is about to be removed from Home Assistant."""
+        """Stop serving the prepared cache after the entity leaves Home Assistant."""
+        self._availability_cache_active = False
         await super().async_will_remove_from_hass()

@@ -106,7 +106,7 @@ def _serial_identifier(serial: str) -> str:
 def test_portable_screen_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: RUF105
+    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # ruff: ignore[line-too-long]
     entry = _config_entry(hass)
     registry = er.async_get(hass)
 
@@ -150,7 +150,7 @@ def test_portable_screen_migration_is_idempotent_no_registry_writes(
 def test_grid_standard_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # noqa: RUF105
+    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # ruff: ignore[line-too-long]
     entry = _config_entry(hass)
     registry = er.async_get(hass)
 
@@ -184,7 +184,7 @@ def test_grid_standard_migration_is_idempotent_no_registry_writes(
 def test_battery_pack_migration_is_idempotent_no_registry_writes(
     hass: HomeAssistant,
 ) -> None:
-    """Re-running migration on already-migrated pack does not call registry.update/remove."""  # noqa: RUF105
+    """Re-running migration on already-migrated pack does not call registry.update/remove."""  # ruff: ignore[line-too-long]
     entry = _config_entry(hass)
     registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
@@ -245,8 +245,9 @@ def test_battery_pack_migration_is_idempotent_no_registry_writes(
         assert preserved_ent.entity_id == entity_id
         assert preserved_ent.unique_id == f"{new_identifier}_state_of_charge"
 
-        preserved_dev = device_registry.async_get_device(
-            identifiers={(DOMAIN, new_identifier)}
+        preserved_dev = device_registry.async_get_device_by_identifier(
+            (DOMAIN, new_identifier),
+            entry.entry_id,
         )
         assert preserved_dev is not None
         assert preserved_dev.id == pack.id

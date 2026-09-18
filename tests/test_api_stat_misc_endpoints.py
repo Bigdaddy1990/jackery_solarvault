@@ -24,7 +24,7 @@ def _api() -> JackeryApi:
     return JackeryApi(Mock(), "tester@example.com", "secret")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_today_energy_gets_by_device_sn() -> None:
     """Today-energy GETs by deviceSn and unwraps the data dict."""
     api = _api()
@@ -40,7 +40,7 @@ async def test_today_energy_gets_by_device_sn() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_portable_ct_stat_gets_by_device_id() -> None:
     """Portable CT stat GETs by deviceId and unwraps the data dict."""
     api = _api()
@@ -57,7 +57,7 @@ async def test_portable_ct_stat_gets_by_device_id() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_socket_statistic_gets_by_socket_id() -> None:
     """Socket panel statistic GETs by smartSocketId and unwraps the data dict."""
     api = _api()
@@ -73,7 +73,7 @@ async def test_socket_statistic_gets_by_socket_id() -> None:
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ble_ota_versions_posts_version_list() -> None:
     """BLE OTA versions POSTs the version list under the list field."""
     api = _api()

@@ -11,6 +11,7 @@ from custom_components.jackery_solarvault.client.api import (
 from custom_components.jackery_solarvault.const import (
     LOGIN_AES_KEY_LEN,
     LOGIN_AES_SEED_LEN,
+    RSA_PUBLIC_KEY_B64,
 )
 
 if TYPE_CHECKING:
@@ -43,7 +44,7 @@ def test_login_crypto_uses_same_fresh_key_for_aes_and_rsa(
         captured["aes_key"] = key
         return b"aes-ciphertext"
 
-    def _fake_rsa(data: bytes, public_key_b64: str | None = None) -> bytes:
+    def _fake_rsa(data: bytes, public_key_b64: str) -> bytes:
         captured["rsa_key"] = data
         captured["public_key"] = public_key_b64
         return b"rsa-ciphertext"
@@ -59,9 +60,9 @@ def test_login_crypto_uses_same_fresh_key_for_aes_and_rsa(
 
     assert captured["aes_key"] == expected_key
     assert captured["rsa_key"] == expected_key
-    # Production code calls _rsa_pkcs1v15_encrypt without public_key_b64,
-    # so the mock receives None. The bundled key is used internally.
-    assert captured["public_key"] is None
+    # The key is an explicit argument: a mock with a default parameter would
+    # hide a missing one, which previously let a TypeError reach the login.
+    assert captured["public_key"] == RSA_PUBLIC_KEY_B64
     assert fields == {
         "aesEncryptData": base64.b64encode(b"aes-ciphertext").decode("ascii"),
         "rsaForAesKey": base64.b64encode(b"rsa-ciphertext").decode("ascii"),

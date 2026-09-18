@@ -6,27 +6,29 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write # for actions/checkout, if you're in a private repo
   pull-requests: write
   actions: write
   checks: write
-  id-token: write
+  id-token: write # for Trusted Publishing + attest-action
 
 concurrency:
-  group: autofix-${{ github.ref }}
+  group: autofix-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+      PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
 
 jobs:
   autofix:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
-      HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
@@ -45,11 +47,16 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -r requirements.txt
-          pip install -r requirements-test.txt
-          pip install --upgrade pre-commit ruff pyupgrade flake8-type-checking reorder-python-imports
+          pip install -r requirements.txt --upgrade
+          pip install -r requirements-test.txt --upgrade
+          pip install --upgrade uv ruff pyupgrade pyrefly flake8-type-checking reorder-python-imports
 
-      - uses: astral-sh/ruff-action@v3
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+          #enable-cache: true
+          #ignore-nothing-to-cache: true
+
+      - uses: astral-sh/ruff-action@v4.1.0
       - run: ruff check --fix
       - run: ruff format
       - uses: pre-commit-ci/lite-action@v1.1.0
@@ -67,5 +74,12 @@ jobs:
           ruff check . --output-format=github || true
           ruff check . --exit-non-zero-on-fix || true
           ruff format . || true
+          ruff check tests/ --fix || true
+          ruff format tests/ || true
+          pyrefly infer tests/ || true
+          pyrefly infer custom_components/jackery_solarvault || true
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
+
+      - uses: pre-commit/action@v3.0.1
+      - run: uvx pre-commit run --all-files

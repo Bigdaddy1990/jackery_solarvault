@@ -25,7 +25,7 @@ by an immediate cloud fallback snapshot; it never stops independent transports
 from continuing to publish.
 """
 
-import logging
+from dataclasses import dataclass
 import time
 from typing import TYPE_CHECKING, Any, Final
 
@@ -43,14 +43,12 @@ from .const import (
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_STATISTIC,
 )
-from .models import DataSource, FieldProvenance, IngestResult, ProvenanceKey
+from .models import DataSource, FieldProvenance, IngestResult
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from .models import Observation
-
-_LOGGER = logging.getLogger(__name__)
+    from .models import Observation, ProvenanceKey
 
 # Compatibility name retained for existing transport decoders. New code should
 # use ``DataSource`` so the source type is shared with Observation/IngestResult.
@@ -197,16 +195,23 @@ def _provenance_keeps_current(
     ) or incoming_is_older
 
 
+@dataclass(frozen=True, slots=True)
+class _NestedMergeContext:
+    """Shared ownership state for one recursive nested merge."""
+
+    provenance: dict[ProvenanceKey, FieldProvenance]
+    incoming: FieldProvenance
+    received_at: float
+    freshness_window_seconds: float
+
+
 def _merge_nested_with_provenance(
     current: dict[str, Any],
     update: dict[str, Any],
     *,
     path: tuple[str, ...],
     fallback_provenance: FieldProvenance | None,
-    provenance: dict[ProvenanceKey, FieldProvenance],
-    incoming: FieldProvenance,
-    received_at: float,
-    freshness_window_seconds: float,
+    context: _NestedMergeContext,
 ) -> tuple[dict[str, Any], bool]:
     """Merge a nested live mapping while retaining ownership per field path."""
     merged = dict(current)
@@ -214,17 +219,14 @@ def _merge_nested_with_provenance(
     for key, value in update.items():
         field_path = (*path, key)
         current_value = merged.get(key)
-        field_provenance = provenance.get(field_path, fallback_provenance)
+        field_provenance = context.provenance.get(field_path, fallback_provenance)
         if isinstance(current_value, dict) and isinstance(value, dict):
             nested, nested_accepted = _merge_nested_with_provenance(
                 current_value,
                 value,
                 path=field_path,
                 fallback_provenance=field_provenance,
-                provenance=provenance,
-                incoming=incoming,
-                received_at=received_at,
-                freshness_window_seconds=freshness_window_seconds,
+                context=context,
             )
             if nested_accepted:
                 merged[key] = nested
@@ -235,31 +237,28 @@ def _merge_nested_with_provenance(
         if _provenance_keeps_current(
             current_value,
             field_provenance,
-            incoming,
-            received_at=received_at,
-            freshness_window_seconds=freshness_window_seconds,
+            context.incoming,
+            received_at=context.received_at,
+            freshness_window_seconds=context.freshness_window_seconds,
         ):
             continue
         if isinstance(value, dict):
-            _drop_descendant_provenance(provenance, field_path)
+            _drop_descendant_provenance(context.provenance, field_path)
             nested, _ = _merge_nested_with_provenance(
                 {},
                 value,
                 path=field_path,
                 fallback_provenance=None,
-                provenance=provenance,
-                incoming=incoming,
-                received_at=received_at,
-                freshness_window_seconds=freshness_window_seconds,
+                context=context,
             )
             merged[key] = nested
-            provenance[field_path] = incoming
+            context.provenance[field_path] = context.incoming
             accepted = True
             continue
         if isinstance(current_value, dict):
-            _drop_descendant_provenance(provenance, field_path)
+            _drop_descendant_provenance(context.provenance, field_path)
         merged[key] = value
-        provenance[field_path] = incoming
+        context.provenance[field_path] = context.incoming
         accepted = True
     return merged, accepted
 
@@ -315,6 +314,12 @@ def ingest_observation(
             received_at_monotonic=received_at,
             request_id=observation.request_id,
         )
+        merge_context = _NestedMergeContext(
+            provenance=updated_provenance,
+            incoming=incoming,
+            received_at=received_at,
+            freshness_window_seconds=freshness_window_seconds,
+        )
         current_value = merged.get(field)
         current_provenance = updated_provenance.get(field)
         keep_current = _provenance_keeps_current(
@@ -336,10 +341,7 @@ def ingest_observation(
                     value,
                     path=(field,),
                     fallback_provenance=current_provenance,
-                    provenance=updated_provenance,
-                    incoming=incoming,
-                    received_at=received_at,
-                    freshness_window_seconds=freshness_window_seconds,
+                    context=merge_context,
                 )
                 if supplemented_fields:
                     merged[field] = supplemented
@@ -351,10 +353,7 @@ def ingest_observation(
                 value,
                 path=(field,),
                 fallback_provenance=current_provenance,
-                provenance=updated_provenance,
-                incoming=incoming,
-                received_at=received_at,
-                freshness_window_seconds=freshness_window_seconds,
+                context=merge_context,
             )
             if not nested_accepted:
                 continue
@@ -366,10 +365,7 @@ def ingest_observation(
                 value,
                 path=(field,),
                 fallback_provenance=None,
-                provenance=updated_provenance,
-                incoming=incoming,
-                received_at=received_at,
-                freshness_window_seconds=freshness_window_seconds,
+                context=merge_context,
             )
             merged[field] = merged_value
         else:

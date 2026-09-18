@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 INIT = ROOT / "custom_components" / "jackery_solarvault" / "__init__.py"
 
 
-def _async_unload_entry() -> ast.AsyncFunctionDef:
-    """Locate the integration's `async_unload_entry` AST node.
+def _async_function(name: str) -> ast.AsyncFunctionDef:
+    """Locate one integration async-function AST node.
 
     Parses INIT and returns the first matching async function. Raises an
     assertion if the function is absent.
@@ -18,9 +18,9 @@ def _async_unload_entry() -> ast.AsyncFunctionDef:
     """
     tree = ast.parse(INIT.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "async_unload_entry":
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name:
             return node
-    raise AssertionError("async_unload_entry not found")
+    raise AssertionError(f"{name} not found")  # ruff: ignore[raise-vanilla-args]
 
 
 def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
@@ -44,7 +44,7 @@ def _call_line(function: ast.AsyncFunctionDef, attr: str) -> int:
             return node.lineno
         if isinstance(func, ast.Name) and func.id == attr:
             return node.lineno
-    raise AssertionError(f"{attr} call not found")
+    raise AssertionError(f"{attr} call not found")  # ruff: ignore[raise-vanilla-args]
 
 
 def test_unload_platforms_before_coordinator_shutdown() -> None:
@@ -53,10 +53,14 @@ def test_unload_platforms_before_coordinator_shutdown() -> None:
     The platform unload must appear before bounded coordinator shutdown, so
     the coordinator remains alive while the entry can still be loaded.
     """
-    function = _async_unload_entry()
+    function = _async_function("async_unload_entry")
 
     assert _call_line(function, "async_unload_platforms") < _call_line(
-        function, "_async_shutdown_coordinator_bounded"
+        function, "_async_teardown_unloaded_entry"
+    )
+    _call_line(
+        _async_function("_async_teardown_unloaded_entry"),
+        "_async_shutdown_coordinator_bounded",
     )
 
 
@@ -65,8 +69,8 @@ def test_coordinator_shutdown_is_success_gated() -> None:
 
     An `if not unload_ok: ... return` block must precede bounded shutdown.
     """
-    function = _async_unload_entry()
-    shutdown_line = _call_line(function, "_async_shutdown_coordinator_bounded")
+    function = _async_function("async_unload_entry")
+    teardown_line = _call_line(function, "_async_teardown_unloaded_entry")
 
     failure_blocks = [
         node
@@ -76,7 +80,7 @@ def test_coordinator_shutdown_is_success_gated() -> None:
         and isinstance(node.test.op, ast.Not)
         and isinstance(node.test.operand, ast.Name)
         and node.test.operand.id == "unload_ok"
-        and node.lineno < shutdown_line
+        and node.lineno < teardown_line
         and any(isinstance(stmt, ast.Return) for stmt in node.body)
     ]
-    assert failure_blocks, "async_shutdown must be after if not unload_ok return"
+    assert failure_blocks, "runtime teardown must be after if not unload_ok return"

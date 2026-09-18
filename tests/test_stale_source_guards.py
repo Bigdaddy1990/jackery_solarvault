@@ -46,6 +46,7 @@ def _bare_coordinator(
             "custom_components.jackery_solarvault.coordinator.time.monotonic",
             lambda: _NOW,
         )
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
@@ -100,11 +101,17 @@ def test_system_info_cache_expires_instead_of_lying(
     assert "workModel" not in filled
 
 
-async def test_system_info_query_runs_ble_first_without_cloud_mqtt() -> None:
-    """A dead cloud session no longer blocks the SystemBody query (F6).
+async def test_system_info_query_skipped_when_only_ble_is_live() -> None:
+    """A live BLE listener alone cannot carry the SystemBody query.
 
-    The SYSTEM_INFO fields have no HTTP source; with a live BLE transport
-    the BLE-first query must run even while the broker bans the session.
+    Both queries this path dispatches -- cmd 106 (QueryDeviceProperty) and
+    cmd 120 (QueryCombineData) -- are listed in `_BLE_UNSUPPORTED_MSG_TYPES`,
+    so BLE is never a candidate transport for them. An earlier revision opened
+    the gate on the BLE listener alone ("BLE-first"), after which transport
+    selection dropped BLE as unsupported and cloud MQTT as unavailable, then
+    logged the resulting empty transport set as an ERROR on every cycle
+    (observed live 2026-09-02 08:22:50, actionId=3011/3019). Skipping is the
+    correct behaviour: there is nothing to send.
     """
     coordinator = _bare_coordinator(None)
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
@@ -121,7 +128,8 @@ async def test_system_info_query_runs_ble_first_without_cloud_mqtt() -> None:
 
     await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)  # ruff: ignore[private-member-access]
 
-    query_system_info.assert_awaited_once()
+    query_system_info.assert_not_awaited()
+    query_device_info.assert_not_awaited()
 
 
 async def test_system_info_query_skips_without_any_command_transport() -> None:

@@ -82,14 +82,14 @@ def _grid_standard_sensor(
 
 
 @pytest.mark.parametrize(
-    ("unique_id", "suffix"),  # ruff:ignore[pytest-parametrize-names-wrong-type]
+    ["unique_id", "suffix"],
     [
-        ("12345_battery_soc", "_battery_soc"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("9_some_key", "_some_key"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345_battery_pack_0_current", "_current"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("99_battery_pack_12_temp", "_temp"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345", ""),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345_battery_pack_2", ""),  # ruff:ignore[pytest-parametrize-values-wrong-type]
+        ["12345_battery_soc", "_battery_soc"],
+        ["9_some_key", "_some_key"],
+        ["12345_battery_pack_0_current", "_current"],
+        ["99_battery_pack_12_temp", "_temp"],
+        ["12345", ""],
+        ["12345_battery_pack_2", ""],
     ],
 )
 def test_legacy_suffix_matches_supported_ids(unique_id: str, suffix: str) -> None:
@@ -98,15 +98,15 @@ def test_legacy_suffix_matches_supported_ids(unique_id: str, suffix: str) -> Non
 
 
 @pytest.mark.parametrize(
-    ("unique_id", "suffix"),  # ruff:ignore[pytest-parametrize-names-wrong-type]
+    ["unique_id", "suffix"],
     [
-        ("my_device_battery_soc", "_battery_soc"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("abc123_voltage", "_voltage"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345_battery_pack_abc_voltage", "_voltage"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345_battery_soc", "_voltage"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("12345_pv_power_w", "_power_w"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("", "_voltage"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
-        ("_voltage", "_voltage"),  # ruff:ignore[pytest-parametrize-values-wrong-type]
+        ["my_device_battery_soc", "_battery_soc"],
+        ["abc123_voltage", "_voltage"],
+        ["12345_battery_pack_abc_voltage", "_voltage"],
+        ["12345_battery_soc", "_voltage"],
+        ["12345_pv_power_w", "_power_w"],
+        ["", "_voltage"],
+        ["_voltage", "_voltage"],
     ],
 )
 def test_legacy_suffix_rejects_current_or_malformed_ids(

@@ -1,4 +1,4 @@
-"""Behavioral tests for the bounded persistent HTTP day-backfill queue."""
+"""White-box tests for the bounded persistent HTTP day-backfill queue."""
 
 import asyncio
 from datetime import date
@@ -12,6 +12,8 @@ from custom_components.jackery_solarvault import coordinator as coordinator_modu
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
+    CT_STAT_TYPE_L1,
+    CT_STAT_TYPE_L2,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -37,22 +39,23 @@ def _coordinator() -> JackerySolarVaultCoordinator:
         config=SimpleNamespace(time_zone="Europe/Berlin"),
     )
     obj.api = SimpleNamespace()
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_day_backfill_shares_slow_http_concurrency_gate() -> None:
     """A bounded historical day request must wait for the shared HTTP gate."""
     coordinator = _coordinator()
     raw = cast("Any", coordinator)
     coordinator._slow_http_request_semaphore = asyncio.Semaphore(1)  # ruff: ignore[private-member-access]
-    raw._historical_day_source_prefixes = (  # ruff: ignore[private-member-access]
-        lambda _device_id, _payload: (APP_SECTION_BATTERY_STAT,)
+    raw._historical_day_source_prefixes = lambda _device_id, _payload: (  # ruff: ignore[private-member-access]
+        APP_SECTION_BATTERY_STAT,
     )
     fetch_started = asyncio.Event()
 
     # Mock the API call that _async_fetch_historical_day_chart_source makes
-    async def _mock_battery_stat(  # noqa: RUF029, RUF105
+    async def _mock_battery_stat(  # ruff: ignore[unused-async]
         *_args: object, **_kwargs: object
     ) -> dict[str, object]:
         fetch_started.set()
@@ -90,7 +93,7 @@ def test_automatic_day_backfill_horizon_reaches_mid_april() -> None:
     assert days[-1] == date(2026, 7, 22)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_empty_historical_payload_is_not_reported_as_success() -> None:
     """An empty/gated cloud response cannot complete a source/day pair."""
     coordinator = _coordinator()
@@ -101,10 +104,10 @@ async def test_empty_historical_payload_is_not_reported_as_success() -> None:
         section_sources={},
     )
 
-    assert result == (False, 0)
+    assert result == (None, 0)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ["response", "expected_status"],
     [
@@ -134,7 +137,7 @@ async def test_single_source_fetch_distinguishes_empty_from_data(
     assert bool(source) is bool(response)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_single_source_timeout_remains_retryable() -> None:
     """A temporary network timeout is persisted as pending transport failure."""
     coordinator = _coordinator()
@@ -154,7 +157,7 @@ async def test_single_source_timeout_remains_retryable() -> None:
     assert source == {}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_ct_day_uses_cloud_response_directly() -> None:
     """The Jackery CT day endpoint is the only historical CT source."""
     coordinator = _coordinator()
@@ -182,7 +185,48 @@ async def test_ct_day_uses_cloud_response_directly() -> None:
     assert source == cloud_source
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+async def test_ct_day_retries_l2_when_l1_chart_is_empty() -> None:
+    """A placeholder L1 CT chart does not hide the App's L2 CT path."""
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
+    l1_placeholder = {
+        "unit": "kWh",
+        "x": [],
+        "y1": [],
+        "y2": [],
+        "totalInCtEnergy": 0,
+        "totalOutCtEnergy": 0,
+    }
+    l2_source = {
+        "unit": "kWh",
+        "x": ["00:00"],
+        "y1": [2.0],
+        "y2": [0.25],
+        "totalInCtEnergy": 2.0,
+        "totalOutCtEnergy": 0.25,
+    }
+    api = SimpleNamespace(
+        async_get_device_ct_stat=AsyncMock(side_effect=[l1_placeholder, l2_source]),
+    )
+    cast("Any", coordinator).api = api
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={},
+        target_day=date(2026, 4, 15),
+        section_prefix=APP_SECTION_CT_STAT,
+    )
+
+    assert status == "fetched"
+    assert source == l2_source
+    assert [
+        call.kwargs["query"].stat_type
+        for call in api.async_get_device_ct_stat.await_args_list
+    ] == [CT_STAT_TYPE_L1, CT_STAT_TYPE_L2]
+
+
+@pytest.mark.asyncio()
 async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
     """An empty CT envelope is reported ambiguous; no LAN fallback exists."""
     coordinator = _coordinator()
@@ -202,7 +246,7 @@ async def test_empty_ct_day_stays_empty_without_lan_fallback() -> None:
     assert source == {}
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
     """Success for one source never marks another source/day as complete."""
     coordinator = _coordinator()
@@ -241,10 +285,10 @@ async def test_failed_source_day_remains_pending_while_peer_completes() -> None:
         _DEVICE_ID
     ]["http_day_backfill"]["sources"]
     assert sources["battery"]["days"][day_key]["status"] == "imported"
-    assert sources["ct"]["days"][day_key]["status"] == "retryable"
+    assert sources["ct"]["days"][day_key]["status"] == "pending"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_empty_day_does_not_block_other_source_days() -> None:
     """An unavailable bucket remains pending while another day still advances."""
     coordinator = _coordinator()
@@ -284,7 +328,76 @@ async def test_empty_day_does_not_block_other_source_days() -> None:
     assert requested_days[1] != requested_days[0]
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
+async def test_current_week_curves_stay_prioritized_in_chronological_order() -> None:
+    """Verified totals do not postpone the hourly Recorder curves they lack."""
+    coordinator = _coordinator()
+    raw = cast("Any", coordinator)
+    raw.data = {}
+    raw._push_partial_update = lambda _update: None  # ruff: ignore[private-member-access]
+    raw._historical_day_source_prefixes = lambda _device_id, _payload: (  # ruff: ignore[private-member-access]
+        APP_SECTION_BATTERY_STAT,
+    )
+    stat_key = next(
+        metric_stat_key
+        for metric_section, metric_stat_key, _metric_key, _label in (
+            coordinator_module.APP_CHART_STAT_METRICS
+        )
+        if metric_section == APP_SECTION_BATTERY_STAT
+    )
+    current_week_days = [
+        date(2026, 7, 20),
+        date(2026, 7, 21),
+        date(2026, 7, 22),
+    ]
+    raw._statistics_backfill_state = {  # ruff: ignore[private-member-access]
+        "devices": {
+            _DEVICE_ID: {
+                "http_day_backfill": {
+                    "sources": {
+                        APP_SECTION_BATTERY_STAT: {
+                            "days": {
+                                target_day.isoformat(): {
+                                    "attempts": 0,
+                                    "status": "pending",
+                                    "verified_totals": {stat_key: 1.0},
+                                }
+                                for target_day in current_week_days
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    requested_days: list[date] = []
+
+    async def _fetch(
+        *,
+        target_day: date,
+        **_kwargs: object,
+    ) -> tuple[str, dict[str, object]]:
+        await asyncio.sleep(0)
+        requested_days.append(target_day)
+        return "fetched", {"unit": "kWh", "y": [1.0]}
+
+    raw._async_fetch_historical_day_chart_source = _fetch  # ruff: ignore[private-member-access]
+    raw._record_verified_day_totals_update = lambda _updates, **_kwargs: {stat_key: 1.0}  # ruff: ignore[private-member-access]
+    raw._async_import_historical_day_chart_statistics_for_device = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value=(True, 1),
+    )
+
+    await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
+        {_DEVICE_ID: {}},
+        force=True,
+        window_days=10,
+        request_budget=len(current_week_days),
+    )
+
+    assert requested_days == current_week_days
+
+
+@pytest.mark.asyncio()
 async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
     """Repeated network failures leave a cooldown-backed retry, not unavailable."""
     coordinator = _coordinator()
@@ -309,8 +422,9 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
     day_state = cast("Any", coordinator)._statistics_backfill_state["devices"][  # ruff: ignore[private-member-access]
         _DEVICE_ID
     ]["http_day_backfill"]["sources"]["battery"]["days"][day_key]
-    assert day_state["status"] == "retryable"
-    assert day_state["retry_after_epoch"] > 0
+    assert day_state["status"] == "pending"
+    assert "retry_after_epoch" not in day_state
+    assert day_state["last_error"] == "transport_error"
     assert result["pending_sources"] == 1
 
     immediate_retry = await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
@@ -319,10 +433,10 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
         window_days=1,
         request_budget=1,
     )
-    assert immediate_retry["requests"] == 0
+    assert immediate_retry["requests"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_repeated_empty_day_becomes_terminal_without_queue_loop() -> None:
     """A completed historical day with no source data stops rapid retries."""
     coordinator = _coordinator()
