@@ -237,6 +237,7 @@ class TestMandatoryRedaction:
         # The function should not accept a disable parameter
         import inspect  # ruff: ignore[import-outside-top-level]
 
+        # ruff: ignore[import-outside-top-level]
         from homeassistant.components.diagnostics import (
             async_redact_data as _recursive_redact,
         )

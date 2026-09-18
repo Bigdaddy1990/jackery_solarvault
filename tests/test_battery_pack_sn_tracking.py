@@ -238,6 +238,7 @@ def test_communication_state_derived_from_live_pack_presence() -> None:
     connected state (``commState == 1`` semantics) from the pack's live
     telemetry so the entity is not stuck on "unknown".
     """
+    # ruff: ignore[import-outside-top-level]
     from custom_components.jackery_solarvault.sensor import (
         BATTERY_PACK_SENSOR_DESCRIPTIONS,
     )
