@@ -967,6 +967,8 @@ warn_return_any = true
 no_implicit_reexport = true
 
 [tool.pyrefly]
+# Type-check the shipped integration; tests use dynamic Home Assistant doubles.
+project-includes = ["custom_components/jackery_solarvault"]
 python-version = "3.14.0"
 preset = "legacy"
 ignore-missing-imports = ["*"]
