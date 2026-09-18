@@ -53,6 +53,7 @@ class TestPayloadRedaction:
             "data": {"nested_token": "secret_nested"},
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["access_token"] == "**REDACTED**"
@@ -73,6 +74,7 @@ class TestPayloadRedaction:
             "credentials": {"username": "user", "password": "pass"},
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["password"] == "**REDACTED**"
@@ -99,6 +101,7 @@ class TestPayloadRedaction:
             "gps": {"lat": 48.8566, "lon": 2.3522},
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["aes_key"] == "**REDACTED**"
@@ -124,6 +127,7 @@ class TestPayloadRedaction:
             "bind_user_id": "user_999",
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["user_id"] == "**REDACTED**"
@@ -149,6 +153,7 @@ class TestPayloadRedaction:
             "onlineState": 1,
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # All these should be preserved (not redacted)
         # pyrefly: ignore [bad-index]
@@ -174,6 +179,7 @@ class TestPayloadRedaction:
             "chart_data": [1.0, 2.0, 3.0],
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["devices"][0]["deviceId"] == "**REDACTED**"
@@ -197,6 +203,7 @@ class TestPayloadRedaction:
             "str_val": "hello",
         }
         redacted = _payload_debug_redacted(payload)
+        assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
         assert redacted["none_val"] is None

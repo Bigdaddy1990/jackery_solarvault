@@ -5,7 +5,7 @@ Focus on the uncovered lines from services.py coverage report.
 
 from datetime import UTC
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -23,6 +23,7 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_SET_AC_NICKNAME,
     SERVICE_UNBIND_ACCESSORIES,
 )
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 if TYPE_CHECKING:
@@ -45,8 +46,13 @@ def _make_service_call(data: dict[str, Any]) -> SimpleNamespace:
     return call
 
 
+async def _async_setup_services(hass: SimpleNamespace) -> None:
+    """Pass the deliberately minimal Home Assistant test double to the service setup."""
+    await services.async_setup_services(cast(HomeAssistant, hass))
+
+
 async def _registered_handler(hass: SimpleNamespace, service_name: str):  # ruff: ignore[missing-return-type-private-function]
-    await services.async_setup_services(hass)
+    await _async_setup_services(hass)
     for call in hass.services.async_register.call_args_list:
         if call[0][0] == DOMAIN and call[0][1] == service_name:
             return call[0][2]
@@ -95,7 +101,7 @@ class TestServiceBindCurrency:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
@@ -117,7 +123,7 @@ class TestServiceBindCurrency:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
@@ -134,7 +140,7 @@ class TestServiceBindCurrency:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
@@ -147,7 +153,7 @@ class TestServiceBindCurrency:
     async def test_bind_currency_no_coordinator(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         hass = _make_hass()
         with patch.object(services, "_coordinator_for_device", return_value=None):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_BIND_CURRENCY)
             assert handler is not None
 
@@ -168,7 +174,7 @@ class TestServiceCheckSystemBound:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
@@ -194,7 +200,7 @@ class TestServiceCheckSystemBound:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
@@ -222,7 +228,7 @@ class TestServiceCheckSystemBound:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
@@ -246,7 +252,7 @@ class TestServiceCheckSystemBound:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_CHECK_SYSTEM_BOUND)
             assert handler is not None
 
@@ -272,7 +278,7 @@ class TestServiceUnbindAccessories:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
 
@@ -293,7 +299,7 @@ class TestServiceUnbindAccessories:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
 
@@ -315,7 +321,7 @@ class TestServiceUnbindAccessories:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_UNBIND_ACCESSORIES)
             assert handler is not None
 
@@ -339,7 +345,7 @@ class TestServiceSetAcNickname:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
@@ -365,7 +371,7 @@ class TestServiceSetAcNickname:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
@@ -386,7 +392,7 @@ class TestServiceSetAcNickname:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_SET_AC_NICKNAME)
             assert handler is not None
 
@@ -411,7 +417,7 @@ class TestServiceReportDeviceTimezone:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
@@ -437,7 +443,7 @@ class TestServiceReportDeviceTimezone:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
@@ -460,7 +466,7 @@ class TestServiceReportDeviceTimezone:
         with patch.object(
             services, "_coordinator_for_device", return_value=coordinator
         ):
-            await services.async_setup_services(hass)
+            await _async_setup_services(hass)
             handler = await _registered_handler(hass, SERVICE_REPORT_DEVICE_TIMEZONE)
             assert handler is not None
 
