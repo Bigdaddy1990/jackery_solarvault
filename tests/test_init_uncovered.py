@@ -135,8 +135,13 @@ class TestInitModule:
                                 with patch(
                                     "custom_components.jackery_solarvault._async_clean_legacy_entities"
                                 ):
-                                    with patch(
-                                        "custom_components.jackery_solarvault._async_remove_legacy_system_parent_devices"
+                                    with (
+                                        patch(
+                                            "custom_components.jackery_solarvault._async_remove_legacy_system_parent_devices"
+                                        ),
+                                        patch(
+                                            "custom_components.jackery_solarvault._async_register_main_devices"
+                                        ),
                                     ):
                                         with patch.object(
                                             hass.config_entries,

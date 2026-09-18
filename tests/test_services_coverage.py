@@ -24,14 +24,14 @@ def _translation_error(error: ServiceValidationError) -> str:
     return placeholders["error"]
 
 
-def test_global_service_registration_is_idempotent(hass: HomeAssistant) -> None:
+async def test_global_service_registration_is_idempotent(hass: HomeAssistant) -> None:
     """Repeated setup preserves the registered domain service handlers."""
-    services.async_setup_services(hass)
+    await services.async_setup_services(hass)
     registrations = services._service_registrations()  # ruff: ignore[private-member-access]
     assert all(hass.services.has_service(DOMAIN, item.name) for item in registrations)
 
     before = dict(hass.services.async_services()[DOMAIN])
-    services.async_setup_services(hass)
+    await services.async_setup_services(hass)
     assert hass.services.async_services()[DOMAIN] == before
 
 

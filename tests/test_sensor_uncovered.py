@@ -258,12 +258,7 @@ class TestSensorCreation:
         sensor = JackeryBatteryPackSensor(
             coordinator=coordinator,
             device_id="test_device",
-            # pyrefly: ignore [unexpected-keyword]
-            pack_index=1,
-            # pyrefly: ignore [unexpected-keyword]
-            pack_sn="test_sn",
-            # pyrefly: ignore [unexpected-keyword]
-            pack_key="pack_1",
+            identity=(1, "test_sn", "pack_1"),
             description=description,
         )
         assert sensor is not None

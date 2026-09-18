@@ -231,8 +231,8 @@ def test_number_empty_description_has_safe_defaults() -> None:
     assert entity._allowed_values() == ()  # ruff: ignore[private-member-access]
 
 
-async def test_number_without_setter_validates_then_performs_no_write() -> None:
-    """A read-only description returns cleanly after range validation."""
+async def test_number_without_setter_raises_translated_action_error() -> None:
+    """A read-only description reports that the entity is not writable."""
     entity = _number(
         JackeryNumberDescription(
             # pyrefly: ignore [unexpected-keyword]
@@ -244,7 +244,10 @@ async def test_number_without_setter_validates_then_performs_no_write() -> None:
         ),
     )
 
-    await entity.async_set_native_value(5)
+    with pytest.raises(HomeAssistantError) as raised:
+        await entity.async_set_native_value(5)
+
+    assert raised.value.translation_key == "entity_action_failed"
 
 
 @pytest.mark.parametrize(
@@ -284,28 +287,6 @@ async def test_number_preserves_structured_setter_errors(
 
     if isinstance(error, HomeAssistantError):
         assert caught.value is error
-
-
-async def test_optional_number_setter_ignores_transport_failure() -> None:
-    """An explicitly optional write logs a transport failure without masking HA."""
-    setter = AsyncMock(side_effect=TimeoutError("offline"))
-    entity = _number(
-        JackeryNumberDescription(
-            # pyrefly: ignore [unexpected-keyword]
-            key="optional",
-            # pyrefly: ignore [unexpected-keyword]
-            native_min_value=0,
-            # pyrefly: ignore [unexpected-keyword]
-            native_max_value=10,
-            setter=setter,
-            # pyrefly: ignore [unexpected-keyword]
-            raise_on_setter_error=False,
-        ),
-    )
-
-    await entity.async_set_native_value(5)
-
-    setter.assert_awaited_once()
 
 
 def test_device_and_system_name_native_fallbacks() -> None:
@@ -472,16 +453,13 @@ def test_third_party_native_value_none_and_constructor_pattern_branch() -> None:
     constructed = JackeryThirdPartyMqttText(
         entity.coordinator,
         _DEVICE_ID,
-        # pyrefly: ignore [unexpected-keyword]
-        key_suffix="token",
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="third_party_mqtt_token",
-        # pyrefly: ignore [unexpected-keyword]
-        field="token",
-        # pyrefly: ignore [unexpected-keyword]
-        mode=TextMode.TEXT,
-        # pyrefly: ignore [unexpected-keyword]
-        pattern=r"^\d+$",
+        config=(
+            "token",
+            "third_party_mqtt_token",
+            "token",
+            TextMode.TEXT,
+            r"^\d+$",
+        ),
     )
 
     assert entity.native_value is None

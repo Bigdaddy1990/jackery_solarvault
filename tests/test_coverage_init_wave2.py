@@ -983,6 +983,7 @@ async def test_successful_unload_defers_pending_supplemental_cleanup(
             AsyncMock(return_value=True),
         ),
         patch.object(integration, "_defer_supplemental_transports") as defer,
+        patch.object(integration, "_supplemental_cleanup_pending", return_value=True),
         patch.object(integration, "_schedule_supplemental_cleanup") as cleanup,
     ):
         assert await integration.async_unload_entry(hass, entry) is True
@@ -1047,6 +1048,7 @@ async def test_release_fenced_coordinator_clears_only_after_http_shutdown(
             AsyncMock(side_effect=[False, True]),
         ) as shutdown,
         patch.object(integration, "_defer_supplemental_transports") as defer,
+        patch.object(integration, "_supplemental_cleanup_pending", return_value=True),
         patch.object(integration, "_schedule_supplemental_cleanup") as cleanup,
     ):
         assert not await integration._async_release_fenced_coordinator(hass, entry)  # ruff: ignore[private-member-access]
@@ -1245,7 +1247,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "head-1_battery_pack_PACK-1")},
         name="Pack",
-        via_device=(DOMAIN, "head-1"),
+        via_device_id=parent.id,
     )
 
     assert integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
@@ -1261,7 +1263,7 @@ def test_battery_pack_registry_identity_requires_one_parent_scoped_id(
             (DOMAIN, "head-1_battery_pack_PACK-3"),
         },
         name="Ambiguous pack",
-        via_device=(DOMAIN, "head-1"),
+        via_device_id=parent.id,
     )
     assert (
         integration._battery_pack_registry_identity(  # ruff: ignore[private-member-access]
@@ -1281,7 +1283,7 @@ def test_phantom_cleanup_removes_head_unit_duplicate_pack(
     coordinator.data = {}
     entry.runtime_data = coordinator
     registry = dr.async_get(hass)
-    registry.async_get_or_create(
+    parent = registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, "head-2")},
         name="SolarVault",
@@ -1292,7 +1294,7 @@ def test_phantom_cleanup_removes_head_unit_duplicate_pack(
         identifiers={(DOMAIN, "head-2_battery_pack_HEAD-SERIAL")},
         name="False pack",
         serial_number="HEAD-SERIAL",
-        via_device=(DOMAIN, "head-2"),
+        via_device_id=parent.id,
     )
 
     integration._async_remove_phantom_battery_pack_devices(  # ruff: ignore[private-member-access]

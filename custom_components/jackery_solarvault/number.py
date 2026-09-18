@@ -260,7 +260,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
             # ty's narrowing of `callable()` over a union that includes a tuple
             # type falls back to `Top[(...) -> object]`; mypy narrows correctly.
             return tuple(
-                allowed(  # ty: ignore[call-top-callable, invalid-argument-type]
+                allowed(  # ty: ignore[invalid-argument-type]
                     self._payload_for_sources(self.entity_description.data_sources)
                 )
             )

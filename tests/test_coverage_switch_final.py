@@ -25,6 +25,7 @@ from custom_components.jackery_solarvault.switch import (
     JackerySmartPlugSwitch,
     JackerySwitchDescription,
 )
+from custom_components.jackery_solarvault.util import payload_has_home_payload_evidence
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 if TYPE_CHECKING:
@@ -123,17 +124,12 @@ def test_payload_family_detection_prefers_home_evidence() -> None:
     )
     assert (
         # pyrefly: ignore [missing-attribute]
-        switch_mod._payload_has_home_payload_evidence({  # ruff: ignore[private-member-access]
-            PAYLOAD_SYSTEM: {"systemId": "system-1"}
-        })
+        payload_has_home_payload_evidence({PAYLOAD_SYSTEM: {"systemId": "system-1"}})
         is True
     )
     assert (
         # pyrefly: ignore [missing-attribute]
-        switch_mod._payload_has_home_payload_evidence({  # ruff: ignore[private-member-access]
-            "http_properties": {"batSoc": 50}
-        })
-        is True
+        payload_has_home_payload_evidence({"http_properties": {"batSoc": 50}}) is True
     )
     assert switch_mod._is_portable_payload({}) is False  # ruff: ignore[private-member-access]
 
@@ -294,13 +290,15 @@ def test_description_state_fallback_order_and_unknown_transform() -> None:
 
 
 async def test_description_no_setter_and_error_passthrough_branches() -> None:
-    """Read-only switches no-op and translated/auth errors retain HA semantics."""
+    """Read-only switches and transport errors retain HA semantics."""
     no_setter = _description_switch(
         # pyrefly: ignore [unexpected-keyword]
         JackerySwitchDescription(key="readonly", source_keys=("flag",)),
     )
-    await no_setter.async_turn_on()
-    await no_setter.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await no_setter.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await no_setter.async_turn_off()
 
     translated = HomeAssistantError(
         translation_domain="jackery_solarvault",

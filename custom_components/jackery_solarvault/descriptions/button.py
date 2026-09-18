@@ -91,7 +91,7 @@ class JackeryButtonDescription(ButtonEntityDescription):
     http_subdevice_dev_type: int | None = None
     data_sources: tuple[str, ...] = ()
     command_sources: tuple[str, ...] = ()
-    device_registry_role: str | None = "head"
+    device_registry_role: str = "head"
 
     def __post_init__(self) -> None:
         """Resolve direct read and command transports for this App command."""

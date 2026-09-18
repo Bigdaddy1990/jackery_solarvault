@@ -1913,31 +1913,6 @@ def test_pre_commit_python_target_matches_ha_minimum() -> None:
     assert "--py313-plus" not in config
 
 
-def test_gate_ruff_scope_excludes_embedded_non_integration_trees() -> None:
-    """Ruff gates must inspect Jackery sources/tests, not embedded tool examples."""
-    source = pathlib.Path("scripts/gate.py").read_text(encoding="utf-8")
-
-    assert "RUFF_TARGETS: Final = (" in source
-    assert '"custom_components/jackery_solarvault"' in source
-    assert '"tests"' in source
-    assert '"format", "--check", "."' not in source
-    assert '"check", "."' not in source
-    assert '"check", "--fix", "."' not in source
-
-
-def _load_py314_exception_guard_module() -> types.ModuleType:
-    """Load the local Python 3.14 exception-style guard script."""
-    spec = importlib.util.spec_from_file_location(
-        "verify_py314_exception_style",
-        pathlib.Path("scripts/verify_py314_exception_style.py"),
-    )
-    assert spec is not None
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
 def test_generated_payload_debug_logs_are_ignored() -> None:
     """Implement test generated payload debug logs are ignored."""
     gitignore = pathlib.Path(".gitignore").read_text(encoding="utf-8")

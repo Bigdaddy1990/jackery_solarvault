@@ -11,7 +11,11 @@ from custom_components.jackery_solarvault import (
     JackeryLocalMqttClient,
     async_unload_entry,
 )
-from custom_components.jackery_solarvault.const import CONF_THIRD_PARTY_MQTT_IP, DOMAIN
+from custom_components.jackery_solarvault.const import (
+    CONF_THIRD_PARTY_MQTT_ENABLE,
+    CONF_THIRD_PARTY_MQTT_IP,
+    DOMAIN,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -82,10 +86,11 @@ async def test_unload_defers_local_mqtt_when_unsubscribe_fails(
     # unsubscribe has completed. Cleanup owns the eventual listener restart.
     coordinator = MagicMock()
     entry.runtime_data = coordinator
+    bucket.pop(integration._UNLOADING_COORDINATOR_RUNTIME_KEY, None)  # ruff: ignore[private-member-access]
     hass.config_entries.async_update_entry(
         entry,
         options={
-            "local_mqtt_enable": True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "192.0.2.10",
         },
     )

@@ -84,11 +84,12 @@ async def test_rejected_or_failed_sink_is_diagnosed(
     await client._handle_message("jackery/device", b"{}")  # ruff: ignore[private-member-access]
 
     snapshot = client.diagnostics_snapshot()
-    assert snapshot["messages_dropped"] == 1
     if isinstance(sink_result, RuntimeError):
+        assert snapshot["messages_dropped"] == 1
         assert snapshot["sink_errors"] == 1
         assert "RuntimeError" in cast_str(snapshot["last_sink_error"])
     else:
+        assert snapshot["messages_dropped"] == 0
         assert snapshot["messages_rejected_by_sink"] == 1
 
 
