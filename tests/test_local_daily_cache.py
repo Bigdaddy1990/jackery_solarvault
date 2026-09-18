@@ -1,14 +1,13 @@
 # ruff: noqa: E501, SLF001
 """Tests for the current-day local lifetime-counter anchor."""
-
 from datetime import date
 from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.core import HomeAssistant
 
 from custom_components.jackery_solarvault.client import daily_energy as cache
-from homeassistant.core import HomeAssistant
 
 _TODAY = date(2024, 5, 20)
 _TODAY_ISO = "2024-05-20"

@@ -1,6 +1,4 @@
 """Small offline manifest validator used when the official action is unavailable."""
-
-
 import argparse
 import json
 import sys

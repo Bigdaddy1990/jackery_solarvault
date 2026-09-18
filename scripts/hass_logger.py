@@ -1,5 +1,4 @@
 """Plugin for logger invocations."""
-
 from typing import ClassVar
 
 from astroid import nodes

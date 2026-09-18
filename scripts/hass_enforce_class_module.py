@@ -1,12 +1,10 @@
 """Plugin for checking if class is in correct module."""
-
 from typing import ClassVar
 
 from astroid import nodes  # noqa: TC002
+from homeassistant.const import Platform
 from pylint.checkers import BaseChecker
 from pylint.lint import PyLinter  # noqa: TC002
-
-from homeassistant.const import Platform
 
 _BASE_ENTITY_MODULES: set[str] = {
     "BaseCoordinatorEntity",

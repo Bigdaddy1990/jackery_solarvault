@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Inspect all component SCHEMAS."""
-
 import importlib
-from pathlib import Path
 import pkgutil
+from pathlib import Path
 
 from homeassistant.config import _identify_config_schema  # noqa: PLC2701
 from homeassistant.scripts.check_config import color

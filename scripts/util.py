@@ -1,5 +1,4 @@
 """Utility functions for the scaffold script."""
-
 import argparse
 from typing import Any
 

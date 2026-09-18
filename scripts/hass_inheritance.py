@@ -1,5 +1,4 @@
 """Plugin to enforce type hints on specific functions."""
-
 import re
 from typing import ClassVar
 

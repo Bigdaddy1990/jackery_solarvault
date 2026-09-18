@@ -1,9 +1,8 @@
 """Helper script to update currency list from the official source."""
-
 from pathlib import Path
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 
 from .hassfest.serializer import format_python_namespace
 

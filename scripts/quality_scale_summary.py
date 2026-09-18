@@ -3,10 +3,9 @@
 Run with python3 -m script.quality_scale_summary
 Data collected at https://docs.google.com/spreadsheets/d/1xEiwovRJyPohAv8S4ad2LAB-0A38s1HWmzHng8v-4NI
 """
-
 import csv
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from homeassistant.const import __version__ as current_version
 from homeassistant.util.json import load_json

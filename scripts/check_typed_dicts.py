@@ -16,7 +16,6 @@ Exit codes:
 - 0: OK
 - 1: Errors found
 """
-
 import ast
 from pathlib import Path
 

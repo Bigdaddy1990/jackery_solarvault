@@ -1,7 +1,6 @@
 """Plugin for checking imports."""
-
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import ClassVar
 
 from astroid import nodes  # noqa: TC002

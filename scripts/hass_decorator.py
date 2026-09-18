@@ -1,5 +1,4 @@
 """Plugin to check decorators."""
-
 from typing import ClassVar
 
 from astroid import nodes
