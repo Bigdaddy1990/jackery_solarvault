@@ -28,6 +28,7 @@ from custom_components.jackery_solarvault.sensor import (
     _StatRefreshResult,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 
@@ -53,9 +54,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="power",
+            device_class=SensorDeviceClass.POWER,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="measurement",
+            state_class=SensorStateClass.MEASUREMENT,
             getter=lambda props: props.get("test_key"),
         )
         return JackerySensor(
@@ -105,9 +106,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="energy",
+            device_class=SensorDeviceClass.ENERGY,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="total_increasing",
+            state_class=SensorStateClass.TOTAL_INCREASING,
             stat_key="pv",
         )
         sensor = JackeryStatSensor(
@@ -128,9 +129,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="energy",
+            device_class=SensorDeviceClass.ENERGY,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="total",
+            state_class=SensorStateClass.TOTAL,
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
@@ -162,9 +163,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="energy",
+            device_class=SensorDeviceClass.ENERGY,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="total",
+            state_class=SensorStateClass.TOTAL,
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
@@ -210,9 +211,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="kWh",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="energy",
+            device_class=SensorDeviceClass.ENERGY,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="total",
+            state_class=SensorStateClass.TOTAL,
             stat_key="pv",
         )
         sensor = JackeryStatSensor(coordinator, "test_device", description)
@@ -249,9 +250,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="power",
+            device_class=SensorDeviceClass.POWER,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="measurement",
+            state_class=SensorStateClass.MEASUREMENT,
             getter=lambda props: props.get("pack_key"),
         )
         # pyrefly: ignore [missing-argument]
@@ -274,9 +275,9 @@ class TestSensorCreation:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="EUR",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="monetary",
+            device_class=SensorDeviceClass.MONETARY,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="total",
+            state_class=SensorStateClass.TOTAL,
             path=("savings", "value"),
         )
         sensor = JackerySavingsDetailSensor(
@@ -395,9 +396,9 @@ class TestSensorState:
             # pyrefly: ignore [unexpected-keyword]
             native_unit_of_measurement="W",
             # pyrefly: ignore [unexpected-keyword]
-            device_class="power",
+            device_class=SensorDeviceClass.POWER,
             # pyrefly: ignore [unexpected-keyword]
-            state_class="measurement",
+            state_class=SensorStateClass.MEASUREMENT,
             getter=lambda props: props.get("test_key"),
         )
         return JackerySensor(
