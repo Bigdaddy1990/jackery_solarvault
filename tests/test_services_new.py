@@ -23,11 +23,10 @@ from custom_components.jackery_solarvault.const import (
     SERVICE_SET_AC_NICKNAME,
     SERVICE_UNBIND_ACCESSORIES,
 )
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 if TYPE_CHECKING:
-    from homeassistant.core import ServiceResponse
+    from homeassistant.core import HomeAssistant, ServiceResponse
 
 # Disable pytest_homeassistant_custom_component auto-setup for these tests
 pytestmark = pytest.mark.unit
@@ -48,7 +47,7 @@ def _make_service_call(data: dict[str, Any]) -> SimpleNamespace:
 
 async def _async_setup_services(hass: SimpleNamespace) -> None:
     """Pass the deliberately minimal Home Assistant test double to the service setup."""
-    await services.async_setup_services(cast(HomeAssistant, hass))
+    await services.async_setup_services(cast("HomeAssistant", hass))
 
 
 async def _registered_handler(hass: SimpleNamespace, service_name: str):  # ruff: ignore[missing-return-type-private-function]
