@@ -77,6 +77,7 @@ from custom_components.jackery_solarvault.models import BleProcessDisposition
 from homeassistant.exceptions import ServiceValidationError
 
 if TYPE_CHECKING:
+    from bleak import BleakClient
     from collections.abc import Coroutine
 
 # ---------------------------------------------------------------------------
@@ -187,16 +188,16 @@ def test_aes_round_trip_with_deterministic_iv_aes256() -> None:
     assert aes_decrypt(ciphertext, key, iv) == plaintext
 
 
-def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
+def test_aes_round_trip_with_synthetic_aes128_key() -> None:
     """AES-128 with the SolarVault-shaped 16-byte key round-trips too.
 
-    Pinned input is the synthetic ``bluetoothKey`` for a
-    SolarVault-shaped payload: ``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
+    Pinned input is a synthetic 16-byte ``bluetoothKey`` fixture:
+    ``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
     → ``b"0123456789abcdef"``. This is the regression that motivated
     accepting both key lengths.
     """
     key = base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
+    assert len(key) == BLE_AES_KEY_LEN_AES128
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
@@ -333,7 +334,7 @@ def test_encrypt_decrypt_round_trip_recovers_frame_aes256() -> None:
 
 
 def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
-    """End-to-end frame round-trip with the captured 16-byte device key."""
+    """End-to-end frame round-trip with a synthetic 16-byte device key."""
     key = base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")
     frame = BleFrame(
         frame_index=1,
@@ -431,11 +432,11 @@ def test_split_payload_handles_empty_payload() -> None:
 # ---------------------------------------------------------------------------
 
 
-_SYNTHETIC_KEY_B64 = "MDEyMzQ1Njc4OWFiY2RlZg=="  # synthetic 16-byte AES-128 key
+_TEST_KEY_B64 = "MDEyMzQ1Njc4OWFiY2RlZg=="  # synthetic 16-byte AES-128 key
 
-_SANITIZED_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
+_LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     # (raw_hex, expected_cmd, expected_body_len, first_body_byte_marker)
-    # Sanitized from captured frames by re-encrypting with the synthetic key.
+    # Captured 2026-05-16 from SolarVault 3 Pro Max via ESPHome BLE proxy.
     (
         (
             "32373731383339313431373738393000d267c47b972262f9133252b378358c2e"
@@ -487,15 +488,10 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     telemetry that the integration would otherwise have to wait for from
     the cloud.
     """
-    key = base64.b64decode(_SYNTHETIC_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     assert len(key) == BLE_AES_KEY_LEN_AES128
 
-    for (
-        raw_hex,
-        expected_cmd,
-        expected_body_len,
-        body_marker,
-    ) in _SANITIZED_NOTIFY_SAMPLES:
+    for raw_hex, expected_cmd, expected_body_len, body_marker in _LIVE_NOTIFY_SAMPLES:
         raw = bytes.fromhex(raw_hex)
         frame = decrypt_binary_notify(raw, key)
         assert isinstance(frame, BleBinaryFrame)
@@ -516,14 +512,14 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
-    key = base64.b64decode(_SYNTHETIC_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     with pytest.raises(ValueError, match="notify too short"):
         decrypt_binary_notify(b"too short", key)
 
 
 def test_decrypt_binary_notify_rejects_unknown_version() -> None:
     """Frames with an unknown protocol version raise ``ValueError``."""
-    key = base64.b64decode(_SYNTHETIC_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
     mutated = plain[:2] + b"\x99\x99" + plain[4:]
     blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
@@ -540,7 +536,7 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     :class:`.ble.BleBinaryFrame` docstring); the round-trip test uses
     explicit zero bytes that the decoder simply passes through.
     """
-    key = base64.b64decode(_SYNTHETIC_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     body = b'{"cmd":107,"swEps":1}'
     plain = build_binary_frame(cmd=107, body=body, flags=42, security=0x1234)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
@@ -605,7 +601,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         ``msg_id=3011`` / ``ble_msg_type=106`` must come back as
         ``flags==3011`` / ``cmd==106`` after decryption.
         """
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "573702884982521856", _FakeClient())
         ok = await listener.async_send_command(
@@ -1282,16 +1278,16 @@ def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
 
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
-    """A representative HTTP payload puts the AES key at the system level, not per-device.
+    """A system response may put the AES key at system level, not per-device.
 
-    The representative ``/v1/device/system/list`` payload from a SolarVault 3
-    Pro Max had ``data[].bluetoothKey == "MDEyMzQ1Njc4OWFiY2RlZg=="`` at
+    The synthetic ``/v1/device/system/list`` fixture has
+    ``data[].bluetoothKey == "MDEyMzQ1Njc4OWFiY2RlZg=="`` at
     the system level and ``data[].devices[0].bluetoothKey == null`` for
     the main device. Before this regression test the integration only
     looked at the per-device slot and silently failed to decrypt BLE
     notify frames with ``decode_error="no bluetoothKey for device"`` —
-    visible in the BLE-transport diagnostics export from that capture.
-    """  # ruff: ignore[line-too-long]
+    visible in BLE-transport diagnostics.
+    """
     self = cast(
         "Any",
         JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
@@ -1300,7 +1296,7 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
     self._device_index = {
         "573702884982521856": {
             PAYLOAD_DEVICE_META: {
-                # Key is null at device level — matches the observed HTTP shape.
+                # Key is null at device level — matches the live HTTP shape.
                 FIELD_BLUETOOTH_KEY: None,
             },
             PAYLOAD_SYSTEM_META: {
@@ -1433,9 +1429,10 @@ def _attach_session(
     # notify_started defaults to False, and _async_send_command returns early on
     # a session whose notifications were never started. A double that stands in
     # for a live connection must therefore set it explicitly.
-    session = _GattSession(generation=1, client=client, notify_started=True)
+    typed_client = cast("BleakClient", client)
+    session = _GattSession(generation=1, client=typed_client, notify_started=True)
     listener._sessions[device_id] = session  # ruff: ignore[private-member-access]  # isort: skip
-    listener._clients[device_id] = client  # ruff: ignore[private-member-access]  # isort: skip
+    listener._clients[device_id] = typed_client  # ruff: ignore[private-member-access]  # isort: skip
     return session
 
 
@@ -1447,7 +1444,7 @@ def test_listener_install_session_cannot_replace_retained_owner() -> None:
     new_client = object()
 
     with pytest.raises(RuntimeError, match="still owns"):
-        listener._install_session("dev", new_client, generation=2)  # ruff: ignore[private-member-access]  # isort: skip
+        listener._install_session("dev", cast("BleakClient", new_client), generation=2)  # ruff: ignore[private-member-access]  # isort: skip
 
     assert listener._sessions["dev"] is old_session  # ruff: ignore[private-member-access]  # isort: skip
     assert listener._clients["dev"] is old_client  # ruff: ignore[private-member-access]  # isort: skip
@@ -1534,7 +1531,7 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
                 assert connectable is True
                 lookup_calls += 1
 
-        listener._teardown_session = _retry_teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
+        cast("Any", listener)._teardown_session = _retry_teardown
         listener._ha_bluetooth = cast("Any", _BluetoothModule())  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(
@@ -1763,7 +1760,7 @@ def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> N
         listener._on_disconnect(  # ruff: ignore[private-member-access]  # isort: skip
             "dev",
             generation=session.generation,
-            client=client,
+            client=cast("BleakClient", client),
         )
         release_sink.set()
         await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
@@ -1939,7 +1936,7 @@ def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
             await release_second.wait()
             second_finished.set()
 
-        listener._teardown_session = _teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
+        cast("Any", listener)._teardown_session = _teardown
         stop_task = asyncio.create_task(listener._async_stop_impl())  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
         await asyncio.sleep(0)
@@ -2104,7 +2101,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         BLE message type therefore completes the serialized ACK wait even
         when its observed flags field differs.
         """
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2167,7 +2164,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     async def _run() -> None:
         """Assert ack-timeout behaviour and pending-ack cleanup."""
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2214,7 +2211,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         ACK matching uses the newer notify sequence, session ownership and
         BLE message type; the observed flags field is not a transaction ID.
         """
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2339,11 +2336,8 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             raise RuntimeError("simulated GATT failure")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
-
-        Builds a bare listener configured with the synthetic AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """  # noqa: E501, RUF105
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        """Clear pending ACKs after a simulated GATT write failure."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
         cast("Any", exploding).is_connected = True
@@ -2495,7 +2489,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
     async def _run() -> None:
         """A >187-byte body splits into two indexed frames that reassemble."""
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2543,7 +2537,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
     async def _run() -> None:
         """``mtu_override`` forces smaller chunking than the cached MTU."""
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True
@@ -2583,15 +2577,8 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
             raise AssertionError("invalid MTU must not write to GATT")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
-
-        Constructs a bare listener with a fake client and a resolved AES key, then calls
-        `async_send_command` with a non-integer `mtu_override` to assert input validation.
-
-        Raises:
-            ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """  # noqa: E501, RUF105
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        """Reject a non-integer MTU override before attempting a write."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2657,11 +2644,8 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     )
 
     async def _run() -> None:
-        """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
-
-        This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """  # noqa: E501, RUF105
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        """Decode a synthetic notify and clear the previous frame error."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")
         # Mirror the real decode-failure path, which stamps BOTH fields
@@ -2701,7 +2685,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
     async def _run() -> None:
         """Chunked writes register ONE pending ack for the whole message."""
-        key = base64.b64decode(_SYNTHETIC_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True
