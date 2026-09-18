@@ -1309,9 +1309,8 @@ def test_ble_body_rejects_non_container_value() -> None:
     """Integers are neither mapping nor JSON string."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._ble_body_from_service(42, "dev")  # ruff: ignore[private-member-access]
-    assert (
-        "must be a mapping or JSON object string"
-        in (_translation_placeholder(err.value))
+    assert "must be a mapping or JSON object string" in (
+        _translation_placeholder(err.value)
     )
 
 
@@ -1344,9 +1343,8 @@ def test_tou_tasks_rejects_non_dict_task() -> None:
     """Tasks must be JSON objects."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._tou_tasks_from_service(["string"], "dev")  # ruff: ignore[private-member-access]
-    assert (
-        "each TOU task must be a JSON object"
-        in (_translation_placeholder(err.value))
+    assert "each TOU task must be a JSON object" in (
+        _translation_placeholder(err.value)
     )
 
 
@@ -1410,10 +1408,7 @@ def test_service_required_text_rejects_overlong() -> None:
         services._service_required_text(  # ruff: ignore[private-member-access]
             "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert (
-        "f must be at most 10 characters"
-        in (_translation_placeholder(err.value))
-    )
+    assert "f must be at most 10 characters" in (_translation_placeholder(err.value))
 
 
 def test_service_optional_text_defaults_none_to_empty() -> None:
@@ -1455,10 +1450,7 @@ def test_service_optional_text_rejects_overlong() -> None:
         services._service_optional_text(  # ruff: ignore[private-member-access]
             "x" * 11, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert (
-        "f must be at most 10 characters"
-        in (_translation_placeholder(err.value))
-    )
+    assert "f must be at most 10 characters" in (_translation_placeholder(err.value))
 
 
 def test_service_int_accepts_in_range() -> None:
@@ -1520,10 +1512,7 @@ def test_service_float_rejects_out_of_range(raw: object) -> None:
             device_id="d",
             bounds=(1.0, 10.0),
         )
-    assert (
-        "f must be between 1.0 and 10.0"
-        in (_translation_placeholder(err.value))
-    )
+    assert "f must be between 1.0 and 10.0" in (_translation_placeholder(err.value))
 
 
 def test_service_float_rejects_non_number() -> None:
