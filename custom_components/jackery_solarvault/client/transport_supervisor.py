@@ -57,10 +57,10 @@ class TransportSupervisor:
         coordinator: DataUpdateCoordinator,
         config: SupervisorConfig,
     ) -> None:
-        self.hass = hass
-        self.entry = entry
-        self.coordinator = coordinator
-        self.config = config
+        self.hass: HomeAssistant = hass
+        self.entry: ConfigEntry = entry
+        self.coordinator: DataUpdateCoordinator = coordinator
+        self.config: SupervisorConfig = config
         self._state = SupervisorState.STOPPED
         self._task: asyncio.Task[Any] | None = None
         self._reconnect_task: asyncio.Task[Any] | None = None
@@ -238,9 +238,9 @@ class TransportSupervisorManager:
         entry: ConfigEntry,
         coordinator: DataUpdateCoordinator,
     ) -> None:
-        self.hass = hass
-        self.entry = entry
-        self.coordinator = coordinator
+        self.hass: HomeAssistant = hass
+        self.entry: ConfigEntry = entry
+        self.coordinator: DataUpdateCoordinator = coordinator
         self._supervisors: dict[str, TransportSupervisor] = {}
 
     def register(

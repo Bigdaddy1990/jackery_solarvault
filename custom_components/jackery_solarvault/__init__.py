@@ -123,6 +123,8 @@ from .util import (
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Coroutine, Iterable
 
+    import voluptuous as vol
+
     from homeassistant.core import HomeAssistant
 
 # Typed ConfigEntry alias — the runtime_data attribute is a
@@ -150,7 +152,7 @@ _LOGGER = logging.getLogger(__name__)
 # surface. The `cv.config_entry_only_config_schema` helper documents
 # that contract to hassfest and rejects any YAML the user might add by
 # accident.
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+CONFIG_SCHEMA: vol.Schema = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(  # HA loader contract.

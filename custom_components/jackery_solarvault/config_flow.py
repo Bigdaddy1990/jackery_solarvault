@@ -527,7 +527,7 @@ def _reconfigure_options(
     return merged
 
 
-USER_SCHEMA = vol.Schema({
+USER_SCHEMA: vol.Schema = vol.Schema({
     vol.Required(CONF_USERNAME): str,
     vol.Required(CONF_PASSWORD): str,
     vol.Optional(
