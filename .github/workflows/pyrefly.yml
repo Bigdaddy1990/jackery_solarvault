@@ -39,7 +39,7 @@ jobs:
       - name: Install Pyrefly
         run: |
           pyrefly suppress --remove-unused --output-format=github || true
-          pyrefly check --summarize-errors --output-format=github || true
+          pyrefly check --summarize-errors --output-format=min-text || true
           pyrefly infer tests/ --output-format=github || true
           pyrefly infer custom_components/jackery_solarvault/ --output-format=github || true
           pyrefly infer --output-format=github || true
