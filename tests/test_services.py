@@ -85,6 +85,15 @@ def _service_call(data: dict[str, object]) -> ServiceCall:
     return cast("ServiceCall", _Call(data))
 
 
+def _translation_placeholder(exc: HomeAssistantError, key: str = "error") -> str:
+    """Read a required translation placeholder from a service error."""
+    placeholders = exc.translation_placeholders
+    assert placeholders is not None
+    value = placeholders[key]
+    assert isinstance(value, str)
+    return value
+
+
 # pyrefly: ignore [deprecated]
 @contextmanager
 def _ignore_private() -> Iterator[None]:
@@ -1269,7 +1278,7 @@ def test_json_native_body_rejects_non_dict_body() -> None:
         # pyrefly: ignore [bad-argument-type]
         services._json_native_body([1], "dev")  # ruff: ignore[private-member-access]
     assert err.value.translation_key == "send_ble_command_failed"
-    assert "**REDACTED**" in err.value.translation_placeholders["error"]
+    assert "**REDACTED**" in _translation_placeholder(err.value)
 
 
 def test_ble_body_accepts_mapping() -> None:
@@ -1286,14 +1295,14 @@ def test_ble_body_rejects_json_array_string() -> None:
     """Non-object JSON text is rejected."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._ble_body_from_service("[1]", "dev")  # ruff: ignore[private-member-access]
-    assert "body JSON must be an object" in err.value.translation_placeholders["error"]
+    assert "body JSON must be an object" in _translation_placeholder(err.value)
 
 
 def test_ble_body_rejects_malformed_json() -> None:
     """Unparseable JSON strings are rejected."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._ble_body_from_service("{", "dev")  # ruff: ignore[private-member-access]
-    assert "body is not valid JSON" in err.value.translation_placeholders["error"]
+    assert "body is not valid JSON" in _translation_placeholder(err.value)
 
 
 def test_ble_body_rejects_non_container_value() -> None:
@@ -1302,7 +1311,7 @@ def test_ble_body_rejects_non_container_value() -> None:
         services._ble_body_from_service(42, "dev")  # ruff: ignore[private-member-access]
     assert (
         "must be a mapping or JSON object string"
-        in (err.value.translation_placeholders["error"])
+        in (_translation_placeholder(err.value))
     )
 
 
@@ -1321,14 +1330,14 @@ def test_tou_tasks_rejects_dict_without_tasks() -> None:
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._tou_tasks_from_service({"foo": 1}, "dev")  # ruff: ignore[private-member-access]
     assert err.value.translation_key == "save_tou_plan_failed"
-    assert "body must be a tasks list" in err.value.translation_placeholders["error"]
+    assert "body must be a tasks list" in _translation_placeholder(err.value)
 
 
 def test_tou_tasks_rejects_malformed_json() -> None:
     """Unparseable JSON strings are rejected."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._tou_tasks_from_service("{bad", "dev")  # ruff: ignore[private-member-access]
-    assert "body is not valid JSON" in err.value.translation_placeholders["error"]
+    assert "body is not valid JSON" in _translation_placeholder(err.value)
 
 
 def test_tou_tasks_rejects_non_dict_task() -> None:
@@ -1337,7 +1346,7 @@ def test_tou_tasks_rejects_non_dict_task() -> None:
         services._tou_tasks_from_service(["string"], "dev")  # ruff: ignore[private-member-access]
     assert (
         "each TOU task must be a JSON object"
-        in (err.value.translation_placeholders["error"])
+        in (_translation_placeholder(err.value))
     )
 
 
@@ -1360,7 +1369,7 @@ def test_service_bool_rejects_non_boolean(raw: object) -> None:
     """Non-boolean values raise a translated field error."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._service_bool(raw, field_name="f", translation_key="k", device_id="d")  # ruff: ignore[private-member-access]
-    assert "f must be a boolean" in err.value.translation_placeholders["error"]
+    assert "f must be a boolean" in _translation_placeholder(err.value)
 
 
 def test_service_required_text_strips_value() -> None:
@@ -1383,7 +1392,7 @@ def test_service_required_text_rejects_non_text() -> None:
         services._service_required_text(  # ruff: ignore[private-member-access]
             1, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "f must be text" in err.value.translation_placeholders["error"]
+    assert "f must be text" in _translation_placeholder(err.value)
 
 
 def test_service_required_text_rejects_blank() -> None:
@@ -1392,7 +1401,7 @@ def test_service_required_text_rejects_blank() -> None:
         services._service_required_text(  # ruff: ignore[private-member-access]
             "", field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "f must not be empty" in err.value.translation_placeholders["error"]
+    assert "f must not be empty" in _translation_placeholder(err.value)
 
 
 def test_service_required_text_rejects_overlong() -> None:
@@ -1403,7 +1412,7 @@ def test_service_required_text_rejects_overlong() -> None:
         )
     assert (
         "f must be at most 10 characters"
-        in (err.value.translation_placeholders["error"])
+        in (_translation_placeholder(err.value))
     )
 
 
@@ -1437,7 +1446,7 @@ def test_service_optional_text_rejects_non_text() -> None:
         services._service_optional_text(  # ruff: ignore[private-member-access]
             1, field_name="f", translation_key="k", device_id="d", max_length=10
         )
-    assert "f must be text" in err.value.translation_placeholders["error"]
+    assert "f must be text" in _translation_placeholder(err.value)
 
 
 def test_service_optional_text_rejects_overlong() -> None:
@@ -1448,7 +1457,7 @@ def test_service_optional_text_rejects_overlong() -> None:
         )
     assert (
         "f must be at most 10 characters"
-        in (err.value.translation_placeholders["error"])
+        in (_translation_placeholder(err.value))
     )
 
 
@@ -1474,7 +1483,7 @@ def test_service_int_rejects_out_of_range(raw: object) -> None:
         services._service_int(  # ruff: ignore[private-member-access]
             raw, field_name="f", translation_key="k", device_id="d", bounds=(1, 10)
         )
-    assert "f must be between 1 and 10" in err.value.translation_placeholders["error"]
+    assert "f must be between 1 and 10" in _translation_placeholder(err.value)
 
 
 def test_service_int_rejects_non_integer() -> None:
@@ -1483,7 +1492,7 @@ def test_service_int_rejects_non_integer() -> None:
         services._service_int(  # ruff: ignore[private-member-access]
             "x", field_name="f", translation_key="k", device_id="d", bounds=(1, 10)
         )
-    assert "f must be an integer" in err.value.translation_placeholders["error"]
+    assert "f must be an integer" in _translation_placeholder(err.value)
 
 
 def test_service_float_accepts_in_range() -> None:
@@ -1513,7 +1522,7 @@ def test_service_float_rejects_out_of_range(raw: object) -> None:
         )
     assert (
         "f must be between 1.0 and 10.0"
-        in (err.value.translation_placeholders["error"])
+        in (_translation_placeholder(err.value))
     )
 
 
@@ -1523,7 +1532,7 @@ def test_service_float_rejects_non_number() -> None:
         services._service_float(  # ruff: ignore[private-member-access]
             "x", field_name="f", translation_key="k", device_id="d", bounds=(1.0, 10.0)
         )
-    assert "f must be a number" in err.value.translation_placeholders["error"]
+    assert "f must be a number" in _translation_placeholder(err.value)
 
 
 def test_reject_json_constant_names_the_constant() -> None:
@@ -1557,7 +1566,7 @@ def test_service_validation_error_merges_extra_placeholders() -> None:
     err = services._service_validation_error(  # ruff: ignore[private-member-access]
         "key", device_id="d", error="oops", extra_placeholders={"alert_id": "a1"}
     )
-    assert err.translation_placeholders["alert_id"] == "a1"
+    assert _translation_placeholder(err, "alert_id") == "a1"
 
 
 def test_service_action_error_wraps_home_assistant_error() -> None:
@@ -1572,7 +1581,7 @@ def test_service_action_error_merges_extra_placeholders() -> None:
     err = services._service_action_error(  # ruff: ignore[private-member-access]
         "key", device_id="d", error="oops", extra_placeholders={"extra": "v"}
     )
-    assert err.translation_placeholders["extra"] == "v"
+    assert _translation_placeholder(err, "extra") == "v"
 
 
 def test_device_id_from_service_rejects_blank(
@@ -1582,7 +1591,7 @@ def test_device_id_from_service_rejects_blank(
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, _r: "x")
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._device_id_from_service(_test_hass(), "  ", translation_key="k")  # ruff: ignore[private-member-access]
-    assert "device_id must not be empty" in err.value.translation_placeholders["error"]
+    assert "device_id must not be empty" in _translation_placeholder(err.value)
 
 
 def test_device_id_from_service_rejects_non_text(
@@ -1592,21 +1601,21 @@ def test_device_id_from_service_rejects_non_text(
     monkeypatch.setattr(services, "_resolve_jackery_device_id", lambda _h, _r: "x")
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._device_id_from_service(_test_hass(), 42, translation_key="k")  # ruff: ignore[private-member-access]
-    assert "device_id must be text" in err.value.translation_placeholders["error"]
+    assert "device_id must be text" in _translation_placeholder(err.value)
 
 
 def test_rename_name_rejects_non_text() -> None:
     """A non-string new_name raises a translated type error."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._rename_name_from_service(42, "123")  # ruff: ignore[private-member-access]
-    assert "new_name must be text" in err.value.translation_placeholders["error"]
+    assert "new_name must be text" in _translation_placeholder(err.value)
 
 
 def test_storm_alert_id_rejects_non_text() -> None:
     """A non-string alert id raises a translated type error."""
     with pytest.raises(ServiceValidationError) as err, _ignore_private():
         services._storm_alert_id_from_service(42, "dev")  # ruff: ignore[private-member-access]
-    assert "alert_id must be text" in err.value.translation_placeholders["error"]
+    assert "alert_id must be text" in _translation_placeholder(err.value)
 
 
 def test_coordinator_for_device_finds_match(
@@ -1735,7 +1744,7 @@ def test_raise_if_portable_home_service_rejects_portables(
             service_name="rename_system",
         )
     assert err.value.translation_key == "k"
-    assert "rename_system" in err.value.translation_placeholders["error"]
+    assert "rename_system" in _translation_placeholder(err.value)
 
 
 def test_loaded_coordinators_keeps_only_typed_runtime_data(
