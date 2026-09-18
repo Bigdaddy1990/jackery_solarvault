@@ -144,7 +144,7 @@ def test_stale_accessory_frame_keeps_identity_but_not_old_telemetry() -> None:
         "battery_packs",
         "pack-1",
         {"deviceSn": "pack-1", "soc": 11},
-        TransportSource.LOCAL_MQTT,
+        source=TransportSource.LOCAL_MQTT,
         current={"deviceSn": "pack-1", "soc": 72},
         observed_at=stale_at,
     )

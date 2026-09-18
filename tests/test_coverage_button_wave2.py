@@ -341,12 +341,11 @@ def _specialized_button(
             JackeryReadScheduleButton(
                 coordinator,
                 _DEVICE_ID,
-                # pyrefly: ignore [unexpected-keyword]
-                task_type=TIMER_TASK_TYPE_SMART_PLUG,
-                # pyrefly: ignore [unexpected-keyword]
-                key_suffix="plug_schedule",
-                # pyrefly: ignore [unexpected-keyword]
-                translation_key="read_smart_plug_schedule",
+                config=(
+                    TIMER_TASK_TYPE_SMART_PLUG,
+                    "plug_schedule",
+                    "read_smart_plug_schedule",
+                ),
                 plug_sn="PLUG-1",
             ),
             coordinator.async_read_device_schedule,

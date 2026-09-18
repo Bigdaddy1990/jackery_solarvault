@@ -34,6 +34,7 @@ pytestmark = pytest.mark.unit
 
 def _make_coordinator() -> AsyncMock:
     coordinator = AsyncMock()
+    coordinator.config_entry.async_start_reauth = Mock()
     coordinator.data = {}  # keeps portable-device guards from firing
     return coordinator
 
@@ -70,14 +71,13 @@ def _make_hass() -> SimpleNamespace:
     mock_registry.async_wait_loaded = (
         AsyncMock()
     )  # needed by entity_registry async_load
-    # dr.async_get(hass) returns the registry
-    dr.async_get = Mock(return_value=mock_registry)
+    # ``dr.async_get(hass)`` reads the registry from Home Assistant data.
     hass.data[dr.DATA_REGISTRY] = mock_registry
     hass.services = SimpleNamespace()
-    hass.services.async_register = AsyncMock()
+    hass.services.async_register = Mock()
     hass.services.has_service = Mock(return_value=False)
     hass.bus = SimpleNamespace()
-    hass.bus.async_listen = AsyncMock()
+    hass.bus.async_listen = Mock()
     # Add time zone for dt_util
     hass.config = SimpleNamespace()
     hass.config.time_zone = UTC

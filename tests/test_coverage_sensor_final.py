@@ -16,6 +16,10 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_PROPERTIES,
     PAYLOAD_SYSTEM,
 )
+from custom_components.jackery_solarvault.descriptions.sensor import (
+    JackerySensorDescription,
+)
+from custom_components.jackery_solarvault.util import payload_has_home_payload_evidence
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntityDescription,
@@ -51,11 +55,7 @@ def test_payload_family_detection_uses_positive_protocol_evidence(
     expected_portable: bool,
 ) -> None:
     """Home evidence wins; only legacy-bind metadata identifies portable payloads."""
-    assert (
-        # pyrefly: ignore [missing-attribute]
-        sensor_module._payload_has_home_payload_evidence(payload, props)  # ruff: ignore[private-member-access]
-        is expected_home
-    )
+    assert payload_has_home_payload_evidence(payload, props) is expected_home
     assert sensor_module._is_portable_payload(payload, props) is expected_portable  # ruff: ignore[private-member-access]
 
 
@@ -133,16 +133,16 @@ def test_getter_factories_preserve_metadata_and_source_semantics() -> None:
 def test_description_metadata_uses_getter_then_smali_and_explicit_sources() -> None:
     """Description provenance follows the getter, then the Smali field fallback."""
     # pyrefly: ignore [missing-attribute]
-    getter = sensor_module._prop("soc")  # ruff: ignore[private-member-access]
+    getter = sensor_module._prop_any("soc")  # ruff: ignore[private-member-access]
     # pyrefly: ignore [unexpected-keyword]
-    from_getter = sensor_module.JackerySensorDescription(key="getter", getter=getter)
-    from_smali = sensor_module.JackerySensorDescription(
+    from_getter = JackerySensorDescription(key="getter", getter=getter)
+    from_smali = JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="smali",
         getter=lambda _props: None,
         smali_field="legacyField",
     )
-    explicit = sensor_module.JackerySensorDescription(
+    explicit = JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="explicit",
         getter=getter,
@@ -253,11 +253,11 @@ async def test_restored_lifetime_energy_rejects_invalid_recorder_state(
 
 def test_jackery_sensor_value_mapping_and_source_attributes() -> None:
     """Fallbacks, value maps, and live-over-HTTP diagnostics share one payload view."""
-    description = sensor_module.JackerySensorDescription(
+    description = JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="mode",
         # pyrefly: ignore [missing-attribute]
-        getter=sensor_module._prop("mode"),  # ruff: ignore[private-member-access]
+        getter=sensor_module._prop_any("mode"),  # ruff: ignore[private-member-access]
         fallbacks=(lambda payload: payload.get("fallback"),),
         value_map={2: "self_consumption"},
     )

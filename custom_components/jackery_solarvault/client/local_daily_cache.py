@@ -267,21 +267,18 @@ def _merge_snapshots(
             incoming.get(_KEY_FULL_DAY_METRICS),
             incoming_values,
         )
-        merged = {
-            _KEY_DAY: incoming_day,
-            _KEY_VALUES: {
-                metric: min(incoming_values.get(metric, value), value)
-                for metric, value in existing_values.items()
-            }
-            | {
-                metric: value
-                for metric, value in incoming_values.items()
-                if metric not in existing_values
-            },
+        merged_values = {
+            metric: min(incoming_values.get(metric, value), value)
+            for metric, value in existing_values.items()
+        } | {
+            metric: value
+            for metric, value in incoming_values.items()
+            if metric not in existing_values
         }
+        merged = {_KEY_DAY: incoming_day, _KEY_VALUES: merged_values}
         merged_full_day_metrics = (
             existing_full_day_metrics | incoming_full_day_metrics
-        ) & merged[_KEY_VALUES].keys()
+        ) & merged_values.keys()
         if merged_full_day_metrics:
             merged[_KEY_FULL_DAY_METRICS] = sorted(merged_full_day_metrics)
         merged_last_deltas = _clean_metric_values(existing.get(_KEY_LAST_DELTAS))
