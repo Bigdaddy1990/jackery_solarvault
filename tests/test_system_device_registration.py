@@ -1,7 +1,7 @@
 """Regression tests for the single SolarVault main-device registry model."""
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -46,7 +46,7 @@ def test_obsolete_system_parent_is_removed_and_head_is_detached(
 
     migrated_head = registry.async_get(head.id)
     assert migrated_head is not None
-    assert migrated_head.via_device_id is None
+    assert cast("Any", migrated_head).via_device_id is None
     obsolete_parent = registry.async_get_device_by_identifier(
         parent_identifier,
         entry.entry_id,
