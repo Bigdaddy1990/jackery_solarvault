@@ -214,6 +214,7 @@ class TestCurrentLocalMqttOptions:
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
 
+
 # =============================================================================
 # JackeryOptionsFlow
 # =============================================================================
