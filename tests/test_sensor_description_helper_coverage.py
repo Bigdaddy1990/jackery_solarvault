@@ -17,10 +17,13 @@ _TWO_AND_HALF = 2.5
 
 
 def _entity(**payload: Any) -> Any:
-    return cast("Any", SimpleNamespace(
-        payload=payload,
-        merged_properties=payload.get("properties", {}),
-    ))
+    return cast(
+        "Any",
+        SimpleNamespace(
+            payload=payload,
+            merged_properties=payload.get("properties", {}),
+        ),
+    )
 
 
 def test_scalar_conversion_helpers_cover_invalid_and_valid_inputs() -> None:
@@ -99,12 +102,18 @@ def test_payload_access_helpers_cover_missing_and_fallback_values() -> None:
         descriptions._get_first_list_count(_entity(section="bad"), "section", "a")
         is None
     )
-    assert descriptions._get_first_list_count(
-        _entity(section={"a": "bad", "b": [1, 2]}), "section", "a", "b"
-    ) == _TWO
-    assert descriptions._get_first_list_count(
-        _entity(section={"a": "bad"}), "section", "a"
-    ) is None
+    assert (
+        descriptions._get_first_list_count(
+            _entity(section={"a": "bad", "b": [1, 2]}), "section", "a", "b"
+        )
+        == _TWO
+    )
+    assert (
+        descriptions._get_first_list_count(
+            _entity(section={"a": "bad"}), "section", "a"
+        )
+        is None
+    )
 
     entity = _entity(
         properties={
