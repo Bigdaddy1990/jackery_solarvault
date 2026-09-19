@@ -25,25 +25,18 @@ from custom_components.jackery_solarvault.config_flow import (
     _entry_data_from_api_login,  # ruff: ignore[import-private-name]
     _entry_text,  # ruff: ignore[import-private-name]
     _flow_options,  # ruff: ignore[import-private-name]
-    _merge_local_mqtt_options,  # ruff: ignore[import-private-name]
     _normalize_account,  # ruff: ignore[import-private-name]
     _reconfigure_options,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
-    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
 )
 from homeassistant.config_entries import ConfigEntryState
 
