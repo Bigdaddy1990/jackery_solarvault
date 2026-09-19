@@ -1,0 +1,61 @@
+name: Pre-commit Lite
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # for actions/checkout, if you're in a private repo
+  pull-requests: write
+  actions: write
+  checks: write
+  id-token: write # for Trusted Publishing + attest-action
+
+concurrency:
+  group: pre-commit-lite-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+   PYTHON_VERSION: ${{ vars.PYTHON_VERSION != '' && vars.PYTHON_VERSION || '3.14' }}
+   HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '' }}
+   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  pre-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          # Value already defaults to true, but `persist-credentials` is required to push new commits to the repository.
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+            pyproject.toml
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+          #enable-cache: true
+          #ignore-nothing-to-cache: true
+      - name: Install test dependencies for type-checking hooks
+        run: |
+          uv venv .venv --python python3.14
+          uv pip install --python .venv/bin/python -r requirements.txt -r requirements-test.txt
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - uses: astral-sh/ruff-action@v4.1.0
+      - uses: pre-commit/action@v3.0.1
+      - uses: pre-commit-ci/lite-action@v1.1.0
+        if: always()

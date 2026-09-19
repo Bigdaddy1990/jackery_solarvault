@@ -1,0 +1,149 @@
+"""A hung poll cycle becomes UpdateFailed instead of freezing the schedule.
+
+Owner: recurring "polling festhängt / pausiert". HA's DataUpdateCoordinator
+does not schedule the next refresh until ``_async_update_data`` returns, so a
+single await that never returns freezes polling forever. The update is now
+bounded by ``COORDINATOR_UPDATE_TIMEOUT_SEC``; a timeout raises UpdateFailed so
+HA logs it and reschedules the next cycle.
+"""
+
+import asyncio
+from datetime import timedelta
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from custom_components.jackery_solarvault.const import COORDINATOR_UPDATE_TIMEOUT_SEC
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
+)
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
+
+_MODULE = "custom_components.jackery_solarvault.coordinator"
+_POLL_INTERVAL_SEC = 15.0
+_COLD_DISCOVERY_TIMEOUT_CAP_SEC = float(COORDINATOR_UPDATE_TIMEOUT_SEC)
+_SHORT_CYCLE_ELAPSED_SEC = 2.0
+
+
+def _bare_coordinator() -> JackerySolarVaultCoordinator:
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    # HA's DataUpdateCoordinator.__init__ seeds ``data`` to ``None`` before the
+    # first successful cycle; the guard reads ``self.data`` on its failure paths,
+    # so a cold coordinator must expose that same initial state.
+    obj = cast("Any", coordinator)
+    obj.data = None
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._active_http_update_tasks = set()  # ruff: ignore[private-member-access]
+    obj._configured_update_interval = timedelta(seconds=_POLL_INTERVAL_SEC)  # ruff: ignore[private-member-access]
+    obj._last_http_cycle_started_monotonic = float("-inf")  # ruff: ignore[private-member-access]
+    obj._polling_diagnostics = {}  # ruff: ignore[private-member-access]
+    obj._device_index = {}  # ruff: ignore[private-member-access]
+    obj._device_registry_observer = None  # ruff: ignore[private-member-access]
+    return coordinator  # pyrefly: ignore [no-any-return-implicit]
+
+
+@pytest.mark.asyncio()
+async def test_normal_cycle_returns_guarded_result() -> None:
+    """When the guarded update completes, its result passes straight through."""
+    coordinator = _bare_coordinator()
+    data: dict[str, dict[str, Any]] = {"dev-1": {"soc": 80}}
+    cast("Any", coordinator)._async_update_data_guarded = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value=data,
+    )
+
+    result = await coordinator._async_update_data()  # ruff: ignore[private-member-access]
+
+    assert result == data
+
+
+@pytest.mark.asyncio()
+async def test_hung_cycle_raises_update_failed() -> None:
+    """A cycle that exceeds the ceiling is turned into UpdateFailed."""
+    coordinator = _bare_coordinator()
+
+    async def _hang() -> dict[str, dict[str, Any]]:
+        await asyncio.sleep(1)
+        return {}
+
+    cast("Any", coordinator)._async_update_data_guarded = _hang  # ruff: ignore[private-member-access]
+
+    with (
+        patch(f"{_MODULE}.COORDINATOR_UPDATE_TIMEOUT_SEC", 0.01),
+        pytest.raises(UpdateFailed),
+    ):
+        await coordinator._async_update_data()  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_cold_auth_failure_starts_reauth_and_propagates() -> None:
+    """A cold coordinator propagates an auth failure after starting reauth.
+
+    A running coordinator with data keeps its last state during reauth, but the
+    first refresh has no usable state. Home Assistant requires the auth error to
+    propagate so config-entry setup opens the reauthentication flow.
+    """
+    coordinator = _bare_coordinator()
+    cast("Any", coordinator)._async_update_data_guarded = AsyncMock(  # ruff: ignore[private-member-access]
+        side_effect=ConfigEntryAuthFailed("bad-credentials"),
+    )
+    entry = MagicMock()
+    hass = MagicMock()
+    cast("Any", coordinator).entry = entry
+    cast("Any", coordinator).hass = hass
+
+    with pytest.raises(ConfigEntryAuthFailed, match="bad-credentials"):
+        await coordinator._async_update_data()  # ruff: ignore[private-member-access]
+
+    entry.async_start_reauth.assert_called_once_with(hass)
+
+
+@pytest.mark.asyncio()
+async def test_completed_cycle_records_configured_followup_delay() -> None:
+    """A completed cycle records elapsed time and the configured HA interval."""
+    coordinator = _bare_coordinator()
+    data: dict[str, dict[str, Any]] = {"dev-1": {"soc": 80}}
+    cast("Any", coordinator)._async_update_data_guarded = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value=data,
+    )
+
+    with patch(
+        f"{_MODULE}.time.monotonic",
+        side_effect=[
+            100.0,
+            100.0,
+            100.0,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
+        ],
+    ):
+        result = await coordinator._async_update_data()  # ruff: ignore[private-member-access]
+
+    assert result == data
+    diagnostics = coordinator.polling_diagnostics
+    assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(
+        _SHORT_CYCLE_ELAPSED_SEC
+    )
+    assert diagnostics["next_poll_delay_sec"] == pytest.approx(_POLL_INTERVAL_SEC)
+
+
+def test_cold_first_refresh_keeps_the_hard_timeout_cap() -> None:
+    """Unknown devices cannot be budgeted before discovery completes."""
+    coordinator = _bare_coordinator()
+
+    assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(  # ruff: ignore[private-member-access]
+        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
+    )
+
+
+def test_warm_poll_keeps_hard_cap_when_rediscovery_can_replace_the_index() -> None:
+    """An invalid known device can be rediscovered as an unknown-sized set."""
+    coordinator = _bare_coordinator()
+    coordinator.data = {"previous": {}}
+    coordinator._device_index = {"stale-device": {}}  # ruff: ignore[private-member-access]
+
+    assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(  # ruff: ignore[private-member-access]
+        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
+    )

@@ -1,0 +1,19 @@
+name: Hassfest & HACS nightly
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hassfest-hacs:
+    uses: ./.github/workflows/reusable-marketplace-validation.yml
+    with:
+      category: integration
+      ignore: brands

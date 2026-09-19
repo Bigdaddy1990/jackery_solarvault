@@ -1,0 +1,113 @@
+ci:
+  autoupdate_schedule: weekly
+  autofix_prs: true
+  # Type checks run with dependencies in Pre-commit Lite, not on pre-commit.ci.
+  skip: [ty, pyrefly-check]
+  autofix_commit_msg: "[pre-commit.ci] autofix"
+  autoupdate_branch: main
+  autoupdate_commit_msg: "[pre-commit.ci] autoupdate"
+
+default_language_version:
+  python: python3.14
+
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+  - post-checkout
+  - post-merge
+  - post-rewrite
+
+repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.12.13
+    hooks:
+      - id: uv-sync
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.2
+    hooks:
+      - id: pyupgrade
+        args:
+          - --py314-plus
+
+  - repo: https://github.com/JelleZijlstra/autotyping
+    rev: 24.9.0
+    hooks:
+      - id: autotyping
+        stages: [pre-commit]
+        types: [python]
+        args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        args:
+          - --fix
+          - --unsafe-fixes
+          - --exit-non-zero-on-fix
+          - --extend-select=I,E,F,B,UP,D,E501,unused-noqa,ANN,ASYNC,Q,W
+        types_or:
+          - python
+          - pyi
+      - id: ruff-format
+        types_or:
+          - python
+          - pyi
+
+  #- repo: https://github.com/pre-commit/mirrors-mypy
+  #  rev: v2.3.1  # Use the sha / tag you want to point at
+  #  hooks:
+  #    - id: mypy
+  #      # By default, mypy will run with mypy --ignore-missing-imports, pre-commit runs mypy from an isolated
+        # virtualenv so it won't have access to those. To change the arguments, override the args as follows:
+  #      args: [--strict, --ignore-missing-imports]
+  #      additional_dependencies: [types-pyyaml, pydantic]
+  #      exclude: ^(manifest.*|docs/|scripts/)
+
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.80
+    hooks:
+      - id: ty
+        types: [python]
+        args: [--no-sync]
+
+  - repo: https://github.com/facebook/pyrefly-pre-commit
+    rev: 1.3.0  # The pyrefly version to use
+    hooks:
+      - id: pyrefly-check
+        name: Pyrefly (type checking)
+        pass_filenames: false
+        # Recommended to do full repo checks. However, you can change this to `true` to only check changed files
+        language: system  # Use system-installed pyrefly
+        args: [--summarize-errors, --output-format=github]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+        args:
+          - --allow-multiple-documents
+          - --unsafe
+        exclude: ^(docs/)
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args:
+          - --fix=lf
+      - id: debug-statements
+      - id: requirements-txt-fixer
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-builtin-literals
+      - id: check-symlinks
+      - id: pretty-format-json
+        args:
+          - --autofix
+          - --no-ensure-ascii
+        exclude: ^(custom_components/jackery_solarvault/manifest.*|tests/|docs/|scripts/)
+      - id: fix-byte-order-marker
+      - id: destroyed-symlinks

@@ -1,0 +1,76 @@
+name-template: 'v$RESOLVED_VERSION 🌞'
+tag-template: 'v$RESOLVED_VERSION'
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/Bigdaddy1990/jackery_solarvault/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+  ## Installation
+
+  Install via [HACS](https://hacs.xyz/) → "Integrations" → search for "Jackery SolarVault".
+  Or download `jackery_solarvault.zip` from this release and extract into
+  `<config>/custom_components/jackery_solarvault/`. Restart Home Assistant.
+
+categories:
+  - title: '💥 Breaking changes'
+    labels:
+      - 'breaking'
+      - 'breaking-change'
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '🐛 Bug fixes'
+    labels:
+      - 'fix'
+      - 'bug'
+  - title: '⚡ Performance'
+    labels:
+      - 'performance'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: '🧪 Tests'
+    labels:
+      - 'test'
+      - 'tests'
+  - title: '🧰 Maintenance'
+    labels:
+      - 'chore'
+      - 'maintenance'
+      - 'refactor'
+  - title: '⬆️ Dependencies'
+    collapse-after: 5
+    labels:
+      - 'dependencies'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'breaking'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'fix'
+      - 'bug'
+      - 'documentation'
+      - 'chore'
+      - 'maintenance'
+      - 'performance'
+      - 'refactor'
+      - 'tests'
+      - 'dependencies'
+  default: patch
+
+exclude-labels:
+  - 'skip-changelog'
