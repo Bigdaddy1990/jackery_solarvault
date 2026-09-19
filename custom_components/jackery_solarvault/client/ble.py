@@ -86,9 +86,9 @@ _UINT16_MAX: int = 0xFFFF
 
 #: Key lengths (in bytes) accepted by the BLE crypto helpers.
 #:
-#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but the
-#: representative ``/v1/device/system/list`` payload for a SolarVault 3 Pro Max
-#: uses a synthetic 16-byte key (``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
+#: PROTOCOL.md §14 originally documented a fixed 32-byte AES-256 key, but a
+#: synthetic 16-byte fixture demonstrates the supported AES-128 key
+#: size (``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
 #: → ``0123456789abcdef``). The Jackery app's smali ``bb/a`` accepts either
 #: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
 #: AES-128 or AES-256 from the key length implicitly. Both are listed here
