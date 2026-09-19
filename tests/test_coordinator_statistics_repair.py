@@ -84,9 +84,8 @@ async def test_cancelled_backfill_persists_fetched_progress(store_fails: bool) -
     """Reload must preserve fetched evidence while propagating task cancellation."""
     coordinator = _ready_backfill_coordinator()
     if store_fails:
-        cast("Any", coordinator)._statistics_backfill_store.async_save.side_effect = RuntimeError(  # ruff: ignore[private-member-access]
-            "store unavailable"
-        )
+        store = cast("Any", coordinator)._statistics_backfill_store  # noqa: SLF001
+        store.async_save.side_effect = RuntimeError("store unavailable")
     coordinator._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
     coordinator._statistics_backfill_task = None  # ruff: ignore[private-member-access]
     state = coordinator._statistics_backfill_device_state(_DEV)  # ruff: ignore[private-member-access]
@@ -96,7 +95,8 @@ async def test_cancelled_backfill_persists_fetched_progress(store_fails: bool) -
     )
     with pytest.raises(asyncio.CancelledError):
         await coordinator._async_statistics_backfill_job({_DEV: {}})  # ruff: ignore[private-member-access]
-    saved = cast("Any", coordinator)._statistics_backfill_store.async_save.await_args.args[0]  # ruff: ignore[private-member-access]
+    store = cast("Any", coordinator)._statistics_backfill_store  # noqa: SLF001
+    saved = store.async_save.await_args.args[0]
     assert saved["devices"][_DEV]["inflight"]["unimported_source"]["y"] == [500]
 
 
