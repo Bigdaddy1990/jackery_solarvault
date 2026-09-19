@@ -374,7 +374,7 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
     )
     coordinator.hass = _RejectingHass()
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="rejected-stop-owner")
-    coordinator._mqtt = transport  # ruff: ignore[private-member-access]
+    vars(coordinator)["_mqtt"] = transport
     coordinator._ble_listener = None  # ruff: ignore[private-member-access]
     coordinator._layer5_stop_tasks = {}  # ruff: ignore[private-member-access]
 

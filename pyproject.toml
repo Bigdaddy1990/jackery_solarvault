@@ -18,7 +18,6 @@ redundant-cast = "warn"
 python-version = "3.14"
 # Tailor type stubs and conditionalized type definitions to windows.
 python-platform = "linux"
-output-format = "github"
 
 [tool.setuptools.packages.find]
 include = ["custom_components*"]
