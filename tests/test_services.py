@@ -1131,9 +1131,9 @@ async def test_send_ble_command_service_rejects_direct_invalid_ack_timeout(
 # ---------------------------------------------------------------------------
 
 
-def _fake_coordinator(data: object) -> object:
-    """Return a coordinator-shaped stub carrying the given payload data."""
-    return SimpleNamespace(data=data)
+def _fake_coordinator(data: object) -> JackerySolarVaultCoordinator:
+    """Return a typed coordinator-shaped stub carrying the given payload data."""
+    return cast("JackerySolarVaultCoordinator", SimpleNamespace(data=data))
 
 
 @pytest.mark.parametrize("raw", [True, False])

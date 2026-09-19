@@ -213,10 +213,10 @@ def test_late_ct_identity_updates_existing_registry_device(
     sensor._sync_device_mac_connection({FIELD_DEVICE_SN: serial})  # ruff: ignore[private-member-access]
     updated = registry.async_get(device.id)
     assert updated is not None
-    assert updated.serial_number == serial
+    assert cast("Any", updated).serial_number == serial
     expected = {connection}
     if serial == "AABBCCDDEEFF":
         expected.add((dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff"))
-    assert updated.connections == expected
+    assert cast("Any", updated).connections == expected
     sensor._sync_device_mac_connection({FIELD_DEVICE_SN: serial})  # ruff: ignore[private-member-access]
     assert registry.async_get(device.id) is updated

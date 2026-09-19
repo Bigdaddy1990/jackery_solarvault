@@ -50,8 +50,7 @@ async def _async_setup_services(hass: SimpleNamespace) -> None:
     await services.async_setup_services(cast("HomeAssistant", hass))
 
 
-async def _registered_handler(hass: SimpleNamespace, service_name: str):  # ruff: ignore[missing-return-type-private-function]
-    await _async_setup_services(hass)
+async def _registered_handler(hass: SimpleNamespace, service_name: str):  # ruff: ignore[missing-return-type-private-function, unused-async]
     for call in hass.services.async_register.call_args_list:
         if call[0][0] == DOMAIN and call[0][1] == service_name:
             return call[0][2]

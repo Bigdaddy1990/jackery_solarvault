@@ -199,7 +199,9 @@ class TestTransportIsolationMatrix:
             stop_fn=AsyncMock(),
         )
 
-        manager = TransportSupervisorManager(hass, entry, coordinator)
+        manager = TransportSupervisorManager(
+            cast("Any", hass), cast("Any", entry), coordinator
+        )
         manager.register("ble", ble_config)
         manager.register("cloud_mqtt", mqtt_config)
         manager.register("local_mqtt", local_mqtt_config)

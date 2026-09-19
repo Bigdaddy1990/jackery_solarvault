@@ -21,29 +21,20 @@ from custom_components.jackery_solarvault.config_flow import (
     _coerce_local_mqtt_port,  # ruff: ignore[import-private-name]
     _coerce_local_mqtt_qos,  # ruff: ignore[import-private-name]
     _current_local_mqtt_options,  # ruff: ignore[import-private-name]
-    _current_option_values,  # ruff: ignore[import-private-name]
     _entry_data_from_api_login,  # ruff: ignore[import-private-name]
     _entry_text,  # ruff: ignore[import-private-name]
-    _flow_options,  # ruff: ignore[import-private-name]
-    _merge_local_mqtt_options,  # ruff: ignore[import-private-name]
     _normalize_account,  # ruff: ignore[import-private-name]
-    _reconfigure_options,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
     CONF_THIRD_PARTY_MQTT_QOS,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
-    DEFAULT_THIRD_PARTY_MQTT_IP,
-    DEFAULT_THIRD_PARTY_MQTT_PASSWORD,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
-    DEFAULT_THIRD_PARTY_MQTT_USERNAME,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
 )
 from homeassistant.config_entries import ConfigEntryState
 
@@ -93,9 +84,6 @@ def _fake_hass() -> SimpleNamespace:
 class TestEntryDataFromApiLogin:
     """Lines 212-250."""
 
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"  # ruff: ignore[line-too-long]
-    )
     def test_valid_login_returns_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = "EU"
@@ -105,11 +93,8 @@ class TestEntryDataFromApiLogin:
         assert result["username"] == "user@example.com"
         assert result["password"] == "correct_password"
         assert result["region_code"] == "EU"
-        assert result["mqtt_session"] == {"broker": "emqx.jackeryapp.com"}
+        assert result[ENTRY_BOOTSTRAP_MQTT_SESSION] == {"broker": "emqx.jackeryapp.com"}
 
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _entry_data_from_api_login behavior"  # ruff: ignore[line-too-long]
-    )
     def test_valid_login_falls_back_to_existing_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
         api.region_code = None
@@ -210,20 +195,6 @@ class TestCoerceLocalMqttQos:
 class TestCurrentLocalMqttOptions:
     """Lines 303-394."""
 
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
-    )
-    def test_entry_with_options_returns_them(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        result = _current_local_mqtt_options(entry)
-        assert result["key"] == "val"
-        # Also contains all MQTT default keys
-        assert CONF_THIRD_PARTY_MQTT_ENABLE in result
-        assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
-
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
-    )
     def test_entry_without_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
         result = _current_local_mqtt_options(entry)
@@ -235,167 +206,11 @@ class TestCurrentLocalMqttOptions:
             == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
         )
 
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
-    )
     def test_entry_with_empty_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options={})
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
-
-    @pytest.mark.skip(
-        "pre-existing: stale assertion against legacy _current_local_mqtt_options behavior"  # ruff: ignore[line-too-long]
-    )
-    def test_entry_id_is_ignored(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        entry.entry_id = "should_not_appear_in_result"
-        result = _current_local_mqtt_options(entry)
-        assert result["key"] == "val"
-        assert "should_not_appear_in_result" not in str(result)
-
-
-# =============================================================================
-# _merge_local_mqtt_options
-# =============================================================================
-
-
-class TestMergeLocalMqttOptions:
-    """Lines 394-477."""
-
-    def test_basic_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": 1, "b": 2}
-        update = {"b": 20, "c": 3}
-        result = _merge_local_mqtt_options(base, update)
-        assert result["a"] == 1
-        assert result["b"] == 20  # ruff: ignore[magic-value-comparison]
-        assert result["c"] == 3  # ruff: ignore[magic-value-comparison]
-        # Should contain all MQTT keys
-        assert CONF_THIRD_PARTY_MQTT_ENABLE in result
-        assert CONF_THIRD_PARTY_MQTT_IP in result
-        assert CONF_THIRD_PARTY_MQTT_PORT in result
-        assert CONF_THIRD_PARTY_MQTT_QOS in result
-        assert CONF_THIRD_PARTY_MQTT_USERNAME in result
-        assert CONF_THIRD_PARTY_MQTT_PASSWORD in result
-        assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
-
-    def test_none_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": 1}
-        # pyrefly: ignore [bad-argument-type]
-        result = _merge_local_mqtt_options(base, None)
-        assert result["a"] == 1
-        # Should contain all MQTT default values
-        assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
-        assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
-        assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
-        assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
-            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
-        )
-
-    def test_empty_update_returns_base_with_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": 1}
-        result = _merge_local_mqtt_options(base, {})
-        assert result["a"] == 1
-        # Should contain all MQTT default values
-        assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
-        assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
-        assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
-        assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
-            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
-        )
-
-    def test_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": 1}
-        update = {"a": None}
-        result = _merge_local_mqtt_options(base, update)
-        assert result["a"] == 1
-
-    def test_nested_dict_merge(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": {"x": 1, "y": 2}}
-        update = {"a": {"y": 20, "z": 3}}
-        result = _merge_local_mqtt_options(base, update)
-        assert result["a"]["x"] == 1
-        assert result["a"]["y"] == 20  # ruff: ignore[magic-value-comparison]
-        assert result["a"]["z"] == 3  # ruff: ignore[magic-value-comparison]
-
-    def test_nested_none_in_update_does_not_overwrite(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": {"x": 1}}
-        update = {"a": None}
-        result = _merge_local_mqtt_options(base, update)
-        assert result["a"]["x"] == 1
-
-    def test_base_not_mutated(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        base = {"a": 1}
-        _merge_local_mqtt_options(base, {"a": 2})
-        assert base["a"] == 1
-
-    def test_new_keys_are_added_but_mqtt_keys_preserved(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        result = _merge_local_mqtt_options({}, {"new": 42})
-        assert result["new"] == 42  # ruff: ignore[magic-value-comparison]
-        # Should contain all MQTT default values
-        assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
-        assert result[CONF_THIRD_PARTY_MQTT_IP] == DEFAULT_THIRD_PARTY_MQTT_IP
-        assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
-        assert result[CONF_THIRD_PARTY_MQTT_QOS] == DEFAULT_THIRD_PARTY_MQTT_QOS
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_USERNAME] == DEFAULT_THIRD_PARTY_MQTT_USERNAME
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_PASSWORD] == DEFAULT_THIRD_PARTY_MQTT_PASSWORD
-        )
-        assert (
-            result[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]
-            == DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER
-        )
-
-
-# =============================================================================
-# _reconfigure_options
-# =============================================================================
-
-
-class TestReconfigureOptions:
-    """Lines 477-530."""
-
-    def test_basic_reconfigure_returns_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry()
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_data_and_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(data={"key": "val"}, options={"opt": "val"})
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_no_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options=None)
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_empty_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={})
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
 
 
 # =============================================================================
@@ -412,11 +227,6 @@ class TestJackeryOptionsFlow:
 
     def test_has_async_step_init_method(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert hasattr(JackeryOptionsFlow, "async_step_init")
-
-    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        flow = JackeryOptionsFlow()
-        assert hasattr(flow, "config_entry")
-        assert hasattr(flow, "options")
 
 
 # =============================================================================
@@ -442,12 +252,6 @@ class TestJackeryConfigFlow:
         assert hasattr(JackeryConfigFlow, "async_step_reauth_confirm")
         assert hasattr(JackeryConfigFlow, "async_step_accept_shared")
 
-    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        flow = JackeryConfigFlow()
-        assert hasattr(flow, "hass")
-        assert hasattr(flow, "context")
-        assert hasattr(flow, "reauth_entry")
-
 
 # =============================================================================
 # Helper functions
@@ -462,17 +266,7 @@ class TestHelperFunctions:
         assert _normalize_account("\t\n test \t\n") == "test"
         assert _normalize_account("") == ""  # ruff: ignore[compare-to-empty-string]
 
-    def test_current_option_values(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        result = _current_option_values(entry)
-        assert result == {"key": "val"}
-
-    def test_flow_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        result = _flow_options({"key": "val"})
-        assert result == {"key": "val"}
-
     def test_entry_text(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        # pyrefly: ignore [missing-argument]
-        assert _entry_text("test_key") == "test_key"
-        # pyrefly: ignore [missing-argument]
-        assert _entry_text("") == ""  # ruff: ignore[compare-to-empty-string]
+        entry = _make_entry(data={"test_key": "value"})
+        assert _entry_text(entry, "test_key") == "value"
+        assert _entry_text(entry, "missing") == ""  # ruff: ignore[compare-to-empty-string]

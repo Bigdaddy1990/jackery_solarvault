@@ -17,8 +17,9 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, STATE_UNAVAILABLE
 from homeassistant.data_entry_flow import FlowResultType
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
     from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from homeassistant.core import HomeAssistant
 
 _TEST_HTTP_DATA = {
     "test-device": {

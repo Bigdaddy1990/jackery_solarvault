@@ -1,5 +1,6 @@
 """Tests for uncovered paths in sensor.py to increase coverage."""
 
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -260,7 +261,7 @@ class TestSensorCreation:
             coordinator=coordinator,
             device_id="test_device",
             identity=(1, "test_sn", "pack_1"),
-            description=description,
+            description=cast("Any", description),
         )
         assert sensor is not None
 

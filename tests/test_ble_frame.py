@@ -77,8 +77,9 @@ from custom_components.jackery_solarvault.models import BleProcessDisposition
 from homeassistant.exceptions import ServiceValidationError
 
 if TYPE_CHECKING:
-    from bleak import BleakClient
     from collections.abc import Coroutine
+
+    from bleak import BleakClient
 
 # ---------------------------------------------------------------------------
 # Constants — pinned to the smali-verified literals
@@ -432,11 +433,11 @@ def test_split_payload_handles_empty_payload() -> None:
 # ---------------------------------------------------------------------------
 
 
-_TEST_KEY_B64 = "MDEyMzQ1Njc4OWFiY2RlZg=="  # synthetic 16-byte AES-128 key
+_SYNTHETIC_KEY_B64 = "MDEyMzQ1Njc4OWFiY2RlZg=="  # b"0123456789abcdef"
 
-_LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
+_SANITIZED_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     # (raw_hex, expected_cmd, expected_body_len, first_body_byte_marker)
-    # Captured 2026-05-16 from SolarVault 3 Pro Max via ESPHome BLE proxy.
+    # Captured frames re-encrypted with the public synthetic key above.
     (
         (
             "32373731383339313431373738393000d267c47b972262f9133252b378358c2e"
@@ -480,18 +481,21 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
 )
 
 
-def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
-    """The live binary decoder reproduces real device JSON bodies.
+def test_decrypt_binary_notify_recovers_sanitized_telemetry() -> None:
+    """The binary decoder reproduces the sanitized device JSON bodies.
 
-    Pinned inputs are wire-bytes captured 2026-05-16 from a SolarVault 3
-    Pro Max via the ESPHome BLE proxy. Decoding them recovers the JSON
-    telemetry that the integration would otherwise have to wait for from
-    the cloud.
+    Pinned inputs preserve the captured frame layout and plaintext behavior,
+    but their ciphertext is generated with a public synthetic key.
     """
-    key = base64.b64decode(_TEST_KEY_B64)
+    key = base64.b64decode(_SYNTHETIC_KEY_B64, validate=True)
     assert len(key) == BLE_AES_KEY_LEN_AES128
 
-    for raw_hex, expected_cmd, expected_body_len, body_marker in _LIVE_NOTIFY_SAMPLES:
+    for (
+        raw_hex,
+        expected_cmd,
+        expected_body_len,
+        body_marker,
+    ) in _SANITIZED_NOTIFY_SAMPLES:
         raw = bytes.fromhex(raw_hex)
         frame = decrypt_binary_notify(raw, key)
         assert isinstance(frame, BleBinaryFrame)
@@ -510,16 +514,31 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
         assert len(frame.trailer) == 4  # ruff: ignore[magic-value-comparison]  # isort: skip
 
 
+@pytest.mark.parametrize(
+    "raw_hex",
+    [sample[0] for sample in _SANITIZED_NOTIFY_SAMPLES],
+    ids=lambda raw_hex: f"iv-{raw_hex[:32]}",
+)
+def test_sanitized_notify_samples_reject_a_different_aes128_key(raw_hex: str) -> None:
+    """Sanitized captures are cryptographically bound to the public test key."""
+    synthetic_key = base64.b64decode(_SYNTHETIC_KEY_B64, validate=True)
+    unrelated_key = b"fedcba9876543210"
+
+    assert synthetic_key == b"0123456789abcdef"
+    with pytest.raises(ValueError, match="Invalid padding bytes"):
+        decrypt_binary_notify(bytes.fromhex(raw_hex), unrelated_key)
+
+
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
-    key = base64.b64decode(_TEST_KEY_B64)
+    key = base64.b64decode(_SYNTHETIC_KEY_B64)
     with pytest.raises(ValueError, match="notify too short"):
         decrypt_binary_notify(b"too short", key)
 
 
 def test_decrypt_binary_notify_rejects_unknown_version() -> None:
     """Frames with an unknown protocol version raise ``ValueError``."""
-    key = base64.b64decode(_TEST_KEY_B64)
+    key = base64.b64decode(_SYNTHETIC_KEY_B64)
     plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
     mutated = plain[:2] + b"\x99\x99" + plain[4:]
     blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
@@ -536,7 +555,7 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     :class:`.ble.BleBinaryFrame` docstring); the round-trip test uses
     explicit zero bytes that the decoder simply passes through.
     """
-    key = base64.b64decode(_TEST_KEY_B64)
+    key = base64.b64decode(_SYNTHETIC_KEY_B64)
     body = b'{"cmd":107,"swEps":1}'
     plain = build_binary_frame(cmd=107, body=body, flags=42, security=0x1234)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
@@ -601,7 +620,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         ``msg_id=3011`` / ``ble_msg_type=106`` must come back as
         ``flags==3011`` / ``cmd==106`` after decryption.
         """
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "573702884982521856", _FakeClient())
         ok = await listener.async_send_command(
@@ -1531,7 +1550,7 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
                 assert connectable is True
                 lookup_calls += 1
 
-        cast("Any", listener)._teardown_session = _retry_teardown  # noqa: SLF001
+        cast("Any", listener)._teardown_session = _retry_teardown  # ruff: ignore[private-member-access]
         listener._ha_bluetooth = cast("Any", _BluetoothModule())  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(
@@ -1936,7 +1955,7 @@ def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
             await release_second.wait()
             second_finished.set()
 
-        cast("Any", listener)._teardown_session = _teardown  # noqa: SLF001
+        cast("Any", listener)._teardown_session = _teardown  # ruff: ignore[private-member-access]
         stop_task = asyncio.create_task(listener._async_stop_impl())  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
         await asyncio.sleep(0)
@@ -2101,7 +2120,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         BLE message type therefore completes the serialized ACK wait even
         when its observed flags field differs.
         """
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2164,7 +2183,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     async def _run() -> None:
         """Assert ack-timeout behaviour and pending-ack cleanup."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2211,7 +2230,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         ACK matching uses the newer notify sequence, session ownership and
         BLE message type; the observed flags field is not a transaction ID.
         """
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2337,7 +2356,7 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
 
     async def _run() -> None:
         """Clear pending ACKs after a simulated GATT write failure."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
         cast("Any", exploding).is_connected = True
@@ -2489,7 +2508,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
     async def _run() -> None:
         """A >187-byte body splits into two indexed frames that reassemble."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2537,7 +2556,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
     async def _run() -> None:
         """``mtu_override`` forces smaller chunking than the cached MTU."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True
@@ -2578,7 +2597,7 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
 
     async def _run() -> None:
         """Reject a non-integer MTU override before attempting a write."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2645,7 +2664,7 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
 
     async def _run() -> None:
         """Decode a synthetic notify and clear the previous frame error."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")
         # Mirror the real decode-failure path, which stamps BOTH fields
@@ -2685,7 +2704,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
     async def _run() -> None:
         """Chunked writes register ONE pending ack for the whole message."""
-        key = base64.b64decode(_TEST_KEY_B64)
+        key = base64.b64decode(_SYNTHETIC_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True

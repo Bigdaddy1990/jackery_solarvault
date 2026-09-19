@@ -79,7 +79,7 @@ def _attach_session(
     """Install a current fake GATT session."""
     return listener._install_session(  # ruff: ignore[private-member-access]
         device_id,
-        client,
+        cast("Any", client),
         listener._next_session_generation(device_id),  # ruff: ignore[private-member-access]
     )
 
@@ -197,7 +197,7 @@ def test_negotiated_mtu_is_owned_by_current_session() -> None:
     listener = _listener()
     client = _Client()
     current = _attach_session(listener, "dev", client)
-    stale = _GattSession(generation=0, client=client)
+    stale = _GattSession(generation=0, client=cast("Any", client))
 
     listener._record_negotiated_mtu(  # ruff: ignore[private-member-access]
         "dev",
@@ -495,7 +495,7 @@ async def test_stale_session_notification_is_ignored_before_stats_and_sink() -> 
     current_client = SimpleNamespace(is_connected=True)
     stale_client = SimpleNamespace(is_connected=True)
     _attach_session(listener, "dev", current_client)
-    stale = _GattSession(generation=0, client=stale_client)
+    stale = _GattSession(generation=0, client=cast("Any", stale_client))
 
     await listener._handle_notification(  # ruff: ignore[private-member-access]
         "dev",
