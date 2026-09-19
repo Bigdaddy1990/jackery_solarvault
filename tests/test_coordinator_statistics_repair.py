@@ -50,7 +50,7 @@ async def test_startup_fetches_prior_periods_once_then_only_missing_periods() ->
     """Full startup history is not repeated by the following maintenance pass."""
     coordinator = _ready_backfill_coordinator()
     coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
-    coordinator.entry = _entry(**{
+    cast("Any", coordinator).entry = _entry(**{
         CONF_ENABLE_WEEK_STATISTICS: False,
         CONF_ENABLE_YEAR_STATISTICS: False,
     })
@@ -61,7 +61,7 @@ async def test_startup_fetches_prior_periods_once_then_only_missing_periods() ->
         await asyncio.sleep(0)
         return {}
 
-    coordinator._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
     first = await coordinator._async_http_backfill_period_statistics({_DEV: {}})  # ruff: ignore[private-member-access]
     assert set(fetched) == {
         date(2026, 1, 1),
@@ -84,9 +84,8 @@ async def test_cancelled_backfill_persists_fetched_progress(store_fails: bool) -
     """Reload must preserve fetched evidence while propagating task cancellation."""
     coordinator = _ready_backfill_coordinator()
     if store_fails:
-        coordinator._statistics_backfill_store.async_save.side_effect = RuntimeError(  # ruff: ignore[private-member-access]
-            "store unavailable"
-        )
+        store = cast("Any", coordinator)._statistics_backfill_store  # noqa: SLF001
+        store.async_save.side_effect = RuntimeError("store unavailable")
     coordinator._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
     coordinator._statistics_backfill_task = None  # ruff: ignore[private-member-access]
     state = coordinator._statistics_backfill_device_state(_DEV)  # ruff: ignore[private-member-access]
@@ -96,7 +95,8 @@ async def test_cancelled_backfill_persists_fetched_progress(store_fails: bool) -
     )
     with pytest.raises(asyncio.CancelledError):
         await coordinator._async_statistics_backfill_job({_DEV: {}})  # ruff: ignore[private-member-access]
-    saved = coordinator._statistics_backfill_store.async_save.await_args.args[0]  # ruff: ignore[private-member-access]
+    store = cast("Any", coordinator)._statistics_backfill_store  # noqa: SLF001
+    saved = store.async_save.await_args.args[0]
     assert saved["devices"][_DEV]["inflight"]["unimported_source"]["y"] == [500]
 
 
@@ -220,7 +220,7 @@ def test_fill_does_not_honor_legacy_week_long_empty_cooldown() -> None:
 async def test_full_period_pass_fetches_all_closed_months_without_budget() -> None:
     """One pass covers all six sources and six closed months, not one slice."""
     coordinator = _ready_backfill_coordinator()
-    coordinator.entry = _entry(**{
+    cast("Any", coordinator).entry = _entry(**{
         CONF_ENABLE_WEEK_STATISTICS: False,
         CONF_ENABLE_YEAR_STATISTICS: False,
     })
@@ -258,13 +258,13 @@ def _backfill_store_double() -> SimpleNamespace:
 def _ready_backfill_coordinator() -> JackerySolarVaultCoordinator:
     """Return a coordinator with an empty, pre-loaded backfill state."""
     coordinator = _coordinator()
-    coordinator._statistics_backfill_store = _backfill_store_double()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._statistics_backfill_store = _backfill_store_double()  # ruff: ignore[private-member-access]
     coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
         co._STATISTICS_BACKFILL_STORE_DEVICES: {},  # ruff: ignore[private-member-access]
     }
     coordinator._statistics_backfill_state_loaded = True  # ruff: ignore[private-member-access]
     coordinator._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
     return coordinator
 
 
@@ -304,7 +304,7 @@ async def test_statistics_import_wrapper_uses_only_bounded_backfill_job() -> Non
     bounded_job = AsyncMock(return_value={_DEV})
     legacy_repair = AsyncMock(return_value=(0, 0))
     coordinator._async_import_current_app_chart_statistics_job = bounded_job  # ruff: ignore[private-member-access]
-    coordinator._async_repair_missing_app_chart_statistics = legacy_repair  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_repair_missing_app_chart_statistics = legacy_repair  # ruff: ignore[private-member-access]
 
     await coordinator._async_import_and_repair_app_chart_statistics(snapshot)  # ruff: ignore[private-member-access]
 
@@ -505,8 +505,8 @@ async def test_complete_period_pass_precedes_complete_day_pass() -> None:
         return {"requests": 180, "actionable_sources": 0}
 
     # pyrefly: ignore [bad-assignment]
-    coordinator._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
-    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]  # pyrefly: ignore [bad-assignment]
+    cast("Any", coordinator)._async_http_backfill_period_statistics = period_backfill  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]  # pyrefly: ignore [bad-assignment]
 
     await coordinator._async_advance_statistics_backfill({_DEV: {}})  # ruff: ignore[private-member-access]
 
@@ -636,7 +636,7 @@ async def test_backfill_completes_each_device_without_budget_slices() -> None:
         return {"requests": 100, "actionable_sources": 0}
 
     # pyrefly: ignore [bad-assignment]
-    coordinator._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_http_backfill_recent_day_statistics = day_backfill  # ruff: ignore[private-member-access]
     coordinator._async_http_backfill_period_statistics = AsyncMock(  # ruff: ignore[private-member-access]
         return_value={"requests": 0, "actionable_sources": 0},
     )
@@ -760,7 +760,7 @@ async def test_import_app_chart_statistics_default_options_imports_all_periods()
 ):
     """With no opt-outs, week/month/year chart buckets are all imported."""
     coordinator = _coordinator()
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
     add_stat = AsyncMock(return_value=(True, 1))
     coordinator._async_add_app_chart_statistics = add_stat  # ruff: ignore[private-member-access]
 
@@ -785,7 +785,7 @@ async def test_import_app_chart_statistics_all_toggles_false_imports_nothing() -
             CONF_ENABLE_YEAR_STATISTICS: False,
         }),
     )
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
     add_stat = AsyncMock(return_value=(True, 1))
     coordinator._async_add_app_chart_statistics = add_stat  # ruff: ignore[private-member-access]
 
@@ -801,7 +801,7 @@ async def test_import_app_chart_statistics_single_toggle_skips_only_that_period(
 ):
     """Disabling only the year toggle leaves the week/month imports untouched."""
     coordinator = _coordinator(_entry(**{CONF_ENABLE_YEAR_STATISTICS: False}))
-    coordinator._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_today = lambda: date(2026, 7, 9)  # ruff: ignore[private-member-access]
     add_stat = AsyncMock(return_value=(True, 1))
     coordinator._async_add_app_chart_statistics = add_stat  # ruff: ignore[private-member-access]
 
@@ -819,7 +819,7 @@ async def test_import_app_chart_statistics_single_toggle_skips_only_that_period(
 async def test_historical_day_idempotent_recorder_match_is_imported() -> None:
     """A matching existing Recorder series is a terminal success, not write_error."""
     coordinator = _coordinator()
-    coordinator._local_now = lambda: datetime(2026, 7, 9, 12, tzinfo=UTC)  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._local_now = lambda: datetime(2026, 7, 9, 12, tzinfo=UTC)  # ruff: ignore[private-member-access]
     add_stat = AsyncMock(return_value=(True, 0))
     coordinator._async_add_app_chart_statistics = add_stat  # ruff: ignore[private-member-access]
     source = {
