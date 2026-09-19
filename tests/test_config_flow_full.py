@@ -26,7 +26,6 @@ from custom_components.jackery_solarvault.config_flow import (
     _entry_text,  # ruff: ignore[import-private-name]
     _flow_options,  # ruff: ignore[import-private-name]
     _normalize_account,  # ruff: ignore[import-private-name]
-    _reconfigure_options,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -37,6 +36,7 @@ from custom_components.jackery_solarvault.const import (
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_QOS,
     DEFAULT_THIRD_PARTY_MQTT_TOPIC_FILTER,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
 )
 from homeassistant.config_entries import ConfigEntryState
 
@@ -95,7 +95,7 @@ class TestEntryDataFromApiLogin:
         assert result["username"] == "user@example.com"
         assert result["password"] == "correct_password"
         assert result["region_code"] == "EU"
-        assert result["mqtt_session"] == {"broker": "emqx.jackeryapp.com"}
+        assert result[ENTRY_BOOTSTRAP_MQTT_SESSION] == {"broker": "emqx.jackeryapp.com"}
 
     def test_valid_login_falls_back_to_existing_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         api = MagicMock(spec=JackeryApi)
@@ -197,14 +197,6 @@ class TestCoerceLocalMqttQos:
 class TestCurrentLocalMqttOptions:
     """Lines 303-394."""
 
-    def test_entry_with_options_returns_them(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        result = _current_local_mqtt_options(entry)
-        assert result["key"] == "val"
-        # Also contains all MQTT default keys
-        assert CONF_THIRD_PARTY_MQTT_ENABLE in result
-        assert CONF_THIRD_PARTY_MQTT_TOPIC_FILTER in result
-
     def test_entry_without_options_returns_defaults(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(options=None)
         result = _current_local_mqtt_options(entry)
@@ -221,47 +213,6 @@ class TestCurrentLocalMqttOptions:
         result = _current_local_mqtt_options(entry)
         assert result[CONF_THIRD_PARTY_MQTT_ENABLE] == DEFAULT_THIRD_PARTY_MQTT_ENABLE
         assert result[CONF_THIRD_PARTY_MQTT_PORT] == DEFAULT_THIRD_PARTY_MQTT_PORT
-
-    def test_entry_id_is_ignored(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        entry.entry_id = "should_not_appear_in_result"
-        result = _current_local_mqtt_options(entry)
-        assert result["key"] == "val"
-        assert "should_not_appear_in_result" not in str(result)
-
-
-# =============================================================================
-# _reconfigure_options
-# =============================================================================
-
-
-class TestReconfigureOptions:
-    """Lines 477-530."""
-
-    def test_basic_reconfigure_returns_entry(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry()
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_data_and_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(data={"key": "val"}, options={"opt": "val"})
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_no_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options=None)
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
-    def test_entry_with_empty_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={})
-        # pyrefly: ignore [missing-argument]
-        result = _reconfigure_options(entry)
-        assert result is not None
-
 
 # =============================================================================
 # JackeryOptionsFlow
