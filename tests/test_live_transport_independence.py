@@ -320,7 +320,11 @@ def test_ble_frames_are_pushed_immediately_without_coalescing() -> None:
             coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW],
         )
 
-    coordinator._listeners = {"test-listener": (_capture_committed_value, None)}
+    object.__setattr__(
+        coordinator,
+        "_listeners",
+        {"test-listener": (_capture_committed_value, None)},
+    )
 
     coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
         "dev-1",
@@ -348,7 +352,11 @@ def test_ble_freshness_metadata_alone_does_not_wake_all_entities() -> None:
     }
     coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
     listener = MagicMock()
-    coordinator._listeners = {"test-listener": (listener, None)}
+    object.__setattr__(
+        coordinator,
+        "_listeners",
+        {"test-listener": (listener, None)},
+    )
 
     coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]
         "dev-1",
