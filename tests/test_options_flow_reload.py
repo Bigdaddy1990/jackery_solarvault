@@ -16,7 +16,7 @@ These tests pin the migrated behaviour:
 * Re-submitting identical options does not schedule a redundant reload.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -115,9 +115,12 @@ async def _async_submit_options(
     """Submit one real options flow and return its terminal result."""
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
-    return await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input=user_input,
+    return cast(
+        "ConfigFlowResult",
+        await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=user_input,
+        ),
     )
 
 

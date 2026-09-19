@@ -1,1 +1,0 @@
-"""Shared protocol-contract fixtures."""

@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import re
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock
 
 from custom_components.jackery_solarvault.const import (
@@ -245,7 +245,7 @@ def test_pack_ota_fetch_is_background_not_coordinator_blocking() -> None:
     )
     assert (
         coordinator._publish_mqtt_route_update(  # ruff: ignore[private-member-access]
-            context,
+            cast("Any", context),
             {PAYLOAD_BATTERY_PACKS: [{FIELD_DEVICE_SN: "pack-1"}]},
             touched=True,
         )

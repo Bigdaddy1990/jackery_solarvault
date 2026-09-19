@@ -80,7 +80,7 @@ def _plug_switch(
 ) -> JackerySmartPlugSwitch:
     """Build a plug switch bound to the supplied payload."""
     cls = JackerySmartPlugPrioritySwitch if priority else JackerySmartPlugSwitch
-    entity = cls.__new__(cls)
+    entity = cast("Any", cls).__new__(cls)
     mutable = cast("Any", entity)
     mutable.coordinator = _coordinator(
         {_DEVICE_ID: {PAYLOAD_SMART_PLUGS: [plug]}},
