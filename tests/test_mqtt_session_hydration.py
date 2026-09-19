@@ -1,6 +1,6 @@
 """Unit tests for MQTT session cache hydration before Layer-5 start."""
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 from custom_components.jackery_solarvault.__init__ import (
@@ -97,7 +97,7 @@ async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  
             }
         }
     )
-    snapshot = _entry_bootstrap_mqtt_session(entry)
+    snapshot = _entry_bootstrap_mqtt_session(cast("Any", entry))
     assert snapshot is not None
     assert snapshot[MQTT_SESSION_USER_ID] == "user123"
     assert snapshot[MQTT_SESSION_MAC_ID] == "mac456"
@@ -106,7 +106,7 @@ async def test_entry_bootstrap_mqtt_session_extracts_valid_snapshot() -> None:  
 async def test_entry_bootstrap_mqtt_session_returns_none_for_missing() -> None:  # ruff: ignore[unused-async]
     """_entry_bootstrap_mqtt_session returns None when key missing."""
     entry = MockConfigEntry(data={})
-    snapshot = _entry_bootstrap_mqtt_session(entry)
+    snapshot = _entry_bootstrap_mqtt_session(cast("Any", entry))
     assert snapshot is None
 
 
@@ -121,7 +121,7 @@ async def test_entry_bootstrap_mqtt_session_returns_none_for_invalid() -> None: 
             }
         }
     )
-    snapshot = _entry_bootstrap_mqtt_session(entry)
+    snapshot = _entry_bootstrap_mqtt_session(cast("Any", entry))
     assert snapshot is None
 
 
@@ -143,7 +143,7 @@ async def test_async_prime_entry_bootstrap_mqtt_session_hydrates_api() -> None:
     api._mqtt_seed_b64 = None  # ruff: ignore[private-member-access]
     api._mqtt_mac_id = None  # ruff: ignore[private-member-access]
 
-    result = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
+    result = await _async_prime_entry_bootstrap_mqtt_session(cast("Any", hass), cast("Any", entry), api)
     assert result is not None
     assert api._mqtt_user_id == "user123"  # ruff: ignore[private-member-access]
     assert api._mqtt_mac_id == "mac456"  # ruff: ignore[private-member-access]
@@ -157,7 +157,7 @@ async def test_async_prime_entry_bootstrap_mqtt_session_noop_when_missing() -> N
     api = JackeryApi.__new__(JackeryApi)
     api._mqtt_user_id = None  # ruff: ignore[private-member-access]
 
-    result = await _async_prime_entry_bootstrap_mqtt_session(hass, entry, api)
+    result = await _async_prime_entry_bootstrap_mqtt_session(cast("Any", hass), cast("Any", entry), api)
     assert result is None
     assert api._mqtt_user_id is None  # ruff: ignore[private-member-access]
 
