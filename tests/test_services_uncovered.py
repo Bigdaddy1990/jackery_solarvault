@@ -75,9 +75,6 @@ class TestServices:
     """Test services module handler functions directly."""
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_unbind_accessories(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -110,9 +107,6 @@ class TestServices:
         assert result == {"result": {"success": True}}
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_unbind_accessories_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -143,9 +137,6 @@ class TestServices:
         assert "unbind_accessories_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_unbind_accessories_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -179,9 +170,6 @@ class TestServices:
             await _async_handle_unbind_accessories(hass, call)
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_set_ac_nickname(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -216,9 +204,6 @@ class TestServices:
         )  # noqa: E501, RUF100, RUF105
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_set_ac_nickname_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -250,9 +235,6 @@ class TestServices:
         assert "set_ac_nickname_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_set_ac_nickname_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -289,9 +271,6 @@ class TestServices:
             await _async_handle_set_ac_nickname(hass, call)
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_report_device_timezone(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -326,9 +305,6 @@ class TestServices:
         )  # noqa: E501, RUF100, RUF105
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_report_device_timezone_no_coordinator(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
@@ -360,9 +336,6 @@ class TestServices:
         assert "report_device_timezone_failed" in exc.value.translation_key
 
     @pytest.mark.asyncio()
-    @pytest.mark.skip(
-        reason="stale: predates refactor of service handlers (signature/behavior changed)"  # ruff: ignore[line-too-long]
-    )
     async def test_service_report_device_timezone_auth_error(  # ruff: ignore[no-self-use]
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:  # noqa: E501, PLR6301, RUF100, RUF105
