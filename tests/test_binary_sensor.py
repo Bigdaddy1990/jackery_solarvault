@@ -75,7 +75,8 @@ class TestBinarySensor:
         """Test JackeryBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (  # ruff: ignore[import-outside-top-level]
+        # ruff: ignore[import-outside-top-level]
+        from custom_components.jackery_solarvault.binary_sensor import (
             JackeryBinaryDescription,
         )
 
@@ -110,7 +111,8 @@ class TestBinarySensor:
         """Test JackerySubdeviceAlarmBinarySensor creation."""
         entry = self._bare_entry()
         coordinator = self._bare_coordinator(entry)
-        from custom_components.jackery_solarvault.binary_sensor import (  # ruff: ignore[import-outside-top-level]
+        # ruff: ignore[import-outside-top-level]
+        from custom_components.jackery_solarvault.binary_sensor import (
             JackerySubdeviceAlarmBinarySensorDescription,
         )
 

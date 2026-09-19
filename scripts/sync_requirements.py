@@ -8,7 +8,6 @@ Usage:
     python -m scripts.sync_requirements --write   # Schreibt Dateien
     python -m scripts.sync_requirements --check   # CI-Modus: Exit 1 wenn Abweichung
 """
-
 import argparse
 import ast
 import pathlib

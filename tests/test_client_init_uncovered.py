@@ -52,7 +52,8 @@ class TestLazyImports:
 
     def test_jackery_mqtt_push_client_lazy_import(self) -> None:  # ruff: ignore[no-self-use]
         """Test JackeryMqttPushClient is lazily imported."""
-        from custom_components.jackery_solarvault.client import (  # ruff: ignore[import-outside-top-level]
+        # ruff: ignore[import-outside-top-level]
+        from custom_components.jackery_solarvault.client import (
             JackeryMqttPushClient as MqttPushClient,
         )
 

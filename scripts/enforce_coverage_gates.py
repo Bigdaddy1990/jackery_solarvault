@@ -1,11 +1,9 @@
 """Enforce total and critical-module coverage gates from coverage.py XML."""
-
-
 import argparse
-from decimal import Decimal, InvalidOperation
-from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 CRITICAL_MODULES: dict[str, int] = {
     "custom_components/jackery_solarvault/config_flow.py": 90,

@@ -1,8 +1,7 @@
 """Fail when test files contain TODO markers."""
-
 import argparse
-from pathlib import Path
 import re
+from pathlib import Path
 
 
 def _iter_test_files(tests_dir: Path) -> list[Path]:

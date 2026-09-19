@@ -1,5 +1,4 @@
 """Plugin for checking super calls."""
-
 from typing import ClassVar
 
 from astroid import nodes

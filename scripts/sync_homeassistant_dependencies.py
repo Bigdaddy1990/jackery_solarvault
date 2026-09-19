@@ -1,20 +1,20 @@
 """Synchronise dependencies with the upstream Home Assistant repository."""
-
 import argparse
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 import json
-from pathlib import Path, PurePosixPath
 import shutil
 import tarfile
 import tempfile
 import tomllib
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 from packaging.requirements import Requirement
 from packaging.specifiers import Specifier
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 from pip._vendor import requests
+
 from scripts import check_vendor_pyyaml as vendor_monitor
 
 # Paths relative to the Home Assistant core repository root.

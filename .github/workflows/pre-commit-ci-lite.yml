@@ -50,13 +50,12 @@ jobs:
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
           #enable-cache: true
           #ignore-nothing-to-cache: true
-      - run: pyrefly infer tests/ || true
-      - run: pyrefly infer custom_components/jackery_solarvault/ || true
+      - name: Install test dependencies for type-checking hooks
+        run: |
+          uv venv .venv --python python3.14
+          uv pip install --python .venv/bin/python -r requirements.txt -r requirements-test.txt
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - uses: astral-sh/ruff-action@v4.1.0
-      - run: ruff check . --fix
-      - run: ruff format .
-      - run: ruff check . --fix --preview --unsafe-fixes --target-version py314 || true
-      - run: ruff format . || true
       - uses: pre-commit/action@v3.0.1
       - uses: pre-commit-ci/lite-action@v1.1.0
         if: always()

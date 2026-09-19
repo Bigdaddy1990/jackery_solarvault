@@ -152,7 +152,7 @@ async def night_setup(
 
     coordinator = entry.runtime_data
     coordinator.async_set_updated_data(_night_payload(hass))
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     yield entry
 
@@ -219,7 +219,7 @@ async def test_day_period_sensor_prefers_scalar_total_over_power_curve_sum(
         },
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)
@@ -250,7 +250,7 @@ async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_i
         APP_DEVICE_STAT_PV_ENERGY: 2062,
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)
@@ -281,7 +281,7 @@ async def test_day_period_sensor_never_integrates_day_power_curve_over_scalar(
         },
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)
@@ -315,7 +315,7 @@ async def test_day_period_sensor_is_unavailable_without_todays_bucket(
         },
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)
@@ -345,7 +345,7 @@ async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
         APP_DEVICE_STAT_PV_ENERGY: 174_597.0,
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)
@@ -378,7 +378,7 @@ async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
         APP_DEVICE_STAT_PV_ENERGY: 3_580,
     }
     coordinator.async_set_updated_data(payload)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entity_id = _entity_id_for(hass, "device_today_pv_energy")
     state = hass.states.get(entity_id)

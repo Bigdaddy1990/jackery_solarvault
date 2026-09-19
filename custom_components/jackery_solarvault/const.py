@@ -313,10 +313,10 @@ _HEX16_WIDTH: int = 4
 HEX16_WIDTH: Final = _HEX16_WIDTH
 #: Key lengths (in bytes) accepted by the BLE crypto helpers.
 #:
-#: PROTOCOL.md originally documented a fixed 32-byte AES-256 key, but the
-#: live ``/v1/device/system/list`` capture from a SolarVault 3 Pro Max
-#: returned a 16-byte key (``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-#: → ``hr2c0hh361336138``). The Jackery app's smali ``bb/a`` accepts either
+#: PROTOCOL.md originally documented a fixed 32-byte AES-256 key, but a
+#: synthetic 16-byte fixture demonstrates the supported AES-128 key
+#: size (``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
+#: → ``0123456789abcdef``). The Jackery app's smali ``bb/a`` accepts either
 #: width because ``Cipher.getInstance("AES/CBC/PKCS7Padding")`` selects
 #: AES-128 or AES-256 from the key length implicitly. Both are listed here
 #: so callers can pick the right one without hard-coding either.

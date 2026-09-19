@@ -4,7 +4,6 @@
 # package module; moving them solely to satisfy the generic package-init rule
 # would break HA's loader contract.
 # ruff: file-ignore[non-empty-init-module]
-
 import asyncio
 from datetime import timedelta
 import hashlib

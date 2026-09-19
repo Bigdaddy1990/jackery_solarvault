@@ -1,6 +1,5 @@
 # ruff: noqa: E501, SLF001
 """Tests for persistent discovery, MQTT-session, and daily-energy state."""
-
 import asyncio
 import time
 from types import ModuleType
@@ -9,32 +8,22 @@ from typing import Any
 import pytest
 from homeassistant.core import HomeAssistant
 
-from custom_components.jackery_solarvault.client import (
-    daily_energy as local_daily_cache_module,
-    discovery_store as discovery_cache_module,
-    mqtt_session_store as mqtt_session_cache_module,
-)
-from custom_components.jackery_solarvault.client.discovery_store import (
-    async_load_discovery_cache,
-    async_save_discovery_cache,
-)
-from custom_components.jackery_solarvault.client.mqtt_session_store import (
-    async_clear_mqtt_session,
-    async_load_mqtt_session,
-    async_save_mqtt_session,
-)
+from custom_components.jackery_solarvault.client import \
+    daily_energy as local_daily_cache_module
+from custom_components.jackery_solarvault.client import \
+    discovery_store as discovery_cache_module
+from custom_components.jackery_solarvault.client import \
+    mqtt_session_store as mqtt_session_cache_module
 from custom_components.jackery_solarvault.client.daily_energy import (
-    async_load_daily_cache,
-    async_save_daily_cache,
-)
+    async_load_daily_cache, async_save_daily_cache)
+from custom_components.jackery_solarvault.client.discovery_store import (
+    async_load_discovery_cache, async_save_discovery_cache)
+from custom_components.jackery_solarvault.client.mqtt_session_store import (
+    async_clear_mqtt_session, async_load_mqtt_session, async_save_mqtt_session)
 from custom_components.jackery_solarvault.const import (
-    MQTT_SESSION_CACHE_CACHED_AT_KEY,
-    MQTT_SESSION_CACHE_EXPIRES_AT_KEY,
-    MQTT_SESSION_MAC_ID,
-    MQTT_SESSION_MAC_ID_SOURCE,
-    MQTT_SESSION_SEED_B64,
-    MQTT_SESSION_USER_ID,
-)
+    MQTT_SESSION_CACHE_CACHED_AT_KEY, MQTT_SESSION_CACHE_EXPIRES_AT_KEY,
+    MQTT_SESSION_MAC_ID, MQTT_SESSION_MAC_ID_SOURCE, MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_USER_ID)
 
 _VALID_SEED_B64 = "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg="
 

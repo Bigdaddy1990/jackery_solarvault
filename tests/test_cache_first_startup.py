@@ -3,23 +3,25 @@
 
 Task 6: Load caches first and start independent transport supervisors.
 """
-
 import asyncio
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-
-from custom_components.jackery_solarvault import _async_run_primary_http_startup
-from custom_components.jackery_solarvault.coordinator import JackerySolarVaultCoordinator
-from custom_components.jackery_solarvault.client.transport_supervisor import (
-    SupervisorState,
-    TransportSupervisor,
-    TransportSupervisorManager,
-    SupervisorConfig,
-)
 from homeassistant.config_entries import ConfigEntryState
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+from custom_components.jackery_solarvault import \
+    _async_run_primary_http_startup
+from custom_components.jackery_solarvault.client.transport_supervisor import (
+    SupervisorConfig, SupervisorState, TransportSupervisor,
+    TransportSupervisorManager)
+from custom_components.jackery_solarvault.coordinator import \
+    JackerySolarVaultCoordinator
 
 
 def _coordinator(*, data: dict[str, Any] | None = None) -> JackerySolarVaultCoordinator:
@@ -79,7 +81,7 @@ class TestTransportSupervisor:
             stop_fn=mock_stop,
         )
 
-        supervisor = TransportSupervisor(hass, entry, coordinator, config)
+        supervisor = TransportSupervisor(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator, config)
         assert supervisor.state == SupervisorState.STOPPED
 
         await supervisor.async_start()
@@ -106,7 +108,7 @@ class TestTransportSupervisor:
             stop_fn=AsyncMock(),
         )
 
-        supervisor = TransportSupervisor(hass, entry, coordinator, config)
+        supervisor = TransportSupervisor(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator, config)
         await supervisor.async_start()
         assert supervisor.state == SupervisorState.STOPPED
 
@@ -143,7 +145,7 @@ class TestTransportSupervisor:
             max_reconnect_delay_sec=0.1,
         )
 
-        supervisor = TransportSupervisor(hass, entry, coordinator, config)
+        supervisor = TransportSupervisor(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator, config)
 
         # First start fails
         await supervisor.async_start()
@@ -184,7 +186,7 @@ class TestTransportSupervisor:
             stop_fn=AsyncMock(),
         )
 
-        supervisor = TransportSupervisor(hass, entry, coordinator, config)
+        supervisor = TransportSupervisor(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator, config)
         # ConfigEntryAuthFailed is re-raised after marking DEGRADED
         with pytest.raises(ConfigEntryAuthFailed):
             await supervisor.async_start()
@@ -234,7 +236,7 @@ class TestTransportSupervisorManager:
             stop_fn=AsyncMock(),
         )
 
-        manager = TransportSupervisorManager(hass, entry, coordinator)
+        manager = TransportSupervisorManager(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator)
         manager.register("ble", ble_config)
         manager.register("cloud_mqtt", mqtt_config)
         manager.register("local_mqtt", local_mqtt_config)
@@ -276,7 +278,7 @@ class TestTransportSupervisorManager:
             stop_fn=AsyncMock(),
         )
 
-        manager = TransportSupervisorManager(hass, entry, coordinator)
+        manager = TransportSupervisorManager(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator)
         manager.register("ble", ble_config)
         manager.register("cloud_mqtt", mqtt_config)
 
@@ -318,7 +320,7 @@ class TestTransportSupervisorManager:
             update_credentials_fn=lambda: update_called.__setitem__("mqtt", True),
         )
 
-        manager = TransportSupervisorManager(hass, entry, coordinator)
+        manager = TransportSupervisorManager(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator)
         manager.register("ble", ble_config)
         manager.register("cloud_mqtt", mqtt_config)
 
@@ -349,7 +351,7 @@ class TestTransportSupervisorManager:
             stop_fn=AsyncMock(),
         )
 
-        manager = TransportSupervisorManager(hass, entry, coordinator)
+        manager = TransportSupervisorManager(cast("HomeAssistant", hass), cast("ConfigEntry[Any]", entry), coordinator)
         manager.register("ble", ble_config)
         manager.register("cloud_mqtt", mqtt_config)
 

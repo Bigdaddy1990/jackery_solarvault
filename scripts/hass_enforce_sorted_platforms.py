@@ -1,5 +1,4 @@
 """Plugin for checking sorted platforms list."""
-
 from typing import ClassVar
 
 from astroid import nodes

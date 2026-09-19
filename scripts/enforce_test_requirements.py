@@ -1,10 +1,9 @@
 """Ensure test imports declare the third-party packages they rely on."""
-
 import argparse
 import ast
+import sys
 from collections.abc import Iterable
 from pathlib import Path
-import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTS_ROOT = REPO_ROOT / "tests"

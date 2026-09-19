@@ -1,14 +1,12 @@
 """Build the Markdown files in docs/ into standalone HTML pages."""
-
-
 import argparse
-from collections.abc import Iterable
 import difflib
 import html
-from pathlib import Path
 import re
 import sys
 import time
+from collections.abc import Iterable
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = ROOT / "docs"

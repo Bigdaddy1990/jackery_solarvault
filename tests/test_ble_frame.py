@@ -92,10 +92,9 @@ def test_wire_format_constants_match_smali() -> None:
     assert BLE_AES_IV_LEN == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
     # Both AES-128 (16 bytes) and AES-256 (32 bytes) are accepted; the
     # length is selected per-device from the base64-decoded bluetoothKey.
-    # A SolarVault 3 Pro Max captured 2026-05-16 returned a 16-byte key
-    # ("hr2c0hh361336138" → AES-128), so the helpers must accept that too.
-    assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
-    assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]  # isort: skip
+    # A synthetic 16-byte key exercises the AES-128 compatibility path.
+    assert BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]
+    assert BLE_AES_KEY_LEN_AES256 == 32  # ruff: ignore[magic-value-comparison]
     assert set(BLE_AES_KEY_LENGTHS) == {16, 32}
     # The legacy single-value alias points at AES-128 because that is the
     # observed wild-type for SolarVault.
@@ -188,16 +187,16 @@ def test_aes_round_trip_with_deterministic_iv_aes256() -> None:
     assert aes_decrypt(ciphertext, key, iv) == plaintext
 
 
-def test_aes_round_trip_with_aes128_key_observed_in_the_wild() -> None:
+def test_aes_round_trip_with_synthetic_aes128_key() -> None:
     """AES-128 with the SolarVault-shaped 16-byte key round-trips too.
 
-    Pinned input is the actual ``bluetoothKey`` captured 2026-05-16 from
-    a SolarVault 3 Pro Max: ``base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")``
-    → ``b"hr2c0hh361336138"``. This is the regression that motivated
+    Pinned input is a synthetic 16-byte ``bluetoothKey`` fixture:
+    ``base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")``
+    → ``b"0123456789abcdef"``. This is the regression that motivated
     accepting both key lengths.
     """
-    key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
-    assert len(key) == BLE_AES_KEY_LEN_AES128 == 16  # ruff: ignore[magic-value-comparison]  # isort: skip
+    key = base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")
+    assert len(key) == BLE_AES_KEY_LEN_AES128
     iv = bytes(BLE_AES_IV_LEN)
     plaintext = b"DFED0001000100010BEE007100010000"
     ciphertext = aes_encrypt(plaintext, key, iv)
@@ -334,8 +333,8 @@ def test_encrypt_decrypt_round_trip_recovers_frame_aes256() -> None:
 
 
 def test_encrypt_decrypt_round_trip_with_solarvault_aes128_key() -> None:
-    """End-to-end frame round-trip with the captured 16-byte device key."""
-    key = base64.b64decode("aHIyYzBoaDM2MTMzNjEzOA==")
+    """End-to-end frame round-trip with a synthetic 16-byte device key."""
+    key = base64.b64decode("MDEyMzQ1Njc4OWFiY2RlZg==")
     frame = BleFrame(
         frame_index=1,
         chunk_count=1,
@@ -432,24 +431,23 @@ def test_split_payload_handles_empty_payload() -> None:
 # ---------------------------------------------------------------------------
 
 
-_LIVE_KEY_B64 = "aHIyYzBoaDM2MTMzNjEzOA=="  # 16-byte AES-128 key from device
+_TEST_KEY_B64 = "MDEyMzQ1Njc4OWFiY2RlZg=="  # synthetic 16-byte AES-128 key
 
 _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     # (raw_hex, expected_cmd, expected_body_len, first_body_byte_marker)
     # Captured 2026-05-16 from SolarVault 3 Pro Max via ESPHome BLE proxy.
     (
         (
-            "32373731383339313431373738393000"
-            "e85350bc2bc69eb244252c5745eb0a619f341bfa5a92b34c3be3786db38a4ebf"
-            "2d578615198d49eea423bf07199c66b9118a57c33b027a71be688bd64d36917e"
-            "f39233a369ccd53a9eccbdf712a901961f8fd9b555f08dc75320909403a7c442"
-            "d63745bc549382cabc227ef031ed865645aeda679dbfc027bf1ac1c2dff827b3"
-            "3c9236e7baf89ccf97c910defa78e356d409dad3c9b5d3c1fdaaed8286334869"
-            "ed300b6b056b37b1866b1fea8196d65ce839a5f46f3c42d40f17e233ea7dfbdf"
-            "97b8efca02b6722050998354402ee58c70afcfdc33ee29b220b251828d46a4ab"
-            "f7b862ec34ef1473d2ba21c34564cb241470a85f3eef7a9f409c327fd8ac0e13"
-            "8f17f38446261f24974099a3e72dbe775395b21baede73017a3db60f519ac5a3"
-            "d41ab2aba9b013e754ed4a0d0a666442"
+            "32373731383339313431373738393000d267c47b972262f9133252b378358c2e"
+            "3263d6065c76a3e3064be86e0d7ad057096750291e7808a1d79f3f0ab745f4c4"
+            "f977815c7b86248c3dea76352f221efce8720a29a83a1a37a1afe97b017616b0"
+            "9d65894ebad9a4ccf1120bef77e70298ffe09d72f607de31eb50381ec36001c9"
+            "1f8794954a499f61ae401c23ef6b50590b864472a854723b900b8987f5b2a7d7"
+            "b555cf34fd14145cb24ac9b1387a3f402642708f713056978598bbae297e5b18"
+            "da04d2f426599b3c7cb19ff527829324c10b1ba0188bf5b6110617f7e04d67e5"
+            "3fd47988c22210bc2ac58d0815d2b04cc1a8b1d0b553bb03659db482a12cf5f0"
+            "bcf7a33db0b57b322f2a11f46c6842154b330d8fa574b3686c15c996f5c3d00b"
+            "754b306c7ceaef4e373213d2cc0f25f6e6b7541d4dee65e5ffb93e08586e8656"
         ),
         107,  # DevicePropertyChange
         272,
@@ -457,11 +455,11 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     ),
     (
         (
-            "3134373339363034343131373738390030b643e9f3747cb075dabffa3115ecb0"
-            "261ed615b0a5e0ec7c767ebca1b0b127a744947c40497e2d5f2e1e579d206147"
-            "320499d1e235be30e08251195d8a7d6167dbb5edc976f237ec80d1137ab31f25"
-            "d56acc46040630775e163c84f9b1cf1ae92ebad5f7fc2c68be73daca864a1c6c"
-            "6240f285a4b5782cba46870dcafb5f52c581dcc868b5541ddd221516b9363ae7"
+            "31343733393630343431313737383900a244389a9fa76d76a33cf5e042b03857"
+            "8d33177643e5ab4838b829ddb10dd09a3eb455042fb85cae6ae882b5e2d6044c"
+            "425a2218dd39524cceb821fcdffd4e9a57bc7f728a72f84b168d4955f5c03047"
+            "3f941a650d8abf0b5657018fcf9080d7a0896c454c7c82a0070617f17ca7716a"
+            "d1f50c686183e5e7f399eb5307e34b29080d44161e9047b781629696bcd2b150"
         ),
         111,  # ControlSubDevice (sub-device incremental property)
         118,
@@ -469,10 +467,10 @@ _LIVE_NOTIFY_SAMPLES: tuple[tuple[str, int, int, str], ...] = (
     ),
     (
         (
-            "393936333539323634313737383930006852f3235ffc0dbd0586c39e2237a31a"
-            "c8d0d400d3286e94dca1adeb3de5db4c5f8d251fcfc16549af868bdd29e12c17"
-            "d682bd1c2e0eb6ea0fdd508c18d2c41880a737b5e554ad218db53182ec08ed59"
-            "d0e245afc3cffd959eb463a07a658fc25e83c7e0f45c444345b7d05be3bee98a"
+            "39393633353932363431373738393000a28188ef0d1c4e8a08740878f48fc193"
+            "0e4fdec9006195379cd6bf69a38abe0bad81bcce684065d393c1bd9a2080b9d3"
+            "76f3db655eaf1bb59c792f1b8189c1006db4f686088c6d959e3f62344aba8cce"
+            "97f812d96659147e02a0eb9cd99b463b490d28ce5f0150bc35dfa5f8b23a292e"
         ),
         111,
         78,
@@ -489,7 +487,7 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
     telemetry that the integration would otherwise have to wait for from
     the cloud.
     """
-    key = base64.b64decode(_LIVE_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     assert len(key) == BLE_AES_KEY_LEN_AES128
 
     for raw_hex, expected_cmd, expected_body_len, body_marker in _LIVE_NOTIFY_SAMPLES:
@@ -513,14 +511,14 @@ def test_decrypt_binary_notify_recovers_real_telemetry() -> None:
 
 def test_decrypt_binary_notify_rejects_short_frame() -> None:
     """Frames smaller than ``IV + header + trailer`` raise ``ValueError``."""
-    key = base64.b64decode(_LIVE_KEY_B64)
-    with pytest.raises(ValueError):  # ruff: ignore[pytest-raises-too-broad]  # isort: skip
+    key = base64.b64decode(_TEST_KEY_B64)
+    with pytest.raises(ValueError, match="notify too short"):
         decrypt_binary_notify(b"too short", key)
 
 
 def test_decrypt_binary_notify_rejects_unknown_version() -> None:
     """Frames with an unknown protocol version raise ``ValueError``."""
-    key = base64.b64decode(_LIVE_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     plain = build_binary_frame(cmd=107, body=b'{"cmd":107}', security=0x1234)
     mutated = plain[:2] + b"\x99\x99" + plain[4:]
     blob = encrypt_binary_notify(mutated, key, iv=bytes(BLE_AES_IV_LEN))
@@ -537,7 +535,7 @@ def test_build_then_decrypt_binary_frame_round_trips() -> None:
     :class:`.ble.BleBinaryFrame` docstring); the round-trip test uses
     explicit zero bytes that the decoder simply passes through.
     """
-    key = base64.b64decode(_LIVE_KEY_B64)
+    key = base64.b64decode(_TEST_KEY_B64)
     body = b'{"cmd":107,"swEps":1}'
     plain = build_binary_frame(cmd=107, body=body, flags=42, security=0x1234)
     blob = encrypt_binary_notify(plain, key, iv=bytes(BLE_AES_IV_LEN))
@@ -602,7 +600,7 @@ def test_listener_async_send_command_writes_through_fake_client() -> None:
         ``msg_id=3011`` / ``ble_msg_type=106`` must come back as
         ``flags==3011`` / ``cmd==106`` after decryption.
         """
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "573702884982521856", _FakeClient())
         ok = await listener.async_send_command(
@@ -1279,15 +1277,15 @@ def test_send_ble_service_body_accepts_dict_and_json_string() -> None:
 
 
 def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
-    """Live HTTP capture puts the AES key at the system level, not per-device.
+    """A system response may put the AES key at system level, not per-device.
 
-    The 2026-05-16 ``/v1/device/system/list`` capture from a SolarVault 3
-    Pro Max had ``data[].bluetoothKey == "aHIyYzBoaDM2MTMzNjEzOA=="`` at
+    The synthetic ``/v1/device/system/list`` fixture has
+    ``data[].bluetoothKey == "MDEyMzQ1Njc4OWFiY2RlZg=="`` at
     the system level and ``data[].devices[0].bluetoothKey == null`` for
     the main device. Before this regression test the integration only
     looked at the per-device slot and silently failed to decrypt BLE
     notify frames with ``decode_error="no bluetoothKey for device"`` —
-    visible in the BLE-transport diagnostics export from that capture.
+    visible in BLE-transport diagnostics.
     """
     self = cast(
         "Any",
@@ -1301,13 +1299,13 @@ def test_device_bluetooth_key_falls_back_to_system_meta() -> None:
                 FIELD_BLUETOOTH_KEY: None,
             },
             PAYLOAD_SYSTEM_META: {
-                # System-level key — base64-decoded "hr2c0hh361336138".
-                FIELD_BLUETOOTH_KEY: "aHIyYzBoaDM2MTMzNjEzOA==",
+                # System-level key — base64-decoded "0123456789abcdef".
+                FIELD_BLUETOOTH_KEY: "MDEyMzQ1Njc4OWFiY2RlZg==",
             },
         }
     }
     key = JackerySolarVaultCoordinator.device_bluetooth_key(self, "573702884982521856")
-    assert key == b"hr2c0hh361336138"
+    assert key == b"0123456789abcdef"
 
 
 def test_device_bluetooth_key_prefers_device_meta_when_both_set() -> None:
@@ -2101,7 +2099,7 @@ def test_listener_resolves_pending_ack_on_matching_cmd() -> None:
         BLE message type therefore completes the serialized ACK wait even
         when its observed flags field differs.
         """
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2164,7 +2162,7 @@ def test_listener_ack_timeout_raises_runtime_error() -> None:
 
     async def _run() -> None:
         """Assert ack-timeout behaviour and pending-ack cleanup."""
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2211,7 +2209,7 @@ def test_listener_ack_cmd_filter_ignores_mismatched_cmd() -> None:
         ACK matching uses the newer notify sequence, session ownership and
         BLE message type; the observed flags field is not a transaction ID.
         """
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
 
@@ -2336,11 +2334,8 @@ def test_listener_send_command_write_failure_releases_pending_ack() -> None:
             raise RuntimeError("simulated GATT failure")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Exercise the listener's send-command path using a client that fails on write and assert that pending ACKs are cleared after the failure.
-
-        Builds a bare listener configured with the captured live AES key and an _ExplodingClient that raises on GATT writes, calls async_send_command with wait_for_ack enabled (expecting a `RuntimeError` matching "simulated GATT failure"), and verifies the listener's pending-ack registry is empty afterwards.
-        """  # ruff: ignore[line-too-long]  # isort: skip
-        key = base64.b64decode(_LIVE_KEY_B64)
+        """Clear pending ACKs after a simulated GATT write failure."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         exploding = _ExplodingClient()
         cast("Any", exploding).is_connected = True
@@ -2492,7 +2487,7 @@ def test_listener_chunks_oversize_body_into_indexed_frames() -> None:
 
     async def _run() -> None:
         """A >187-byte body splits into two indexed frames that reassemble."""
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2540,7 +2535,7 @@ def test_listener_mtu_override_forces_smaller_chunks() -> None:
 
     async def _run() -> None:
         """``mtu_override`` forces smaller chunking than the cached MTU."""
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True
@@ -2580,15 +2575,8 @@ def test_listener_mtu_override_rejects_non_integer_value() -> None:
             raise AssertionError("invalid MTU must not write to GATT")  # ruff: ignore[raise-vanilla-args]  # isort: skip
 
     async def _run() -> None:
-        """Runs a minimal listener scenario to verify validation of the `mtu_override` parameter.
-
-        Constructs a bare listener with a fake client and a resolved AES key, then calls
-        `async_send_command` with a non-integer `mtu_override` to assert input validation.
-
-        Raises:
-            ValueError: if `mtu_override` is not an integer (expected message: "mtu_override must be an integer").
-        """  # ruff: ignore[line-too-long]  # isort: skip
-        key = base64.b64decode(_LIVE_KEY_B64)
+        """Reject a non-integer MTU override before attempting a write."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         _attach_session(listener, "dev", _FakeClient())
 
@@ -2654,11 +2642,8 @@ def test_listener_successful_notify_decode_clears_stale_last_error() -> None:
     )
 
     async def _run() -> None:
-        """Exercise the listener's notification handling by delivering a real encrypted binary notify and asserting the listener decodes it and clears a previous error state.
-
-        This async helper sets a known AES key on a bare listener, injects a prior `last_error`, delivers an encrypted binary notify carrying an empty JSON body, and asserts that `stats.frames_decoded` increments to reflect a successfully decoded frame and that `stats.last_error` becomes `None`.
-        """  # ruff: ignore[line-too-long]  # isort: skip
-        key = base64.b64decode(_LIVE_KEY_B64)
+        """Decode a synthetic notify and clear the previous frame error."""
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         stats = listener.stats_for("dev")
         # Mirror the real decode-failure path, which stamps BOTH fields
@@ -2698,7 +2683,7 @@ def test_listener_chunked_write_uses_single_ack_for_whole_message() -> None:
 
     async def _run() -> None:
         """Chunked writes register ONE pending ack for the whole message."""
-        key = base64.b64decode(_LIVE_KEY_B64)
+        key = base64.b64decode(_TEST_KEY_B64)
         listener = _build_bare_listener(key)
         session = _attach_session(listener, "dev", _FakeClient())
         session.notify_started = True

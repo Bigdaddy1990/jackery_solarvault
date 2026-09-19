@@ -1,6 +1,4 @@
 """Run the Home Assistant test harness with predictable coverage behavior."""
-
-
 import sys
 
 import pytest

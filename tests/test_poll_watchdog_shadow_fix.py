@@ -136,7 +136,8 @@ async def test_merge_concurrent_updates_prioritizes_http_properties() -> None:  
 
 async def test_merge_concurrent_updates_preserves_layer5_deltas() -> None:  # ruff: ignore[unused-async]
     """Merge logic preserves Layer-5 deltas for non-property fields."""
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (
         merge_present_dict_values,
     )
 
@@ -296,7 +297,8 @@ async def test_merge_handles_missing_property_source_state() -> None:  # ruff: i
 
 async def test_merge_preserves_non_property_deltas_from_layer5() -> None:  # ruff: ignore[unused-async]
     """Merge preserves Layer-5 deltas for non-property fields (e.g., stats)."""
-    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+    # ruff: ignore[import-outside-top-level]
+    from custom_components.jackery_solarvault.coordinator import (
         merge_present_dict_values,
     )
 

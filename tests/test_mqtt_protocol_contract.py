@@ -118,7 +118,6 @@ def test_mqtt_setter_commands_match_app_protocol() -> None:
 def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
     """Third-party MQTT config responses belong in their own payload bucket."""
     import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
-
     from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         ACTION_ID_QUERY_THIRD_PARTY_MQTT_CONFIG,
         FIELD_ACTION_ID,
@@ -337,7 +336,6 @@ def test_enum_only_subdevice_types_are_not_queried_speculatively() -> None:
 def test_mqtt_handler_accepts_text_cmd_for_action_topic_routing() -> None:
     """MQTT command routing tolerates text cmd IDs from payloads."""
     import asyncio  # ruff: ignore[import-outside-top-level]  # isort: skip
-
     from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_BODY,
         FIELD_CMD,
@@ -446,7 +444,6 @@ def test_http_refresh_keeps_fresh_mqtt_live_soc_over_stale_http(
     """Stale HTTP property snapshots must not create SOC spikes."""
     from datetime import timedelta  # ruff: ignore[import-outside-top-level]  # isort: skip
     import time  # ruff: ignore[import-outside-top-level]  # isort: skip
-
     from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]  # isort: skip
         FIELD_BAT_OUT_PW,
         FIELD_BAT_SOC,

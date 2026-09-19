@@ -1,5 +1,4 @@
 """Plugin for checking preferred coding of μ is used."""
-
 from typing import ClassVar
 
 from astroid import nodes
