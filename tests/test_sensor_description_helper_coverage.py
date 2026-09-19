@@ -4,6 +4,8 @@
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
 from custom_components.jackery_solarvault.descriptions import sensor as descriptions
 
 
@@ -19,14 +21,14 @@ def test_scalar_conversion_helpers_cover_invalid_and_valid_inputs() -> None:
     assert descriptions._state_value({"bad": "state"}) is None
     assert descriptions._state_value(0) == 0
     assert descriptions._identity("value") == "value"
-    assert descriptions._div(10)("25") == 2.5
+    assert descriptions._div(10)("25") == pytest.approx(2.5)
     assert descriptions._div(10)("bad") is None
     assert descriptions.safe_int([]) is None
     assert descriptions.safe_int("bad") is None
     assert descriptions.safe_int("2") == 2
     assert descriptions.safe_float({}) is None
     assert descriptions.safe_float("bad") is None
-    assert descriptions.safe_float("2.5") == 2.5
+    assert descriptions.safe_float("2.5") == pytest.approx(2.5)
     assert descriptions.safe_bool(None) is None
     assert descriptions.safe_bool(True) is True
     assert descriptions.safe_bool(0) is False
@@ -83,7 +85,10 @@ def test_storm_plan_helpers_cover_root_rows_defaults_and_fallbacks() -> None:
 
 def test_payload_access_helpers_cover_missing_and_fallback_values() -> None:
     """Description accessors handle absent, malformed, and populated payloads."""
-    assert descriptions._get_first_list_count(_entity(section="bad"), "section", "a") is None
+    assert (
+        descriptions._get_first_list_count(_entity(section="bad"), "section", "a")
+        is None
+    )
     assert descriptions._get_first_list_count(
         _entity(section={"a": "bad", "b": [1, 2]}), "section", "a", "b"
     ) == 2
