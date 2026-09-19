@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -88,7 +89,7 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
         )
         # Manually initialize since we're not going through HA setup
         coordinator.data = _TEST_HTTP_DATA
-        coordinator._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
+        cast("Any", coordinator)._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
         _cancel_poll_watchdog(coordinator)
 
     return coordinator
@@ -107,7 +108,7 @@ class TestCoordinatorIntegration:
         assert coordinator.update_interval == timedelta(
             seconds=DEFAULT_SCAN_INTERVAL_SEC
         )
-        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
+        assert cast("Any", coordinator)._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
     @pytest.mark.asyncio()
     async def test_coordinator_async_update_data_returns_data(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
@@ -124,7 +125,7 @@ class TestCoordinatorIntegration:
         coordinator = _make_coordinator()
 
         # Should have device registry sync flag set
-        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
+        assert cast("Any", coordinator)._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
     @pytest.mark.asyncio()
     async def test_coordinator_handles_multiple_devices(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip

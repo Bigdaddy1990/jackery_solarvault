@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -419,7 +420,7 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         """Test _async_refresh_discovery_if_due method."""
         coordinator = self._create_coordinator()
         coordinator.async_discover = AsyncMock(return_value=True)
-        coordinator._discovery_refresh_scheduled = True  # ruff: ignore[private-member-access]
+        cast("Any", coordinator)._discovery_refresh_scheduled = True  # ruff: ignore[private-member-access]
 
         import asyncio  # ruff: ignore[import-outside-top-level]
 

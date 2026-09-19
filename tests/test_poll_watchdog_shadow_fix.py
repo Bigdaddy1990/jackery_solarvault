@@ -8,6 +8,7 @@ These tests verify that:
 
 from datetime import datetime
 import time
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
@@ -38,7 +39,7 @@ def _make_coordinator_stub() -> JackerySolarVaultCoordinator:
     coordinator._accessory_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._property_source_state = {}  # ruff: ignore[private-member-access]
     coordinator._slow_cache = {}  # ruff: ignore[private-member-access]
-    coordinator.entry = SimpleNamespace(entry_id="test_entry")
+    cast("Any", coordinator).entry = SimpleNamespace(entry_id="test_entry")
     # pyrefly: ignore [no-any-return-implicit]
     return coordinator
 
@@ -202,7 +203,7 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:  # ruff: igno
     coordinator._price_config_interval_sec = 3600  # ruff: ignore[private-member-access]
 
     # Mock the property query methods that are called internally
-    coordinator._async_query_all_properties_for_device = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._async_query_all_properties_for_device = AsyncMock(return_value={})  # ruff: ignore[private-member-access]
     coordinator._async_query_system_info_for_missing = AsyncMock()  # ruff: ignore[private-member-access]
     coordinator._async_refresh_discovery_if_due = AsyncMock()  # ruff: ignore[private-member-access]
 

@@ -6,6 +6,7 @@ state transitions without requiring the full Home Assistant test infrastructure.
 
 import asyncio
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -111,7 +112,7 @@ def _make_coordinator() -> JackerySolarVaultCoordinator:
     ):
         coordinator = JackerySolarVaultCoordinator(hass, entry, api, update_interval)
         # Manually initialize since we're not going through HA setup
-        coordinator._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
+        cast("Any", coordinator)._device_registry_synced = True  # ruff: ignore[private-member-access]  # isort: skip
 
     # pyrefly: ignore [bad-argument-type]
     return _finalize_coordinator(coordinator, _TEST_HTTP_DATA)
@@ -181,7 +182,7 @@ class TestCoordinatorEntityManagement:
         assert coordinator.update_interval == timedelta(
             seconds=DEFAULT_SCAN_INTERVAL_SEC
         )
-        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
+        assert cast("Any", coordinator)._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
     @pytest.mark.asyncio()
     async def test_coordinator_async_update_data_returns_data(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
@@ -197,7 +198,7 @@ class TestCoordinatorEntityManagement:
         coordinator = _make_coordinator()
 
         # Should have device registry sync flag set
-        assert coordinator._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
+        assert cast("Any", coordinator)._device_registry_synced is True  # ruff: ignore[private-member-access]  # isort: skip
 
     @pytest.mark.asyncio()
     async def test_coordinator_handles_multiple_devices(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
