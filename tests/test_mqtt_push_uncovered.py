@@ -1,7 +1,7 @@
 """Tests for uncovered paths in mqtt_push.py to increase coverage."""
 
 import asyncio
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -279,11 +279,7 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         async def dummy_coro() -> str:  # ruff: ignore[unused-async]
             return "done"
 
-        setattr(
-            getattr(client, "_hass"),
-            "async_create_background_task",
-            _create_task,
-        )
+        client._hass.async_create_background_task = _create_task
         # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # ruff: ignore[line-too-long]
         # It schedules the coroutine but returns None (task is tracked internally)
         client._schedule_coroutine(dummy_coro, "test")  # ruff: ignore[private-member-access]
