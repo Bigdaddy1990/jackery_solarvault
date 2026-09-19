@@ -71,6 +71,7 @@ repos:
     hooks:
       - id: ty
         types: [python]
+        files: ^custom_components/
         args: [--no-sync]
 
   - repo: https://github.com/facebook/pyrefly-pre-commit
