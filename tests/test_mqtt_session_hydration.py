@@ -143,7 +143,9 @@ async def test_async_prime_entry_bootstrap_mqtt_session_hydrates_api() -> None:
     api._mqtt_seed_b64 = None  # ruff: ignore[private-member-access]
     api._mqtt_mac_id = None  # ruff: ignore[private-member-access]
 
-    result = await _async_prime_entry_bootstrap_mqtt_session(cast("Any", hass), cast("Any", entry), api)
+    result = await _async_prime_entry_bootstrap_mqtt_session(
+        cast("Any", hass), cast("Any", entry), api
+    )
     assert result is not None
     assert api._mqtt_user_id == "user123"  # ruff: ignore[private-member-access]
     assert api._mqtt_mac_id == "mac456"  # ruff: ignore[private-member-access]
@@ -157,7 +159,9 @@ async def test_async_prime_entry_bootstrap_mqtt_session_noop_when_missing() -> N
     api = JackeryApi.__new__(JackeryApi)
     api._mqtt_user_id = None  # ruff: ignore[private-member-access]
 
-    result = await _async_prime_entry_bootstrap_mqtt_session(cast("Any", hass), cast("Any", entry), api)
+    result = await _async_prime_entry_bootstrap_mqtt_session(
+        cast("Any", hass), cast("Any", entry), api
+    )
     assert result is None
     assert api._mqtt_user_id is None  # ruff: ignore[private-member-access]
 
