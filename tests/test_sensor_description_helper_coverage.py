@@ -1,4 +1,4 @@
-# ruff: noqa: SLF001
+# ruff: file-ignore[private-member-access]
 """Focused branch coverage for sensor description value helpers."""
 
 from types import SimpleNamespace
