@@ -8,6 +8,13 @@ import pytest
 
 from custom_components.jackery_solarvault.descriptions import sensor as descriptions
 
+_TWO = 2
+_THREE = 3
+_SEVEN = 7
+_TWELVE = 12
+_FIFTEEN = 15
+_TWO_AND_HALF = 2.5
+
 
 def _entity(**payload: Any) -> Any:
     return cast("Any", SimpleNamespace(
@@ -21,14 +28,14 @@ def test_scalar_conversion_helpers_cover_invalid_and_valid_inputs() -> None:
     assert descriptions._state_value({"bad": "state"}) is None
     assert descriptions._state_value(0) == 0
     assert descriptions._identity("value") == "value"
-    assert descriptions._div(10)("25") == pytest.approx(2.5)
+    assert descriptions._div(10)("25") == pytest.approx(_TWO_AND_HALF)
     assert descriptions._div(10)("bad") is None
     assert descriptions.safe_int([]) is None
     assert descriptions.safe_int("bad") is None
-    assert descriptions.safe_int("2") == 2
+    assert descriptions.safe_int("2") == _TWO
     assert descriptions.safe_float({}) is None
     assert descriptions.safe_float("bad") is None
-    assert descriptions.safe_float("2.5") == pytest.approx(2.5)
+    assert descriptions.safe_float("2.5") == pytest.approx(_TWO_AND_HALF)
     assert descriptions.safe_bool(None) is None
     assert descriptions.safe_bool(True) is True
     assert descriptions.safe_bool(0) is False
@@ -40,9 +47,9 @@ def test_scalar_conversion_helpers_cover_invalid_and_valid_inputs() -> None:
 def test_first_nonblank_and_source_helpers_cover_all_shapes() -> None:
     """Legacy scalar and source variants remain deterministic."""
     assert descriptions.first_nonblank_int(None) is None
-    assert descriptions.first_nonblank_int(2.9) == 2
+    assert descriptions.first_nonblank_int(2.9) == _TWO
     assert descriptions.first_nonblank_int(" ") is None
-    assert descriptions.first_nonblank_int("3.9") == 3
+    assert descriptions.first_nonblank_int("3.9") == _THREE
     assert descriptions.first_nonblank_int("bad") is None
     assert descriptions.first_nonblank_int([]) is None
     assert descriptions.property_data_sources("x", layer5_proven=True) == (
@@ -62,9 +69,9 @@ def test_storm_plan_helpers_cover_root_rows_defaults_and_fallbacks() -> None:
     storm = descriptions.FIELD_STORM
     enabled = descriptions.FIELD_WPS
 
-    assert descriptions._storm_minutes_from_plan({wpc: "15"}) == 15
+    assert descriptions._storm_minutes_from_plan({wpc: "15"}) == _FIFTEEN
     assert descriptions._storm_minutes_from_plan({wpc: -1, interval: 0}) == 0
-    assert descriptions._storm_minutes_from_plan({storm: ["bad", {interval: "7"}]}) == 7
+    assert descriptions._storm_minutes_from_plan({storm: ["bad", {interval: "7"}]}) == _SEVEN
     assert descriptions._storm_minutes_from_plan({storm: [{}]}) == (
         descriptions.DEFAULT_STORM_WARNING_MINUTES
     )
@@ -91,7 +98,7 @@ def test_payload_access_helpers_cover_missing_and_fallback_values() -> None:
     )
     assert descriptions._get_first_list_count(
         _entity(section={"a": "bad", "b": [1, 2]}), "section", "a", "b"
-    ) == 2
+    ) == _TWO
     assert descriptions._get_first_list_count(
         _entity(section={"a": "bad"}), "section", "a"
     ) is None
@@ -108,5 +115,5 @@ def test_payload_access_helpers_cover_missing_and_fallback_values() -> None:
     assert descriptions._get_prop_any(entity, "missing_value") is None
     assert descriptions._get_prop_or_disconnected(entity, "present") == 0
     assert descriptions._get_prop_or_disconnected(entity, "missing") == "—"
-    assert descriptions._get_pv_channel_power(entity, "pv") == 12
+    assert descriptions._get_pv_channel_power(entity, "pv") == _TWELVE
     assert descriptions._get_pv_channel_power(entity, "bad_pv") is None
