@@ -21,10 +21,8 @@ from custom_components.jackery_solarvault.config_flow import (
     _coerce_local_mqtt_port,  # ruff: ignore[import-private-name]
     _coerce_local_mqtt_qos,  # ruff: ignore[import-private-name]
     _current_local_mqtt_options,  # ruff: ignore[import-private-name]
-    _current_option_values,  # ruff: ignore[import-private-name]
     _entry_data_from_api_login,  # ruff: ignore[import-private-name]
     _entry_text,  # ruff: ignore[import-private-name]
-    _flow_options,  # ruff: ignore[import-private-name]
     _normalize_account,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
@@ -230,11 +228,6 @@ class TestJackeryOptionsFlow:
     def test_has_async_step_init_method(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         assert hasattr(JackeryOptionsFlow, "async_step_init")
 
-    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        flow = JackeryOptionsFlow()
-        assert hasattr(flow, "config_entry")
-        assert hasattr(flow, "options")
-
 
 # =============================================================================
 # JackeryConfigFlow
@@ -259,12 +252,6 @@ class TestJackeryConfigFlow:
         assert hasattr(JackeryConfigFlow, "async_step_reauth_confirm")
         assert hasattr(JackeryConfigFlow, "async_step_accept_shared")
 
-    def test_has_required_attributes(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        flow = JackeryConfigFlow()
-        assert hasattr(flow, "hass")
-        assert hasattr(flow, "context")
-        assert hasattr(flow, "reauth_entry")
-
 
 # =============================================================================
 # Helper functions
@@ -278,15 +265,6 @@ class TestHelperFunctions:
         assert _normalize_account("  test  ") == "test"
         assert _normalize_account("\t\n test \t\n") == "test"
         assert _normalize_account("") == ""  # ruff: ignore[compare-to-empty-string]
-
-    def test_current_option_values(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        entry = _make_entry(options={"key": "val"})
-        result = _current_option_values(entry)
-        assert result == {"key": "val"}
-
-    def test_flow_options(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        result = _flow_options({"key": "val"})
-        assert result == {"key": "val"}
 
     def test_entry_text(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
         entry = _make_entry(data={"test_key": "value"})

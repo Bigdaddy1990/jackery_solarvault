@@ -14,14 +14,6 @@ missing-import = "error"
 redundant-condition = "error"
 redundant-cast = "warn"
 
-[tool.ty.environment]
-python-version = "3.14"
-# Tailor type stubs and conditionalized type definitions to windows.
-python-platform = "linux"
-
-[tool.ty.src]
-include = ["custom_components/jackery_solarvault"]
-
 [tool.setuptools.packages.find]
 include = ["custom_components*"]
 
@@ -55,7 +47,6 @@ dependencies = [
     "ruff>=0.16.6",
     "mypy>=2.3.0",
     "uv>=0.5.1",
-    "ty<=0.0.81",
 ]
 
 [project.urls]

@@ -36,7 +36,7 @@ class _Registry:
     def __init__(self, devices: dict[str, _Device]) -> None:
         self._devices = devices
 
-    def async_get(self, device_id: str) -> _Device | None:
+    def async_get(self, device_id: str, **_kwargs: object) -> _Device | None:
         return self._devices.get(device_id)
 
     def async_get_or_create(self, **kwargs) -> Mock:  # ruff: ignore[no-self-use]  # ruff: ignore[missing-type-kwargs]
