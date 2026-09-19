@@ -77,7 +77,6 @@ from custom_components.jackery_solarvault.models import BleProcessDisposition
 from homeassistant.exceptions import ServiceValidationError
 
 if TYPE_CHECKING:
-    from bleak import BleakClient
     from collections.abc import Coroutine
 
 # ---------------------------------------------------------------------------
@@ -1429,10 +1428,9 @@ def _attach_session(
     # notify_started defaults to False, and _async_send_command returns early on
     # a session whose notifications were never started. A double that stands in
     # for a live connection must therefore set it explicitly.
-    typed_client = cast("BleakClient", client)
-    session = _GattSession(generation=1, client=typed_client, notify_started=True)
+    session = _GattSession(generation=1, client=client, notify_started=True)
     listener._sessions[device_id] = session  # ruff: ignore[private-member-access]  # isort: skip
-    listener._clients[device_id] = typed_client  # ruff: ignore[private-member-access]  # isort: skip
+    listener._clients[device_id] = client  # ruff: ignore[private-member-access]  # isort: skip
     return session
 
 
@@ -1444,7 +1442,7 @@ def test_listener_install_session_cannot_replace_retained_owner() -> None:
     new_client = object()
 
     with pytest.raises(RuntimeError, match="still owns"):
-        listener._install_session("dev", cast("BleakClient", new_client), generation=2)  # ruff: ignore[private-member-access]  # isort: skip
+        listener._install_session("dev", new_client, generation=2)  # ruff: ignore[private-member-access]  # isort: skip
 
     assert listener._sessions["dev"] is old_session  # ruff: ignore[private-member-access]  # isort: skip
     assert listener._clients["dev"] is old_client  # ruff: ignore[private-member-access]  # isort: skip
@@ -1531,7 +1529,7 @@ def test_connection_runner_retries_retained_teardown_before_connect() -> None:
                 assert connectable is True
                 lookup_calls += 1
 
-        cast("Any", listener)._teardown_session = _retry_teardown  # noqa: SLF001
+        listener._teardown_session = _retry_teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
         listener._ha_bluetooth = cast("Any", _BluetoothModule())  # ruff: ignore[private-member-access]  # isort: skip
 
         await asyncio.wait_for(
@@ -1760,7 +1758,7 @@ def test_listener_accepted_fragments_reassemble_after_disconnect_callback() -> N
         listener._on_disconnect(  # ruff: ignore[private-member-access]  # isort: skip
             "dev",
             generation=session.generation,
-            client=cast("BleakClient", client),
+            client=client,
         )
         release_sink.set()
         await asyncio.wait_for(session.notify_queue.join(), timeout=1.0)
@@ -1936,7 +1934,7 @@ def test_listener_stop_waits_for_all_session_teardowns_before_raising() -> None:
             await release_second.wait()
             second_finished.set()
 
-        cast("Any", listener)._teardown_session = _teardown  # noqa: SLF001
+        listener._teardown_session = _teardown  # type: ignore[method-assign]  # ruff: ignore[private-member-access]  # isort: skip
         stop_task = asyncio.create_task(listener._async_stop_impl())  # ruff: ignore[private-member-access]  # isort: skip
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
         await asyncio.sleep(0)

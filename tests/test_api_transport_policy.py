@@ -3,7 +3,6 @@
 import asyncio
 from json import JSONDecodeError
 from types import SimpleNamespace
-from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -38,20 +37,20 @@ def _response(content_type: str, *, json_value: object = None) -> SimpleNamespac
 async def test_json_decoder_rejects_wrong_content_type() -> None:
     """Reject JSON decoding when the response advertises a non-JSON type."""
     with pytest.raises(JackeryApiError, match="Content-Type"):
-        await JackeryApi._decode_json_response(cast("Any", _response("text/html")))  # ruff: ignore[private-member-access]
+        await JackeryApi._decode_json_response(_response("text/html"))  # ruff: ignore[private-member-access]
 
 
 async def test_limited_reader_rejects_declared_and_streamed_oversize() -> None:
     """Enforce the response-size limit for declared and streamed bodies."""
     declared = SimpleNamespace(content_length=11, content=_Chunks(b"ok"))
     with pytest.raises(JackeryApiError, match="exceeds"):
-        await JackeryApi._read_limited_bytes(cast("Any", declared), limit=10)  # ruff: ignore[private-member-access]
+        await JackeryApi._read_limited_bytes(declared, limit=10)  # ruff: ignore[private-member-access]
 
     streamed = SimpleNamespace(
         content_length=None, content=_Chunks(b"12345", b"678901")
     )
     with pytest.raises(JackeryApiError, match="exceeds"):
-        await JackeryApi._read_limited_bytes(cast("Any", streamed), limit=10)  # ruff: ignore[private-member-access]
+        await JackeryApi._read_limited_bytes(streamed, limit=10)  # ruff: ignore[private-member-access]
 
 
 async def test_json_decoder_redacts_non_json_failure() -> None:
@@ -59,7 +58,7 @@ async def test_json_decoder_redacts_non_json_failure() -> None:
     response = _response("application/json")
     response.json.side_effect = JSONDecodeError("secret-token", "secret-token", 0)
     with pytest.raises(JackeryApiError, match="redacted") as raised:
-        await JackeryApi._decode_json_response(cast("Any", response))  # ruff: ignore[private-member-access]
+        await JackeryApi._decode_json_response(response)  # ruff: ignore[private-member-access]
     assert "secret-token" not in str(raised.value)
 
 

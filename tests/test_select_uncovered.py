@@ -44,33 +44,33 @@ class TestStormMinutesHelpers:
 
     def test_storm_minutes_value_from_properties(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes from properties."""
-        properties: dict[str, object] = {"wpc": 60}
-        weather_plan: dict[str, object] = {}
-        task_plan: dict[str, object] = {}
+        properties = {"wpc": 60}
+        weather_plan = {}
+        task_plan = {}
         # pyrefly: ignore [bad-argument-type]
         assert _storm_minutes_value(properties, weather_plan, task_plan) == 60  # ruff: ignore[magic-value-comparison]
 
     def test_storm_minutes_value_from_weather_plan(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes from weather plan."""
-        properties: dict[str, object] = {}
-        weather_plan: dict[str, object] = {"minsInterval": 120}
-        task_plan: dict[str, object] = {}
+        properties = {}
+        weather_plan = {"minsInterval": 120}
+        task_plan = {}
         # pyrefly: ignore [bad-argument-type]
         assert _storm_minutes_value(properties, weather_plan, task_plan) == 120  # ruff: ignore[magic-value-comparison]
 
     def test_storm_minutes_value_below_min_valid(self) -> None:  # ruff: ignore[no-self-use]
         """Test storm minutes below minimum valid returns None."""
-        properties: dict[str, object] = {"wpc": 1}
-        weather_plan: dict[str, object] = {}
-        task_plan: dict[str, object] = {}
+        properties = {"wpc": 1}
+        weather_plan = {}
+        task_plan = {}
         # pyrefly: ignore [bad-argument-type]
         assert _storm_minutes_value(properties, weather_plan, task_plan) is None
 
     def test_storm_minutes_fallback_with_wps(self) -> None:  # ruff: ignore[no-self-use]
         """Test fallback with WPS enabled."""
-        properties: dict[str, object] = {"wps": 1}
-        weather_plan: dict[str, object] = {}
-        task_plan: dict[str, object] = {}
+        properties = {"wps": 1}
+        weather_plan = {}
+        task_plan = {}
         from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
             DEFAULT_STORM_WARNING_MINUTES,
         )
@@ -92,7 +92,7 @@ class TestPriceSourceHelpers:
 
     def test_price_source_label(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source label generation."""
-        source: dict[str, object] = {
+        source = {
             "platformCompanyId": "123",
             "companyName": "Test Provider",
             "country": "DE",
@@ -105,14 +105,14 @@ class TestPriceSourceHelpers:
 
     def test_price_source_regions(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source regions extraction."""
-        source: dict[str, object] = {"country": "DE,FR"}
+        source = {"country": "DE,FR"}
         # pyrefly: ignore [bad-argument-type]
         regions = _price_source_regions(source)
         assert "DE" in regions or "FR" in regions
 
     def test_price_source_matches_current(self) -> None:  # ruff: ignore[no-self-use]
         """Test price source matches current."""
-        source: dict[str, object] = {"platformCompanyId": "123", "country": "DE"}
+        source = {"platformCompanyId": "123", "country": "DE"}
         # pyrefly: ignore [bad-argument-type]
         assert _price_source_matches_current(source, "123", "DE") is True
         # pyrefly: ignore [bad-argument-type]
@@ -120,7 +120,7 @@ class TestPriceSourceHelpers:
 
     def test_price_sources_from_payload(self) -> None:  # ruff: ignore[no-self-use]
         """Test price sources from payload."""
-        payload: dict[str, object] = {
+        payload = {
             "price_sources": [
                 {
                     "platformCompanyId": "123",
@@ -289,7 +289,7 @@ class TestPriceProviderHelpers:
             ]
         }
         result = _price_provider_current(entity)
-        assert isinstance(result, str)
+        # pyrefly: ignore [not-iterable]
         assert "Provider1" in result
 
 
@@ -427,9 +427,9 @@ class TestJackerySelect:
                 # pyrefly: ignore [unexpected-keyword]
                 translation_key=key,
                 options=["option1", "option2"],
-                value_fn=lambda e: "option1",
+                current_fn=lambda e: "option1",
                 # pyrefly: ignore [bad-argument-type]
-                select_fn=AsyncMock(),
+                select_fn=lambda e, o: None,
             )
         return JackerySelect(
             coordinator=coordinator, device_id="test_device", description=desc

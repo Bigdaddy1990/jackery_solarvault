@@ -1,15 +1,13 @@
 """Regression tests for less common local MQTT adapter branches."""
 
 import asyncio
-from dataclasses import replace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
-    LocalMqttConnectionSettings,
     _local_mqtt_client,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.const import (
@@ -41,16 +39,18 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
 
     assert client.is_connected is False
     assert client.is_started is False
-    configuration = LocalMqttConnectionSettings(
-        host="192.0.2.10",
-        port=1884,
-        username="user",
-        password="secret",
-        topic_filter="jackery/device/#",
-        qos=2,
-    )
-    assert client.matches_configuration(configuration)
-    assert not client.matches_configuration(replace(configuration, host="other"))
+    configuration = {
+        "host": "192.0.2.10",
+        "port": 1884,
+        "username": "user",
+        "password": "secret",
+        "topic_filter": "jackery/device/#",
+        "qos": 2,
+    }
+    # pyrefly: ignore [bad-argument-type]
+    assert client.matches_configuration(**configuration)
+    # pyrefly: ignore [bad-argument-type]
+    assert not client.matches_configuration(**(configuration | {"host": "other"}))
     redacted = client.diagnostics_snapshot()
     plain = client.diagnostics_snapshot(redact=False)
     assert redacted["transport"] == "direct_mqtt"
@@ -87,7 +87,7 @@ def test_constructor_rejects_invalid_qos(
 ) -> None:
     """Only MQTT QoS levels supported by HA are accepted."""
     with pytest.raises(ValueError, match="QoS"):
-        JackeryLocalMqttClient(hass, qos=cast("Any", qos))
+        JackeryLocalMqttClient(hass, qos=qos)  # type: ignore[arg-type]
 
 
 async def test_message_without_sink_is_counted_as_dropped(

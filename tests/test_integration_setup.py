@@ -18,7 +18,6 @@ from homeassistant.data_entry_flow import FlowResultType
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 _TEST_HTTP_DATA = {
     "test-device": {
@@ -34,7 +33,7 @@ async def _setup_entry(
     hass: HomeAssistant,
     mock_jackery_login: None,
     http_data: dict | None = None,
-) -> MockConfigEntry:
+) -> None:
     """Helper to set up a config entry with patched I/O."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry  # ruff: ignore[import-outside-top-level]  # isort: skip
 
