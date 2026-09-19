@@ -279,11 +279,7 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         async def dummy_coro() -> str:  # ruff: ignore[unused-async]
             return "done"
 
-        object.__setattr__(
-            vars(client)["_hass"],
-            "async_create_background_task",
-            _create_task,
-        )
+        vars(vars(client)["_hass"])["async_create_background_task"] = _create_task
         # _schedule_coroutine takes a coroutine factory, label, generation, runner_task, tracked_tasks  # ruff: ignore[line-too-long]
         # It schedules the coroutine but returns None (task is tracked internally)
         client._schedule_coroutine(dummy_coro, "test")  # ruff: ignore[private-member-access]
