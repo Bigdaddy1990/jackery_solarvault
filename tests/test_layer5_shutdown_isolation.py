@@ -3,7 +3,7 @@
 import asyncio
 import time
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
@@ -44,7 +44,7 @@ def _bare_coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
         JackerySolarVaultCoordinator,
     )
     coordinator.hass = hass
-    coordinator.entry = SimpleNamespace(entry_id="layer5-shutdown-test")
+    cast("Any", coordinator).entry = SimpleNamespace(entry_id="layer5-shutdown-test")
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
     coordinator._ble_listener = None  # ruff: ignore[private-member-access]
     coordinator._ble_start_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
@@ -96,7 +96,7 @@ async def test_layer5_stop_is_hard_bounded_and_single_flight(
     transport = _CancellationResistantTransport(entered, release)
     coordinator = _bare_coordinator(hass)
     # pyrefly: ignore [bad-assignment]
-    coordinator._mqtt = transport  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._mqtt = transport  # ruff: ignore[private-member-access]
     monkeypatch.setattr(
         coordinator_module,
         "_BACKGROUND_TASK_STOP_TIMEOUT_SEC",
@@ -270,7 +270,7 @@ async def test_ble_start_rechecks_shutdown_after_executor_import() -> None:
     coordinator.hass = SimpleNamespace(
         async_add_executor_job=_async_add_executor_job,
     )
-    coordinator.entry = SimpleNamespace(
+    cast("Any", coordinator).entry = SimpleNamespace(
         entry_id="ble-start-shutdown-race",
         data={},
         options={CONF_ENABLE_BLE_TRANSPORT: True},
@@ -320,7 +320,7 @@ async def test_partial_ble_start_cleanup_failure_retains_exact_owner() -> None:
     coordinator.hass = SimpleNamespace(
         async_add_executor_job=_async_add_executor_job,
     )
-    coordinator.entry = SimpleNamespace(
+    cast("Any", coordinator).entry = SimpleNamespace(
         entry_id="ble-partial-start-failure",
         data={},
         options={CONF_ENABLE_BLE_TRANSPORT: True},
@@ -373,7 +373,7 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
         JackerySolarVaultCoordinator,
     )
     coordinator.hass = _RejectingHass()
-    coordinator.entry = SimpleNamespace(entry_id="rejected-stop-owner")
+    cast("Any", coordinator).entry = SimpleNamespace(entry_id="rejected-stop-owner")
     coordinator._mqtt = transport  # ruff: ignore[private-member-access]
     coordinator._ble_listener = None  # ruff: ignore[private-member-access]
     coordinator._layer5_stop_tasks = {}  # ruff: ignore[private-member-access]
