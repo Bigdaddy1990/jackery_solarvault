@@ -71,7 +71,10 @@ def test_storm_plan_helpers_cover_root_rows_defaults_and_fallbacks() -> None:
 
     assert descriptions._storm_minutes_from_plan({wpc: "15"}) == _FIFTEEN
     assert descriptions._storm_minutes_from_plan({wpc: -1, interval: 0}) == 0
-    assert descriptions._storm_minutes_from_plan({storm: ["bad", {interval: "7"}]}) == _SEVEN
+    assert (
+        descriptions._storm_minutes_from_plan({storm: ["bad", {interval: "7"}]})
+        == _SEVEN
+    )
     assert descriptions._storm_minutes_from_plan({storm: [{}]}) == (
         descriptions.DEFAULT_STORM_WARNING_MINUTES
     )
