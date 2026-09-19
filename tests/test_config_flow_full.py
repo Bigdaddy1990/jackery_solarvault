@@ -337,7 +337,6 @@ class TestHelperFunctions:
         assert result == {"key": "val"}
 
     def test_entry_text(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        # pyrefly: ignore [missing-argument]
-        assert _entry_text("test_key") == "test_key"
-        # pyrefly: ignore [missing-argument]
-        assert _entry_text("") == ""  # ruff: ignore[compare-to-empty-string]
+        entry = _make_entry(data={"test_key": "value"})
+        assert _entry_text(entry, "test_key") == "value"
+        assert _entry_text(entry, "missing") == ""  # ruff: ignore[compare-to-empty-string]

@@ -134,7 +134,7 @@ class TestServices:
         })
         with pytest.raises(ServiceValidationError) as exc:
             await _async_handle_unbind_accessories(hass, call)
-        assert "unbind_accessories_failed" in exc.value.translation_key
+        assert exc.value.translation_key == "unbind_accessories_failed"
 
     @pytest.mark.asyncio()
     async def test_service_unbind_accessories_auth_error(  # ruff: ignore[no-self-use]
@@ -232,7 +232,7 @@ class TestServices:
         })
         with pytest.raises(ServiceValidationError) as exc:
             await _async_handle_set_ac_nickname(hass, call)
-        assert "set_ac_nickname_failed" in exc.value.translation_key
+        assert exc.value.translation_key == "set_ac_nickname_failed"
 
     @pytest.mark.asyncio()
     async def test_service_set_ac_nickname_auth_error(  # ruff: ignore[no-self-use]
@@ -333,7 +333,7 @@ class TestServices:
         })
         with pytest.raises(ServiceValidationError) as exc:
             await _async_handle_report_device_timezone(hass, call)
-        assert "report_device_timezone_failed" in exc.value.translation_key
+        assert exc.value.translation_key == "report_device_timezone_failed"
 
     @pytest.mark.asyncio()
     async def test_service_report_device_timezone_auth_error(  # ruff: ignore[no-self-use]
