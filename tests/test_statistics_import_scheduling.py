@@ -1,8 +1,9 @@
 """Regression tests for independent live-statistics and history scheduling."""
 
+import asyncio
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from custom_components.jackery_solarvault.coordinator import (
     _STATISTICS_IMPORT_THROTTLE_SEC,  # ruff: ignore[import-private-name]
@@ -45,3 +46,54 @@ def test_startup_backfill_does_not_slow_current_statistics_imports() -> None:
         })
 
     assert len(created) == 1
+
+
+async def test_completed_startup_keeps_one_backfill_running() -> None:
+    """Later imports must fill new history while keeping one backfill task."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    raw = cast("Any", coordinator)
+    raw._shutdown_started = False  # ruff: ignore[private-member-access]
+    raw._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
+    raw._statistics_import_task = None  # ruff: ignore[private-member-access]
+    raw._statistics_backfill_task = None  # ruff: ignore[private-member-access]
+    release_history = asyncio.Event()
+    snapshot = {"device-1": {"device": {"deviceSn": "SV3PM123456"}}}
+    created: list[asyncio.Task[None]] = []
+
+    def create_task(
+        coro: Coroutine[Any, Any, None],
+        **_kwargs: Any,
+    ) -> asyncio.Task[None]:
+        task = asyncio.create_task(coro)
+        created.append(task)
+        return task
+
+    async def advance_history(_snapshot: dict[str, dict[str, Any]]) -> None:
+        await release_history.wait()
+
+    with (
+        patch.object(
+            coordinator, "_create_entry_background_task", side_effect=create_task
+        ),
+        patch.object(
+            coordinator,
+            "_async_import_and_repair_app_chart_statistics",
+            new_callable=AsyncMock,
+        ) as import_current,
+        patch.object(
+            coordinator,
+            "_async_advance_statistics_backfill",
+            side_effect=advance_history,
+        ) as advance,
+    ):
+        try:
+            await coordinator._async_statistics_import_job(snapshot)  # ruff: ignore[private-member-access]
+            await asyncio.sleep(0)
+            advance.assert_awaited_once_with(snapshot)
+            import_current.reset_mock()
+            await coordinator._async_statistics_import_job(snapshot)  # ruff: ignore[private-member-access]
+            import_current.assert_awaited_once_with(snapshot)
+            assert len(created) == 1
+        finally:
+            release_history.set()
+            await asyncio.gather(*created)

@@ -2778,8 +2778,8 @@ def _day_power_sample_energy_value(
             APP_STAT_TOTAL_DISCHARGE,
             APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
         }:
-            if series_key == APP_CHART_SERIES_Y1:
-                # Some accounts return one combined signed y1 curve: positive
+            if series_key in {APP_CHART_SERIES_Y, APP_CHART_SERIES_Y1}:
+                # Some accounts return one combined signed y/y1 curve: positive
                 # samples are charging and negative samples are discharging.
                 return abs(value) if value < 0 else 0.0
             # The documented/App-2.4.0 split payload uses y1 for charge and y2
@@ -3757,6 +3757,23 @@ def day_power_series_key(
         # Explicit directional arrays can be used even when an older app view
         # only labels its combined y curve. Never infer a direction from y alone.
         return key if key is not None and isinstance(source.get(key), list) else None
+    if (
+        section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
+        and stat_key
+        in {
+            APP_STAT_TOTAL_CHARGE,
+            APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+            APP_STAT_TOTAL_DISCHARGE,
+            APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+        }
+        and not any(
+            isinstance(source.get(key), list) and source[key]
+            for key in (APP_CHART_SERIES_Y1, APP_CHART_SERIES_Y2)
+        )
+        and isinstance(source.get(APP_CHART_SERIES_Y), list)
+    ):
+        # Historical battery payloads also use one signed y power curve.
+        return APP_CHART_SERIES_Y
     if section.startswith((
         APP_SECTION_BATTERY_STAT,
         APP_SECTION_BATTERY_TRENDS,
