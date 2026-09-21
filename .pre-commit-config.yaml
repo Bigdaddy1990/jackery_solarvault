@@ -2,7 +2,7 @@ ci:
   autoupdate_schedule: weekly
   autofix_prs: true
   # Type checks run with dependencies in Pre-commit Lite, not on pre-commit.ci.
-  skip: [ty, pyrefly-check]
+  skip: [pyrefly-check]
   autofix_commit_msg: "[pre-commit.ci] autofix"
   autoupdate_branch: main
   autoupdate_commit_msg: "[pre-commit.ci] autoupdate"

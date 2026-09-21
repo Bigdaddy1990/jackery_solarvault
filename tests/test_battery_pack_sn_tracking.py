@@ -304,7 +304,7 @@ def test_registry_migration_rekeys_pack_and_preserves_entity_id(
 def test_existing_serial_target_removes_only_duplicate_numeric_device(
     hass: HomeAssistant,
 ) -> None:
-    """A serial target makes its same-serial numeric fallback removable."""
+    """A serial target keeps legacy entity ids while removing its fallback."""
     coordinator = _coordinator([{"deviceSn": _SN_A}])
     cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_PROPERTIES] = {
         FIELD_BAT_NUM: 1,
@@ -321,13 +321,6 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
         serial_identifier,
         serial_number=_SN_A,
     )
-    serial_entity = _pack_entity(
-        entity_registry,
-        entry,
-        serial_device,
-        f"{serial_identifier}_state_of_charge",
-    )
-
     numeric_identifier = f"{_PARENT_ID}_battery_pack_1"
     numeric_device = _pack_device(
         device_registry,
@@ -335,12 +328,32 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
         numeric_identifier,
         serial_number=_SN_A,
     )
-    numeric_entity = _pack_entity(
-        entity_registry,
-        entry,
-        numeric_device,
-        f"{numeric_identifier}_state_of_charge",
-    )
+    numeric_entities = {
+        key: _pack_entity(
+            entity_registry,
+            entry,
+            numeric_device,
+            f"{numeric_identifier}_{key}",
+        )
+        for key in (
+            "state_of_charge",
+            "lifetime_charge_energy",
+            "lifetime_discharge_energy",
+        )
+    }
+    duplicate_entity_ids = {
+        key: _pack_entity(
+            entity_registry,
+            entry,
+            serial_device,
+            f"{serial_identifier}_{key}",
+        ).entity_id
+        for key in (
+            "state_of_charge",
+            "lifetime_charge_energy",
+            "lifetime_discharge_energy",
+        )
+    }
     user_entity = entity_registry.async_get_or_create(
         "sensor",
         "manual",
@@ -353,16 +366,21 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
     _async_migrate_battery_pack_identities(hass, entry)
     _async_remove_phantom_battery_pack_devices(hass, entry)
 
-    surviving_target = device_registry.async_get(serial_device.id)
-    assert surviving_target is not None
-    assert entry.entry_id in surviving_target.config_entries
+    assert device_registry.async_get(serial_device.id) is not None
+    assert entry.entry_id in serial_device.config_entries
     removed_fallback = device_registry.async_get(numeric_device.id)
     assert removed_fallback is None or entry.entry_id not in (
         removed_fallback.config_entries
     )
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
-    assert entity_registry.async_get(serial_entity.entity_id) == serial_entity
-    assert entity_registry.async_get(numeric_entity.entity_id) is None
+    for key, legacy_entity in numeric_entities.items():
+        preserved_entity = entity_registry.async_get(legacy_entity.entity_id)
+        assert preserved_entity is not None
+        assert preserved_entity.entity_id == legacy_entity.entity_id
+        assert preserved_entity.unique_id == f"{serial_identifier}_{key}"
+        assert preserved_entity.device_id == serial_device.id
+    for duplicate_entity_id in duplicate_entity_ids.values():
+        assert entity_registry.async_get(duplicate_entity_id) is None
     preserved_user_entity = entity_registry.async_get(user_entity.entity_id)
     assert preserved_user_entity is not None
     assert preserved_user_entity.entity_id == user_entity.entity_id
@@ -371,8 +389,58 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
     _async_migrate_battery_pack_identities(hass, entry)
     _async_remove_phantom_battery_pack_devices(hass, entry)
 
-    assert device_registry.async_get(serial_device.id) == surviving_target
+    assert device_registry.async_get(serial_device.id) is not None
     assert entity_registry.async_get(user_entity.entity_id) == preserved_user_entity
+
+
+@pytest.mark.parametrize("collision_owner", ["other_entry", "other_device"])
+def test_serial_collision_outside_target_preserves_all_entities(
+    hass: HomeAssistant,
+    collision_owner: str,
+) -> None:
+    """An unrelated serial entity prevents the entire numeric pack migration."""
+    coordinator = _coordinator([{"deviceSn": _SN_A}])
+    cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_PROPERTIES] = {
+        FIELD_BAT_NUM: 1,
+    }
+    entry = _entry(hass, coordinator)
+    other_entry = MockConfigEntry(domain=DOMAIN, entry_id="entry-2")
+    other_entry.add_to_hass(hass)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    parent = _parent_device(device_registry, entry)
+    serial_identifier = _serial_identifier(_SN_A)
+    serial_device = _pack_device(
+        device_registry, entry, serial_identifier, serial_number=_SN_A
+    )
+    numeric_identifier = f"{_PARENT_ID}_battery_pack_1"
+    numeric_device = _pack_device(
+        device_registry, entry, numeric_identifier, serial_number=_SN_A
+    )
+    numeric_entities = [
+        _pack_entity(
+            entity_registry, entry, numeric_device, f"{numeric_identifier}_{key}"
+        )
+        for key in ("state_of_charge", "lifetime_charge_energy")
+    ]
+    serial_entity = _pack_entity(
+        entity_registry, entry, serial_device, f"{serial_identifier}_state_of_charge"
+    )
+    collision = _pack_entity(
+        entity_registry,
+        other_entry if collision_owner == "other_entry" else entry,
+        parent if collision_owner == "other_device" else serial_device,
+        f"{serial_identifier}_lifetime_charge_energy",
+    )
+
+    for _ in range(2):
+        _async_migrate_battery_pack_identities(hass, entry)
+        _async_remove_phantom_battery_pack_devices(hass, entry)
+
+        assert device_registry.async_get(numeric_device.id) == numeric_device
+        assert device_registry.async_get(serial_device.id) == serial_device
+        for entity in [*numeric_entities, serial_entity, collision]:
+            assert entity_registry.async_get(entity.entity_id) == entity
 
 
 def test_duplicate_legacy_serial_targets_keep_one_canonical_pack(
