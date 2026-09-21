@@ -447,6 +447,45 @@ def test_day_battery_discharge_curve_ignores_positive_charge_samples() -> None:
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 0.05)]
 
 
+@pytest.mark.parametrize("empty_split_arrays", [False, True])
+def test_day_battery_signed_y_preserves_charge_and_discharge_hours(
+    empty_split_arrays: bool,
+) -> None:
+    """The combined historical curve retains each direction and its real hours."""
+    section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-09-14",
+            util.APP_REQUEST_END_DATE: "2026-09-14",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["10:00", "11:00", "12:00"],
+        util.APP_CHART_SERIES_Y: [600, -300, 600],
+        util.APP_STAT_TOTAL_CHARGE: "0.2",
+        util.APP_STAT_TOTAL_DISCHARGE: "0.05",
+    }
+    if empty_split_arrays:
+        source[util.APP_CHART_SERIES_Y1] = []
+        source[util.APP_CHART_SERIES_Y2] = []
+
+    for stat_key, expected in (
+        (util.APP_STAT_TOTAL_CHARGE, [0.1, 0.0, 0.1]),
+        (util.APP_STAT_TOTAL_DISCHARGE, [0.0, 0.05, 0.0]),
+    ):
+        points = util.day_power_energy_points(
+            source,
+            section,
+            stat_key,
+            today=util.date(2026, 9, 15),
+            now=util.datetime(2026, 9, 15),
+        )
+        assert points == [
+            util.TrendStatisticPoint(util.datetime(2026, 9, 14, hour), value)
+            for hour, value in zip((10, 11, 12), expected, strict=True)
+        ]
+
+
 def test_day_battery_discharge_uses_positive_y2_magnitude_curve() -> None:
     """The documented split battery day payload imports positive y2 discharge."""
     section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"

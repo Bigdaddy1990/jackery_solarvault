@@ -14134,8 +14134,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             # crash (which reads as a hung setup to the user).
             _LOGGER.exception("Jackery recorder-statistics import failed")
         else:
-            if not self._statistics_startup_sync_pending:
-                return
             self._schedule_statistics_backfill(snapshot)
         finally:
             if asyncio.current_task() is self._statistics_import_task:
