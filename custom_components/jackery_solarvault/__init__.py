@@ -3647,8 +3647,65 @@ def _matching_serial_battery_pack_target(
     return identifier[1], live_serial
 
 
+def _move_numeric_battery_pack_entities_to_serial_target(
+    entity_registry: er.EntityRegistry,
+    entry: JackeryConfigEntry,
+    numeric_device: dr.DeviceEntry,
+    serial_device: dr.DeviceEntry,
+    identifiers: tuple[str, str],
+) -> int | None:
+    """Preserve legacy entity ids after checking every destination's ownership."""
+    old_identifier, target_identifier = identifiers
+    old_prefix = f"{old_identifier}_"
+    target_prefix = f"{target_identifier}_"
+    moves: list[tuple[str, str, str | None]] = []
+    for entity in er.async_entries_for_device(
+        entity_registry,
+        numeric_device.id,
+        include_disabled_entities=True,
+    ):
+        unique_id = entity.unique_id or ""
+        if (
+            entity.config_entry_id != entry.entry_id
+            or entity.platform != DOMAIN
+            or not unique_id.startswith(old_prefix)
+        ):
+            continue
+        new_unique_id = target_prefix + unique_id.removeprefix(old_prefix)
+        duplicate_entity_id = entity_registry.async_get_entity_id(
+            entity.domain,
+            DOMAIN,
+            new_unique_id,
+        )
+        if duplicate_entity_id is not None:
+            duplicate = entity_registry.async_get(duplicate_entity_id)
+            if duplicate is None or (
+                duplicate.config_entry_id != entry.entry_id
+                or duplicate.device_id != serial_device.id
+            ):
+                _LOGGER.warning(
+                    "Preserving battery-pack device %s: entity %s is outside "
+                    "the expected serial target",
+                    old_identifier,
+                    duplicate_entity_id,
+                )
+                return None
+        moves.append((entity.entity_id, new_unique_id, duplicate_entity_id))
+
+    for entity_id, new_unique_id, duplicate_entity_id in moves:
+        if duplicate_entity_id is not None:
+            entity_registry.async_remove(duplicate_entity_id)
+        entity_registry.async_update_entity(
+            entity_id,
+            new_unique_id=new_unique_id,
+            device_id=serial_device.id,
+        )
+    return len(moves)
+
+
 def _async_remove_phantom_battery_pack_device(
     device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
     device: dr.DeviceEntry,
@@ -3684,6 +3741,21 @@ def _async_remove_phantom_battery_pack_device(
         if target is None:
             return
         target_identifier, live_serial = target
+        serial_device = device_registry.async_get_device_by_identifier(
+            (DOMAIN, target_identifier),
+            entry.entry_id,
+        )
+        moved = None
+        if serial_device is not None:
+            moved = _move_numeric_battery_pack_entities_to_serial_target(
+                entity_registry,
+                entry,
+                device,
+                serial_device,
+                (current_identifier, target_identifier),
+            )
+        if moved is None:
+            return
         device_registry.async_remove_device(device.id)
         coordinator.set_battery_pack_identity_override(
             parent_device_id,
@@ -3692,9 +3764,10 @@ def _async_remove_phantom_battery_pack_device(
         )
         _LOGGER.info(
             "Removed duplicate numeric battery-pack registry device %s; "
-            "serial target %s already exists",
+            "serial target %s already exists (%d legacy entities preserved)",
             current_identifier,
             target_identifier,
+            moved,
         )
         return
 
@@ -3714,11 +3787,13 @@ def _async_remove_phantom_battery_pack_devices(
     """Remove pack registry devices disproved by a complete current topology."""
     coordinator = entry.runtime_data
     device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
     for device in list(
         dr.async_entries_for_config_entry(device_registry, entry.entry_id)
     ):
         _async_remove_phantom_battery_pack_device(
             device_registry,
+            entity_registry,
             entry,
             coordinator,
             device,
