@@ -12,9 +12,13 @@ jobs:
   label:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
-
+      actions: write
+      checks: write
+      id-token: write # for Trusted Publishing + attest-action
+      issues: write
+  
     steps:
       - uses: actions/labeler@v7
         with:
