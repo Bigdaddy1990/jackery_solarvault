@@ -17,9 +17,12 @@ on:
         type: string
 
 permissions:
-  contents: read
   id-token: write
-
+  contents: write # for actions/checkout, if you're in a private repo
+  pull-requests: write
+  actions: write
+  checks: write
+  
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
