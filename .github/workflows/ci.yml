@@ -10,9 +10,12 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  id-token: write
-
+  contents: write # for actions/checkout, if you're in a private repo
+  pull-requests: write
+  actions: write
+  checks: write
+  id-token: write # for Trusted Publishing + attest-action
+  
 jobs:
   hassfest:
     name: Hassfest
