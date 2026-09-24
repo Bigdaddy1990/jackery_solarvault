@@ -11,6 +11,7 @@ permissions:
   actions: write
   checks: write
   id-token: write # for Trusted Publishing + attest-action
+  issues: write
 
 jobs:
   release:
