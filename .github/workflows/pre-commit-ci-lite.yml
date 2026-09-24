@@ -14,7 +14,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.14"
-  HA_SPEC: ${{ vars.HA_VERSION != '' && format('=={0}', vars.HA_VERSION) || '>=2025.1.0' }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -46,7 +45,7 @@ jobs:
           enable-cache: true
 
       - name: Install test dependencies for type-checking hooks
-        run: uv pip install --system "homeassistant${HA_SPEC}" -r requirements.txt -r requirements-test.txt
+        run: uv pip install --system -r requirements.txt -r requirements-test.txt
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
