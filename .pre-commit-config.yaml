@@ -20,7 +20,7 @@ default_install_hook_types:
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.12.17
+    rev: 0.12.19
     hooks:
       - id: uv-sync
 
@@ -40,7 +40,7 @@ repos:
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.8
+    rev: v0.16.9
     hooks:
       - id: ruff-check
         args:
