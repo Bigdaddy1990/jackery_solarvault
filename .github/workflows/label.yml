@@ -18,7 +18,7 @@ jobs:
       checks: write
       id-token: write # for Trusted Publishing + attest-action
       issues: write
-  
+
     steps:
       - uses: actions/labeler@v7
         with:

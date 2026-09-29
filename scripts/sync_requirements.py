@@ -1,11 +1,14 @@
 """scripts/sync_requirements.py.
 
-Scannt alle Imports im Projekt, filtert Stdlib und HA-bereitgestellte Pakete
-heraus und schreibt requirements.txt / requirements_test.txt neu.
+Scannt alle Imports im Projekt und prüft die Laufzeit- und Testabhängigkeiten.
+Das Manifest bestimmt die Laufzeitpakete; requirements-test.txt bestimmt die
+Versionsangaben der Testpakete (auch nach Dependabot-Updates).
 
 Usage:
     python -m scripts.sync_requirements           # Dry-run (zeigt Diff)
-    python -m scripts.sync_requirements --write   # Schreibt Dateien
+    python -m scripts.sync_requirements --write   # Spiegel/Laufzeitdatei aktualisieren
+    python -m scripts.sync_requirements --write --force-runtime-from-manifest
+                                                # Bewusst Laufzeitdatei ersetzen
     python -m scripts.sync_requirements --check   # CI-Modus: Exit 1 wenn Abweichung
 """
 import argparse
@@ -173,68 +176,69 @@ IMPORT_TO_PYPI: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Pakete die immer in requirements_test.txt stehen sollen
-#    (Typ-Stubs, CI-Tools usw. die kein direktes Import haben)
+# 4. Pakete die immer in requirements-test.txt stehen sollen
+#    (Typ-Stubs, CI-Tools usw. ohne direkten Import). Versionen stehen nur in
+#    requirements-test.txt, damit Dependabot sie aktualisieren kann.
 # ---------------------------------------------------------------------------
 ALWAYS_TEST: list[str] = [
     'aiohttp',
-    'aiomqtt==2.5.1',
-    'aiousbwatcher==1.1.2',
-    'annotated-doc>=0.0.5',
-    'annotated-types>=0.8.0',
-    'annotatedyaml>=1.0.2',
+    'aiomqtt',
+    'aiousbwatcher',
+    'annotated-doc',
+    'annotated-types',
+    'annotatedyaml',
     'astroid',
-    'attrs>=26.1.0',
-    'autotyping>=24.9.0',
-    'coverage[toml]>=7.6.0',
-    'homeassistant>=2026.9.2',
-    'homeassistant-stubs>=2026.9.2',
-    'hypothesis>=6.168.0',
-    'ifaddr>=0.2.0',
-    'iniconfig>=2.3.0',
-    'jinja2>=3.1.6',
-    'multidict>=6.8.0,<7.0',
-    'mypy>=2.3.0',
-    'packaging>=26.3',
-    'pip>=26.2.1',
-    'pre-commit>=4.6.2',
+    'attrs',
+    'autotyping',
+    'coverage[toml]',
+    'homeassistant',
+    'homeassistant-stubs',
+    'hypothesis',
+    'ifaddr',
+    'iniconfig',
+    'jinja2',
+    'multidict',
+    'mypy',
+    'packaging',
+    'pip',
+    'pre-commit',
     'pylint',
-    'pyrefly>=1.3.1',
-    'pytest==9.0.3',
-    'pytest-asyncio>=1.4.0',
-    'pytest-cov>=7.1.0',
-    'pytest-github-actions-annotate-failures>=0.4.2',
-    'pytest-homeassistant-custom-component>=0.13.365  # follows daily HA version',
-    'pytest-mock>=3.15.1',
-    'pytest-socket==0.8.0',
+    'pyrefly',
+    'pytest',
+    'pytest-asyncio',
+    'pytest-cov',
+    'pytest-github-actions-annotate-failures',
+    'pytest-homeassistant-custom-component',
+    'pytest-mock',
+    'pytest-socket',
     'python-dateutil',
-    'python_discovery>=1.6.0',
-    'pyyaml>=6.0.3',
-    'ruff>=0.16.8',
-    'serialx==1.10.0',
-    'smellcheck>=0.3.10',
-    'ty<=0.0.80',
-    'types-aiofiles>=25.1.0.20260518',
-    'types-atomicwrites>=1.4.5.1',
-    'types-caldav>=1.3.0.20250516',
-    'types-chardet>=5.0.4.6',
-    'types-croniter>=6.2.4.20260711',
-    'types-decorator>=5.2.0.20260712',
-    'types-pexpect>=4.9.0.20260518',
-    'types-protobuf>=7.35.1.20260906',
-    'types-psutil>=7.2.2.20260906',
-    'types-pyserial>=3.5.0.20260712',
-    'types-python-dateutil>=2.9.0.20260807',
-    'types-python-slugify>=8.0.2.20240310',
-    'types-pytz>=2026.3.1.20260727',
-    'types-PyYAML>=6.0.12.20260906',
-    'types-requests>=2.33.0.20260906',
-    'types-xmltodict>=1.0.1.20260518',
-    'typing-extensions>=4.16.0,<5.0',
-    'typing-inspection>=0.4.4',
+    'python_discovery',
+    'pyyaml',
+    'ruff',
+    'serialx',
+    'smellcheck',
+    'ty',
+    'types-aiofiles',
+    'types-atomicwrites',
+    'types-caldav',
+    'types-chardet',
+    'types-croniter',
+    'types-decorator',
+    'types-pexpect',
+    'types-protobuf',
+    'types-psutil',
+    'types-pyserial',
+    'types-python-dateutil',
+    'types-python-slugify',
+    'types-pytz',
+    'types-PyYAML',
+    'types-requests',
+    'types-xmltodict',
+    'typing-extensions',
+    'typing-inspection',
     'uv',
-    'voluptuous>=0.16.0,<0.17.0',
-    'voluptuous-serialize>=2.7.0',
+    'voluptuous',
+    'voluptuous-serialize',
     'wrapt',
 ]
 
@@ -299,12 +303,22 @@ def show_diff(label: str, current: list[str], proposed: list[str]) -> bool:  # n
     return True
 
 
+def requirement_name(line: str) -> str:
+    """Normalize a requirement's package name without comparing its version."""
+    return Requirement(line.split("#", 1)[0].strip()).name.lower().replace("-", "_")
+
+
 # ---------------------------------------------------------------------------
 # 8. Main
 # ---------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:  # noqa: D103
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true", help="Dateien schreiben")
+    parser.add_argument(
+        "--force-runtime-from-manifest",
+        action="store_true",
+        help="requirements.txt bewusst mit den Manifest-Werten überschreiben",
+    )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -330,13 +344,9 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
 
     changed_req = show_diff("requirements.txt", current_req, manifest_reqs)
 
-    # -- requirements_test.txt / requirements-test.txt ------------------------
-    all_test_paths = (
-        ROOT / "requirements_test.txt",
-        ROOT / "requirements-test.txt",
-    )
-    req_test_paths = [p for p in all_test_paths if p.exists()] or [all_test_paths[1]]
-    req_test_path = req_test_paths[0]
+    # -- requirements-test.txt ist die Quelle für Test-Versionen --------------
+    req_test_path = ROOT / "requirements-test.txt"
+    mirror_path = ROOT / "requirements_test.txt"
     current_test = (
         req_test_path.read_text(encoding="utf-8").splitlines()
         if req_test_path.exists()
@@ -344,11 +354,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
     )
 
     # Unbekannte Script-Imports warnen
-    declared_test_requirements = {
-        Requirement(requirement.split("#")[0].strip()).name.lower().replace("-", "_")
-        for requirement in ALWAYS_TEST
-        if requirement.split("#")[0].strip()
-    }
+    declared_test_requirements = {requirement_name(item) for item in ALWAYS_TEST}
     (
         {
             Requirement(IMPORT_TO_PYPI.get(module, module).split("#")[0].strip())
@@ -360,28 +366,48 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         - {"astroid"}
     )
 
-    changed_test = show_diff(req_test_path.name, current_test, ALWAYS_TEST)
-    for mirror_path in req_test_paths[1:]:
-        mirror_current = (
-            mirror_path.read_text(encoding="utf-8").splitlines()
-            if mirror_path.exists()
-            else []
-        )
-        changed_test = (
-            show_diff(mirror_path.name, mirror_current, ALWAYS_TEST) or changed_test
-        )
+    current_names = {
+        requirement_name(line)
+        for line in current_test
+        if line.split("#", 1)[0].strip()
+    }
+    missing_test = [item for item in ALWAYS_TEST if requirement_name(item) not in current_names]
+    unexpected_test = current_names - declared_test_requirements
+    proposed_test = [
+        line
+        for line in current_test
+        if not line.split("#", 1)[0].strip()
+        or requirement_name(line) in declared_test_requirements
+    ] + missing_test
+    changed_test = show_diff(req_test_path.name, current_test, proposed_test)
+    if mirror_path.exists():
+        mirror_current = mirror_path.read_text(encoding="utf-8").splitlines()
+        changed_test = show_diff(mirror_path.name, mirror_current, current_test) or changed_test
 
     any_changed = changed_req or changed_test
 
     if args.write:
-        # requirements.txt
-        content = "\n".join(manifest_reqs) + "\n" if manifest_reqs else ""
-        req_path.write_text(content, encoding="utf-8")
+        if missing_test or unexpected_test:
+            print(
+                "requirements-test.txt package inventory differs from ALWAYS_TEST. "
+                "Reconcile package names and intentional version constraints before --write."
+            )
+            return 1
+        if changed_req and req_path.exists() and not args.force_runtime_from_manifest:
+            print(
+                "requirements.txt differs from manifest.json; reconcile both files "
+                "or use --force-runtime-from-manifest to intentionally replace "
+                "requirements.txt"
+            )
+            return 1
+        if not req_path.exists() or (changed_req and args.force_runtime_from_manifest):
+            content = "\n".join(manifest_reqs) + "\n" if manifest_reqs else ""
+            req_path.write_text(content, encoding="utf-8")
 
-        # requirements_test.txt / requirements-test.txt
-        test_content = "\n".join(ALWAYS_TEST) + "\n"
-        for path in req_test_paths:
-            path.write_text(test_content, encoding="utf-8")
+        # The canonical test file is edited by Dependabot or deliberately by a
+        # maintainer. Only an optional legacy mirror is ever regenerated.
+        if mirror_path.exists():
+            mirror_path.write_text(req_test_path.read_text(encoding="utf-8"), encoding="utf-8")
 
     elif args.check and any_changed:
         # Use ASCII-only punctuation here: Windows consoles default to cp1252

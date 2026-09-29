@@ -23,7 +23,7 @@ permissions:
   actions: write
   checks: write
   issues: write
-  
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
