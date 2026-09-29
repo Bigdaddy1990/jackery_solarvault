@@ -58,13 +58,22 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
 async def _seed_overcounted_day(hass: HomeAssistant) -> None:
     """Store the day as the live recorder held it: one +11.86 kWh hour."""
     rows = [
-        {"start": _DAY - timedelta(hours=1), "sum": 100.0, "state": 9.0,
-         "last_reset": _DAY - timedelta(days=1)},
+        {
+            "start": _DAY - timedelta(hours=1),
+            "sum": 100.0,
+            "state": 9.0,
+            "last_reset": _DAY - timedelta(days=1),
+        },
     ]
     stored = [100.0] * 9 + [103.12, 114.98] + [117.0] * 13
     rows.extend(
-        {"start": _DAY + timedelta(hours=hour), "sum": total, "state": None,
-         "last_reset": _DAY}
+        # pyrefly: ignore [bad-assignment]
+        {
+            "start": _DAY + timedelta(hours=hour),
+            "sum": total,
+            "state": None,
+            "last_reset": _DAY,
+        }
         for hour, total in enumerate(stored)
     )
     rows.append({"start": _NEXT, "sum": 117.5, "state": 0.5, "last_reset": _NEXT})

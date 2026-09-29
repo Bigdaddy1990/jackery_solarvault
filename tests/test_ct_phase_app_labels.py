@@ -84,6 +84,8 @@ def test_smart_meter_names_do_not_repeat_the_device_name() -> None:
         sensors = _translation(filename)["entity"]["sensor"]
         for key in keys:
             name = sensors[key]["name"].lower()
-            assert not name.startswith(
-                ("smart meter", "smart-meter", "ct ", "ct-")
-            ), (filename, key, name)
+            assert not name.startswith(("smart meter", "smart-meter", "ct ", "ct-")), (
+                filename,
+                key,
+                name,
+            )

@@ -89,9 +89,7 @@ def test_matching_day_writes_nothing() -> None:
         existing[hour] = StatisticRow(total, total - 10.0, _DAY)
     existing[48 * _H] = StatisticRow(total, 0.0, 48 * _H)
 
-    plan = plan_statistic_day_reconcile(
-        _HOURS, {_HOURS[12]: 0.5}, existing, _day_reset
-    )
+    plan = plan_statistic_day_reconcile(_HOURS, {_HOURS[12]: 0.5}, existing, _day_reset)
 
     assert plan.rows == []
     assert plan.shift_start is None
@@ -101,9 +99,7 @@ def test_day_before_history_is_anchored_backwards_without_shift() -> None:
     """Without an earlier row the day ends where the first later row starts."""
     existing: dict[float, Any] = {48 * _H: StatisticRow(20.0, 0.0, 48 * _H)}
 
-    plan = plan_statistic_day_reconcile(
-        _HOURS, {_HOURS[10]: 4.0}, existing, _day_reset
-    )
+    plan = plan_statistic_day_reconcile(_HOURS, {_HOURS[10]: 4.0}, existing, _day_reset)
 
     assert plan.shift_start is None
     assert plan.rows[-1]["sum"] == pytest.approx(20.0)

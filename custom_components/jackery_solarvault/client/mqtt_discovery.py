@@ -118,7 +118,9 @@ def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
         # The registered device is stable; device_info follows the payload (a CT
         # payload without identity falls back to "<device>_smart_meter_1"), which
         # moved the mirror to topics its retained config never subscribed to.
+        # pyrefly: ignore [missing-attribute]
         info["identifiers"] = registered.identifiers
+        # pyrefly: ignore [missing-attribute]
         info["name"] = registered.name_by_user or registered.name
     # Only a full DeviceEntry has these fields; reading them on a ChildDeviceEntry
     # (battery packs) is a deprecated compat shim that breaks in HA 2027.9.
@@ -126,10 +128,15 @@ def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
         info.update(
             (key, value)
             for key, value in (
+                # pyrefly: ignore [missing-attribute]
                 ("manufacturer", registered.manufacturer),
+                # pyrefly: ignore [missing-attribute]
                 ("model", registered.model),
+                # pyrefly: ignore [missing-attribute]
                 ("sw_version", registered.sw_version),
+                # pyrefly: ignore [missing-attribute]
                 ("hw_version", registered.hw_version),
+                # pyrefly: ignore [missing-attribute]
                 ("serial_number", registered.serial_number),
             )
             if value is not None
@@ -273,10 +280,10 @@ class JackeryMqttSensorPublisher:
                 if namespace == DOMAIN:
                     mirror_identifier = ("mqtt", f"{DOMAIN}:{identifier}")
                     for mirror in registry.devices:
-                        if (
-                            mirror_identifier in mirror.identifiers
-                            and via_id not in {mirror.id, mirror.via_device_id}
-                        ):
+                        if mirror_identifier in mirror.identifiers and via_id not in {
+                            mirror.id,
+                            mirror.via_device_id,
+                        }:
                             registry.async_update_device(
                                 mirror.id, via_device_id=via_id
                             )
@@ -482,7 +489,7 @@ class JackeryMqttSensorPublisher:
             # "Cloud-MQTT", "Firmware-Version") pushed the native sensor to "_2".
             "default_entity_id": "sensor.jackery_mqtt_"
             + slugify(
-                f"{device['name'].replace('Zusatzbatterie', 'Battery pack')} "
+                f"{device["name"].replace("Zusatzbatterie", "Battery pack")} "
                 f"{_legacy_description_name(entity, description, unique_id)}"
             ),
             "origin": {
@@ -674,7 +681,7 @@ def async_release_native_entity_ids(hass: HomeAssistant) -> None:
         )
         if native_id != f"{mirror.entity_id}_2":
             continue
-        target = f"sensor.jackery_mqtt_{mirror.entity_id.removeprefix('sensor.')}"
+        target = f"sensor.jackery_mqtt_{mirror.entity_id.removeprefix("sensor.")}"
         if registry.async_is_registered(target):
             continue
         registry.async_update_entity(mirror.entity_id, new_entity_id=target)
@@ -726,9 +733,7 @@ def async_start_mqtt_discovery_cleanup(
             pending = orphaned_mirror_config_topics(hass, entry.entry_id)
             removed = await _async_clear_topics(hass, pending)
             if removed:
-                _LOGGER.info(
-                    "Removed %d obsolete Jackery MQTT sensor mirrors", removed
-                )
+                _LOGGER.info("Removed %d obsolete Jackery MQTT sensor mirrors", removed)
             if pending:
                 _LOGGER.warning(
                     "%d obsolete Jackery MQTT discovery topics remain; "

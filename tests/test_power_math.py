@@ -366,9 +366,7 @@ def test_day_power_energy_points_leaves_blank_samples_missing() -> None:
         now=util.datetime(2026, 5, 14, 0, 15),
     )
 
-    assert points == [
-        util.TrendStatisticPoint(util.datetime(2026, 5, 14, 0, 5), 0.05)
-    ]
+    assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 14, 0, 5), 0.05)]
 
 
 def test_day_power_energy_points_ignores_stale_zero_total_with_live_curve() -> None:
@@ -603,13 +601,13 @@ def test_battery_soc_trace_does_not_scale_power_to_stale_scalar() -> None:
     }
 
     points = util.day_power_energy_points(
-        source, section, util.APP_STAT_TOTAL_DISCHARGE,
+        source,
+        section,
+        util.APP_STAT_TOTAL_DISCHARGE,
         today=util.date(2026, 9, 24),
     )
 
-    assert points == [
-        util.TrendStatisticPoint(util.datetime(2026, 9, 23), 0.125)
-    ]
+    assert points == [util.TrendStatisticPoint(util.datetime(2026, 9, 23), 0.125)]
 
 
 def test_day_chart_does_not_borrow_unrelated_series() -> None:
@@ -620,12 +618,15 @@ def test_day_chart_does_not_borrow_unrelated_series() -> None:
         util.APP_CHART_SERIES_Y1: [600],
         util.APP_CHART_SERIES_Y2: [300],
     }
-    assert util.day_power_energy_points(
-        source,
-        section,
-        util.APP_DEVICE_STAT_ONGRID_TO_BATTERY,
-        today=util.date(2026, 9, 24),
-    ) == []
+    assert (
+        util.day_power_energy_points(
+            source,
+            section,
+            util.APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+            today=util.date(2026, 9, 24),
+        )
+        == []
+    )
 
 
 def test_day_battery_soc_trace_does_not_invent_discharge_on_charge_only_day() -> None:
@@ -1160,9 +1161,12 @@ def test_pv_channel_lifetime_offset_is_not_a_period_energy_bucket() -> None:
 
     assert util.trend_series_total(day, "device_pv_stat_day", "pv1Egy") is None
     assert util.trend_series_total(month, "device_pv_stat_month", "pv1Egy") is None
-    assert util.chart_value_for_day(
-        month, "device_pv_stat_month", "pv1Egy", today=util.date(2026, 9, 28)
-    ) is None
+    assert (
+        util.chart_value_for_day(
+            month, "device_pv_stat_month", "pv1Egy", today=util.date(2026, 9, 28)
+        )
+        is None
+    )
     assert util.chart_value_for_day(
         month, "device_pv_stat_month", "pv1Egy", today=util.date(2026, 9, 29)
     ) == pytest.approx(0.34)

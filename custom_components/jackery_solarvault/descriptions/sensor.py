@@ -1770,9 +1770,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
     JackerySensorDescription(
-        value_fn=lambda e: _section_share(
-            e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "pv"
-        ),
+        value_fn=lambda e: _section_share(e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "pv"),
         # pyrefly: ignore [unexpected-keyword]
         key="today_pv_source_pv_share",
         # pyrefly: ignore [unexpected-keyword]
@@ -1783,9 +1781,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
     ),
     JackerySensorDescription(
-        value_fn=lambda e: _section_share(
-            e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "ac"
-        ),
+        value_fn=lambda e: _section_share(e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "ac"),
         # pyrefly: ignore [unexpected-keyword]
         key="today_pv_source_ac_share",
         # pyrefly: ignore [unexpected-keyword]
@@ -1796,9 +1792,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
     ),
     JackerySensorDescription(
-        value_fn=lambda e: _section_share(
-            e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "home"
-        ),
+        value_fn=lambda e: _section_share(e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "home"),
         # pyrefly: ignore [unexpected-keyword]
         key="today_pv_usage_home_share",
         # pyrefly: ignore [unexpected-keyword]
@@ -1822,9 +1816,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
     ),
     JackerySensorDescription(
-        value_fn=lambda e: _section_share(
-            e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "ac"
-        ),
+        value_fn=lambda e: _section_share(e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "ac"),
         # pyrefly: ignore [unexpected-keyword]
         key="today_pv_usage_ac_share",
         # pyrefly: ignore [unexpected-keyword]
@@ -2010,9 +2002,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms1_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms1"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms1"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms1_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2023,9 +2013,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms2_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms2"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms2"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms2_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2036,9 +2024,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms3_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms3"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms3"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms3_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2049,9 +2035,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms4_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms4"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms4"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms4_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2062,9 +2046,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms5_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms5"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms5"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms5_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2075,9 +2057,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="bms6_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "bms6"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "bms6"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="bms6_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2088,9 +2068,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ems1_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "ems1"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "ems1"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ems1_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2101,9 +2079,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ems2_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "ems2"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "ems2"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ems2_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2114,9 +2090,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="pcs1_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "pcs1"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "pcs1"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pcs1_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2127,9 +2101,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="pcs2_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "pcs2"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "pcs2"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pcs2_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2140,9 +2112,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="pcs3_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "pcs3"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "pcs3"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pcs3_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2153,9 +2123,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="pcs4_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "pcs4"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "pcs4"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pcs4_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2166,9 +2134,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="pcs5_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "pcs5"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "pcs5"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pcs5_fault_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -2179,9 +2145,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="iot1_fault_code",
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_DEVICE_ALERT, "iot1"
-        ),
+        value_fn=lambda e: _get_payload_section(e, PAYLOAD_DEVICE_ALERT, "iot1"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="iot1_fault_code",
         # pyrefly: ignore [unexpected-keyword]

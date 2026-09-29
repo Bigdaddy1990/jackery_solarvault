@@ -890,17 +890,17 @@ async def test_mqtt_pack_cell_temperature_push_reaches_its_pack(
 
     _set_test_attr(coordinator, "_push_partial_update", _capture)
     payload = {
-            FIELD_DEVICE_ID: "dev-1",
-            FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
-            "actionId": 0,
-            FIELD_TIMESTAMP: datetime.now(UTC).timestamp(),
-            FIELD_BODY: {
-                "cellTemp": 251,
-                "cmd": 107,
-                FIELD_DEVICE_SN: "PACK-SN",
-                "messageId": 0,
-            },
-        }
+        FIELD_DEVICE_ID: "dev-1",
+        FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        "actionId": 0,
+        FIELD_TIMESTAMP: datetime.now(UTC).timestamp(),
+        FIELD_BODY: {
+            "cellTemp": 251,
+            "cmd": 107,
+            FIELD_DEVICE_SN: "PACK-SN",
+            "messageId": 0,
+        },
+    }
     if local_mqtt:
         payload["type"] = 107
         assert await coordinator.async_handle_local_mqtt_message(

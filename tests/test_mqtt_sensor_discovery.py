@@ -77,9 +77,7 @@ async def test_native_setup_preserves_existing_mqtt_discovery(
 
     with (
         patch("homeassistant.components.mqtt.is_connected", return_value=True),
-        patch(
-            "homeassistant.components.mqtt.async_subscribe_connection_status"
-        ),
+        patch("homeassistant.components.mqtt.async_subscribe_connection_status"),
         patch(
             "homeassistant.components.mqtt.async_publish",
             new=AsyncMock(),
@@ -242,12 +240,16 @@ def test_release_native_entity_ids_swaps_mirror_out_of_native_id(
     async_release_native_entity_ids(hass)
     async_release_native_entity_ids(hass)
 
-    assert registry.async_get_entity_id(
-        "sensor", DOMAIN, "dev_cloud_mqtt"
-    ) == "sensor.solarvault_cloud_mqtt"
-    assert registry.async_get_entity_id(
-        "sensor", "mqtt", "jackery_solarvault_mqtt_dev_cloud_mqtt"
-    ) == "sensor.jackery_mqtt_solarvault_cloud_mqtt"
+    assert (
+        registry.async_get_entity_id("sensor", DOMAIN, "dev_cloud_mqtt")
+        == "sensor.solarvault_cloud_mqtt"
+    )
+    assert (
+        registry.async_get_entity_id(
+            "sensor", "mqtt", "jackery_solarvault_mqtt_dev_cloud_mqtt"
+        )
+        == "sensor.jackery_mqtt_solarvault_cloud_mqtt"
+    )
     assert registry.async_get(untouched.entity_id) is not None
 
 
@@ -483,9 +485,7 @@ async def test_mirror_topics_follow_registered_device_not_payload(
         await publisher._async_publish_entity(  # ruff: ignore[private-member-access]
             entity.unique_id, cast("Any", entity)
         )
-        assert [call.args for call in publish.await_args_list] == [
-            (state_topic, "5.0")
-        ]
+        assert [call.args for call in publish.await_args_list] == [(state_topic, "5.0")]
 
         # A renamed device republishes the discovery document exactly once.
         entity.device_entry = registry.async_update_device(

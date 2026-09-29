@@ -3592,14 +3592,10 @@ def _matching_serial_battery_pack_target(
     if stored_serial is None:
         return None
     if (
-        (
-            child_serial is not None
-            and stable_subdevice_key("battery_pack", child_serial, numeric_index)
-            != live_key
-        )
-        or stable_subdevice_key("battery_pack", stored_serial, numeric_index)
+        child_serial is not None
+        and stable_subdevice_key("battery_pack", child_serial, numeric_index)
         != live_key
-    ):
+    ) or stable_subdevice_key("battery_pack", stored_serial, numeric_index) != live_key:
         return None
     expected_identity = (
         parent_device_id,

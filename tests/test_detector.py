@@ -79,10 +79,7 @@ def test_battery_pack_merge_prunes_persisted_request_selector() -> None:
 def test_parent_serial_repeated_on_mqtt_pack_rows_keeps_all_packs() -> None:
     """The parent serial on each row is not a unique pack identity."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    rows = [
-        {FIELD_DEVICE_SN: "head", FIELD_OUT_PW: power}
-        for power in (107, 99, 128)
-    ]
+    rows = [{FIELD_DEVICE_SN: "head", FIELD_OUT_PW: power} for power in (107, 99, 128)]
     normalized = coordinator._drop_head_unit_packs(  # ruff: ignore[private-member-access]
         rows,
         None,
@@ -91,12 +88,17 @@ def test_parent_serial_repeated_on_mqtt_pack_rows_keeps_all_packs() -> None:
     assert len(normalized) == len(rows)
     assert all(FIELD_DEVICE_SN not in row for row in normalized)
     assert [row[FIELD_OUT_PW] for row in merge_battery_pack_lists([], normalized)] == [
-        107, 99, 128
+        107,
+        99,
+        128,
     ]
-    assert [row[FIELD_OUT_PW] for row in merge_battery_pack_lists(
-        [{FIELD_DEVICE_SN: f"pack-{index}", FIELD_OUT_PW: 0} for index in range(3)],
-        normalized,
-    )] == [107, 99, 128]
+    assert [
+        row[FIELD_OUT_PW]
+        for row in merge_battery_pack_lists(
+            [{FIELD_DEVICE_SN: f"pack-{index}", FIELD_OUT_PW: 0} for index in range(3)],
+            normalized,
+        )
+    ] == [107, 99, 128]
 
     context = _SubdeviceMergeContext(
         updated={PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "head"}},
@@ -108,7 +110,9 @@ def test_parent_serial_repeated_on_mqtt_pack_rows_keeps_all_packs() -> None:
         context, rows
     )
     assert [pack[FIELD_OUT_PW] for pack in context.updated["battery_packs"]] == [
-        107, 99, 128
+        107,
+        99,
+        128,
     ]
 
 

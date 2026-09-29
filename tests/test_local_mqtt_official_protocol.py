@@ -90,15 +90,14 @@ async def test_device_topic_serial_routes_body_only_report() -> None:
     assert await coordinator.async_handle_local_mqtt_message(
         f"hb/device/{_DEVICE_SN}/status", {"type": 2, "body": {"batSoc": 55}}
     )
+    # pyrefly: ignore [missing-attribute]
     assert handler.await_args.args[1]["deviceSn"] == _DEVICE_SN
     assert (
-        local_mqtt_topic_device_serial(f"hb/device/{_DEVICE_SN}/status")
-        == _DEVICE_SN
+        local_mqtt_topic_device_serial(f"hb/device/{_DEVICE_SN}/status") == _DEVICE_SN
     )
     assert local_mqtt_topic_device_serial("hb/app/user123/device") is None
     assert (
-        local_mqtt_topic_device_serial(f"other/hb/device/{_DEVICE_SN}/status")
-        is None
+        local_mqtt_topic_device_serial(f"other/hb/device/{_DEVICE_SN}/status") is None
     )
 
 

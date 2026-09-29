@@ -154,6 +154,7 @@ async def test_ble_read_queries_do_not_wait_for_setter_acks() -> None:
         )
         assert [label for label, _operation in operations] == ["BLE"]
         await operations[0][1]
+        # pyrefly: ignore [missing-attribute]
         assert send_ble.await_args.kwargs["wait_for_ack"] is expected_ack
 
 

@@ -124,7 +124,8 @@ async def test_optional_jackery_topic_refusal_keeps_configured_subscription() ->
 
     broker.messages = _messages()
     await client._async_consume_session(  # ruff: ignore[private-member-access]
-        broker, list(client._topic_filters)  # ruff: ignore[private-member-access]
+        broker,
+        list(client._topic_filters),  # ruff: ignore[private-member-access]
     )
     assert client._subscribed_topics == {  # ruff: ignore[private-member-access]
         "homeassistant/#",

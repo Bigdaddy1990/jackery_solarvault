@@ -2000,9 +2000,7 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         create, and calls the platform's entity adder for any discovered entities.
         """
         nonlocal last_option_signature, last_signature
-        _reconcile_pv_input_devices(
-            hass, entry, coordinator, reconciled_pv_channels
-        )
+        _reconcile_pv_input_devices(hass, entry, coordinator, reconciled_pv_channels)
         sig = coordinator_entity_signature(coordinator.data)
         option_signature = _entity_option_signature()
         registration_eligibility = _registration_eligibility()
@@ -3377,7 +3375,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 context.payload,
                 context.local_timezone,
                 context.local_now,
-            ) < 0
+            )
+            < 0
         )
         future = bool(
             not state.day_bucket_fallback
@@ -3387,7 +3386,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 context.payload,
                 context.local_timezone,
                 context.local_now,
-            ) > 0
+            )
+            > 0
         )
         if stale or future:
             state.raw = None
@@ -3592,16 +3592,22 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
     ) -> _StatCacheSnapshot:
         """Apply stale/future guards and transform one scalar statistic."""
         if state.day_bucket_fallback is None and self._reset_period:
-            state.stale = self._period_data_offset(
-                state.cached_source_section,
-                context.payload,
-                context.local_timezone,
-            ) < 0
-            state.future = self._period_data_offset(
-                state.cached_source_section,
-                context.payload,
-                context.local_timezone,
-            ) > 0
+            state.stale = (
+                self._period_data_offset(
+                    state.cached_source_section,
+                    context.payload,
+                    context.local_timezone,
+                )
+                < 0
+            )
+            state.future = (
+                self._period_data_offset(
+                    state.cached_source_section,
+                    context.payload,
+                    context.local_timezone,
+                )
+                > 0
+            )
         if state.stale or state.future:
             state.raw = None
         native_value = (

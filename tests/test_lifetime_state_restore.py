@@ -270,9 +270,7 @@ def test_restored_value_never_uses_the_ha_reserved_attribute() -> None:
     mutable._pack_sn = "PACK-1"  # ruff: ignore[private-member-access]
     mutable._pack_key = "battery_pack_pack_1"  # ruff: ignore[private-member-access]
     mutable.entity_description = next(
-        item
-        for item in BATTERY_PACK_SENSOR_DESCRIPTIONS
-        if item.key == "charge_power"
+        item for item in BATTERY_PACK_SENSOR_DESCRIPTIONS if item.key == "charge_power"
     )
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
     mutable._cached_attrs = {}  # ruff: ignore[private-member-access]

@@ -1,6 +1,5 @@
 """Tests for module-level functions in coordinator.py for coverage."""
 
-
 import pytest
 
 from custom_components.jackery_solarvault.const import FIELD_SYSTEM_REGION

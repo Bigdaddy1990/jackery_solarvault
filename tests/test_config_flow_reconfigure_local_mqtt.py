@@ -167,7 +167,6 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
             CONF_PASSWORD: "secret",
             CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "10.0.0.5",
-
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/device/+/status",
         },
     )

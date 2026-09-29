@@ -74,6 +74,7 @@ async def _load(
             is None
         )
         await hass.async_block_till_done()
+    # pyrefly: ignore [no-any-return-implicit]
     return coordinator.local_period_energy_kwh(
         _DEVICE, FIELD_CT_TOTAL_PHASE_ENERGY, period=period, today=_TODAY
     )
@@ -90,6 +91,7 @@ async def test_month_is_lifetime_now_minus_reading_at_month_start(
     value = await _load(hass, coordinator, executor, DATE_TYPE_MONTH)
 
     assert value == pytest.approx(212.84)
+    # pyrefly: ignore [missing-attribute]
     function, _hass, start, end, ids, period, _units, types = executor.await_args.args
     assert function is coordinator_module.statistics_during_period
     assert (end.year, end.month, end.day, end.hour) == (2026, 9, 1, 0)
@@ -112,6 +114,7 @@ async def test_year_without_an_earlier_reading_is_the_lifetime_total(
         1381.3
     )
     _function, _hass, _start, end, _ids, period, _units, _types = (
+        # pyrefly: ignore [missing-attribute]
         executor.await_args.args
     )
     assert (end.year, end.month, end.day) == (2026, 1, 1)
