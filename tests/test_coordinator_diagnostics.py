@@ -7,9 +7,7 @@ back to cached discovery. All are pure lookups over in-memory coordinator state
 — no I/O — so they assert real branch behavior directly.
 """
 
-from typing import Any, cast
-
-import pytest
+from typing import TYPE_CHECKING, Any, cast
 
 from custom_components.jackery_solarvault import coordinator as co
 from custom_components.jackery_solarvault.const import (
@@ -28,6 +26,9 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
+
+if TYPE_CHECKING:
+    import pytest
 
 _Coordinator = JackerySolarVaultCoordinator
 

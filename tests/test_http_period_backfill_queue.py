@@ -345,6 +345,7 @@ async def test_period_transport_failure_remains_available_to_next_fill(
     cast("Any", coordinator)._async_fetch_historical_app_chart_source = fetch  # ruff: ignore[private-member-access]
 
     for _attempt in range(
+        # pyrefly: ignore [missing-attribute]
         coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS  # ruff: ignore[private-member-access]
     ):
         result = await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]

@@ -331,5 +331,3 @@ async def test_historical_http_failures_remain_retryable_and_local(
 
     assert status == expected_status
     assert result == {}
-
-

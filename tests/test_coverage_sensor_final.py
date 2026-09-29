@@ -218,10 +218,7 @@ def test_total_increasing_jitter_guard_preserves_only_tiny_regressions(
     expected: object,
 ) -> None:
     """Lifetime totals hold regressions, while ordinary measurements pass."""
-    assert (
-        guard_total_increasing_jitter(previous, current, description)
-        == expected
-    )
+    assert guard_total_increasing_jitter(previous, current, description) == expected
 
 
 @pytest.mark.parametrize(

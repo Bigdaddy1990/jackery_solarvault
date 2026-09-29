@@ -93,6 +93,7 @@ async def _import(
         points=points,
     )
     await async_wait_recording_done(hass)
+    # pyrefly: ignore [no-any-return-implicit]
     return result
 
 

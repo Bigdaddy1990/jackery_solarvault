@@ -1,6 +1,5 @@
 """Tests for specific uncovered paths in coordinator.py."""
 
-
 import pytest
 
 from custom_components.jackery_solarvault.coordinator import (
