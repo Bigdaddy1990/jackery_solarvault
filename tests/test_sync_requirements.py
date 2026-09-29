@@ -88,6 +88,17 @@ class SyncRequirementsTests(unittest.TestCase):
         assert sync_requirements.main(["--write"]) == 1
         assert self.runtime_path.read_text(encoding="utf-8") == updated
 
+    def test_check_rejects_package_outside_inventory(self) -> None:
+        """An obsolete or accidental test package must not escape the gate."""
+        updated = (
+            self.test_path.read_text(encoding="utf-8") + "unused-dependency>=9.9.9\n"
+        )
+        self.test_path.write_text(updated, encoding="utf-8")
+
+        assert sync_requirements.main(["--check"]) == 1
+        assert sync_requirements.main(["--write"]) == 1
+        assert self.test_path.read_text(encoding="utf-8") == updated
+
 
 if __name__ == "__main__":
     unittest.main()

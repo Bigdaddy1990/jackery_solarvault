@@ -372,19 +372,25 @@ def main(argv: list[str] | None = None) -> int:  # noqa: D103
         if line.split("#", 1)[0].strip()
     }
     missing_test = [item for item in ALWAYS_TEST if requirement_name(item) not in current_names]
-    changed_test = show_diff(req_test_path.name, current_test, current_test + missing_test)
+    unexpected_test = current_names - declared_test_requirements
+    proposed_test = [
+        line
+        for line in current_test
+        if not line.split("#", 1)[0].strip()
+        or requirement_name(line) in declared_test_requirements
+    ] + missing_test
+    changed_test = show_diff(req_test_path.name, current_test, proposed_test)
     if mirror_path.exists():
         mirror_current = mirror_path.read_text(encoding="utf-8").splitlines()
-        changed_test = show_diff(mirror_path.name, mirror_current, current_test + missing_test) or changed_test
+        changed_test = show_diff(mirror_path.name, mirror_current, current_test) or changed_test
 
     any_changed = changed_req or changed_test
 
     if args.write:
-        if missing_test:
+        if missing_test or unexpected_test:
             print(
-                "requirements-test.txt is missing required packages: "
-                + ", ".join(missing_test)
-                + ". Add them with intentional version constraints before --write."
+                "requirements-test.txt package inventory differs from ALWAYS_TEST. "
+                "Reconcile package names and intentional version constraints before --write."
             )
             return 1
         if changed_req and req_path.exists() and not args.force_runtime_from_manifest:
