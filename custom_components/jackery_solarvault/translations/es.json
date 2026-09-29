@@ -47,10 +47,7 @@
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "enable_ble_transport": "Activar transporte BLE",
           "enable_derived_home_energy_fallback": "Permitir fallback derivado de energía del hogar",
-          "enable_month_statistics": "Importar estadísticas mensuales",
           "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Importar estadísticas semanales",
-          "enable_year_statistics": "Importar estadísticas anuales",
           "password": "Contraseña",
           "third_party_mqtt_enable": "Activar puente MQTT de terceros",
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
@@ -68,10 +65,7 @@
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_derived_home_energy_fallback": "Si sys/home/trends no está disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagnósticos de origen.",
-          "enable_month_statistics": "Importa la carga útil del período mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "third_party_mqtt_enable": "Pide a la SolarVault que publique telemetría en tu propio broker MQTT (PROTOCOL.md §5 / §15). Experimental: el relé REST en la nube para este comando está bloqueado en el servidor, por lo que la integración publica el frame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) primero directamente por BLE y luego por MQTT en la nube. El usuario, la contraseña y el token se codifican con el códec ThirdPartMQTTConfig compatible con la app antes de enviarse.",
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",
           "third_party_mqtt_password": "Contraseña opcional del broker MQTT.",
@@ -117,6 +111,18 @@
       },
       "online": {
         "name": "En línea"
+      },
+      "pv1_connected": {
+        "name": "PV1 connected"
+      },
+      "pv2_connected": {
+        "name": "PV2 connected"
+      },
+      "pv3_connected": {
+        "name": "PV3 connected"
+      },
+      "pv4_connected": {
+        "name": "PV4 connected"
       },
       "smart_plug_switch_state": {
         "name": "Estado del enchufe inteligente"
@@ -548,11 +554,20 @@
       "ac_output_voltage_2": {
         "name": "Tensión de salida CA 2"
       },
+      "ac_to_battery_lifetime_energy": {
+        "name": "AC to battery energy (lifetime)"
+      },
+      "ac_to_grid_side_lifetime_energy": {
+        "name": "AC to grid side energy (lifetime)"
+      },
       "activation_date": {
         "name": "Fecha de activación"
       },
       "alarm_count": {
         "name": "Alarmas activas"
+      },
+      "alert_count": {
+        "name": "Active alerts"
       },
       "ambient_temperature": {
         "name": "Temperatura ambiente"
@@ -635,6 +650,9 @@
       "battery_pack_update_status": {
         "name": "Estado de actualización del paquete de batería"
       },
+      "battery_pack_version": {
+        "name": "Battery pack version"
+      },
       "battery_soc": {
         "name": "Nivel total de batería"
       },
@@ -650,8 +668,29 @@
       "battery_temperature": {
         "name": "Temperatura de la batería"
       },
+      "battery_to_ac_lifetime_energy": {
+        "name": "Battery to AC energy (lifetime)"
+      },
       "ble_transport": {
         "name": "Transporte BLE"
+      },
+      "bms1_fault_code": {
+        "name": "BMS 1 fault code"
+      },
+      "bms2_fault_code": {
+        "name": "BMS 2 fault code"
+      },
+      "bms3_fault_code": {
+        "name": "BMS 3 fault code"
+      },
+      "bms4_fault_code": {
+        "name": "BMS 4 fault code"
+      },
+      "bms5_fault_code": {
+        "name": "BMS 5 fault code"
+      },
+      "bms6_fault_code": {
+        "name": "BMS 6 fault code"
       },
       "box_mode": {
         "name": "Modo de caja"
@@ -881,6 +920,12 @@
       "dynamic_price_today_low": {
         "name": "Precio dinámico mínimo de hoy"
       },
+      "ems1_fault_code": {
+        "name": "EMS 1 fault code"
+      },
+      "ems2_fault_code": {
+        "name": "EMS 2 fault code"
+      },
       "energy_plan_power": {
         "name": "Potencia del plan de energía"
       },
@@ -959,6 +1004,9 @@
       "grid_out_power": {
         "name": "Exportación a red"
       },
+      "grid_side_to_ac_load_lifetime_energy": {
+        "name": "Grid side to AC load energy (lifetime)"
+      },
       "grid_standard": {
         "name": "Estándar de red"
       },
@@ -997,6 +1045,12 @@
       },
       "inverter_ac_output_power": {
         "name": "Salida CA del inversor"
+      },
+      "iot1_fault_code": {
+        "name": "IOT 1 fault code"
+      },
+      "last_alarm_id": {
+        "name": "Last alarm ID"
       },
       "last_offline": {
         "name": "Última vez sin conexión"
@@ -1076,6 +1130,45 @@
       "meter_head_output_power": {
         "name": "Potencia de salida del medidor"
       },
+      "month_battery_source_ac_share": {
+        "name": "Battery source share AC (month)"
+      },
+      "month_battery_source_home_share": {
+        "name": "Battery source share home (month)"
+      },
+      "month_battery_source_pv_share": {
+        "name": "Battery source share PV (month)"
+      },
+      "month_battery_usage_ac_share": {
+        "name": "Battery usage share AC (month)"
+      },
+      "month_battery_usage_home_share": {
+        "name": "Battery usage share home (month)"
+      },
+      "month_home_source_ac_share": {
+        "name": "Home source share AC (month)"
+      },
+      "month_home_source_battery_share": {
+        "name": "Home source share battery (month)"
+      },
+      "month_home_source_pv_share": {
+        "name": "Home source share PV (month)"
+      },
+      "month_pv_source_ac_share": {
+        "name": "PV source share AC (month)"
+      },
+      "month_pv_source_pv_share": {
+        "name": "PV source share PV (month)"
+      },
+      "month_pv_usage_ac_share": {
+        "name": "PV usage share AC (month)"
+      },
+      "month_pv_usage_battery_share": {
+        "name": "PV usage share battery (month)"
+      },
+      "month_pv_usage_home_share": {
+        "name": "PV usage share home (month)"
+      },
       "off_grid_shutdown_state": {
         "name": "Estado de apagado sin conexión a red"
       },
@@ -1099,6 +1192,21 @@
       },
       "panel_temperature": {
         "name": "Temperatura del panel"
+      },
+      "pcs1_fault_code": {
+        "name": "PCS 1 fault code"
+      },
+      "pcs2_fault_code": {
+        "name": "PCS 2 fault code"
+      },
+      "pcs3_fault_code": {
+        "name": "PCS 3 fault code"
+      },
+      "pcs4_fault_code": {
+        "name": "PCS 4 fault code"
+      },
+      "pcs5_fault_code": {
+        "name": "PCS 5 fault code"
       },
       "power_count": {
         "name": "Conteo de potencia"
@@ -1130,6 +1238,9 @@
       "pv4_power": {
         "name": "FV4"
       },
+      "pv_max_charge_power": {
+        "name": "PV maximum charge power"
+      },
       "pv_month_energy": {
         "name": "Energía FV mensual"
       },
@@ -1147,6 +1258,12 @@
       },
       "pv_revenue_year": {
         "name": "Ingresos FV anuales"
+      },
+      "pv_to_ac_lifetime_energy": {
+        "name": "PV to AC energy (lifetime)"
+      },
+      "pv_to_grid_side_lifetime_energy": {
+        "name": "PV to grid side energy (lifetime)"
       },
       "pv_week_energy": {
         "name": "Energía FV semanal"
@@ -1210,12 +1327,6 @@
       },
       "smart_meter_fun_form": {
         "name": "Forma de función del Smart Meter"
-      },
-      "smart_meter_grid_export_energy": {
-        "name": "Energía de exportación a red del Smart Meter"
-      },
-      "smart_meter_grid_import_energy": {
-        "name": "Energía de importación de red del Smart Meter"
       },
       "smart_meter_gross_phase_export_power": {
         "name": "Potencia bruta de exportación por fase del Smart Meter"
@@ -1403,6 +1514,9 @@
       "soc_discharge_limit": {
         "name": "Límite de descarga"
       },
+      "soc_force_charge": {
+        "name": "Forced charge SOC"
+      },
       "solar_production_energy": {
         "name": "Lifetime solar production energy"
       },
@@ -1445,8 +1559,26 @@
       "timezone": {
         "name": "Zona horaria"
       },
+      "today_battery_charge_energy": {
+        "name": "Battery charge energy (today)"
+      },
       "today_battery_energy": {
         "name": "Energía de batería hoy"
+      },
+      "today_battery_source_ac_share": {
+        "name": "Battery source share AC (today)"
+      },
+      "today_battery_source_home_share": {
+        "name": "Battery source share home (today)"
+      },
+      "today_battery_source_pv_share": {
+        "name": "Battery source share PV (today)"
+      },
+      "today_battery_usage_ac_share": {
+        "name": "Battery usage share AC (today)"
+      },
+      "today_battery_usage_home_share": {
+        "name": "Battery usage share home (today)"
       },
       "today_grid_import_energy": {
         "name": "Importación de red hoy"
@@ -1454,8 +1586,32 @@
       "today_home_load_energy": {
         "name": "Consumo del hogar hoy"
       },
+      "today_home_source_ac_share": {
+        "name": "Home source share AC (today)"
+      },
+      "today_home_source_battery_share": {
+        "name": "Home source share battery (today)"
+      },
+      "today_home_source_pv_share": {
+        "name": "Home source share PV (today)"
+      },
       "today_load": {
         "name": "Salida diaria a red (nube de Jackery)"
+      },
+      "today_pv_source_ac_share": {
+        "name": "PV source share AC (today)"
+      },
+      "today_pv_source_pv_share": {
+        "name": "PV source share PV (today)"
+      },
+      "today_pv_usage_ac_share": {
+        "name": "PV usage share AC (today)"
+      },
+      "today_pv_usage_battery_share": {
+        "name": "PV usage share battery (today)"
+      },
+      "today_pv_usage_home_share": {
+        "name": "PV usage share home (today)"
       },
       "today_solar_energy": {
         "name": "Today solar energy"
@@ -1499,6 +1655,45 @@
       "weather_plan": {
         "name": "Plan meteorológico"
       },
+      "week_battery_source_ac_share": {
+        "name": "Battery source share AC (week)"
+      },
+      "week_battery_source_home_share": {
+        "name": "Battery source share home (week)"
+      },
+      "week_battery_source_pv_share": {
+        "name": "Battery source share PV (week)"
+      },
+      "week_battery_usage_ac_share": {
+        "name": "Battery usage share AC (week)"
+      },
+      "week_battery_usage_home_share": {
+        "name": "Battery usage share home (week)"
+      },
+      "week_home_source_ac_share": {
+        "name": "Home source share AC (week)"
+      },
+      "week_home_source_battery_share": {
+        "name": "Home source share battery (week)"
+      },
+      "week_home_source_pv_share": {
+        "name": "Home source share PV (week)"
+      },
+      "week_pv_source_ac_share": {
+        "name": "PV source share AC (week)"
+      },
+      "week_pv_source_pv_share": {
+        "name": "PV source share PV (week)"
+      },
+      "week_pv_usage_ac_share": {
+        "name": "PV usage share AC (week)"
+      },
+      "week_pv_usage_battery_share": {
+        "name": "PV usage share battery (week)"
+      },
+      "week_pv_usage_home_share": {
+        "name": "PV usage share home (week)"
+      },
       "wifi_ip": {
         "name": "Dirección IP"
       },
@@ -1519,6 +1714,45 @@
       },
       "work_mode": {
         "name": "Modo de trabajo"
+      },
+      "year_battery_source_ac_share": {
+        "name": "Battery source share AC (year)"
+      },
+      "year_battery_source_home_share": {
+        "name": "Battery source share home (year)"
+      },
+      "year_battery_source_pv_share": {
+        "name": "Battery source share PV (year)"
+      },
+      "year_battery_usage_ac_share": {
+        "name": "Battery usage share AC (year)"
+      },
+      "year_battery_usage_home_share": {
+        "name": "Battery usage share home (year)"
+      },
+      "year_home_source_ac_share": {
+        "name": "Home source share AC (year)"
+      },
+      "year_home_source_battery_share": {
+        "name": "Home source share battery (year)"
+      },
+      "year_home_source_pv_share": {
+        "name": "Home source share PV (year)"
+      },
+      "year_pv_source_ac_share": {
+        "name": "PV source share AC (year)"
+      },
+      "year_pv_source_pv_share": {
+        "name": "PV source share PV (year)"
+      },
+      "year_pv_usage_ac_share": {
+        "name": "PV usage share AC (year)"
+      },
+      "year_pv_usage_battery_share": {
+        "name": "PV usage share battery (year)"
+      },
+      "year_pv_usage_home_share": {
+        "name": "PV usage share home (year)"
       }
     },
     "switch": {
@@ -1656,6 +1890,9 @@
     "check_system_bound_failed": {
       "message": "No se pudo comprobar la vinculacion del sistema del dispositivo {device_id}: {error}"
     },
+    "delete_electricity_strategy_failed": {
+      "message": "Could not delete the electricity strategy for device {device_id}: {error}"
+    },
     "delete_storm_alert_failed": {
       "message": "No se pudo eliminar la alerta de tormenta {alert_id} para el dispositivo {device_id}: {error}"
     },
@@ -1694,6 +1931,9 @@
     },
     "get_user_info_failed": {
       "message": "No se pudo obtener la informacion de usuario del dispositivo {device_id}: {error}"
+    },
+    "insert_electricity_strategy_failed": {
+      "message": "Could not create the electricity strategy for device {device_id}: {error}"
     },
     "invalid_number_allowed_values": {
       "message": "{entity} para el dispositivo {device_id} debe ser uno de estos valores: {allowed_values}"
@@ -1770,6 +2010,9 @@
     "query_cutoff_stat_failed": {
       "message": "No se pudieron consultar las estadisticas de corte del dispositivo {device_id}: {error}"
     },
+    "query_electricity_strategy_failed": {
+      "message": "Could not read the electricity strategy for device {device_id}: {error}"
+    },
     "query_profit_stat_failed": {
       "message": "No se pudieron consultar las estadisticas de beneficio del dispositivo {device_id}: {error}"
     },
@@ -1821,6 +2064,9 @@
     "send_ble_command_failed": {
       "message": "No se pudo enviar el comando BLE para el dispositivo {device_id}: {error}"
     },
+    "send_device_schedule_failed": {
+      "message": "Could not send the schedule to device {device_id}: {error}"
+    },
     "set_ac_nickname_failed": {
       "message": "No se pudo renombrar el puerto CA del dispositivo {device_id}: {error}"
     },
@@ -1865,6 +2111,9 @@
     },
     "unbind_smart_part_failed": {
       "message": "No se pudo desvincular el accesorio inteligente para el dispositivo {device_id}: {error}"
+    },
+    "update_electricity_strategy_failed": {
+      "message": "Could not update the electricity strategy for device {device_id}: {error}"
     }
   },
   "issues": {
@@ -1889,10 +2138,8 @@
           "create_smart_meter_derived_sensors": "Crear sensores calculados del Smart Meter",
           "enable_ble_transport": "Activar transporte BLE",
           "enable_derived_home_energy_fallback": "Permitir fallback derivado de energía del hogar",
-          "enable_month_statistics": "Importar estadísticas mensuales",
           "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Importar estadísticas semanales",
-          "enable_year_statistics": "Importar estadísticas anuales",
+          "enable_unredacted_debug": "Enable unredacted diagnostics and payload debug log",
           "scan_interval": "Intervalo de sondeo en directo (segundos)",
           "third_party_mqtt_enable": "Activar puente MQTT de terceros",
           "third_party_mqtt_ip": "IP / nombre de host del broker MQTT de terceros",
@@ -1909,10 +2156,8 @@
           "create_smart_meter_derived_sensors": "Crea sensores netos adicionales, sensores de flujo bruto por fase y consumo del hogar calculado a partir de la carga doméstica instantánea indicada por Jackery cuando esté disponible; de lo contrario, usa los valores de fase del Smart Meter más la entrada/salida de red de Jackery. Desactívalo si solo quieres los valores brutos de Jackery.",
           "enable_ble_transport": "Inicia el lector BLE local experimental para diagnosticos SolarVault BLE decodificados/en bruto. Requiere acceso Bluetooth en el host de Home Assistant y esta desactivado de forma predeterminada.",
           "enable_derived_home_energy_fallback": "Si sys/home/trends no está disponible, deriva home_energy desde device_home_stat.totalOutGridEnergy. Los valores derivados se marcan en atributos y diagnósticos de origen.",
-          "enable_month_statistics": "Importa la carga útil del período mensual en las series sensor.* y jackery_solarvault:*_month_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Importa la carga útil del período semanal en las series sensor.* y jackery_solarvault:*_week_daily correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
-          "enable_year_statistics": "Importa la carga útil del período anual en las series sensor.* y jackery_solarvault:*_year_monthly correspondientes. La serie externa horaria day_hourly se importa de todos modos.",
+          "enable_unredacted_debug": "Development only. Exports full diagnostics and captures complete HTTP, MQTT, and BLE JSONL frames without redaction or log rotation, including credentials and device identifiers. Disable after capture; never share these files publicly.",
           "scan_interval": "Con qué frecuencia se consulta la nube de Jackery para obtener valores en directo. El MQTT en la nube y el Bluetooth entregan actualizaciones más rápidas de forma independiente; 30 s sigue la recomendación de Home Assistant para integraciones de sondeo en la nube. Mínimo 15 s.",
           "third_party_mqtt_enable": "Pide a la SolarVault que publique telemetría en tu propio broker MQTT (PROTOCOL.md §5 / §15). Experimental: el relé REST en la nube para este comando está bloqueado en el servidor, por lo que la integración publica el frame SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) primero directamente por BLE y luego por MQTT en la nube. El usuario, la contraseña y el token se codifican con el códec ThirdPartMQTTConfig compatible con la app antes de enviarse.",
           "third_party_mqtt_ip": "IP o nombre de host de tu broker MQTT local, por ejemplo 192.168.x.x.",

@@ -47,10 +47,7 @@
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
-          "enable_month_statistics": "Import month statistics",
           "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Import week statistics",
-          "enable_year_statistics": "Import year statistics",
           "password": "Password",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
@@ -68,10 +65,7 @@
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
-          "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
@@ -117,6 +111,18 @@
       },
       "online": {
         "name": "Online"
+      },
+      "pv1_connected": {
+        "name": "PV1 connected"
+      },
+      "pv2_connected": {
+        "name": "PV2 connected"
+      },
+      "pv3_connected": {
+        "name": "PV3 connected"
+      },
+      "pv4_connected": {
+        "name": "PV4 connected"
       },
       "smart_plug_switch_state": {
         "name": "Smart plug state"
@@ -548,11 +554,20 @@
       "ac_output_voltage_2": {
         "name": "AC output voltage 2"
       },
+      "ac_to_battery_lifetime_energy": {
+        "name": "AC to battery energy (lifetime)"
+      },
+      "ac_to_grid_side_lifetime_energy": {
+        "name": "AC to grid side energy (lifetime)"
+      },
       "activation_date": {
         "name": "Activation date"
       },
       "alarm_count": {
         "name": "Active alarms"
+      },
+      "alert_count": {
+        "name": "Active alerts"
       },
       "ambient_temperature": {
         "name": "Ambient temperature"
@@ -635,6 +650,9 @@
       "battery_pack_update_status": {
         "name": "Battery pack update status"
       },
+      "battery_pack_version": {
+        "name": "Battery pack version"
+      },
       "battery_soc": {
         "name": "Total battery level"
       },
@@ -650,8 +668,29 @@
       "battery_temperature": {
         "name": "Battery temperature"
       },
+      "battery_to_ac_lifetime_energy": {
+        "name": "Battery to AC energy (lifetime)"
+      },
       "ble_transport": {
         "name": "BLE transport"
+      },
+      "bms1_fault_code": {
+        "name": "BMS 1 fault code"
+      },
+      "bms2_fault_code": {
+        "name": "BMS 2 fault code"
+      },
+      "bms3_fault_code": {
+        "name": "BMS 3 fault code"
+      },
+      "bms4_fault_code": {
+        "name": "BMS 4 fault code"
+      },
+      "bms5_fault_code": {
+        "name": "BMS 5 fault code"
+      },
+      "bms6_fault_code": {
+        "name": "BMS 6 fault code"
       },
       "box_mode": {
         "name": "Box mode"
@@ -708,28 +747,28 @@
         "name": "Country code"
       },
       "ct_input_day_energy": {
-        "name": "CT grid import today energy"
+        "name": "Grid import today"
       },
       "ct_input_month_energy": {
-        "name": "Monthly CT grid import"
+        "name": "Monthly grid import"
       },
       "ct_input_week_energy": {
-        "name": "Weekly CT grid import"
+        "name": "Weekly grid import"
       },
       "ct_input_year_energy": {
-        "name": "Yearly CT grid import"
+        "name": "Yearly grid import"
       },
       "ct_output_day_energy": {
-        "name": "CT grid export today energy"
+        "name": "Grid export today"
       },
       "ct_output_month_energy": {
-        "name": "Monthly CT grid export"
+        "name": "Monthly grid export"
       },
       "ct_output_week_energy": {
-        "name": "Weekly CT grid export"
+        "name": "Weekly grid export"
       },
       "ct_output_year_energy": {
-        "name": "Yearly CT grid export"
+        "name": "Yearly grid export"
       },
       "ct_state": {
         "name": "CT state"
@@ -881,6 +920,12 @@
       "dynamic_price_today_low": {
         "name": "Dynamic price today low"
       },
+      "ems1_fault_code": {
+        "name": "EMS 1 fault code"
+      },
+      "ems2_fault_code": {
+        "name": "EMS 2 fault code"
+      },
       "energy_plan_power": {
         "name": "Energy plan power"
       },
@@ -959,6 +1004,9 @@
       "grid_out_power": {
         "name": "Grid export"
       },
+      "grid_side_to_ac_load_lifetime_energy": {
+        "name": "Grid side to AC load energy (lifetime)"
+      },
       "grid_standard": {
         "name": "Grid standard"
       },
@@ -997,6 +1045,12 @@
       },
       "inverter_ac_output_power": {
         "name": "Inverter AC output"
+      },
+      "iot1_fault_code": {
+        "name": "IOT 1 fault code"
+      },
+      "last_alarm_id": {
+        "name": "Last alarm ID"
       },
       "last_offline": {
         "name": "Last offline"
@@ -1076,6 +1130,45 @@
       "meter_head_output_power": {
         "name": "Meter head output power"
       },
+      "month_battery_source_ac_share": {
+        "name": "Battery source share AC (month)"
+      },
+      "month_battery_source_home_share": {
+        "name": "Battery source share home (month)"
+      },
+      "month_battery_source_pv_share": {
+        "name": "Battery source share PV (month)"
+      },
+      "month_battery_usage_ac_share": {
+        "name": "Battery usage share AC (month)"
+      },
+      "month_battery_usage_home_share": {
+        "name": "Battery usage share home (month)"
+      },
+      "month_home_source_ac_share": {
+        "name": "Home source share AC (month)"
+      },
+      "month_home_source_battery_share": {
+        "name": "Home source share battery (month)"
+      },
+      "month_home_source_pv_share": {
+        "name": "Home source share PV (month)"
+      },
+      "month_pv_source_ac_share": {
+        "name": "PV source share AC (month)"
+      },
+      "month_pv_source_pv_share": {
+        "name": "PV source share PV (month)"
+      },
+      "month_pv_usage_ac_share": {
+        "name": "PV usage share AC (month)"
+      },
+      "month_pv_usage_battery_share": {
+        "name": "PV usage share battery (month)"
+      },
+      "month_pv_usage_home_share": {
+        "name": "PV usage share home (month)"
+      },
       "off_grid_shutdown_state": {
         "name": "Off-grid shutdown state"
       },
@@ -1099,6 +1192,21 @@
       },
       "panel_temperature": {
         "name": "Panel temperature"
+      },
+      "pcs1_fault_code": {
+        "name": "PCS 1 fault code"
+      },
+      "pcs2_fault_code": {
+        "name": "PCS 2 fault code"
+      },
+      "pcs3_fault_code": {
+        "name": "PCS 3 fault code"
+      },
+      "pcs4_fault_code": {
+        "name": "PCS 4 fault code"
+      },
+      "pcs5_fault_code": {
+        "name": "PCS 5 fault code"
       },
       "power_count": {
         "name": "Power count"
@@ -1130,6 +1238,9 @@
       "pv4_power": {
         "name": "PV4"
       },
+      "pv_max_charge_power": {
+        "name": "PV maximum charge power"
+      },
       "pv_month_energy": {
         "name": "Monthly PV energy"
       },
@@ -1147,6 +1258,12 @@
       },
       "pv_revenue_year": {
         "name": "PV revenue yearly"
+      },
+      "pv_to_ac_lifetime_energy": {
+        "name": "PV to AC energy (lifetime)"
+      },
+      "pv_to_grid_side_lifetime_energy": {
+        "name": "PV to grid side energy (lifetime)"
       },
       "pv_week_energy": {
         "name": "Weekly PV energy"
@@ -1188,13 +1305,13 @@
         "name": "SLTB value"
       },
       "smart_meter_apparent_power": {
-        "name": "Smart meter apparent power"
+        "name": "Apparent power"
       },
       "smart_meter_communication_mode": {
-        "name": "Smart meter communication mode"
+        "name": "Communication mode"
       },
       "smart_meter_current": {
-        "name": "Smart meter current"
+        "name": "Current"
       },
       "smart_meter_export_month_energy": {
         "name": "Monthly smart-meter grid export"
@@ -1206,25 +1323,19 @@
         "name": "Yearly smart-meter grid export"
       },
       "smart_meter_frequency": {
-        "name": "Smart meter frequency"
+        "name": "Frequency"
       },
       "smart_meter_fun_form": {
-        "name": "Smart meter function form"
-      },
-      "smart_meter_grid_export_energy": {
-        "name": "Smart-meter grid export energy"
-      },
-      "smart_meter_grid_import_energy": {
-        "name": "Smart-meter grid import energy"
+        "name": "Function form"
       },
       "smart_meter_gross_phase_export_power": {
-        "name": "Smart meter gross phase export power"
+        "name": "Gross phase export power"
       },
       "smart_meter_gross_phase_flow_power": {
-        "name": "Smart meter gross phase flow power"
+        "name": "Gross phase flow power"
       },
       "smart_meter_gross_phase_import_power": {
-        "name": "Smart meter gross phase import power"
+        "name": "Gross phase import power"
       },
       "smart_meter_import_month_energy": {
         "name": "Monthly smart-meter grid import"
@@ -1236,22 +1347,22 @@
         "name": "Yearly smart-meter grid import"
       },
       "smart_meter_ip_address": {
-        "name": "Smart meter IP address"
+        "name": "IP address"
       },
       "smart_meter_lifetime_export_energy": {
-        "name": "Smart meter lifetime grid export"
+        "name": "Lifetime grid export"
       },
       "smart_meter_lifetime_import_energy": {
-        "name": "Smart meter lifetime grid import"
+        "name": "Lifetime grid import"
       },
       "smart_meter_mac_address": {
-        "name": "Smart meter MAC address"
+        "name": "MAC address"
       },
       "smart_meter_net_export_power": {
-        "name": "Smart meter net export power"
+        "name": "Net export power"
       },
       "smart_meter_net_import_power": {
-        "name": "Smart meter net import power"
+        "name": "Net import power"
       },
       "smart_meter_panel_charging_energy": {
         "name": "Smart Meter panel charging energy"
@@ -1260,88 +1371,88 @@
         "name": "Smart Meter panel discharging energy"
       },
       "smart_meter_phase_1_apparent_power": {
-        "name": "CT phase A apparent power"
+        "name": "Phase A apparent power"
       },
       "smart_meter_phase_1_current": {
-        "name": "CT phase A current"
+        "name": "Phase A current"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "CT phase A lifetime grid export"
+        "name": "Phase A lifetime grid export"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "CT phase A lifetime grid import"
+        "name": "Phase A lifetime grid import"
       },
       "smart_meter_phase_1_power": {
-        "name": "CT phase A power"
+        "name": "Phase A power"
       },
       "smart_meter_phase_1_power_factor": {
-        "name": "CT phase A power factor"
+        "name": "Phase A power factor"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "CT phase A reactive power"
+        "name": "Phase A reactive power"
       },
       "smart_meter_phase_1_voltage": {
-        "name": "CT phase A voltage"
+        "name": "Phase A voltage"
       },
       "smart_meter_phase_2_apparent_power": {
-        "name": "CT phase B apparent power"
+        "name": "Phase B apparent power"
       },
       "smart_meter_phase_2_current": {
-        "name": "CT phase B current"
+        "name": "Phase B current"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "CT phase B lifetime grid export"
+        "name": "Phase B lifetime grid export"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "CT phase B lifetime grid import"
+        "name": "Phase B lifetime grid import"
       },
       "smart_meter_phase_2_power": {
-        "name": "CT phase B power"
+        "name": "Phase B power"
       },
       "smart_meter_phase_2_power_factor": {
-        "name": "CT phase B power factor"
+        "name": "Phase B power factor"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "CT phase B reactive power"
+        "name": "Phase B reactive power"
       },
       "smart_meter_phase_2_voltage": {
-        "name": "CT phase B voltage"
+        "name": "Phase B voltage"
       },
       "smart_meter_phase_3_apparent_power": {
-        "name": "CT phase C apparent power"
+        "name": "Phase C apparent power"
       },
       "smart_meter_phase_3_current": {
-        "name": "CT phase C current"
+        "name": "Phase C current"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "CT phase C lifetime grid export"
+        "name": "Phase C lifetime grid export"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "CT phase C lifetime grid import"
+        "name": "Phase C lifetime grid import"
       },
       "smart_meter_phase_3_power": {
-        "name": "CT phase C power"
+        "name": "Phase C power"
       },
       "smart_meter_phase_3_power_factor": {
-        "name": "CT phase C power factor"
+        "name": "Phase C power factor"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "CT phase C reactive power"
+        "name": "Phase C reactive power"
       },
       "smart_meter_phase_3_voltage": {
-        "name": "CT phase C voltage"
+        "name": "Phase C voltage"
       },
       "smart_meter_power": {
-        "name": "CT phase T power"
+        "name": "Phase T power"
       },
       "smart_meter_power_factor": {
-        "name": "Smart meter power factor"
+        "name": "Power factor"
       },
       "smart_meter_reactive_power": {
-        "name": "Smart meter reactive power"
+        "name": "Reactive power"
       },
       "smart_meter_voltage": {
-        "name": "Smart meter voltage"
+        "name": "Voltage"
       },
       "smart_mode_active": {
         "name": "Smart mode active"
@@ -1403,6 +1514,9 @@
       "soc_discharge_limit": {
         "name": "Discharge limit"
       },
+      "soc_force_charge": {
+        "name": "Forced charge SOC"
+      },
       "solar_production_energy": {
         "name": "Lifetime solar production energy"
       },
@@ -1445,8 +1559,26 @@
       "timezone": {
         "name": "Timezone"
       },
+      "today_battery_charge_energy": {
+        "name": "Battery charge energy (today)"
+      },
       "today_battery_energy": {
         "name": "Today battery energy"
+      },
+      "today_battery_source_ac_share": {
+        "name": "Battery source share AC (today)"
+      },
+      "today_battery_source_home_share": {
+        "name": "Battery source share home (today)"
+      },
+      "today_battery_source_pv_share": {
+        "name": "Battery source share PV (today)"
+      },
+      "today_battery_usage_ac_share": {
+        "name": "Battery usage share AC (today)"
+      },
+      "today_battery_usage_home_share": {
+        "name": "Battery usage share home (today)"
       },
       "today_grid_import_energy": {
         "name": "Today grid import energy"
@@ -1454,8 +1586,32 @@
       "today_home_load_energy": {
         "name": "Today home load energy"
       },
+      "today_home_source_ac_share": {
+        "name": "Home source share AC (today)"
+      },
+      "today_home_source_battery_share": {
+        "name": "Home source share battery (today)"
+      },
+      "today_home_source_pv_share": {
+        "name": "Home source share PV (today)"
+      },
       "today_load": {
         "name": "Daily on-grid output (Jackery cloud)"
+      },
+      "today_pv_source_ac_share": {
+        "name": "PV source share AC (today)"
+      },
+      "today_pv_source_pv_share": {
+        "name": "PV source share PV (today)"
+      },
+      "today_pv_usage_ac_share": {
+        "name": "PV usage share AC (today)"
+      },
+      "today_pv_usage_battery_share": {
+        "name": "PV usage share battery (today)"
+      },
+      "today_pv_usage_home_share": {
+        "name": "PV usage share home (today)"
       },
       "today_solar_energy": {
         "name": "Today solar energy"
@@ -1499,6 +1655,45 @@
       "weather_plan": {
         "name": "Weather plan"
       },
+      "week_battery_source_ac_share": {
+        "name": "Battery source share AC (week)"
+      },
+      "week_battery_source_home_share": {
+        "name": "Battery source share home (week)"
+      },
+      "week_battery_source_pv_share": {
+        "name": "Battery source share PV (week)"
+      },
+      "week_battery_usage_ac_share": {
+        "name": "Battery usage share AC (week)"
+      },
+      "week_battery_usage_home_share": {
+        "name": "Battery usage share home (week)"
+      },
+      "week_home_source_ac_share": {
+        "name": "Home source share AC (week)"
+      },
+      "week_home_source_battery_share": {
+        "name": "Home source share battery (week)"
+      },
+      "week_home_source_pv_share": {
+        "name": "Home source share PV (week)"
+      },
+      "week_pv_source_ac_share": {
+        "name": "PV source share AC (week)"
+      },
+      "week_pv_source_pv_share": {
+        "name": "PV source share PV (week)"
+      },
+      "week_pv_usage_ac_share": {
+        "name": "PV usage share AC (week)"
+      },
+      "week_pv_usage_battery_share": {
+        "name": "PV usage share battery (week)"
+      },
+      "week_pv_usage_home_share": {
+        "name": "PV usage share home (week)"
+      },
       "wifi_ip": {
         "name": "WiFi IP address"
       },
@@ -1519,6 +1714,45 @@
       },
       "work_mode": {
         "name": "Work mode"
+      },
+      "year_battery_source_ac_share": {
+        "name": "Battery source share AC (year)"
+      },
+      "year_battery_source_home_share": {
+        "name": "Battery source share home (year)"
+      },
+      "year_battery_source_pv_share": {
+        "name": "Battery source share PV (year)"
+      },
+      "year_battery_usage_ac_share": {
+        "name": "Battery usage share AC (year)"
+      },
+      "year_battery_usage_home_share": {
+        "name": "Battery usage share home (year)"
+      },
+      "year_home_source_ac_share": {
+        "name": "Home source share AC (year)"
+      },
+      "year_home_source_battery_share": {
+        "name": "Home source share battery (year)"
+      },
+      "year_home_source_pv_share": {
+        "name": "Home source share PV (year)"
+      },
+      "year_pv_source_ac_share": {
+        "name": "PV source share AC (year)"
+      },
+      "year_pv_source_pv_share": {
+        "name": "PV source share PV (year)"
+      },
+      "year_pv_usage_ac_share": {
+        "name": "PV usage share AC (year)"
+      },
+      "year_pv_usage_battery_share": {
+        "name": "PV usage share battery (year)"
+      },
+      "year_pv_usage_home_share": {
+        "name": "PV usage share home (year)"
       }
     },
     "switch": {
@@ -1656,6 +1890,9 @@
     "check_system_bound_failed": {
       "message": "Could not check system binding for device {device_id}: {error}"
     },
+    "delete_electricity_strategy_failed": {
+      "message": "Could not delete the electricity strategy for device {device_id}: {error}"
+    },
     "delete_storm_alert_failed": {
       "message": "Could not delete storm alert {alert_id} for device {device_id}: {error}"
     },
@@ -1694,6 +1931,9 @@
     },
     "get_user_info_failed": {
       "message": "Could not get user info for device {device_id}: {error}"
+    },
+    "insert_electricity_strategy_failed": {
+      "message": "Could not create the electricity strategy for device {device_id}: {error}"
     },
     "invalid_number_allowed_values": {
       "message": "{entity} for device {device_id} must be one of: {allowed_values}"
@@ -1770,6 +2010,9 @@
     "query_cutoff_stat_failed": {
       "message": "Could not query cutoff statistics for device {device_id}: {error}"
     },
+    "query_electricity_strategy_failed": {
+      "message": "Could not read the electricity strategy for device {device_id}: {error}"
+    },
     "query_profit_stat_failed": {
       "message": "Could not query profit statistics for device {device_id}: {error}"
     },
@@ -1821,6 +2064,9 @@
     "send_ble_command_failed": {
       "message": "Could not send BLE command for device {device_id}: {error}"
     },
+    "send_device_schedule_failed": {
+      "message": "Could not send the schedule to device {device_id}: {error}"
+    },
     "set_ac_nickname_failed": {
       "message": "Could not rename the AC port for device {device_id}: {error}"
     },
@@ -1865,6 +2111,9 @@
     },
     "unbind_smart_part_failed": {
       "message": "Could not unbind smart part for device {device_id}: {error}"
+    },
+    "update_electricity_strategy_failed": {
+      "message": "Could not update the electricity strategy for device {device_id}: {error}"
     }
   },
   "issues": {
@@ -1889,10 +2138,8 @@
           "create_smart_meter_derived_sensors": "Create calculated smart-meter sensors",
           "enable_ble_transport": "Enable BLE transport",
           "enable_derived_home_energy_fallback": "Allow derived home-energy fallback",
-          "enable_month_statistics": "Import month statistics",
           "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Import week statistics",
-          "enable_year_statistics": "Import year statistics",
+          "enable_unredacted_debug": "Enable unredacted diagnostics and payload debug log",
           "scan_interval": "Live poll interval (seconds)",
           "third_party_mqtt_enable": "Enable Third-Party MQTT bridge",
           "third_party_mqtt_ip": "Third-Party MQTT broker IP / hostname",
@@ -1909,10 +2156,8 @@
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
-          "enable_month_statistics": "Imports the month period payload into the matching sensor.* and jackery_solarvault:*_month_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Imports the week period payload into the matching sensor.* and jackery_solarvault:*_week_daily statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
-          "enable_year_statistics": "Imports the year period payload into the matching sensor.* and jackery_solarvault:*_year_monthly statistic series. The hour-by-hour day-hourly external series stays imported regardless.",
+          "enable_unredacted_debug": "Development only. Exports full diagnostics and captures complete HTTP, MQTT, and BLE JSONL frames without redaction or log rotation, including credentials and device identifiers. Disable after capture; never share these files publicly.",
           "scan_interval": "How often the Jackery cloud is polled for live values. Cloud MQTT and Bluetooth push faster updates independently; 30 s follows Home Assistant's guidance for cloud-polling integrations. Minimum 15 s.",
           "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",

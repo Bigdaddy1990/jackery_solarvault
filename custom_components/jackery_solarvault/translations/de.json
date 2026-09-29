@@ -47,10 +47,7 @@
           "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
           "enable_ble_transport": "BLE-Transport aktivieren",
           "enable_derived_home_energy_fallback": "Abgeleiteten Home-Energie-Fallback erlauben",
-          "enable_month_statistics": "Monatsstatistiken importieren",
-          "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Wochenstatistiken importieren",
-          "enable_year_statistics": "Jahresstatistiken importieren",
+          "enable_payload_debug_log": "Redaktiertes Payload-Debug-Protokoll aktivieren",
           "password": "Passwort",
           "third_party_mqtt_enable": "Third-Party-MQTT-Bridge aktivieren",
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",
@@ -66,13 +63,10 @@
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
-          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
+          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener für decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verfügbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
-          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
-          "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
-          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
-          "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md §5 / §15). Experimentell: Der Cloud-REST-Relay fuer diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
+          "enable_payload_debug_log": "Schreibt eine begrenzte JSONL-Spur von HTTP-, MQTT- und BLE-Payloads. Vertrauliche Daten werden geschwärzt, sofern ungeschwärztes Debugging nicht ausdrücklich in den Integrationsoptionen aktiviert ist.",
+          "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md §5 / §15). Experimentell: Der Cloud-REST-Relay für diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
@@ -97,7 +91,7 @@
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
-          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
+          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener für decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
         },
         "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Halte die Jackery-App vom SolarVault-Account abgemeldet, solange Home Assistant Live-MQTT-Updates empfangen soll. Wenn die App kurz geöffnet wird, pausiert Home Assistant MQTT-Reconnects kurzzeitig, pollt weiter per HTTP und nimmt Live-Updates danach automatisch wieder auf.",
         "title": "Jackery SolarVault"
@@ -117,6 +111,18 @@
       },
       "online": {
         "name": "Online"
+      },
+      "pv1_connected": {
+        "name": "PV1 verbunden"
+      },
+      "pv2_connected": {
+        "name": "PV2 verbunden"
+      },
+      "pv3_connected": {
+        "name": "PV3 verbunden"
+      },
+      "pv4_connected": {
+        "name": "PV4 verbunden"
       },
       "smart_plug_switch_state": {
         "name": "Smart-Plug Zustand"
@@ -420,9 +426,9 @@
       "portable_ups_model": {
         "name": "USV-Modell",
         "state": {
-          "agm": "agm",
+          "agm": "AGM",
           "custom": "Benutzerdefiniert",
-          "gel": "gel",
+          "gel": "Gel",
           "lifepo4": "LiFePO4",
           "standard": "Standard"
         }
@@ -548,10 +554,19 @@
       "ac_output_voltage_2": {
         "name": "AC-Ausgangsspannung 2"
       },
+      "ac_to_battery_lifetime_energy": {
+        "name": "AC → Batterie Energie (gesamt)"
+      },
+      "ac_to_grid_side_lifetime_energy": {
+        "name": "AC → Netzseite Energie (gesamt)"
+      },
       "activation_date": {
         "name": "Aktivierungsdatum"
       },
       "alarm_count": {
+        "name": "Aktive Alarme"
+      },
+      "alert_count": {
         "name": "Aktive Alarme"
       },
       "ambient_temperature": {
@@ -635,6 +650,9 @@
       "battery_pack_update_status": {
         "name": "Zusatzbatterie Update-Status"
       },
+      "battery_pack_version": {
+        "name": "Zusatzbatterie-Version"
+      },
       "battery_soc": {
         "name": "Batteriestand gesamt"
       },
@@ -650,8 +668,29 @@
       "battery_temperature": {
         "name": "Batterietemperatur"
       },
+      "battery_to_ac_lifetime_energy": {
+        "name": "Batterie → AC Energie (gesamt)"
+      },
       "ble_transport": {
         "name": "BLE-Transport"
+      },
+      "bms1_fault_code": {
+        "name": "BMS 1 Fehlercode"
+      },
+      "bms2_fault_code": {
+        "name": "BMS 2 Fehlercode"
+      },
+      "bms3_fault_code": {
+        "name": "BMS 3 Fehlercode"
+      },
+      "bms4_fault_code": {
+        "name": "BMS 4 Fehlercode"
+      },
+      "bms5_fault_code": {
+        "name": "BMS 5 Fehlercode"
+      },
+      "bms6_fault_code": {
+        "name": "BMS 6 Fehlercode"
       },
       "box_mode": {
         "name": "Box-Modus"
@@ -708,28 +747,28 @@
         "name": "Ländercode"
       },
       "ct_input_day_energy": {
-        "name": "CT-Netzbezug heute"
+        "name": "Netzbezug heute"
       },
       "ct_input_month_energy": {
-        "name": "CT-Netzbezug Monat"
+        "name": "Netzbezug Monat"
       },
       "ct_input_week_energy": {
-        "name": "CT-Netzbezug Woche"
+        "name": "Netzbezug Woche"
       },
       "ct_input_year_energy": {
-        "name": "CT-Netzbezug Jahr"
+        "name": "Netzbezug Jahr"
       },
       "ct_output_day_energy": {
-        "name": "CT-Netzeinspeisung heute"
+        "name": "Netzeinspeisung heute"
       },
       "ct_output_month_energy": {
-        "name": "CT-Netzeinspeisung Monat"
+        "name": "Netzeinspeisung Monat"
       },
       "ct_output_week_energy": {
-        "name": "CT-Netzeinspeisung Woche"
+        "name": "Netzeinspeisung Woche"
       },
       "ct_output_year_energy": {
-        "name": "CT-Netzeinspeisung Jahr"
+        "name": "Netzeinspeisung Jahr"
       },
       "ct_state": {
         "name": "CT-Status"
@@ -881,6 +920,12 @@
       "dynamic_price_today_low": {
         "name": "Dynamischer Preis heute niedrig"
       },
+      "ems1_fault_code": {
+        "name": "EMS 1 Fehlercode"
+      },
+      "ems2_fault_code": {
+        "name": "EMS 2 Fehlercode"
+      },
       "energy_plan_power": {
         "name": "Energieplan-Leistung"
       },
@@ -959,6 +1004,9 @@
       "grid_out_power": {
         "name": "Netzeinspeisung"
       },
+      "grid_side_to_ac_load_lifetime_energy": {
+        "name": "Netzseite → AC-Last Energie (gesamt)"
+      },
       "grid_standard": {
         "name": "Netz-Standard"
       },
@@ -998,6 +1046,12 @@
       "inverter_ac_output_power": {
         "name": "Wechselrichter AC-Ausgang"
       },
+      "iot1_fault_code": {
+        "name": "IOT 1 Fehlercode"
+      },
+      "last_alarm_id": {
+        "name": "Letzte Alarm-ID"
+      },
       "last_offline": {
         "name": "Zuletzt offline"
       },
@@ -1026,16 +1080,16 @@
         "name": "MAC-Adresse"
       },
       "main_battery_charge_energy": {
-        "name": "Hauptbatterie Lebensenergie geladen"
+        "name": "Hauptbatterie Energie seit Inbetriebnahme geladen (berechnet)"
       },
       "main_battery_discharge_energy": {
-        "name": "Hauptbatterie Lebensenergie entladen"
+        "name": "Hauptbatterie Energie seit Inbetriebnahme entladen (berechnet)"
       },
       "max_feed_grid_read": {
         "name": "Max. Einspeiseleistung (Laufzeit)"
       },
       "max_grid_standard_power": {
-        "name": "Maximum grid standard power"
+        "name": "Max. Netzstandardleistung"
       },
       "max_inverter_power": {
         "name": "Max. Wechselrichterleistung"
@@ -1076,6 +1130,45 @@
       "meter_head_output_power": {
         "name": "Meter-Head Ausgangsleistung"
       },
+      "month_battery_source_ac_share": {
+        "name": "Batterie-Herkunft Anteil AC (Monat)"
+      },
+      "month_battery_source_home_share": {
+        "name": "Batterie-Herkunft Anteil Haus (Monat)"
+      },
+      "month_battery_source_pv_share": {
+        "name": "Batterie-Herkunft Anteil PV (Monat)"
+      },
+      "month_battery_usage_ac_share": {
+        "name": "Batterie-Verwendung Anteil AC (Monat)"
+      },
+      "month_battery_usage_home_share": {
+        "name": "Batterie-Verwendung Anteil Haus (Monat)"
+      },
+      "month_home_source_ac_share": {
+        "name": "Haus-Herkunft Anteil AC (Monat)"
+      },
+      "month_home_source_battery_share": {
+        "name": "Haus-Herkunft Anteil Batterie (Monat)"
+      },
+      "month_home_source_pv_share": {
+        "name": "Haus-Herkunft Anteil PV (Monat)"
+      },
+      "month_pv_source_ac_share": {
+        "name": "PV-Herkunft Anteil AC (Monat)"
+      },
+      "month_pv_source_pv_share": {
+        "name": "PV-Herkunft Anteil PV (Monat)"
+      },
+      "month_pv_usage_ac_share": {
+        "name": "PV-Verwendung Anteil AC (Monat)"
+      },
+      "month_pv_usage_battery_share": {
+        "name": "PV-Verwendung Anteil Batterie (Monat)"
+      },
+      "month_pv_usage_home_share": {
+        "name": "PV-Verwendung Anteil Haus (Monat)"
+      },
       "off_grid_shutdown_state": {
         "name": "Inselbetrieb Auto-aus Status"
       },
@@ -1099,6 +1192,21 @@
       },
       "panel_temperature": {
         "name": "Panel-Temperatur"
+      },
+      "pcs1_fault_code": {
+        "name": "PCS 1 Fehlercode"
+      },
+      "pcs2_fault_code": {
+        "name": "PCS 2 Fehlercode"
+      },
+      "pcs3_fault_code": {
+        "name": "PCS 3 Fehlercode"
+      },
+      "pcs4_fault_code": {
+        "name": "PCS 4 Fehlercode"
+      },
+      "pcs5_fault_code": {
+        "name": "PCS 5 Fehlercode"
       },
       "power_count": {
         "name": "Leistungszähler"
@@ -1130,6 +1238,9 @@
       "pv4_power": {
         "name": "PV4"
       },
+      "pv_max_charge_power": {
+        "name": "Max. PV-Ladeleistung"
+      },
       "pv_month_energy": {
         "name": "PV Monatsenergie"
       },
@@ -1147,6 +1258,12 @@
       },
       "pv_revenue_year": {
         "name": "PV-Erlös jährlich"
+      },
+      "pv_to_ac_lifetime_energy": {
+        "name": "PV → AC Energie (gesamt)"
+      },
+      "pv_to_grid_side_lifetime_energy": {
+        "name": "PV → Netzseite Energie (gesamt)"
       },
       "pv_week_energy": {
         "name": "PV Wochenenergie"
@@ -1188,13 +1305,13 @@
         "name": "SLTB-Wert"
       },
       "smart_meter_apparent_power": {
-        "name": "Smart-Meter Scheinleistung"
+        "name": "Scheinleistung"
       },
       "smart_meter_communication_mode": {
-        "name": "Smart-Meter Kommunikationsmodus"
+        "name": "Kommunikationsmodus"
       },
       "smart_meter_current": {
-        "name": "Smart meter current"
+        "name": "Strom"
       },
       "smart_meter_export_month_energy": {
         "name": "Smart-Meter Netzeinspeisung Monatswert"
@@ -1206,25 +1323,19 @@
         "name": "Smart-Meter Netzeinspeisung Jahreswert"
       },
       "smart_meter_frequency": {
-        "name": "Smart-Meter Frequenz"
+        "name": "Frequenz"
       },
       "smart_meter_fun_form": {
-        "name": "Smart-Meter Funktionsform"
-      },
-      "smart_meter_grid_export_energy": {
-        "name": "Smart-Meter Netzeinspeisung Energie"
-      },
-      "smart_meter_grid_import_energy": {
-        "name": "Smart-Meter Netzbezug Energie"
+        "name": "Funktionsform"
       },
       "smart_meter_gross_phase_export_power": {
-        "name": "Smart-Meter Phaseneinspeisung brutto"
+        "name": "Phaseneinspeisung brutto"
       },
       "smart_meter_gross_phase_flow_power": {
-        "name": "Smart-Meter Phasenfluss brutto"
+        "name": "Phasenfluss brutto"
       },
       "smart_meter_gross_phase_import_power": {
-        "name": "Smart-Meter Phasenbezug brutto"
+        "name": "Phasenbezug brutto"
       },
       "smart_meter_import_month_energy": {
         "name": "Smart-Meter Netzbezug Monatswert"
@@ -1236,22 +1347,22 @@
         "name": "Smart-Meter Netzbezug Jahreswert"
       },
       "smart_meter_ip_address": {
-        "name": "Smart-Meter IP-Adresse"
+        "name": "IP-Adresse"
       },
       "smart_meter_lifetime_export_energy": {
-        "name": "Smart-Meter Netzeinspeisung Gesamt"
+        "name": "Netzeinspeisung Gesamt"
       },
       "smart_meter_lifetime_import_energy": {
-        "name": "Smart-Meter Netzbezug Gesamt"
+        "name": "Netzbezug Gesamt"
       },
       "smart_meter_mac_address": {
-        "name": "Smart-Meter MAC-Adresse"
+        "name": "MAC-Adresse"
       },
       "smart_meter_net_export_power": {
-        "name": "Smart-Meter Netzeinspeisung saldiert"
+        "name": "Netzeinspeisung saldiert"
       },
       "smart_meter_net_import_power": {
-        "name": "Smart-Meter Netzbezug saldiert"
+        "name": "Netzbezug saldiert"
       },
       "smart_meter_panel_charging_energy": {
         "name": "Smart-Meter Panel Ladeenergie"
@@ -1260,88 +1371,88 @@
         "name": "Smart-Meter Panel Entladeenergie"
       },
       "smart_meter_phase_1_apparent_power": {
-        "name": "CT-Phase A Scheinleistung"
+        "name": "Phase A Scheinleistung"
       },
       "smart_meter_phase_1_current": {
-        "name": "CT-Phase A Strom"
+        "name": "Phase A Strom"
       },
       "smart_meter_phase_1_lifetime_export_energy": {
-        "name": "CT-Phase A Netzeinspeisung Gesamt"
+        "name": "Phase A Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_1_lifetime_import_energy": {
-        "name": "CT-Phase A Netzbezug Gesamt"
+        "name": "Phase A Netzbezug Gesamt"
       },
       "smart_meter_phase_1_power": {
-        "name": "CT-Phase A Leistung"
+        "name": "Phase A Leistung"
       },
       "smart_meter_phase_1_power_factor": {
-        "name": "CT-Phase A Leistungsfaktor"
+        "name": "Phase A Leistungsfaktor"
       },
       "smart_meter_phase_1_reactive_power": {
-        "name": "CT-Phase A Blindleistung"
+        "name": "Phase A Blindleistung"
       },
       "smart_meter_phase_1_voltage": {
-        "name": "CT-Phase A Spannung"
+        "name": "Phase A Spannung"
       },
       "smart_meter_phase_2_apparent_power": {
-        "name": "CT-Phase B Scheinleistung"
+        "name": "Phase B Scheinleistung"
       },
       "smart_meter_phase_2_current": {
-        "name": "CT-Phase B Strom"
+        "name": "Phase B Strom"
       },
       "smart_meter_phase_2_lifetime_export_energy": {
-        "name": "CT-Phase B Netzeinspeisung Gesamt"
+        "name": "Phase B Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_2_lifetime_import_energy": {
-        "name": "CT-Phase B Netzbezug Gesamt"
+        "name": "Phase B Netzbezug Gesamt"
       },
       "smart_meter_phase_2_power": {
-        "name": "CT-Phase B Leistung"
+        "name": "Phase B Leistung"
       },
       "smart_meter_phase_2_power_factor": {
-        "name": "CT-Phase B Leistungsfaktor"
+        "name": "Phase B Leistungsfaktor"
       },
       "smart_meter_phase_2_reactive_power": {
-        "name": "CT-Phase B Blindleistung"
+        "name": "Phase B Blindleistung"
       },
       "smart_meter_phase_2_voltage": {
-        "name": "CT-Phase B Spannung"
+        "name": "Phase B Spannung"
       },
       "smart_meter_phase_3_apparent_power": {
-        "name": "CT-Phase C Scheinleistung"
+        "name": "Phase C Scheinleistung"
       },
       "smart_meter_phase_3_current": {
-        "name": "CT-Phase C Strom"
+        "name": "Phase C Strom"
       },
       "smart_meter_phase_3_lifetime_export_energy": {
-        "name": "CT-Phase C Netzeinspeisung Gesamt"
+        "name": "Phase C Netzeinspeisung Gesamt"
       },
       "smart_meter_phase_3_lifetime_import_energy": {
-        "name": "CT-Phase C Netzbezug Gesamt"
+        "name": "Phase C Netzbezug Gesamt"
       },
       "smart_meter_phase_3_power": {
-        "name": "CT-Phase C Leistung"
+        "name": "Phase C Leistung"
       },
       "smart_meter_phase_3_power_factor": {
-        "name": "CT-Phase C Leistungsfaktor"
+        "name": "Phase C Leistungsfaktor"
       },
       "smart_meter_phase_3_reactive_power": {
-        "name": "CT-Phase C Blindleistung"
+        "name": "Phase C Blindleistung"
       },
       "smart_meter_phase_3_voltage": {
-        "name": "CT-Phase C Spannung"
+        "name": "Phase C Spannung"
       },
       "smart_meter_power": {
-        "name": "CT-Phase T Leistung"
+        "name": "Phase T Leistung"
       },
       "smart_meter_power_factor": {
-        "name": "Smart-Meter Leistungsfaktor"
+        "name": "Leistungsfaktor"
       },
       "smart_meter_reactive_power": {
-        "name": "Smart-Meter Blindleistung"
+        "name": "Blindleistung"
       },
       "smart_meter_voltage": {
-        "name": "Smart-Meter Spannung"
+        "name": "Spannung"
       },
       "smart_mode_active": {
         "name": "Intelligenter Modus aktiv"
@@ -1403,6 +1514,9 @@
       "soc_discharge_limit": {
         "name": "Entladelimit"
       },
+      "soc_force_charge": {
+        "name": "Zwangsladung SOC"
+      },
       "solar_production_energy": {
         "name": "PV-Erzeugung Lebensenergie"
       },
@@ -1445,8 +1559,26 @@
       "timezone": {
         "name": "Zeitzone"
       },
+      "today_battery_charge_energy": {
+        "name": "Batterie-Ladeenergie (heute)"
+      },
       "today_battery_energy": {
         "name": "Batterieenergie heute"
+      },
+      "today_battery_source_ac_share": {
+        "name": "Batterie-Herkunft Anteil AC (heute)"
+      },
+      "today_battery_source_home_share": {
+        "name": "Batterie-Herkunft Anteil Haus (heute)"
+      },
+      "today_battery_source_pv_share": {
+        "name": "Batterie-Herkunft Anteil PV (heute)"
+      },
+      "today_battery_usage_ac_share": {
+        "name": "Batterie-Verwendung Anteil AC (heute)"
+      },
+      "today_battery_usage_home_share": {
+        "name": "Batterie-Verwendung Anteil Haus (heute)"
       },
       "today_grid_import_energy": {
         "name": "Netzbezug heute"
@@ -1454,8 +1586,32 @@
       "today_home_load_energy": {
         "name": "Hauslast heute"
       },
+      "today_home_source_ac_share": {
+        "name": "Haus-Herkunft Anteil AC (heute)"
+      },
+      "today_home_source_battery_share": {
+        "name": "Haus-Herkunft Anteil Batterie (heute)"
+      },
+      "today_home_source_pv_share": {
+        "name": "Haus-Herkunft Anteil PV (heute)"
+      },
       "today_load": {
         "name": "Tägliche Hauslast (Jackery-Cloud)"
+      },
+      "today_pv_source_ac_share": {
+        "name": "PV-Herkunft Anteil AC (heute)"
+      },
+      "today_pv_source_pv_share": {
+        "name": "PV-Herkunft Anteil PV (heute)"
+      },
+      "today_pv_usage_ac_share": {
+        "name": "PV-Verwendung Anteil AC (heute)"
+      },
+      "today_pv_usage_battery_share": {
+        "name": "PV-Verwendung Anteil Batterie (heute)"
+      },
+      "today_pv_usage_home_share": {
+        "name": "PV-Verwendung Anteil Haus (heute)"
       },
       "today_solar_energy": {
         "name": "Solarenergie heute"
@@ -1499,6 +1655,45 @@
       "weather_plan": {
         "name": "Unwetterplan"
       },
+      "week_battery_source_ac_share": {
+        "name": "Batterie-Herkunft Anteil AC (Woche)"
+      },
+      "week_battery_source_home_share": {
+        "name": "Batterie-Herkunft Anteil Haus (Woche)"
+      },
+      "week_battery_source_pv_share": {
+        "name": "Batterie-Herkunft Anteil PV (Woche)"
+      },
+      "week_battery_usage_ac_share": {
+        "name": "Batterie-Verwendung Anteil AC (Woche)"
+      },
+      "week_battery_usage_home_share": {
+        "name": "Batterie-Verwendung Anteil Haus (Woche)"
+      },
+      "week_home_source_ac_share": {
+        "name": "Haus-Herkunft Anteil AC (Woche)"
+      },
+      "week_home_source_battery_share": {
+        "name": "Haus-Herkunft Anteil Batterie (Woche)"
+      },
+      "week_home_source_pv_share": {
+        "name": "Haus-Herkunft Anteil PV (Woche)"
+      },
+      "week_pv_source_ac_share": {
+        "name": "PV-Herkunft Anteil AC (Woche)"
+      },
+      "week_pv_source_pv_share": {
+        "name": "PV-Herkunft Anteil PV (Woche)"
+      },
+      "week_pv_usage_ac_share": {
+        "name": "PV-Verwendung Anteil AC (Woche)"
+      },
+      "week_pv_usage_battery_share": {
+        "name": "PV-Verwendung Anteil Batterie (Woche)"
+      },
+      "week_pv_usage_home_share": {
+        "name": "PV-Verwendung Anteil Haus (Woche)"
+      },
       "wifi_ip": {
         "name": "IP-Adresse"
       },
@@ -1519,6 +1714,45 @@
       },
       "work_mode": {
         "name": "Arbeitsmodus"
+      },
+      "year_battery_source_ac_share": {
+        "name": "Batterie-Herkunft Anteil AC (Jahr)"
+      },
+      "year_battery_source_home_share": {
+        "name": "Batterie-Herkunft Anteil Haus (Jahr)"
+      },
+      "year_battery_source_pv_share": {
+        "name": "Batterie-Herkunft Anteil PV (Jahr)"
+      },
+      "year_battery_usage_ac_share": {
+        "name": "Batterie-Verwendung Anteil AC (Jahr)"
+      },
+      "year_battery_usage_home_share": {
+        "name": "Batterie-Verwendung Anteil Haus (Jahr)"
+      },
+      "year_home_source_ac_share": {
+        "name": "Haus-Herkunft Anteil AC (Jahr)"
+      },
+      "year_home_source_battery_share": {
+        "name": "Haus-Herkunft Anteil Batterie (Jahr)"
+      },
+      "year_home_source_pv_share": {
+        "name": "Haus-Herkunft Anteil PV (Jahr)"
+      },
+      "year_pv_source_ac_share": {
+        "name": "PV-Herkunft Anteil AC (Jahr)"
+      },
+      "year_pv_source_pv_share": {
+        "name": "PV-Herkunft Anteil PV (Jahr)"
+      },
+      "year_pv_usage_ac_share": {
+        "name": "PV-Verwendung Anteil AC (Jahr)"
+      },
+      "year_pv_usage_battery_share": {
+        "name": "PV-Verwendung Anteil Batterie (Jahr)"
+      },
+      "year_pv_usage_home_share": {
+        "name": "PV-Verwendung Anteil Haus (Jahr)"
       }
     },
     "switch": {
@@ -1624,37 +1858,40 @@
   },
   "exceptions": {
     "accept_shared_device_failed": {
-      "message": "Geteiltes Geraet fuer Geraet {device_id} konnte nicht angenommen werden: {error}"
+      "message": "Geteiltes Gerät für Gerät {device_id} konnte nicht angenommen werden: {error}"
     },
     "agree_privacy_consent_failed": {
-      "message": "Datenschutz-Zustimmung fuer Geraet {device_id} konnte nicht bestaetigt werden: {error}"
+      "message": "Datenschutz-Zustimmung für Gerät {device_id} konnte nicht bestätigt werden: {error}"
     },
     "bind_currency_failed": {
-      "message": "Waehrung fuer Geraet {device_id} konnte nicht gebunden werden: {error}"
+      "message": "Waehrung für Gerät {device_id} konnte nicht gebunden werden: {error}"
     },
     "bind_device_failed": {
-      "message": "Geraet {device_id} konnte nicht gebunden werden: {error}"
+      "message": "Gerät {device_id} konnte nicht gebunden werden: {error}"
     },
     "bind_smart_part_failed": {
-      "message": "Smart-Zubehoer fuer Geraet {device_id} konnte nicht gebunden werden: {error}"
+      "message": "Smart-Zubehoer für Gerät {device_id} konnte nicht gebunden werden: {error}"
     },
     "cancel_dynamic_price_contract_auth_failed": {
-      "message": "Dynamic-Price-Vertragsfreigabe fuer Geraet {device_id} konnte nicht aufgehoben werden: {error}"
+      "message": "Dynamic-Price-Vertragsfreigabe für Gerät {device_id} konnte nicht aufgehoben werden: {error}"
     },
     "check_accessories_exist_failed": {
-      "message": "Zubehoer fuer Geraet {device_id} konnte nicht geprueft werden: {error}"
+      "message": "Zubehoer für Gerät {device_id} konnte nicht geprueft werden: {error}"
     },
     "check_app_version_failed": {
-      "message": "App-Version fuer Geraet {device_id} konnte nicht geprueft werden: {error}"
+      "message": "App-Version für Gerät {device_id} konnte nicht geprueft werden: {error}"
     },
     "check_jackery_accessories_exist_failed": {
-      "message": "Jackery-Zubehoer fuer Geraet {device_id} konnte nicht geprueft werden: {error}"
+      "message": "Jackery-Zubehoer für Gerät {device_id} konnte nicht geprueft werden: {error}"
     },
     "check_privacy_update_failed": {
-      "message": "Datenschutz-Aktualisierung fuer Geraet {device_id} konnte nicht geprueft werden: {error}"
+      "message": "Datenschutz-Aktualisierung für Gerät {device_id} konnte nicht geprueft werden: {error}"
     },
     "check_system_bound_failed": {
-      "message": "Systembindung fuer Geraet {device_id} konnte nicht geprueft werden: {error}"
+      "message": "Systembindung für Gerät {device_id} konnte nicht geprueft werden: {error}"
+    },
+    "delete_electricity_strategy_failed": {
+      "message": "Die Stromstrategie für Gerät {device_id} konnte nicht gelöscht werden: {error}"
     },
     "delete_storm_alert_failed": {
       "message": "Sturm-Warnung {alert_id} für Gerät {device_id} konnte nicht gelöscht werden: {error}"
@@ -1666,34 +1903,37 @@
       "message": "{entity} für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
     },
     "get_alarm_detail_failed": {
-      "message": "Alarmdetails fuer Geraet {device_id} konnten nicht abgerufen werden: {error}"
+      "message": "Alarmdetails für Gerät {device_id} konnten nicht abgerufen werden: {error}"
     },
     "get_device_currency_failed": {
-      "message": "Geraetewaehrung fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Gerätewaehrung für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_dynamic_price_login_url_failed": {
-      "message": "Dynamic-Price-Login-URL fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Dynamic-Price-Login-URL für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_product_instruction_failed": {
-      "message": "Produktanleitung fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Produktanleitung für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_push_config_failed": {
-      "message": "Push-Konfiguration fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Push-Konfiguration für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_share_qr_code_failed": {
       "message": "Der Freigabe-QR-Code für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_shelly_auth_url_failed": {
-      "message": "Shelly-Auth-URL fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Shelly-Auth-URL für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_smart_schedule_prediction_failed": {
       "message": "Die intelligente Zeitplanvorhersage für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_unread_count_failed": {
-      "message": "Ungelesen-Zaehler fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Ungelesen-Zaehler für Gerät {device_id} konnte nicht abgerufen werden: {error}"
     },
     "get_user_info_failed": {
-      "message": "Benutzerinfo fuer Geraet {device_id} konnte nicht abgerufen werden: {error}"
+      "message": "Benutzerinfo für Gerät {device_id} konnte nicht abgerufen werden: {error}"
+    },
+    "insert_electricity_strategy_failed": {
+      "message": "Die Stromstrategie für Gerät {device_id} konnte nicht angelegt werden: {error}"
     },
     "invalid_number_allowed_values": {
       "message": "{entity} für Gerät {device_id} muss einer dieser Werte sein: {allowed_values}"
@@ -1708,31 +1948,31 @@
       "message": "{entity} für Gerät {device_id} darf nicht leer sein"
     },
     "list_accessories_failed": {
-      "message": "Zubehoer fuer Geraet {device_id} konnte nicht aufgelistet werden: {error}"
+      "message": "Zubehoer für Gerät {device_id} konnte nicht aufgelistet werden: {error}"
     },
     "list_banners_failed": {
-      "message": "Banner fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Banner für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_country_zones_failed": {
-      "message": "Laenderzonen fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Laenderzonen für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_currencies_failed": {
-      "message": "Waehrungen fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Waehrungen für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_dynamic_price_contracts_failed": {
-      "message": "Dynamic-Price-Vertraege fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Dynamic-Price-Vertraege für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_faq_answers_failed": {
-      "message": "FAQ-Antworten fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "FAQ-Antworten für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_faqs_failed": {
-      "message": "FAQs fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "FAQs für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_grid_standards_failed": {
-      "message": "Netzstandards fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Netzstandards für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_notifications_failed": {
-      "message": "Benachrichtigungen fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Benachrichtigungen für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_shared_devices_failed": {
       "message": "Geteilte Geräte für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
@@ -1741,10 +1981,10 @@
       "message": "Geteilte Manager für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_shelly_binding_failures_failed": {
-      "message": "Shelly-Binding-Fehler fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Shelly-Binding-Fehler für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "list_shelly_devices_failed": {
-      "message": "Shelly-Geraete fuer Geraet {device_id} konnten nicht aufgelistet werden: {error}"
+      "message": "Shelly-Geräte für Gerät {device_id} konnten nicht aufgelistet werden: {error}"
     },
     "missing_system_id": {
       "message": "Gerät {device_id} kann nicht aktualisiert werden: systemId fehlt"
@@ -1756,34 +1996,37 @@
       "message": "MQTT-Befehl für {device_id} kann nicht gesendet werden: deviceSn fehlt"
     },
     "mqtt_missing_subdevice_sn": {
-      "message": "MQTT-Untergeraete-Befehl fuer {device_id} kann nicht gesendet werden: deviceSn des Untergeraets fehlt"
+      "message": "MQTT-Untergeraete-Befehl für {device_id} kann nicht gesendet werden: deviceSn des Untergeraets fehlt"
     },
     "query_box_stat_failed": {
-      "message": "Box-Statistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Box-Statistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_carbon_stat_failed": {
-      "message": "CO2-Statistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "CO2-Statistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_charge_report_failed": {
-      "message": "Ladebericht fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Ladebericht für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_cutoff_stat_failed": {
-      "message": "Ausfallstatistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Ausfallstatistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
+    },
+    "query_electricity_strategy_failed": {
+      "message": "Die Stromstrategie für Gerät {device_id} konnte nicht gelesen werden: {error}"
     },
     "query_profit_stat_failed": {
-      "message": "Ertragsstatistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Ertragsstatistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_soc_stat_failed": {
-      "message": "SOC-Statistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "SOC-Statistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_socket_stat_failed": {
-      "message": "Socket-Statistik fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Socket-Statistik für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_third_party_mqtt_config_failed": {
-      "message": "Drittanbieter-MQTT-Konfiguration fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "Drittanbieter-MQTT-Konfiguration für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "query_tou_plan_failed": {
-      "message": "TOU-Plan fuer Geraet {device_id} konnte nicht abgefragt werden: {error}"
+      "message": "TOU-Plan für Gerät {device_id} konnte nicht abgefragt werden: {error}"
     },
     "refresh_subdevices_failed": {
       "message": "Untergeräte für Gerät {device_id} konnten nicht aktualisiert werden: {error}"
@@ -1807,64 +2050,70 @@
       "message": "Zeitzone für Gerät {device_id} konnte nicht gemeldet werden: {error}"
     },
     "save_device_max_power_failed": {
-      "message": "Maximalleistung fuer Geraet {device_id} konnte nicht gespeichert werden: {error}"
+      "message": "Maximalleistung für Gerät {device_id} konnte nicht gespeichert werden: {error}"
     },
     "save_dynamic_price_contract_auth_failed": {
-      "message": "Dynamic-Price-Vertragsfreigabe fuer Geraet {device_id} konnte nicht gespeichert werden: {error}"
+      "message": "Dynamic-Price-Vertragsfreigabe für Gerät {device_id} konnte nicht gespeichert werden: {error}"
     },
     "save_dynamic_price_location_id_failed": {
-      "message": "Dynamic-Price-Standorttoken fuer Geraet {device_id} konnte nicht gespeichert werden: {error}"
+      "message": "Dynamic-Price-Standorttoken für Gerät {device_id} konnte nicht gespeichert werden: {error}"
     },
     "save_tou_plan_failed": {
-      "message": "TOU-Plan fuer Geraet {device_id} konnte nicht gespeichert werden: {error}"
+      "message": "TOU-Plan für Gerät {device_id} konnte nicht gespeichert werden: {error}"
     },
     "send_ble_command_failed": {
-      "message": "BLE-Befehl fuer Geraet {device_id} konnte nicht gesendet werden: {error}"
+      "message": "BLE-Befehl für Gerät {device_id} konnte nicht gesendet werden: {error}"
+    },
+    "send_device_schedule_failed": {
+      "message": "Der Zeitplan konnte nicht an Gerät {device_id} gesendet werden: {error}"
     },
     "set_ac_nickname_failed": {
       "message": "AC-Port für Gerät {device_id} konnte nicht umbenannt werden: {error}"
     },
     "set_accessory_name_failed": {
-      "message": "Zubehoer fuer Geraet {device_id} konnte nicht umbenannt werden: {error}"
+      "message": "Zubehoer für Gerät {device_id} konnte nicht umbenannt werden: {error}"
     },
     "set_account_nickname_failed": {
-      "message": "Konto-Anzeigename fuer Geraet {device_id} konnte nicht gesetzt werden: {error}"
+      "message": "Konto-Anzeigename für Gerät {device_id} konnte nicht gesetzt werden: {error}"
     },
     "set_device_nickname_failed": {
-      "message": "Spitzname fuer Geraet {device_id} konnte nicht gesetzt werden: {error}"
+      "message": "Spitzname für Gerät {device_id} konnte nicht gesetzt werden: {error}"
     },
     "set_push_config_failed": {
-      "message": "Push-Konfiguration fuer Geraet {device_id} konnte nicht gesetzt werden: {error}"
+      "message": "Push-Konfiguration für Gerät {device_id} konnte nicht gesetzt werden: {error}"
     },
     "set_storm_alert_location_failed": {
-      "message": "Standort fuer Sturmwarnung fuer Geraet {device_id} konnte nicht gesetzt werden: {error}"
+      "message": "Standort für Sturmwarnung für Gerät {device_id} konnte nicht gesetzt werden: {error}"
     },
     "set_third_party_mqtt_config_failed": {
-      "message": "Drittanbieter-MQTT-Konfiguration fuer Geraet {device_id} konnte nicht gesetzt werden: {error}"
+      "message": "Drittanbieter-MQTT-Konfiguration für Gerät {device_id} konnte nicht gesetzt werden: {error}"
     },
     "submit_feedback_failed": {
-      "message": "Feedback fuer Geraet {device_id} konnte nicht gesendet werden: {error}"
+      "message": "Feedback für Gerät {device_id} konnte nicht gesendet werden: {error}"
     },
     "sync_alerts_failed": {
-      "message": "Alarme fuer Geraet {device_id} konnten nicht synchronisiert werden: {error}"
+      "message": "Alarme für Gerät {device_id} konnten nicht synchronisiert werden: {error}"
     },
     "sync_offline_statistics_failed": {
-      "message": "Could not upload offline statistics for device {device_id}: {error}"
+      "message": "Offline-Statistiken für Gerät {device_id} konnten nicht hochgeladen werden: {error}"
     },
     "unbind_accessories_failed": {
       "message": "Zubehör für Gerät {device_id} konnte nicht entkoppelt werden: {error}"
     },
     "unbind_device_failed": {
-      "message": "Geraet {device_id} konnte nicht entkoppelt werden: {error}"
+      "message": "Gerät {device_id} konnte nicht entkoppelt werden: {error}"
     },
     "unbind_shelly_account_failed": {
-      "message": "Shelly-Konto fuer Geraet {device_id} konnte nicht entkoppelt werden: {error}"
+      "message": "Shelly-Konto für Gerät {device_id} konnte nicht entkoppelt werden: {error}"
     },
     "unbind_shelly_device_failed": {
-      "message": "Shelly-Geraet fuer Geraet {device_id} konnte nicht entkoppelt werden: {error}"
+      "message": "Shelly-Gerät für Gerät {device_id} konnte nicht entkoppelt werden: {error}"
     },
     "unbind_smart_part_failed": {
-      "message": "Smart-Zubehoer fuer Geraet {device_id} konnte nicht entkoppelt werden: {error}"
+      "message": "Smart-Zubehoer für Gerät {device_id} konnte nicht entkoppelt werden: {error}"
+    },
+    "update_electricity_strategy_failed": {
+      "message": "Die Stromstrategie für Gerät {device_id} konnte nicht aktualisiert werden: {error}"
     }
   },
   "issues": {
@@ -1889,10 +2138,8 @@
           "create_smart_meter_derived_sensors": "Berechnete Smart-Meter-Sensoren erstellen",
           "enable_ble_transport": "BLE-Transport aktivieren",
           "enable_derived_home_energy_fallback": "Abgeleiteten Home-Energie-Fallback erlauben",
-          "enable_month_statistics": "Monatsstatistiken importieren",
-          "enable_payload_debug_log": "Enable redacted payload debug log",
-          "enable_week_statistics": "Wochenstatistiken importieren",
-          "enable_year_statistics": "Jahresstatistiken importieren",
+          "enable_payload_debug_log": "Redaktiertes Payload-Debug-Protokoll aktivieren",
+          "enable_unredacted_debug": "Ungeschwärzte Diagnostik und Payload-Rohprotokoll aktivieren",
           "scan_interval": "Abfrageintervall Live-Werte (Sekunden)",
           "third_party_mqtt_enable": "Third-Party-MQTT-Bridge aktivieren",
           "third_party_mqtt_ip": "Third-Party-MQTT-Broker IP / Hostname",
@@ -1907,14 +2154,12 @@
           "create_calculated_power_sensors": "Erstellt optionale lokale Netto-Leistungssensoren aus bereits von Jackery gelieferten Werten: Hauptbatterie Ladeleistung minus Entladeleistung, Batteriesystem/Stack Ladeleistung minus Entladeleistung und netzseitiger Eingang minus Ausgang. Diese Sensoren sind nur für Dashboards gedacht, die einen vorzeichenbehafteten Nettowert brauchen; es sind keine zusätzlichen App-Rohwerte. Standardmäßig aus, damit die originalen Jackery-Werte eindeutig bleiben.",
           "create_savings_detail_sensors": "Erstellt optionale Sensoren für die Ersparnis-Berechnung: berechnete Ersparnis, selbst genutzte AC-Energie, Preis, Batterie-Lade-/Entladebilanz, Wechselrichter-/Umwandlungsverlustenergie, PV-Restenergie nach Eigenverbrauch und berechnete aktuelle Wechselrichter-/Umwandlungsverlustleistung. Standardmäßig aus, weil es Diagnose-Zwischenwerte sind.",
           "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
-          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener fuer decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
+          "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener für decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert.",
           "enable_derived_home_energy_fallback": "Wenn sys/home/trends nicht verfügbar ist, wird home_energy aus device_home_stat.totalOutGridEnergy abgeleitet. Abgeleitete Werte werden in Attributen und Source-Diagnosen markiert.",
-          "enable_month_statistics": "Importiert die Monats-App-Payload in die passenden sensor.*- und jackery_solarvault:*_month_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
-          "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "enable_week_statistics": "Importiert die Wochen-App-Payload in die passenden sensor.*- und jackery_solarvault:*_week_daily-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
-          "enable_year_statistics": "Importiert die Jahres-App-Payload in die passenden sensor.*- und jackery_solarvault:*_year_monthly-Statistik-Reihen. Die stundenweise day_hourly-External-Reihe wird unabhängig davon weiterhin importiert.",
+          "enable_payload_debug_log": "Schreibt eine begrenzte JSONL-Spur von HTTP-, MQTT- und BLE-Payloads. Vertrauliche Daten werden geschwärzt, sofern ungeschwärztes Debugging nicht ausdrücklich aktiviert ist.",
+          "enable_unredacted_debug": "Nur für die Entwicklung. Exportiert vollständige Diagnostik und erfasst HTTP-, MQTT- und BLE-Frames ohne Schwärzung oder Logrotation, einschließlich Zugangsdaten und Gerätekennungen. Nach der Aufnahme deaktivieren; Dateien nie öffentlich teilen.",
           "scan_interval": "Wie oft die Jackery-Cloud nach Live-Werten abgefragt wird. Cloud-MQTT und Bluetooth liefern unabhängig davon schnellere Aktualisierungen; 30 s entspricht der Home-Assistant-Vorgabe für Cloud-Polling-Integrationen. Minimum 15 s.",
-          "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md §5 / §15). Experimentell: Der Cloud-REST-Relay fuer diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
+          "third_party_mqtt_enable": "Fordert die SolarVault auf, Telemetrie an deinen eigenen MQTT-Broker zu senden (PROTOCOL.md §5 / §15). Experimentell: Der Cloud-REST-Relay für diesen Befehl ist serverseitig blockiert, daher sendet die Integration den SET_THIRD_PARTY_MQTT_CONFIG-Frame (actionId 3046) zuerst direkt per BLE und danach per Cloud-MQTT. Benutzername, Passwort und Token werden vor dem Senden mit dem app-kompatiblen ThirdPartMQTTConfig-Codec kodiert.",
           "third_party_mqtt_ip": "IP oder Hostname deines lokalen MQTT-Brokers, zum Beispiel 192.168.x.x.",
           "third_party_mqtt_password": "Optionales MQTT-Broker-Passwort.",
           "third_party_mqtt_port": "TCP-Port deines MQTT-Brokers. Standard ist 1883.",
@@ -1930,29 +2175,29 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Nimmt ein geteiltes Jackery-Geraet im Konto an, dem das ausgewaehlte Geraet gehoert, und aktualisiert danach.",
+      "description": "Nimmt ein geteiltes Jackery-Gerät im Konto an, dem das ausgewaehlte Gerät gehoert, und aktualisiert danach.",
       "fields": {
         "device_id": {
-          "description": "Waehle ein Jackery-Geraet aus dem Konto, das die Freigabe annehmen soll.",
-          "name": "Geraete-ID"
+          "description": "Waehle ein Jackery-Gerät aus dem Konto, das die Freigabe annehmen soll.",
+          "name": "Geräte-ID"
         },
         "qr_code_id": {
           "description": "QR-Code-ID aus der Freigabeeinladung.",
           "name": "QR-Code-ID"
         },
         "target_dev_id": {
-          "description": "Jackery-Geraete-ID aus der Freigabeeinladung.",
-          "name": "Ziel-Geraete-ID"
+          "description": "Jackery-Geräte-ID aus der Freigabeeinladung.",
+          "name": "Ziel-Geräte-ID"
         }
       },
-      "name": "Geteiltes Geraet annehmen"
+      "name": "Geteiltes Gerät annehmen"
     },
     "agree_privacy_consent": {
       "description": "Zustimmung zu einer oder mehreren Jackery-Datenschutzversionen speichern.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "pending_agree_version_ids": {
           "description": "Liste numerischer Datenschutz-Versions-IDs als pendingAgreeVersionIds.",
@@ -1962,55 +2207,55 @@
       "name": "Datenschutz zustimmen"
     },
     "bind_currency": {
-      "description": "Bindet eine Waehrung ueber die Jackery-HTTP-API an das ausgewaehlte Geraet und aktualisiert danach den Coordinator.",
+      "description": "Bindet eine Waehrung ueber die Jackery-HTTP-API an das ausgewaehlte Gerät und aktualisiert danach den Coordinator.",
       "fields": {
         "currency": {
           "description": "Waehrungscode oder Kennung, die von der Jackery-App-API akzeptiert wird.",
           "name": "Waehrung"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Waehrung binden"
     },
     "bind_device": {
-      "description": "Bindet ein Jackery-Geraet ueber die Jackery-Cloud-API an dasselbe Konto wie das ausgewaehlte Geraet. Das Zielgeraet muss den von der App abgeleiteten bindKey, devId und GUID bereits liefern.",
+      "description": "Bindet ein Jackery-Gerät ueber die Jackery-Cloud-API an dasselbe Konto wie das ausgewaehlte Gerät. Das Zielgeraet muss den von der App abgeleiteten bindKey, devId und GUID bereits liefern.",
       "fields": {
         "bind_key": {
           "description": "Numerischer, von der App abgeleiteter bindKey des Zielgeraets.",
           "name": "Bind-Key"
         },
         "device_id": {
-          "description": "Vorhandenes Jackery-Geraet aus dem Konto auswaehlen, das die neue Bindung erhalten soll.",
-          "name": "Konto-Geraet"
+          "description": "Vorhandenes Jackery-Gerät aus dem Konto auswaehlen, das die neue Bindung erhalten soll.",
+          "name": "Konto-Gerät"
         },
         "guid": {
           "description": "Von der App abgeleitete GUID des Zielgeraets.",
           "name": "GUID"
         },
         "target_dev_id": {
-          "description": "Numerische Jackery-devId des zu bindenden Geraets.",
-          "name": "Ziel-Geraete-ID"
+          "description": "Numerische Jackery-devId des zu bindenden Geräts.",
+          "name": "Ziel-Geräte-ID"
         },
         "timezone_offset": {
-          "description": "Lokaler Zeitzonen-Offset fuer den Jackery-Bind-Endpunkt.",
+          "description": "Lokaler Zeitzonen-Offset für den Jackery-Bind-Endpunkt.",
           "name": "Zeitzonen-Offset"
         }
       },
-      "name": "Geraet binden"
+      "name": "Gerät binden"
     },
     "bind_smart_part": {
-      "description": "Bindet ein Smart-Zubehoer (zum Beispiel einen Smart Plug) ueber MQTT an das ausgewaehlte Geraet.",
+      "description": "Bindet ein Smart-Zubehoer (zum Beispiel einen Smart Plug) ueber MQTT an das ausgewaehlte Gerät.",
       "fields": {
         "accessory_sn": {
           "description": "Seriennummer des zu bindenden Smart-Zubehoers, aufgedruckt auf dem Zubehoer oder sichtbar in der Jackery-App.",
           "name": "Zubehoer-Seriennummer"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Smart-Zubehoer binden"
@@ -2019,8 +2264,8 @@
       "description": "Hebt die Dynamic-Price-Vertragsfreigabe ueber die Jackery-HTTP-API auf und aktualisiert danach den Coordinator.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um Konto und System zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um Konto und System zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "platform_company_id": {
           "description": "Platform-Company-ID des Dynamic-Price-Anbieters aus der Jackery-App-API.",
@@ -2030,25 +2275,25 @@
       "name": "Dynamic-Price-Vertragsfreigabe aufheben"
     },
     "check_accessories_exist": {
-      "description": "Prueft, ob fuer die angegebenen Jackery-Geraete-IDs Zubehoer existiert. Gibt nur die Antwort zurueck.",
+      "description": "Prueft, ob für die angegebenen Jackery-Geräte-IDs Zubehoer existiert. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "devices": {
-          "description": "Durch Kommas getrennte Jackery-Geraete-IDs fuer den devices-Parameter der App-API.",
-          "name": "Geraete"
+          "description": "Durch Kommas getrennte Jackery-Geräte-IDs für den devices-Parameter der App-API.",
+          "name": "Geräte"
         }
       },
       "name": "Zubehoerexistenz pruefen"
     },
     "check_app_version": {
-      "description": "Jackery-App-Versionsdaten fuer das ausgewaehlte Konto pruefen. Gibt nur die Antwort zurueck.",
+      "description": "Jackery-App-Versionsdaten für das ausgewaehlte Konto pruefen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "type": {
           "description": "Optionaler App-Plattformtyp als type.",
@@ -2062,15 +2307,15 @@
       "name": "App-Version pruefen"
     },
     "check_jackery_accessories_exist": {
-      "description": "Prueft, ob fuer die angegebenen Geraeteserieninfos Jackery-Zubehoer existiert. Gibt nur die Antwort zurueck.",
+      "description": "Prueft, ob für die angegebenen Geräteserieninfos Jackery-Zubehoer existiert. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn_infos": {
-          "description": "Geraeteserieninfo, die von der Jackery-App-API akzeptiert wird.",
-          "name": "Geraeteserieninfo"
+          "description": "Geräteserieninfo, die von der Jackery-App-API akzeptiert wird.",
+          "name": "Geräteserieninfo"
         }
       },
       "name": "Jackery-Zubehoerexistenz pruefen"
@@ -2079,44 +2324,44 @@
       "description": "Pruefen, ob das ausgewaehlte Konto eine Datenschutz-Aktualisierung bestaetigen muss. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Datenschutz-Aktualisierung pruefen"
     },
     "check_system_bound": {
-      "description": "Prueft, ob Bind-Key, Geraeteseriennummer und GUID bereits gebunden sind. Gibt nur die Antwort zurueck.",
+      "description": "Prueft, ob Bind-Key, Geräteseriennummer und GUID bereits gebunden sind. Gibt nur die Antwort zurueck.",
       "fields": {
         "bind_key": {
           "description": "Bind-Key, der von der Jackery-App-API akzeptiert wird.",
           "name": "Bind-Key"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraeteseriennummer, die als deviceSn gesendet wird.",
-          "name": "Geraeteseriennummer"
+          "description": "Geräteseriennummer, die als deviceSn gesendet wird.",
+          "name": "Geräteseriennummer"
         },
         "guid": {
-          "description": "GUID fuer die Jackery-App-API.",
+          "description": "GUID für die Jackery-App-API.",
           "name": "GUID"
         }
       },
       "name": "Systembindung pruefen"
     },
     "delete_electricity_strategy": {
-      "description": "Loescht einen Stromtarif-Plan vom Geraet.",
+      "description": "Loescht einen Stromtarif-Plan vom Gerät.",
       "fields": {
         "body": {
           "description": "Strategie-Body als JSON, benoetigt normalerweise nur die tid (Task-ID).",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Stromtarif-Strategie loeschen"
@@ -2143,28 +2388,28 @@
           "name": "Alarm-Key"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Alarmdetails abrufen"
     },
     "get_device_currency": {
-      "description": "Ruft den Waehrungs-Payload fuer das ausgewaehlte Jackery-Geraet ab. Gibt nur die Antwort zurueck.",
+      "description": "Ruft den Waehrungs-Payload für das ausgewaehlte Jackery-Gerät ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
-      "name": "Geraetewaehrung abrufen"
+      "name": "Gerätewaehrung abrufen"
     },
     "get_dynamic_price_login_url": {
-      "description": "Ruft die Login-URL des Dynamic-Price-Anbieters fuer das ausgewaehlte Geraet ab. Gibt nur die Antwort zurueck.",
+      "description": "Ruft die Login-URL des Dynamic-Price-Anbieters für das ausgewaehlte Gerät ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um Konto und System zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um Konto und System zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "platform_company_id": {
           "description": "Platform-Company-ID des Dynamic-Price-Anbieters aus der Jackery-App-API.",
@@ -2174,15 +2419,15 @@
       "name": "Dynamic-Price-Login-URL abrufen"
     },
     "get_product_instruction": {
-      "description": "Produktanleitung fuer eine Geraete-Seriennummer abrufen. Gibt nur die Antwort zurueck.",
+      "description": "Produktanleitung für eine Geräte-Seriennummer abrufen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraete-Seriennummer als devSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Geräte-Seriennummer als devSn.",
+          "name": "Geräte-Seriennummer"
         },
         "type": {
           "description": "Optionaler Anleitungstyp als type.",
@@ -2192,11 +2437,11 @@
       "name": "Produktanleitung abrufen"
     },
     "get_push_config": {
-      "description": "Ruft die Push-Benachrichtigungskonfiguration fuer das ausgewaehlte Konto ab. Gibt nur die Antwort zurueck.",
+      "description": "Ruft die Push-Benachrichtigungskonfiguration für das ausgewaehlte Konto ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Push-Konfiguration abrufen"
@@ -2212,11 +2457,11 @@
       "name": "Freigabe-QR-Code abrufen"
     },
     "get_shelly_auth_url": {
-      "description": "Ruft die Jackery-Shelly-OAuth-Autorisierung fuer das Konto des ausgewaehlten Geraets ab. Gibt nur die Antwort zurueck.",
+      "description": "Ruft die Jackery-Shelly-OAuth-Autorisierung für das Konto des ausgewaehlten Geräts ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Shelly-Auth-URL abrufen"
@@ -2232,89 +2477,89 @@
       "name": "Intelligente Zeitplanvorhersage abrufen"
     },
     "get_unread_count": {
-      "description": "Ruft Zaehler ungelesener Benachrichtigungen fuer das ausgewaehlte Konto ab. Gibt nur die Antwort zurueck.",
+      "description": "Ruft Zaehler ungelesener Benachrichtigungen für das ausgewaehlte Konto ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Ungelesen-Zaehler abrufen"
     },
     "get_user_info": {
-      "description": "Benutzerprofilinformationen fuer das ausgewaehlte Konto abrufen. Gibt nur die Antwort zurueck.",
+      "description": "Benutzerprofilinformationen für das ausgewaehlte Konto abrufen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Benutzerinfo abrufen"
     },
     "insert_electricity_strategy": {
-      "description": "Fuegt einen neuen Stromtarif-Plan (Laden/Entladen) zum Geraet hinzu.",
+      "description": "Fuegt einen neuen Stromtarif-Plan (Laden/Entladen) zum Gerät hinzu.",
       "fields": {
         "body": {
           "description": "Strategie-Body als JSON. Felder sind in der Source-of-Truth dokumentiert.",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Stromtarif-Strategie hinzufuegen"
     },
     "list_accessories": {
-      "description": "Listet Smart-Zubehoer fuer das ausgewaehlte Jackery-Geraet auf. Gibt nur die Antwort zurueck.",
+      "description": "Listet Smart-Zubehoer für das ausgewaehlte Jackery-Gerät auf. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Zubehoer auflisten"
     },
     "list_banners": {
-      "description": "Jackery-App-Banner fuer das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
+      "description": "Jackery-App-Banner für das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Banner auflisten"
     },
     "list_country_zones": {
-      "description": "Listet Laender-/Zoneneintraege fuer die Jackery-DIY-Geraeteeinrichtung auf. Gibt nur die Antwort zurueck.",
+      "description": "Listet Laender-/Zoneneintraege für die Jackery-DIY-Geräteeinrichtung auf. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Laenderzonen auflisten"
     },
     "list_currencies": {
-      "description": "Listet die Waehrungen des Jackery-Kontos auf, dem das ausgewaehlte Geraet gehoert. Gibt nur die Antwort zurueck.",
+      "description": "Listet die Waehrungen des Jackery-Kontos auf, dem das ausgewaehlte Gerät gehoert. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das besitzende Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das besitzende Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Waehrungen auflisten"
     },
     "list_dynamic_price_contracts": {
-      "description": "Listet Dynamic-Price-Vertraege fuer Kunde und Anbieter auf. Gibt nur die Antwort zurueck.",
+      "description": "Listet Dynamic-Price-Vertraege für Kunde und Anbieter auf. Gibt nur die Antwort zurueck.",
       "fields": {
         "customer_number": {
-          "description": "Kundennummer fuer die Vertragslisten-API des Anbieters.",
+          "description": "Kundennummer für die Vertragslisten-API des Anbieters.",
           "name": "Kundennummer"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "platform_company_id": {
           "description": "Platform-Company-ID des Dynamic-Price-Anbieters aus der Jackery-App-API.",
@@ -2324,53 +2569,53 @@
       "name": "Dynamic-Price-Vertraege auflisten"
     },
     "list_faq_answers": {
-      "description": "Jackery-FAQ-Antworten fuer das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
+      "description": "Jackery-FAQ-Antworten für das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "FAQ-Antworten auflisten"
     },
     "list_faqs": {
-      "description": "Jackery-FAQ-Eintraege fuer das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
+      "description": "Jackery-FAQ-Eintraege für das ausgewaehlte Konto auflisten. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "FAQs auflisten"
     },
     "list_grid_standards": {
-      "description": "Listet Netzanschlussstandards fuer einen Laendercode auf. Gibt nur die Antwort zurueck.",
+      "description": "Listet Netzanschlussstandards für einen Laendercode auf. Gibt nur die Antwort zurueck.",
       "fields": {
         "country": {
           "description": "Laendercode, der von der Jackery-App-API akzeptiert wird.",
           "name": "Land"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Netzstandards auflisten"
     },
     "list_notifications": {
-      "description": "Listet Jackery-Push-Benachrichtigungen fuer das ausgewaehlte Konto auf. Gibt nur die Antwort zurueck.",
+      "description": "Listet Jackery-Push-Benachrichtigungen für das ausgewaehlte Konto auf. Gibt nur die Antwort zurueck.",
       "fields": {
         "current_time": {
           "description": "Optionaler currentTime-Zeitstempel in Millisekunden; 0 deaktiviert den Filter.",
           "name": "Aktuelle Zeit"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Optionaler Geraeteseriennummer-Filter als deviceSn.",
-          "name": "Geraeteseriennummer"
+          "description": "Optionaler Geräteseriennummer-Filter als deviceSn.",
+          "name": "Geräteseriennummer"
         },
         "page_no": {
           "description": "Seitennummer ab 1.",
@@ -2412,11 +2657,11 @@
       "name": "Geteilte Manager auflisten"
     },
     "list_shelly_binding_failures": {
-      "description": "Listet Shelly-Binding-Fehler aus dem Jackery-Konto auf, dem das ausgewaehlte Geraet gehoert. Gibt nur die Antwort zurueck.",
+      "description": "Listet Shelly-Binding-Fehler aus dem Jackery-Konto auf, dem das ausgewaehlte Gerät gehoert. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Waehle ein Jackery-Geraet. Die Fehlerliste wird im besitzenden Konto abgerufen.",
-          "name": "Geraete-ID"
+          "description": "Waehle ein Jackery-Gerät. Die Fehlerliste wird im besitzenden Konto abgerufen.",
+          "name": "Geräte-ID"
         },
         "state": {
           "description": "Optionaler Backend-Statusfilter.",
@@ -2426,17 +2671,17 @@
       "name": "Shelly-Binding-Fehler auflisten"
     },
     "list_shelly_devices": {
-      "description": "Listet Shelly-Cloud-Geraete auf, die mit dem Jackery-Konto des ausgewaehlten Geraets verknuepft sind. Gibt nur die Antwort zurueck.",
+      "description": "Listet Shelly-Cloud-Geräte auf, die mit dem Jackery-Konto des ausgewaehlten Geräts verknuepft sind. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
-      "name": "Shelly-Geraete auflisten"
+      "name": "Shelly-Geräte auflisten"
     },
     "query_box_stat": {
-      "description": "Generische Box-Stromstatistik fuer eine Geraete-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
+      "description": "Generische Box-Stromstatistik für eine Geräte-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "begin_date": {
           "description": "Startdatum als beginDate.",
@@ -2447,12 +2692,12 @@
           "name": "Datumstyp"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraete-Seriennummer als deviceSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Geräte-Seriennummer als deviceSn.",
+          "name": "Geräte-Seriennummer"
         },
         "end_date": {
           "description": "Enddatum als endDate.",
@@ -2460,35 +2705,35 @@
         },
         "key": {
           "description": "Optionaler Statistik-Key der Jackery-App-API.",
-          "name": "Key"
+          "name": "Schlüssel"
         }
       },
       "name": "Box-Statistik abfragen"
     },
     "query_carbon_stat": {
-      "description": "CO2-Statistik fuer eine Geraete-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
+      "description": "CO2-Statistik für eine Geräte-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraete-Seriennummer als deviceSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Geräte-Seriennummer als deviceSn.",
+          "name": "Geräte-Seriennummer"
         }
       },
       "name": "CO2-Statistik abfragen"
     },
     "query_charge_report": {
-      "description": "Ladebericht-Verlauf fuer eine Geraete-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
+      "description": "Ladebericht-Verlauf für eine Geräte-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraete-Seriennummer als deviceSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Geräte-Seriennummer als deviceSn.",
+          "name": "Geräte-Seriennummer"
         },
         "page_index": {
           "description": "Einsbasierter Seitenindex.",
@@ -2498,19 +2743,19 @@
       "name": "Ladebericht abfragen"
     },
     "query_cutoff_stat": {
-      "description": "Ausfallstatistik fuer eine Geraete-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
+      "description": "Ausfallstatistik für eine Geräte-Seriennummer abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "begin_date": {
           "description": "Startdatum als beginDate.",
           "name": "Startdatum"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Geraete-Seriennummer als deviceSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Geräte-Seriennummer als deviceSn.",
+          "name": "Geräte-Seriennummer"
         },
         "end_date": {
           "description": "Enddatum als endDate.",
@@ -2520,37 +2765,37 @@
       "name": "Ausfallstatistik abfragen"
     },
     "query_electricity_strategy": {
-      "description": "Fragt alle Stromtarif-Plaene vom Geraet ab.",
+      "description": "Fragt alle Stromtarif-Plaene vom Gerät ab.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Stromtarif-Strategien abfragen"
     },
     "query_profit_stat": {
-      "description": "Ertragsstatistik fuer das ausgewaehlte Geraet abfragen. Gibt nur die Antwort zurueck.",
+      "description": "Ertragsstatistik für das ausgewaehlte Gerät abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Ertragsstatistik abfragen"
     },
     "query_soc_stat": {
-      "description": "SOC-Statistik fuer das ausgewaehlte Geraet abfragen. Gibt nur die Antwort zurueck.",
+      "description": "SOC-Statistik für das ausgewaehlte Gerät abfragen. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "SOC-Statistik abfragen"
     },
     "query_socket_stat": {
-      "description": "Fragt App-Socket-Chartstatistiken fuer eine Smart-Socket-Zubehoer-Geraete-ID ab. Gibt nur die Antwort zurueck.",
+      "description": "Fragt App-Socket-Chartstatistiken für eine Smart-Socket-Zubehoer-Geräte-ID ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "begin_date": {
           "description": "Startdatum des Zeitraums als beginDate, zum Beispiel 2026-07-01.",
@@ -2561,16 +2806,16 @@
           "name": "Zeitraumtyp"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "end_date": {
           "description": "Enddatum des Zeitraums als endDate, zum Beispiel 2026-07-08.",
           "name": "Enddatum"
         },
         "target_dev_id": {
-          "description": "Smart-Socket-Zubehoer-Geraete-ID, die als deviceId an die App-Statistik-API gesendet wird.",
-          "name": "Ziel-Geraete-ID"
+          "description": "Smart-Socket-Zubehoer-Geräte-ID, die als deviceId an die App-Statistik-API gesendet wird.",
+          "name": "Ziel-Geräte-ID"
         }
       },
       "name": "Socket-Statistik abfragen"
@@ -2579,8 +2824,8 @@
       "description": "Fragt die experimentelle Drittanbieter-MQTT-Bridge-Konfiguration ueber den bestehenden Jackery-MQTT-Befehlskanal ab.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Drittanbieter-MQTT-Konfiguration abfragen"
@@ -2589,8 +2834,8 @@
       "description": "Fragt den aktuellen TOU-Zeitplan ueber die Jackery-HTTP-API ab. Gibt nur die Antwort zurueck.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "TOU-Plan abfragen"
@@ -2645,8 +2890,8 @@
           "name": "Geräte-ID"
         },
         "target_dev_id": {
-          "description": "Optionale Jackery-Cloud-Geraete-ID, von der geteilter Zugriff entfernt wird. Standard ist das ausgewaehlte Geraet.",
-          "name": "Ziel-Geraete-ID"
+          "description": "Optionale Jackery-Cloud-Geräte-ID, von der geteilter Zugriff entfernt wird. Standard ist das ausgewaehlte Gerät.",
+          "name": "Ziel-Geräte-ID"
         }
       },
       "name": "Geteilten Zugriff entfernen"
@@ -2687,30 +2932,30 @@
       "description": "Speichert den dokumentierten Maximalleistungsdatensatz ueber die Jackery-HTTP-API und aktualisiert danach den Coordinator.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         },
         "max_power": {
           "description": "Maximalleistung, die als maxPower gesendet wird.",
           "name": "Maximalleistung"
         }
       },
-      "name": "Geraete-Maximalleistung speichern"
+      "name": "Geräte-Maximalleistung speichern"
     },
     "save_dynamic_price_contract_auth": {
       "description": "Speichert die Dynamic-Price-Vertragsfreigabe ueber die Jackery-HTTP-API und aktualisiert danach den Coordinator.",
       "fields": {
         "contract_id": {
-          "description": "Vertrags-ID fuer die Freigabe-API des Anbieters.",
+          "description": "Vertrags-ID für die Freigabe-API des Anbieters.",
           "name": "Vertrags-ID"
         },
         "custom_id": {
-          "description": "Kunden- oder Custom-ID fuer die Freigabe-API des Anbieters.",
+          "description": "Kunden- oder Custom-ID für die Freigabe-API des Anbieters.",
           "name": "Custom-ID"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um Konto und System zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um Konto und System zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "platform_company_id": {
           "description": "Platform-Company-ID des Dynamic-Price-Anbieters aus der Jackery-App-API.",
@@ -2727,8 +2972,8 @@
           "name": "Connect-Token"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Dynamic-Price-Standorttoken speichern"
@@ -2738,40 +2983,40 @@
       "fields": {
         "body": {
           "description": "TOU-Aufgaben als JSON-Liste oder als Objekt mit einer tasks-Liste.",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "TOU-Plan speichern"
     },
     "send_ble_command": {
-      "description": "Sendet einen experimentellen binaeren BLE-Befehlsframe an das ausgewaehlte Geraet. Benoetigt BLE-Transport, BLE-Schreibzugriffe und eine aktive BLE-Verbindung.",
+      "description": "Sendet einen experimentellen binaeren BLE-Befehlsframe an das ausgewaehlte Gerät. Benoetigt BLE-Transport, BLE-Schreibzugriffe und eine aktive BLE-Verbindung.",
       "fields": {
         "ack_timeout": {
-          "description": "Wartezeit in Sekunden auf eine Notify-Antwort des Geraets nach dem Write. Wird ignoriert, wenn \"Auf ACK warten\" aus ist.",
+          "description": "Wartezeit in Sekunden auf eine Notify-Antwort des Geräts nach dem Write. Wird ignoriert, wenn \"Auf ACK warten\" aus ist.",
           "name": "ACK-Timeout"
         },
         "body": {
           "description": "JSON-Objekt, das verschluesselt und geschrieben wird. Das body-level cmd-Feld eintragen, wenn der Zielbefehl der Firmware es erwartet.",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "cmd": {
           "description": "Binaere BLE-Header-Command-ID, 1 bis 65535.",
           "name": "Befehl"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         },
         "flags": {
-          "description": "Binaere BLE-Header-Flags, fuer ausgehende Testbefehle normalerweise 0.",
+          "description": "Binaere BLE-Header-Flags, für ausgehende Testbefehle normalerweise 0.",
           "name": "Flags"
         },
         "wait_for_ack": {
-          "description": "Auf eine vom Geraet zurueckgesendete, dekodierbare Notify-Antwort warten, bevor der Write als erfolgreich gilt. Fuer Setter empfohlen, damit ein stiller Firmware-Drop den Aufruf fehlschlagen laesst statt verloren zu gehen.",
+          "description": "Auf eine vom Gerät zurueckgesendete, dekodierbare Notify-Antwort warten, bevor der Write als erfolgreich gilt. Fuer Setter empfohlen, damit ein stiller Firmware-Drop den Aufruf fehlschlagen laesst statt verloren zu gehen.",
           "name": "Auf ACK warten"
         }
       },
@@ -2782,11 +3027,11 @@
       "fields": {
         "action_id": {
           "description": "TIMER_TASK-Aktion: 3015=ADD, 3016=DELETE, 3017=UPDATE, 3018=READ.",
-          "name": "Action ID"
+          "name": "Aktions-ID"
         },
         "body": {
           "description": "Zeitplan-Body als JSON. Typische Felder: actionType, taskType, mode, pw (W), sysSwitch (0/1), start/end (HH:MM), loops (7-stellige Mo-So-Bitmaske), tid (Task-ID). Die Integration ergänzt cmd=112 automatisch.",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "device_id": {
           "description": "Jackery-Gerät auswählen. Automationen können auch direkt die numerische Jackery-Geräte-ID übergeben.",
@@ -2821,8 +3066,8 @@
           "name": "Zubehoer-ID"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "nickname": {
           "description": "Neuer Zubehoername, 1 bis 64 Zeichen.",
@@ -2846,29 +3091,29 @@
       "name": "Konto-Anzeigename setzen"
     },
     "set_device_nickname": {
-      "description": "Setzt einen benutzerdefinierten Spitznamen fuer ein Jackery-Geraet ueber die Jackery-Cloud-API. Der Spitzname wird in der Jackery-App und in den Home-Assistant-Geraeteinformationen angezeigt.",
+      "description": "Setzt einen benutzerdefinierten Spitznamen für ein Jackery-Gerät ueber die Jackery-Cloud-API. Der Spitzname wird in der Jackery-App und in den Home-Assistant-Geräteinformationen angezeigt.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         },
         "nickname": {
-          "description": "Neuer Geraete-Spitzname, 1 bis 64 Zeichen.",
+          "description": "Neuer Geräte-Spitzname, 1 bis 64 Zeichen.",
           "name": "Spitzname"
         }
       },
-      "name": "Geraete-Spitzname setzen"
+      "name": "Geräte-Spitzname setzen"
     },
     "set_push_config": {
-      "description": "Setzt die Push-Benachrichtigungskonfiguration fuer das ausgewaehlte Konto ueber die Jackery-HTTP-API.",
+      "description": "Setzt die Push-Benachrichtigungskonfiguration für das ausgewaehlte Konto ueber die Jackery-HTTP-API.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "set": {
           "description": "Ganzzahliger Push-Konfigurationswert der Jackery-App-API.",
-          "name": "Set"
+          "name": "Setzen"
         }
       },
       "name": "Push-Konfiguration setzen"
@@ -2895,8 +3140,8 @@
       "description": "Setzt die experimentelle Drittanbieter-MQTT-Bridge-Konfiguration ueber den bestehenden Jackery-MQTT-Befehlskanal.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         },
         "enable": {
           "description": "Bridge ein- oder ausschalten.",
@@ -2937,12 +3182,12 @@
           "name": "Inhalt"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "device_sn": {
-          "description": "Optionale Geraete-Seriennummer als deviceSn.",
-          "name": "Geraete-Seriennummer"
+          "description": "Optionale Geräte-Seriennummer als deviceSn.",
+          "name": "Geräte-Seriennummer"
         }
       },
       "name": "Feedback senden"
@@ -2955,29 +3200,29 @@
           "name": "Inhalt"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen, um das zugehoerige Konto zu bestimmen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen, um das zugehoerige Konto zu bestimmen.",
+          "name": "Geräte-ID"
         },
         "id": {
-          "description": "Geraete- oder Systemkennung, die als id gesendet wird.",
+          "description": "Geräte- oder Systemkennung, die als id gesendet wird.",
           "name": "ID"
         }
       },
       "name": "Alarme synchronisieren"
     },
     "sync_offline_statistics": {
-      "description": "Upload an original offline device packet to Jackery. This writes cloud data; it does not retrieve history. Returns a synchronization acknowledgement.",
+      "description": "Lade ein Original-Offline-Gerätepaket zu Jackery hoch. Dies schreibt Cloud-Daten; es ruft keinen Verlauf ab. Gibt eine Synchronisationsbestätigung zurück.",
       "fields": {
         "body": {
-          "description": "The unchanged, non-empty body object from the device's offline report. Do not supply invented measurements.",
-          "name": "Original device body"
+          "description": "Das unveränderte, nicht-leere Body-Objekt aus dem Offline-Bericht des Geräts. Keine erfundenen Messwerte angeben.",
+          "name": "Original-Geräte-Body"
         },
         "device_id": {
-          "description": "Pick a Jackery device to select the owning account.",
-          "name": "Device ID"
+          "description": "Wähle ein Jackery-Gerät, um das zugehörige Konto auszuwählen.",
+          "name": "Geräte-ID"
         }
       },
-      "name": "Synchronize offline statistics"
+      "name": "Offline-Statistiken synchronisieren"
     },
     "unbind_accessories": {
       "description": "Entkoppelt Smart-Zubehör per Bind-ID vom übergeordneten Gerät und aktualisiert anschließend. Gibt das Ergebnis je Eintrag zurück.",
@@ -2994,67 +3239,67 @@
       "name": "Zubehör entkoppeln"
     },
     "unbind_device": {
-      "description": "Entkoppelt (entfernt) ein Geraet vom Jackery-Konto ueber die Jackery-Cloud-API. Dies ist destruktiv: Das Geraet und seine Entitaeten werden nach der naechsten Aktualisierung aus Home Assistant entfernt.",
+      "description": "Entkoppelt (entfernt) ein Gerät vom Jackery-Konto ueber die Jackery-Cloud-API. Dies ist destruktiv: Das Gerät und seine Entitaeten werden nach der naechsten Aktualisierung aus Home Assistant entfernt.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
-      "name": "Geraet entkoppeln"
+      "name": "Gerät entkoppeln"
     },
     "unbind_shelly_account": {
-      "description": "Entkoppelt das Shelly-Konto vom Jackery-Konto, dem das ausgewaehlte Geraet gehoert, und aktualisiert danach.",
+      "description": "Entkoppelt das Shelly-Konto vom Jackery-Konto, dem das ausgewaehlte Gerät gehoert, und aktualisiert danach.",
       "fields": {
         "device_id": {
-          "description": "Waehle ein Jackery-Geraet. Die Shelly-Konto-Entkopplung erfolgt im besitzenden Konto.",
-          "name": "Geraete-ID"
+          "description": "Waehle ein Jackery-Gerät. Die Shelly-Konto-Entkopplung erfolgt im besitzenden Konto.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Shelly-Konto entkoppeln"
     },
     "unbind_shelly_device": {
-      "description": "Entkoppelt ein Shelly-Cloud-Geraet ueber das Jackery-Konto, dem das ausgewaehlte Geraet gehoert, und aktualisiert danach.",
+      "description": "Entkoppelt ein Shelly-Cloud-Gerät ueber das Jackery-Konto, dem das ausgewaehlte Gerät gehoert, und aktualisiert danach.",
       "fields": {
         "binding_id": {
           "description": "Shelly-Binding-ID aus der Jackery-Cloud.",
           "name": "Binding-ID"
         },
         "device_id": {
-          "description": "Waehle ein Jackery-Geraet. Die Shelly-Geraete-Entkopplung erfolgt im besitzenden Konto.",
-          "name": "Geraete-ID"
+          "description": "Waehle ein Jackery-Gerät. Die Shelly-Geräte-Entkopplung erfolgt im besitzenden Konto.",
+          "name": "Geräte-ID"
         },
         "shelly_device_id": {
-          "description": "Zu entkoppelnde Shelly-Geraete-ID.",
-          "name": "Shelly-Geraete-ID"
+          "description": "Zu entkoppelnde Shelly-Geräte-ID.",
+          "name": "Shelly-Geräte-ID"
         }
       },
-      "name": "Shelly-Geraet entkoppeln"
+      "name": "Shelly-Gerät entkoppeln"
     },
     "unbind_smart_part": {
-      "description": "Entkoppelt (entfernt) ein Smart-Zubehoer ueber MQTT vom ausgewaehlten Geraet.",
+      "description": "Entkoppelt (entfernt) ein Smart-Zubehoer ueber MQTT vom ausgewaehlten Gerät.",
       "fields": {
         "accessory_sn": {
           "description": "Seriennummer des zu entkoppelnden Smart-Zubehoers, aufgedruckt auf dem Zubehoer oder sichtbar in der Jackery-App.",
           "name": "Zubehoer-Seriennummer"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geraete-ID uebergeben.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen. Automationen koennen auch direkt die numerische Jackery-Geräte-ID uebergeben.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Smart-Zubehoer entkoppeln"
     },
     "update_electricity_strategy": {
-      "description": "Aktualisiert einen bestehenden Stromtarif-Plan auf dem Geraet.",
+      "description": "Aktualisiert einen bestehenden Stromtarif-Plan auf dem Gerät.",
       "fields": {
         "body": {
           "description": "Strategie-Body als JSON.",
-          "name": "Body"
+          "name": "Rumpf"
         },
         "device_id": {
-          "description": "Jackery-Geraet auswaehlen.",
-          "name": "Geraete-ID"
+          "description": "Jackery-Gerät auswaehlen.",
+          "name": "Geräte-ID"
         }
       },
       "name": "Stromtarif-Strategie aktualisieren"
