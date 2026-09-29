@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 _async_migrate_portable_screen_entity = (
     _init_module._async_migrate_portable_screen_entity  # ruff: ignore[private-member-access]
 )
-_async_migrate_grid_standard_entity = _init_module._async_migrate_grid_standard_entity  # ruff: ignore[private-member-access]
 _async_migrate_battery_pack_identities = (
     _init_module._async_migrate_battery_pack_identities  # ruff: ignore[private-member-access]
 )
@@ -142,40 +141,6 @@ def test_portable_screen_migration_is_idempotent_no_registry_writes(
         )
 
         # Entity should remain unchanged
-        preserved = registry.async_get(target_entity_id)
-        assert preserved is not None
-        assert preserved.entity_id == target_entity_id
-
-
-def test_grid_standard_migration_is_idempotent_no_registry_writes(
-    hass: HomeAssistant,
-) -> None:
-    """Re-running migration on already-migrated entity does not call registry.update/remove."""  # ruff: ignore[line-too-long]
-    entry = _config_entry(hass)
-    registry = er.async_get(hass)
-
-    # Pre-create the migrated sensor entity
-    target = _grid_standard_sensor(registry, entry)
-    target_entity_id = target.entity_id
-
-    with (
-        patch.object(
-            registry, "async_update_entity", wraps=registry.async_update_entity
-        ) as mock_update,
-        patch.object(
-            registry, "async_remove", wraps=registry.async_remove
-        ) as mock_remove,
-    ):
-        _async_migrate_grid_standard_entity(hass, entry)
-        _async_migrate_grid_standard_entity(hass, entry)
-
-        assert mock_update.call_count == 0, (
-            "async_update_entity should not be called on idempotent re-run"
-        )
-        assert mock_remove.call_count == 0, (
-            "async_remove should not be called on idempotent re-run"
-        )
-
         preserved = registry.async_get(target_entity_id)
         assert preserved is not None
         assert preserved.entity_id == target_entity_id

@@ -9,7 +9,6 @@ from custom_components.jackery_solarvault import config_flow
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
-    CONF_ENABLE_WEEK_STATISTICS,
     CONF_REGION_CODE,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
@@ -45,7 +44,7 @@ def test_normalize_account_strips_whitespace() -> None:
 def test_flow_options_preserves_current_and_third_party_fields() -> None:
     """Option merging includes the full persistable option surface."""
     result = config_flow._flow_options(  # ruff: ignore[private-member-access]
-        {CONF_ENABLE_WEEK_STATISTICS: True},
+        {CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: True},
         {
             CONF_ENABLE_BLE_TRANSPORT: False,
             CONF_THIRD_PARTY_MQTT_IP: "broker.local",
@@ -53,7 +52,7 @@ def test_flow_options_preserves_current_and_third_party_fields() -> None:
         },
     )
 
-    assert result[CONF_ENABLE_WEEK_STATISTICS] is True
+    assert result[CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK] is True
     assert result[CONF_ENABLE_BLE_TRANSPORT] is False
     assert result[CONF_THIRD_PARTY_MQTT_IP] == "broker.local"
     assert result[CONF_THIRD_PARTY_MQTT_PORT] == _LOCAL_PORT

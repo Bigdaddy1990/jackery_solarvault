@@ -59,10 +59,14 @@ def _sensor_entity(cls: type[Any], payload: dict[str, object]) -> Any:
     Returns:
         Any: An instance of `cls` initialized with the given payload.
     """  # ruff: ignore[line-too-long]
+    coordinator = cast("Any", SimpleNamespace(
+        data={"dev1": payload},
+        battery_pack_identity_serial=lambda device_id, pack_index: None,
+    ))
     entity = cast("Any", cls).__new__(cls)
     JackeryEntity.__init__(  # ruff: ignore[unnecessary-dunder-call]
         entity,
-        cast("Any", SimpleNamespace(data={"dev1": payload})),
+        coordinator,
         "dev1",
         "test",
     )

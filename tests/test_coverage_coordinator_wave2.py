@@ -15,7 +15,6 @@ from custom_components.jackery_solarvault.const import (
     CONF_THIRD_PARTY_MQTT_IP,
 )
 from custom_components.jackery_solarvault.coordinator import (
-    BackfillStatus,
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.ingest import TransportSource
@@ -117,38 +116,63 @@ async def test_background_scheduler_reuses_active_task_then_allows_replay() -> N
     assert await replay == 2  # ruff: ignore[magic-value-comparison]
 
 
-def test_stale_live_property_is_rejected_without_blocking_http_configuration() -> None:
-    """An old live frame cannot rewind SOC while its static field still merges."""
-    coordinator = _bare_coordinator()
-    stale_at = datetime.now(UTC) - timedelta(hours=6)
+def test_older_live_frame_cannot_rewind_newer_value_but_late_frame_merges() -> None:
+    """Ingest keeps a newer value; a late frame is merged, never pre-dropped.
 
+    The former age pre-filter outside ingest discarded 2209 cloud-MQTT live
+    observations (60-506 s) even when no newer value existed.
+    """
+    coordinator = _bare_coordinator()
+    now = datetime.now(UTC)
+    fresh = coordinator._property_updates_for_source(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        {"soc": 83, "temperatureUnit": 0},
+        TransportSource.CLOUD_MQTT,
+        base={},
+        observed_at=now,
+    )
     merged = coordinator._property_updates_for_source(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         {"soc": 12, "temperatureUnit": 1},
         TransportSource.HTTP,
-        base={"soc": 83, "temperatureUnit": 0},
-        observed_at=stale_at,
+        base=fresh,
+        observed_at=now - timedelta(hours=6),
     )
-
     assert merged["soc"] == 83  # ruff: ignore[magic-value-comparison]
     assert merged["temperatureUnit"] == 1
 
+    late_only = _bare_coordinator()._property_updates_for_source(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        {"soc": 12},
+        TransportSource.CLOUD_MQTT,
+        base={},
+        observed_at=now - timedelta(seconds=300),
+    )
+    assert late_only["soc"] == 12  # ruff: ignore[magic-value-comparison]
 
-def test_stale_accessory_frame_keeps_identity_but_not_old_telemetry() -> None:
-    """Accessory identity remains discoverable while stale telemetry is ignored."""
+
+def test_older_accessory_frame_cannot_rewind_newer_pack_value() -> None:
+    """Pack identity always merges; only a newer value beats an older frame."""
     coordinator = _bare_coordinator()
-    stale_at = datetime.now(UTC) - timedelta(hours=6)
-
+    now = datetime.now(UTC)
+    fresh = coordinator._accessory_updates_for_source(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        "battery_packs",
+        "pack-1",
+        {"deviceSn": "pack-1", "soc": 72},
+        source=TransportSource.LOCAL_MQTT,
+        current={},
+        observed_at=now,
+    )
     merged = coordinator._accessory_updates_for_source(  # ruff: ignore[private-member-access]
         _DEVICE_ID,
         "battery_packs",
         "pack-1",
         {"deviceSn": "pack-1", "soc": 11},
         source=TransportSource.LOCAL_MQTT,
-        current={"deviceSn": "pack-1", "soc": 72},
-        observed_at=stale_at,
+        current=fresh,
+        observed_at=now - timedelta(hours=6),
     )
-
     assert merged["deviceSn"] == "pack-1"
     assert merged["soc"] == 72  # ruff: ignore[magic-value-comparison]
 
@@ -309,14 +333,3 @@ async def test_historical_http_failures_remain_retryable_and_local(
     assert result == {}
 
 
-def test_backfill_state_never_marks_an_open_period_imported() -> None:
-    """Open buckets remain retryable while closed imported buckets stay durable."""
-    normalize = coord_mod._normalize_backfill_status  # ruff: ignore[private-member-access]
-    is_closed = coord_mod._backfill_period_is_closed  # ruff: ignore[private-member-access]
-
-    assert normalize("imported", closed=False) is BackfillStatus.RETRYABLE
-    assert normalize("imported", closed=True) is BackfillStatus.IMPORTED
-    assert normalize("recorder_error", closed=True) is BackfillStatus.RETRYABLE
-    assert normalize("unknown", closed=True) is BackfillStatus.PENDING
-    assert is_closed("week", date(2026, 8, 3), today=date(2026, 8, 10)) is True
-    assert is_closed("week", date(2026, 8, 10), today=date(2026, 8, 10)) is False

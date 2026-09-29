@@ -1,18 +1,10 @@
 """Tests for specific uncovered paths in coordinator.py."""
 
-from datetime import date
 
 import pytest
 
-from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_YEAR,
-)
 from custom_components.jackery_solarvault.coordinator import (
     BackfillStatus,
-    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
     _normalize_backfill_status,  # ruff: ignore[import-private-name]
     changed_dict_values,
     find_dict_with_any_key,
@@ -20,60 +12,6 @@ from custom_components.jackery_solarvault.coordinator import (
     merge_missing_dict_values,
     merge_present_dict_values,
 )
-
-
-class TestBackfillPeriodIsClosed:
-    """Test _backfill_period_is_closed uncovered paths."""
-
-    def test_day_type(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        today = date(2026, 8, 16)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_DAY, date(2026, 8, 15), today=today)
-            is True
-        )
-        assert _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today) is False
-
-    def test_week_type(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        today = date(2026, 8, 16)  # Sunday
-        # Week starts Monday
-        last_week = date(2026, 8, 3)
-        this_week = date(2026, 8, 10)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_WEEK, last_week, today=today) is True
-        )
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_WEEK, this_week, today=today) is False
-        )
-
-    def test_month_type_december_rollover(self) -> None:  # ruff: ignore[no-self-use]
-        """December -> January year rollover (line 864)."""
-        today = date(2026, 1, 15)
-        dec_start = date(2025, 12, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, dec_start, today=today) is True
-        )
-
-    def test_month_type_current(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        today = date(2026, 8, 16)
-        aug_start = date(2026, 8, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, aug_start, today=today) is False
-        )
-
-    def test_year_type(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        today = date(2026, 8, 16)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_YEAR, date(2025, 1, 1), today=today)
-            is True
-        )
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_YEAR, date(2026, 1, 1), today=today)
-            is False
-        )
-
-    def test_unknown_type_returns_false(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        today = date(2026, 8, 16)
-        assert _backfill_period_is_closed("UNKNOWN", today, today=today) is False
 
 
 class TestNormalizeBackfillStatus:

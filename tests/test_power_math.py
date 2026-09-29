@@ -343,6 +343,34 @@ def test_day_power_energy_points_skips_unverified_null_gaps() -> None:
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 7, 28, 9), 0.05)]
 
 
+def test_day_power_energy_points_leaves_blank_samples_missing() -> None:
+    """Empty app slots may be filled by later HTTP backfill, so never publish zero."""
+    source = {
+        "unit": "W",
+        "totalSolarEnergy": "0.05",
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-05-14",
+            "endDate": "2026-05-14",
+        },
+        "x": ["00:00", "00:05", "00:10"],
+        "y": ["", 600, None],
+    }
+
+    points = util.day_power_energy_points(
+        source,
+        "device_pv_stat_day",
+        "totalSolarEnergy",
+        bucket_minutes=5,
+        today=util.date(2026, 5, 14),
+        now=util.datetime(2026, 5, 14, 0, 15),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.datetime(2026, 5, 14, 0, 5), 0.05)
+    ]
+
+
 def test_day_power_energy_points_ignores_stale_zero_total_with_live_curve() -> None:
     """A stale zero scalar must not erase a positive day power curve."""
     source = {
@@ -369,18 +397,25 @@ def test_day_power_energy_points_ignores_stale_zero_total_with_live_curve() -> N
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 0.1)]
 
 
-def test_day_power_energy_points_scales_current_day_curve_to_positive_scalar() -> None:
-    """A positive current-day scalar reconciles inflated raw power integration."""
+def test_day_power_energy_points_never_lowers_curve_to_lagging_smaller_scalar() -> None:
+    """A smaller cloud scalar lags the measured curve and must not shrink it.
+
+    Payload evidence (logs/, 2026-08-14..09-23): complete 288-sample PV curves
+    integrate to 10-20 kWh while the same responses carry ``totalSolarEnergy``
+    of 0.01-2.09 kWh; the device lifetime counter confirms the curve (22.09.:
+    curve 11.74, local delta 11.48, scalar 2.09). docs/SENSOR_SOURCE_PATHS.md:
+    an observed value may replace a lagging smaller cloud scalar.
+    """
     source = {
         util.APP_REQUEST_META: {
             util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
-            util.APP_REQUEST_BEGIN_DATE: "2026-05-23",
-            util.APP_REQUEST_END_DATE: "2026-05-23",
+            util.APP_REQUEST_BEGIN_DATE: "2026-09-22",
+            util.APP_REQUEST_END_DATE: "2026-09-22",
         },
-        util.APP_STAT_UNIT: "w",
-        util.APP_CHART_LABELS: ["10:00", "10:05"],
-        util.APP_CHART_SERIES_Y: [6000, 6000],
-        util.APP_STAT_TOTAL_SOLAR_ENERGY: 0.1,
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["10:00", "10:05", "11:00"],
+        util.APP_CHART_SERIES_Y: [6000, 6000, 1200],
+        util.APP_STAT_TOTAL_SOLAR_ENERGY: "0.1",
     }
 
     points = util.day_power_energy_points(
@@ -388,15 +423,24 @@ def test_day_power_energy_points_scales_current_day_curve_to_positive_scalar() -
         f"{util.APP_SECTION_PV_STAT}_{util.DATE_TYPE_DAY}",
         util.APP_STAT_TOTAL_SOLAR_ENERGY,
         bucket_minutes=60,
-        today=util.date(2026, 5, 23),
-        now=util.datetime(2026, 5, 23, 10, 10),
+        today=util.date(2026, 9, 24),
+        now=util.datetime(2026, 9, 24, 1, 0),
+        keep_curve_over_smaller_scalar=True,
     )
 
-    assert points == [util.TrendStatisticPoint(util.datetime(2026, 5, 23, 10, 0), 0.1)]
+    assert points == [
+        util.TrendStatisticPoint(util.datetime(2026, 9, 22, 10, 0), 1.0),
+        util.TrendStatisticPoint(util.datetime(2026, 9, 22, 11, 0), 0.1),
+    ]
 
 
-def test_blank_unit_day_curve_is_rejected_without_unit_evidence() -> None:
-    """A blank unit cannot prove whether chart samples are power or energy."""
+def test_blank_unit_day_curve_is_treated_as_watt_curve() -> None:
+    """A blank unit defaults to watt and the curve is integrated, never discarded.
+
+    Day curves arrive without unit evidence on several paths (live MQTT,
+    day poll); rejecting the whole curve over a missing unit field would
+    silently drop the day's energy from the dashboard.
+    """
     source = {
         util.APP_REQUEST_META: {
             util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
@@ -405,7 +449,7 @@ def test_blank_unit_day_curve_is_rejected_without_unit_evidence() -> None:
         },
         util.APP_STAT_UNIT: "",
         util.APP_CHART_LABELS: ["15:35"],
-        util.APP_CHART_SERIES_Y: [119_718],
+        util.APP_CHART_SERIES_Y: [1_197],
         util.APP_STAT_TOTAL_SOLAR_ENERGY: 0.61,
     }
 
@@ -418,7 +462,11 @@ def test_blank_unit_day_curve_is_rejected_without_unit_evidence() -> None:
         now=util.datetime(2026, 7, 23, 15, 40),
     )
 
-    assert points == []
+    # 1197 W over one 5-minute sample = 0.09975 kWh; the larger 0.61 kWh
+    # scalar total for the day still reconciles the bucket upwards.
+    assert len(points) == 1
+    assert points[0].start_date == util.datetime(2026, 7, 23, 15, 0)
+    assert points[0].value == pytest.approx(0.61)
 
 
 def test_day_battery_discharge_curve_ignores_positive_charge_samples() -> None:
@@ -512,6 +560,92 @@ def test_day_battery_discharge_uses_positive_y2_magnitude_curve() -> None:
     )
 
     assert points == [util.TrendStatisticPoint(util.datetime(2026, 7, 29, 10, 0), 0.05)]
+
+
+def test_day_battery_soc_y2_is_not_charge_energy() -> None:
+    """Observed y2 percentages must not become charging energy."""
+    section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-09-23",
+            util.APP_REQUEST_END_DATE: "2026-09-23",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["00:00", "00:05"],
+        util.APP_CHART_SERIES_Y1: [-600, -300],
+        util.APP_CHART_SERIES_Y2: [100, 200],
+    }
+    charge = util.day_power_energy_points(
+        source, section, util.APP_STAT_TOTAL_CHARGE, today=util.date(2026, 9, 24)
+    )
+    discharge = util.day_power_energy_points(
+        source, section, util.APP_STAT_TOTAL_DISCHARGE, today=util.date(2026, 9, 24)
+    )
+    assert charge[0].value == 0
+    assert discharge[0].value == pytest.approx(0.075)
+
+
+def test_battery_soc_trace_does_not_scale_power_to_stale_scalar() -> None:
+    """Observed signed W samples must not shrink to a stale 0.01 kWh total."""
+    section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-09-23",
+            util.APP_REQUEST_END_DATE: "2026-09-23",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["00:00", "00:05", "00:10"],
+        util.APP_CHART_SERIES_Y1: [-500, -500, -500],
+        util.APP_CHART_SERIES_Y2: [46, 45, 45],
+        util.APP_STAT_TOTAL_DISCHARGE: "0.01",
+    }
+
+    points = util.day_power_energy_points(
+        source, section, util.APP_STAT_TOTAL_DISCHARGE,
+        today=util.date(2026, 9, 24),
+    )
+
+    assert points == [
+        util.TrendStatisticPoint(util.datetime(2026, 9, 23), 0.125)
+    ]
+
+
+def test_day_chart_does_not_borrow_unrelated_series() -> None:
+    """An absent mapped y3 stays absent when only battery y1/y2 exist."""
+    section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"
+    source = {
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_SERIES_Y1: [600],
+        util.APP_CHART_SERIES_Y2: [300],
+    }
+    assert util.day_power_energy_points(
+        source,
+        section,
+        util.APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+        today=util.date(2026, 9, 24),
+    ) == []
+
+
+def test_day_battery_soc_trace_does_not_invent_discharge_on_charge_only_day() -> None:
+    """A 0..100 percent y2 trace is not a directional energy curve."""
+    section = f"{util.APP_SECTION_BATTERY_STAT}_{util.DATE_TYPE_DAY}"
+    source = {
+        util.APP_REQUEST_META: {
+            util.APP_REQUEST_DATE_TYPE: util.DATE_TYPE_DAY,
+            util.APP_REQUEST_BEGIN_DATE: "2026-09-23",
+            util.APP_REQUEST_END_DATE: "2026-09-23",
+        },
+        util.APP_STAT_UNIT: "W",
+        util.APP_CHART_LABELS: ["00:00", "00:05"],
+        util.APP_CHART_SERIES_Y1: [600, 600],
+        util.APP_CHART_SERIES_Y2: [50, 51],
+    }
+    discharge = util.day_power_energy_points(
+        source, section, util.APP_STAT_TOTAL_DISCHARGE, today=util.date(2026, 9, 24)
+    )
+    assert discharge[0].value == 0
 
 
 def test_coordinator_entity_signature_is_stable_for_routine_poll_updates() -> None:
@@ -995,6 +1129,43 @@ def test_day_payload_totals_use_scalar_fields_not_power_curves() -> None:
     assert (
         util.trend_series_total(battery_day, "battery_trends", "totalDisChgEgy") == 2.42  # ruff: ignore[magic-value-comparison, float-equality-comparison]
     )
+
+
+def test_pv_channel_lifetime_offset_is_not_a_period_energy_bucket() -> None:
+    """A vendor lifetime prefix in PV1 must not enter day or month statistics."""
+    day = {
+        "unit": "W",
+        "totalSolarEnergy": "2.89",
+        "pv1Egy": 120431.96,
+        "y": [1000] * 12,
+        "y1": [500] * 12,
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-09-29",
+            "endDate": "2026-09-29",
+        },
+    }
+    month = {
+        "unit": "kWh",
+        "totalSolarEnergy": "4.42",
+        "pv1Egy": 120432.30,
+        "y": [2.89, 1.53],
+        "y1": [120431.96, 0.34],
+        "_request": {
+            "dateType": "month",
+            "beginDate": "2026-09-28",
+            "endDate": "2026-09-29",
+        },
+    }
+
+    assert util.trend_series_total(day, "device_pv_stat_day", "pv1Egy") is None
+    assert util.trend_series_total(month, "device_pv_stat_month", "pv1Egy") is None
+    assert util.chart_value_for_day(
+        month, "device_pv_stat_month", "pv1Egy", today=util.date(2026, 9, 28)
+    ) is None
+    assert util.chart_value_for_day(
+        month, "device_pv_stat_month", "pv1Egy", today=util.date(2026, 9, 29)
+    ) == pytest.approx(0.34)
 
 
 def test_day_power_energy_points_scale_watt_curves_to_hourly_buckets() -> None:

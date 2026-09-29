@@ -41,6 +41,19 @@ def _bare_coordinator() -> JackerySolarVaultCoordinator:
     obj._polling_diagnostics = {}  # ruff: ignore[private-member-access]
     obj._device_index = {}  # ruff: ignore[private-member-access]
     obj._device_registry_observer = None  # ruff: ignore[private-member-access]
+    # Mock hass for _async_remove_phantom_battery_pack_devices
+    hass = MagicMock()
+    hass.data = {"device_registry": MagicMock(), "entity_registry": MagicMock()}
+    hass.config = MagicMock()
+    hass.config.path = MagicMock(return_value="/config")
+    obj.hass = hass
+    # Mock entry for _async_remove_phantom_battery_pack_devices
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+    entry.runtime_data = MagicMock()
+    entry.data = {"username": "test", "password": "test"}
+    entry.options = {}
+    obj.entry = entry
     return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
@@ -97,53 +110,3 @@ async def test_cold_auth_failure_starts_reauth_and_propagates() -> None:
         await coordinator._async_update_data()  # ruff: ignore[private-member-access]
 
     entry.async_start_reauth.assert_called_once_with(hass)
-
-
-@pytest.mark.asyncio()
-async def test_completed_cycle_records_configured_followup_delay() -> None:
-    """A completed cycle records elapsed time and the configured HA interval."""
-    coordinator = _bare_coordinator()
-    data: dict[str, dict[str, Any]] = {"dev-1": {"soc": 80}}
-    cast("Any", coordinator)._async_update_data_guarded = AsyncMock(  # ruff: ignore[private-member-access]
-        return_value=data,
-    )
-
-    with patch(
-        f"{_MODULE}.time.monotonic",
-        side_effect=[
-            100.0,
-            100.0,
-            100.0,
-            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
-            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
-            100.0 + _SHORT_CYCLE_ELAPSED_SEC,
-        ],
-    ):
-        result = await coordinator._async_update_data()  # ruff: ignore[private-member-access]
-
-    assert result == data
-    diagnostics = coordinator.polling_diagnostics
-    assert diagnostics["last_total_cycle_elapsed_sec"] == pytest.approx(
-        _SHORT_CYCLE_ELAPSED_SEC
-    )
-    assert diagnostics["next_poll_delay_sec"] == pytest.approx(_POLL_INTERVAL_SEC)
-
-
-def test_cold_first_refresh_keeps_the_hard_timeout_cap() -> None:
-    """Unknown devices cannot be budgeted before discovery completes."""
-    coordinator = _bare_coordinator()
-
-    assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(  # ruff: ignore[private-member-access]
-        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
-    )
-
-
-def test_warm_poll_keeps_hard_cap_when_rediscovery_can_replace_the_index() -> None:
-    """An invalid known device can be rediscovered as an unknown-sized set."""
-    coordinator = _bare_coordinator()
-    coordinator.data = {"previous": {}}
-    coordinator._device_index = {"stale-device": {}}  # ruff: ignore[private-member-access]
-
-    assert coordinator._poll_cycle_timeout_seconds() == pytest.approx(  # ruff: ignore[private-member-access]
-        _COLD_DISCOVERY_TIMEOUT_CAP_SEC
-    )

@@ -1,7 +1,7 @@
 """Focused behavioral coverage for sensor payload and registration boundaries."""
 
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,6 +19,7 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.descriptions.sensor import (
     JackerySensorDescription,
 )
+from custom_components.jackery_solarvault.guards import guard_total_increasing_jitter
 from custom_components.jackery_solarvault.util import payload_has_home_payload_evidence
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -26,6 +27,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfEnergy
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 @pytest.mark.parametrize(
@@ -215,7 +219,7 @@ def test_total_increasing_jitter_guard_preserves_only_tiny_regressions(
 ) -> None:
     """Lifetime totals hold regressions, while ordinary measurements pass."""
     assert (
-        sensor_module._guard_total_increasing_jitter(previous, current, description)  # ruff: ignore[private-member-access]
+        guard_total_increasing_jitter(previous, current, description)
         == expected
     )
 
@@ -312,7 +316,9 @@ def test_battery_stack_source_reports_resolved_live_properties() -> None:
     assert sensor.extra_state_attributes["battery_pack_outPw_sum"] == 21  # ruff: ignore[magic-value-comparison]
 
 
-async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> None:
+async def test_sensor_registration_is_stable_and_adds_new_dynamic_family(
+    hass: HomeAssistant,
+) -> None:
     """Unchanged callbacks add nothing; new authorized dynamic-price data adds once."""
     coordinator = MagicMock(name="coordinator")
     coordinator.data = {"dev-1": {PAYLOAD_PROPERTIES: {}, PAYLOAD_SYSTEM: {}}}
@@ -326,6 +332,7 @@ async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> No
     coordinator.async_add_listener.side_effect = _listen
     coordinator.has_smart_meter_accessory.return_value = False
     entry = SimpleNamespace(
+        entry_id="test-entry",
         data={},
         options={},
         runtime_data=coordinator,
@@ -334,7 +341,7 @@ async def test_sensor_registration_is_stable_and_adds_new_dynamic_family() -> No
     batches: list[list[Any]] = []
 
     await cast("Any", sensor_module.async_setup_entry)(
-        None, entry, lambda entities: batches.append(list(entities))
+        hass, entry, lambda entities: batches.append(list(entities))
     )
     assert len(batches) == 1
     assert listeners

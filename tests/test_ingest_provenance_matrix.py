@@ -353,3 +353,26 @@ def test_provenance_metadata_never_leaks_into_entity_payload() -> None:
     assert "observed_at" not in result.payload
     assert "request_id" not in result.payload
     assert result.provenance[_FIELD].request_id == "mqtt-42"
+
+
+def test_stale_frame_fills_blank_fields_but_keeps_populated_unknown_age() -> None:
+    """A retained hours-old frame never overwrites, but is never pre-dropped.
+
+    The age rule lives in ingest per field: a populated value of unknown age
+    stays, a blank field is filled from the late frame.
+    """
+    stale = datetime.now(UTC) - timedelta(hours=6)
+    result = ingest_observation(
+        Observation(
+            source=DataSource.CLOUD_MQTT,
+            device_id=_DEVICE_ID,
+            section=_SECTION,
+            payload={_FIELD: _OLD_VALUE, "batSoc": 40},
+            observed_at=stale,
+        ),
+        current={_FIELD: _NEW_VALUE},
+        provenance={},
+        freshness_window_seconds=60.0,
+    )
+    assert result.payload[_FIELD] == _NEW_VALUE
+    assert result.payload["batSoc"] == 40  # ruff: ignore[magic-value-comparison]

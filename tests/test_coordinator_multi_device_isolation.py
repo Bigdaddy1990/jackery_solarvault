@@ -24,6 +24,7 @@ runs for real.
 """
 
 import asyncio
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -157,7 +158,9 @@ async def test_symmetry_backoff_does_not_suppress_sibling_device(
     # stubbed out rather than left to schedule a real, unawaited task.
     monkeypatch.setattr(coordinator, "async_request_refresh", AsyncMock())
 
-    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+    snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+    coordinator.async_set_updated_data(snapshot)
+    await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
     assert "task" in captured, "the slow-metrics background refresh was not launched"
     await captured["task"]
 

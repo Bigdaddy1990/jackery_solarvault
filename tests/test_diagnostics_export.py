@@ -8,11 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.jackery_solarvault import coordinator as co, util as util_module
+from custom_components.jackery_solarvault import coordinator as co
 from custom_components.jackery_solarvault.client.local_mqtt import (
     JackeryLocalMqttClient,
 )
 from custom_components.jackery_solarvault.const import (
+    CONF_ENABLE_UNREDACTED_DEBUG,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -338,6 +339,69 @@ async def test_export_raw_api_app_chart_import_empty_when_no_devices() -> None:
     assert result["raw_api"]["app_chart_import"]["devices"] == {}
 
 
+@pytest.mark.asyncio()
+async def test_app_chart_import_reports_nonzero_scalar_without_series() -> None:
+    """A real scalar the recorder never receives is surfaced for diagnosability.
+
+    A NON-zero scalar without a curve is a value the integration discards
+    because a scalar cannot establish when the energy occurred. Users must be
+    able to tell that apart from a cloud zero-shell, which carries no value.
+    """
+    day_section = "device_battery_stat_day"
+    coordinator, entry = _diagnostics_rig(
+        coordinator_data={
+            "device_1": {
+                day_section: {
+                    "unit": "W",
+                    "batOtGridEgy": "0.01",
+                    "y1": [0.0] * 4,
+                    "y2": [5.0, 5.0, 4.0, 4.0],
+                },
+            },
+        },
+    )
+
+    result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
+
+    discarded = result["raw_api"]["app_chart_import"]["discarded_scalar_without_series"]
+    assert discarded["count"] >= 1
+    entry_row = next(
+        item for item in discarded["entries"] if item["stat_key"] == "batOtGridEgy"
+    )
+    assert entry_row["scalar_total"] == pytest.approx(0.01)
+    assert entry_row["unit"] == "W"
+    assert entry_row["section"] == day_section
+
+
+@pytest.mark.asyncio()
+async def test_app_chart_import_ignores_zero_scalar_zero_shell() -> None:
+    """A zero scalar without a curve is a cloud zero-shell, not a discarded value.
+
+    Reporting it would fire on every CT/EPS period that legitimately carries no
+    energy, drowning the signal from genuine discard cases.
+    """
+    day_section = "device_ct_stat_day"
+    coordinator, entry = _diagnostics_rig(
+        coordinator_data={
+            "device_1": {
+                day_section: {
+                    "unit": "kWh",
+                    "totalInCtEnergy": "0",
+                    "totalOutCtEnergy": "0",
+                    "y1": [],
+                    "y2": [],
+                },
+            },
+        },
+    )
+
+    result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
+
+    discarded = result["raw_api"]["app_chart_import"]["discarded_scalar_without_series"]
+    assert discarded["count"] == 0
+    assert discarded["entries"] == []
+
+
 # ---------------------------------------------------------------------------
 # local_mqtt sub-section
 # ---------------------------------------------------------------------------
@@ -464,6 +528,26 @@ async def test_local_mqtt_diagnostics_uses_registered_client_snapshot() -> None:
     client.diagnostics_snapshot.assert_called_once_with()
 
 
+@pytest.mark.asyncio()
+async def test_entry_raw_option_unredacts_local_mqtt_snapshot() -> None:
+    """Local MQTT topics are requested unredacted for this entry's export."""
+    client = MagicMock(spec=JackeryLocalMqttClient)
+    client.diagnostics_snapshot.return_value = {"last_topic": "hb/device/serial/status"}
+    coordinator, entry = _diagnostics_rig(
+        options={
+            CONF_ENABLE_UNREDACTED_DEBUG: True,
+            CONF_THIRD_PARTY_MQTT_ENABLE: True,
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.10",
+        },
+        hass_data={DOMAIN: {_ENTRY_ID: {LOCAL_MQTT_RUNTIME_KEY: client}}},
+    )
+
+    result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
+
+    assert result["raw_api"]["local_mqtt"]["last_topic"] == ("hb/device/serial/status")
+    client.diagnostics_snapshot.assert_called_once_with(redact=False)
+
+
 # ---------------------------------------------------------------------------
 # mandatory redaction paths
 # ---------------------------------------------------------------------------
@@ -520,12 +604,64 @@ async def test_legacy_unredacted_option_cannot_disable_export_redaction() -> Non
 
 
 @pytest.mark.asyncio()
-async def test_dev_mode_environment_cannot_disable_export_redaction(
+async def test_dev_mode_environment_disables_export_redaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """JACKERY_DEV_MODE never turns a shareable diagnostics export into raw data."""
-    monkeypatch.setattr(util_module, "_DEV_MODE_CACHED", None, raising=False)
+    """JACKERY_DEV_MODE exports complete, unredacted data (never share it).
+
+    docs/source-of-truth/diagnostics.md: "DEV_MODE wieder funktional machen";
+    docs/html/diagnostics.html describes redactions_disabled + dev_mode source.
+    """
     monkeypatch.setenv("JACKERY_DEV_MODE", "1")
+    token = "env-token-secret"
+    broker_secret = "env-broker-secret"
+    coordinator, entry = _diagnostics_rig(
+        data={
+            FIELD_TOKEN: token,
+            "nested": {"mqttPassWord": broker_secret},
+        },
+        options={CONF_THIRD_PARTY_MQTT_PASSWORD: broker_secret},
+    )
+
+    result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
+
+    exported = json.dumps(result, default=str)
+    assert token in exported
+    assert broker_secret in exported
+    metadata = result["raw_api"]["coordinator"]
+    assert metadata["redactions_enforced"] is False
+    assert metadata["dev_mode"] == "JACKERY_DEV_MODE=1"
+
+
+@pytest.mark.asyncio()
+async def test_entry_option_disables_export_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The options-flow debug switch exposes complete payloads for one entry."""
+    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
+    coordinator, entry = _diagnostics_rig(
+        options={CONF_ENABLE_UNREDACTED_DEBUG: True},
+        data={FIELD_TOKEN: "entry-token-secret"},
+        coordinator_data={"device-secret": {"bluetoothKey": "entry-ble-secret"}},
+    )
+
+    result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
+
+    rendered = json.dumps(result, default=str)
+    assert "entry-token-secret" in rendered
+    assert "entry-ble-secret" in rendered
+    assert "device-secret" in result["devices"]
+    metadata = result["raw_api"]["coordinator"]
+    assert metadata["redactions_enforced"] is False
+    assert metadata["dev_mode"] == "options.enable_unredacted_debug"
+
+
+@pytest.mark.asyncio()
+async def test_export_stays_redacted_without_dev_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without JACKERY_DEV_MODE the export keeps mandatory redaction."""
+    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
     token = "env-token-secret"
     broker_secret = "env-broker-secret"
     coordinator, entry = _diagnostics_rig(

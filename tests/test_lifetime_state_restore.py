@@ -25,9 +25,10 @@ from custom_components.jackery_solarvault.sensor import (
     JackeryStatSensor,
     _StatCacheSnapshot,  # ruff: ignore[import-private-name]
     _async_restored_lifetime_energy_value,  # ruff: ignore[import-private-name]
+    _async_restored_pack_measurement_value,  # ruff: ignore[import-private-name]
 )
 from homeassistant.components.sensor import SensorExtraStoredData
-from homeassistant.const import UnitOfEnergy
+from homeassistant.const import ATTR_RESTORED, UnitOfEnergy, UnitOfPower
 
 _DEVICE_ID = "dev-1"
 
@@ -102,13 +103,13 @@ def test_system_lifetime_restore_is_replaced_by_real_transport_value() -> None:
         _StatCacheSnapshot(None, {"source_section": "properties"}, "properties")
     )
     assert sensor.native_value == pytest.approx(54.25)
-    assert sensor.extra_state_attributes["restored"] is True
+    assert sensor.extra_state_attributes["value_restored"] is True
 
     sensor._apply_cache_snapshot(  # ruff: ignore[private-member-access]
         _StatCacheSnapshot(55.0, {"source_section": "properties"}, "properties")
     )
     assert sensor.native_value == pytest.approx(55.0)
-    assert "restored" not in sensor.extra_state_attributes
+    assert "value_restored" not in sensor.extra_state_attributes
 
 
 def test_pack_lifetime_restore_is_replaced_by_real_transport_value() -> None:
@@ -137,14 +138,65 @@ def test_pack_lifetime_restore_is_replaced_by_real_transport_value() -> None:
 
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     assert sensor.native_value == pytest.approx(26.523)
-    assert mutable._cached_attrs["restored"] is True  # ruff: ignore[private-member-access]
+    assert mutable._cached_attrs["value_restored"] is True  # ruff: ignore[private-member-access]
 
     mutable.coordinator.data[_DEVICE_ID][PAYLOAD_BATTERY_PACKS][0][FIELD_IN_EGY] = (
         26_600
     )
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     assert sensor.native_value == pytest.approx(266.0)
-    assert "restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+    assert "value_restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_pack_power_restore_reads_stored_watt_value() -> None:
+    """An unchanged pack power value can survive a restart."""
+    entity = SimpleNamespace(
+        async_get_last_sensor_data=lambda: _async_value(
+            SensorExtraStoredData(23.9, UnitOfPower.WATT)
+        )
+    )
+
+    restored = await _async_restored_pack_measurement_value(
+        cast("Any", entity),
+        UnitOfPower.WATT,
+    )
+
+    assert restored == pytest.approx(23.9)
+
+
+def test_pack_temperature_requires_a_current_frame() -> None:
+    """An old HA value must not masquerade as a current pack temperature."""
+    sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+    mutable = cast("Any", sensor)
+    mutable.coordinator = SimpleNamespace(
+        data={
+            _DEVICE_ID: {
+                PAYLOAD_BATTERY_PACKS: [{FIELD_DEVICE_SN: "PACK-1", "inPw": 0}],
+            }
+        }
+    )
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._pack_index = 1  # ruff: ignore[private-member-access]
+    mutable._pack_sn = "PACK-1"  # ruff: ignore[private-member-access]
+    mutable._pack_key = "battery_pack_pack_1"  # ruff: ignore[private-member-access]
+    mutable.entity_description = next(
+        item
+        for item in BATTERY_PACK_SENSOR_DESCRIPTIONS
+        if item.key == "cell_temperature"
+    )
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._restored_lifetime_value = 23.9  # ruff: ignore[private-member-access]
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value is None
+    assert "value_restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+
+    mutable.coordinator.data[_DEVICE_ID][PAYLOAD_BATTERY_PACKS][0]["cellTemp"] = 251
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(25.1)
+    assert "value_restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
 
 
 def test_smart_meter_lifetime_restore_is_replaced_by_real_transport_value() -> None:
@@ -164,14 +216,14 @@ def test_smart_meter_lifetime_restore_is_replaced_by_real_transport_value() -> N
 
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     assert sensor.native_value == pytest.approx(77.92)
-    assert mutable._cached_attrs["restored"] is True  # ruff: ignore[private-member-access]
+    assert mutable._cached_attrs["value_restored"] is True  # ruff: ignore[private-member-access]
 
     mutable.coordinator.data[_DEVICE_ID][PAYLOAD_CT_METER] = {
         FIELD_CT_TOTAL_PHASE_ENERGY: 78_000,
     }
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     assert sensor.native_value == pytest.approx(78.0)
-    assert "restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+    assert "value_restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
 
 
 def test_smart_plug_lifetime_restore_is_replaced_by_real_transport_value() -> None:
@@ -198,4 +250,36 @@ def test_smart_plug_lifetime_restore_is_replaced_by_real_transport_value() -> No
     ]
     sensor._refresh_cache()  # ruff: ignore[private-member-access]
     assert sensor.native_value == pytest.approx(12.6)
-    assert "restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+    assert "value_restored" not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+
+
+def test_restored_value_never_uses_the_ha_reserved_attribute() -> None:
+    """Never mark a restored value with HA's reserved ``restored`` attribute.
+
+    Live 2026-09-28: the frontend showed a restored pack value as "no
+    longer provided by jackery_solarvault" — ``restored`` is HA's marker for
+    orphaned registry placeholders (ATTR_RESTORED).
+    """
+    sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+    mutable = cast("Any", sensor)
+    mutable.coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {PAYLOAD_BATTERY_PACKS: [{FIELD_DEVICE_SN: "PACK-1"}]}}
+    )
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._pack_index = 1  # ruff: ignore[private-member-access]
+    mutable._pack_sn = "PACK-1"  # ruff: ignore[private-member-access]
+    mutable._pack_key = "battery_pack_pack_1"  # ruff: ignore[private-member-access]
+    mutable.entity_description = next(
+        item
+        for item in BATTERY_PACK_SENSOR_DESCRIPTIONS
+        if item.key == "charge_power"
+    )
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cached_attrs = {}  # ruff: ignore[private-member-access]
+    mutable._restored_lifetime_value = 16.7  # ruff: ignore[private-member-access]
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+
+    assert sensor.native_value == pytest.approx(16.7)
+    assert ATTR_RESTORED not in mutable._cached_attrs  # ruff: ignore[private-member-access]
+    assert mutable._cached_attrs["value_restored"] is True  # ruff: ignore[private-member-access]

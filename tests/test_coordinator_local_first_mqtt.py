@@ -200,11 +200,6 @@ async def test_connected_but_silent_local_client_does_not_pause_cloud(
     """
     coordinator = _live_local_coordinator()
     coordinator._local_mqtt_last_message_monotonic = float("-inf")  # ruff: ignore[private-member-access]
-    monkeypatch.setattr(
-        type(coordinator),
-        "_local_mqtt_direct_client_connected",
-        lambda _self: True,
-    )
 
     assert coordinator._local_mqtt_is_active() is False  # ruff: ignore[private-member-access]
 

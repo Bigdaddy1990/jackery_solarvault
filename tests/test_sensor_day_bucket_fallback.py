@@ -47,6 +47,8 @@ if TYPE_CHECKING:
 _DEVICE_ID = "dev-home-1"
 _DEVICE_SN = "SN-HOME-0001"
 _TODAY_BUCKET_KWH = 3.4
+# Deliberately period-sized: a borrowed month bucket must never win.
+_MONTH_BUCKET_DECOY_KWH = 999.0
 _DAY_SECTION = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}"
 _MONTH_SECTION = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}"
 
@@ -262,11 +264,17 @@ async def test_day_period_sensor_rejects_lagging_cloud_scalar_when_local_delta_i
     assert state.attributes["fallback"] == "local_lifetime_delta"
 
 
-async def test_day_period_sensor_never_integrates_day_power_curve_over_scalar(
+async def test_day_period_sensor_uses_curve_over_lagging_smaller_scalar(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """The dateType=day watt curve never replaces the dated scalar."""
+    """A complete day watt curve beats a smaller, lagging dated scalar.
+
+    Live 2026-09: ``pv1_tagesenergie`` showed the broken cloud day value
+    (18.09.: 0.30 kWh) while the 5-minute curve integrates to 1.85 kWh. The
+    curve was first shrunk to the scalar, so the "curve wins when larger"
+    rule in ``_initial_period_state`` could never fire.
+    """
     entry = night_setup
     coordinator = entry.runtime_data
     payload = _night_payload(hass)
@@ -287,16 +295,46 @@ async def test_day_period_sensor_never_integrates_day_power_curve_over_scalar(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "0.1"
+    # 12 000 W over one 5-minute sample = 1.0 kWh > lagging scalar 0.1 kWh.
+    assert state.state == "1.0"
     assert state.attributes["source_section"] == _DAY_SECTION
+    assert state.attributes["fallback"] == "integrated_current_day_power_curve"
     assert "day_power_curve_has_activity" not in state.attributes
 
 
-async def test_day_period_sensor_is_unavailable_without_todays_bucket(
+async def test_pv1_day_sensor_rejects_lifetime_scalar_from_current_http_payload(
     hass: HomeAssistant,
     night_setup: MockConfigEntry,
 ) -> None:
-    """Without today's bucket the stable sensor identity is unavailable.
+    """PV1 day energy uses its W curve when the raw scalar is a lifetime offset."""
+    coordinator = night_setup.runtime_data
+    payload = _night_payload(hass)
+    today = _local_today(hass)
+    payload[_DEVICE_ID][_DAY_SECTION] = {
+        "totalSolarEnergy": "2.89",
+        "pv1Egy": 120431.96,
+        "unit": "W",
+        "y": [1000] * 12,
+        "y1": [1000] * 12,
+        APP_REQUEST_META: {
+            APP_REQUEST_BEGIN_DATE: today.isoformat(),
+            APP_REQUEST_END_DATE: today.isoformat(),
+        },
+    }
+    coordinator.async_set_updated_data(payload)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    state = hass.states.get(_entity_id_for(hass, "device_pv1_day_energy"))
+    assert state is not None
+    assert state.state == "1.0"
+    assert state.attributes["fallback"] == "integrated_current_day_power_curve"
+
+
+async def test_day_period_sensor_is_unknown_without_todays_bucket(
+    hass: HomeAssistant,
+    night_setup: MockConfigEntry,
+) -> None:
+    """Without today's bucket the reachable sensor reports unknown.
 
     A stale month chart (yesterday's range) must not leak an old bucket
     into today's value — the midnight-race guard semantics stay intact.
@@ -321,7 +359,7 @@ async def test_day_period_sensor_is_unavailable_without_todays_bucket(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "unavailable"
+    assert state.state == "unknown"
 
 
 async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
@@ -351,7 +389,7 @@ async def test_day_period_sensor_ignores_raw_lifetime_counter_fallback(
     state = hass.states.get(entity_id)
 
     assert state is not None
-    assert state.state == "unavailable"
+    assert state.state == "unknown"
 
 
 async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
@@ -386,3 +424,61 @@ async def test_day_period_sensor_uses_local_lifetime_delta_in_kwh(
     assert state is not None
     assert state.state == "35.8"
     assert state.attributes["fallback"] == "local_lifetime_delta"
+
+
+async def test_day_period_sensor_uses_own_curve_before_borrowed_month_bucket(
+    hass: HomeAssistant,
+    night_setup: MockConfigEntry,
+) -> None:
+    """The day payload's own curve outranks a bucket borrowed from another period.
+
+    The day stat sections carry their energy as five-minute power curves, not as
+    the ``pv1Egy``-style scalars that only week/month/year sections provide. When
+    the scalar is absent the sensor must integrate its OWN curve rather than
+    borrow a month/week chart bucket — a borrowed bucket is a PERIOD value and
+    would be misread as a day value (a month total attributed to one day).
+
+    Observed live: ``sensor.solarvault_3_pro_max_pv1_tagesenergie`` showed 6 of
+    129 days, each a month-sized value on a month boundary, because the month
+    bucket won over the day's own curve.
+    """
+    entry = night_setup
+    coordinator = entry.runtime_data
+    payload = _night_payload(hass)
+    today = _local_today(hass)
+    # No ``totalSolarEnergy`` scalar in the day section, exactly as the cloud
+    # returns it: only the 5-minute watt curve is present.
+    payload[_DEVICE_ID][_DAY_SECTION] = {
+        APP_CHART_SERIES_Y: [1000.0] * 12,
+        "unit": "w",
+        APP_REQUEST_META: {
+            APP_REQUEST_BEGIN_DATE: today.isoformat(),
+            APP_REQUEST_END_DATE: today.isoformat(),
+        },
+    }
+    # A month chart carrying a much larger period value would previously win.
+    month_begin = today.replace(day=1)
+    payload[_DEVICE_ID][_MONTH_SECTION] = {
+        APP_CHART_SERIES_Y: [_MONTH_BUCKET_DECOY_KWH] * (today - month_begin).days,
+        APP_REQUEST_META: {
+            APP_REQUEST_BEGIN_DATE: month_begin.isoformat(),
+            APP_REQUEST_END_DATE: today.isoformat(),
+        },
+    }
+    coordinator.async_set_updated_data(payload)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    entity_id = _entity_id_for(hass, "device_today_pv_energy")
+    state = hass.states.get(entity_id)
+
+    assert state is not None
+    # The value comes from the day curve, never from the borrowed month bucket
+    # (which would have been 999.0). Assert the property, not a hand-computed
+    # constant: the exact kWh depends on how many 5-minute slots fall before
+    # the fixture's ``now``.
+    assert float(state.state) > 0
+    assert float(state.state) < _MONTH_BUCKET_DECOY_KWH
+    # The borrowed month bucket must not have been used.
+    assert state.attributes.get("fallback") != (
+        f"current_day_bucket_from_{_MONTH_SECTION}"
+    )

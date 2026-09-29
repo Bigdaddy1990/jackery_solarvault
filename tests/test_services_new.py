@@ -40,9 +40,8 @@ def _make_coordinator() -> AsyncMock:
 
 
 def _make_service_call(data: dict[str, Any]) -> SimpleNamespace:
-    call = SimpleNamespace()
-    call.data = data
-    return call
+    # Mirror ServiceCall: domain and service are always set.
+    return SimpleNamespace(domain="jackery_solarvault", service="test", data=data)
 
 
 async def _async_setup_services(hass: SimpleNamespace) -> None:

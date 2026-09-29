@@ -112,6 +112,27 @@ async def test_broker_refused_subscription_is_not_reported_as_healthy() -> None:
 
 
 @pytest.mark.asyncio()
+async def test_optional_jackery_topic_refusal_keeps_configured_subscription() -> None:
+    """An ACL refusal for one extra device topic must not stop local MQTT."""
+    client = _client("homeassistant")
+    broker = cast("Any", MagicMock())
+    broker.subscribe = AsyncMock(side_effect=[(0,), (0x80,), (0,)])
+
+    async def _messages() -> Any:  # ruff: ignore[unused-async]
+        if False:
+            yield None
+
+    broker.messages = _messages()
+    await client._async_consume_session(  # ruff: ignore[private-member-access]
+        broker, list(client._topic_filters)  # ruff: ignore[private-member-access]
+    )
+    assert client._subscribed_topics == {  # ruff: ignore[private-member-access]
+        "homeassistant/#",
+        "hb/device/+/status",
+    }
+
+
+@pytest.mark.asyncio()
 async def test_broker_acl_refusal_marks_configuration_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -124,6 +145,34 @@ async def test_broker_acl_refusal_marks_configuration_error(
     broker = MagicMock()
     broker.__aenter__ = AsyncMock(
         side_effect=MqttError("broker refused the subscription to 'x'")
+    )
+    broker.__aexit__ = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.client.local_mqtt.MqttClient",
+        MagicMock(return_value=broker),
+    )
+
+    connected = await client._async_run_session()  # ruff: ignore[private-member-access]
+
+    assert connected is False
+    assert client._configuration_error is True  # ruff: ignore[private-member-access]
+    assert str(client._last_error).startswith("CONFIG_ERROR")  # ruff: ignore[private-member-access]
+
+
+@pytest.mark.asyncio()
+async def test_connack_135_not_authorized_marks_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A CONNACK code 135 (Not authorized) is a credential/ACL problem.
+
+    ``aiomqtt`` raises ``MqttConnectError`` with the broker's reason code on
+    a bad username/password or client-id ACL. This is not a transient
+    network glitch, so the supervisor must stop instead of retrying forever.
+    """
+    client = _client("homeassistant/#")
+    broker = MagicMock()
+    broker.__aenter__ = AsyncMock(
+        side_effect=MqttError("MqttConnectError: [code:135] Not authorized")
     )
     broker.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(
@@ -192,12 +241,14 @@ def test_concrete_local_topic_is_not_silently_broadened(topic: str) -> None:
 
 
 @pytest.mark.parametrize("topic", ["homeassistant", "homeassistant/#"])
-def test_discovery_prefix_also_receives_official_jackery_device_topics(
-    topic: str,
-) -> None:
-    """Discovery traffic must not be the only subscribed protocol tree."""
+def test_discovery_prefix_also_subscribes_to_jackery_telemetry(topic: str) -> None:
+    """The HA root remains configured while native device reports are ingested."""
     client = _client(topic)
-    assert client._topic_filters == ("homeassistant/#", "hb/device/#")  # ruff: ignore[private-member-access]
+    assert client._topic_filters == (  # ruff: ignore[private-member-access]
+        "homeassistant/#",
+        "hb/device/+/event",
+        "hb/device/+/status",
+    )
 
 
 def test_explicit_wildcard_local_topic_is_not_broadened() -> None:

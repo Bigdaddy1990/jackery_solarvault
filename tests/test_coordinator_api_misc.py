@@ -9,7 +9,6 @@ and — where the code does it — the refresh / guard / systemId behavior.
 """
 
 import asyncio
-import time
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -25,10 +24,6 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 _DEVICE = "573702884982521856"
 _SENTINEL: dict[str, Any] = {"ok": True, "value": 42}
-# Mirror of coordinator._ACCESSORIES_SYNC_BACKOFF_KEY. Duplicated as a literal
-# rather than imported to avoid a private-name import; drift is caught because
-# the assertion below would then fail.
-_ACCESSORIES_SYNC_BACKOFF_KEY = "accessories_sync"
 
 
 def _coordinator(*, home_config: bool = False) -> JackerySolarVaultCoordinator:
@@ -424,34 +419,39 @@ async def test_sync_alerts_refreshes_and_returns() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_accessory_sync_backs_off_after_persistent_10600() -> None:
-    """A persistent code=10600 stops the discovery-cadence accessory sync spam.
+async def test_accessory_enumeration_reads_list_and_never_posts_sync() -> None:
+    """Discovery reads accessories/list only and returns its failures.
 
-    ``synchronizeSmartAccessoriesData`` is a genuine POST, but accounts without
-    smart accessories get code=10600 on every discovery cycle. The call is
-    routed through the shared endpoint-backoff ladder so it fires once, opens a
-    window, and is suppressed on the next cycle instead of re-firing (and
-    re-logging) forever. The HTTP verb is unchanged.
+    ``synchronizeSmartAccessoriesData`` uploads device-reported sub-devices (app
+    ``HomeDeviceController`` posts a ``RequestTypeBean`` array); the former empty
+    POST was rejected with code=10600 on every discovery cycle.
     """
     coordinator = _coordinator()
-    obj = cast("Any", coordinator)
-    obj._endpoint_backoff = {}  # ruff: ignore[private-member-access]
     api = _api(coordinator)
-    api.async_sync_smart_accessories = AsyncMock(
-        side_effect=JackeryApiError("code=10600 msg=''"),
-    )
-    api.async_get_accessories_list = AsyncMock(return_value=[])
-    obj._overlay_http_accessories = MagicMock()  # ruff: ignore[private-member-access]
+    api.async_sync_smart_accessories = AsyncMock()
+    failure = JackeryApiError("code=500 msg='down'")
+    api.async_get_accessories_list = AsyncMock(side_effect=failure)
     index: dict[str, dict[str, Any]] = {_DEVICE: {PAYLOAD_SYSTEM: {}}}
 
-    await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
-    await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
+    failures = await coordinator._async_enumerate_http_accessories(index)  # ruff: ignore[private-member-access]
 
-    assert api.async_sync_smart_accessories.await_count == 1
-    assert (
-        coordinator._endpoint_backoff_active(  # ruff: ignore[private-member-access]
-            _ACCESSORIES_SYNC_BACKOFF_KEY,
-            time.monotonic(),
-        )
-        is True
+    api.async_sync_smart_accessories.assert_not_awaited()
+    api.async_get_accessories_list.assert_awaited_once_with(_DEVICE)
+    assert failures == [failure]
+
+
+@pytest.mark.asyncio()
+async def test_refresh_subdevices_surfaces_accessory_list_failure() -> None:
+    """The explicit refresh action fails loudly instead of succeeding silently."""
+    coordinator = _coordinator(home_config=True)
+    obj = cast("Any", coordinator)
+    obj._shutdown_started = False  # ruff: ignore[private-member-access]
+    obj._device_index = {_DEVICE: {}}  # ruff: ignore[private-member-access]
+    _api(coordinator).async_get_accessories_list = AsyncMock(
+        side_effect=JackeryApiError("code=500 msg='down'"),
     )
+
+    with pytest.raises(JackeryApiError, match="code=500"):
+        await coordinator.async_refresh_subdevices(context_device_id=_DEVICE)
+
+    obj.async_request_refresh.assert_not_awaited()

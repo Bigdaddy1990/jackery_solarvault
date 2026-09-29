@@ -11,7 +11,7 @@ cloud channel.
 
 import inspect
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -316,13 +316,6 @@ def test_local_mqtt_inactive_without_any_message() -> None:
     coordinator = _bare_coordinator()
 
     assert coordinator._local_mqtt_is_active(time.monotonic()) is False  # ruff: ignore[private-member-access]
-
-
-def test_direct_client_connected_false_without_runtime() -> None:
-    """Missing hass/entry runtime means no direct local client session."""
-    coordinator = _bare_coordinator()
-
-    assert cast("Any", coordinator)._local_mqtt_direct_client_connected() is False  # ruff: ignore[private-member-access]
 
 
 # --- unsupported endpoints (code=10600) back off instead of spamming ---------

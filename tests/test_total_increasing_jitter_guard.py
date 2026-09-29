@@ -55,7 +55,6 @@ def _set_ct_counter(sensor: JackerySmartMeterSensor, value_wh: int) -> None:
 @pytest.mark.parametrize(
     ["key", "first_wh", "second_wh", "expected"],
     [
-        ["grid_import_energy", 77_915, 77_913, 77.92],
         ["lifetime_import_energy", 77_915, 77_913, 77.92],
     ],
 )

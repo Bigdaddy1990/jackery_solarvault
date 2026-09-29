@@ -14,8 +14,6 @@ from custom_components.jackery_solarvault.const import (
     APP_SECTION_CT_STAT,
     APP_SECTION_HOME_STAT,
     APP_SECTION_PV_STAT,
-    APP_STAT_TOTAL_CT_INPUT_ENERGY,
-    APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
     APP_STAT_TOTAL_IN_GRID_ENERGY,
     APP_STAT_TOTAL_OUT_GRID_ENERGY,
     APP_STAT_TOTAL_SOLAR_ENERGY,
@@ -163,7 +161,7 @@ def test_year_period_sensor_uses_positive_scalar_when_chart_is_zero_placeholder(
         ],
     ],
 )
-def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(  # ruff: ignore[too-many-arguments, too-many-positional-arguments]
+def test_ct_period_never_borrows_device_grid_side_when_ct_chart_is_empty(  # ruff: ignore[too-many-arguments, too-many-positional-arguments]
     description_key: str,
     date_type: Literal["day", "week", "month", "year"],
     fallback_stat_key: str,
@@ -171,28 +169,21 @@ def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(  # ru
     end_date: str,
     expected: float,
 ) -> None:
-    """A successful but empty CT chart falls back to the populated grid period."""
+    """An empty CT chart stays missing; ``device/stat/onGrid`` is another boundary.
+
+    ``docs/APP_POLLING_MQTT.md`` separates ``device/stat/onGrid`` (device grid
+    side) from ``device/stat/ct`` (smart-meter / public-grid boundary).  The
+    coordinator drops an L1+L2-empty CT chart to ``{}`` (diagnostics export
+    2026-09-24), so the CT sensor must not report the device's own grid-side
+    energy as public-grid import/export.
+    """
     ct_section = f"{APP_SECTION_CT_STAT}_{date_type}"
     home_section = f"{APP_SECTION_HOME_STAT}_{date_type}"
     description = next(
         item for item in STAT_DESCRIPTIONS if item.key == description_key
     )
-    primary_stat_key = (
-        APP_STAT_TOTAL_CT_INPUT_ENERGY
-        if description_key.startswith("ct_input_")
-        else APP_STAT_TOTAL_CT_OUTPUT_ENERGY
-    )
     payload = {
-        ct_section: {
-            primary_stat_key: "0",
-            "y1": [],
-            "y2": [],
-            APP_REQUEST_META: {
-                APP_REQUEST_DATE_TYPE_ALT: date_type,
-                APP_REQUEST_BEGIN_DATE_ALT: begin_date,
-                APP_REQUEST_END_DATE_ALT: end_date,
-            },
-        },
+        ct_section: {},
         home_section: {
             fallback_stat_key: str(expected),
             APP_REQUEST_META: {
@@ -215,5 +206,6 @@ def test_ct_period_uses_verified_system_grid_total_when_ct_chart_is_empty(  # ru
 
     snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
 
-    assert snapshot.native_value == pytest.approx(expected)
-    assert snapshot.attrs["source_section"] == home_section
+    assert snapshot.native_value is None
+    assert snapshot.attrs.get("source_section") != home_section
+    assert all(section != home_section for section, _ in description.fallback_sources)

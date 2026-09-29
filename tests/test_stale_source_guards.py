@@ -101,21 +101,12 @@ def test_system_info_cache_expires_instead_of_lying(
     assert "workModel" not in filled
 
 
-async def test_system_info_query_skipped_when_only_ble_is_live() -> None:
-    """A live BLE listener alone cannot carry the SystemBody query.
-
-    Both queries this path dispatches -- cmd 106 (QueryDeviceProperty) and
-    cmd 120 (QueryCombineData) -- are listed in `_BLE_UNSUPPORTED_MSG_TYPES`,
-    so BLE is never a candidate transport for them. An earlier revision opened
-    the gate on the BLE listener alone ("BLE-first"), after which transport
-    selection dropped BLE as unsupported and cloud MQTT as unavailable, then
-    logged the resulting empty transport set as an ERROR on every cycle
-    (observed live 2026-09-02 08:22:50, actionId=3011/3019). Skipping is the
-    correct behaviour: there is nothing to send.
-    """
+async def test_system_info_queries_use_ble_without_cloud_mqtt() -> None:
+    """Read queries still run when BLE is the only usable command transport."""
     coordinator = _bare_coordinator(None)
     coordinator._mqtt = None  # ruff: ignore[private-member-access]
     coordinator._ble_listener = SimpleNamespace()  # ruff: ignore[private-member-access]
+    cast("Any", coordinator)._ble_writes_enabled = lambda: True  # ruff: ignore[private-member-access]
     coordinator._system_info_query_interval_sec = 180  # ruff: ignore[private-member-access]
     coordinator._last_system_info_query = {  # ruff: ignore[private-member-access]
         _DEVICE: time.monotonic() - coordinator._system_info_query_interval_sec - 1  # ruff: ignore[private-member-access]
@@ -126,10 +117,44 @@ async def test_system_info_query_skipped_when_only_ble_is_live() -> None:
     cast("Any", coordinator).async_query_device_info = query_device_info
     cast("Any", coordinator).async_query_system_info = query_system_info
 
-    await coordinator._async_query_system_info_for_missing(ensure_mqtt=False)  # ruff: ignore[private-member-access]
+    await coordinator._async_query_system_info_for_missing(  # ruff: ignore[private-member-access]
+        force=True, ensure_mqtt=False
+    )
 
-    query_system_info.assert_not_awaited()
-    query_device_info.assert_not_awaited()
+    query_system_info.assert_awaited_once_with(_DEVICE, ensure_mqtt=False)
+    query_device_info.assert_awaited_once_with(_DEVICE, ensure_mqtt=False)
+
+
+async def test_ble_read_queries_do_not_wait_for_setter_acks() -> None:
+    """Commands 106/110/120 use BLE data responses; setters keep ACKs."""
+    coordinator = _bare_coordinator(None)
+    coordinator._mqtt = None  # ruff: ignore[private-member-access]
+    send_ble = AsyncMock(return_value=True)
+    cast("Any", coordinator).async_send_ble_command = send_ble
+
+    for action_id, cmd, expected_ack in (
+        (3011, 106, False),
+        (3014, 110, False),
+        (3019, 120, False),
+        (3001, 1, True),
+    ):
+        operations = coordinator._command_transport_operations(  # ruff: ignore[private-member-access]
+            _DEVICE,
+            cmd,
+            cast(
+                "Any",
+                {
+                    "action_id": action_id,
+                    "body_fields": {},
+                    "message_type": "test",
+                    "ensure_mqtt": False,
+                },
+            ),
+            cast("Any", SimpleNamespace()),
+        )
+        assert [label for label, _operation in operations] == ["BLE"]
+        await operations[0][1]
+        assert send_ble.await_args.kwargs["wait_for_ack"] is expected_ack
 
 
 async def test_system_info_query_skips_without_any_command_transport() -> None:

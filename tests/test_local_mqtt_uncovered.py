@@ -114,6 +114,7 @@ async def test_sink_rejection_and_failure_are_distinguished(
     rejected_diagnostics = rejected.diagnostics_snapshot(redact=False)
     assert rejected_diagnostics["messages_rejected_by_sink"] == 1
     assert rejected_diagnostics["messages_dropped"] == 0
+    assert rejected_diagnostics["messages_forwarded"] == 0
 
     failing_sink = AsyncMock(side_effect=RuntimeError("bad frame"))
     failed = JackeryLocalMqttClient(hass, sink=failing_sink, topic_filter="#")

@@ -15,6 +15,7 @@ from collections import deque
 import contextlib
 from datetime import UTC, datetime
 import json
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
@@ -822,6 +823,42 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
             )
 
         assert committed is BleProcessDisposition.RETRY
+
+    asyncio.run(_run())
+
+
+def test_unparsed_ble_frame_is_captured_only_with_raw_debug() -> None:
+    """A failed BLE decode still leaves its exact wire bytes in raw capture."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator.entry = SimpleNamespace(options={"enable_unredacted_debug": True})
+        received_at = datetime.now(UTC)
+        observation = BleFrameObservation(
+            received_at=received_at,
+            raw_bytes=b"\xde\xad",
+            base64_encoded="3q0=",
+            parsed=None,
+            decode_error="invalid frame",
+            session_generation=2,
+            notify_sequence=4,
+        )
+        with patch.object(
+            JackerySolarVaultCoordinator, "_schedule_payload_debug_event"
+        ) as capture:
+            result = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]
+                "dev", observation
+            )
+        assert result is BleProcessDisposition.INVALID
+        event = capture.call_args.args[0]()
+        assert event["raw_hex"] == "dead"
+        assert event["received_at"] == received_at.isoformat()
+        assert event["session_generation"] == 2  # ruff: ignore[magic-value-comparison]
+        assert event["notify_sequence"] == 4  # ruff: ignore[magic-value-comparison]
+        assert event["decode_error"] == "invalid frame"
+
+        coordinator.entry = SimpleNamespace(options={})
+        assert "raw_hex" not in capture.call_args.args[0]()
 
     asyncio.run(_run())
 

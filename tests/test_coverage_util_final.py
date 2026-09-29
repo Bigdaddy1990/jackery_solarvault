@@ -57,7 +57,12 @@ def test_day_power_sample_energy_value_preserves_directional_semantics() -> None
     battery_day = f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
 
     assert (
-        sample_value(None, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1) == 0
+        sample_value(None, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1)
+        is None
+    )
+    assert (
+        sample_value("", battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1)
+        is None
     )
     assert (
         sample_value({}, battery_day, APP_STAT_TOTAL_CHARGE, APP_CHART_SERIES_Y1)
@@ -185,7 +190,12 @@ def test_day_power_energy_points_rejects_invalid_bucket_sizes(
 
 
 def test_day_power_energy_points_rejects_unproven_scalar_and_unknown_unit() -> None:
-    """A scalar without positive curve energy and an unknown unit remain unimportable."""  # ruff: ignore[line-too-long]
+    """A scalar without positive curve energy remains unimportable.
+
+    Unknown units (e.g. "joule") are not recognized as power or energy, so
+    the payload defaults to watt and the scalar-only curve still cannot
+    establish when energy occurred.
+    """
     today = date(2026, 8, 10)
     base = {
         APP_CHART_SERIES_Y: [0],

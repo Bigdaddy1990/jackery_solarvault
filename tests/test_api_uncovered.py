@@ -27,6 +27,7 @@ from custom_components.jackery_solarvault.client.api import (
     build_login_crypto_fields,
     generate_login_aes_key,
 )
+from custom_components.jackery_solarvault.client.credentials import redacted_error
 from custom_components.jackery_solarvault.const import (
     ACCESSORIES_BIND_PATH,
     ACCESSORIES_UNBIND_PATH,
@@ -1200,6 +1201,33 @@ class TestAuthFailurePaths:
 
         assert result == (200, {"code": 0, "data": {"result": "fresh"}})
         assert attempts == 2  # ruff: ignore[magic-value-comparison]
+
+    @pytest.mark.asyncio()
+    async def test_rejected_cloud_code_reaches_payload_log_unredacted(self) -> None:
+        """A non-zero cloud code is payload-logged and readable in the error."""
+        client = self._create_client()
+        events: list[object] = []
+        client.payload_debug_callback = events.append
+
+        async def rejected() -> tuple[int, object]:  # ruff: ignore[unused-async]
+            return 200, {"code": 10600, "msg": "not supported", "data": None}
+
+        with pytest.raises(JackeryApiError) as err:
+            await client._perform_authenticated_json_request(  # ruff: ignore[private-member-access]
+                method="GET",
+                path="/v1/device/chargeReport",
+                request=rejected,
+                token_used="test_token",
+            )
+
+        assert events == [
+            client._http_payload_debug(  # ruff: ignore[private-member-access]
+                request=("GET", "/v1/device/chargeReport"),
+                status=200,
+                response={"code": 10600, "msg": "not supported", "data": None},
+            )
+        ]
+        assert "code=10600" in redacted_error(err.value)
 
     @pytest.mark.asyncio()
     async def test_property_retry_survives_auth_refresh_timeout(self) -> None:

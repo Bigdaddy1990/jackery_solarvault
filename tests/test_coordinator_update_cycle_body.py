@@ -19,7 +19,7 @@ result / diagnostics), never call order:
 """
 
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 from time import monotonic
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -225,8 +225,10 @@ async def test_historical_home_months_refresh_off_the_http_hot_path(
 
     assert DEVICE_ID in first_result
     api.async_get_home_trends.assert_not_awaited()
-
-    await hass.async_block_till_done()
+    coordinator.async_set_updated_data(first_result)
+    await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
+    assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+    await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
     repaired_result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
 
     repaired_year = repaired_result[DEVICE_ID][year_section]
@@ -272,6 +274,8 @@ async def test_historical_home_months_acquire_shared_http_gate_once(
         first_result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
 
         assert DEVICE_ID in first_result
+        coordinator.async_set_updated_data(first_result)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         slow_refresh_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
         assert slow_refresh_task is not None
         await asyncio.wait_for(slow_refresh_task, timeout=2)
@@ -292,7 +296,7 @@ async def test_update_cycle_does_not_spawn_unowned_enrichment_tasks(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Slow accessory enrichments use only the tracked refresh worker."""
+    """Property polling does not start unowned enrichment or statistic work."""
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
     real_create_background_task = hass.async_create_background_task
     create_background_task = MagicMock(wraps=real_create_background_task)
@@ -309,8 +313,7 @@ async def test_update_cycle_does_not_spawn_unowned_enrichment_tasks(
         ]
 
         assert not [name for name in names if name.startswith("jackery_enrich_")]
-        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
-        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        assert coordinator._slow_metrics_bg_task is None  # ruff: ignore[private-member-access]
     finally:
         await _teardown(hass, entry.entry_id)
 
@@ -408,27 +411,6 @@ async def test_broken_shelly_enrichment_never_breaks_l3(
 
     # L3 property data is present despite the third-party enrichment failure.
     assert result[DEVICE_ID]["properties"]["batSoc"] == 62  # ruff: ignore[magic-value-comparison]
-    await _teardown(hass, entry.entry_id)
-
-
-@pytest.mark.asyncio()
-async def test_statistics_import_dispatched_then_throttled(
-    hass: HomeAssistant,
-) -> None:
-    """The recorder import runs again after slow metrics advanced period caches."""
-    coordinator, entry, _api = await setup_update_cycle_coordinator(hass)
-    import_job = AsyncMock(return_value=None)
-    coordinator._async_import_current_app_chart_statistics_job = import_job  # type: ignore[method-assign]  # ruff: ignore[private-member-access]
-    coordinator._statistics_import_ready = True  # ruff: ignore[private-member-access]
-
-    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-    await hass.async_block_till_done()
-    await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-    await hass.async_block_till_done()
-
-    # The background slow-metrics refresh advances periodic caches and resets
-    # the import throttle so the next coordinator cycle consumes fresh buckets.
-    assert import_job.await_count == 2  # ruff: ignore[magic-value-comparison]
     await _teardown(hass, entry.entry_id)
 
 

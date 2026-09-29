@@ -189,6 +189,45 @@ def test_smart_meter_registry_migration_removes_empty_duplicate(
     assert registry.async_get(target_device.id) is not None
 
 
+def test_late_ct_payload_moves_period_sensors_from_head_device(
+    hass: HomeAssistant,
+) -> None:
+    """Existing CT history sensors follow the accessory when it appears later."""
+    coordinator = _coordinator({FIELD_DEVICE_SN: _METER_SN})
+    entry = _entry(hass, coordinator)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    parent = parent_device(devices, entry)
+    meter = devices.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, _meter_identifier(_METER_SN))},
+        via_device_id=parent.id,
+    )
+    period_ids = (
+        f"{_PARENT_ID}_ct_input_day_energy",
+        f"{_PARENT_ID}_ct_output_year_energy",
+    )
+    for unique_id in (*period_ids, f"{_PARENT_ID}_bat_soc"):
+        entities.async_get_or_create(
+            "sensor", DOMAIN, unique_id, config_entry=entry, device_id=parent.id
+        )
+
+    _migrate_smart_meter_identity(hass, entry)
+
+    for unique_id in period_ids:
+        entity_id = entities.async_get_entity_id("sensor", DOMAIN, unique_id)
+        assert entity_id is not None
+        registered = entities.async_get(entity_id)
+        assert registered is not None
+        assert registered.device_id == meter.id
+        assert registered.unique_id == unique_id
+    head_id = entities.async_get_entity_id("sensor", DOMAIN, f"{_PARENT_ID}_bat_soc")
+    assert head_id is not None
+    head = entities.async_get(head_id)
+    assert head is not None
+    assert head.device_id == parent.id
+
+
 @pytest.mark.parametrize("serial", ["AABBCCDDEEFF", "CT-SERIAL-42"])
 def test_late_ct_identity_updates_existing_registry_device(
     hass: HomeAssistant,

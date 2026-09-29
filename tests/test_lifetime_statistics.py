@@ -24,11 +24,11 @@ from custom_components.jackery_solarvault.const import (
     APP_STAT_TOTAL_SOLAR_ENERGY,
     PAYLOAD_STATISTIC,
 )
+from custom_components.jackery_solarvault.guards import guard_lifetime_totals
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
 )
-from custom_components.jackery_solarvault.util import guard_statistic_totals_from_year
 from homeassistant.components.sensor import SensorStateClass
 from homeassistant.const import CURRENCY_EURO, UnitOfEnergy, UnitOfMass
 
@@ -93,7 +93,7 @@ def test_guard_leaves_generation_unchanged_when_raw_meets_previous_floor() -> No
     """No dip: the cloud-reported total already satisfies the previous-value floor."""
     payload = _statistic_payload(_RAW_GENERATION_NO_DIP)
 
-    guard_statistic_totals_from_year(
+    guard_lifetime_totals(
         payload,
         previous_statistic=_previous_statistic(_PREVIOUS_GENERATION),
     )
@@ -107,7 +107,7 @@ def test_guard_raises_generation_to_previous_floor_when_dip_exceeds_tolerance() 
     """A real regression (dip beyond rounding noise) is floored, never left lowered."""
     payload = _statistic_payload(_RAW_GENERATION_BIG_DIP)
 
-    guard_statistic_totals_from_year(
+    guard_lifetime_totals(
         payload,
         previous_statistic=_previous_statistic(_PREVIOUS_GENERATION),
     )
@@ -119,7 +119,7 @@ def test_guard_leaves_generation_unchanged_when_dip_is_within_tolerance() -> Non
     """A dip inside the rounding-noise tolerance passes through uncorrected."""
     payload = _statistic_payload(_RAW_GENERATION_SMALL_DIP)
 
-    guard_statistic_totals_from_year(
+    guard_lifetime_totals(
         payload,
         previous_statistic=_previous_statistic(_PREVIOUS_GENERATION),
     )
@@ -138,7 +138,7 @@ def test_guard_prefers_app_system_pv_year_total_over_device_pv_total() -> None:
         f"{APP_SECTION_PV_TRENDS}_year": {APP_STAT_TOTAL_SOLAR_ENERGY: 967.89},
     }
 
-    guard_statistic_totals_from_year(payload)
+    guard_lifetime_totals(payload)
 
     assert payload[PAYLOAD_STATISTIC][APP_STAT_TOTAL_GENERATION] == pytest.approx(
         967.89
@@ -147,3 +147,34 @@ def test_guard_prefers_app_system_pv_year_total_over_device_pv_total() -> None:
     assert payload[PAYLOAD_STATISTIC]["_total_lower_bound_guard"]["corrected"][
         APP_STAT_TOTAL_GENERATION
     ]["current_year_total"] == pytest.approx(967.89)
+
+
+def test_poll_cycle_keeps_published_lifetime_generation_when_cloud_dips() -> None:
+    """Regression: the lifetime guard is wired into every device poll cycle.
+
+    0.1.0 called the guard per device after the system merge; the refactor lost
+    that call, so a smaller cloud ``totalGeneration`` reached the sensor.
+    """
+    from types import SimpleNamespace  # ruff: ignore[import-outside-top-level]
+
+    from custom_components.jackery_solarvault.coordinator import (  # ruff: ignore[import-outside-top-level]
+        JackerySolarVaultCoordinator,
+    )
+
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    shell = cast("Any", coordinator)
+    shell.data = {
+        _DEVICE_ID: {PAYLOAD_STATISTIC: _previous_statistic(_PREVIOUS_GENERATION)}
+    }
+    shell._device_enrichment_cache_stale = lambda _dev_id: False  # ruff: ignore[private-member-access]
+    entry = _statistic_payload(_RAW_GENERATION_BIG_DIP)
+
+    coordinator._finalize_guarded_device_enrichments(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        entry,
+        cast("Any", SimpleNamespace(devices_needing_enrichment_refresh=set())),
+    )
+
+    assert entry[PAYLOAD_STATISTIC][APP_STAT_TOTAL_GENERATION] == pytest.approx(
+        _PREVIOUS_GENERATION
+    )

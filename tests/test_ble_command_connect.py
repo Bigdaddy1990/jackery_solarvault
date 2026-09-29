@@ -84,8 +84,8 @@ async def test_ble_first_ensures_connection_before_write() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_query_command_never_opens_or_writes_ble() -> None:
-    """Query/data frames are excluded from the ACK-dependent BLE leg."""
+async def test_query_command_uses_ble_without_ack_and_cloud_mqtt() -> None:
+    """BLE and Cloud MQTT query independently; data responses need no ACK."""
     coordinator = _ble_first_coordinator()
     cast("Any", coordinator)._coerce_transport_cmd = MagicMock(return_value=106)  # ruff: ignore[private-member-access]
     send_ble = AsyncMock(return_value=True)
@@ -101,7 +101,9 @@ async def test_query_command_never_opens_or_writes_ble() -> None:
         body_fields={},
     )
 
-    send_ble.assert_not_awaited()
+    send_ble.assert_awaited_once()
+    assert send_ble.await_args is not None
+    assert send_ble.await_args.kwargs["wait_for_ack"] is False
     publish_mqtt.assert_awaited_once()
 
 

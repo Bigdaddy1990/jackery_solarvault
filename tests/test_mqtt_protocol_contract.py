@@ -9,6 +9,8 @@ from custom_components.jackery_solarvault.const import DOMAIN
 if TYPE_CHECKING:
     import pytest
 
+from custom_components.jackery_solarvault.filters import sanitize_main_properties
+
 ROOT = Path(__file__).resolve().parents[1]
 COORDINATOR_PATH = ROOT / "custom_components" / "jackery_solarvault" / "coordinator.py"
 MQTT_PUSH_PATH = (
@@ -213,7 +215,7 @@ def test_third_party_mqtt_response_does_not_pollute_main_properties() -> None:
         assert entry[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] == {
             key: value for key, value in body.items() if key != FIELD_CMD
         }
-        assert JackerySolarVaultCoordinator._sanitize_main_properties(body) == {}  # ruff: ignore[private-member-access]  # isort: skip
+        assert sanitize_main_properties(body) == {}  # isort: skip
 
     asyncio.run(_run())
 
@@ -619,3 +621,16 @@ def test_write_retries_rebuild_auth_headers_after_relogin() -> None:
         assert "_perform_authenticated_json_request(" in source
         assert "token_used=token_used" in source
         assert "await self._ensure_token()" in source
+
+
+def test_main_battery_soc_never_becomes_system_soc() -> None:
+    """Live 2026-09-27: batSoc 92 was mirrored into soc while the system was at 78 %.
+
+    batSoc is the main battery's internal SOC, soc the system SOC
+    (WIRING_REFERENCE.md); a frame carrying only batSoc must leave soc unset.
+    """
+    clean = sanitize_main_properties({"batSoc": 92, "batInPw": 300})
+
+    assert clean["batSoc"] == 92  # ruff: ignore[magic-value-comparison]
+    assert "soc" not in clean
+    assert "batterySoc" not in clean

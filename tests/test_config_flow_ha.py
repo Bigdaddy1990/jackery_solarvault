@@ -476,13 +476,12 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
         flow["flow_id"],
         {
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: topic,
-            CONF_THIRD_PARTY_MQTT_QOS: "2",
         },
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == topic
-    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == _QOS_EXACTLY_ONCE
+    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == 0
 
     reopened = await hass.config_entries.options.async_init(entry.entry_id)
     assert reopened["type"] is FlowResultType.FORM

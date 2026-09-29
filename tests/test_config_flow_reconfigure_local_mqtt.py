@@ -167,7 +167,7 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
             CONF_PASSWORD: "secret",
             CONF_THIRD_PARTY_MQTT_ENABLE: True,
             CONF_THIRD_PARTY_MQTT_IP: "10.0.0.5",
-            CONF_THIRD_PARTY_MQTT_QOS: "2",
+
             CONF_THIRD_PARTY_MQTT_TOPIC_FILTER: "hb/device/+/status",
         },
     )
@@ -176,7 +176,7 @@ async def test_reconfigure_credentials_can_enable_local_mqtt(
     assert result["reason"] == FLOW_ABORT_RECONFIGURE_SUCCESSFUL
     assert entry.options[CONF_THIRD_PARTY_MQTT_ENABLE] is True
     assert entry.options[CONF_THIRD_PARTY_MQTT_IP] == "10.0.0.5"
-    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == _QOS_EXACTLY_ONCE
+    assert entry.options[CONF_THIRD_PARTY_MQTT_QOS] == 0
     assert entry.options[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == "hb/device/+/status"
 
 

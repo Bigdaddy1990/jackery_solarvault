@@ -244,6 +244,63 @@ async def test_reassembly_accepts_out_of_order_chunks_and_keeps_first_sequence()
 
 
 @pytest.mark.asyncio()
+async def test_reassembly_diagnostics_missing_final_predecessors() -> None:
+    """An early final chunk records its missing predecessors and can recover."""
+    await asyncio.sleep(0)
+    listener = _listener()
+    final = _frame(index=3, count=3, flags=3011, cmd=106, body=b"}")
+
+    incomplete, _ = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev", final, notify_sequence=3
+    )
+    assert incomplete is None
+    stats = listener.stats_for("dev")
+    assert stats.multi_chunk_final_incomplete_by_cmd == {106: 1}
+    assert stats.last_multi_chunk_final_incomplete_by_cmd[106] == {
+        "reason": "missing_prior_chunks",
+        "flags": 3011,
+        "present_indices": [3],
+        "session_generation": None,
+        "current_generation": None,
+        "notify_sequence": 3,
+    }
+
+    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=1, count=3, flags=3011, cmd=106, body=b"{"),
+        notify_sequence=1,
+    )
+    complete, _ = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=2, count=3, flags=3011, cmd=106, body=b'"ok":1'),
+        notify_sequence=2,
+    )
+    assert complete is not None
+    assert complete.body == b'{"ok":1}'
+
+
+def test_reassembly_diagnostics_identify_session_owner_rejection() -> None:
+    """A stale accepted session reports why its final chunk was not joined."""
+    listener = _listener()
+    session = _attach_session(listener, "dev", object())
+    listener._clients.pop("dev")  # ruff: ignore[private-member-access]
+
+    incomplete, _ = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=3, count=3, flags=3011, cmd=106, body=b"}"),
+        session=session,
+        notify_sequence=3,
+        accepted=True,
+    )
+    assert incomplete is None
+    stats = listener.stats_for("dev")
+    assert stats.multi_chunk_owner_rejected_by_cmd == {106: 1}
+    assert stats.last_multi_chunk_final_incomplete_by_cmd[106]["reason"] == (
+        "session_not_owner"
+    )
+
+
+@pytest.mark.asyncio()
 async def test_reassembly_restarts_after_conflicting_duplicate_chunk() -> None:
     """A replaced fragment can complete a new out-of-order message."""
     await asyncio.sleep(0)
@@ -273,6 +330,9 @@ async def test_reassembly_restarts_after_conflicting_duplicate_chunk() -> None:
     assert assembled.body == b"new-1new-2new-3"
     assert sequence is None
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1
+    assert listener.stats_for("dev").multi_chunk_drop_reasons == {
+        "cmd107:duplicate_changed": 1
+    }
 
 
 @pytest.mark.asyncio()

@@ -25,6 +25,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.jackery_solarvault.config_flow import JackeryOptionsFlow
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+    CONF_ENABLE_UNREDACTED_DEBUG,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
@@ -133,6 +134,7 @@ async def test_options_form_has_single_bridge_mask(hass: HomeAssistant) -> None:
     assert CONF_THIRD_PARTY_MQTT_ENABLE in schema_keys
     assert CONF_THIRD_PARTY_MQTT_IP in schema_keys
     assert CONF_ENABLE_PAYLOAD_DEBUG_LOG in schema_keys
+    assert CONF_ENABLE_UNREDACTED_DEBUG in schema_keys
     assert "enable_unredacted_diagnostics" not in schema_keys
     duplicates = [f for f in _DUPLICATE_LOCAL_FIELDS if f in schema_keys]
     assert not duplicates, f"options form still shows duplicate fields: {duplicates}"

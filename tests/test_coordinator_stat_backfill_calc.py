@@ -95,14 +95,6 @@ def test_iter_calendar_weeks_returns_monday_starts() -> None:
     assert all(day.weekday() == 0 for day in weeks)
 
 
-def test_iter_calendar_years_is_inclusive_range() -> None:
-    """Year iteration returns every calendar year inclusive of both ends."""
-    assert JackerySolarVaultCoordinator._iter_calendar_years(  # ruff: ignore[private-member-access]
-        date(2024, 6, 1),
-        date(2026, 2, 1),
-    ) == [2024, 2025, 2026]
-
-
 # --- _historical_day_payload_from_sources --------------------------------
 
 

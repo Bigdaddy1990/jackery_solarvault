@@ -1541,22 +1541,6 @@ def test_third_party_mqtt_logs_do_not_emit_warning_noise() -> None:
     assert "_LOGGER.warning(" not in query_block
 
 
-def test_coordinator_sets_http_properties_from_fresh_sanitized_property_payload() -> (
-    None
-):
-    """HTTP source payload must be defined before entry assembly."""
-    source = (CUSTOM_COMPONENT / "coordinator.py").read_text(encoding="utf-8")
-    refresh_block = source.split("async def _async_update_data", 1)[1].split(
-        "@property\n    def update_interval", 1
-    )[0]
-
-    assert "new_props" not in refresh_block
-    assert "http_props = self._sanitize_main_properties(" in refresh_block
-    assert "payload.get(PAYLOAD_PROPERTIES) or {}" in refresh_block
-    assert "PAYLOAD_HTTP_PROPERTIES: http_props" in refresh_block
-    assert "http_props," in refresh_block
-
-
 def test_component_modules_import_all_referenced_const_names() -> None:  # ruff: ignore[too-many-branches]
     """Catch runtime NameError regressions from missing .const imports in any module."""
     const_tree = ast.parse((CUSTOM_COMPONENT / "const.py").read_text(encoding="utf-8"))

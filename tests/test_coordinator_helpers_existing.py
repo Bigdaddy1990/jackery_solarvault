@@ -1,6 +1,5 @@
 """Tests for coordinator helper functions that exist in coordinator.py."""
 
-from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
@@ -8,17 +7,14 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryError
 from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
     FIELD_BAT_SOC,
     FIELD_SUB_TYPE,
     FIELD_SYSTEM_REGION,
     SUBDEVICE_DEV_TYPE_BATTERY_PACK,
 )
 from custom_components.jackery_solarvault.coordinator import (
-    _backfill_period_is_closed,  # ruff: ignore[import-private-name]  # isort: skip
     _clean_dict_list_update,  # ruff: ignore[import-private-name]  # isort: skip
     _dict_list_identity_values,  # ruff: ignore[import-private-name]  # isort: skip
-    _is_blank_value,  # ruff: ignore[import-private-name]  # isort: skip
     _is_system_busy_error,  # ruff: ignore[import-private-name]  # isort: skip
     _load_mqtt_push_client,  # ruff: ignore[import-private-name]  # isort: skip
     _merge_identified_dict_lists,  # ruff: ignore[import-private-name]  # isort: skip
@@ -89,15 +85,6 @@ class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  
         client_class = _load_mqtt_push_client()
         assert client_class is not None
 
-    def test_backfill_period_is_closed(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
-        """Test _backfill_period_is_closed."""
-        today = date(2026, 8, 16)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_DAY, date(2026, 8, 15), today=today)
-            is True
-        )
-        assert _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today) is False
-
     def test_normalize_backfill_status(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _normalize_backfill_status."""
         from custom_components.jackery_solarvault.coordinator import BackfillStatus  # ruff: ignore[import-outside-top-level]  # isort: skip
@@ -141,17 +128,6 @@ class TestCoordinatorHelpersExisting:  # ruff: ignore[too-many-public-methods]  
         after = {"a": 1, "b": 2}
         result = changed_dict_values(before, after)
         assert result == {"b": 2}
-
-    def test_is_blank_value(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
-        """Test _is_blank_value."""
-        assert _is_blank_value(None) is True
-        assert _is_blank_value("") is True
-        assert _is_blank_value("   ") is True
-        assert _is_blank_value([]) is True
-        assert _is_blank_value({}) is True
-        assert _is_blank_value("value") is False
-        assert _is_blank_value(0) is False
-        assert _is_blank_value(False) is False
 
     def test_dict_list_identity_values(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Test _dict_list_identity_values."""

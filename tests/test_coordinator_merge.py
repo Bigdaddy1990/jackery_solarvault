@@ -62,18 +62,6 @@ def _coordinator(data: dict[str, dict[str, Any]] | None = None) -> Any:
     return shell
 
 
-def test_property_value_present_rejects_empty_sentinels() -> None:
-    """None, blank strings and empty containers do not count as present."""
-    present = JackerySolarVaultCoordinator._property_value_present  # ruff: ignore[private-member-access]
-
-    assert present(0) is True
-    assert present("ok") is True
-    assert present(None) is False
-    assert present("   ") is False
-    assert present({}) is False
-    assert present([]) is False
-
-
 def test_device_and_combine_battery_scopes_do_not_collide_or_revert_to_http(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

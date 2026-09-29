@@ -23,8 +23,13 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     battery_pack_serial,
+    merge_battery_pack_lists,
 )
-from custom_components.jackery_solarvault.sensor import JackeryBatteryPackSensor
+from custom_components.jackery_solarvault.sensor import (
+    JackeryBatteryPackSensor,
+    _SensorCollection,  # ruff: ignore[import-private-name]
+    _collect_battery_packs,  # ruff: ignore[import-private-name]
+)
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
@@ -44,6 +49,79 @@ _SN_BEFORE_A = "HQ2C00000000AA0"
 _SOC_A = 50
 _SOC_B = 10
 _PARENT_ID = "device-1"
+
+
+def test_pack_cell_temperature_is_registered_from_complete_payload() -> None:
+    """A per-pack cellTemp must produce its own temperature entity."""
+    pack = {"deviceSn": _SN_A, "batSoc": _SOC_A, "cellTemp": 259}
+    coordinator = _coordinator([pack])
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+
+    _collect_battery_packs(
+        collection,
+        _PARENT_ID,
+        {PAYLOAD_BATTERY_PACKS: [pack]},
+        {FIELD_BAT_NUM: 1},
+    )
+
+    temperature = next(
+        entity
+        for entity in collection.entities
+        if entity.entity_description.key == "cell_temperature"
+    )
+    assert temperature._value_from_pack(pack) == pytest.approx(25.9)  # ruff: ignore[private-member-access]
+
+
+def test_pack_without_known_serial_gets_no_index_identity() -> None:
+    """No serial yet means no pack entity yet.
+
+    Live 2026-09-26: an index-based pack identity became serial-based on the
+    next restart, so every pack entity was re-registered and the user's enabled
+    diagnostic entities came back disabled.
+    """
+    coordinator = _coordinator([])
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+
+    _collect_battery_packs(collection, _PARENT_ID, {}, {FIELD_BAT_NUM: 2})
+
+    assert collection.entities == []
+    assert collection.battery_pack_identities == {}
+
+
+def test_sparse_cell_temperature_frame_uses_known_pack_serial() -> None:
+    """A cmd 107 pack temperature must not become main-device temperature."""
+    current = {PAYLOAD_BATTERY_PACKS: [{"deviceSn": _SN_A, "outEgy": 237}]}
+    classify = JackerySolarVaultCoordinator._is_known_battery_pack_frame  # ruff: ignore[private-member-access]
+    assert classify(current, {"deviceSn": _SN_A, "cellTemp": 251, "cmd": 107})
+    assert not classify(current, {"deviceSn": _SN_B, "cellTemp": 251, "cmd": 107})
+    assert not classify(current, {"deviceSn": _SN_A, "cmd": 107})
+    # After a restart the pack list can be empty: a non-head serial is a pack,
+    # the head unit's own serial is not.
+    empty: dict[str, Any] = {PAYLOAD_BATTERY_PACKS: []}
+    head = {"HEAD-SN"}
+    assert classify(empty, {"deviceSn": _SN_B, "cellTemp": 251, "cmd": 107}, head)
+    assert not classify(empty, {"deviceSn": "HEAD-SN", "cellTemp": 179}, head)
+    merged = merge_battery_pack_lists(
+        current[PAYLOAD_BATTERY_PACKS],
+        [{"deviceSn": _SN_A, "cellTemp": 251, "cmd": 107}],
+    )
+    assert merged == [{"deviceSn": _SN_A, "outEgy": 237, "cellTemp": 251, "cmd": 107}]
 
 
 def _coordinator(
@@ -134,6 +212,33 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
     assert battery_pack_serial({"batSoc": 5}) is None
 
 
+def test_pack_firmware_version_updates_registered_device(
+    hass: HomeAssistant,
+) -> None:
+    """Late BatteryPackSub version must reach device properties."""
+    coordinator = _coordinator()
+    entry = _entry(hass, coordinator)
+    cast("Any", coordinator).config_entry = entry
+    registry = dr.async_get(hass)
+    _parent_device(registry, entry)
+    pack_key = stable_subdevice_key("battery_pack", _SN_A, 1)
+    device = _pack_device(
+        registry,
+        entry,
+        f"{_PARENT_ID}_{pack_key}",
+        serial_number=_SN_A,
+    )
+    sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+    sensor.hass = hass
+    sensor._device_id = _PARENT_ID  # ruff: ignore[private-member-access]
+    sensor._pack_key = pack_key  # ruff: ignore[private-member-access]
+    sensor.coordinator = coordinator
+
+    sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
+
+    assert registry.async_get(device.id).sw_version == "1.4"
+
+
 def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
     """DeviceSn wins over devSn/sn, and a blank/whitespace-only value is None.
 
@@ -184,18 +289,36 @@ def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
         assert second["batSoc"] == _SOC_A
 
 
-def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
-    """Index N binds to the same physical serial regardless of list order.
+def test_pinned_pack_uses_ordered_anonymous_rows_when_serials_disappear() -> None:
+    """A sparse group frame must not make every pinned pack unavailable."""
+    sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+    sensor._pack_index = 2  # ruff: ignore[private-member-access]
+    sensor._pack_sn = _SN_B  # ruff: ignore[private-member-access]
+    with patch.object(
+        JackeryBatteryPackSensor,
+        "_payload",
+        new_callable=PropertyMock,
+        return_value={PAYLOAD_BATTERY_PACKS: [{"batSoc": _SOC_A}, {"batSoc": _SOC_B}]},
+    ):
+        assert sensor._pack["batSoc"] == _SOC_B  # ruff: ignore[private-member-access]
 
-    Each HA restart recreates the entity with ``_pack_sn=None``, so the
-    within-session serial pin (see ``test_pack_tracks_by_serial_after_reorder``)
-    cannot protect against reordering that happens *between* restarts: a fresh
-    entity's first positional resolution (``pack_dicts[pack_index - 1]``)
-    would otherwise pin to whichever pack the cloud/MQTT list happens to put
-    at that position this session, silently rebinding ``battery_pack_N``'s
-    stable unique_id to a different physical serial and contaminating
-    Recorder history with no indication.
-    """
+
+def test_pinned_pack_does_not_bind_to_another_identified_pack() -> None:
+    """A changed identified row cannot silently inherit a prior serial."""
+    sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+    sensor._pack_index = 1  # ruff: ignore[private-member-access]
+    sensor._pack_sn = _SN_A  # ruff: ignore[private-member-access]
+    with patch.object(
+        JackeryBatteryPackSensor,
+        "_payload",
+        new_callable=PropertyMock,
+        return_value={PAYLOAD_BATTERY_PACKS: [{"deviceSn": _SN_B, "batSoc": _SOC_B}]},
+    ):
+        assert sensor._pack == {}  # ruff: ignore[private-member-access]
+
+
+def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
+    """A registry-pinned serial still wins if live MQTT changes list order."""
     first_boot = {
         PAYLOAD_BATTERY_PACKS: [
             {"deviceSn": _SN_A, "batSoc": _SOC_A},
@@ -211,10 +334,12 @@ def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
         ],
     }
 
-    def _resolve(pack_index: int, payload: dict[str, Any]) -> str | None:
+    def _resolve(
+        pack_index: int, payload: dict[str, Any], trusted_serial: str
+    ) -> str | None:
         sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
         sensor._pack_index = pack_index  # ruff: ignore[private-member-access]
-        sensor._pack_sn = None  # fresh entity, as after a restart  # ruff: ignore[private-member-access]
+        sensor._pack_sn = trusted_serial  # ruff: ignore[private-member-access]
         with patch.object(
             JackeryBatteryPackSensor,
             "_payload",
@@ -224,10 +349,32 @@ def test_battery_pack_index_binds_to_same_serial_across_restarts() -> None:
             pack: dict[str, Any] = sensor._pack  # ruff: ignore[private-member-access]
             return battery_pack_serial(pack)
 
-    assert _resolve(1, first_boot) == _SN_A
-    assert _resolve(2, first_boot) == _SN_B
-    assert _resolve(1, second_boot) == _SN_A
-    assert _resolve(2, second_boot) == _SN_B
+    assert _resolve(1, first_boot, _SN_A) == _SN_A
+    assert _resolve(2, first_boot, _SN_B) == _SN_B
+    assert _resolve(1, second_boot, _SN_A) == _SN_A
+    assert _resolve(2, second_boot, _SN_B) == _SN_B
+
+
+def test_first_pack_resolution_keeps_http_order_and_lifetime_owner() -> None:
+    """Serial sorting must not move pack 3's lifetime counter to pack 1."""
+    source = {
+        PAYLOAD_BATTERY_PACKS: [
+            {"deviceSn": "Z-PACK-1", "outEgy": 237},
+            {"deviceSn": "Y-PACK-2", "outEgy": 219},
+            {"deviceSn": "A-PACK-3", "outEgy": 33776},
+        ],
+    }
+    for index, expected in ((1, 237), (2, 219), (3, 33776)):
+        sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
+        sensor._pack_index = index  # ruff: ignore[private-member-access]
+        sensor._pack_sn = None  # ruff: ignore[private-member-access]
+        with patch.object(
+            JackeryBatteryPackSensor,
+            "_payload",
+            new_callable=PropertyMock,
+            return_value=source,
+        ):
+            assert sensor._pack["outEgy"] == expected  # ruff: ignore[private-member-access]
 
 
 def test_communication_state_derived_from_live_pack_presence() -> None:
@@ -301,8 +448,10 @@ def test_registry_migration_rekeys_pack_and_preserves_entity_id(
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
 
 
+@pytest.mark.parametrize("numeric_serial", [None, _SN_A])
 def test_existing_serial_target_removes_only_duplicate_numeric_device(
     hass: HomeAssistant,
+    numeric_serial: str | None,
 ) -> None:
     """A serial target keeps legacy entity ids while removing its fallback."""
     coordinator = _coordinator([{"deviceSn": _SN_A}])
@@ -326,7 +475,7 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
         device_registry,
         entry,
         numeric_identifier,
-        serial_number=_SN_A,
+        serial_number=numeric_serial,
     )
     numeric_entities = {
         key: _pack_entity(

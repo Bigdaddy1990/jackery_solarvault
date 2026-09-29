@@ -468,7 +468,7 @@ def test_stat_row_start_datetime_and_scalar() -> None:
 
 
 # ---------------------------------------------------------------------------
-# entity_targets_for_app_points / filter_completed_app_points
+# app-point stubs
 # ---------------------------------------------------------------------------
 
 
@@ -476,35 +476,6 @@ class _Point(NamedTuple):
     """Minimal app-point stub exposing only a start_date."""
 
     start_date: object
-
-
-def test_filter_completed_app_points_day_passthrough() -> None:
-    """Day imports return their points unchanged."""
-    points = [_Point(date(2026, 7, 8))]
-    assert (
-        util.filter_completed_app_points(points, "day", "day", date(2026, 7, 8))
-        is points
-    )
-
-
-def test_filter_completed_app_points_excludes_current_and_future() -> None:
-    """Non-day imports drop today's bucket and undated points."""
-    today = date(2026, 7, 8)
-    points = [
-        _Point(date(2026, 7, 7)),
-        _Point(datetime(2026, 7, 8, tzinfo=UTC)),
-        _Point("not-a-date"),
-    ]
-    result = util.filter_completed_app_points(points, "week", "week", today)
-    assert [p.start_date for p in result] == [date(2026, 7, 7)]
-
-
-def test_filter_completed_app_points_year_reset() -> None:
-    """Year-reset imports drop buckets in the current month or later."""
-    today = date(2026, 7, 8)
-    points = [_Point(date(2026, 6, 1)), _Point(date(2026, 7, 1))]
-    result = util.filter_completed_app_points(points, "month", "year", today)
-    assert [p.start_date for p in result] == [date(2026, 6, 1)]
 
 
 def test_historical_day_payload_from_sources() -> None:

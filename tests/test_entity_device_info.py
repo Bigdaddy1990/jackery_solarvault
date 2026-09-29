@@ -9,6 +9,8 @@ model/name always wins when present — only the fallback changes.
 from types import SimpleNamespace
 from typing import Any, cast
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.jackery_solarvault.binary_sensor import (
     JackerySubdeviceAlarmBinarySensor,
 )
@@ -23,7 +25,13 @@ from custom_components.jackery_solarvault.const import (
     PAYLOAD_DISCOVERY,
     PAYLOAD_PROPERTIES,
 )
+from custom_components.jackery_solarvault.descriptions.number import NUMBER_DESCRIPTIONS
+from custom_components.jackery_solarvault.descriptions.sensor import (
+    SENSOR_DESCRIPTIONS,
+    STAT_DESCRIPTIONS,
+)
 from custom_components.jackery_solarvault.entity import JackeryEntity
+import custom_components.jackery_solarvault.sensor as sensor_module
 from custom_components.jackery_solarvault.sensor import (
     JackeryBatteryPackSensor,
     JackeryBreakerSensor,
@@ -33,7 +41,7 @@ from custom_components.jackery_solarvault.sensor import (
 )
 from custom_components.jackery_solarvault.switch import JackeryBreakerSwitch
 from custom_components.jackery_solarvault.util import stable_subdevice_key
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 _DEVICE_ID = "home-power-3002"
 
@@ -94,6 +102,194 @@ def test_parent_device_info_exposes_normalized_mac_connection() -> None:
     assert _entity(payload).device_info["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
     }
+
+
+def test_main_battery_uses_child_device_without_changing_entity_identity(
+    hass: Any,
+) -> None:
+    """Group internal-battery entities under one child while retaining unique IDs."""
+    entry_id = "main-battery-entry"
+    MockConfigEntry(domain=DOMAIN, entry_id=entry_id).add_to_hass(hass)
+    parent = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={(DOMAIN, _DEVICE_ID)},
+    )
+    descriptions = (
+        next(d for d in SENSOR_DESCRIPTIONS if d.key == "bat_soc"),
+        next(
+            d
+            for d in SENSOR_DESCRIPTIONS
+            if d.key == "main_battery_charge_energy_derived"
+        ),
+        next(d for d in STAT_DESCRIPTIONS if d.key == "main_battery_charge_energy"),
+        next(d for d in NUMBER_DESCRIPTIONS if d.key == "soc_charge_limit_set"),
+    )
+    for description in descriptions:
+        entity = _entity({})
+        entity.coordinator = SimpleNamespace(
+            data={_DEVICE_ID: {}},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
+        )
+        entity.entity_description = description
+        entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
+        info = entity.device_info
+        assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_main_battery")}
+        assert info["parent_device_id"] == parent.id
+        assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
+        child = dr.async_get(hass).async_get_or_create_child(
+            config_entry_id=entry_id,
+            identifiers=info["identifiers"],
+            name=info["name"],
+            parent_device_id=info["parent_device_id"],
+        )
+        assert child.parent_device_id == parent.id
+
+
+def test_ct_statistics_join_existing_smart_meter_device(hass: Any) -> None:
+    """CT period sensors keep their unique IDs while joining the CT device."""
+    entry_id = "ct-stat-entry"
+    MockConfigEntry(domain=DOMAIN, entry_id=entry_id).add_to_hass(hass)
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={(DOMAIN, _DEVICE_ID)},
+    )
+    ct = {"deviceSn": "CT-SERIAL-1"}
+    entity = _entity({PAYLOAD_CT_METER: ct})
+    entity.coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {PAYLOAD_CT_METER: ct}},
+        hass=hass,
+        config_entry=SimpleNamespace(entry_id=entry_id),
+    )
+    entity.entity_description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == "ct_input_day_energy"
+    )
+    entity._attr_unique_id = f"{_DEVICE_ID}_ct_input_day_energy"  # ruff: ignore[private-member-access]
+    meter_key = stable_subdevice_key("smart_meter", ct["deviceSn"], 1)
+    assert entity.device_info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_{meter_key}")}
+    assert entity.unique_id == f"{_DEVICE_ID}_ct_input_day_energy"
+    meter = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers=entity.device_info["identifiers"],
+    )
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        entity.unique_id,
+        config_entry=next(iter(hass.config_entries.async_entries(DOMAIN))),
+        device_id=meter.id,
+    )
+    entity.coordinator.data[_DEVICE_ID] = {}
+    assert entity.device_info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_{meter_key}")}
+
+
+def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> None:
+    """One present PV input gets one logical child and keeps old entity IDs."""
+    entry_id = "pv-channel-entry"
+    MockConfigEntry(domain=DOMAIN, entry_id=entry_id).add_to_hass(hass)
+    parent = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry_id,
+        identifiers={(DOMAIN, _DEVICE_ID)},
+    )
+    payload = {PAYLOAD_PROPERTIES: {"pv1": {"pvPw": 24}}}
+    for description in (
+        next(d for d in SENSOR_DESCRIPTIONS if d.key == "pv1_power"),
+        next(d for d in STAT_DESCRIPTIONS if d.key == "device_pv1_day_energy"),
+    ):
+        entity = _entity(payload)
+        entity.coordinator = SimpleNamespace(
+            data={_DEVICE_ID: payload},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
+        )
+        entity.entity_description = description
+        entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
+        info = entity.device_info
+        assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_pv_input_1")}
+        assert info["parent_device_id"] == parent.id
+        assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
+        dr.async_get(hass).async_get_or_create_child(
+            config_entry_id=entry_id,
+            identifiers=info["identifiers"],
+            name=info["name"],
+            parent_device_id=info["parent_device_id"],
+        )
+
+    temporarily_missing = _entity({})
+    temporarily_missing.coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {}},
+        hass=hass,
+        config_entry=SimpleNamespace(entry_id=entry_id),
+    )
+    temporarily_missing.entity_description = next(
+        d for d in SENSOR_DESCRIPTIONS if d.key == "pv1_power"
+    )
+    assert temporarily_missing.device_info["identifiers"] == {
+        (DOMAIN, f"{_DEVICE_ID}_pv_input_1")
+    }
+
+    absent = _entity(payload)
+    absent.entity_description = next(
+        d for d in SENSOR_DESCRIPTIONS if d.key == "pv2_power"
+    )
+    assert absent.device_info["identifiers"] == {(DOMAIN, _DEVICE_ID)}
+
+
+def test_late_pv_channel_moves_existing_sensors_to_child(hass: Any) -> None:
+    """A newly observed input rehomes old period sensors without new IDs."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="late-pv-entry")
+    entry.add_to_hass(hass)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    parent = devices.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, _DEVICE_ID)},
+    )
+    pv_ids = (f"{_DEVICE_ID}_pv1_power", f"{_DEVICE_ID}_device_pv1_day_energy")
+    for unique_id in (*pv_ids, f"{_DEVICE_ID}_bat_soc"):
+        entities.async_get_or_create(
+            "sensor", DOMAIN, unique_id, config_entry=entry, device_id=parent.id
+        )
+    seen: set[tuple[str, int]] = set()
+    coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {PAYLOAD_PROPERTIES: {"pv1": {"pvPw": 24}}}}
+    )
+
+    sensor_module._reconcile_pv_input_devices(  # ruff: ignore[private-member-access]
+        hass, entry, cast("Any", coordinator), seen
+    )
+
+    child = devices.async_get_child_device_by_identifier(
+        (DOMAIN, f"{_DEVICE_ID}_pv_input_1"), entry.entry_id
+    )
+    assert child is not None
+    assert child.parent_device_id == parent.id
+    for unique_id in pv_ids:
+        entity_id = entities.async_get_entity_id("sensor", DOMAIN, unique_id)
+        assert entity_id is not None
+        registered = entities.async_get(entity_id)
+        assert registered is not None
+        assert registered.device_id == child.id
+        assert registered.unique_id == unique_id
+    head_id = entities.async_get_entity_id("sensor", DOMAIN, f"{_DEVICE_ID}_bat_soc")
+    assert head_id is not None
+    head = entities.async_get(head_id)
+    assert head is not None
+    assert head.device_id == parent.id
+    assert seen == {(_DEVICE_ID, 1)}
+
+
+def test_channel_and_ct_period_descriptions_share_their_device_roles() -> None:
+    """Every period variant joins its matching PV input or Smart Meter."""
+    roles = {d.key: d.device_registry_role for d in STAT_DESCRIPTIONS}
+    for channel in range(1, 5):
+        for period in ("day", "week", "month", "year"):
+            assert roles[f"device_pv{channel}_{period}_energy"] == (
+                f"pv_input_{channel}"
+            )
+    for direction in ("input", "output"):
+        for period in ("day", "week", "month", "year"):
+            assert roles[f"ct_{direction}_{period}_energy"] == "smart_meter"
 
 
 def test_smart_plug_base_name_falls_back_to_jackery_device_id() -> None:

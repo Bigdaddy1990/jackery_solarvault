@@ -5,11 +5,11 @@ import pytest
 from custom_components.jackery_solarvault.coordinator import (
     _clean_dict_list_update,  # ruff: ignore[import-private-name]
     _dict_list_identity_values,  # ruff: ignore[import-private-name]
-    _is_blank_value,  # ruff: ignore[import-private-name]
     merge_dict_values,
     merge_missing_dict_values,
     merge_present_dict_values,
 )
+from custom_components.jackery_solarvault.ingest import is_blank
 
 
 class TestDictListIdentityValues:
@@ -46,37 +46,37 @@ class TestDictListIdentityValues:
 
 
 class TestIsBlankValue:
-    """Test _is_blank_value helper."""
+    """Test the single ingest blank-value rule."""
 
     def test_returns_true_for_none(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value(None) is True
+        assert is_blank(None) is True
 
     def test_returns_true_for_empty_string(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value("") is True
+        assert is_blank("") is True
 
     def test_returns_true_for_whitespace_string(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value("   ") is True
+        assert is_blank("   ") is True
 
     def test_returns_true_for_empty_list(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value([]) is True
+        assert is_blank([]) is True
 
     def test_returns_true_for_empty_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value({}) is True
+        assert is_blank({}) is True
 
     def test_returns_false_for_non_blank_string(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value("value") is False
+        assert is_blank("value") is False
 
     def test_returns_false_for_non_blank_list(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value([1, 2]) is False
+        assert is_blank([1, 2]) is False
 
     def test_returns_false_for_non_blank_dict(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value({"key": "value"}) is False
+        assert is_blank({"key": "value"}) is False
 
     def test_returns_false_for_zero(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value(0) is False
+        assert is_blank(0) is False
 
     def test_returns_false_for_false_bool(self) -> None:  # ruff: ignore[undocumented-public-method, no-self-use]
-        assert _is_blank_value(False) is False
+        assert is_blank(False) is False
 
 
 class TestCleanDictListUpdate:

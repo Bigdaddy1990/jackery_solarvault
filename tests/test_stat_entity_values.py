@@ -24,6 +24,7 @@ from custom_components.jackery_solarvault.const import (
     FIELD_CT_TOTAL_PHASE_ENERGY,
     PAYLOAD_LOCAL_DAILY_ENERGY,
 )
+from custom_components.jackery_solarvault.descriptions.sensor import _section_share  # ruff: ignore[import-private-name]
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
@@ -352,11 +353,15 @@ def test_battery_week_replaces_stale_today_bucket_with_local_day_total() -> None
 
 
 def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
-    """Open CT week/month/year totals include the latest 0.528 kWh day."""
+    """Open CT week/month/year totals include the latest 0.528 kWh day.
+
+    The closed buckets come from ``device/stat/ct`` itself; the device grid
+    side (``device/stat/onGrid``) is a different boundary and never feeds CT.
+    """
     today = datetime(2026, 8, 21, tzinfo=UTC).date()
     payload = {
-        "device_home_stat_week": {
-            "totalInGridEnergy": 0.02,
+        "device_ct_stat_week": {
+            "totalInCtEnergy": 0.02,
             APP_CHART_SERIES_Y1: [0.0, 0.0, 0.02, 0.0, 0.0, 0.0, 0.0],
             APP_STAT_UNIT: APP_UNIT_KWH,
             APP_REQUEST_META: {
@@ -365,8 +370,8 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
                 APP_REQUEST_END_DATE: "2026-08-23",
             },
         },
-        "device_home_stat_month": {
-            "totalInGridEnergy": 0.29,
+        "device_ct_stat_month": {
+            "totalInCtEnergy": 0.29,
             APP_CHART_SERIES_Y1: [
                 0.14,
                 0.06,
@@ -407,8 +412,8 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
                 APP_REQUEST_END_DATE: "2026-08-31",
             },
         },
-        "device_home_stat_year": {
-            "totalInGridEnergy": 2.41,
+        "device_ct_stat_year": {
+            "totalInCtEnergy": 2.41,
             APP_CHART_SERIES_Y1: [
                 0.0,
                 0.0,
@@ -688,25 +693,32 @@ def test_device_daily_flow_falls_back_to_local_kwh_delta(sensor_key: str) -> Non
 
 
 def _today_battery_value(
-    primary: float | None,
-    fallback: float | None,
+    primary: float | str | None,
+    fallback: float | str | None,
+    *,
+    key: str = "today_battery_energy",
+    curve: list[int] | None = None,
 ) -> float | None:
-    """Resolve today battery energy from the two independent HTTP sources."""
-    description = next(
-        desc for desc in STAT_DESCRIPTIONS if desc.key == "today_battery_energy"
-    )
+    """Resolve a today battery value from its two independent HTTP sources."""
+    description = next(desc for desc in STAT_DESCRIPTIONS if desc.key == key)
     fallback_section, fallback_key = description.fallback_sources[0]
     primary_source = {description.stat_key: primary} if primary is not None else {}
     fallback_source = {fallback_key: fallback} if fallback is not None else {}
+    sections = {
+        description.section: primary_source,
+        fallback_section: fallback_source,
+    }
+    if curve is not None:
+        curve_section, curve_key = description.fallback_sources[1]
+        sections[curve_section] = {
+            curve_key: 0,
+            APP_CHART_SERIES_Y1: curve,
+            APP_STAT_UNIT: "W",
+        }
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(
-        data={
-            _DEVICE_ID: {
-                description.section: primary_source,
-                fallback_section: fallback_source,
-            },
-        },
+        data={_DEVICE_ID: sections},
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
@@ -733,6 +745,35 @@ def test_today_battery_rejects_single_source_zero() -> None:
 def test_today_battery_accepts_two_source_zero() -> None:
     """Two independent HTTP zero observations corroborate a real zero."""
     assert _today_battery_value(0.0, 0.0) == pytest.approx(0.0)
+
+
+def test_today_battery_charge_replaces_stalled_system_zero() -> None:
+    """Live 2026-09-27: systemStatistic stayed 0.00 while deviceStatistic counted."""
+    value = _today_battery_value("0.00", "7.22", key="today_battery_charge_energy")
+    assert value == pytest.approx(7.22)
+
+
+def test_today_battery_charge_keeps_present_system_value() -> None:
+    """A non-zero system value is authoritative; the fallback only fills zero."""
+    value = _today_battery_value("2.94", "2.50", key="today_battery_charge_energy")
+    assert value == pytest.approx(2.94)
+
+
+def test_today_battery_charge_keeps_zero_without_positive_fallback() -> None:
+    """Zero stays zero when the device statistic also reports zero."""
+    value = _today_battery_value("0.00", "0.00", key="today_battery_charge_energy")
+    assert value == pytest.approx(0.0)
+
+
+def test_today_battery_charge_uses_measured_curve_when_cloud_totals_are_zero() -> None:
+    """A measured W curve beats two stale 0 kWh Cloud day scalars."""
+    value = _today_battery_value(
+        "0.00",
+        "0.00",
+        key="today_battery_charge_energy",
+        curve=[600] * 12 + [0] * 276,
+    )
+    assert value == pytest.approx(0.6)
 
 
 def _period_sensor(reset_period: str) -> JackeryStatSensor:
@@ -782,3 +823,22 @@ def test_day_period_sensor_still_reports_last_reset() -> None:
 
     assert sensor._attr_state_class is SensorStateClass.TOTAL  # ruff: ignore[private-member-access]
     assert isinstance(sensor.last_reset, datetime)
+
+
+@pytest.mark.parametrize(
+    ["shares", "expected"],
+    [
+        [{"ac": 0, "home": 0, "pv": 0}, None],
+        [{"ac": 0, "home": 2, "pv": 98}, 98],
+        [{"ac": 0, "home": 0, "pv": 100}, 100],
+    ],
+)
+def test_all_zero_share_split_is_unknown(
+    shares: dict[str, int], expected: int | None
+) -> None:
+    """An all-zero split is the cloud's not-aggregated placeholder, not 0 %."""
+    entity = SimpleNamespace(
+        payload_section_for_sources=lambda _section: {"batterySources": shares}
+    )
+    value = _section_share(cast("Any", entity), "battery", "batterySources", "pv")
+    assert value == expected

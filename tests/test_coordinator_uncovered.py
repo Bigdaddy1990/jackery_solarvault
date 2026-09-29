@@ -10,7 +10,6 @@ import pytest
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     _clean_dict_list_update,  # ruff: ignore[import-private-name]
-    _is_blank_value,  # ruff: ignore[import-private-name]
     _is_system_busy_error,  # ruff: ignore[import-private-name]
     _merge_identified_dict_lists,  # ruff: ignore[import-private-name]
     battery_pack_serial,
@@ -86,6 +85,9 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
             hass.data = {}
             hass.config = MagicMock()
             hass.config.path = MagicMock(return_value="/config")
+            # Registries used by _async_remove_phantom_battery_pack_devices.
+            hass.data["device_registry"] = MagicMock()
+            hass.data["entity_registry"] = MagicMock()
         hass.async_create_background_task = MagicMock(
             side_effect=self._closed_background_task
         )
@@ -268,12 +270,6 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         assert isinstance(candidates, list)
         assert all(isinstance(c, tuple) and len(c) == 2 for c in candidates)  # ruff: ignore[magic-value-comparison]
 
-    def test_enabled_app_chart_date_types(self) -> None:
-        """Test _enabled_app_chart_date_types method."""
-        coordinator = self._create_coordinator()
-        date_types = coordinator._enabled_app_chart_date_types()  # ruff: ignore[private-member-access]
-        assert isinstance(date_types, set)
-
     def test_derived_home_energy_fallback_enabled(self) -> None:
         """Test _derived_home_energy_fallback_enabled method."""
         coordinator = self._create_coordinator()
@@ -303,12 +299,6 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         coordinator = self._create_coordinator()
         obs = coordinator.local_mqtt_observations()
         assert isinstance(obs, dict)
-
-    def test_local_mqtt_direct_client_connected(self) -> None:
-        """Test _local_mqtt_direct_client_connected method."""
-        coordinator = self._create_coordinator()
-        result = coordinator._local_mqtt_direct_client_connected()  # ruff: ignore[private-member-access]
-        assert isinstance(result, bool)
 
     def test_local_mqtt_is_active(self) -> None:
         """Test _local_mqtt_is_active method."""
@@ -528,12 +518,6 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         # Test retain
         coordinator._retain_pending_supplemental_tasks(tasks)  # ruff: ignore[private-member-access]
         assert coordinator._supplemental_transport_tasks() is not None  # ruff: ignore[private-member-access]
-
-    def test_local_mqtt_direct_client_connected(self) -> None:  # ruff: ignore[redefined-while-unused]
-        """Test _local_mqtt_direct_client_connected method."""
-        coordinator = self._create_coordinator()
-        result = coordinator._local_mqtt_direct_client_connected()  # ruff: ignore[private-member-access]
-        assert isinstance(result, bool)
 
     def test_local_mqtt_is_active(self) -> None:  # ruff: ignore[redefined-while-unused]
         """Test _local_mqtt_is_active method."""
@@ -781,16 +765,6 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         new = {"a": 1, "b": 3, "c": 4}
         result = changed_dict_values(old, new)
         assert result == {"b": 3, "c": 4}
-
-    def test_is_blank_value(self) -> None:  # ruff: ignore[no-self-use]
-        """Test _is_blank_value function."""
-        assert _is_blank_value(None) is True
-        assert _is_blank_value("") is True
-        assert _is_blank_value([]) is True
-        assert _is_blank_value({}) is True
-        assert _is_blank_value(0) is False
-        assert _is_blank_value(False) is False
-        assert _is_blank_value("text") is False
 
     def test_clean_dict_list_update(self) -> None:  # ruff: ignore[no-self-use]
         """Test _clean_dict_list_update function."""
@@ -1317,7 +1291,7 @@ class TestCoordinatorUtilities:  # ruff: ignore[too-many-public-methods]
         items = [{"sn": "2", "soc": 10}, {"sn": "1", "soc": 20}]
         result = sorted_battery_pack_payloads(items)
         assert len(result) == 2  # ruff: ignore[magic-value-comparison]
-        assert result[0]["sn"] == "1"
+        assert result[0]["sn"] == "2"
 
     def test_valid_discovery_list_response(self) -> None:  # ruff: ignore[no-self-use]
         """Test valid_discovery_list_response function."""

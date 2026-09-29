@@ -2,7 +2,7 @@
 
 from collections import Counter
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -23,6 +23,9 @@ from custom_components.jackery_solarvault.sensor import (
     JackerySystemMetaSensor,
 )
 from homeassistant.helpers.entity import EntityCategory
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _SPECIAL_DAY_SIBLINGS = {
     "pv_week_energy": "device_today_pv_energy",
@@ -83,6 +86,14 @@ def test_default_power_is_a_disabled_diagnostic() -> None:
     assert description.entity_category == EntityCategory.DIAGNOSTIC
 
 
+def test_savings_price_is_not_a_sensor() -> None:
+    """The calculation price stays in diagnostics without a duplicate entity."""
+    assert all(
+        item.key != "savings_price"
+        for item in sensor_module.SAVINGS_DETAIL_SENSOR_DESCRIPTIONS
+    )
+
+
 def test_all_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
     """Every diagnostic description avoids recorder load until explicitly enabled."""
     groups = (
@@ -116,6 +127,7 @@ def test_all_diagnostic_sensor_descriptions_are_disabled_by_default() -> None:
 
 
 async def _setup_grid_standard_entities(
+    hass: HomeAssistant,
     value: object,
     *,
     extra_payload: dict[str, Any] | None = None,
@@ -134,6 +146,7 @@ async def _setup_grid_standard_entities(
     coordinator.async_add_listener.return_value = lambda: None
     coordinator.has_smart_meter_accessory.return_value = False
     entry = SimpleNamespace(
+        entry_id="test-entry",
         data={},
         options={},
         runtime_data=coordinator,
@@ -141,15 +154,17 @@ async def _setup_grid_standard_entities(
     )
     added: list[Any] = []
 
-    await cast("Any", sensor_module.async_setup_entry)(None, entry, added.extend)
+    await cast("Any", sensor_module.async_setup_entry)(hass, entry, added.extend)
     return added
 
 
-async def test_grid_standard_is_a_read_only_diagnostic_sensor() -> None:
+async def test_grid_standard_is_a_read_only_diagnostic_sensor(
+    hass: HomeAssistant,
+) -> None:
     """System grid-standard metadata is exposed only as a diagnostic sensor."""
     device_id = "dev-1"
 
-    added = await _setup_grid_standard_entities(20)
+    added = await _setup_grid_standard_entities(hass, 20)
 
     entity = next(
         candidate
@@ -164,17 +179,20 @@ async def test_grid_standard_is_a_read_only_diagnostic_sensor() -> None:
 
 @pytest.mark.parametrize("value", [[20], {"code": 20}])
 async def test_malformed_grid_standard_does_not_abort_sensor_setup(
+    hass: HomeAssistant,
     value: object,
 ) -> None:
     """Non-scalar API values are ignored instead of aborting platform setup."""
-    added = await _setup_grid_standard_entities(value)
+    added = await _setup_grid_standard_entities(hass, value)
 
     assert all(candidate.unique_id != "dev-1_grid_standard" for candidate in added)
 
 
-async def test_empty_optional_symmetry_stats_do_not_create_unknown_entities() -> None:
+async def test_empty_optional_symmetry_stats_do_not_create_unknown_entities(
+    hass: HomeAssistant,
+) -> None:
     """An absent ATS statistics family must not create enabled unknown sensors."""
-    added = await _setup_grid_standard_entities(None)
+    added = await _setup_grid_standard_entities(hass, None)
 
     assert all(
         candidate.unique_id
@@ -186,9 +204,12 @@ async def test_empty_optional_symmetry_stats_do_not_create_unknown_entities() ->
     )
 
 
-async def test_observed_symmetry_stats_register_both_entities() -> None:
+async def test_observed_symmetry_stats_register_both_entities(
+    hass: HomeAssistant,
+) -> None:
     """The optional ATS entities appear once the HTTP endpoint proves support."""
     added = await _setup_grid_standard_entities(
+        hass,
         None,
         extra_payload={
             f"{APP_SECTION_SYMMETRY_STAT}_{DATE_TYPE_DAY}": {

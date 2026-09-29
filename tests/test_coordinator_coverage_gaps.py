@@ -1,21 +1,13 @@
 """Targeted tests for uncovered lines in coordinator.py to achieve 100% coverage."""
 
-from datetime import date
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
 
-from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_YEAR,
-)
 from custom_components.jackery_solarvault.coordinator import (
     MqttConnectionManager,
-    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
     _load_mqtt_push_client,  # ruff: ignore[import-private-name]
     mqtt_connect_failure_signature,
 )
@@ -27,95 +19,6 @@ def test_load_mqtt_push_client_imports_correctly() -> None:
     client_class = _load_mqtt_push_client()
     assert client_class is not None
     assert client_class.__name__ == "JackeryMqttPushClient"
-
-
-class TestBackfillPeriodIsClosed:
-    """Test _backfill_period_is_closed edge cases for all date types."""
-
-    def test_day_type_closed_when_yesterday(self) -> None:  # ruff: ignore[no-self-use]
-        """DAY bucket is closed when period_end < today."""
-        today = date(2026, 8, 16)
-        yesterday = date(2026, 8, 15)
-        assert _backfill_period_is_closed(DATE_TYPE_DAY, yesterday, today=today) is True
-
-    def test_day_type_open_when_today(self) -> None:  # ruff: ignore[no-self-use]
-        """DAY bucket is open when period_end == today."""
-        today = date(2026, 8, 16)
-        assert _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today) is False
-
-    def test_week_type_closed_when_last_week(self) -> None:  # ruff: ignore[no-self-use]
-        """WEEK bucket is closed when week has fully elapsed."""
-        today = date(2026, 8, 16)  # Sunday
-        last_week_start = date(2026, 8, 3)  # Previous Monday
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_WEEK, last_week_start, today=today)
-            is True
-        )
-
-    def test_week_type_open_when_current_week(self) -> None:  # ruff: ignore[no-self-use]
-        """WEEK bucket is open during current week."""
-        today = date(2026, 8, 16)
-        this_week_start = date(2026, 8, 10)  # Current Monday
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_WEEK, this_week_start, today=today)
-            is False
-        )
-
-    def test_month_type_december_boundary(self) -> None:  # ruff: ignore[no-self-use]
-        """MONTH bucket handles December -> January year rollover correctly (line 864)."""  # ruff: ignore[line-too-long]
-        today = date(2026, 1, 15)
-        dec_start = date(2025, 12, 1)
-        # December period ends Dec 31, which is < Jan 15
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, dec_start, today=today) is True
-        )
-
-    def test_month_type_january_open(self) -> None:  # ruff: ignore[no-self-use]
-        """MONTH bucket for January is open in mid-January."""
-        today = date(2026, 1, 15)
-        jan_start = date(2026, 1, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, jan_start, today=today) is False
-        )
-
-    def test_month_type_regular_month_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """Regular month boundary (not December) works correctly."""
-        today = date(2026, 8, 16)
-        july_start = date(2026, 7, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, july_start, today=today) is True
-        )
-
-    def test_month_type_current_month_open(self) -> None:  # ruff: ignore[no-self-use]
-        """Current month is open."""
-        today = date(2026, 8, 16)
-        aug_start = date(2026, 8, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_MONTH, aug_start, today=today) is False
-        )
-
-    def test_year_type_closed_when_last_year(self) -> None:  # ruff: ignore[no-self-use]
-        """YEAR bucket is closed for previous year."""
-        today = date(2026, 8, 16)
-        last_year_start = date(2025, 1, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_YEAR, last_year_start, today=today)
-            is True
-        )
-
-    def test_year_type_open_when_current_year(self) -> None:  # ruff: ignore[no-self-use]
-        """YEAR bucket is open for current year."""
-        today = date(2026, 8, 16)
-        this_year_start = date(2026, 1, 1)
-        assert (
-            _backfill_period_is_closed(DATE_TYPE_YEAR, this_year_start, today=today)
-            is False
-        )
-
-    def test_unknown_date_type_returns_false(self) -> None:  # ruff: ignore[no-self-use]
-        """Unknown date_type returns False (line 875)."""
-        today = date(2026, 8, 16)
-        assert _backfill_period_is_closed("UNKNOWN", today, today=today) is False
 
 
 class TestMqttConnectFailureSignature:

@@ -15,6 +15,7 @@ These tests lock down two things:
 2. A real guarded update cycle passes that resolved id to the CT-stat API.
 """
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -116,7 +117,9 @@ async def test_update_cycle_uses_accessory_id_for_ct_stats(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator.async_set_updated_data(snapshot)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]  # isort: skip
         assert slow_metrics_task is not None
         await slow_metrics_task
@@ -199,6 +202,8 @@ async def test_update_cycle_uses_l2_for_every_empty_l1_ct_period(
 
     try:
         result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator.async_set_updated_data(result)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         slow_metrics_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]  # isort: skip
         assert slow_metrics_task is not None
         await slow_metrics_task

@@ -1,7 +1,7 @@
 """HTTP-only statistic ownership and period coverage contracts."""
 
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
@@ -42,6 +42,7 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
+    DATE_TYPE_YEAR,
     FIELD_CT_TOTAL_PHASE_ENERGY,
     FIELD_CURRENCY,
     FIELD_DYNAMIC_OR_SINGLE,
@@ -92,6 +93,16 @@ def _stat_sensor(
         local_period_energy_kwh=lambda _device_id, _metric_key, **_kwargs: (
             local_period_kwh
         ),
+        _price={"currency": "$"},
+        _pv_trends={},
+        _home_trends={},
+        _battery_trends={},
+        _statistic={},
+        _pv_stat={},
+        _battery_stat={},
+        _home_stat={},
+        _ct_stat={},
+        _eps_stat={},
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
@@ -777,6 +788,25 @@ def test_ct_week_uses_fully_covered_local_period_when_cloud_is_placeholder() -> 
     )
 
 
+@pytest.mark.parametrize(
+    ["sensor_key", "period"],
+    [
+        ["ct_input_month_energy", DATE_TYPE_MONTH],
+        ["ct_output_year_energy", DATE_TYPE_YEAR],
+    ],
+)
+def test_ct_month_and_year_use_local_period_when_cloud_meter_has_none(
+    sensor_key: str, period: str
+) -> None:
+    """Live 2026-09-28: Shelly cloud meter, device/stat/ct month/year are {}."""
+    payload: dict[str, Any] = {f"{APP_SECTION_CT_STAT}_{period}": {}}
+
+    sensor = _stat_sensor(sensor_key, payload, local_period_kwh=212.84)
+
+    assert sensor.native_value == pytest.approx(212.84)
+    assert sensor.extra_state_attributes["fallback"] == "local_lifetime_delta"
+
+
 @pytest.mark.asyncio()
 async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     hass: HomeAssistant,
@@ -786,7 +816,9 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        coordinator.async_set_updated_data(snapshot)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
         await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
 
@@ -813,6 +845,44 @@ async def test_http_only_cycle_fetches_every_proven_device_stat_period(
 
 
 @pytest.mark.asyncio()
+async def test_statistics_timer_fetches_after_property_polls_stop(
+    hass: HomeAssistant,
+) -> None:
+    """Statistics keep their HTTP cadence without another property request."""
+    api = make_update_cycle_api()
+    coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
+    try:
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        if coordinator._slow_metrics_bg_task is not None:  # ruff: ignore[private-member-access]
+            await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        coordinator.async_set_updated_data(snapshot)
+        coordinator._slow_cache.clear()  # ruff: ignore[private-member-access]
+        api.async_get_device_property.reset_mock()
+        api.async_get_device_battery_stat.reset_mock()
+        api.async_get_device_battery_stat.return_value = {
+            "totalCharge": 1.25,
+            APP_STAT_UNIT: APP_UNIT_KWH,
+        }
+
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
+        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+
+        api.async_get_device_property.assert_not_awaited()
+        assert api.async_get_device_battery_stat.await_count >= len(
+            APP_PERIOD_DATE_TYPES
+        )
+        assert coordinator.data is not None
+        battery_day = coordinator.data[DEVICE_ID][
+            f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}"
+        ]
+        assert battery_day["totalCharge"] == pytest.approx(1.25)
+    finally:
+        await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+
+@pytest.mark.asyncio()
 async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     hass: HomeAssistant,
 ) -> None:
@@ -833,13 +903,13 @@ async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        coordinator.async_set_updated_data(snapshot)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
         await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
-
-        result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
-
-        assert result[DEVICE_ID][APP_SECTION_TODAY_ENERGY][
+        assert coordinator.data is not None
+        assert coordinator.data[DEVICE_ID][APP_SECTION_TODAY_ENERGY][
             APP_STAT_TODAY_HOME_LOAD_ENERGY
         ] == pytest.approx(0.75)
     finally:
@@ -893,7 +963,9 @@ async def test_slow_http_refresh_bounds_request_concurrency_without_blocking_pro
     slow_refresh_task = None
 
     try:
-        await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        coordinator.async_set_updated_data(snapshot)
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
         slow_refresh_task = coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
         assert slow_refresh_task is not None
 
@@ -987,3 +1059,57 @@ def test_pv_revenue_day_derives_single_tariff_value_from_local_pv() -> None:
         "price_source": f"{PAYLOAD_PRICE}.{FIELD_SINGLE_PRICE}",
         "currency": "$",
     }
+
+
+def _revenue_payload(cloud_revenue: str) -> dict[str, Any]:
+    return {
+        APP_SECTION_PV_TRENDS: {
+            APP_STAT_TOTAL_SOLAR_REVENUE: cloud_revenue,
+        },
+        PAYLOAD_LOCAL_DAILY_ENERGY: {APP_DEVICE_STAT_PV_ENERGY: 1182},
+        PAYLOAD_PRICE: {FIELD_DYNAMIC_OR_SINGLE: 2, FIELD_SINGLE_PRICE: 0.28},
+    }
+
+
+def test_pv_revenue_day_replaces_lagging_positive_cloud_value() -> None:
+    """Live 2026-09-27: cloud said 0.06 EUR while 11.82 kWh PV were observed."""
+    sensor = _stat_sensor("pv_revenue_day", _revenue_payload("0.06"))
+
+    assert sensor.native_value == pytest.approx(3.31)
+    assert sensor.extra_state_attributes["fallback"] == "derived_single_tariff_revenue"
+
+
+def test_pv_revenue_day_keeps_cloud_value_covering_observed_pv() -> None:
+    """A cloud total at or above the derived value stays authoritative."""
+    sensor = _stat_sensor("pv_revenue_day", _revenue_payload("3.50"))
+
+    assert float(cast("str", sensor.native_value)) == pytest.approx(3.5)
+
+
+@pytest.mark.parametrize(
+    ["sensor_key", "expected"],
+    [
+        ["ct_input_day_energy", 5.78],
+        ["ct_input_week_energy", None],
+        ["ct_input_month_energy", None],
+        ["ct_input_year_energy", None],
+    ],
+)
+def test_today_local_delta_is_never_a_week_month_or_year_total(
+    sensor_key: str, expected: float | None, freezer: Any
+) -> None:
+    """Live 2026-09-27: every CT period showed today's 5.78 kWh.
+
+    Mid-period date: on a period's first day its total legitimately is today's.
+    """
+    freezer.move_to("2026-09-24 12:00:00+00:00")
+    sensor = _stat_sensor(
+        sensor_key,
+        {},
+        local_daily_kwh={FIELD_CT_TOTAL_PHASE_ENERGY: 5.78},
+        local_period_kwh=None,
+    )
+
+    assert sensor.native_value == (
+        pytest.approx(expected) if expected is not None else None
+    )

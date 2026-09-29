@@ -6,7 +6,6 @@ as monotonically increasing lifetime counters.
 """
 
 import ast
-import json
 from pathlib import Path
 import re
 
@@ -528,7 +527,31 @@ def test_savings_detail_energy_sensor_state_classes_match_semantics() -> None:
     assert found["savings_conversion_loss_year_energy"][1] == "TOTAL"
     assert found["savings_pv_residual_year_energy"][1] == "TOTAL"
     assert found["savings_calculated_total"] == ("MONETARY", "TOTAL")
-    assert found["savings_price"] == (None, "MEASUREMENT")
+    assert "savings_price" not in found
+
+
+def test_derived_main_battery_energy_has_recorder_state_class() -> None:
+    """Derived charge/discharge counters must retain HA energy statistics."""
+    tree = ast.parse(SENSOR_DESCRIPTIONS_PATH.read_text(encoding="utf-8"))
+    descriptions = {
+        key: call
+        for call in ast.walk(tree)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "JackerySensorDescription"
+        if (key := _const_keyword(call, "key"))
+        in {
+            "main_battery_charge_energy_derived",
+            "main_battery_discharge_energy_derived",
+        }
+    }
+    assert set(descriptions) == {
+        "main_battery_charge_energy_derived",
+        "main_battery_discharge_energy_derived",
+    }
+    for description in descriptions.values():
+        assert _device_class_keyword(description) == "ENERGY"
+        assert _state_class_keyword(description) == "TOTAL_INCREASING"
 
 
 def test_battery_charge_discharge_balance_is_not_published_as_cumulative_loss() -> None:
@@ -589,7 +612,7 @@ def test_stat_state_class_matrix_for_totals_periods_and_prices() -> None:
         "total_revenue": ("TOTAL_INCREASING", None),
         "total_carbon_saved": ("TOTAL_INCREASING", None),
         # power_price is a spot €/kWh reading: MEASUREMENT, consistent
-        # with savings_price below (no device class, no reset period).
+        # with no device class or reset period.
         "power_price": ("MEASUREMENT", None),
     }
     calls = _stat_description_calls()
@@ -655,7 +678,9 @@ def test_day_period_sensors_fallback_to_current_day_chart_bucket() -> None:
         "class JackeryStatSensor(JackeryEntity, RestoreSensor):", 1
     )[1].split("class JackeryBatteryPackSensor", 1)[0]
 
-    assert "def _chart_value_for_day" in sensor_source
+    assert "def chart_value_for_day" in (COMPONENT_PATH / "util.py").read_text(
+        encoding="utf-8"
+    )
     assert "def _current_day_bucket_from_period_chart" in stat_block
     assert "_current_day_bucket_from_period_chart(" in stat_block
     assert "current_day_bucket_from_" in stat_block
@@ -703,140 +728,49 @@ def test_statistics_backfill_state_is_persisted_on_demand() -> None:
     assert "def statistics_import_diagnostics" in coordinator_source
 
 
-def test_week_month_year_statistic_toggles_filter_imports() -> None:
-    """W/M/Y toggles stay aligned across imports, config flow, and strings."""
-    const_source = (COMPONENT_PATH / "const.py").read_text(encoding="utf-8")
-    assert (
-        'CONF_ENABLE_WEEK_STATISTICS: Final = "enable_week_statistics"'
-    ) in const_source
-    assert (
-        'CONF_ENABLE_MONTH_STATISTICS: Final = "enable_month_statistics"'
-    ) in const_source
-    assert (
-        'CONF_ENABLE_YEAR_STATISTICS: Final = "enable_year_statistics"'
-    ) in const_source
-    assert "DEFAULT_ENABLE_WEEK_STATISTICS: Final = True" in const_source
-    assert "DEFAULT_ENABLE_MONTH_STATISTICS: Final = True" in const_source
-    assert "DEFAULT_ENABLE_YEAR_STATISTICS: Final = True" in const_source
-
+def test_week_month_year_statistic_toggles_are_removed() -> None:
+    """HA derives W/M/Y from the day-energy sensor; no period toggles remain."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
-    assert "def _enabled_app_chart_date_types" in coordinator_source
-
-    import_fn = coordinator_source.split(
-        "async def _async_import_app_chart_statistics", 1
-    )[1].split("\n    async def _async_import_current_app_chart_statistics_job", 1)[0]
-    assert "enabled_date_types = self._enabled_app_chart_date_types()" in import_fn
-    assert "if date_type not in enabled_date_types:" in import_fn
-
-    # Entity-id imports were removed because HA Recorder owns those rows.
-    # Options therefore gate the current external import and period queue only.
+    assert "def _enabled_app_chart_date_types" not in coordinator_source
+    assert "async def _async_import_app_chart_statistics" not in coordinator_source
     assert "def _current_app_chart_entity_source_batches" not in coordinator_source
-    assert (
-        "async def _async_import_current_app_chart_entity_statistics"
-        not in coordinator_source
-    )
 
-    # Config-flow schemas expose the three toggles in both the options-flow
-    # and reconfigure entry points.
     config_flow_source = (COMPONENT_PATH / "config_flow.py").read_text(encoding="utf-8")
     for key in (
         "CONF_ENABLE_WEEK_STATISTICS",
         "CONF_ENABLE_MONTH_STATISTICS",
         "CONF_ENABLE_YEAR_STATISTICS",
     ):
-        # Both schemas (options-flow init + reconfigure) must reference each
-        # constant — at least two occurrences per key.
-        assert config_flow_source.count(key) >= 2, key  # ruff: ignore[magic-value-comparison]
+        assert key not in config_flow_source, key
 
-    # Translations carry the new labels in every locale so HA renders them.
-    base = json.loads((COMPONENT_PATH / "strings.json").read_text(encoding="utf-8"))
-    for key in (
-        "enable_week_statistics",
-        "enable_month_statistics",
-        "enable_year_statistics",
-    ):
-        assert key in base["options"]["step"]["init"]["data"], (
-            f"{key} missing in strings.json options step"
-        )
-        assert key in base["config"]["step"]["reconfigure_credentials"]["data"], (
-            f"{key} missing in strings.json reconfigure_credentials step"
-        )
+    translation_files = [
+        COMPONENT_PATH / "strings.json",
+        *sorted((COMPONENT_PATH / "translations").glob("*.json")),
+    ]
+    for path in translation_files:
+        text = path.read_text(encoding="utf-8")
+        for key in (
+            "enable_week_statistics",
+            "enable_month_statistics",
+            "enable_year_statistics",
+        ):
+            assert key not in text, f"{key} still in {path.name}"
 
 
-def test_day_external_history_backfill_uses_http_day_curves() -> None:
-    """Day history uses its own dated HTTP curve queue and import path."""
+def test_history_import_uses_external_statistics_only() -> None:
+    """Historical app curves must not race HA's own sensor recorder."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
-    assert "def _iter_calendar_days" not in coordinator_source
-    assert "(DATE_TYPE_DAY, self._iter_calendar_days(from_date, to_date))" not in (
-        coordinator_source
-    )
-    day_fetch = coordinator_source.split(
-        "async def _async_fetch_historical_day_chart_source", 1
-    )[1].split(
-        "\n    async def _async_import_historical_day_chart_statistics_for_device",
-        1,
-    )[0]
-    assert "app_period_request_kwargs(DATE_TYPE_DAY, today=target_day)" in day_fetch
-
-    current_day_source = coordinator_source.split(
-        "async def _async_import_day_chart_statistics", 1
-    )[1].split("\n    def _enabled_app_chart_date_types", 1)[0]
-    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in current_day_source
-    assert "APP_DAY_CHART_BUCKET_LABEL" in current_day_source
-    assert "_day_chart_points_for_metric(" in current_day_source
-
-    backfill_source = coordinator_source.split(
-        "async def _async_import_historical_day_chart_statistics_for_device", 1
-    )[1].split("\n    async def _async_http_backfill_recent_day_statistics", 1)[0]
-    assert "EXTERNAL_STAT_BUCKET_DAY_HOURLY" in backfill_source
-    assert "_day_chart_points_for_metric(" in backfill_source
-    assert "_async_add_app_chart_statistics(" in backfill_source
-
-
-def test_entity_id_statistics_import_path_is_removed() -> None:
-    """Recorder imports use stable external statistic IDs, not entity-ID repairs."""
-    coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
-
-    assert "async def _async_import_day_chart_statistics" in coordinator_source
-    assert "async def _async_import_app_chart_statistics" in coordinator_source
-    assert "_async_add_app_chart_statistics(" in coordinator_source
-
-
-def test_statistics_import_uses_http_backfill_without_old_repair_state() -> None:
-    """Automatic backfill is HTTP-only and does not restore old repair state."""
-    src = COORDINATOR_PATH.read_text(encoding="utf-8")
     for removed in (
-        "_STATISTICS_ROLLING_BACKFILL_WINDOW_DAYS",
-        "_STATISTICS_ROLLING_BACKFILL_INTERVAL_SEC",
-        "self._last_statistics_rolling_backfill_monotonic",
-        "def _statistics_rolling_backfill_from_date",
-        "async def async_repair_statistics",
-        "_STATISTICS_BACKFILL_LAST_MANUAL_FROM",
-        "_STATISTICS_BACKFILL_LAST_SOURCE_COUNTS",
+        "async def _async_import_day_chart_statistics",
+        "async def _async_import_app_chart_statistics",
+        "async def _import_collected_repair_buckets",
     ):
-        assert removed not in src
-
-    import_job = src.split(
-        "async def _async_import_current_app_chart_statistics_job", 1
-    )[1].split(
-        "\n    # ------------------------------------------------------------------", 1
-    )[0]
-    backfill_job = src.split("async def _async_advance_statistics_backfill", 1)[
-        1
-    ].split(
-        "\n    # ------------------------------------------------------------------", 1
-    )[0]
-    assert "_statistics_repair_from_date(device_id, today)" not in import_job
-    assert "_statistics_rolling_backfill_from_date(" not in import_job
-    assert "_async_repair_missing_app_chart_statistics(" not in import_job
-    assert "_async_http_backfill_period_statistics(" not in import_job
-    assert "_async_http_backfill_recent_day_statistics(" not in import_job
-    assert "_async_http_backfill_period_statistics(" in backfill_job
-    assert "_async_http_backfill_recent_day_statistics(" in backfill_job
-    assert backfill_job.index("_async_http_backfill_period_statistics(") < (
-        backfill_job.index("_async_http_backfill_recent_day_statistics(")
-    )
+        assert removed not in coordinator_source
+    history_import = coordinator_source.split(
+        "async def _async_import_historical_day_chart_statistics_for_device", 1
+    )[1].split("\n    def _verified_historical_day_totals", 1)[0]
+    assert "entity_statistic_id=" not in history_import
 
 
 def test_statistics_repair_source_matrix_is_removed() -> None:

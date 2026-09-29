@@ -1,12 +1,13 @@
 """Behavioral tests for legacy entity unique-ID matching."""
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault import (
-    _async_migrate_grid_standard_entity,  # ruff: ignore[import-private-name]
+    _async_clean_legacy_entities,  # ruff: ignore[import-private-name]
     _async_migrate_portable_screen_entity,  # ruff: ignore[import-private-name]
     _legacy_suffix_matches,  # ruff: ignore[import-private-name]
 )
@@ -164,98 +165,6 @@ def test_portable_screen_migration_preserves_user_registry_metadata(
     assert migrated.disabled_by is er.RegistryEntryDisabler.USER
 
 
-def test_grid_standard_migration_creates_diagnostic_sensor(
-    hass: HomeAssistant,
-) -> None:
-    """The obsolete text entry becomes a read-only diagnostic sensor."""
-    entry = _config_entry(hass)
-    registry = er.async_get(hass)
-    area = ar.async_get(hass).async_create("Utility room")
-    old_entry = _grid_standard_text(registry, entry)
-    old_entry = registry.async_update_entity(
-        old_entry.entity_id,
-        area_id=area.id,
-        icon="mdi:transmission-tower",
-        name="Grid code",
-    )
-
-    _async_migrate_grid_standard_entity(hass, entry)
-
-    target_id = registry.async_get_entity_id("sensor", DOMAIN, _GRID_STANDARD_UID)
-    assert target_id is not None
-    migrated = registry.async_get(target_id)
-    assert migrated is not None
-    assert registry.async_get(old_entry.entity_id) is None
-    assert migrated.entity_category == EntityCategory.DIAGNOSTIC
-    assert migrated.translation_key == "grid_standard"
-    assert migrated.name == "Grid code"
-    assert migrated.icon == "mdi:transmission-tower"
-    assert migrated.area_id == area.id
-
-
-def test_grid_standard_migration_keeps_existing_same_entry_sensor(
-    hass: HomeAssistant,
-) -> None:
-    """An existing sensor is retained while the obsolete text entry is removed."""
-    entry = _config_entry(hass)
-    registry = er.async_get(hass)
-    target = _grid_standard_sensor(
-        registry,
-        entry,
-        suggested_object_id="existing_grid_standard",
-    )
-    target = registry.async_update_entity(
-        target.entity_id,
-        icon="mdi:meter-electric",
-        name="Keep this sensor",
-    )
-    old_entry = _grid_standard_text(registry, entry)
-
-    _async_migrate_grid_standard_entity(hass, entry)
-
-    assert registry.async_get(old_entry.entity_id) is None
-    preserved = registry.async_get(target.entity_id)
-    assert preserved is not None
-    assert preserved.name == "Keep this sensor"
-    assert preserved.icon == "mdi:meter-electric"
-
-
-def test_grid_standard_migration_is_idempotent(hass: HomeAssistant) -> None:
-    """Repeating setup leaves the already migrated sensor unchanged."""
-    entry = _config_entry(hass)
-    registry = er.async_get(hass)
-    old_entry = _grid_standard_text(registry, entry)
-
-    _async_migrate_grid_standard_entity(hass, entry)
-    target_id = registry.async_get_entity_id("sensor", DOMAIN, _GRID_STANDARD_UID)
-    assert target_id is not None
-
-    _async_migrate_grid_standard_entity(hass, entry)
-
-    assert registry.async_get(old_entry.entity_id) is None
-    assert (
-        registry.async_get_entity_id("sensor", DOMAIN, _GRID_STANDARD_UID) == target_id
-    )
-
-
-def test_grid_standard_migration_skips_cross_entry_collision(
-    hass: HomeAssistant,
-) -> None:
-    """A sensor owned by another entry blocks migration without data loss."""
-    source_entry = _config_entry(hass, "source-entry")
-    other_entry = _config_entry(hass, "other-entry")
-    registry = er.async_get(hass)
-    old_entry = _grid_standard_text(registry, source_entry)
-    collision = _grid_standard_sensor(registry, other_entry)
-
-    _async_migrate_grid_standard_entity(hass, source_entry)
-
-    assert registry.async_get(old_entry.entity_id) is not None
-    preserved = registry.async_get(collision.entity_id)
-    assert preserved is not None
-    assert preserved.config_entry_id == other_entry.entry_id
-
-
 def test_portable_screen_migration_keeps_existing_same_entry_select(
     hass: HomeAssistant,
 ) -> None:
@@ -332,3 +241,41 @@ def test_portable_screen_migration_skips_cross_entry_collision(
     preserved = registry.async_get(collision.entity_id)
     assert preserved is not None
     assert preserved.config_entry_id == other_entry.entry_id
+
+
+def test_setup_cleanup_keeps_writable_grid_standard_text(hass: HomeAssistant) -> None:
+    """The editable text and the read-only sensor share one unique_id by design.
+
+    Live 2026-09-26: a stale text->sensor migration removed the text entry on
+    every setup, so HA re-registered it as new on each restart.
+    """
+    entry = _config_entry(hass)
+    entry.runtime_data = SimpleNamespace(data={})
+    registry = er.async_get(hass)
+    text = _grid_standard_text(registry, entry)
+    sensor = _grid_standard_sensor(registry, entry)
+
+    _async_clean_legacy_entities(hass, entry)
+
+    kept = registry.async_get(text.entity_id)
+    assert kept is not None
+    assert kept.id == text.id
+    assert registry.async_get(sensor.entity_id) is not None
+
+
+def test_setup_cleanup_retires_duplicate_alert_count(hass: HomeAssistant) -> None:
+    """Retire the old counter while preserving the documented alarm_count ID."""
+    entry = _config_entry(hass)
+    entry.runtime_data = SimpleNamespace(data={})
+    registry = er.async_get(hass)
+    obsolete = registry.async_get_or_create(
+        "sensor", DOMAIN, "12345_alert_count", config_entry=entry
+    )
+    canonical = registry.async_get_or_create(
+        "sensor", DOMAIN, "12345_alarm_count", config_entry=entry
+    )
+
+    _async_clean_legacy_entities(hass, entry)
+
+    assert registry.async_get(obsolete.entity_id) is None
+    assert registry.async_get(canonical.entity_id) is not None

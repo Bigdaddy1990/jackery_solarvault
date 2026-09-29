@@ -1,14 +1,12 @@
 """Characterisation tests for the statistics backfill date/window helpers."""
 
-from datetime import date, datetime
-from types import SimpleNamespace
+from datetime import date
 
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_HOME_TRENDS,
     PAYLOAD_HOME_TRENDS,
 )
 from custom_components.jackery_solarvault.util import (
-    filter_completed_app_points,
     historical_day_payload_from_sources,
     parse_statistics_backfill_date,
     statistics_current_year_recovery_needed,
@@ -72,49 +70,6 @@ def test_historical_payload_maps_home_trends_section() -> None:
     result = historical_day_payload_from_sources({APP_SECTION_HOME_TRENDS: {"pv": [1]}})
 
     assert result == {PAYLOAD_HOME_TRENDS: {"pv": [1]}}
-
-
-# --- filter_completed_app_points -----------------------------------------
-
-
-def _pt(day: object) -> SimpleNamespace:
-    return SimpleNamespace(start_date=day)
-
-
-def test_filter_points_day_keeps_all() -> None:
-    """Day points are all completed by definition."""
-    points = [_pt(_TODAY)]
-
-    assert filter_completed_app_points(points, "day", "day", _TODAY) == points
-
-
-def test_filter_points_week_excludes_today() -> None:
-    """A week point dated today is still open; yesterday is complete."""
-    today_pt = _pt(_TODAY)
-    yesterday_pt = _pt(date(2024, 5, 14))
-
-    result = filter_completed_app_points(
-        [today_pt, yesterday_pt], "week", "week", _TODAY
-    )
-
-    assert result == [yesterday_pt]
-
-
-def test_filter_points_year_excludes_current_month() -> None:
-    """A yearly point in the current month is open; last month is complete."""
-    this_month = _pt(datetime(2024, 5, 1))
-    last_month = _pt(datetime(2024, 4, 1))
-
-    result = filter_completed_app_points(
-        [this_month, last_month], "year", "year", _TODAY
-    )
-
-    assert result == [last_month]
-
-
-def test_filter_points_skips_non_date_start() -> None:
-    """A point without a usable date is dropped."""
-    assert filter_completed_app_points([_pt("bad")], "week", "week", _TODAY) == []
 
 
 # --- parse_statistics_backfill_date --------------------------------------

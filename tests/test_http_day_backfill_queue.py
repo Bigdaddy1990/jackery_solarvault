@@ -12,6 +12,7 @@ from custom_components.jackery_solarvault import coordinator as coordinator_modu
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
+    APP_SECTION_PV_STAT,
     CT_STAT_TYPE_L1,
     CT_STAT_TYPE_L2,
 )
@@ -112,6 +113,7 @@ async def test_empty_historical_payload_is_not_reported_as_success() -> None:
     ["response", "expected_status"],
     [
         [{}, "empty_ambiguous"],
+        [{"_request": {"beginDate": "2026-04-15"}}, "empty_ambiguous"],
         [{"y": [1.0]}, "fetched"],
     ],
 )
@@ -134,7 +136,7 @@ async def test_single_source_fetch_distinguishes_empty_from_data(
     )
 
     assert status == expected_status
-    assert bool(source) is bool(response)
+    assert bool(source) is (expected_status == "fetched")
 
 
 @pytest.mark.asyncio()
@@ -408,9 +410,7 @@ async def test_transport_failure_is_deferred_not_permanently_lost() -> None:
         return_value=("transport_error", {}),
     )
 
-    for _attempt in range(
-        coordinator_module._STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS  # ruff: ignore[private-member-access]
-    ):
+    for _attempt in range(3):
         result = await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
             {_DEVICE_ID: {}},
             force=True,
@@ -447,7 +447,7 @@ async def test_repeated_empty_day_becomes_terminal_without_queue_loop() -> None:
         return_value=("empty_ambiguous", {}),
     )
 
-    for _attempt in range(coordinator_module._STATISTICS_HTTP_EMPTY_MAX_ATTEMPTS):  # ruff: ignore[private-member-access]
+    for _attempt in range(2):
         await coordinator._async_http_backfill_recent_day_statistics(  # ruff: ignore[private-member-access]
             {_DEVICE_ID: {}},
             force=True,
@@ -462,3 +462,224 @@ async def test_repeated_empty_day_becomes_terminal_without_queue_loop() -> None:
         request_budget=1,
     )
     assert third_run["requests"] == 0
+
+
+def test_imported_days_reopen_once_for_curve_import_rule() -> None:
+    """Days imported while curves were shrunk to a lagging scalar are re-read.
+
+    Until 2026-09-24 the day converter scaled complete 5-minute curves down to
+    a smaller cloud scalar (22.09.: 11.74 kWh curve -> 2.09 kWh). Imported days
+    are never revisited, so the persisted queue reopens them exactly once.
+    """
+    coordinator = _coordinator()
+    obj = cast("Any", coordinator)
+    obj._statistics_backfill_state["devices"][_DEVICE_ID] = {  # ruff: ignore[private-member-access]
+        "http_day_backfill": {
+            "sources": {
+                "device_pv_stat": {
+                    "days": {
+                        "2026-07-20": {"status": "imported", "imported_rows": 0},
+                        "2026-04-01": {"status": "unmapped"},
+                    }
+                }
+            }
+        }
+    }
+
+    _source, days = obj._http_day_backfill_days_state(  # ruff: ignore[private-member-access]
+        _DEVICE_ID, "device_pv_stat"
+    )
+
+    assert days["2026-07-20"] == {"status": "pending"}
+    assert days["2026-04-01"] == {"status": "unmapped"}
+
+    days["2026-07-20"]["status"] = "imported"
+    _source, days = obj._http_day_backfill_days_state(  # ruff: ignore[private-member-access]
+        _DEVICE_ID, "device_pv_stat"
+    )
+
+    assert days["2026-07-20"]["status"] == "imported"
+
+
+def _day_request(day: str) -> dict[str, str]:
+    return {"dateType": "day", "beginDate": day, "endDate": day}
+
+
+def _system_day_api(
+    *,
+    device_pv: dict[str, Any],
+    device_battery: dict[str, Any],
+    pv_trends: dict[str, Any],
+    battery_trends: dict[str, Any],
+    calls: list[str],
+) -> SimpleNamespace:
+    """API boundary with the exact real signatures (no absorbing defaults)."""
+
+    async def async_get_device_pv_stat(  # ruff: ignore[unused-async]  # mirrors the async API boundary
+        device_id: str | int,
+        system_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(f"device_pv:{begin_date}")
+        return device_pv
+
+    async def async_get_device_battery_stat(  # ruff: ignore[unused-async]  # mirrors the async API boundary
+        device_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(f"device_battery:{begin_date}")
+        return device_battery
+
+    async def async_get_pv_trends(  # ruff: ignore[unused-async]  # mirrors the async API boundary
+        system_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(f"sys_pv:{system_id}:{date_type}:{begin_date}:{end_date}")
+        return pv_trends
+
+    async def async_get_battery_trends(  # ruff: ignore[unused-async]  # mirrors the async API boundary
+        system_id: str | int,
+        *,
+        date_type: str = "day",
+        begin_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        calls.append(f"sys_battery:{system_id}:{date_type}:{begin_date}:{end_date}")
+        return battery_trends
+
+    return SimpleNamespace(
+        async_get_device_pv_stat=async_get_device_pv_stat,
+        async_get_device_battery_stat=async_get_device_battery_stat,
+        async_get_pv_trends=async_get_pv_trends,
+        async_get_battery_trends=async_get_battery_trends,
+    )
+
+
+@pytest.mark.asyncio()
+async def test_empty_device_day_falls_back_to_system_day_curves() -> None:
+    """Days the device endpoint answers with ``data: null`` use the system curve.
+
+    Payload logs (2026-08-19..09-24): ``device/stat/pv|battery`` day answers
+    ``data: null`` for every day older than 90 days, while the app still shows
+    5-minute curves. ``sys/pv/statics`` and ``sys/battery/trends`` carry the
+    identical 5-minute samples (same labels and values on overlapping days).
+    """
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
+    calls: list[str] = []
+    cast("Any", coordinator).api = _system_day_api(
+        device_pv={"_request": _day_request("2026-05-15")},
+        device_battery={"_request": _day_request("2026-05-15")},
+        pv_trends={
+            "x": ["12:00", "12:05"],
+            "y": [1200, 1200],
+            "unit": None,
+            "totalSolarEnergy": "0.2",
+            "pvUsage": {"home": 100},
+        },
+        battery_trends={
+            "x": ["12:00", "12:05"],
+            "y1": [600, 0],
+            "y2": [0, 300],
+            "unit": "W",
+            "totalChgEgy": "0.05",
+            "totalDisChgEgy": "0.025",
+        },
+        calls=calls,
+    )
+    payload = {"system": {"id": "sys-1"}}
+
+    pv_status, pv_source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload=payload,
+        target_day=date(2026, 5, 15),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+    bat_status, bat_source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload=payload,
+        target_day=date(2026, 5, 15),
+        section_prefix=APP_SECTION_BATTERY_STAT,
+    )
+
+    assert "sys_pv:sys-1:day:2026-05-15:2026-05-15" in calls
+    assert "sys_battery:sys-1:day:2026-05-15:2026-05-15" in calls
+    assert pv_status == "fetched"
+    assert pv_source["y"] == [1200, 1200]
+    assert pv_source["x"] == ["12:00", "12:05"]
+    assert pv_source["unit"] == "W"
+    assert pv_source["totalSolarEnergy"] == "0.2"
+    assert pv_source["_request"] == _day_request("2026-05-15")
+    assert "pv1Egy" not in pv_source
+    assert bat_status == "fetched"
+    assert bat_source["y1"] == [600, 0]
+    assert bat_source["y2"] == [0, 300]
+    assert bat_source["totalCharge"] == "0.05"
+    assert bat_source["totalDischarge"] == "0.025"
+    assert bat_source["_request"] == _day_request("2026-05-15")
+
+
+@pytest.mark.asyncio()
+async def test_device_day_curve_wins_over_system_curve() -> None:
+    """The fuller device curve (PV1-4) is never displaced by the system curve."""
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
+    calls: list[str] = []
+    device_pv = {
+        "x": ["12:00"],
+        "y": [1200],
+        "y1": [300],
+        "unit": "W",
+        "_request": _day_request("2026-09-22"),
+    }
+    cast("Any", coordinator).api = _system_day_api(
+        device_pv=device_pv,
+        device_battery={},
+        pv_trends={"x": ["12:00"], "y": [9999]},
+        battery_trends={},
+        calls=calls,
+    )
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={"system": {"id": "sys-1"}},
+        target_day=date(2026, 9, 22),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+
+    assert status == "fetched"
+    assert source == device_pv
+    assert not any(call.startswith("sys_") for call in calls)
+
+
+@pytest.mark.asyncio()
+async def test_empty_system_day_curve_stays_empty() -> None:
+    """Without any curve the day stays missing, never a synthetic zero."""
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
+    cast("Any", coordinator).api = _system_day_api(
+        device_pv={"_request": _day_request("2026-03-01")},
+        device_battery={},
+        pv_trends={"totalSolarEnergy": "0", "y": None},
+        battery_trends={},
+        calls=[],
+    )
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={"system": {"id": "sys-1"}},
+        target_day=date(2026, 3, 1),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+
+    assert status == "empty_ambiguous"
+    assert source == {}

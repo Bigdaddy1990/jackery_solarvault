@@ -6,7 +6,6 @@ without any Home Assistant recorder dependency.
 """
 
 from collections import deque
-from datetime import date
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -14,22 +13,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
-from custom_components.jackery_solarvault.client import JackeryAuthError, JackeryError
-from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_YEAR,
-)
+from custom_components.jackery_solarvault.client import JackeryError
 from custom_components.jackery_solarvault.coordinator import (
     _SYSTEM_BUSY_API_CODE,  # ruff: ignore[import-private-name]
     BackfillStatus,
     JackerySolarVaultCoordinator,
-    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
     _is_system_busy_error,  # ruff: ignore[import-private-name]
     _merge_identified_dict_lists,  # ruff: ignore[import-private-name]
     _normalize_backfill_status,  # ruff: ignore[import-private-name]
-    _safe_enrich,  # ruff: ignore[import-private-name]
     _slow_fetch_failure_log_level,  # ruff: ignore[import-private-name]
     _stable_payload_debug_signature,  # ruff: ignore[import-private-name]
     merge_missing_dict_values,
@@ -42,66 +33,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # _safe_enrich
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio()
-async def test_safe_enrich_runs_enrichment_on_success() -> None:
-    """Successful enrichment function is awaited."""
-    mock_enrich = AsyncMock()
-    dev_id = "test-device"
-    entry = {"key": "value"}
-    await _safe_enrich(dev_id, entry, mock_enrich, stale_ok=True)
-    mock_enrich.assert_awaited_once_with(dev_id, entry, stale_ok=True)
-
-
-@pytest.mark.asyncio()
-async def test_safe_enrich_catches_jackery_auth_error() -> None:
-    """JackeryAuthError is caught and logged at DEBUG level."""
-    auth_err = JackeryAuthError("unauthorized")
-    mock_enrich = AsyncMock(side_effect=auth_err)
-    dev_id = "test-device"
-    entry = {"key": "value"}
-
-    # Should not raise
-    await _safe_enrich(dev_id, entry, mock_enrich, stale_ok=True)
-
-    mock_enrich.assert_awaited_once()
-
-
-@pytest.mark.asyncio()
-async def test_safe_enrich_catches_timeout_error() -> None:
-    """TimeoutError is caught and logged at DEBUG level."""
-    timeout_err = TimeoutError("timeout")
-    mock_enrich = AsyncMock(side_effect=timeout_err)
-    dev_id = "test-device"
-    entry = {"key": "value"}
-
-    await _safe_enrich(dev_id, entry, mock_enrich, stale_ok=True)
-
-    mock_enrich.assert_awaited_once()
-
-
-@pytest.mark.asyncio()
-async def test_safe_enrich_catches_jackery_error() -> None:
-    """JackeryError is caught and logged at DEBUG level."""
-    jackery_err = JackeryError("api error")
-    mock_enrich = AsyncMock(side_effect=jackery_err)
-    dev_id = "test-device"
-    entry = {"key": "value"}
-
-    await _safe_enrich(dev_id, entry, mock_enrich, stale_ok=True)
-
-    mock_enrich.assert_awaited_once()
-
-
-@pytest.mark.asyncio()
-async def test_safe_enrich_passes_stale_ok_false() -> None:
-    """stale_ok=False is passed through to enrichment function."""
-    mock_enrich = AsyncMock()
-    dev_id = "test-device"
-    entry = {"key": "value"}
-    await _safe_enrich(dev_id, entry, mock_enrich, stale_ok=False)
-    mock_enrich.assert_awaited_once_with(dev_id, entry, stale_ok=False)
 
 
 # ---------------------------------------------------------------------------
@@ -418,70 +349,6 @@ def test_merge_missing_dict_values_deepcopy() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_backfill_period_is_closed_day_before_today() -> None:
-    """Day bucket before today is closed."""
-    today = date(2024, 6, 15)
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_DAY, date(2024, 6, 14), today=today)
-        is True
-    )
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_DAY, date(2024, 6, 15), today=today)
-        is False
-    )
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_DAY, date(2024, 6, 16), today=today)
-        is False
-    )
-
-
-def test_backfill_period_is_closed_week_before_today() -> None:
-    """Week bucket before today is closed."""
-    today = date(2024, 6, 15)  # Saturday
-    # Week starting June 9 ends June 15
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_WEEK, date(2024, 6, 9), today=today)
-        is False
-    )
-    # Week starting June 2 ends June 8
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_WEEK, date(2024, 6, 2), today=today)
-        is True
-    )
-
-
-def test_backfill_period_is_closed_month_before_today() -> None:
-    """Month bucket before today is closed."""
-    today = date(2024, 6, 15)
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_MONTH, date(2024, 5, 1), today=today)
-        is True
-    )
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_MONTH, date(2024, 6, 1), today=today)
-        is False
-    )
-
-
-def test_backfill_period_is_closed_year_before_today() -> None:
-    """Year bucket before today is closed."""
-    today = date(2024, 6, 15)
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_YEAR, date(2023, 1, 1), today=today)
-        is True
-    )
-    assert (
-        _backfill_period_is_closed(DATE_TYPE_YEAR, date(2024, 1, 1), today=today)
-        is False
-    )
-
-
-def test_backfill_period_is_closed_unknown_type_returns_false() -> None:
-    """Unknown date type returns False (no closure assumed)."""
-    today = date(2024, 6, 15)
-    assert _backfill_period_is_closed("unknown", date(2024, 1, 1), today=today) is False
-
-
 # ---------------------------------------------------------------------------
 # _normalize_backfill_status
 # ---------------------------------------------------------------------------
@@ -656,7 +523,8 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
 
     executor_job.assert_awaited_once()
     # pyrefly: ignore [missing-attribute]
-    writer, _path, events = executor_job.await_args.args
+    writer, _path, events, unredacted = executor_job.await_args.args
     assert writer.__name__ == "append_payload_debug_lines"
+    assert unredacted is False
     assert [event["sequence"] for event in events] == [1, 2]
     assert all(event["entry_id"] == "test-entry" for event in events)

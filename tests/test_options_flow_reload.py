@@ -23,6 +23,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
     CONF_CREATE_CALCULATED_POWER_SENSORS,
+    CONF_ENABLE_UNREDACTED_DEBUG,
     CONF_SCAN_INTERVAL,
     CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     DEFAULT_SCAN_INTERVAL_SEC,
@@ -205,5 +206,24 @@ async def test_identical_semantic_options_do_not_reload(
             )
         assert result["type"] is FlowResultType.CREATE_ENTRY
         reload.assert_not_called()
+    finally:
+        await _async_unload_entry(hass, entry)
+
+
+async def test_enabling_unredacted_debug_persists_and_reloads(
+    hass: HomeAssistant,
+) -> None:
+    """A raw-debug transition reloads so the HTTP login buffer is recaptured."""
+    entry = await _async_setup_entry(hass)
+    try:
+        with patch.object(hass.config_entries, "async_schedule_reload") as reload:
+            result = await _async_submit_options(
+                hass,
+                entry,
+                {CONF_ENABLE_UNREDACTED_DEBUG: True},
+            )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert entry.options[CONF_ENABLE_UNREDACTED_DEBUG] is True
+        reload.assert_called_once_with(entry.entry_id)
     finally:
         await _async_unload_entry(hass, entry)

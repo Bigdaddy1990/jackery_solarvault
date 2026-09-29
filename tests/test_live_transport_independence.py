@@ -7,6 +7,8 @@ from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from custom_components.jackery_solarvault import (
     button as button_module,
     coordinator as coordinator_module,
@@ -45,6 +47,7 @@ from custom_components.jackery_solarvault.const import (
     MQTT_CMD_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
     MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+    PAYLOAD_BATTERY_PACKS,
     PAYLOAD_CT_METER,
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
@@ -82,7 +85,7 @@ _PLAN_POWER_W = 800
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
-    import pytest
+    from homeassistant.core import HomeAssistant
 
 
 class _ImmediateBackgroundEntry:
@@ -106,7 +109,9 @@ def _set_test_attr(target: object, name: str, value: Any) -> None:
     setattr(target, name, value)
 
 
-async def test_home_and_ct_entities_register_without_current_values() -> None:
+async def test_home_and_ct_entities_register_without_current_values(
+    hass: HomeAssistant,
+) -> None:
     """A restart without push transports must re-create stable registry entities."""
     coordinator = MagicMock(name="coordinator")
     coordinator.data = {
@@ -120,6 +125,7 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     coordinator.has_smart_meter_accessory.return_value = True
     coordinator.async_add_listener.return_value = lambda: None
     entry = SimpleNamespace(
+        entry_id="test-entry",
         data={},
         options={},
         runtime_data=coordinator,
@@ -128,7 +134,7 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     added: list[Any] = []
 
     await sensor_module.async_setup_entry(
-        cast("Any", None),
+        hass,
         cast("Any", entry),
         cast("Any", added.extend),
     )
@@ -140,7 +146,7 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
     assert "dev-1_today_load" in unique_ids
     assert "dev-1_alarm_count" in unique_ids
     assert "dev-1_firmware_version" in unique_ids
-    assert "dev-1_smart_meter_grid_import_energy" in unique_ids
+    assert "dev-1_smart_meter_lifetime_import_energy" in unique_ids
     assert "dev-1_smart_meter_phase_3_lifetime_import_energy" in unique_ids
     assert "dev-1_home_consumption_power" in unique_ids
     unsupported_voltage = next(
@@ -149,11 +155,15 @@ async def test_home_and_ct_entities_register_without_current_values() -> None:
         if entity.unique_id == "dev-1_smart_meter_phase_1_voltage"
     )
     unsupported_voltage._refresh_cache()  # ruff: ignore[private-member-access]
+    coordinator.is_device_reachable.return_value = True
+    # A reachable device without the field is ``unknown``, not ``unavailable``.
     assert unsupported_voltage.native_value is None
-    assert unsupported_voltage.available is False
+    assert unsupported_voltage.available is True
 
 
-async def test_discovered_accessory_sensors_register_before_live_push() -> None:
+async def test_discovered_accessory_sensors_register_before_live_push(
+    hass: HomeAssistant,
+) -> None:
     """Discovery topology keeps accessory identities stable without MQTT/BLE."""
     coordinator = MagicMock(name="coordinator")
     coordinator.data = {
@@ -184,6 +194,7 @@ async def test_discovered_accessory_sensors_register_before_live_push() -> None:
     coordinator.has_smart_meter_accessory.return_value = False
     coordinator.async_add_listener.return_value = lambda: None
     entry = SimpleNamespace(
+        entry_id="test-entry",
         data={},
         options={},
         runtime_data=coordinator,
@@ -192,7 +203,7 @@ async def test_discovered_accessory_sensors_register_before_live_push() -> None:
     added: list[Any] = []
 
     await sensor_module.async_setup_entry(
-        cast("Any", None),
+        hass,
         cast("Any", entry),
         cast("Any", added.extend),
     )
@@ -846,3 +857,64 @@ def test_shelly_ip_address_is_not_copied_into_input_power() -> None:
 
     assert normalized[FIELD_IP] == "192.168.2.109"
     assert FIELD_IN_PW not in normalized
+
+
+@pytest.mark.parametrize("known_pack", [True, False])
+@pytest.mark.parametrize("local_mqtt", [True, False])
+async def test_mqtt_pack_cell_temperature_push_reaches_its_pack(
+    known_pack: bool,
+    local_mqtt: bool,
+) -> None:
+    """A sparse cmd 107 pack push routes through either MQTT transport."""
+    coordinator = _source_priority_coordinator()
+    packs = (
+        [{FIELD_DEVICE_SN: "PACK-SN", "devType": 1, "batSoc": 5}] if known_pack else []
+    )
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {"cellTemp": 179},
+            PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "HEAD-SN"},
+            PAYLOAD_BATTERY_PACKS: packs,
+        }
+    }
+    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
+    _set_test_attr(coordinator, "_mqtt_session_actions_seen", set())
+    _set_test_attr(coordinator, "_synchronize_mqtt_session_generation", MagicMock())
+    _set_test_attr(coordinator, "_local_mqtt_last_device_message_monotonic", {})
+
+    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
+
+    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    payload = {
+            FIELD_DEVICE_ID: "dev-1",
+            FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+            "actionId": 0,
+            FIELD_TIMESTAMP: datetime.now(UTC).timestamp(),
+            FIELD_BODY: {
+                "cellTemp": 251,
+                "cmd": 107,
+                FIELD_DEVICE_SN: "PACK-SN",
+                "messageId": 0,
+            },
+        }
+    if local_mqtt:
+        payload["type"] = 107
+        assert await coordinator.async_handle_local_mqtt_message(
+            "hb/device/HEAD-SN/event", payload
+        )
+    else:
+        await coordinator.async_handle_mqtt_message("hb/app/user/device", payload)
+
+    entry = coordinator.data["dev-1"]
+    pack_rows = [
+        row
+        for row in entry[PAYLOAD_BATTERY_PACKS]
+        if row.get(FIELD_DEVICE_SN) == "PACK-SN"
+    ]
+    assert pack_rows
+    assert pack_rows[0]["cellTemp"] == 251  # ruff: ignore[magic-value-comparison]
+    assert entry[PAYLOAD_PROPERTIES]["cellTemp"] == 179  # ruff: ignore[magic-value-comparison]

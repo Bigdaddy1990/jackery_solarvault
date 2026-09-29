@@ -163,6 +163,7 @@ def test_dynamic_unit_prefers_price_currency() -> None:
         {_DEVICE_ID: {PAYLOAD_PRICE: {FIELD_SINGLE_PRICE: 0.3, "singleCurrency": "$"}}},
     )
 
+    assert entity.native_value == pytest.approx(0.3)
     assert entity.native_unit_of_measurement == "$"
 
 

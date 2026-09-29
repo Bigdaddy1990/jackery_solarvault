@@ -354,6 +354,48 @@ async def test_battery_pack_read_combines_list_and_type_one_shadow() -> None:
     )
 
 
+@pytest.mark.asyncio()
+async def test_regular_shadow_poll_queries_type_one_for_known_packs() -> None:
+    """HTTP has a pack source: the per-pack sub-shadow keyed by the request.
+
+    ``accessories/list`` never lists add-on packs and ``battery/pack/list``
+    returns ``data: null``, so the regular shadow poll must query devType 1
+    for every known pack serial and pin the serial onto the serial-less body.
+    """
+    pack_sn = "PACK-A"
+    working: dict[str, Any] = {
+        PAYLOAD_DEVICE: {FIELD_DEVICE_SN: _DEVICE_SN},
+        PAYLOAD_PROPERTIES: {},
+        PAYLOAD_BATTERY_PACKS: [
+            {
+                FIELD_DEVICE_SN: pack_sn,
+                FIELD_DEV_TYPE: SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+                FIELD_BAT_SOC: 5,
+            },
+        ],
+    }
+    coordinator = _bare_coordinator(working)
+    api = _mock_api(coordinator)
+    api.async_get_sub_shadow.return_value = {"inPw": 0, "outPw": 3}
+
+    await coordinator._async_apply_shadows_for_entry(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        working,
+        [],
+        parent_sn=_DEVICE_SN,
+    )
+
+    api.async_get_sub_shadow.assert_awaited_once_with(
+        dev_type=str(SUBDEVICE_DEV_TYPE_BATTERY_PACK),
+        device_sn=_DEVICE_SN,
+        sub_device_sn=pack_sn,
+    )
+    packs = working[PAYLOAD_BATTERY_PACKS]
+    assert len(packs) == 1
+    assert packs[0][FIELD_DEVICE_SN] == pack_sn
+    assert packs[0]["outPw"] == 3  # ruff: ignore[magic-value-comparison]
+
+
 @pytest.mark.parametrize(
     ["dev_type", "serial", "body", "bucket"],
     [

@@ -117,12 +117,12 @@ def test_export_energy_falls_back_to_per_phase_negative_sum() -> None:
     ["key", "fields", "expected"],
     [
         [
-            "grid_import_energy",
+            "lifetime_import_energy",
             {"aPhaseEgy": 10_000, "bPhaseEgy": 20_000, "cPhaseEgy": 30_000},
             60.0,
         ],
         [
-            "grid_export_energy",
+            "lifetime_export_energy",
             {"anPhaseEgy": 1_000, "bnPhaseEgy": 2_000, "cnPhaseEgy": 3_000},
             6.0,
         ],

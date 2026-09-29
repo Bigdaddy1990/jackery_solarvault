@@ -10,16 +10,9 @@ from typing import Any, cast
 
 import pytest
 
-from custom_components.jackery_solarvault.const import (
-    DATE_TYPE_DAY,
-    DATE_TYPE_MONTH,
-    DATE_TYPE_WEEK,
-    DATE_TYPE_YEAR,
-)
 from custom_components.jackery_solarvault.coordinator import (
     BackfillStatus,
     JackerySolarVaultCoordinator,
-    _backfill_period_is_closed,  # ruff: ignore[import-private-name]
     _normalize_backfill_status,  # ruff: ignore[import-private-name]
 )
 
@@ -40,29 +33,6 @@ class TestBackfillOpenPeriodState:
         """BackfillStatus must have exactly PENDING, RETRYABLE, IMPORTED."""
         states = set(BackfillStatus)
         assert states == {"pending", "retryable", "imported"}
-
-    def test_current_day_is_never_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """Current day (today) must never be marked as closed."""
-        today = date.today()  # ruff: ignore[call-date-today]
-        assert not _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today)
-
-    def test_current_week_is_never_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """Current week must never be marked as closed."""
-        today = date.today()  # ruff: ignore[call-date-today]
-        week_start = today - timedelta(days=today.weekday())
-        assert not _backfill_period_is_closed(DATE_TYPE_WEEK, week_start, today=today)
-
-    def test_current_month_is_never_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """Current month must never be marked as closed."""
-        today = date.today()  # ruff: ignore[call-date-today]
-        month_start = today.replace(day=1)
-        assert not _backfill_period_is_closed(DATE_TYPE_MONTH, month_start, today=today)
-
-    def test_current_year_is_never_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """Current year must never be marked as closed."""
-        today = date.today()  # ruff: ignore[call-date-today]
-        year_start = today.replace(month=1, day=1)
-        assert not _backfill_period_is_closed(DATE_TYPE_YEAR, year_start, today=today)
 
     def test_two_empty_responses_do_not_make_open_period_terminal(self) -> None:  # ruff: ignore[no-self-use]
         """An open period receiving two empty responses stays RETRYABLE, never IMPORTED."""  # ruff: ignore[line-too-long]
@@ -144,20 +114,6 @@ class TestBackfillOpenPeriodState:
             status = _normalize_backfill_status(legacy, closed=True)
             assert status == BackfillStatus.RETRYABLE
 
-    def test_no_active_period_becomes_unavailable_closed(self) -> None:  # ruff: ignore[no-self-use]
-        """No active (open) period should ever become a terminal unavailable_closed state."""  # ruff: ignore[line-too-long]
-        # The state machine has only three states:
-        # PENDING -> RETRYABLE -> IMPORTED
-        # There is no "unavailable_closed" state for open periods
-
-        today = date.today()  # ruff: ignore[call-date-today]
-        # All open periods (today and future) are never closed
-        assert not _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today)
-
-        # Normalize any legacy value for an open period
-        status = _normalize_backfill_status("unavailable", closed=False)
-        assert status == BackfillStatus.RETRYABLE  # Not a terminal state
-
     def test_backfill_status_serializable(self) -> None:  # ruff: ignore[no-self-use]
         """BackfillStatus values are serializable strings for storage."""
         for status in BackfillStatus:
@@ -189,55 +145,6 @@ class TestBackfillOpenPeriodState:
         for legacy, expected in test_cases:
             result = _normalize_backfill_status(legacy, closed=False)
             assert result == expected, f"Legacy {legacy!r} should map to {expected}"
-
-
-class TestBackfillPeriodClosure:
-    """Test the calendar boundary logic for period closure."""
-
-    def test_day_boundary(self) -> None:  # ruff: ignore[no-self-use]
-        """Day period ends at midnight."""
-        today = date(2026, 7, 15)
-        yesterday = date(2026, 7, 14)
-        assert not _backfill_period_is_closed(DATE_TYPE_DAY, today, today=today)
-        assert _backfill_period_is_closed(DATE_TYPE_DAY, yesterday, today=today)
-
-    def test_week_boundary(self) -> None:  # ruff: ignore[no-self-use]
-        """Week period ends on Sunday (Monday-Sunday)."""
-        # Monday 2026-07-13 to Sunday 2026-07-19
-        monday = date(2026, 7, 13)
-        date(2026, 7, 19)
-        next_monday = date(2026, 7, 20)
-
-        # During the week (Wednesday), week is not closed
-        wednesday = date(2026, 7, 15)
-        assert not _backfill_period_is_closed(DATE_TYPE_WEEK, monday, today=wednesday)
-
-        # After Sunday, the week is closed
-        assert _backfill_period_is_closed(DATE_TYPE_WEEK, monday, today=next_monday)
-
-    def test_month_boundary(self) -> None:  # ruff: ignore[no-self-use]
-        """Month period ends on last calendar day."""
-        july = date(2026, 7, 1)
-        august = date(2026, 8, 1)
-
-        # During July, not closed
-        assert not _backfill_period_is_closed(
-            DATE_TYPE_MONTH, july, today=date(2026, 7, 15)
-        )
-        # August 1st means July is closed
-        assert _backfill_period_is_closed(DATE_TYPE_MONTH, july, today=august)
-
-    def test_year_boundary(self) -> None:  # ruff: ignore[no-self-use]
-        """Year period ends on Dec 31."""
-        year_2025 = date(2025, 1, 1)
-        year_2026 = date(2026, 1, 1)
-
-        # During 2025, not closed
-        assert not _backfill_period_is_closed(
-            DATE_TYPE_YEAR, year_2025, today=date(2025, 7, 1)
-        )
-        # 2026 means 2025 is closed
-        assert _backfill_period_is_closed(DATE_TYPE_YEAR, year_2025, today=year_2026)
 
 
 # Import constants for the tests

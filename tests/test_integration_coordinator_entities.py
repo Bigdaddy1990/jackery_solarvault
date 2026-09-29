@@ -46,7 +46,13 @@ def _make_hass_entry_api() -> tuple[MagicMock, MagicMock, MagicMock]:
     """Create mocked constructor dependencies."""
     hass = MagicMock()
     hass.loop = asyncio.get_running_loop()
-    hass.data = {}
+    # Registries used by _async_remove_phantom_battery_pack_devices.
+    mock_device_registry = MagicMock()
+    mock_entity_registry = MagicMock()
+    hass.data = {
+        "device_registry": mock_device_registry,
+        "entity_registry": mock_entity_registry,
+    }
     hass.config = MagicMock()
     hass.config.path = MagicMock(return_value="/config")
     hass.async_create_background_task = MagicMock(side_effect=_background_task_mock)

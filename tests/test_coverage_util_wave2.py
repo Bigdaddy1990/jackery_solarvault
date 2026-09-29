@@ -1,10 +1,9 @@
 """Behavioral coverage for remaining high-value utility edge paths."""
 
-from datetime import date, datetime
+from datetime import date
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
 
 import pytest
 
@@ -190,25 +189,6 @@ def test_calendar_bucket_iterators_return_empty_for_reversed_ranges() -> None:
     assert util.iter_calendar_months(start, end) == []
     assert util.iter_calendar_weeks(start, end) == []
     assert util.iter_calendar_years(start, end) == []
-
-
-def test_completed_point_filter_drops_invalid_and_current_period_starts() -> None:
-    """Only completed dated buckets survive non-day Recorder imports."""
-    invalid = util.TrendStatisticPoint(
-        cast("date | datetime", "not-a-date"),
-        1.0,
-    )
-    previous = util.TrendStatisticPoint(date(2026, 8, 9), 2.0)
-    current = util.TrendStatisticPoint(datetime(2026, 8, 10, 3), 3.0)
-
-    filtered = util.filter_completed_app_points(
-        [invalid, previous, current],
-        DATE_TYPE_WEEK,
-        "week",
-        date(2026, 8, 10),
-    )
-
-    assert filtered == [previous]
 
 
 def test_trend_points_skip_invalid_values_and_request_overflow() -> None:

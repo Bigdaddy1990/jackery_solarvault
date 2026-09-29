@@ -177,6 +177,7 @@ class _HandlerCase(SimpleNamespace):
     extra: dict[str, object]
     is_response: bool
     portable: bool
+    portable_only: bool
     has_auth: bool
     backend_error: BaseException
 
@@ -188,6 +189,7 @@ def _case(  # ruff: ignore[too-many-arguments]
     extra: dict[str, object] | None = None,
     is_response: bool = False,
     portable: bool = False,
+    portable_only: bool = False,
     has_auth: bool = True,
     backend_error: BaseException | None = None,
 ) -> _HandlerCase:
@@ -197,6 +199,7 @@ def _case(  # ruff: ignore[too-many-arguments]
         extra=extra or {},
         is_response=is_response,
         portable=portable,
+        portable_only=portable_only,
         has_auth=has_auth,
         backend_error=backend_error or JackeryError("boom"),
     )
@@ -411,6 +414,7 @@ _CASES: tuple[_HandlerCase, ...] = (
         "async_query_charge_report",
         extra={SERVICE_FIELD_DEVICE_SN: _TEXT},
         is_response=True,
+        portable_only=True,
     ),
     _case(
         SERVICE_QUERY_CUTOFF_STAT,
@@ -695,7 +699,7 @@ async def test_service_forwards_to_owning_coordinator(
     case: _HandlerCase,
 ) -> None:
     """Each action forwards to its coordinator method and returns its envelope."""
-    coordinator = _coordinator(case.method)
+    coordinator = _coordinator(case.method, portable=case.portable_only)
 
     response = await _call(hass, case, coordinator)
 
@@ -747,7 +751,9 @@ async def test_service_maps_backend_error_to_home_assistant_error(
     case: _HandlerCase,
 ) -> None:
     """A backend ``JackeryError`` becomes a translated HomeAssistantError."""
-    coordinator = _coordinator(case.method, error=case.backend_error)
+    coordinator = _coordinator(
+        case.method, error=case.backend_error, portable=case.portable_only
+    )
 
     with pytest.raises(HomeAssistantError):
         await _call(hass, case, coordinator)
@@ -760,7 +766,9 @@ async def test_service_maps_auth_error_to_reauth(
     case: _HandlerCase,
 ) -> None:
     """Rejected credentials raise ConfigEntryAuthFailed to trigger reauth."""
-    coordinator = _coordinator(case.method, error=JackeryAuthError("nope"))
+    coordinator = _coordinator(
+        case.method, error=JackeryAuthError("nope"), portable=case.portable_only
+    )
 
     with pytest.raises(ConfigEntryAuthFailed):
         await _call(hass, case, coordinator)
@@ -802,6 +810,18 @@ async def test_home_family_service_rejects_portable_device(
 ) -> None:
     """Home-family commands refuse Explorer/portable devices before the API call."""
     coordinator = _coordinator(case.method, portable=True)
+
+    with pytest.raises(ServiceValidationError):
+        await _call(hass, case, coordinator)
+
+    getattr(coordinator, case.method).assert_not_awaited()
+
+
+@pytest.mark.asyncio()
+async def test_charge_report_rejects_home_device(hass: HomeAssistant) -> None:
+    """App 2.4.1 offers charge reports only on portable settings screens."""
+    case = next(case for case in _CASES if case.name == SERVICE_QUERY_CHARGE_REPORT)
+    coordinator = _coordinator(case.method)
 
     with pytest.raises(ServiceValidationError):
         await _call(hass, case, coordinator)

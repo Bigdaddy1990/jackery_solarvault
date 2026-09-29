@@ -13,6 +13,7 @@ from custom_components.jackery_solarvault.const import (
     CT_METER_KEYS,
     FIELD_BATTERY_PACK,
     FIELD_BATTERY_PACKS,
+    FIELD_BATTERY_PACKS_UNDERSCORE,
     FIELD_BATTERY_PACK_LIST,
     FIELD_BAT_SOC,
 )
@@ -90,6 +91,15 @@ class TestBatteryPackFromSource:
     def test_extracts_from_battery_pack_list_key(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
         """Extracts from FIELD_BATTERY_PACK_LIST key."""
         source = {FIELD_BATTERY_PACK_LIST: [{FIELD_BAT_SOC: 50}]}
+        result = battery_packs_from_source(
+            source, CT_METER_KEYS, BATTERY_PACK_HINT_KEYS
+        )
+        assert result is not None
+        assert len(result) == 1
+
+    def test_extracts_from_battery_packs_underscore_key(self) -> None:  # ruff: ignore[no-self-use]  # isort: skip
+        """Extracts from FIELD_BATTERY_PACKS_UNDERSCORE key."""
+        source = {FIELD_BATTERY_PACKS_UNDERSCORE: [{FIELD_BAT_SOC: 50}]}
         result = battery_packs_from_source(
             source, CT_METER_KEYS, BATTERY_PACK_HINT_KEYS
         )

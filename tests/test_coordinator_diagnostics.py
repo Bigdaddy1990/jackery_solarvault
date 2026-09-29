@@ -8,7 +8,6 @@ back to cached discovery. All are pure lookups over in-memory coordinator state
 """
 
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -153,24 +152,6 @@ def test_statistics_backfill_diagnostics_tolerates_missing_devices() -> None:
         "tracked_devices": 0,
         "devices": {},
     }
-
-
-@pytest.mark.asyncio()
-async def test_statistics_import_job_awaits_repair_wrapper() -> None:
-    """The current import job awaits current import and schedules backfill."""
-    coordinator = _bare()
-    coordinator._statistics_import_task = None  # ruff: ignore[private-member-access]
-    coordinator._statistics_startup_sync_pending = True  # ruff: ignore[private-member-access]
-    repair = AsyncMock()
-    coordinator._async_import_and_repair_app_chart_statistics = repair  # ruff: ignore[private-member-access]
-    scheduler = MagicMock()
-    coordinator._schedule_statistics_backfill = scheduler  # ruff: ignore[private-member-access]
-
-    snapshot: dict[str, dict[str, Any]] = {"dev-1": {}}
-    await coordinator._async_statistics_import_job(snapshot)  # ruff: ignore[private-member-access]
-
-    repair.assert_awaited_once_with(snapshot)
-    scheduler.assert_called_once_with(snapshot)
 
 
 def test_statistics_backfill_device_state_creates_nested_state() -> None:

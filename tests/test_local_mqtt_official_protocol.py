@@ -11,6 +11,7 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     TransportSource,
+    local_mqtt_topic_device_serial,
 )
 
 _DEVICE_ID = "device-1"
@@ -77,6 +78,62 @@ async def test_topic_serial_is_injected_before_shared_ingest() -> None:
     normalized = handler.await_args.args[1]
     assert normalized["deviceSn"] == _DEVICE_SN
     assert normalized["body"]["batSoc"] == 55  # ruff: ignore[magic-value-comparison]
+
+
+@pytest.mark.asyncio()
+async def test_device_topic_serial_routes_body_only_report() -> None:
+    """An exact device topic identifies a body-only LAN report."""
+    coordinator = _coordinator_shell()
+    handler = AsyncMock(return_value=_DEVICE_ID)
+    coordinator.async_handle_mqtt_message = handler
+
+    assert await coordinator.async_handle_local_mqtt_message(
+        f"hb/device/{_DEVICE_SN}/status", {"type": 2, "body": {"batSoc": 55}}
+    )
+    assert handler.await_args.args[1]["deviceSn"] == _DEVICE_SN
+    assert (
+        local_mqtt_topic_device_serial(f"hb/device/{_DEVICE_SN}/status")
+        == _DEVICE_SN
+    )
+    assert local_mqtt_topic_device_serial("hb/app/user123/device") is None
+    assert (
+        local_mqtt_topic_device_serial(f"other/hb/device/{_DEVICE_SN}/status")
+        is None
+    )
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"deviceSn": "FOREIGN", "type": 2, "body": {"batSoc": 55}},
+        {"deviceId": "other-device", "type": 2, "body": {"batSoc": 55}},
+    ],
+)
+async def test_device_topic_rejects_conflicting_payload_identity(
+    payload: dict[str, Any],
+) -> None:
+    """A shared broker cannot reassign a conflicting device frame."""
+    coordinator = _coordinator_shell()
+    coordinator._device_index["other-device"] = {"device_meta": {"deviceSn": "FOREIGN"}}  # ruff: ignore[private-member-access]
+    coordinator.async_handle_mqtt_message = AsyncMock()
+
+    assert not await coordinator.async_handle_local_mqtt_message(
+        f"hb/device/{_DEVICE_SN}/status", payload
+    )
+    coordinator.async_handle_mqtt_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio()
+async def test_foreign_discovery_message_is_not_device_traffic() -> None:
+    """A retained HA discovery payload remains visible as an unrouted frame."""
+    coordinator = _coordinator_shell()
+    coordinator.async_handle_mqtt_message = AsyncMock(return_value=None)
+
+    assert not await coordinator.async_handle_local_mqtt_message(
+        "homeassistant/sensor/other/config", {"name": "unrelated"}
+    )
+    assert coordinator._local_mqtt_rejection_reasons == {"unsupported_report": 1}  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.asyncio()
