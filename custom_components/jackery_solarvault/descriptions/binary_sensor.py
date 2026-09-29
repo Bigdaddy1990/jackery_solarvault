@@ -12,8 +12,13 @@ from homeassistant.const import EntityCategory
 from ..const import (
     DEFAULT_NULL_SEMANTICS,
     FIELD_ALERT_COUNT,
+    FIELD_COMM_STATE,
     FIELD_ETH_PORT,
     FIELD_ONLINE_STATUS,
+    FIELD_PV1,
+    FIELD_PV2,
+    FIELD_PV3,
+    FIELD_PV4,
     FIELD_SW_EPS_STATE,
 )
 from ..entity import ALL_LIVE_DATA_SOURCES, HTTP_DATA_SOURCES, property_data_sources
@@ -21,6 +26,8 @@ from ..util import safe_int
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from ..entity import JackeryEntity
 
 
 def _default_binary_value(_entity: object) -> None:
@@ -85,6 +92,13 @@ class JackerySubdeviceAlarmBinarySensorDescription(BinarySensorEntityDescription
 # ---------------------------------------------------------------------------
 
 
+def _pv_comm_state(entity: JackeryEntity, channel: str) -> bool | None:
+    """Return an MPPT channel's ``commState`` from its nested PV object."""
+    pv = entity.merged_properties.get(channel)
+    state = pv.get(FIELD_COMM_STATE) if isinstance(pv, dict) else None
+    return None if state is None else state == 1
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[
     JackeryBinaryDescription | JackerySubdeviceAlarmBinarySensorDescription, ...
 ] = (
@@ -141,5 +155,53 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[
             (count := safe_int(e.sub_device.get(FIELD_ALERT_COUNT))) is not None
             and count > 0
         ),
+    ),
+    JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv1_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv1_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda e: _pv_comm_state(e, FIELD_PV1),
+        required_property_keys=(FIELD_PV1,),
+    ),
+    JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv2_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv2_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda e: _pv_comm_state(e, FIELD_PV2),
+        required_property_keys=(FIELD_PV2,),
+    ),
+    JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv3_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv3_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda e: _pv_comm_state(e, FIELD_PV3),
+        required_property_keys=(FIELD_PV3,),
+    ),
+    JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv4_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv4_connected",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda e: _pv_comm_state(e, FIELD_PV4),
+        required_property_keys=(FIELD_PV4,),
     ),
 )

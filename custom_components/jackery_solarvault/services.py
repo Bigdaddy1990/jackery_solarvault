@@ -1094,17 +1094,17 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
         subdevice suffix removed.
     """
     registry = dr.async_get(hass)
-    # Jackery never registers HA's newer child-device kind; narrow to main
-    # devices so `via_device_id`/`identifiers` stay available without a union.
-    device = registry.async_get(raw, include_child_devices=False)
+    # Battery packs and accessories are HA child devices (HA 2026.9); the UI
+    # device selector passes their id, so climb to the parent main device.
+    device = registry.async_get(raw)
     if device is not None:
         seen: set[str] = set()
-        while device.via_device_id and device.via_device_id not in seen:
-            seen.add(device.via_device_id)
-            parent = registry.async_get(
-                device.via_device_id,
-                include_child_devices=False,
-            )
+        while (
+            parent_id := getattr(device, "parent_device_id", None)
+            or getattr(device, "via_device_id", None)
+        ) and parent_id not in seen:
+            seen.add(parent_id)
+            parent = registry.async_get(parent_id)
             if parent is None:
                 break
             device = parent
@@ -5193,6 +5193,14 @@ async def _async_handle_query_charge_report(
             msg,
             device_id=device_id,
             error="no Jackery entry owns this device id",
+        )
+    # App 2.4.1 opens ChargeReportActivity only from the portable settings
+    # screens; the cloud rejects device/chargeReport for Home devices.
+    if not _is_portable_device(coordinator, device_id):
+        raise _service_validation_error(
+            "query_charge_report_failed",
+            device_id=device_id,
+            error="charge reports exist only for portable devices",
         )
     device_sn = _service_required_text(
         call.data[SERVICE_FIELD_DEVICE_SN],

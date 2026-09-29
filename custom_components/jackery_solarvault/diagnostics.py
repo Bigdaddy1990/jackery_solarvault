@@ -1,5 +1,6 @@
 """Diagnostics support for Jackery SolarVault."""
 
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -9,6 +10,7 @@ from .const import (
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
+    CONF_THIRD_PARTY_MQTT_TOPIC_FILTER,
     CONF_THIRD_PARTY_MQTT_USERNAME,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DIAGNOSTICS_SCHEMA_VERSION,
@@ -21,9 +23,12 @@ from .util import (
     active_redact_keys,
     config_entry_int_option,
     config_entry_str_option,
+    jackery_dev_mode_enabled,
     local_mqtt_opt_in,
     redacted_json_safe_payload,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -58,9 +63,10 @@ def _redacted_payload_map(
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
     redacted: dict[str, Any] = {}
+    dev_mode = not redact_keys
     for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
-        label = f"{prefix}_{index}"
+        label = str(key) if dev_mode else f"{prefix}_{index}"
         if isinstance(payload, dict):
             redacted[label] = async_redact_data(payload, redact_keys)
         else:
@@ -87,7 +93,22 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
               diagnostics.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
-    redact_keys = active_redact_keys()
+    dev_mode = jackery_dev_mode_enabled(entry)
+    source = None
+    if dev_mode:
+        source = (
+            "JACKERY_DEV_MODE=1"
+            if jackery_dev_mode_enabled()
+            else "options.enable_unredacted_debug"
+        )
+    if source:
+        _LOGGER.warning(
+            "Jackery diagnostics exported UNREDACTED because %s is enabled: "
+            "credentials, serials, device ids, topics and bluetoothKey are "
+            "in clear text; do not share this export publicly",
+            source,
+        )
+    redact_keys = active_redact_keys(entry)
     sensitive_sources = (
         dict(entry.data),
         dict(entry.options),
@@ -115,7 +136,8 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
                 int(coordinator.configured_update_interval.total_seconds())
             ),
             "coordinator_polling": True,
-            "redactions_enforced": True,
+            "redactions_enforced": not dev_mode,
+            **({"dev_mode": source} if source else {}),
             "credential_contract": "v1",
         },
         "login_response": async_redact_data(
@@ -206,7 +228,9 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
     }
     return cast(
         "dict[str, Any]",
-        redacted_json_safe_payload(export, sensitive_sources=sensitive_sources),
+        redacted_json_safe_payload(
+            export, sensitive_sources=sensitive_sources, unredacted=dev_mode
+        ),
     )
 
 
@@ -237,8 +261,14 @@ def _local_mqtt_diagnostics(
     password = config_entry_str_option(
         entry, CONF_THIRD_PARTY_MQTT_PASSWORD, ""
     ).strip()
-    diagnostic_host = REDACTED_VALUE if host else ""
-    diagnostic_port = REDACTED_VALUE if port else ""
+    dev_mode = jackery_dev_mode_enabled(entry)
+    diagnostic_host = host if dev_mode else REDACTED_VALUE if host else ""
+    diagnostic_port = port if dev_mode else REDACTED_VALUE if port else ""
+    topic_filter = (
+        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
+        if dev_mode
+        else REDACTED_VALUE
+    )
 
     # Bewusst als ``object`` gehalten: der Typ von ``runtime_data`` verspricht den
     # Coordinator, zur Laufzeit kann er beim fehlgeschlagenen Setup oder waehrend
@@ -255,8 +285,8 @@ def _local_mqtt_diagnostics(
                 "port": diagnostic_port,
                 "username_set": bool(username),
                 "password_set": bool(password),
-                "topic_filter": REDACTED_VALUE,
-                "effective_topic_filter": REDACTED_VALUE,
+                "topic_filter": topic_filter,
+                "effective_topic_filter": topic_filter,
             },
         }
 
@@ -288,8 +318,12 @@ def _local_mqtt_diagnostics(
                 "port": diagnostic_port,
                 "username_set": bool(username),
                 "password_set": bool(password),
-                "topic_filter": REDACTED_VALUE,
-                "effective_topic_filter": REDACTED_VALUE,
+                "topic_filter": topic_filter,
+                "effective_topic_filter": topic_filter,
             },
         }
-    return client.diagnostics_snapshot()
+    return (
+        client.diagnostics_snapshot(redact=False)
+        if dev_mode
+        else client.diagnostics_snapshot()
+    )

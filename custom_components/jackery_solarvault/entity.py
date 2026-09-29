@@ -3,10 +3,9 @@
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -28,6 +27,7 @@ from .const import (
     MANUFACTURER,
     PAYLOAD_ALARM,
     PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_CT_METER,
     PAYLOAD_DEVICE,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_DISCOVERY,
@@ -51,6 +51,7 @@ from .util import (
     jackery_online_state,
     nonblank_text,
     normalize_mac_address,
+    smart_meter_identity,
     smart_plug_serial,
     stable_subdevice_key,
     subdevice_branding,
@@ -317,7 +318,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         return self._payload.get(PAYLOAD_SOCKET_STAT) or {}
 
     @property
-    def device_info(self) -> DeviceInfo:
+    def device_info(self) -> DeviceInfo | ChildDeviceInfo:
         """Constructs the DeviceInfo for the parent SolarVault device.
 
         The result includes the parent identifier, manufacturer, display name,
@@ -365,7 +366,89 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         )
         if parent_mac is not None:
             info["connections"] = {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
-        return info
+        return self._group_device_info(str(name)) or info
+
+    def _group_device_info(self, name: str) -> DeviceInfo | ChildDeviceInfo | None:
+        """Group existing entities without changing their unique IDs."""
+        role = getattr(
+            getattr(self, "entity_description", None),
+            "device_registry_role",
+            self.device_registry_role,
+        )
+        if role == "main_battery":
+            hass = getattr(self.coordinator, "hass", None)
+            entry = getattr(self.coordinator, "config_entry", None)
+            if hass is not None and entry is not None:
+                parent = dr.async_get(hass).async_get_device_by_identifier(
+                    (DOMAIN, self._device_id), entry.entry_id
+                )
+                if parent is not None:
+                    language = getattr(getattr(hass, "config", None), "language", "en")
+                    battery_name = (
+                        "Hauptbatterie" if language.startswith("de") else "Main battery"
+                    )
+                    return ChildDeviceInfo(
+                        identifiers={(DOMAIN, f"{self._device_id}_main_battery")},
+                        name=f"{name} {battery_name}",
+                        parent_device_id=parent.id,
+                    )
+        if role == "smart_meter":
+            ct = self._payload.get(PAYLOAD_CT_METER)
+            if isinstance(ct, dict) and ct:
+                key = stable_subdevice_key("smart_meter", smart_meter_identity(ct), 1)
+                meter = DeviceInfo(
+                    identifiers={(DOMAIN, f"{self._device_id}_{key}")},
+                    name=f"{name} Smart Meter",
+                )
+                self._apply_via_device(meter)
+                return meter
+            return self._registered_smart_meter_info()
+        if role in {"pv_input_1", "pv_input_2", "pv_input_3", "pv_input_4"}:
+            channel = role[-1]
+            hass = getattr(self.coordinator, "hass", None)
+            entry = getattr(self.coordinator, "config_entry", None)
+            if hass is not None and entry is not None:
+                registry = dr.async_get(hass)
+                identifier = (DOMAIN, f"{self._device_id}_{role}")
+                existing = registry.async_get_child_device_by_identifier(
+                    identifier, entry.entry_id
+                )
+                if isinstance(self._properties.get(f"pv{channel}"), dict) or existing:
+                    parent = registry.async_get_device_by_identifier(
+                        (DOMAIN, self._device_id), entry.entry_id
+                    )
+                    if parent is not None:
+                        return ChildDeviceInfo(
+                            identifiers={identifier},
+                            name=f"{name} PV {channel}",
+                            parent_device_id=parent.id,
+                        )
+        return None
+
+    def _registered_smart_meter_info(self) -> DeviceInfo | None:
+        """Keep an existing CT device link through a missing payload."""
+        hass = getattr(self.coordinator, "hass", None)
+        if hass is None or self.unique_id is None:
+            return None
+        entities = er.async_get(hass)
+        entity_id = entities.async_get_entity_id("sensor", DOMAIN, self.unique_id)
+        registered = entities.async_get(entity_id) if entity_id else None
+        if registered is None or registered.device_id is None:
+            return None
+        device = dr.async_get(hass).async_get(registered.device_id)
+        if device is None:
+            return None
+        matching = {
+            identifier
+            for identifier in device.identifiers
+            if identifier[0] == DOMAIN
+            and identifier[1].startswith(f"{self._device_id}_smart_meter_")
+        }
+        if not matching:
+            return None
+        meter = DeviceInfo(identifiers=matching)
+        self._apply_via_device(meter)
+        return meter
 
     def _build_smart_plug_device_info(
         self,
@@ -537,9 +620,9 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             )
         if not super().available or not transport_reachable:
             return False
-        if not self._online_marker_available(transport_reachable):
-            return False
-        return not isinstance(self, SensorEntity) or self.native_value is not None
+        # A missing value is ``unknown`` (native_value None), not ``unavailable``:
+        # unavailable is reserved for an unreachable device or transport.
+        return self._online_marker_available(transport_reachable)
 
     @callback
     def _refresh_availability_cache(self) -> None:

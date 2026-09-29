@@ -64,10 +64,10 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
 # Default topic filter for the local HA-broker listener (docs/ENV.md:51+79).
-# A bare legacy "homeassistant" is widened to this child-topic wildcard at
-# subscribe time. The cloud "hb/app/*" namespace must never appear here
-# (local MQTT and cloud MQTT are separate layers).
-LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant/#"
+# The discovery topic is the documented HA root: ``homeassistant``. It is
+# never widened to a wildcard and never mixed with the cloud MQTT tree
+# (``hb/app/*``). Local MQTT and cloud MQTT are separate layers (2026-09-22).
+LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant"
 # Native Shelly RPC status pushes observed in the shared Home Assistant broker.
 # Subscribe to this exact topic only. The adapter filters high-rate BLE scan
 # events and unrelated RPC sources before they reach shared ingest.
@@ -746,6 +746,9 @@ PAYLOAD_METER_HEADS: Final = "meter_heads"
 # the plug list with the same shape as battery packs.
 PAYLOAD_SMART_PLUGS: Final = "smart_plugs"
 PAYLOAD_NOTICE: Final = "notice"
+# Layer-5 UploadDeviceAlert frames (cmd 122): BLE fault codes and cloud-MQTT
+# alert counters, merged per field; HTTP /v1/api/alarm keeps PAYLOAD_ALARM.
+PAYLOAD_DEVICE_ALERT: Final = "device_alert"
 PAYLOAD_ELECTRICITY_STRATEGY: Final = "electricity_strategy"
 PAYLOAD_TOU_SCHEDULE: Final = "tou_schedule"
 PAYLOAD_SMART_MODE: Final = "smart_mode"
@@ -862,6 +865,24 @@ FIELD_SPH_PC: Final = "sph_pc"
 FIELD_SW: Final = "sw"
 FIELD_SUB_DEVICE: Final = "subDevice"
 FIELD_ALARM_ID: Final = "alarmId"
+FIELD_DEVICE_ONLINE_TIME: Final = "onlineTime"
+FIELD_DEVICE_OFFLINE_TIME: Final = "offlineTime"
+DEVICE_ALERT_FAULT_CODE_FIELDS: Final = (
+    "bms1",
+    "bms2",
+    "bms3",
+    "bms4",
+    "bms5",
+    "bms6",
+    "ems1",
+    "ems2",
+    "pcs1",
+    "pcs2",
+    "pcs3",
+    "pcs4",
+    "pcs5",
+    "iot1",
+)
 FIELD_SYS_ALERT_COUNT: Final = "sysAlertCount"
 FIELD_ALERT_COUNT: Final = "alertCount"
 FIELD_SW_EPS: Final = "swEps"
@@ -921,6 +942,7 @@ FIELD_LIST: Final = "list"
 FIELD_BATTERY_PACKS: Final = "batteryPacks"
 FIELD_BATTERY_PACK: Final = "batteryPack"
 FIELD_BATTERY_PACK_LIST: Final = "batteryPackList"
+FIELD_BATTERY_PACKS_UNDERSCORE: Final = "battery_packs"
 FIELD_BATTERIES: Final = "batteries"
 FIELD_PACK_LIST: Final = "packList"
 # HomeSubBody sub-device arrays (verified against
@@ -978,6 +1000,7 @@ FIELD_MAX_GRID_STD_PW: Final = "maxGridStdPw"
 FIELD_DEFAULT_PW: Final = "defaultPw"
 FIELD_SOC_CHG_LIMIT: Final = "socChgLimit"
 FIELD_SOC_FORCE_CHG: Final = "socForceChg"
+FIELD_PV_MAX_CHG_POWER: Final = "pvMaxChgPower"
 FIELD_SOC_CHARGE_LIMIT: Final = "socChargeLimit"
 FIELD_SOC_DISCHG_LIMIT: Final = "socDischgLimit"
 FIELD_SOC_DISCHARGE_LIMIT: Final = "socDischargeLimit"
@@ -1248,6 +1271,32 @@ CT_ATTRIBUTE_FIELDS: Final = (
     FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
 )
+# Measurements only Jackery's own CT clamp reports (App model AccCTBody,
+# APP_FIELD_EXPOSURE.md). Cloud-bridged meters (isCloud, e.g. Shelly Pro 3EM)
+# deliver phase power and energy only, so these never carry a value there.
+ACC_CT_BODY_MEASUREMENT_FIELDS: Final = frozenset({
+    FIELD_CT_VOLT,
+    FIELD_CT_VOLT1,
+    FIELD_CT_VOLT2,
+    FIELD_CT_VOLT3,
+    FIELD_CT_CURRENT,
+    FIELD_CT_CURRENT1,
+    FIELD_CT_CURRENT2,
+    FIELD_CT_CURRENT3,
+    FIELD_CT_FREQUENCY,
+    FIELD_CT_POWER_FACTOR,
+    FIELD_CT_POWER_FACTOR1,
+    FIELD_CT_POWER_FACTOR2,
+    FIELD_CT_POWER_FACTOR3,
+    FIELD_CT_APPARENT_POWER,
+    FIELD_CT_APPARENT_POWER1,
+    FIELD_CT_APPARENT_POWER2,
+    FIELD_CT_APPARENT_POWER3,
+    FIELD_CT_REACTIVE_POWER,
+    FIELD_CT_REACTIVE_POWER1,
+    FIELD_CT_REACTIVE_POWER2,
+    FIELD_CT_REACTIVE_POWER3,
+})
 
 FIELD_TARGET_MODULE_VERSION: Final = "targetModuleVersion"
 FIELD_UPGRADE_TYPE: Final = "upgradeType"
@@ -2230,6 +2279,7 @@ NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = frozenset({
     "_task_plan",
 })
 REMOVED_SENSOR_SUFFIXES: Final = {
+    "_alert_count",
     "_grid_side_in_power",
     "_grid_side_out_power",
     "_max_grid_power",
@@ -2249,6 +2299,9 @@ REMOVED_SENSOR_SUFFIXES: Final = {
     "_savings_pv_surplus_loss_year_energy",
     "_smart_meter_import_today_energy",
     "_smart_meter_export_today_energy",
+    # Duplicates of _smart_meter_lifetime_{import,export}_energy (same tPhaseEgy).
+    "_smart_meter_grid_import_energy",
+    "_smart_meter_grid_export_energy",
 }
 
 PLATFORMS: Final = [
@@ -2772,6 +2825,8 @@ DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 EXTERNAL_STAT_BUCKET_DAILY: Final = "daily"
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
 DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = False
+CONF_ENABLE_UNREDACTED_DEBUG: Final = "enable_unredacted_debug"
+DEFAULT_ENABLE_UNREDACTED_DEBUG: Final = False
 CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
 DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
 CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
@@ -2952,9 +3007,6 @@ _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
-    CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
-    CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
-    CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: (
         DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
     ),

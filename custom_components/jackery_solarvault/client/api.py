@@ -264,6 +264,7 @@ from ..util import (
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
+    jackery_dev_mode_enabled,
     safe_bool,
     safe_float,
 )
@@ -373,7 +374,9 @@ class JackeryAuthError(JackeryError):
 
 
 class JackeryApiError(JackeryError):
-    """Generic API failure."""
+    """Generic API failure (cloud status/code text, never credentials)."""
+
+    exposes_message = True
 
     @classmethod
     def payload_too_large(cls, limit: int) -> JackeryApiError:
@@ -641,9 +644,6 @@ _SENSITIVE_KEY_PARTS: Final = (
     "seed",
     "token",
 )
-_HTTP_DIAGNOSTIC_MAX_DEPTH: Final = 8
-_HTTP_DIAGNOSTIC_MAX_ITEMS: Final = 100
-_HTTP_DIAGNOSTIC_MAX_KEY_CHARS: Final = 128
 
 
 def build_login_crypto_fields(
@@ -701,6 +701,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self._session = session
         self._account = account
         self._password = password
+        self.dev_mode_entry: object | None = None
         self._region_code = (region_code or "").strip().upper() or None
         self._mqtt_mac_id_configured = mqtt_mac_id
         self._mqtt_mac_id_source = "generated"
@@ -1024,15 +1025,16 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             msg = f"Login returned {type(data).__name__} instead of object"
             raise JackeryApiError(msg)
 
-        # Store redacted version for diagnostics
+        # Store redacted version for diagnostics (complete in JACKERY_DEV_MODE)
         redacted = dict(data)
-        if FIELD_TOKEN in redacted:
-            redacted[FIELD_TOKEN] = REDACTED_VALUE
-        if isinstance(redacted.get(FIELD_DATA), dict):
-            inner = dict(redacted[FIELD_DATA])
-            if FIELD_MQTT_PASSWORD in inner:
-                inner[FIELD_MQTT_PASSWORD] = REDACTED_VALUE
-            redacted[FIELD_DATA] = inner
+        if not jackery_dev_mode_enabled(self.dev_mode_entry):
+            if FIELD_TOKEN in redacted:
+                redacted[FIELD_TOKEN] = REDACTED_VALUE
+            if isinstance(redacted.get(FIELD_DATA), dict):
+                inner = dict(redacted[FIELD_DATA])
+                if FIELD_MQTT_PASSWORD in inner:
+                    inner[FIELD_MQTT_PASSWORD] = REDACTED_VALUE
+                redacted[FIELD_DATA] = inner
         self.last_login_response = redacted
         await self._emit_payload_debug(
             self._http_payload_debug(
@@ -1467,20 +1469,38 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                     retry_transport_once=retry_transport_once,
                 )
             )
+        request_key = (method, path)
         if status != HTTPStatus.OK:
             msg = f"{method} {path} HTTP {status}"
-            raise JackeryApiError(msg)
+            raise await self._rejected_response(request_key, status, data, msg)
         if not isinstance(data, dict):
             msg = f"{method} {path} returned {type(data).__name__} instead of object"
-            raise JackeryApiError(msg)
+            raise await self._rejected_response(request_key, status, data, msg)
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             msg = (
                 f"{method} {path} code={data.get(FIELD_CODE)} "
                 f"msg={data.get(FIELD_MSG)!r}"
             )
-            raise JackeryApiError(msg)
+            raise await self._rejected_response(request_key, status, data, msg)
         return status, data
+
+    async def _rejected_response(
+        self, request: HttpRequestKey, status: int, data: object, msg: str
+    ) -> JackeryApiError:
+        """Payload-log a rejected response and return the error to raise.
+
+        Callers only payload-log successful bodies, so without this every
+        cloud error code stayed invisible in the payload debug log.
+        """
+        await self._emit_payload_debug(
+            self._http_payload_debug(
+                request=request,
+                status=status,
+                response=data if isinstance(data, dict) else None,
+            )
+        )
+        return JackeryApiError(msg)
 
     async def _emit_auth_rejection(self, status: int, data: object) -> None:
         """Notify the coordinator about a final HTTP auth rejection."""
@@ -1522,8 +1542,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 "Jackery payload debug logging failed: %s", err, exc_info=True
             )
 
-    @staticmethod
     def _http_payload_debug(  # keyword-only builder for distinct debug-event fields
+        self,
         *,
         request: HttpRequestKey,
         params: dict[str, Any] | None = None,
@@ -1531,7 +1551,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         status: int | None = None,
         response: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Build an already-redacted, bounded HTTP payload debug event."""
+        """Build a complete HTTP payload event, redacting outside dev mode."""
         method, path = request
         payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
         event: dict[str, Any] = {
@@ -1547,50 +1567,33 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         series_debug = chart_series_debug(payload)
         if series_debug:
             event["chart_series_debug"] = series_debug
+        if jackery_dev_mode_enabled(self.dev_mode_entry):
+            return event
         redacted = JackeryApi._redact_http_diagnostic(event)
         return redacted if isinstance(redacted, dict) else {}
 
     @staticmethod
-    def _redact_http_diagnostic(value: object, *, depth: int = 0) -> object:
-        """Recursively redact credentials and cap diagnostic memory use."""
-        if depth >= _HTTP_DIAGNOSTIC_MAX_DEPTH:
-            return "<depth-limit>"
+    def _redact_http_diagnostic(value: object) -> object:
+        """Recursively redact credential keys without truncating any data.
+
+        Earlier caps (100 items per list/dict, depth 8, 128-char keys, 4 KiB
+        strings) cut every 288-point day curve in the payload debug log to
+        its first 100 points, so log-based curve analysis saw a third of the
+        day. Only credential redaction remains here.
+        """
         if isinstance(value, dict):
             result: dict[str, object] = {}
-            for index, (raw_key, item) in enumerate(value.items()):
-                if index >= _HTTP_DIAGNOSTIC_MAX_ITEMS:
-                    result["<truncated>"] = len(value) - index
-                    break
-                key = str(raw_key)[:_HTTP_DIAGNOSTIC_MAX_KEY_CHARS]
+            for raw_key, item in value.items():
+                key = str(raw_key)
                 if any(part in key.casefold() for part in _SENSITIVE_KEY_PARTS):
                     result[key] = REDACTED_VALUE
                 else:
-                    result[key] = JackeryApi._redact_http_diagnostic(
-                        item, depth=depth + 1
-                    )
+                    result[key] = JackeryApi._redact_http_diagnostic(item)
             return result
         if isinstance(value, list | tuple):
-            items = [
-                JackeryApi._redact_http_diagnostic(item, depth=depth + 1)
-                for item in value[:_HTTP_DIAGNOSTIC_MAX_ITEMS]
-            ]
-            if len(value) > _HTTP_DIAGNOSTIC_MAX_ITEMS:
-                items.append(
-                    f"<truncated {len(value) - _HTTP_DIAGNOSTIC_MAX_ITEMS} items>"
-                )
-            return items
-        if isinstance(value, str):
-            encoded = value.encode("utf-8")
-            if len(encoded) <= _HTTP_POLICY.diagnostic_bytes:
-                return value
-            return (
-                encoded[: _HTTP_POLICY.diagnostic_bytes].decode(
-                    "utf-8", errors="ignore"
-                )
-                + "<truncated>"
-            )
+            return [JackeryApi._redact_http_diagnostic(item) for item in value]
         if isinstance(value, bytes):
-            value = f"<binary {len(value)} bytes>"
+            return f"<binary {len(value)} bytes>"
         return value
 
     @staticmethod
@@ -3886,6 +3889,18 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 "subDeviceSn": sub_device_sn,
             },
         )
+        payload = data.get(FIELD_DATA)
+        if (
+            isinstance(payload, list)
+            and payload
+            and all(
+                isinstance(item, dict) and "name" in item and "value" in item
+                for item in payload
+            )
+        ):
+            # App model DiyPropertySubShadowApi.PropertyBean is a name/value
+            # pair list; keep that shape instead of discarding it.
+            return {str(item["name"]): item["value"] for item in payload}
         return self._payload_dict(data, SUB_SHADOW_PATH)
 
     async def async_get_system_shadow(

@@ -3,12 +3,14 @@
   "name": "Jackery SolarVault",
   "after_dependencies": [
     "bluetooth",
-    "bluetooth_adapters",
     "dhcp",
     "http",
+    "mdns",
     "mqtt",
     "recorder",
     "ssdp",
+    "usb",
+    "websocket",
     "zeroconf"
   ],
   "bluetooth": [
@@ -22,7 +24,7 @@
     "@Bigdaddy1990"
   ],
   "config_flow": true,
-  "dependencies": ["mqtt"],
+  "dependencies": [],
   "dhcp": [
     {
       "hostname": "solarvault*",
@@ -44,15 +46,11 @@
     "custom_components.jackery_solarvault.client.ble",
     "custom_components.jackery_solarvault.client.ble_transport",
     "custom_components.jackery_solarvault.client.local_mqtt",
-    "custom_components.jackery_solarvault.client.mqtt_push",
-    "aiohttp",
-    "aiomqtt"
+    "custom_components.jackery_solarvault.client.mqtt_push"
   ],
-  "mqtt": [
-    "jackery_solarvault/discovery/#"
-  ],
+  "mqtt": [],
   "quality_scale": "custom",
-  "requirements": ["aiomqtt==2.5.1", "cryptography", "bleak-retry-connector>=4.7.1", "segno>=1.6.6"],
+  "requirements": ["aiomqtt==2.5.1", "cryptography", "bleak-retry-connector", "segno>=1.6.0"],
   "version": "0.1.3",
   "zeroconf": [
     {

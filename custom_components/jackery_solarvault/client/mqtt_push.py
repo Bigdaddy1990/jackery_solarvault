@@ -33,6 +33,7 @@ from ..const import (
     MQTT_TOPIC_SUFFIXES,
     REDACTED_VALUE,
 )
+from ..util import jackery_dev_mode_enabled
 from .credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
@@ -1348,7 +1349,9 @@ class JackeryMqttPushClient:
         return datetime.now(UTC).isoformat()
 
     @staticmethod
-    def _redact_topic(topic: str | None) -> str | None:
+    def _redact_topic(
+        topic: str | None, entry: ConfigEntry | None = None
+    ) -> str | None:
         """Redact a user identifier from a configured-prefix MQTT topic.
 
         Replaces the third slash-separated segment with `REDACTED_VALUE` when the first
@@ -1360,8 +1363,8 @@ class JackeryMqttPushClient:
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
         """
-        if topic is None:
-            return None
+        if topic is None or jackery_dev_mode_enabled(entry):
+            return topic
         parts = topic.split("/")
         if (
             len(parts) >= _MQTT_TOPIC_REDACTION_MIN_PARTS
@@ -1489,7 +1492,7 @@ class JackeryMqttPushClient:
             Returns:
                 str | None: The redacted topic, or `None` if `topic` is `None`.
             """
-            return self._redact_topic(topic)
+            return self._redact_topic(topic, self._config_entry)
 
         requested_topics = [topic_value(topic) for topic in self._topics]
         subscribed_topics = [topic_value(topic) for topic in self._subscribed_topics]

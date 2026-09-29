@@ -25,6 +25,7 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
+from ..util import jackery_dev_mode_enabled
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -48,11 +49,17 @@ _SUBACK_FAILURE_CODE = 0x80
 
 
 def _subscription_topic(topic_filter: str) -> str:
-    """Normalize only the documented legacy default; preserve user topics."""
+    """Return the topic filter verbatim, with legacy exact match expanded.
+
+    The discovery topic is the documented HA root: ``homeassistant``. It is
+    normalized to the child-topic wildcard ``homeassistant/#`` to match all
+    subtopics, as documented in ENV.md. Local MQTT and cloud MQTT are separate
+    transports and must never be merged into one subscription set.
+    """
     topic = topic_filter.strip()
-    if not topic:
-        return "hb/app/+/device"
-    return "homeassistant/#" if topic == "homeassistant" else topic
+    if not topic or topic == "homeassistant":
+        return "homeassistant/#"
+    return topic
 
 
 def subscription_refusals(codes: object) -> list[str]:
@@ -173,11 +180,15 @@ class JackeryLocalMqttClient:
         self._client_id = settings.client_id
         self._sink = sink
         self._topic_filter = settings.topic_filter
-        self._topic_filters: tuple[str, ...] = (
-            _subscription_topic(settings.topic_filter),
+        # Jackery telemetry uses hb/device even when discovery uses homeassistant.
+        # Keep the configured filter unchanged and ingest both device reports.
+        configured_topic = _subscription_topic(settings.topic_filter)
+        jackery_topics = (
+            ("hb/device/+/event", "hb/device/+/status")
+            if configured_topic == "homeassistant/#"
+            else ()
         )
-        if self._topic_filters == ("homeassistant/#",):
-            self._topic_filters += ("hb/device/#",)
+        self._topic_filters: tuple[str, ...] = (configured_topic, *jackery_topics)
         if settings.qos not in {0, 1, 2}:
             raise LocalMqttConfigurationError.invalid_qos()
         self._qos = settings.qos
@@ -356,6 +367,19 @@ class JackeryLocalMqttClient:
                 self._configuration_error = True
                 self._last_error = f"CONFIG_ERROR: {error}"
                 return False
+            # A CONNACK code 135 ("Not authorized") is a credential/ACL
+            # problem, not a transient network glitch. Retry forever
+            # against a broker that rejects the client identity.
+            if "code:135" in str(err) or "Not authorized" in str(err):
+                _LOGGER.exception(
+                    "Jackery local MQTT broker rejected the client "
+                    "credentials (CONNACK code 135). Verify the broker "
+                    "username/password and ACL for this client id. "
+                    "Stopping reconnect attempts."
+                )
+                self._configuration_error = True
+                self._last_error = f"CONFIG_ERROR: {error}"
+                return False
             log = _LOGGER.warning if error != self._last_error else _LOGGER.debug
             self._last_error = error
             log("Jackery local MQTT connection failed: %s", err)
@@ -389,11 +413,19 @@ class JackeryLocalMqttClient:
     ) -> None:
         """Subscribe and consume one established direct-broker session."""
         self._client = client
+        subscribed: set[str] = set()
         for topic in topics:
             refused = subscription_refusals(
                 await client.subscribe(topic, qos=self._qos)
             )
             if refused:
+                if topic != _subscription_topic(self._topic_filter):
+                    _LOGGER.warning(
+                        "Jackery local MQTT broker refused telemetry topic %s: %s",
+                        topic,
+                        ", ".join(refused),
+                    )
+                    continue
                 msg = (
                     f"broker refused the subscription to {topic!r} "
                     f"(SUBACK {", ".join(refused)}) — check the broker ACL for "
@@ -403,7 +435,8 @@ class JackeryLocalMqttClient:
                 # failure. Raise MqttError but the outer loop will detect it and
                 # stop reconnecting.
                 raise MqttError(msg)
-        self._subscribed_topics = set(topics)
+            subscribed.add(topic)
+        self._subscribed_topics = subscribed
         self._configuration_error = False
         recovered = self._last_error is not None
         self._connected = True
@@ -706,9 +739,10 @@ class JackeryLocalMqttClient:
             self._last_sink_error = f"{type(err).__name__}: {err}"
             _LOGGER.exception("Local Jackery MQTT sink failed")
             return
-        self._messages_forwarded += 1
         if accepted is False:
             self._messages_rejected_by_sink += 1
+            return
+        self._messages_forwarded += 1
 
     def set_snapshot_requester(
         self,
@@ -859,8 +893,10 @@ class JackeryLocalMqttClient:
                 return True
         return False
 
-    def diagnostics_snapshot(self, *, redact: bool = True) -> dict[str, Any]:
-        """Return privacy-safe transport diagnostics."""
+    def diagnostics_snapshot(self, *, redact: bool | None = None) -> dict[str, Any]:
+        """Return transport diagnostics, redacted unless ``JACKERY_DEV_MODE``."""
+        if redact is None:
+            redact = not jackery_dev_mode_enabled()
         topics = (
             [REDACTED_VALUE] * len(self._topics_seen)
             if redact

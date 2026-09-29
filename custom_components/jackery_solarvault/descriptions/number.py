@@ -571,6 +571,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
     JackeryNumberDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="soc_charge_limit_set",
+        device_registry_role="main_battery",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_charge_limit_set",
         # pyrefly: ignore [unexpected-keyword]
@@ -597,6 +598,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
     JackeryNumberDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="soc_discharge_limit_set",
+        device_registry_role="main_battery",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_discharge_limit_set",
         # pyrefly: ignore [unexpected-keyword]
@@ -701,6 +703,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
     JackeryNumberDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="single_tariff_price_set",
+        source_section=PAYLOAD_PRICE,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="single_tariff_price_set",
         # pyrefly: ignore [unexpected-keyword]

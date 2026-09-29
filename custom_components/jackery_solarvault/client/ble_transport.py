@@ -185,6 +185,13 @@ class BleListenerStats:
     multi_chunk_frames_buffered: int = 0
     multi_chunk_messages_assembled: int = 0
     multi_chunk_assemblies_dropped: int = 0
+    multi_chunk_drop_reasons: dict[str, int] = field(default_factory=dict)
+    multi_chunk_expired_by_cmd: dict[int, int] = field(default_factory=dict)
+    multi_chunk_owner_rejected_by_cmd: dict[int, int] = field(default_factory=dict)
+    multi_chunk_final_incomplete_by_cmd: dict[int, int] = field(default_factory=dict)
+    last_multi_chunk_final_incomplete_by_cmd: dict[int, dict[str, Any]] = field(
+        default_factory=dict
+    )
     notify_frames_dropped: int = 0
     notify_queue_depth: int = 0
     notify_queue_high_watermark: int = 0
@@ -2077,6 +2084,16 @@ class JackeryBleListener:
     # Notification handler
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _record_multi_chunk_drop_reason(
+        stats: BleListenerStats, cmd: int, reason: str
+    ) -> None:
+        """Classify an assembly loss without retaining payload data."""
+        key = f"cmd{cmd}:{reason}"
+        stats.multi_chunk_drop_reasons[key] = (
+            stats.multi_chunk_drop_reasons.get(key, 0) + 1
+        )
+
     # Splitting this bounded state machine would fragment its ownership transaction.
     def _reassemble_frame(  # ruff: ignore[complex-structure, too-many-locals, too-many-branches, too-many-statements]
         self,
@@ -2088,6 +2105,7 @@ class JackeryBleListener:
         accepted: bool = False,
     ) -> tuple[ble.BleBinaryFrame | None, int | None]:
         """Return a complete frame and its earliest queued notification sequence."""
+        stats = self.stats_for(device_id)
         if session is not None:
             owns_session = (
                 self._accepted_notification_session_owns_connection(
@@ -2098,12 +2116,28 @@ class JackeryBleListener:
                 else self._session_is_current(device_id, session)
             )
             if not owns_session:
+                stats.multi_chunk_owner_rejected_by_cmd[frame.cmd] = (
+                    stats.multi_chunk_owner_rejected_by_cmd.get(frame.cmd, 0) + 1
+                )
+                if frame.chunk_count > 1 and frame.frame_index == frame.chunk_count:
+                    current = self._sessions.get(device_id)
+                    stats.last_multi_chunk_final_incomplete_by_cmd[frame.cmd] = {
+                        "reason": "session_not_owner",
+                        "flags": frame.flags,
+                        "present_indices": [],
+                        "session_generation": session.generation,
+                        "current_generation": (
+                            current.generation if current is not None else None
+                        ),
+                        "notify_sequence": notify_sequence,
+                    }
                 return None, None
-        stats = self.stats_for(device_id)
         now = self._hass.loop.time()
         if session is not None:
             owner = self._frame_assembly_owners.get(device_id)
             if owner is not session:
+                for cmd, _flags in self._frame_assemblies.get(device_id, {}):
+                    self._record_multi_chunk_drop_reason(stats, cmd, "owner_switch")
                 if owner is not None:
                     dropped = self._clear_frame_assemblies(device_id, owner)
                     if dropped:
@@ -2122,6 +2156,11 @@ class JackeryBleListener:
             ]
             for key in expired:
                 assemblies.pop(key, None)
+                cmd = key[0]
+                self._record_multi_chunk_drop_reason(stats, cmd, "expired")
+                stats.multi_chunk_expired_by_cmd[cmd] = (
+                    stats.multi_chunk_expired_by_cmd.get(cmd, 0) + 1
+                )
             stats.multi_chunk_assemblies_dropped += len(expired)
             if not assemblies:
                 self._clear_frame_assemblies(device_id, session)
@@ -2150,6 +2189,9 @@ class JackeryBleListener:
         assembly = assemblies.get(key)
         if assembly is not None and assembly.chunk_count != frame.chunk_count:
             assemblies.pop(key, None)
+            self._record_multi_chunk_drop_reason(
+                stats, frame.cmd, "chunk_count_changed"
+            )
             stats.multi_chunk_assemblies_dropped += 1
             assembly = None
         if assembly is not None and frame.frame_index == 1:
@@ -2158,6 +2200,9 @@ class JackeryBleListener:
                 first.body != frame.body or first.trailer != frame.trailer
             ):
                 assemblies.pop(key, None)
+                self._record_multi_chunk_drop_reason(
+                    stats, frame.cmd, "first_chunk_changed"
+                )
                 stats.multi_chunk_assemblies_dropped += 1
                 assembly = None
         if assembly is None:
@@ -2167,6 +2212,7 @@ class JackeryBleListener:
                     key=lambda candidate: assemblies[candidate].updated_at,
                 )
                 assemblies.pop(oldest_key, None)
+                self._record_multi_chunk_drop_reason(stats, oldest_key[0], "capacity")
                 stats.multi_chunk_assemblies_dropped += 1
             assembly = _PendingFrameAssembly(
                 chunk_count=frame.chunk_count,
@@ -2187,6 +2233,9 @@ class JackeryBleListener:
         if prior is not None:
             if prior.body != frame.body or prior.trailer != frame.trailer:
                 assemblies.pop(key, None)
+                self._record_multi_chunk_drop_reason(
+                    stats, frame.cmd, "duplicate_changed"
+                )
                 stats.multi_chunk_assemblies_dropped += 1
                 assembly = _PendingFrameAssembly(
                     chunk_count=frame.chunk_count,
@@ -2204,10 +2253,29 @@ class JackeryBleListener:
         body_size = sum(len(chunk.body) for chunk in assembly.frames.values())
         if body_size > _REASSEMBLY_MAX_BODY_BYTES:
             assemblies.pop(key, None)
+            self._record_multi_chunk_drop_reason(stats, frame.cmd, "body_too_large")
             stats.multi_chunk_assemblies_dropped += 1
             msg = f"assembled BLE body exceeds {_REASSEMBLY_MAX_BODY_BYTES} bytes"
             raise ValueError(msg)
         if len(assembly.frames) < assembly.chunk_count:
+            if frame.frame_index == frame.chunk_count:
+                stats.multi_chunk_final_incomplete_by_cmd[frame.cmd] = (
+                    stats.multi_chunk_final_incomplete_by_cmd.get(frame.cmd, 0) + 1
+                )
+                stats.last_multi_chunk_final_incomplete_by_cmd[frame.cmd] = {
+                    "reason": "missing_prior_chunks",
+                    "flags": frame.flags,
+                    "present_indices": sorted(assembly.frames),
+                    "session_generation": (
+                        session.generation if session is not None else None
+                    ),
+                    "current_generation": (
+                        self._sessions[device_id].generation
+                        if device_id in self._sessions
+                        else None
+                    ),
+                    "notify_sequence": notify_sequence,
+                }
             return None, None
         missing = [
             index

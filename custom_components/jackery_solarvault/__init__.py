@@ -13,7 +13,7 @@ import re
 from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, EntityCategory
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import CoreState, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import (
@@ -173,7 +173,6 @@ def _async_clean_legacy_entities(
     """
     _async_remove_stale_energy_helpers(hass)
     _async_migrate_portable_screen_entity(hass, entry)
-    _async_migrate_grid_standard_entity(hass, entry)
     _async_migrate_smart_meter_identity(hass, entry)
     _async_migrate_battery_pack_identities(hass, entry)
     _async_remove_phantom_battery_pack_devices(hass, entry)
@@ -2670,8 +2669,6 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
 _LEGACY_UID_HEAD_RE = re.compile(r"\d+(?:_battery_pack_\d+)?")
 _PORTABLE_SCREEN_UID_SUFFIX = "_portable_screen"
 _PORTABLE_SCREEN_TRANSLATION_KEY = "portable_screen"
-_GRID_STANDARD_UID_SUFFIX = "_grid_standard"
-_GRID_STANDARD_TRANSLATION_KEY = "grid_standard"
 _BATTERY_PACK_INDEX_MAX = 5
 
 
@@ -2768,76 +2765,6 @@ def _async_migrate_portable_screen_entity(
         )
 
 
-def _async_migrate_grid_standard_entity(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-) -> None:
-    """Replace the obsolete grid-standard text entry with a diagnostic sensor."""
-    registry = er.async_get(hass)
-    for old_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
-        unique_id = old_entry.unique_id or ""
-        if (
-            old_entry.domain != "text"
-            or old_entry.platform != DOMAIN
-            or unique_id == _GRID_STANDARD_UID_SUFFIX
-            or not unique_id.endswith(_GRID_STANDARD_UID_SUFFIX)
-        ):
-            continue
-
-        target_entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
-        if target_entity_id is not None:
-            target_entry = registry.async_get(target_entity_id)
-            if target_entry is None or target_entry.config_entry_id != entry.entry_id:
-                _LOGGER.warning(
-                    "Skipping grid-standard registry migration for %s: "
-                    "sensor target %s belongs to another config entry",
-                    old_entry.entity_id,
-                    target_entity_id,
-                )
-                continue
-            registry.async_remove(old_entry.entity_id)
-            _LOGGER.info(
-                "Removed obsolete grid-standard text %s; sensor %s already exists",
-                old_entry.entity_id,
-                target_entity_id,
-            )
-            continue
-
-        target_entry = registry.async_get_or_create(
-            "sensor",
-            DOMAIN,
-            unique_id,
-            config_entry=entry,
-            device_id=old_entry.device_id,
-            disabled_by=old_entry.disabled_by,
-            hidden_by=old_entry.hidden_by,
-            entity_category=EntityCategory.DIAGNOSTIC,
-            has_entity_name=old_entry.has_entity_name,
-            suggested_object_id=old_entry.entity_id.partition(".")[2],
-            translation_key=_GRID_STANDARD_TRANSLATION_KEY,
-        )
-        registry.async_update_entity(
-            target_entry.entity_id,
-            # ``async_update_entity`` erwartet fuer aliases eine Liste (labels
-            # dagegen ein Set) — ein Set fuehrt zu einem Typfehler in der
-            # Entity-Registry-API.
-            aliases=list(old_entry.aliases),
-            area_id=old_entry.area_id,
-            categories=dict(old_entry.categories),
-            disabled_by=old_entry.disabled_by,
-            hidden_by=old_entry.hidden_by,
-            icon=old_entry.icon,
-            labels=set(old_entry.labels),
-            name=old_entry.name,
-        )
-        registry.async_remove(old_entry.entity_id)
-        _LOGGER.info(
-            "Migrated grid-standard entity %s to %s",
-            old_entry.entity_id,
-            target_entry.entity_id,
-        )
-
-
 def _device_stable_identity(device: dr.DeviceEntry) -> str:
     """Generate a stable identity hash from device info when serial is unavailable.
 
@@ -2891,6 +2818,37 @@ def _battery_pack_registry_identity(
                 pack_identifier.removeprefix(prefix),
             )
     return None
+
+
+def _async_move_ct_period_entities(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    parent_device_id: str,
+    target_device_id: str,
+) -> None:
+    """Attach CT history sensors to their accessory after late discovery."""
+    devices = dr.async_get(hass)
+    parent = devices.async_get_device_by_identifier(
+        (DOMAIN, parent_device_id), entry.entry_id
+    )
+    if parent is None:
+        return
+    period_unique_ids = {
+        f"{parent_device_id}_ct_{direction}_{period}_energy"
+        for direction in ("input", "output")
+        for period in ("day", "week", "month", "year")
+    }
+    entities = er.async_get(hass)
+    for entity in er.async_entries_for_device(
+        entities, parent.id, include_disabled_entities=True
+    ):
+        if (
+            entity.config_entry_id == entry.entry_id
+            and entity.domain == "sensor"
+            and entity.platform == DOMAIN
+            and entity.unique_id in period_unique_ids
+        ):
+            entities.async_update_entity(entity.entity_id, device_id=target_device_id)
 
 
 def _async_migrate_smart_meter_identity(
@@ -2993,6 +2951,11 @@ def _async_migrate_smart_meter_identity(
                 "Migrated smart-meter registry identity %s to %s",
                 legacy_identifier[1],
                 target_identifier[1],
+            )
+
+        if target_device is not None:
+            _async_move_ct_period_entities(
+                hass, entry, parent_device_id, target_device.id
             )
 
 
@@ -3611,7 +3574,7 @@ def _matching_serial_battery_pack_target(
     entry_id, parent_device_id = scope
     child_serial = nonblank_text(device.serial_number)
     live_serial = battery_pack_serial(packs[numeric_index - 1])
-    if child_serial is None or live_serial is None:
+    if live_serial is None:
         return None
     live_key = stable_subdevice_key("battery_pack", live_serial, numeric_index)
     identifier = (DOMAIN, f"{parent_device_id}_{live_key}")
@@ -3629,7 +3592,11 @@ def _matching_serial_battery_pack_target(
     if stored_serial is None:
         return None
     if (
-        stable_subdevice_key("battery_pack", child_serial, numeric_index) != live_key
+        (
+            child_serial is not None
+            and stable_subdevice_key("battery_pack", child_serial, numeric_index)
+            != live_key
+        )
         or stable_subdevice_key("battery_pack", stored_serial, numeric_index)
         != live_key
     ):

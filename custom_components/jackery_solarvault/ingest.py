@@ -26,6 +26,7 @@ from continuing to publish.
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 import time
 from typing import TYPE_CHECKING, Any, Final
 
@@ -128,7 +129,7 @@ def is_periodic_section(section_key: str) -> bool:
     )
 
 
-def _is_blankable(value: object) -> bool:
+def is_blank(value: object) -> bool:
     """Return True for values that must never overwrite a populated field."""
     if value is None:
         return True
@@ -161,11 +162,24 @@ def merge_live_properties(
         current = merged.get(key)
         if isinstance(current, dict) and isinstance(value, dict):
             merged[key] = merge_live_properties(current, value)
-        elif _is_blankable(value) and not _is_blankable(current):
+        elif is_blank(value) and not is_blank(current):
             continue
         else:
             merged[key] = value
     return merged
+
+
+def _incoming_is_stale(
+    incoming: FieldProvenance,
+    freshness_window_seconds: float,
+) -> bool:
+    """Return whether a timestamped observation is older than the window."""
+    # Observation guarantees a timezone-aware ``observed_at``.
+    observed_at = incoming.observed_at
+    if observed_at is None or freshness_window_seconds <= 0:
+        return False
+    age = (datetime.now(UTC) - observed_at).total_seconds()
+    return age > freshness_window_seconds
 
 
 def _provenance_keeps_current(
@@ -176,8 +190,20 @@ def _provenance_keeps_current(
     received_at: float,
     freshness_window_seconds: float,
 ) -> bool:
-    """Return whether provenance protects one populated live value."""
-    if current_provenance is None or _is_blankable(current_value):
+    """Return whether provenance protects one populated live value.
+
+    A timestamped observation older than the freshness window (e.g. a retained
+    broker frame from hours ago) never overwrites a populated value whose own
+    age is unknown, but it still fills blank fields: the decision is made per
+    field here, never by dropping a whole frame before ingest.
+    """
+    if is_blank(current_value):
+        return False
+    if (
+        current_provenance is None or current_provenance.observed_at is None
+    ) and _incoming_is_stale(incoming, freshness_window_seconds):
+        return True
+    if current_provenance is None:
         return False
     current_tier = _LIVE_SOURCE_TIER[current_provenance.source]
     incoming_tier = _LIVE_SOURCE_TIER[incoming.source]
@@ -232,7 +258,7 @@ def _merge_nested_with_provenance(
                 merged[key] = nested
                 accepted = True
             continue
-        if _is_blankable(value) and not _is_blankable(current_value):
+        if is_blank(value) and not is_blank(current_value):
             continue
         if _provenance_keeps_current(
             current_value,

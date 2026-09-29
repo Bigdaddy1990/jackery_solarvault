@@ -26,10 +26,8 @@ from .const import (
     CONF_CREATE_SMART_METER_DERIVED_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
-    CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
-    CONF_ENABLE_WEEK_STATISTICS,
-    CONF_ENABLE_YEAR_STATISTICS,
+    CONF_ENABLE_UNREDACTED_DEBUG,
     CONF_MQTT_MAC_ID,
     CONF_REGION_CODE,
     CONF_SCAN_INTERVAL,
@@ -48,6 +46,7 @@ from .const import (
     DEFAULT_CREATE_SMART_METER_DERIVED_SENSORS,
     DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
+    DEFAULT_ENABLE_UNREDACTED_DEBUG,
     DEFAULT_SCAN_INTERVAL_SEC,
     DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     DEFAULT_THIRD_PARTY_MQTT_IP,
@@ -108,6 +107,7 @@ _BOOL_OPTION_DEFAULTS: dict[str, bool] = {
     **_OPTION_DEFAULTS,
     CONF_THIRD_PARTY_MQTT_ENABLE: DEFAULT_THIRD_PARTY_MQTT_ENABLE,
     CONF_ENABLE_PAYLOAD_DEBUG_LOG: DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG,
+    CONF_ENABLE_UNREDACTED_DEBUG: DEFAULT_ENABLE_UNREDACTED_DEBUG,
 }
 
 _STR_OPTION_DEFAULTS: dict[str, str] = {
@@ -592,7 +592,10 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
                     for key in previous.keys() | merged.keys()
                     if previous.get(key) != merged.get(key)
                 }
-                if not (changed_keys & _ENTITY_CREATING_OPTION_KEYS):
+                if not (
+                    changed_keys
+                    & (_ENTITY_CREATING_OPTION_KEYS | {CONF_ENABLE_UNREDACTED_DEBUG})
+                ):
                     self.automatic_reload = False
                     self.hass.config_entries.async_update_entry(
                         self.config_entry,
@@ -616,9 +619,6 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
             CONF_CREATE_SAVINGS_DETAIL_SENSORS
         ]
         current_enable_ble_transport = current_options[CONF_ENABLE_BLE_TRANSPORT]
-        current_enable_week_statistics = current_options[CONF_ENABLE_WEEK_STATISTICS]
-        current_enable_month_statistics = current_options[CONF_ENABLE_MONTH_STATISTICS]
-        current_enable_year_statistics = current_options[CONF_ENABLE_YEAR_STATISTICS]
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
@@ -647,24 +647,16 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
                 default=current_enable_ble_transport,
             ): bool,
             vol.Optional(
-                CONF_ENABLE_WEEK_STATISTICS,
-                default=current_enable_week_statistics,
-            ): bool,
-            vol.Optional(
-                CONF_ENABLE_MONTH_STATISTICS,
-                default=current_enable_month_statistics,
-            ): bool,
-            vol.Optional(
-                CONF_ENABLE_YEAR_STATISTICS,
-                default=current_enable_year_statistics,
-            ): bool,
-            vol.Optional(
                 CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
                 default=current_enable_derived_home_fallback,
             ): bool,
             vol.Optional(
                 CONF_ENABLE_PAYLOAD_DEBUG_LOG,
                 default=current_options[CONF_ENABLE_PAYLOAD_DEBUG_LOG],
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_UNREDACTED_DEBUG,
+                default=current_options[CONF_ENABLE_UNREDACTED_DEBUG],
             ): bool,
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_ENABLE,
@@ -679,10 +671,6 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(
-                CONF_THIRD_PARTY_MQTT_QOS,
-                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
-            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
-            vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],
             ): str,
@@ -690,12 +678,11 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
                 CONF_THIRD_PARTY_MQTT_PASSWORD,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PASSWORD],
             ): str,
-            # Single bridge mask (owner rule 2026-07-05): the third-party
-            # fields above ARE the one mask. The local listener derives its
-            # ``local_mqtt_*`` values from them via
-            # ``_merge_local_mqtt_options`` below, so no duplicate
-            # ``local_mqtt_*`` field block is exposed here. Only the shared
-            # topic filter is surfaced.
+            # QoS is fixed at 0 for the local broker listener (MQTT 3.1.1
+            # default). It is not user-configurable: a higher QoS would
+            # introduce delivery guarantees the local path does not need
+            # and would mix transport semantics with the cloud MQTT path
+            # (2026-09-22).
             # CONF_THIRD_PARTY_MQTT_TOKEN is intentionally omitted from the form
             # per const.py: "the integration must fill it and must never
             # surface it to the user". _flow_options preserves it from current_options.
@@ -1066,10 +1053,6 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_THIRD_PARTY_MQTT_PORT,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_PORT],
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-            vol.Optional(
-                CONF_THIRD_PARTY_MQTT_QOS,
-                default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_QOS],
-            ): vol.All(vol.Coerce(int), vol.In((0, 1, 2))),
             vol.Optional(
                 CONF_THIRD_PARTY_MQTT_USERNAME,
                 default=current_local_mqtt[CONF_THIRD_PARTY_MQTT_USERNAME],

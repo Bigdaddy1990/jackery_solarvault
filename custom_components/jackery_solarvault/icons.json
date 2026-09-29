@@ -747,12 +747,6 @@
       "smart_meter_fun_form": {
         "default": "mdi:transit-connection-horizontal"
       },
-      "smart_meter_grid_export_energy": {
-        "default": "mdi:transmission-tower-export"
-      },
-      "smart_meter_grid_import_energy": {
-        "default": "mdi:transmission-tower-import"
-      },
       "smart_meter_gross_phase_export_power": {
         "default": "mdi:transmission-tower-export"
       },

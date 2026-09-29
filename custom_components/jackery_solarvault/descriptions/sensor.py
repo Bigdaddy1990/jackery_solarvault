@@ -5,6 +5,7 @@ All descriptions follow HA-standard ``SensorEntityDescription`` with
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from homeassistant.components.sensor import (
@@ -48,12 +49,19 @@ if TYPE_CHECKING:
     )
 
 from ..const import (
+    APP_DEVICE_STAT_AC_TO_BATTERY,
+    APP_DEVICE_STAT_AC_TO_ONGRID,
     APP_DEVICE_STAT_BATTERY_CHARGE,
     APP_DEVICE_STAT_BATTERY_DISCHARGE,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
     APP_DEVICE_STAT_BATTERY_TO_GRID,
+    APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_PV_TO_AC,
     APP_DEVICE_STAT_PV_TO_BATTERY,
+    APP_DEVICE_STAT_PV_TO_ONGRID,
     APP_SECTION_BATTERY_STAT,
+    APP_SECTION_BATTERY_TRENDS,
     APP_SECTION_CT_STAT,
     APP_SECTION_EPS_STAT,
     APP_SECTION_HOME_STAT,
@@ -66,6 +74,7 @@ from ..const import (
     APP_STAT_PV2_ENERGY,
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
+    APP_STAT_TODAY_BATTERY_CHARGE,
     APP_STAT_TODAY_BATTERY_DISCHARGE,
     APP_STAT_TODAY_BATTERY_ENERGY,
     APP_STAT_TODAY_GRID_IMPORT_ENERGY,
@@ -106,9 +115,12 @@ from ..const import (
     FIELD_ACPS,
     FIELD_ACPSP,
     FIELD_ACPSS,
+    FIELD_ALARM_ID,
     FIELD_ALERT_COUNT,
     FIELD_AST,
     FIELD_AUTO_STANDBY,
+    FIELD_BATTERY_SOURCES,
+    FIELD_BATTERY_USAGE,
     FIELD_BAT_IN_PW,
     FIELD_BAT_NUM,
     FIELD_BAT_OUT_PW,
@@ -168,6 +180,8 @@ from ..const import (
     FIELD_CT_VOLT3,
     FIELD_DEFAULT_PW,
     FIELD_DEVICE_ID,
+    FIELD_DEVICE_OFFLINE_TIME,
+    FIELD_DEVICE_ONLINE_TIME,
     FIELD_DEVICE_SN,
     FIELD_DHG_RECALL,
     FIELD_DISCHARGING_ENERGY,
@@ -186,6 +200,7 @@ from ..const import (
     FIELD_GRID_STAT,
     FIELD_GRID_STATE,
     FIELD_GRID_STATE_ALT,
+    FIELD_HOME_SOURCES,
     FIELD_IAC,
     FIELD_IACPW,
     FIELD_IN_EGY,
@@ -252,7 +267,10 @@ from ..const import (
     FIELD_PV2,
     FIELD_PV3,
     FIELD_PV4,
+    FIELD_PV_MAX_CHG_POWER,
     FIELD_PV_PW,
+    FIELD_PV_SOURCES,
+    FIELD_PV_USAGE,
     FIELD_RB,
     FIELD_REBOOT,
     FIELD_SFC,
@@ -266,6 +284,7 @@ from ..const import (
     FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SOC_FORCE_CHG,
     FIELD_SPH,
     FIELD_SPH_PC,
     FIELD_SS,
@@ -304,7 +323,10 @@ from ..const import (
     FIELD_WSIG,
     FIELD_WSS,
     JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_CT_METER,
+    PAYLOAD_DEVICE_ALERT,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_DYNAMIC_PRICE,
     PAYLOAD_HOME_TRENDS,
@@ -421,6 +443,29 @@ def _get_payload_section(
 ) -> StateType:
     """Get value from a payload section."""
     return _state_value(entity.payload_section_for_sources(section).get(key))
+
+
+def _main_battery_energy(
+    entity: JackeryEntity, total_key: str, pack_key: str
+) -> float | None:
+    """Estimate main-battery energy from a system counter and current pack counters."""
+    total = safe_float(_get_payload_section(entity, PAYLOAD_PROPERTIES, total_key))
+    packs = entity.payload.get(PAYLOAD_BATTERY_PACKS)
+    count = safe_int(_get_payload_section(entity, PAYLOAD_PROPERTIES, FIELD_BAT_NUM))
+    if (
+        total is None
+        or count is None
+        or (packs is not None and not isinstance(packs, list))
+    ):
+        return None
+    rows = [pack for pack in packs or [] if isinstance(pack, dict)]
+    if count != len(rows):
+        return None
+    values = [safe_float(pack.get(pack_key)) for pack in rows]
+    if any(value is None for value in values):
+        return None
+    main = total - sum(value for value in values if value is not None)
+    return round(main / JACKERY_LIVE_ENERGY_UNITS_PER_KWH, 2) if main >= 0 else None
 
 
 def _get_ct_meter(entity: JackeryEntity) -> dict[str, Any]:
@@ -615,6 +660,27 @@ def _get_prop_or_disconnected(entity: JackeryEntity, key: str) -> StateType:
 # ---------------------------------------------------------------------------
 
 
+def _section_share(
+    entity: JackeryEntity, section: str, key: str, part: str
+) -> StateType:
+    """Return one percentage of an App energy-flow share object (e.g. pvUsage)."""
+    shares = entity.payload_section_for_sources(section).get(key)
+    # An all-zero split is the cloud's "not aggregated yet" placeholder, not 0 %.
+    if not isinstance(shares, dict) or not any(
+        safe_float(value) for value in shares.values()
+    ):
+        return None
+    return _state_value(shares.get(part))
+
+
+def _device_meta_timestamp(entity: JackeryEntity, key: str) -> datetime | None:
+    """Return an epoch-milliseconds device-meta field as an aware UTC datetime."""
+    millis = safe_float(entity.device_meta.get(key))
+    if millis is None or millis <= 0:
+        return None
+    return datetime.fromtimestamp(millis / 1000, UTC)
+
+
 def _default_sensor_value(entity: JackerySensorEntity) -> StateType:
     """Evaluate the historical getter/transform contract for compatibility."""
     description = entity.entity_description
@@ -650,7 +716,9 @@ class _JackerySensorEntityDescription(SensorEntityDescription):
 class JackerySensorDescription(_JackerySensorEntityDescription):
     """Sensor description supporting entity value_fn and legacy raw getters."""
 
-    value_fn: Callable[[JackerySensorEntity], StateType] = _default_sensor_value
+    value_fn: Callable[[JackerySensorEntity], StateType | datetime] = (
+        _default_sensor_value
+    )
     getter: Callable[[dict[str, Any]], Any] | None = None
     transform: Callable[[Any], Any] = _identity
     fallbacks: tuple[Callable[[dict[str, Any]], Any], ...] = ()
@@ -723,6 +791,7 @@ class JackeryStatSensorDescription(_JackerySensorEntityDescription):
     fallback_sources: tuple[tuple[str, str], ...] = ()
     reset_period: Literal["day", "week", "month", "year"] | None = None
     data_sources: tuple[str, ...] = HTTP_DATA_SOURCES
+    device_registry_role: str = "head"
     transform: Callable[[Any], Any] = _identity
 
 
@@ -887,6 +956,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_BAT_SOC,),
         # pyrefly: ignore [unexpected-keyword]
         key="bat_soc",
+        device_registry_role="main_battery",
         value_fn=lambda e: _get_prop(e, FIELD_BAT_SOC),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_soc_internal",
@@ -901,6 +971,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CELL_TEMP,),
         # pyrefly: ignore [unexpected-keyword]
         key="cell_temperature",
+        device_registry_role="main_battery",
         value_fn=lambda e: _div(10)(_get_prop(e, FIELD_CELL_TEMP)),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="cell_temperature",
@@ -915,6 +986,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_BAT_IN_PW,),
         # pyrefly: ignore [unexpected-keyword]
         key="battery_charge_power",
+        device_registry_role="main_battery",
         value_fn=lambda e: _first_non_none_state(
             _get_prop(e, FIELD_BAT_IN_PW),
             _get_payload_http_prop(e, FIELD_BAT_IN_PW),
@@ -932,6 +1004,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_BAT_OUT_PW,),
         # pyrefly: ignore [unexpected-keyword]
         key="battery_discharge_power",
+        device_registry_role="main_battery",
         value_fn=lambda e: _first_non_none_state(
             _get_prop(e, FIELD_BAT_OUT_PW),
             _get_payload_http_prop(e, FIELD_BAT_OUT_PW),
@@ -963,6 +1036,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PV1,),
         # pyrefly: ignore [unexpected-keyword]
         key="pv1_power",
+        device_registry_role="pv_input_1",
         value_fn=lambda e: _get_pv_channel_power(e, FIELD_PV1),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pv1_power",
@@ -977,6 +1051,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PV2,),
         # pyrefly: ignore [unexpected-keyword]
         key="pv2_power",
+        device_registry_role="pv_input_2",
         value_fn=lambda e: _get_pv_channel_power(e, FIELD_PV2),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pv2_power",
@@ -991,6 +1066,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PV3,),
         # pyrefly: ignore [unexpected-keyword]
         key="pv3_power",
+        device_registry_role="pv_input_3",
         value_fn=lambda e: _get_pv_channel_power(e, FIELD_PV3),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pv3_power",
@@ -1005,6 +1081,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PV4,),
         # pyrefly: ignore [unexpected-keyword]
         key="pv4_power",
+        device_registry_role="pv_input_4",
         value_fn=lambda e: _get_pv_channel_power(e, FIELD_PV4),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="pv4_power",
@@ -1608,6 +1685,1234 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_AC_TO_BATTERY,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="ac_to_battery_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="ac_to_battery_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_AC_TO_ONGRID,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="ac_to_grid_side_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="ac_to_grid_side_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_BATTERY_TO_AC,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="battery_to_ac_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="battery_to_ac_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="grid_side_to_ac_load_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="grid_side_to_ac_load_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_PV_TO_AC,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv_to_ac_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv_to_ac_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_PV_TO_ONGRID,),
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv_to_grid_side_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv_to_grid_side_lifetime_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "pv"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_pv_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_pv_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_PV_TRENDS, FIELD_PV_SOURCES, "ac"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_pv_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_pv_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "home"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_pv_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_pv_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "battery"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_pv_usage_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_pv_usage_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_PV_TRENDS, FIELD_PV_USAGE, "ac"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_pv_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_pv_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_HOME_TRENDS, FIELD_HOME_SOURCES, "pv"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_home_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_home_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_HOME_TRENDS, FIELD_HOME_SOURCES, "battery"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_home_source_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_home_source_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_HOME_TRENDS, FIELD_HOME_SOURCES, "ac"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_home_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_home_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_SOURCES, "pv"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_SOURCES, "home"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_source_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_source_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_SOURCES, "ac"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_USAGE, "home"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        value_fn=lambda e: _section_share(
+            e, PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_USAGE, "ac"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_PV_MAX_CHG_POWER,),
+        # pyrefly: ignore [unexpected-keyword]
+        key="pv_max_charge_power",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pv_max_charge_power",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.POWER,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfPower.WATT,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_SOC_FORCE_CHG,),
+        # pyrefly: ignore [unexpected-keyword]
+        key="soc_force_charge",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="soc_force_charge",
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_BATTERY_CHARGE, FIELD_IN_EGY),
+        # pyrefly: ignore [unexpected-keyword]
+        key="main_battery_charge_energy_derived",
+        device_registry_role="main_battery",
+        value_fn=lambda e: _main_battery_energy(
+            e, APP_DEVICE_STAT_BATTERY_CHARGE, FIELD_IN_EGY
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="main_battery_charge_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        app_fields=(APP_DEVICE_STAT_BATTERY_DISCHARGE, FIELD_OUT_EGY),
+        # pyrefly: ignore [unexpected-keyword]
+        key="main_battery_discharge_energy_derived",
+        device_registry_role="main_battery",
+        value_fn=lambda e: _main_battery_energy(
+            e, APP_DEVICE_STAT_BATTERY_DISCHARGE, FIELD_OUT_EGY
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="main_battery_discharge_energy",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="last_alarm_id",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, FIELD_ALARM_ID
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="last_alarm_id",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms1_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms1"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms1_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms2_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms2"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms2_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms3_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms3"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms3_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms4_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms4"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms4_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms5_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms5"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms5_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="bms6_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "bms6"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="bms6_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="ems1_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "ems1"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="ems1_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="ems2_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "ems2"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="ems2_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pcs1_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "pcs1"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pcs1_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pcs2_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "pcs2"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pcs2_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pcs3_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "pcs3"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pcs3_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pcs4_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "pcs4"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pcs4_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="pcs5_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "pcs5"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="pcs5_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="iot1_fault_code",
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_DEVICE_ALERT, "iot1"
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="iot1_fault_code",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_pv_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_PV_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_pv_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_pv_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_PV_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_pv_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_pv_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_PV_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_pv_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_pv_usage_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_PV_USAGE,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_pv_usage_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_pv_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_PV_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_pv_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_home_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_HOME_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_home_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_home_source_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_HOME_SOURCES,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_home_source_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_home_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_HOME_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_home_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_battery_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_BATTERY_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_battery_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_battery_source_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_BATTERY_SOURCES,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_battery_source_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_battery_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_BATTERY_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_battery_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_battery_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_BATTERY_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_battery_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="week_battery_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_WEEK}",
+            FIELD_BATTERY_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="week_battery_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_pv_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_PV_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_pv_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_pv_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_PV_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_pv_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_pv_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_PV_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_pv_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_pv_usage_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_PV_USAGE,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_pv_usage_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_pv_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_PV_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_pv_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_home_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_HOME_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_home_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_home_source_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_HOME_SOURCES,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_home_source_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_home_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_HOME_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_home_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_battery_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_BATTERY_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_battery_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_battery_source_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_BATTERY_SOURCES,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_battery_source_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_battery_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_BATTERY_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_battery_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_battery_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_BATTERY_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_battery_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="month_battery_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_MONTH}",
+            FIELD_BATTERY_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="month_battery_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_pv_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_PV_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_pv_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_pv_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_PV_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_pv_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_pv_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_PV_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_pv_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_pv_usage_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_PV_USAGE,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_pv_usage_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_pv_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_PV_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_pv_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_home_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_HOME_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_home_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_home_source_battery_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_HOME_SOURCES,
+            "battery",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_home_source_battery_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_home_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_HOME_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_home_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_battery_source_pv_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_BATTERY_SOURCES,
+            "pv",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_battery_source_pv_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_battery_source_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_BATTERY_SOURCES,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_battery_source_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_battery_source_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_BATTERY_SOURCES,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_battery_source_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_battery_usage_home_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_BATTERY_USAGE,
+            "home",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_battery_usage_home_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="year_battery_usage_ac_share",
+        value_fn=lambda e: _section_share(
+            e,
+            f"{APP_SECTION_BATTERY_TRENDS}_{DATE_TYPE_YEAR}",
+            FIELD_BATTERY_USAGE,
+            "ac",
+        ),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="year_battery_usage_ac_share",
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=PERCENTAGE,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="last_online",
+        value_fn=lambda e: _device_meta_timestamp(e, FIELD_DEVICE_ONLINE_TIME),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="last_online",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.TIMESTAMP,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="last_offline",
+        value_fn=lambda e: _device_meta_timestamp(e, FIELD_DEVICE_OFFLINE_TIME),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="last_offline",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.TIMESTAMP,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
@@ -1719,6 +3024,11 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_charge_energy",
+        device_registry_role="main_battery",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
         stat_key=APP_DEVICE_STAT_BATTERY_CHARGE,
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
@@ -1726,7 +3036,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         transform=_div(100),
         # pyrefly: ignore [unexpected-keyword]
-        translation_key="main_battery_charge_energy",
+        translation_key="battery_charge_energy",
         data_sources=ALL_LIVE_DATA_SOURCES,
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
@@ -1738,6 +3048,11 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_discharge_energy",
+        device_registry_role="main_battery",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_registry_enabled_default=False,
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
         stat_key=APP_DEVICE_STAT_BATTERY_DISCHARGE,
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(
@@ -1747,7 +3062,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         transform=_div(100),
         # pyrefly: ignore [unexpected-keyword]
-        translation_key="main_battery_discharge_energy",
+        translation_key="battery_discharge_energy",
         data_sources=ALL_LIVE_DATA_SOURCES,
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
@@ -1898,6 +3213,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv1_day_energy",
+        device_registry_role="pv_input_1",
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
@@ -1916,6 +3232,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv1_week_energy",
+        device_registry_role="pv_input_1",
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
@@ -1934,6 +3251,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv1_month_energy",
+        device_registry_role="pv_input_1",
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
@@ -1952,6 +3270,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv1_year_energy",
+        device_registry_role="pv_input_1",
         stat_key=APP_STAT_PV1_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
@@ -1970,6 +3289,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv2_day_energy",
+        device_registry_role="pv_input_2",
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
@@ -1988,6 +3308,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv2_week_energy",
+        device_registry_role="pv_input_2",
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
@@ -2006,6 +3327,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv2_month_energy",
+        device_registry_role="pv_input_2",
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
@@ -2024,6 +3346,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv2_year_energy",
+        device_registry_role="pv_input_2",
         stat_key=APP_STAT_PV2_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
@@ -2042,6 +3365,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv3_day_energy",
+        device_registry_role="pv_input_3",
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
@@ -2060,6 +3384,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv3_week_energy",
+        device_registry_role="pv_input_3",
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
@@ -2078,6 +3403,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv3_month_energy",
+        device_registry_role="pv_input_3",
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
@@ -2096,6 +3422,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv3_year_energy",
+        device_registry_role="pv_input_3",
         stat_key=APP_STAT_PV3_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
@@ -2114,6 +3441,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv4_day_energy",
+        device_registry_role="pv_input_4",
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_DAY}",
         value_fn=lambda e: _get_payload_section(
@@ -2132,6 +3460,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv4_week_energy",
+        device_registry_role="pv_input_4",
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_WEEK}",
         value_fn=lambda e: _get_payload_section(
@@ -2150,6 +3479,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv4_month_energy",
+        device_registry_role="pv_input_4",
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
         value_fn=lambda e: _get_payload_section(
@@ -2168,6 +3498,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="device_pv4_year_energy",
+        device_registry_role="pv_input_4",
         stat_key=APP_STAT_PV4_ENERGY,
         section=f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}",
         value_fn=lambda e: _get_payload_section(
@@ -2381,14 +3712,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_input_day_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
-                APP_STAT_TOTAL_IN_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
@@ -2405,14 +3731,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_input_week_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_WEEK}",
-                APP_STAT_TOTAL_IN_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
@@ -2429,14 +3750,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_input_month_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_MONTH}",
-                APP_STAT_TOTAL_IN_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
@@ -2455,14 +3771,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_input_year_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_INPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_YEAR}",
-                APP_STAT_TOTAL_IN_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}", APP_STAT_TOTAL_CT_INPUT_ENERGY
         ),
@@ -2479,14 +3790,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_output_day_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}",
-                APP_STAT_TOTAL_OUT_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e, f"{APP_SECTION_CT_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CT_OUTPUT_ENERGY
         ),
@@ -2503,14 +3809,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_output_week_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_WEEK}",
-                APP_STAT_TOTAL_OUT_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_CT_STAT}_{DATE_TYPE_WEEK}",
@@ -2529,14 +3830,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_output_month_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_MONTH}",
-                APP_STAT_TOTAL_OUT_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_CT_STAT}_{DATE_TYPE_MONTH}",
@@ -2555,14 +3851,9 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="ct_output_year_energy",
+        device_registry_role="smart_meter",
         stat_key=APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
         section=f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
-        fallback_sources=(
-            (
-                f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_YEAR}",
-                APP_STAT_TOTAL_OUT_GRID_ENERGY,
-            ),
-        ),
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_CT_STAT}_{DATE_TYPE_YEAR}",
@@ -2856,6 +4147,11 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="today_grid_import_energy",
         stat_key=APP_STAT_TODAY_GRID_IMPORT_ENERGY,
         section=APP_SECTION_TODAY_ENERGY,
+        # stat/today serves today only; the grid-side input day curve (the
+        # documented inOngridEgy fallback) carries the history.
+        fallback_sources=(
+            (f"{APP_SECTION_HOME_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_IN_GRID_ENERGY),
+        ),
         value_fn=lambda e: _get_payload_section(
             e, APP_SECTION_TODAY_ENERGY, APP_STAT_TODAY_GRID_IMPORT_ENERGY
         ),
@@ -2922,8 +4218,6 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
-        # pyrefly: ignore [unexpected-keyword]
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -3132,6 +4426,29 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         ),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="symmetry_total_negative",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.ENERGY,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.TOTAL,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        reset_period=DATE_TYPE_DAY,
+    ),
+    JackeryStatSensorDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="today_battery_charge_energy",
+        stat_key=APP_STAT_TODAY_BATTERY_CHARGE,
+        section=PAYLOAD_STATISTIC,
+        fallback_sources=(
+            (PAYLOAD_DEVICE_STATISTIC, APP_DEVICE_STAT_BATTERY_CHARGE),
+            (f"{APP_SECTION_BATTERY_STAT}_{DATE_TYPE_DAY}", APP_STAT_TOTAL_CHARGE),
+        ),
+        value_fn=lambda e: _get_payload_section(
+            e, PAYLOAD_STATISTIC, APP_STAT_TODAY_BATTERY_CHARGE
+        ),
+        transform=safe_float,
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="today_battery_charge_energy",
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
@@ -4421,18 +5738,6 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
     ),
     JackerySavingsDetailSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
-        key="savings_price",
-        path=("price",),
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="savings_price",
-        # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.MEASUREMENT,
-        # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
-        value_fn=lambda e: safe_float(e.get_savings_value("price")),
-    ),
-    JackerySavingsDetailSensorDescription(
-        # pyrefly: ignore [unexpected-keyword]
         key="savings_battery_loss_year_energy",
         path=("source_energy", "battery_charge_discharge_balance_year_kwh"),
         # pyrefly: ignore [unexpected-keyword]
@@ -4506,7 +5811,6 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         # pyrefly: ignore [unexpected-keyword]
         key="cell_temperature",
         field=FIELD_CELL_TEMP,
-        transform=_div(10),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_pack_cell_temperature",
         # pyrefly: ignore [unexpected-keyword]
@@ -4516,6 +5820,7 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda e: _div(10)(safe_float(_get_prop(e, FIELD_CELL_TEMP))),
+        transform=_div(10),
     ),
     JackeryBatteryPackSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -4550,9 +5855,9 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         key="firmware_version",
         field=FIELD_VERSION,
         # pyrefly: ignore [unexpected-keyword]
-        translation_key="battery_pack_firmware_version",
-        # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="battery_pack_firmware_version",
         value_fn=lambda e: _get_prop(e, FIELD_VERSION),
     ),
     JackeryBatteryPackSensorDescription(
@@ -5025,46 +6330,6 @@ SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] 
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
-        value_fn=lambda e: _smart_meter_value_fn(e, e.entity_description),
-    ),
-    JackerySmartMeterSensorDescription(
-        # pyrefly: ignore [unexpected-keyword]
-        key="grid_import_energy",
-        field=FIELD_CT_TOTAL_PHASE_ENERGY,
-        sum_fields=(
-            FIELD_CT_A_PHASE_ENERGY,
-            FIELD_CT_B_PHASE_ENERGY,
-            FIELD_CT_C_PHASE_ENERGY,
-        ),
-        transform=_div(1000),
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="smart_meter_grid_import_energy",
-        # pyrefly: ignore [unexpected-keyword]
-        device_class=SensorDeviceClass.ENERGY,
-        # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        value_fn=lambda e: _smart_meter_value_fn(e, e.entity_description),
-    ),
-    JackerySmartMeterSensorDescription(
-        # pyrefly: ignore [unexpected-keyword]
-        key="grid_export_energy",
-        field=FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
-        sum_fields=(
-            FIELD_CT_A_NEGATIVE_PHASE_ENERGY,
-            FIELD_CT_B_NEGATIVE_PHASE_ENERGY,
-            FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
-        ),
-        transform=_div(1000),
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="smart_meter_grid_export_energy",
-        # pyrefly: ignore [unexpected-keyword]
-        device_class=SensorDeviceClass.ENERGY,
-        # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda e: _smart_meter_value_fn(e, e.entity_description),
     ),
     JackerySmartMeterSensorDescription(

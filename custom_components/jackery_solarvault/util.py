@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import operator
+import os
 from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
@@ -49,7 +50,6 @@ from .const import (
     APP_STAT_PV3_ENERGY,
     APP_STAT_PV4_ENERGY,
     APP_STAT_PV_PROFIT,
-    APP_STAT_TOTAL_CARBON,
     APP_STAT_TOTAL_CHARGE,
     APP_STAT_TOTAL_CT_INPUT_ENERGY,
     APP_STAT_TOTAL_CT_OUTPUT_ENERGY,
@@ -69,6 +69,7 @@ from .const import (
     APP_UNIT_KWH,
     APP_UNIT_WH,
     APP_YEAR_BACKFILL_META,
+    CONF_ENABLE_UNREDACTED_DEBUG,
     CONF_THIRD_PARTY_MQTT_ENABLE,
     CT_PHASE_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
@@ -129,7 +130,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -158,6 +159,9 @@ _MAX_PRICE_PER_KWH: Final = 10
 _MAX_CARBON_FACTOR: Final = 5
 _APP_UNIT_WATT: Final = "w"
 _DAY_POWER_SAMPLE_MINUTES: Final = 5
+_SOC_TRACE_MIN_SAMPLES: Final = 2
+_SOC_PERCENT_MAX: Final = 100
+_SOC_TRACE_POWER_MIN_W: Final = 100
 _MINUTES_PER_HOUR: Final = 60
 _MINUTES_PER_DAY: Final = _HOURS_PER_DAY * _MINUTES_PER_HOUR
 _WATTS_PER_KILOWATT: Final = 1000
@@ -798,37 +802,6 @@ def historical_day_payload_from_sources(
     return payload
 
 
-def filter_completed_app_points(
-    points: list[Any],
-    date_type: str,
-    reset_period: str,
-    today: date,
-) -> list[Any]:
-    """Filter app points to completed buckets for entity-stat imports.
-
-    Day points are always included. For longer periods, only points
-    whose bucket date is strictly before today are included.
-    """
-    if date_type == "day":
-        return points
-    completed: list[Any] = []
-    for point in points:
-        start = point.start_date
-        point_date = start.date() if isinstance(start, datetime) else start
-        if not isinstance(point_date, date):
-            continue
-        if reset_period in {"day", "week", "month"}:
-            if point_date >= today:
-                continue
-        elif reset_period == "year" and (
-            point_date.year,
-            point_date.month,
-        ) >= (today.year, today.month):
-            continue
-        completed.append(point)
-    return completed
-
-
 def parse_statistics_backfill_date(value: object) -> date | None:
     """Parse a persisted ISO date for statistics repair decisions."""
     if not isinstance(value, str):
@@ -1002,6 +975,34 @@ def safe_int(value: object) -> int | None:  # integral payload value
     return None
 
 
+_DEV_MODE_ENV: Final = "JACKERY_DEV_MODE"
+_DEV_MODE_TRUE_VALUES: Final = frozenset({"1", "true", "yes", "on"})
+
+
+def jackery_dev_mode_enabled(entry: object | None = None) -> bool:
+    """Return whether process or per-entry unredacted debugging is enabled.
+
+    The environment switch applies process-wide. The explicit options-flow
+    switch applies only to the provided config entry. Both expose complete
+    diagnostics and payload logs; never share those exports publicly.
+    """
+    return os.environ.get(
+        _DEV_MODE_ENV, ""
+    ).strip().casefold() in _DEV_MODE_TRUE_VALUES or (
+        entry is not None
+        and config_entry_bool_option(entry, CONF_ENABLE_UNREDACTED_DEBUG, False)
+    )
+
+
+def _json_safe_copy(value: object) -> object:
+    """Return a JSON-serializable deep copy (tuples become lists), unredacted."""
+    if isinstance(value, dict):
+        return {str(key): _json_safe_copy(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe_copy(item) for item in value]
+    return value
+
+
 def _payload_debug_redacted(
     value: object,
 ) -> object:  # recursive JSON walker over payload
@@ -1097,6 +1098,7 @@ def redacted_json_safe_payload(
     value: object,
     *,
     sensitive_sources: tuple[object, ...] = (),
+    unredacted: bool | None = None,
 ) -> object:  # recursive JSON walker over payload
     """Produce a JSON-serializable payload with known sensitive Jackery fields redacted.
 
@@ -1109,6 +1111,10 @@ def redacted_json_safe_payload(
         Any: The input value converted into a JSON-safe structure with sensitive fields
         replaced by the module's redaction marker.
     """
+    if unredacted is None:
+        unredacted = jackery_dev_mode_enabled()
+    if unredacted:
+        return _json_safe_copy(value)
     sensitive_values = set(_sensitive_text_values(value))
     for source in sensitive_sources:
         sensitive_values.update(_sensitive_text_values(source))
@@ -1118,9 +1124,9 @@ def redacted_json_safe_payload(
     )
 
 
-def active_redact_keys() -> frozenset[str]:
-    """Return the immutable mandatory diagnostics redaction-key set."""
-    return REDACT_KEYS
+def active_redact_keys(entry: object | None = None) -> frozenset[str]:
+    """Return the diagnostics redaction-key set for this config entry."""
+    return frozenset() if jackery_dev_mode_enabled(entry) else REDACT_KEYS
 
 
 def chart_series_debug(source: object) -> dict[str, Any]:
@@ -1186,18 +1192,29 @@ def chart_series_debug(source: object) -> dict[str, Any]:
 def append_payload_debug_lines(
     path: str | Path,
     events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    unredacted: bool | None = None,
 ) -> None:
-    """Write every redacted JSONL event using one file open and rotation check."""
+    """Write every JSONL event using one file open and rotation check.
+
+    Events are redacted unless the process or caller explicitly enables raw
+    debugging. In that mode the file is never rotated.
+    """
     if not events:
         return
+    if unredacted is None:
+        unredacted = jackery_dev_mode_enabled()
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        rotate_needed = debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES
+        rotate_needed = (
+            not unredacted and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES
+        )
     except FileNotFoundError:
         rotate_needed = False
     if rotate_needed:
-        backup = debug_path.with_name(debug_path.name + PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX)
+        backup = debug_path.with_suffix(
+            f"{PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX}{debug_path.suffix}"
+        )
         try:
             backup.unlink(missing_ok=True)
         except OSError as err:
@@ -1220,7 +1237,7 @@ def append_payload_debug_lines(
         for event in events:
             file.write(
                 json.dumps(
-                    redacted_json_safe_payload(event),
+                    redacted_json_safe_payload(event, unredacted=unredacted),
                     ensure_ascii=False,
                     sort_keys=True,
                     default=str,
@@ -1798,11 +1815,97 @@ def effective_trend_series_values(
     if not isinstance(series, list):
         return None
     if is_device_year_period_section(source, section):
-        return expanded_year_series_values(source, section, stat_key)
-
+        values = expanded_year_series_values(source, section, stat_key)
+    else:
+        values = [
+            None if (val := safe_float(raw)) is None else round(val, 5)
+            for raw in series
+        ]
+    if values is None or not _is_pv_channel_period(section, stat_key):
+        return values
+    total_values = effective_trend_series_values(
+        source, section, APP_STAT_TOTAL_SOLAR_ENERGY
+    )
+    if total_values is None or len(total_values) != len(values):
+        return values
     return [
-        None if (val := safe_float(raw)) is None else round(val, 5) for raw in series
+        None if _exceeds_pv_total(value, total) else value
+        for value, total in zip(values, total_values, strict=True)
     ]
+
+
+def _is_pv_channel_period(section: str, stat_key: str) -> bool:
+    """Identify PV-channel energy fields in period statistic sections."""
+    return section.startswith(f"{APP_SECTION_PV_STAT}_") and stat_key in {
+        APP_STAT_PV1_ENERGY,
+        APP_STAT_PV2_ENERGY,
+        APP_STAT_PV3_ENERGY,
+        APP_STAT_PV4_ENERGY,
+    }
+
+
+def _exceeds_pv_total(value: float | None, total: float | None) -> bool:
+    """Reject a channel's lifetime offset masquerading as period energy."""
+    return (
+        value is not None
+        and total is not None
+        and total >= 0
+        and value > total + max(0.05, total * 0.05)
+    )
+
+
+def pv_channel_scalar_is_lifetime_offset(
+    source: dict[str, Any], section: str, stat_key: str
+) -> bool:
+    """Check whether the vendor's PV-channel scalar exceeds the whole period."""
+    return _is_pv_channel_period(section, stat_key) and _exceeds_pv_total(
+        safe_float(source.get(stat_key)),
+        safe_float(source.get(APP_STAT_TOTAL_SOLAR_ENERGY)),
+    )
+
+
+def request_date(
+    source: dict[str, Any],
+    primary_key: str,
+    alternate_key: str,
+) -> date | None:
+    """Parse one ISO date from a payload request metadata block."""
+    request = source.get(APP_REQUEST_META)
+    if not isinstance(request, dict):
+        return None
+    raw = request.get(primary_key) or request.get(alternate_key)
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def chart_value_for_day(
+    source: dict[str, Any],
+    section: str,
+    stat_key: str,
+    *,
+    today: date,
+) -> float | None:
+    """Return one day's kWh bucket from a week/month/year app chart payload."""
+    unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
+    if unit and unit != APP_UNIT_KWH:
+        return None
+    begin = request_date(source, APP_REQUEST_BEGIN_DATE, APP_REQUEST_BEGIN_DATE_ALT)
+    if begin is None:
+        return None
+    end = request_date(source, APP_REQUEST_END_DATE, APP_REQUEST_END_DATE_ALT)
+    if today < begin or (end is not None and today > end):
+        return None
+    values = effective_trend_series_values(source, section, stat_key)
+    if not isinstance(values, list):
+        return None
+    index = (today - begin).days
+    if index < 0 or index >= len(values):
+        return None
+    return safe_float(values[index])
 
 
 def effective_period_total_value(
@@ -1822,6 +1925,8 @@ def effective_period_total_value(
         float: The period total rounded to 2 decimals when available, `None` if no value
         can be determined.
     """
+    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
+        return None
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
@@ -2130,7 +2235,7 @@ def _calculated_savings_from_year(  # ruff: ignore[too-many-locals] - cohesive s
             ),
             "savings_basis_ac_year_kwh": _round_stat_value(delivered_ac),
             "home_consumption_year_kwh": _round_stat_value(home_consumption),
-            "ct_public_export_year_kwh": _round_stat_value(public_export or 0.0),
+            "ct_public_export_year_kwh": _round_stat_value(public_export),
             "ct_public_export_year_kwh_present": public_export_present,
             "battery_charge_year_kwh": _round_stat_value(battery_charge),
             "battery_discharge_year_kwh": _round_stat_value(battery_discharge),
@@ -2461,161 +2566,6 @@ def attach_calculated_savings_metadata(payload: dict[str, Any]) -> None:
     }
 
 
-def guard_statistic_totals_from_year(  # ruff: ignore[too-many-locals] - lifetime guard retains diagnostic operands
-    payload: dict[str, Any],
-    *,
-    previous_statistic: dict[str, Any] | None = None,
-) -> None:
-    """Preserve non-decreasing lifetime KPIs and attach savings diagnostics.
-
-    The app occasionally returns lifetime ``statistic.totalGeneration`` below the
-    current-year PV total. Per the period hierarchy, that smaller lifetime value is
-    not allowed to replace a verified longer lower bound. The raw cloud revenue is
-    still kept as its own KPI; calculated savings remain metadata/detail-sensor input.
-    """
-    statistic = payload.get(PAYLOAD_STATISTIC)
-    if not isinstance(statistic, dict):
-        return
-
-    pv_year_section = _period_section(APP_SECTION_PV_TRENDS, DATE_TYPE_YEAR)
-    pv_year = payload.get(pv_year_section)
-    if not isinstance(pv_year, dict):
-        pv_year_section = _period_section(APP_SECTION_PV_STAT, DATE_TYPE_YEAR)
-        pv_year = payload.get(pv_year_section)
-    year_generation = (
-        effective_period_total_value(
-            pv_year,
-            pv_year_section,
-            APP_STAT_TOTAL_SOLAR_ENERGY,
-        )
-        if isinstance(pv_year, dict)
-        else None
-    )
-    year_revenue = _pv_revenue_value(pv_year) if isinstance(pv_year, dict) else None
-
-    raw_generation = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    previous_generation = (
-        safe_float(previous_statistic.get(APP_STAT_TOTAL_GENERATION))
-        if isinstance(previous_statistic, dict)
-        else None
-    )
-    candidates = [
-        value
-        for value in (raw_generation, year_generation, previous_generation)
-        if value is not None
-    ]
-    corrected_generation = max(candidates) if candidates else None
-    guard_meta: dict[str, Any] | None = None
-    if (
-        raw_generation is not None
-        and corrected_generation is not None
-        and corrected_generation
-        > raw_generation + _tolerance_for_values(corrected_generation, raw_generation)
-    ):
-        statistic = dict(statistic)
-        statistic[APP_STAT_TOTAL_GENERATION] = round(corrected_generation, 2)
-        method = (
-            "previous_total_lower_bound"
-            if previous_generation is not None
-            and previous_generation
-            >= corrected_generation
-            - _tolerance_for_values(previous_generation, corrected_generation)
-            else "year_total_lower_bound"
-        )
-        guard_meta = {
-            "method": method,
-            "corrected": {
-                APP_STAT_TOTAL_GENERATION: {
-                    "raw_total": round(raw_generation, 2),
-                    "corrected_total": round(corrected_generation, 2),
-                    "current_year_total": _round_stat_value(year_generation),
-                    "previous_total": _round_stat_value(previous_generation),
-                }
-            },
-        }
-        statistic["_total_lower_bound_guard"] = guard_meta
-        raw_carbon = safe_float(statistic.get(APP_STAT_TOTAL_CARBON))
-        if (
-            raw_carbon is not None
-            and raw_generation > 0
-            and raw_carbon >= 0
-            and corrected_generation >= 0
-        ):
-            carbon_factor = raw_carbon / raw_generation
-            if 0 <= carbon_factor <= _MAX_CARBON_FACTOR:
-                statistic[APP_STAT_TOTAL_CARBON] = round(
-                    corrected_generation * carbon_factor,
-                    2,
-                )
-        payload[PAYLOAD_STATISTIC] = statistic
-    elif previous_generation is not None and raw_generation is None:
-        statistic = dict(statistic)
-        statistic[APP_STAT_TOTAL_GENERATION] = round(previous_generation, 2)
-        statistic["_total_lower_bound_guard"] = {
-            "method": "previous_total_lower_bound",
-            "corrected": {
-                APP_STAT_TOTAL_GENERATION: {
-                    "raw_total": None,
-                    "corrected_total": round(previous_generation, 2),
-                    "current_year_total": _round_stat_value(year_generation),
-                    "previous_total": round(previous_generation, 2),
-                }
-            },
-        }
-        payload[PAYLOAD_STATISTIC] = statistic
-
-    statistic = payload.get(PAYLOAD_STATISTIC)
-    if not isinstance(statistic, dict):
-        return
-    savings = _calculated_savings_from_year(
-        payload,
-        year_generation=year_generation,
-        year_revenue=year_revenue,
-    )
-    if savings is None:
-        return
-    raw_revenue = safe_float(statistic.get(APP_STAT_TOTAL_REVENUE))
-    raw_generation_after_guard = safe_float(statistic.get(APP_STAT_TOTAL_GENERATION))
-    pv_revenue_candidates = (
-        _pv_revenue_candidates(
-            pv_year,
-            year_revenue=year_revenue,
-            raw_generation=raw_generation_after_guard,
-            price=safe_float(savings.get("price")),
-        )
-        if isinstance(pv_year, dict)
-        else []
-    )
-    calculated_total = safe_float(savings.get("calculated_total"))
-    should_publish, decision = (
-        _savings_publish_decision(
-            raw_revenue=raw_revenue,
-            calculated_revenue=calculated_total,
-            raw_generation=raw_generation_after_guard,
-            year_generation=year_generation,
-            pv_revenue_candidates=pv_revenue_candidates,
-        )
-        if calculated_total is not None
-        else (False, "missing_calculated_savings")
-    )
-    savings.update({
-        "raw_cloud_total": raw_revenue,
-        "pv_revenue_candidates": pv_revenue_candidates,
-        "would_replace_cloud_total": should_publish,
-        "decision": decision,
-        "published_value": calculated_total if should_publish else raw_revenue,
-        "published_value_source": "calculated_savings"
-        if should_publish
-        else "cloud_total",
-    })
-    if guard_meta is not None:
-        savings["total_lower_bound_guard"] = guard_meta
-    payload[PAYLOAD_STATISTIC] = {
-        **statistic,
-        APP_SAVINGS_CALC_META: savings,
-    }
-
-
 def _trend_bucket_start(begin: date, date_type: str | None, index: int) -> date | None:
     """Map one app series index to its calendar bucket."""
     if date_type == DATE_TYPE_YEAR:
@@ -2751,20 +2701,11 @@ def _day_power_sample_energy_value(
     raw: object,
     section: str,
     stat_key: str,
-    series_key: str,
+    series_key: str | None,
 ) -> float | None:
     """Return the directional app day-curve sample value to integrate."""
-    if raw is None:
-        # For battery charge stats, missing evidence is treated as zero.
-        # For other stats, missing evidence is None (no artificial bars).
-        is_battery_charge = section.startswith((
-            APP_SECTION_BATTERY_STAT,
-            APP_SECTION_BATTERY_TRENDS,
-        )) and stat_key in {
-            APP_STAT_TOTAL_CHARGE,
-            APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
-        }
-        return 0.0 if is_battery_charge else None
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
     value = safe_float(raw) if isinstance(raw, (int, float, str)) else None
     if value is None:
         return None
@@ -2869,7 +2810,7 @@ def _resolve_day_request_window(
     return begin, now
 
 
-def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals]
+def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals, too-many-branches]
     source: dict[str, Any],
     section: str,
     stat_key: str,
@@ -2877,6 +2818,7 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
     bucket_minutes: int = 60,
     today: date | None = None,
     now: datetime | None = None,
+    keep_curve_over_smaller_scalar: bool = False,
 ) -> list[TrendStatisticPoint]:
     """Convert a day chart curve into kWh statistic buckets for the requested day.
 
@@ -2885,7 +2827,9 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
     `bucket_minutes`, optionally constraining to `today`/`now` when the request begins
     today. Watt samples are integrated over their five-minute interval; they are never
     treated as energy or summed as watts. If the payload includes a positive scalar
-    period total, real curve buckets are reconciled to that total. A scalar without a
+    period total, real curve buckets are reconciled to that total; with
+    ``keep_curve_over_smaller_scalar`` (Recorder import) a scalar smaller than the
+    curve is treated as lagging and ignored. A scalar without a
     curve cannot establish when energy occurred and is therefore not imported into
     Recorder.
 
@@ -2908,21 +2852,32 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         unsupported units, out-of-range request dates, or when scaling rules prevent
         producing buckets.
     """
+    # Day charts arrive via multiple paths (HTTP backfill, MQTT shadow, periodic poll).
+    # Do NOT discard entire payloads here — only filter implausible values later.
+    # Resolve only the series mapped to this metric.
     series_key = day_power_series_key(source, section, stat_key)
+    # Day charts arrive via multiple paths (HTTP backfill, MQTT shadow,
+    # periodic poll). Do NOT discard entire payloads here — only filter
+    # implausible values later. Accept any recognized unit, defaulting to
+    # watt when the payload omits unit evidence entirely. Resolve the
+    # request window; when no request meta is present (e.g. live MQTT/
+    # day-poll payloads) default to the full day so the curve is never
+    # discarded.
     unit = str(source.get(APP_STAT_UNIT) or "").strip().lower()
-    # App 2.4.x returns dateType=day curves as documented five-minute watt
-    # observations. Convert each real sample by duration (W * h / 1000) rather
-    # than summing watts. A missing/unknown unit cannot establish the quantity.
+    if unit not in {_APP_UNIT_WATT, APP_UNIT_KWH, "wh"}:
+        unit = _APP_UNIT_WATT
     window = _resolve_day_request_window(source, today=today, now=now)
+    if window is None:
+        if today is None:
+            today = datetime.now(UTC).astimezone().date()
+        if now is None:
+            now = datetime.now(UTC).astimezone()
+        window = (today, now)
     series = source.get(series_key) if series_key else None
-    if bucket_minutes <= 0 or _MINUTES_PER_DAY % bucket_minutes != 0 or not series_key:
+    if bucket_minutes <= 0 or _MINUTES_PER_DAY % bucket_minutes != 0:
         return []
-    if (
-        unit not in {_APP_UNIT_WATT, APP_UNIT_KWH}
-        or window is None
-        or not isinstance(series, list)
-        or not series
-    ):
+    # If we still have no series, return empty — nothing to aggregate.
+    if window is None or not isinstance(series, list) or not series:
         return []
     begin, now = window
 
@@ -2934,6 +2889,11 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         else _MINUTES_PER_DAY - 1
     )
     scalar_total = effective_period_total_value(source, section, stat_key)
+    if unit == _APP_UNIT_WATT and _battery_day_y2_is_soc(source, section, stat_key):
+        # The observed scalar can lag the signed power samples by hours.
+        # Keep the measured curve; the independent local-day guard can still
+        # reconcile today's complete total when it is available.
+        scalar_total = None
 
     buckets: dict[int, float] = {}
     last_bucket_minute: int | None = None
@@ -2970,13 +2930,23 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         return []
 
     raw_total = sum(buckets.values())
-    reconciled_total = scalar_total
+    # Statistics import: a smaller cloud scalar lags the measured curve
+    # (payloads 2026-08-14..09-23; docs/SENSOR_SOURCE_PATHS.md), so keep the
+    # observed 5-minute energy instead of shrinking it.
+    lagging_scalar = keep_curve_over_smaller_scalar and (
+        scalar_total is not None and 0 < scalar_total < raw_total
+    )
+    reconciled_total = None if lagging_scalar else scalar_total
     if reconciled_total is not None and reconciled_total > 0:
         if raw_total > 0:
             scale = reconciled_total / raw_total
             buckets = {minute: value * scale for minute, value in buckets.items()}
         else:
             return []
+    elif reconciled_total is not None and reconciled_total == 0 and raw_total == 0:
+        # Zero total with zero curve: keep the zero-valued buckets rather
+        # than discarding them. A day with 0 kWh is valid data.
+        pass
 
     bucket_items = sorted(buckets.items())
     rounded_values = [round(max(value, 0.0), 5) for _minute, value in bucket_items]
@@ -3734,6 +3704,27 @@ def trend_series_key(section: str, stat_key: str) -> str | None:
     return _chart_series_key_for_stat(section, stat_key)
 
 
+def _battery_day_y2_is_soc(source: dict[str, Any], section: str, stat_key: str) -> bool:
+    """Identify the observed battery day shape: signed W y1 and SOC % y2."""
+    if not section.startswith(APP_SECTION_BATTERY_STAT) or stat_key not in {
+        APP_STAT_TOTAL_CHARGE,
+        APP_STAT_TOTAL_DISCHARGE,
+    }:
+        return False
+    raw_y1 = source.get(APP_CHART_SERIES_Y1)
+    raw_y2 = source.get(APP_CHART_SERIES_Y2)
+    if not isinstance(raw_y1, list) or not isinstance(raw_y2, list):
+        return False
+    y1 = [value for raw in raw_y1 if (value := safe_float(raw)) is not None]
+    y2 = [value for raw in raw_y2 if (value := safe_float(raw)) is not None]
+    return (
+        bool(y1)
+        and len(y2) >= _SOC_TRACE_MIN_SAMPLES
+        and max(abs(value) for value in y1) > _SOC_TRACE_POWER_MIN_W
+        and all(0 <= value <= _SOC_PERCENT_MAX for value in y2)
+    )
+
+
 def day_power_series_key(
     source: dict[str, Any],
     section: str,
@@ -3741,64 +3732,68 @@ def day_power_series_key(
 ) -> str | None:
     """Get the chart-series key used for day power curves.
 
-    Require the app payload to represent a day period.
-
-    Returns:
-        The chart-series key string for the given `section`/`stat_key` when `source` is
-        a day-period payload, `None` otherwise.
+    Prefer explicit day-period detection, but fall back to any available
+    chart series in the payload. Day curves arrive via HTTP backfill, MQTT
+    shadow responses, and periodic polls — not all carry the `_day` suffix
+    or request meta.
     """
-    if not is_day_period_payload(source, section):
-        return None
-    if section.startswith(APP_SECTION_EPS_STAT):
-        key = {
-            APP_STAT_TOTAL_IN_EPS_ENERGY: APP_CHART_SERIES_Y1,
-            APP_STAT_TOTAL_OUT_EPS_ENERGY: APP_CHART_SERIES_Y2,
-        }.get(stat_key)
-        # Explicit directional arrays can be used even when an older app view
-        # only labels its combined y curve. Never infer a direction from y alone.
-        return key if key is not None and isinstance(source.get(key), list) else None
-    if (
-        section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
-        and stat_key
-        in {
-            APP_STAT_TOTAL_CHARGE,
-            APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+    # First try the strict day-period detection
+    if is_day_period_payload(source, section):
+        if section.startswith(APP_SECTION_EPS_STAT):
+            key = {
+                APP_STAT_TOTAL_IN_EPS_ENERGY: APP_CHART_SERIES_Y1,
+                APP_STAT_TOTAL_OUT_EPS_ENERGY: APP_CHART_SERIES_Y2,
+            }.get(stat_key)
+            return (
+                key if key is not None and isinstance(source.get(key), list) else None
+            )
+        if (
+            section.startswith((APP_SECTION_BATTERY_STAT, APP_SECTION_BATTERY_TRENDS))
+            and stat_key
+            in {
+                APP_STAT_TOTAL_CHARGE,
+                APP_STAT_TOTAL_TREND_CHARGE_ENERGY,
+                APP_STAT_TOTAL_DISCHARGE,
+                APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
+            }
+            and not any(
+                isinstance(source.get(key), list) and source[key]
+                for key in (APP_CHART_SERIES_Y1, APP_CHART_SERIES_Y2)
+            )
+            and isinstance(source.get(APP_CHART_SERIES_Y), list)
+        ):
+            return APP_CHART_SERIES_Y
+        if _battery_day_y2_is_soc(source, section, stat_key):
+            # Here y2 is a 0..100% SOC trace; y1 is signed power.
+            return APP_CHART_SERIES_Y1
+        # Day battery y2 can be a SOC percentage trace. Charging energy in
+        # the observed signed-power shape is the positive part of y1.
+        if section.startswith((
+            APP_SECTION_BATTERY_STAT,
+            APP_SECTION_BATTERY_TRENDS,
+        )) and stat_key in {
             APP_STAT_TOTAL_DISCHARGE,
             APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
-        }
-        and not any(
-            isinstance(source.get(key), list) and source[key]
-            for key in (APP_CHART_SERIES_Y1, APP_CHART_SERIES_Y2)
-        )
-        and isinstance(source.get(APP_CHART_SERIES_Y), list)
-    ):
-        # Historical battery payloads also use one signed y power curve.
-        return APP_CHART_SERIES_Y
-    if section.startswith((
-        APP_SECTION_BATTERY_STAT,
-        APP_SECTION_BATTERY_TRENDS,
-    )) and stat_key in {
-        APP_STAT_TOTAL_DISCHARGE,
-        APP_STAT_TOTAL_TREND_DISCHARGE_ENERGY,
-    }:
-        # App payloads occur in both forms: a split positive y2 discharge
-        # curve, and a signed y1 curve whose negative samples are discharge.
-        # Select the dominant directional magnitude. This retains y2 when y1
-        # contains only a small negative noise sample, while preserving the
-        # actual discharge timeline when y1 carries the substantive energy.
-        signed_y1 = _series_signed_magnitude(
-            source,
-            APP_CHART_SERIES_Y1,
-            negative=True,
-        )
-        positive_y2 = _series_signed_magnitude(
-            source,
-            APP_CHART_SERIES_Y2,
-            negative=False,
-        )
-        if signed_y1 > positive_y2:
-            return APP_CHART_SERIES_Y1
-    return _chart_series_key_for_stat(section, stat_key)
+        }:
+            signed_y1 = _series_signed_magnitude(
+                source,
+                APP_CHART_SERIES_Y1,
+                negative=True,
+            )
+            positive_y2 = _series_signed_magnitude(
+                source,
+                APP_CHART_SERIES_Y2,
+                negative=False,
+            )
+            if signed_y1 > positive_y2:
+                return APP_CHART_SERIES_Y1
+        return _chart_series_key_for_stat(section, stat_key)
+
+    # Missing request metadata never authorizes a different metric's series.
+    mapped = _chart_series_key_for_stat(section, stat_key)
+    return (
+        mapped if mapped is not None and isinstance(source.get(mapped), list) else None
+    )
 
 
 def trend_series_total(  # ruff: ignore[too-many-return-statements]
@@ -3820,6 +3815,8 @@ def trend_series_total(  # ruff: ignore[too-many-return-statements]
         float: The period total rounded to 2 decimals, or `None` when a reliable total
         cannot be determined.
     """
+    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
+        return None
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
 
@@ -4141,3 +4138,91 @@ def is_portable_payload(
         ):
             return True
     return False
+
+
+_GAP_FILL_TOLERANCE_KWH: Final = 0.0005
+_SECONDS_PER_HOUR: Final = 3600
+
+
+class StatisticRow(NamedTuple):
+    """One stored hourly statistic row of an energy sensor."""
+
+    sum: float
+    state: float | None
+    last_reset_ts: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class StatisticDayReconcile:
+    """Hourly rows for one closed day plus the sum shift for all later rows."""
+
+    rows: list[dict[str, Any]]
+    shift_start: float | None
+    shift: float
+
+
+def plan_statistic_day_reconcile(
+    hours: list[float],
+    hourly_energy: Mapping[float, float],
+    existing: Mapping[float, StatisticRow],
+    reset_start: Callable[[float], float],
+) -> StatisticDayReconcile:
+    """Plan one closed day's hourly rows of a daily-reset sensor from the curve.
+
+    ``hours`` are all hour starts (UTC seconds) of the closed local day;
+    ``hourly_energy`` maps them to kWh (an hour without curve points is 0);
+    ``existing`` holds the sensor's stored rows of that day plus the nearest
+    row before and after it.
+
+    Every hour of the day is rewritten so its increase equals the curve,
+    starting from the sum stored before the day; stored rows that already
+    match are not rewritten. Later rows shift by the difference between the
+    new and the stored end-of-day sum, so every later hour keeps its own
+    increase (HA's adjust API, the same as "Adjust sum" in developer tools).
+    Without a row before the day, the day is anchored backwards on the first
+    later row and nothing shifts.
+    """
+    day_start, day_end = hours[0], hours[-1] + _SECONDS_PER_HOUR
+    energies = [max(0.0, hourly_energy.get(hour, 0.0)) for hour in hours]
+    total = sum(energies)
+    before = max((t for t in existing if t < day_start), default=None)
+    after = min((t for t in existing if t >= day_end), default=None)
+    stored_end = max((t for t in existing if t < day_end), default=None)
+    if before is not None:
+        base = existing[before].sum
+    elif after is not None:
+        base = existing[after].sum - total
+    else:
+        return StatisticDayReconcile(rows=[], shift_start=None, shift=0.0)
+    previous = existing.get(before) if before is not None else None
+    cumulative = base
+    rows: list[dict[str, Any]] = []
+    for hour, energy in zip(hours, energies, strict=True):
+        period_start = reset_start(hour)
+        state = (
+            previous.state or 0.0
+            if previous is not None and previous.last_reset_ts == period_start
+            else 0.0
+        )
+        cumulative += energy
+        previous = StatisticRow(
+            round(cumulative, 5), round(state + energy, 5), period_start
+        )
+        stored = existing.get(hour)
+        if stored is None or abs(stored.sum - previous.sum) > _GAP_FILL_TOLERANCE_KWH:
+            rows.append({
+                "start": datetime.fromtimestamp(hour, UTC),
+                "sum": previous.sum,
+                "state": previous.state,
+                "last_reset": datetime.fromtimestamp(period_start, UTC),
+            })
+    shift = 0.0
+    if before is not None and stored_end is not None and after is not None:
+        shift = round(base + total - existing[stored_end].sum, 5)
+        if abs(shift) <= _GAP_FILL_TOLERANCE_KWH:
+            shift = 0.0
+    return StatisticDayReconcile(
+        rows=rows,
+        shift_start=after if shift else None,
+        shift=shift,
+    )

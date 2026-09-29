@@ -50,6 +50,10 @@ def credential_fingerprint(fields: Mapping[str, str]) -> str:
 
 def redacted_error(error: object) -> str:
     """Return useful error classification without retaining exception details."""
-    if isinstance(error, BaseException):
+    if isinstance(error, BaseException) and not getattr(
+        type(error), "exposes_message", False
+    ):
         return f"{type(error).__name__}: {REDACTED_VALUE}"
+    if isinstance(error, BaseException):
+        return f"{type(error).__name__}: {error}"
     return str(error)
