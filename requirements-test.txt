@@ -10,7 +10,7 @@ autotyping>=24.9.0
 coverage[toml]
 homeassistant>=2026.9.4
 homeassistant-stubs>=2026.9.4
-hypothesis>=6.168.1
+hypothesis>=6.168.2
 ifaddr>=0.2.0
 iniconfig>=2.3.0
 jinja2>=3.1.6
