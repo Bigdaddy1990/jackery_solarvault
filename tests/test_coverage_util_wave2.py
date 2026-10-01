@@ -2,8 +2,8 @@
 
 from datetime import date
 import json
-from pathlib import Path
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -26,6 +26,9 @@ from custom_components.jackery_solarvault.const import (
     FIELD_OUT_GRID_SIDE_PW,
     REDACTED_VALUE,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_numeric_normalizers_reject_ambiguous_and_non_finite_values() -> None:
@@ -158,24 +161,18 @@ def test_chart_series_debug_reports_only_real_series_and_metadata() -> None:
     assert util.chart_series_debug([]) == {}
 
 
-def test_payload_debug_rotation_ignores_file_removed_during_replace(
+def test_payload_debug_size_limit_does_not_create_a_backup(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A concurrent rotation cannot turn a debug write into a warning."""
+    """An oversized old log is replaced in place rather than archived."""
     debug_path = tmp_path / "payload.jsonl"
     debug_path.write_text("old payload", encoding="utf-8")
     monkeypatch.setattr(util, "PAYLOAD_DEBUG_LOG_MAX_BYTES", 1)
 
-    def _remove_then_fail(self: Path, _backup: Path) -> Path:
-        self.unlink()
-        raise FileNotFoundError
-
-    monkeypatch.setattr(Path, "replace", _remove_then_fail)
     util.append_payload_debug_line(debug_path, {"event": "current"})
 
-    assert "could not rotate payload debug log" not in caplog.text
+    assert list(tmp_path.iterdir()) == [debug_path]
     assert [
         json.loads(line) for line in debug_path.read_text(encoding="utf-8").splitlines()
     ] == [{"event": "current"}]

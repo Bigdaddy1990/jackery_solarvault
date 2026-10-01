@@ -29,10 +29,270 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from custom_components.jackery_solarvault.util import day_power_energy_points
+from custom_components.jackery_solarvault.util import (
+    apply_year_month_backfill,
+    day_power_energy_points,
+)
 
 _DEV = "dev-1"
 _RETRY_AFTER_SECONDS = 17
+_FULL_DAY_SAMPLES = 288
+
+
+@pytest.mark.parametrize(
+    "gap", ["none", "truncated", "missing", "duplicate", "extra_duplicate"]
+)
+def test_only_complete_day_curves_verify_period_totals(gap: str) -> None:
+    """Partial five-minute evidence cannot certify a whole historical day."""
+    coordinator = _ready_backfill_coordinator()
+    values: list[float | None] = [1000.0] * 288
+    labels = [f"{minute // 60:02}:{minute % 60:02}" for minute in range(0, 1440, 5)]
+    labels[-1] = "24:00"  # The observed app end marker maps to the last slot.
+    if gap == "truncated":
+        values = values[:12]
+    elif gap == "missing":
+        values[150] = None
+    elif gap == "duplicate":
+        labels[150] = labels[149]
+    elif gap == "extra_duplicate":
+        values.append(1000.0)
+        labels.append("12:00")
+    source: dict[str, Any] = {
+        "unit": "W",
+        "x": labels,
+        "y": values,
+        "totalSolarEnergy": "0",
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-07-08",
+            "endDate": "2026-07-08",
+        },
+    }
+    # Sparse measured buckets remain usable by the Recorder converter.
+    assert day_power_energy_points(source, APP_SECTION_PV_STAT, "totalSolarEnergy")
+    totals = coordinator._verified_historical_day_totals(  # ruff: ignore[private-member-access]
+        device_id=_DEV, section_prefix=APP_SECTION_PV_STAT, source=source
+    )
+    assert totals == ({"totalSolarEnergy": 24.0} if gap == "none" else {})
+
+
+def test_verified_day_totals_survive_week_and_month_rollover() -> None:
+    """Completed day evidence must remain usable by month/year reconciliation."""
+    coordinator = _ready_backfill_coordinator()
+    raw = cast("Any", coordinator)
+    today = date(2026, 10, 1)
+    raw._local_today = lambda: today  # ruff: ignore[private-member-access]
+    raw.data = {
+        _DEV: {
+            "verified_day_statistics": {
+                "2026-09-01": {APP_SECTION_PV_STAT: {"pv1Egy": 2.0}},
+                "2026-09-29": {APP_SECTION_PV_STAT: {"pv1Egy": 2.1}},
+                "2025-09-29": {APP_SECTION_PV_STAT: {"pv1Egy": 9.0}},
+                "2026-10-01": {APP_SECTION_PV_STAT: {"pv1Egy": 8.0}},
+            }
+        }
+    }
+    updates: dict[str, dict[str, Any]] = {}
+    coordinator._merge_verified_day_totals_update(  # ruff: ignore[private-member-access]
+        updates,
+        day_totals={"pv1Egy": 1.2},
+        device_id=_DEV,
+        target_day=date(2026, 9, 15),
+        section_prefix=APP_SECTION_PV_STAT,
+        week_start=date(2026, 9, 28),
+        today=today,
+    )
+    expected = {
+        "2026-09-01": {APP_SECTION_PV_STAT: {"pv1Egy": 2.0}},
+        "2026-09-15": {APP_SECTION_PV_STAT: {"pv1Egy": 1.2}},
+        "2026-09-29": {APP_SECTION_PV_STAT: {"pv1Egy": 2.1}},
+    }
+    assert updates[_DEV] == expected
+    assert (
+        coordinator._preserved_fast_payload_value(  # ruff: ignore[private-member-access]
+            "verified_day_statistics", updates[_DEV]
+        )
+        == expected
+    )
+
+
+def test_unversioned_cached_day_total_is_not_a_complete_day_proof() -> None:
+    """Legacy sums have no evidence that all five-minute slots were present."""
+    coordinator = _ready_backfill_coordinator()
+    updates: dict[str, dict[str, Any]] = {}
+    _, _, verified = coordinator._restore_or_reopen_imported_day_totals(  # ruff: ignore[private-member-access]
+        updates,
+        state_status=co.BackfillStatus.IMPORTED,
+        day_state={"verified_totals": {"totalSolarEnergy": 1.0}},
+        device_id=_DEV,
+        target_day=date(2026, 7, 8),
+        section_prefix=APP_SECTION_PV_STAT,
+        week_start=date(2026, 7, 6),
+        today=date(2026, 7, 9),
+    )
+    assert not verified
+    assert not updates
+
+
+@pytest.mark.parametrize("samples", [288, 12, 0])
+async def test_imported_day_totals_recovery_never_reimports(samples: int) -> None:
+    """A budgeted verification reads evidence once and preserves import history."""
+    coordinator = _ready_backfill_coordinator()
+    raw = cast("Any", coordinator)
+    raw._statistics_startup_sync_pending = False  # ruff: ignore[private-member-access]
+    payload = {"system_meta": {"id": "system-1"}}
+    source, days = coordinator._http_day_backfill_days_state(_DEV, APP_SECTION_PV_STAT)  # ruff: ignore[private-member-access]
+    source["curve_rule"] = co._HTTP_DAY_CURVE_IMPORT_RULE  # ruff: ignore[private-member-access]
+    original = {
+        "status": "imported",
+        "imported_rows": 24,
+        "completed_at": "2026-07-08T23:00:00+00:00",
+    }
+    days["2026-07-08"] = deepcopy(original)
+    progress = co._HttpDayBackfillProgress(  # ruff: ignore[private-member-access]
+        target_days=[date(2026, 7, 8)],
+        force=True,
+        window_days=1,
+        include_current_year=True,
+        now_monotonic=0.0,
+        verification_only=True,
+    )
+    candidates = coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+        {_DEV: payload},
+        progress.target_days,
+        today=date(2026, 7, 9),
+        now_epoch=datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
+        progress=progress,
+    )
+    selected = [c for c in candidates if c.section_prefix == APP_SECTION_PV_STAT]
+    assert len(selected) == 1
+    raw._async_fetch_historical_day_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value=(
+            "fetched",
+            {
+                "unit": "W",
+                "y": [1000] * samples,
+                "_request": {
+                    "dateType": "day",
+                    "beginDate": "2026-07-08",
+                    "endDate": "2026-07-08",
+                },
+            },
+        )
+    )
+    raw._async_import_historical_day_chart_statistics_for_device = AsyncMock()  # ruff: ignore[private-member-access]
+    await coordinator._async_process_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+        selected,
+        progress,
+        request_budget=1,
+        week_start=date(2026, 7, 6),
+        today=date(2026, 7, 9),
+    )
+    raw._async_import_historical_day_chart_statistics_for_device.assert_not_awaited()  # ruff: ignore[private-member-access]
+    assert progress.requests == 1
+    assert {k: days["2026-07-08"][k] for k in original} == original
+    updates: dict[str, dict[str, Any]] = {}
+    _, _, verified = coordinator._restore_or_reopen_imported_day_totals(  # ruff: ignore[private-member-access]
+        updates,
+        state_status=co.BackfillStatus.IMPORTED,
+        day_state=days["2026-07-08"],
+        device_id=_DEV,
+        target_day=date(2026, 7, 8),
+        section_prefix=APP_SECTION_PV_STAT,
+        week_start=date(2026, 7, 6),
+        today=date(2026, 7, 9),
+    )
+    assert verified is (samples == _FULL_DAY_SAMPLES)
+    if verified:
+        assert updates[_DEV]["2026-07-08"][APP_SECTION_PV_STAT] == {
+            "totalSolarEnergy": 24.0
+        }
+    else:
+        assert not updates
+    again = coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+        {_DEV: payload},
+        progress.target_days,
+        today=date(2026, 7, 9),
+        now_epoch=datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
+        progress=progress,
+    )
+    assert not any(c.section_prefix == APP_SECTION_PV_STAT for c in again)
+
+
+@pytest.mark.parametrize("verification_only", [False, True])
+def test_day_verification_queue_uses_its_own_attempt_clock(
+    verification_only: bool,
+) -> None:
+    """A failed totals probe rotates without changing Recorder import history."""
+    coordinator = _ready_backfill_coordinator()
+    payload = {"system_meta": {"id": "system-1"}}
+    source, days = coordinator._http_day_backfill_days_state(_DEV, APP_SECTION_PV_STAT)  # ruff: ignore[private-member-access]
+    source["curve_rule"] = co._HTTP_DAY_CURVE_IMPORT_RULE  # ruff: ignore[private-member-access]
+    status = "imported" if verification_only else "pending"
+    days["2026-07-08"] = {
+        "status": status,
+        "last_attempt_at": "2026-07-08T23:00:00+00:00",
+        "totals_last_attempt_at": "2026-07-10T03:00:00+00:00",
+        "totals_last_error": "transport_error",
+    }
+    days["2026-07-09"] = {
+        "status": status,
+        "last_attempt_at": "2026-07-09T23:00:00+00:00",
+    }
+    original = deepcopy(days)
+    progress = co._HttpDayBackfillProgress(  # ruff: ignore[private-member-access]
+        target_days=[date(2026, 7, 8), date(2026, 7, 9)],
+        force=True,
+        window_days=2,
+        include_current_year=True,
+        now_monotonic=0.0,
+        verification_only=verification_only,
+    )
+    candidates = coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+        {_DEV: payload},
+        progress.target_days,
+        today=date(2026, 7, 10),
+        now_epoch=datetime(2026, 7, 10, 4, tzinfo=UTC).timestamp(),
+        progress=progress,
+    )
+    selected = [
+        c.target_day for c in candidates if c.section_prefix == APP_SECTION_PV_STAT
+    ]
+    expected = (
+        [date(2026, 7, 9), date(2026, 7, 8)]
+        if verification_only
+        else progress.target_days
+    )
+    assert selected == expected
+    if verification_only:
+        assert days == original
+
+
+def test_native_home_day_scalar_is_not_replaced_by_a_watt_curve() -> None:
+    """The source contract separates native day energy from Recorder W curves."""
+    source = {
+        "unit": "W",
+        "totalHomeEgy": "0.00",
+        "x": ["00:00", "00:05"],
+        "y": [600, 600],
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-09-30",
+            "endDate": "2026-09-30",
+        },
+    }
+    payload: dict[str, Any] = {
+        "home_trends": source,
+        "device_today_energy": {"dh": 0},
+    }
+
+    JackerySolarVaultCoordinator._reconcile_compact_today_energy(  # ruff: ignore[private-member-access]
+        payload, today=date(2026, 9, 30)
+    )
+
+    assert payload["device_today_energy"]["dh"] == 0
+    assert source["totalHomeEgy"] == "0.00"
+    assert source["y"] == [600, 600]
 
 
 @pytest.mark.parametrize("store_fails", [False, True])
@@ -137,7 +397,7 @@ def test_fill_preserves_history_and_idempotent_completion() -> None:
         {_DEV: {}},
         [date(2026, 7, 8)],
         today=date(2026, 7, 9),
-        now_epoch=0.0,
+        now_epoch=datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
         progress=progress,
     )
     assert "2026-01-01" in days
@@ -165,12 +425,50 @@ def test_fill_does_not_honor_legacy_week_long_empty_cooldown() -> None:
         {_DEV: {}},
         [date(2026, 4, 15)],
         today=date(2026, 7, 9),
-        now_epoch=0.0,
+        now_epoch=datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
         progress=progress,
     )
     assert [
         c.target_day for c in candidates if c.section_prefix == APP_SECTION_HOME_STAT
     ] == [date(2026, 4, 15)]
+
+
+def test_previous_day_backfill_waits_until_recorder_window_closes() -> None:
+    """A midnight fetch must not mark a valid day unmapped for the whole day."""
+    coordinator = _ready_backfill_coordinator()
+    target = date(2026, 9, 28)
+    today = date(2026, 9, 29)
+    ready = coordinator._local_statistic_start(today).timestamp() + 2 * 3600  # ruff: ignore[private-member-access]
+    _, days = coordinator._http_day_backfill_days_state(_DEV, APP_SECTION_HOME_STAT)  # ruff: ignore[private-member-access]
+    days[target.isoformat()] = {
+        "status": "unmapped",
+        "checked_date": today.isoformat(),
+        "last_attempt_at": datetime.fromtimestamp(ready - 3600, UTC).isoformat(),
+        "unimported_source": {"unit": "W", "y": [500] * 288},
+    }
+    progress = co._HttpDayBackfillProgress(  # ruff: ignore[private-member-access]
+        target_days=[target],
+        force=True,
+        window_days=1,
+        include_current_year=True,
+        now_monotonic=0.0,
+    )
+
+    def candidates(now_epoch: float) -> list[co._HttpDayBackfillCandidate]:
+        return coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+            {_DEV: {}},
+            [target],
+            today=today,
+            now_epoch=now_epoch,
+            progress=progress,
+        )
+
+    assert candidates(ready - 1) == []
+    assert days[target.isoformat()]["status"] == "unmapped"
+    assert [candidate.section_prefix for candidate in candidates(ready + 1)].count(
+        APP_SECTION_HOME_STAT
+    ) == 1
+    assert days[target.isoformat()]["status"] == "pending"
 
 
 def _entry(**options: object) -> SimpleNamespace:
@@ -202,6 +500,9 @@ def _backfill_store_double() -> SimpleNamespace:
 def _ready_backfill_coordinator() -> JackerySolarVaultCoordinator:
     """Return a coordinator with an empty, pre-loaded backfill state."""
     coordinator = _coordinator()
+    cast("Any", coordinator).hass = SimpleNamespace(
+        config=SimpleNamespace(time_zone="Europe/Berlin")
+    )
     cast("Any", coordinator)._statistics_backfill_store = _backfill_store_double()  # ruff: ignore[private-member-access]
     coordinator._statistics_backfill_state = {  # ruff: ignore[private-member-access]
         co._STATISTICS_BACKFILL_STORE_DEVICES: {},  # ruff: ignore[private-member-access]
@@ -312,11 +613,12 @@ def test_day_queue_preserves_imports_and_retry_deadlines_without_version_reset()
     assert days_state["2026-04-15"]["status"] == "pending"
     assert "retry_after_epoch" not in days_state["2026-04-15"]
     assert days_state["2026-04-02"] == before["2026-04-02"]
+    # An unattempted day precedes a day already tried four times.
     assert [
         candidate.target_day
         for candidate in candidates
         if candidate.section_prefix == APP_SECTION_HOME_STAT
-    ] == [date(2026, 4, 15), date(2026, 4, 16)]
+    ] == [date(2026, 4, 16), date(2026, 4, 15)]
 
 
 def test_startup_preserves_imported_and_checked_empty_days() -> None:
@@ -341,7 +643,7 @@ def test_startup_preserves_imported_and_checked_empty_days() -> None:
         {_DEV: {}},
         progress.target_days,
         today=date(2026, 7, 9),
-        now_epoch=0,
+        now_epoch=datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
         progress=progress,
     )
 
@@ -389,6 +691,45 @@ def test_needs_year_month_backfill_missing_section_is_false() -> None:
         )
         is False
     )
+
+
+def test_partial_year_rechecks_zero_month_before_active_months() -> None:
+    """The September export has April=0 although April's month chart is nonzero."""
+    coordinator = _coordinator()
+    year = {
+        "unit": "kWh",
+        "totalCharge": "163.27",
+        "y1": [0.0, 0.0, 0.0, 0.0, 92.62, 70.65] + [0.0] * 6,
+    }
+
+    assert coordinator._needs_year_month_backfill(  # ruff: ignore[private-member-access]
+        {"device_battery_stat_year": year},
+        "device_battery_stat",
+        ("totalCharge",),
+        today=date(2026, 9, 30),
+    )
+
+
+def test_april_month_fills_partial_year_without_discarding_may_and_june() -> None:
+    """Same-endpoint April 47.05 kWh augments a year that retains May/June."""
+    payload = {
+        "device_battery_stat_year": {
+            "unit": "kWh",
+            "totalCharge": "163.27",
+            "y1": [0.0, 0.0, 0.0, 0.0, 92.62, 70.65] + [0.0] * 6,
+        }
+    }
+    april = {
+        "unit": "kWh",
+        "totalCharge": "47.05",
+        "y1": [47.05] + [0.0] * 29,
+    }
+
+    apply_year_month_backfill(payload, {"device_battery_stat": {4: april}})
+
+    corrected = payload["device_battery_stat_year"]
+    assert corrected["totalCharge"] == pytest.approx(210.32)
+    assert corrected["y1"][3:6] == [47.05, 92.62, 70.65]
 
 
 # --- _day_chart_points_for_metric ----------------------------------------

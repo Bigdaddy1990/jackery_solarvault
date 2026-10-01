@@ -728,10 +728,12 @@ def test_statistics_backfill_state_is_persisted_on_demand() -> None:
     assert "def statistics_import_diagnostics" in coordinator_source
 
 
-def test_week_month_year_statistic_toggles_are_removed() -> None:
-    """HA derives W/M/Y from the day-energy sensor; no period toggles remain."""
+def test_week_month_year_statistic_polls_are_independent() -> None:
+    """Closed W/M/Y App periods use their own persistent HTTP queue."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
-    assert "def _enabled_app_chart_date_types" not in coordinator_source
+    assert "def _enabled_app_chart_date_types" in coordinator_source
+    assert "async def _async_http_backfill_period_statistics" in coordinator_source
+    assert "_async_advance_statistics_backfill" in coordinator_source
     assert "async def _async_import_app_chart_statistics" not in coordinator_source
     assert "def _current_app_chart_entity_source_batches" not in coordinator_source
 
@@ -757,16 +759,22 @@ def test_week_month_year_statistic_toggles_are_removed() -> None:
             assert key not in text, f"{key} still in {path.name}"
 
 
-def test_history_import_uses_external_statistics_only() -> None:
-    """Historical app curves must not race HA's own sensor recorder."""
+def test_history_import_uses_native_sensor_statistics_only() -> None:
+    """Historical curves repair registered native sensor statistics only."""
     coordinator_source = COORDINATOR_PATH.read_text(encoding="utf-8")
 
     for removed in (
         "async def _async_import_day_chart_statistics",
         "async def _async_import_app_chart_statistics",
-        "async def _import_collected_repair_buckets",
     ):
         assert removed not in coordinator_source
+    assert "async def _import_collected_repair_buckets" in coordinator_source
+    native_import = coordinator_source.split(
+        "async def _import_collected_repair_buckets", 1
+    )[1].split("\n    async def _async_fill_power_statistic_day", 1)[0]
+    assert "self._energy_statistic_targets" in native_import
+    assert "self._async_reconcile_statistic_day" in native_import
+    assert "jackery_solarvault:" not in native_import
     history_import = coordinator_source.split(
         "async def _async_import_historical_day_chart_statistics_for_device", 1
     )[1].split("\n    def _verified_historical_day_totals", 1)[0]

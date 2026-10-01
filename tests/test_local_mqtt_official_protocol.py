@@ -107,6 +107,8 @@ async def test_device_topic_serial_routes_body_only_report() -> None:
     [
         {"deviceSn": "FOREIGN", "type": 2, "body": {"batSoc": 55}},
         {"deviceId": "other-device", "type": 2, "body": {"batSoc": 55}},
+        {"deviceId": "unregistered-device", "type": 2, "body": {"batSoc": 55}},
+        {"deviceSn": "UNKNOWN-PACK", "type": 107, "cellTemp": 274},
     ],
 )
 async def test_device_topic_rejects_conflicting_payload_identity(
@@ -121,6 +123,30 @@ async def test_device_topic_rejects_conflicting_payload_identity(
         f"hb/device/{_DEVICE_SN}/status", payload
     )
     coordinator.async_handle_mqtt_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio()
+async def test_rejected_local_frame_keeps_complete_ingress_evidence() -> None:
+    """Identity rejection must not hide fields from the raw payload audit."""
+    coordinator = _coordinator_shell()
+    capture = MagicMock()
+    cast("Any", coordinator)._schedule_payload_debug_event = capture  # ruff: ignore[private-member-access]
+    payload = {
+        "deviceSn": "FOREIGN-HEAD",
+        "devType": 0,
+        "cellTemp": 274,
+        "inEgy": 36435,
+        "outEgy": 34652,
+    }
+
+    assert not await coordinator.async_handle_local_mqtt_message(
+        f"hb/device/{_DEVICE_SN}/event", payload
+    )
+
+    capture.assert_called_once()
+    event = capture.call_args.args[0]()
+    assert event["kind"] == "local_mqtt_ingress"
+    assert event["payload"] == payload
 
 
 @pytest.mark.asyncio()

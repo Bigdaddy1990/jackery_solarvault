@@ -320,6 +320,36 @@ async def test_setup_entry_creates_gated_home_numbers() -> None:
     assert not any(k.startswith("portable_") for k in keys)
 
 
+async def test_third_party_mqtt_port_registers_after_delayed_config() -> None:
+    """A late 3047 readback adds the port without another topology change."""
+    payload: dict[str, Any] = {PAYLOAD_PROPERTIES: {FIELD_SOC_CHG_LIMIT: 50}}
+    coordinator = _coordinator({_DEVICE_ID: payload})
+    coordinator.async_add_listener = MagicMock(return_value=lambda: None)
+    entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
+    added: list[Any] = []
+    await cast("Any", async_setup_entry)(None, entry, added.extend)
+    listener = coordinator.async_add_listener.call_args.args[0]
+    assert not any(
+        entity.entity_description.key == "third_party_mqtt_port" for entity in added
+    )
+
+    payload[PAYLOAD_THIRD_PARTY_MQTT_CONFIG] = {FIELD_THIRD_PARTY_MQTT_PORT: 1883}
+    listener()
+    ports = [
+        entity
+        for entity in added
+        if entity.entity_description.key == "third_party_mqtt_port"
+    ]
+    assert len(ports) == 1
+    assert ports[0].native_value == 1883  # ruff: ignore[magic-value-comparison]
+
+    count = len(added)
+    payload[PAYLOAD_THIRD_PARTY_MQTT_CONFIG][FIELD_THIRD_PARTY_MQTT_PORT] = 1884
+    listener()
+    assert len(added) == count
+    assert ports[0].native_value == 1884  # ruff: ignore[magic-value-comparison]
+
+
 async def test_setup_entry_creates_portable_family_for_legacy_device() -> None:
     """A legacy-bind portable device only gets the portable_ number family."""
     coordinator = _coordinator({

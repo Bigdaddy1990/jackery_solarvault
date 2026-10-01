@@ -17,6 +17,7 @@ import pytest
 
 from custom_components.jackery_solarvault.client.api import JackeryApiError
 from custom_components.jackery_solarvault.const import (
+    PAYLOAD_AIEMS_ENERGY_PREDICTION,
     PAYLOAD_ALARM,
     PAYLOAD_BATTERY_BOUNDARY,
     PAYLOAD_ELECTRICITY_STRATEGY,
@@ -122,10 +123,14 @@ async def test_shadow_config_buckets_survive_rebuild_on_failed_fetch(
     api.async_get_smart_schedule_prediction = AsyncMock(
         side_effect=JackeryApiError("transient getSmartSchedulePrediction failure"),
     )
+    api.async_get_aiems_energy_prediction = AsyncMock(
+        side_effect=JackeryApiError("transient prediction failure"),
+    )
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
     shadow_buckets = {
         PAYLOAD_SMART_MODE: {"isActive": True, "timeDifference": 42},
         PAYLOAD_SMART_SCHEDULE: {"profit": "1.23", "days": 7},
+        PAYLOAD_AIEMS_ENERGY_PREDICTION: {"pvData": [1.0], "socData": [50.0]},
         PAYLOAD_TOU_SCHEDULE: {"tasks": [{"start": "00:00", "end": "06:00"}]},
     }
     coordinator.data = {DEVICE_ID: dict(shadow_buckets)}

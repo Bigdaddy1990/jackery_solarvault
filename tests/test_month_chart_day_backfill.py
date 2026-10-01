@@ -20,6 +20,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+    JackeryStatisticHistoryPendingError,
     _HttpDayBackfillCandidate,  # ruff: ignore[import-private-name]
     _HttpDayBackfillProgress,  # ruff: ignore[import-private-name]
 )
@@ -161,7 +162,101 @@ async def test_curveless_queue_day_is_imported_from_the_month_chart() -> None:
 
     assert state["status"] == "imported"
     assert state["source"] == "month_chart"
+    assert state["imported_rows"] == 24  # ruff: ignore[magic-value-comparison]
     assert progress.gap_filled_rows == 24  # ruff: ignore[magic-value-comparison]
+
+
+@pytest.mark.asyncio()
+async def test_pending_recorder_history_does_not_block_other_days() -> None:
+    """A day awaiting hourly history remains retryable while the next imports."""
+    coordinator, obj = _coordinator(
+        _month_payload("2026-05-01", "2026-05-31", [0.0, 3.26, 1.42] + [0.0] * 28)
+    )
+    obj._async_fetch_historical_day_chart_source = AsyncMock(  # ruff: ignore[private-member-access]
+        return_value=("empty_ambiguous", {})
+    )
+    obj._async_reconcile_statistic_day = AsyncMock(  # ruff: ignore[private-member-access]
+        side_effect=[
+            JackeryStatisticHistoryPendingError("Waiting for hourly history"),
+            24,
+        ]
+    )
+    pending = _candidate(date(2026, 5, 2))
+    ready = _candidate(date(2026, 5, 3))
+    progress = _progress()
+    progress.pending_sources = progress.actionable_sources = 2
+
+    await coordinator._async_process_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+        [pending, ready],
+        progress,
+        request_budget=None,
+        week_start=date(2026, 9, 21),
+        today=date(2026, 9, 28),
+    )
+
+    assert pending.day_state["status"] == "pending"
+    assert pending.day_state["last_error"] == "Waiting for hourly history"
+    assert "checked_date" not in pending.day_state
+    assert ready.day_state["status"] == "imported"
+    assert ready.day_state["imported_rows"] == 24  # ruff: ignore[magic-value-comparison]
+    assert progress.pending_sources == progress.actionable_sources == 1
+    assert progress.state_changed is True
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("pending_day", [date(2026, 5, 2), date(2026, 9, 21)])
+async def test_bounded_queue_rotates_days_waiting_for_recorder_history(
+    pending_day: date,
+) -> None:
+    """Even a pending current-week day cannot monopolize each one-slot pass."""
+    coordinator, obj = _coordinator({})
+    ready_day = date(2026, 5, 3)
+    today = date(2026, 9, 23)
+    obj._statistics_backfill_state = {"devices": {}}  # ruff: ignore[private-member-access]
+    obj._historical_day_source_prefixes = lambda _device, _payload: (  # ruff: ignore[private-member-access]
+        APP_SECTION_BATTERY_STAT,
+    )
+
+    def fetch(_device: str, **kwargs: Any) -> dict[str, Any]:
+        if kwargs["date_type"] != "month":
+            return {}
+        begin = kwargs["begin_date"]
+        september = begin.startswith("2026-09")
+        end = "2026-09-30" if september else "2026-05-31"
+        return _month_payload(begin, end, [1.0] * (30 if september else 31))
+
+    def reconcile(
+        _statistic: str, hours: list[float], *_args: Any, **_kwargs: Any
+    ) -> int:
+        if datetime.fromtimestamp(hours[0], UTC).date() == pending_day:
+            message = "Waiting for hourly history"
+            raise JackeryStatisticHistoryPendingError(message)
+        return 24
+
+    obj.api.async_get_device_battery_stat = AsyncMock(side_effect=fetch)
+    obj._async_reconcile_statistic_day = AsyncMock(side_effect=reconcile)  # ruff: ignore[private-member-access]
+    for _pass in range(2):
+        progress = _progress()
+        candidates = coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+            {_DEVICE: {}},
+            [pending_day, ready_day],
+            today=today,
+            now_epoch=datetime(2026, 9, 23, tzinfo=UTC).timestamp(),
+            progress=progress,
+        )
+        await coordinator._async_process_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+            candidates,
+            progress,
+            request_budget=1,
+            week_start=date(2026, 9, 21),
+            today=today,
+        )
+
+    _, days = coordinator._http_day_backfill_days_state(  # ruff: ignore[private-member-access]
+        _DEVICE, APP_SECTION_BATTERY_STAT
+    )
+    assert days[pending_day.isoformat()]["status"] == "pending"
+    assert days[ready_day.isoformat()]["status"] == "imported"
 
 
 def test_days_checked_empty_by_older_code_reopen_once() -> None:

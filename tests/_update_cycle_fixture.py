@@ -187,6 +187,7 @@ def make_update_cycle_api(**overrides: object) -> MagicMock:
     api.async_get_pv_trends = AsyncMock(return_value={})
     api.async_get_home_trends = AsyncMock(return_value={})
     api.async_get_battery_trends = AsyncMock(return_value={})
+    api.async_get_aiems_energy_prediction = AsyncMock(return_value={})
     api.async_get_dynamic_price = AsyncMock(return_value={})
     api.async_get_power_price = AsyncMock(return_value={})
     api.async_get_price_sources = AsyncMock(return_value=[])

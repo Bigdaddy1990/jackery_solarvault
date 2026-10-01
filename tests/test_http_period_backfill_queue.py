@@ -185,6 +185,60 @@ async def test_ct_period_retries_l2_when_l1_chart_is_empty() -> None:
 
 
 @pytest.mark.asyncio()
+async def test_period_import_targets_only_matching_native_sensor_period(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Month history writes the native month sensor, never a day or external id."""
+    monkeypatch.setattr(coordinator_module, "APP_CHART_STAT_METRICS", _ONE_PV_METRIC)
+    coordinator = _coordinator()
+    raw = cast("Any", coordinator)
+    raw._energy_statistic_targets = lambda *_args: [  # ruff: ignore[private-member-access]
+        ("sensor.native_month", DATE_TYPE_MONTH),
+        ("sensor.native_day", "day"),
+    ]
+    raw._local_timezone = lambda: coordinator_module.UTC  # ruff: ignore[private-member-access]
+    raw._local_statistic_start = lambda value: coordinator_module.datetime.combine(  # ruff: ignore[private-member-access]
+        value if isinstance(value, date) else value.date(),
+        coordinator_module.datetime.min.time(),
+        tzinfo=coordinator_module.UTC,
+    )
+    reconcile = AsyncMock(return_value=1)
+    monkeypatch.setattr(
+        JackerySolarVaultCoordinator,
+        "_async_reconcile_statistic_day",
+        reconcile,
+    )
+    source = {
+        "unit": "kWh",
+        "x": ["2026-01-01"],
+        "y": [1.0],
+        "_request": {
+            "dateType": DATE_TYPE_MONTH,
+            "beginDate": "2026-01-01",
+            "endDate": "2026-01-31",
+        },
+    }
+
+    (
+        repaired,
+        failed,
+    ) = await JackerySolarVaultCoordinator._import_collected_repair_buckets(  # ruff: ignore[private-member-access]
+        coordinator,
+        device_id=_DEVICE_ID,
+        name_prefix="ignored",
+        collected={(APP_SECTION_PV_STAT, DATE_TYPE_MONTH, date(2026, 1, 1)): source},
+        period_meta_by_type={},
+        to_date=_TODAY,
+    )
+
+    assert (repaired, failed) == (1, 0)
+    call = reconcile.await_args
+    assert call is not None
+    assert call.args[0] == "sensor.native_month"
+    assert call.kwargs["reset_period"] == DATE_TYPE_MONTH
+
+
+@pytest.mark.asyncio()
 async def test_closed_months_then_weeks_skip_open_periods(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

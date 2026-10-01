@@ -279,6 +279,63 @@ async def test_reassembly_diagnostics_missing_final_predecessors() -> None:
     assert complete.body == b'{"ok":1}'
 
 
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("arrival_gap", [0.1, 20.0])
+async def test_reassembly_uses_queued_arrival_time(arrival_gap: float) -> None:
+    """Sink latency must not expire fragments already received together."""
+    await asyncio.sleep(0)
+    listener = _listener()
+    session = _attach_session(listener, "dev", object())
+    arrival = listener._hass.loop.time()  # ruff: ignore[private-member-access]
+    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev",
+        _frame(index=1, count=2, body=b"{"),
+        session=session,
+        received_monotonic=arrival,
+        accepted=True,
+    )
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(listener._hass.loop, "time", lambda: arrival + 20)  # ruff: ignore[private-member-access]
+        complete, _ = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+            "dev",
+            _frame(index=2, count=2, body=b"}"),
+            session=session,
+            received_monotonic=arrival + arrival_gap,
+            accepted=True,
+        )
+    if arrival_gap < ble_transport_module._REASSEMBLY_TIMEOUT_SEC:  # ruff: ignore[private-member-access]
+        assert complete is not None
+        assert complete.body == b"{}"
+        assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 0
+    else:
+        assert complete is None
+        assert listener.stats_for("dev").multi_chunk_drop_reasons == {
+            "cmd107:expired": 1
+        }
+
+
+@pytest.mark.asyncio()
+async def test_reassembly_keeps_session_owner_after_expiring_old_frame() -> None:
+    """The first new fragment survives expiry of an older session-owned frame."""
+    await asyncio.sleep(0)
+    listener = _listener()
+    session = _attach_session(listener, "dev", object())
+    listener._reassemble_frame(  # ruff: ignore[private-member-access]
+        "dev", _frame(index=1, count=3, cmd=106, body=b"old"), session=session
+    )
+    assembly = listener._frame_assemblies["dev"][106, 3022]  # ruff: ignore[private-member-access]
+    assembly.updated_at -= ble_transport_module._REASSEMBLY_TIMEOUT_SEC + 1  # ruff: ignore[private-member-access]
+
+    for index, body in ((1, b"new-1"), (2, b"new-2"), (3, b"new-3")):
+        complete, _ = listener._reassemble_frame(  # ruff: ignore[private-member-access]
+            "dev", _frame(index=index, count=3, cmd=106, body=body), session=session
+        )
+
+    assert complete is not None
+    assert complete.body == b"new-1new-2new-3"
+    assert listener.stats_for("dev").multi_chunk_drop_reasons == {"cmd106:expired": 1}
+
+
 def test_reassembly_diagnostics_identify_session_owner_rejection() -> None:
     """A stale accepted session reports why its final chunk was not joined."""
     listener = _listener()

@@ -121,7 +121,6 @@ def test_main_battery_uses_child_device_without_changing_entity_identity(
             for d in SENSOR_DESCRIPTIONS
             if d.key == "main_battery_charge_energy_derived"
         ),
-        next(d for d in STAT_DESCRIPTIONS if d.key == "main_battery_charge_energy"),
         next(d for d in NUMBER_DESCRIPTIONS if d.key == "soc_charge_limit_set"),
     )
     for description in descriptions:

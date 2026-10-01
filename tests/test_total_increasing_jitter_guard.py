@@ -16,10 +16,39 @@ from custom_components.jackery_solarvault.sensor import (
     BATTERY_PACK_SENSOR_DESCRIPTIONS,
     SMART_METER_SENSOR_DESCRIPTIONS,
     JackeryBatteryPackSensor,
+    JackerySensor,
     JackerySmartMeterSensor,
 )
+from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 
 _DEVICE_ID = "dev-1"
+
+
+def test_derived_main_battery_counter_keeps_last_recorder_state() -> None:
+    """An asynchronous system/pack update may briefly lower a derived total."""
+    reading = [363.13]
+    sensor = JackerySensor.__new__(JackerySensor)
+    mutable = cast("Any", sensor)
+    mutable.entity_description = SimpleNamespace(
+        key="main_battery_discharge_energy_derived",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda _entity: reading[0],
+    )
+    mutable._cached_native_value = None  # ruff: ignore[private-member-access]
+    mutable._cache_refresh_active = True  # ruff: ignore[private-member-access]
+    mutable._source_attributes = dict  # ruff: ignore[private-member-access]
+
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    reading[0] = 363.12
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(363.13)
+    assert sensor.extra_state_attributes["lifetime_value_retained"] is True
+
+    reading[0] = 363.14
+    sensor._refresh_cache()  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(363.14)
+    assert "lifetime_value_retained" not in sensor.extra_state_attributes
 
 
 def _smart_meter_sensor(key: str) -> JackerySmartMeterSensor:

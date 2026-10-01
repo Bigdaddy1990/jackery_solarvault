@@ -1,5 +1,6 @@
 """Regression tests for statistic entity value passthrough."""
 
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
@@ -29,6 +30,10 @@ from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
     JackeryStatSensor,
     _period_from_stat_description,  # ruff: ignore[import-private-name]
+)
+from custom_components.jackery_solarvault.util import (
+    effective_period_total_value,
+    trend_series_total,
 )
 from homeassistant.components.sensor import SensorStateClass
 
@@ -74,6 +79,236 @@ def test_stat_entity_does_not_clamp_negative_period_values() -> None:
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
 
     assert sensor.native_value == pytest.approx(_NEGATIVE_KWH)
+
+
+def test_bad_pv_scalar_does_not_hide_a_complete_valid_channel_series() -> None:
+    """A broken scalar cannot erase independently valid same-period buckets."""
+    source = {
+        "unit": "kWh",
+        "totalSolarEnergy": "4.42",
+        "pv1Egy": 120432.3,
+        "y": [1.53, 2.89, 0, 0, 0, 0, 0],
+        "y1": [0.34, 0.72, 0, 0, 0, 0, 0],
+        "_request": {
+            "dateType": "week",
+            "beginDate": "2026-09-28",
+            "endDate": "2026-10-04",
+        },
+    }
+    values, total, scalar = JackeryStatSensor._resolve_period_value(  # ruff: ignore[private-member-access]
+        source, "device_pv_stat_week", "pv1Egy", {}
+    )
+
+    assert values == source["y1"]
+    assert total == pytest.approx(1.06)
+    assert scalar is None
+    assert effective_period_total_value(
+        source, "device_pv_stat_week", "pv1Egy"
+    ) == pytest.approx(1.06)
+    assert trend_series_total(source, "device_pv_stat_week", "pv1Egy") == pytest.approx(
+        1.06
+    )
+
+
+@pytest.mark.parametrize("period", [DATE_TYPE_MONTH, DATE_TYPE_YEAR])
+@pytest.mark.parametrize("missing_day", [False, True])
+def test_pv_period_rebuild_requires_every_invalid_bucket_to_be_verified(
+    period: str, missing_day: bool
+) -> None:
+    """A dated daily rebuild fills an invalid channel bucket, never a gap."""
+    description = next(
+        desc for desc in STAT_DESCRIPTIONS if desc.key == f"device_pv1_{period}_energy"
+    )
+    sensor = _stat_sensor()
+    mutable = cast("Any", sensor)
+    mutable.entity_description = description
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    today = datetime(2026, 9, 30, 23, tzinfo=UTC)
+    series = [1.0] * 30
+    series[28] = 120431.96
+    source: dict[str, Any] = {
+        "pv1Egy": 120460.96,
+        "totalSolarEnergy": 60.0,
+        "unit": "kWh",
+        "y1": series,
+        "y": [2.0] * 30,
+        "_request": {
+            "dateType": "month",
+            "beginDate": "2026-09-01",
+            "endDate": "2026-09-30",
+        },
+    }
+    verified = {
+        f"2026-09-{day:02}": {"device_pv_stat": {"pv1Egy": 1.0}} for day in range(1, 30)
+    }
+    if period == DATE_TYPE_YEAR:
+        today = datetime(2026, 10, 1, 1, tzinfo=UTC)
+        verified["2026-09-30"] = {"device_pv_stat": {"pv1Egy": 1.0}}
+        source = {
+            "pv1Egy": 120475.96,
+            "totalSolarEnergy": 120.0,
+            "unit": "kWh",
+            "y1": [5.0, 10.0, 0, 0, 0, 0, 0, 0, 120460.96, 0, 0, 0],
+            "y": [10.0, 20.0, 0, 0, 0, 0, 0, 0, 90.0, 0, 0, 0],
+            "_request": {
+                "dateType": "year",
+                "beginDate": "2026-01-01",
+                "endDate": "2026-12-31",
+            },
+        }
+    if missing_day:
+        verified.pop("2026-09-29")
+    original = deepcopy(source)
+    payload = {description.section: source, "verified_day_statistics": verified}
+    mutable.coordinator.data = {_DEVICE_ID: payload}
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+    )
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+
+    if missing_day:
+        assert sensor.native_value is None
+    else:
+        expected = 30.0 if period == DATE_TYPE_MONTH else 45.0
+        assert sensor.native_value == pytest.approx(expected)
+    assert source == original
+
+
+@pytest.mark.parametrize("series", [None, [], [31.0]])
+@pytest.mark.parametrize("missing_day", [False, True])
+def test_year_rebuild_does_not_require_cloud_month_series(
+    series: list[float] | None, missing_day: bool
+) -> None:
+    """Fully dated daily evidence survives a missing cloud month series."""
+    description = next(
+        desc for desc in STAT_DESCRIPTIONS if desc.key == "device_pv1_year_energy"
+    )
+    sensor = _stat_sensor()
+    mutable = cast("Any", sensor)
+    mutable.entity_description = description
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    today = datetime(2026, 2, 3, 12, tzinfo=UTC)
+    source: dict[str, Any] = {
+        "unit": "kWh",
+        "_request": {
+            "dateType": "year",
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31",
+        },
+    }
+    if series is not None:
+        source["y1"] = series
+    verified = {
+        f"2026-01-{day:02}": {"device_pv_stat": {"pv1Egy": 1.0}} for day in range(1, 32)
+    }
+    verified["2026-02-01"] = {"device_pv_stat": {"pv1Egy": 1.5}}
+    verified["2026-02-02"] = {"device_pv_stat": {"pv1Egy": 2.0}}
+    if missing_day:
+        verified.pop("2026-02-02")
+    payload = {description.section: source, "verified_day_statistics": verified}
+    original = deepcopy(payload)
+    mutable.coordinator.data = {_DEVICE_ID: payload}
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+        local_daily_raw=(3.0, "pv1Egy"),
+    )
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+
+    rebuilt = sensor._current_open_month_or_year_with_local_day(  # ruff: ignore[private-member-access]
+        description.section,
+        description.stat_key,
+        context=context,
+        cloud_total=None,
+    )
+    if missing_day:
+        assert rebuilt is None
+    else:
+        assert rebuilt is not None
+        assert sensor.native_value == pytest.approx(37.5)
+    assert payload == original
+
+
+@pytest.mark.parametrize("period", [DATE_TYPE_MONTH, DATE_TYPE_YEAR])
+@pytest.mark.parametrize("missing_day", [False, True])
+@pytest.mark.parametrize("zero_days", [False, True])
+@pytest.mark.parametrize("month_day", [1, 3])
+def test_period_verified_days_replace_stale_high_cloud_totals(
+    period: str, missing_day: bool, zero_days: bool, month_day: int
+) -> None:
+    """Only complete verified past days authorize lowering a cloud total."""
+    description = next(
+        desc for desc in STAT_DESCRIPTIONS if desc.key == f"device_pv1_{period}_energy"
+    )
+    sensor = _stat_sensor()
+    mutable = cast("Any", sensor)
+    mutable.entity_description = description
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    today = datetime(2026, 2, month_day, 12, tzinfo=UTC)
+    month_source: dict[str, Any] = {
+        "pv1Egy": 150.0,
+        "totalSolarEnergy": 300.0,
+        "unit": "kWh",
+        "y1": [50.0, 50.0, 50.0],
+        "y": [100.0, 100.0, 100.0],
+        "_request": {
+            "dateType": "month",
+            "beginDate": "2026-02-01",
+            "endDate": "2026-02-28",
+        },
+    }
+    source = month_source
+    if period == DATE_TYPE_YEAR:
+        source = {
+            "pv1Egy": 500.0,
+            "totalSolarEnergy": 1000.0,
+            "unit": "kWh",
+            "y1": [200.0, 300.0],
+            "y": [400.0, 600.0],
+            "_request": {
+                "dateType": "year",
+                "beginDate": "2026-01-01",
+                "endDate": "2026-12-31",
+            },
+        }
+    verified = {
+        f"2026-01-{day:02}": {"device_pv_stat": {"pv1Egy": 0.0 if zero_days else 1.0}}
+        for day in range(1, 32)
+    }
+    verified["2026-02-01"] = {"device_pv_stat": {"pv1Egy": 0.0 if zero_days else 1.5}}
+    verified["2026-02-02"] = {"device_pv_stat": {"pv1Egy": 0.0 if zero_days else 2.0}}
+    if missing_day:
+        missing_date = "2026-01-31" if month_day == 1 else "2026-02-02"
+        verified.pop(missing_date)
+    payload: dict[str, Any] = {
+        "device_pv_stat_month": month_source,
+        description.section: source,
+        "verified_day_statistics": verified,
+    }
+    original = deepcopy(payload)
+    mutable.coordinator.data = {_DEVICE_ID: payload}
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+        local_daily_raw=(50.0, "pv1Egy"),
+    )
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+    expected = 50.0 if zero_days else (53.5 if period == DATE_TYPE_MONTH else 84.5)
+    if month_day == 1:
+        expected = (
+            150.0 if period == DATE_TYPE_MONTH else (300.0 if zero_days else 331.0)
+        )
+    if missing_day:
+        expected = 150.0 if period == DATE_TYPE_MONTH else 500.0
+    assert sensor.native_value == pytest.approx(expected)
+    assert payload == original
 
 
 def test_period_last_reset_is_precomputed_before_ha_state_calculation(
@@ -213,8 +448,25 @@ def test_ct_eps_day_scalar_zero_is_not_exposed_as_unknown(
     assert sensor.native_value == pytest.approx(0.0)
 
 
-def test_week_period_uses_larger_fully_covered_day_rebuild() -> None:
-    """A complete daily rebuild exposes a stale positive App week total."""
+@pytest.mark.parametrize(
+    ["week_bucket", "month_bucket", "verified_bucket", "verified_count"],
+    [
+        [4.7, 4.7, 4.7, 3],
+        [40.0, 40.0, 4.7, 3],
+        [40.0, 4.7, 4.7, 3],
+        [4.7, 40.0, 4.7, 3],
+        [40.0, 40.0, 0.0, 3],
+        [0.0, 1.0, 1.0, 0],
+        [0.0, 1.0, 1.0, 2],
+    ],
+)
+def test_week_period_uses_verified_completed_days(
+    week_bucket: float,
+    month_bucket: float,
+    verified_bucket: float,
+    verified_count: int,
+) -> None:
+    """Verified complete days replace stale charts, including a genuine zero."""
     description = next(
         desc for desc in STAT_DESCRIPTIONS if desc.key == "device_pv1_week_energy"
     )
@@ -228,24 +480,38 @@ def test_week_period_uses_larger_fully_covered_day_rebuild() -> None:
         APP_REQUEST_END_DATE: (week_start + timedelta(days=6)).isoformat(),
     }
     month_section = description.section.replace("_week", "_month")
-    payload = {
+    completed_day_count = (today - week_start).days
+    payload: dict[str, Any] = {
         description.section: {
-            description.stat_key: 4.85,
-            APP_CHART_SERIES_Y1: [0.0, 4.7, 0.0, 0.15, 0.0, 0.0, 0.0],
+            description.stat_key: (
+                week_bucket + 0.15 if verified_count == completed_day_count else 40.0
+            ),
+            APP_CHART_SERIES_Y1: [
+                0.0,
+                week_bucket,
+                0.0,
+                0.15 if verified_count == completed_day_count else 0.0,
+                0.0,
+                0.0,
+                0.0,
+            ],
             APP_STAT_UNIT: APP_UNIT_KWH,
             APP_REQUEST_META: request,
         },
         month_section: {
-            description.stat_key: 5.28,
-            APP_CHART_SERIES_Y1: [0.23, 4.7, 0.2, 0.15],
+            description.stat_key: month_bucket + 0.58,
+            APP_CHART_SERIES_Y1: [0.23, month_bucket, 0.2, 0.15],
             APP_STAT_UNIT: APP_UNIT_KWH,
         },
         "verified_day_statistics": {
             "2026-08-10": {"device_pv_stat": {description.stat_key: 0.23}},
-            "2026-08-11": {"device_pv_stat": {description.stat_key: 4.7}},
+            "2026-08-11": {"device_pv_stat": {description.stat_key: verified_bucket}},
             "2026-08-12": {"device_pv_stat": {description.stat_key: 0.2}},
         },
     }
+    payload["verified_day_statistics"] = dict(
+        list(payload["verified_day_statistics"].items())[:verified_count]
+    )
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
@@ -267,7 +533,11 @@ def test_week_period_uses_larger_fully_covered_day_rebuild() -> None:
     snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
 
-    assert sensor.native_value == pytest.approx(5.28)
+    if verified_count < completed_day_count:
+        assert sensor.native_value == pytest.approx(40.0)
+        assert "fallback" not in sensor.extra_state_attributes
+        return
+    assert sensor.native_value == pytest.approx(0.58 + verified_bucket)
     assert sensor.extra_state_attributes["source_section"] == description.section
     assert (
         sensor.extra_state_attributes["fallback"]
@@ -442,8 +712,11 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
             0.548,
             "current_open_week_from_daily_buckets",
         ),
-        "ct_input_month_energy": (0.818, "current_open_month_with_local_day"),
-        "ct_input_year_energy": (2.938, "current_open_year_with_local_month"),
+        "ct_input_month_energy": (0.818, "current_open_month_from_daily_buckets"),
+        "ct_input_year_energy": (
+            2.938,
+            "current_open_year_from_month_and_daily_buckets",
+        ),
     }
 
     for sensor_key, (expected_value, expected_fallback) in expected.items():
@@ -731,7 +1004,12 @@ def _today_battery_value(
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
 
     payload = sensor.coordinator.data[_DEVICE_ID]
-    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    now = datetime(2026, 9, 29, 12, tzinfo=UTC)
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=now,
+        local_today=now.date(),
+    )
     snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
     return cast("float | None", sensor.native_value)

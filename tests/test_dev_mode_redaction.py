@@ -16,7 +16,6 @@ from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_UNREDACTED_DEBUG,
-    PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
     REDACTED_VALUE,
     REDACT_KEYS,
@@ -54,7 +53,7 @@ def test_dev_mode_is_off_without_environment(monkeypatch: pytest.MonkeyPatch) ->
     redacted = redacted_json_safe_payload(_SECRET_EVENT)
     assert isinstance(redacted, dict)
     assert redacted["bluetoothKey"] == REDACTED_VALUE
-    assert JackeryMqttPushClient._redact_topic(_TOPIC) != _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC) == _TOPIC  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.parametrize("value", ["1", "true", "YES", " on "])
@@ -82,36 +81,89 @@ def test_dev_mode_disables_all_redaction(
     assert event["response"]["data"]["mqttPassWord"] == "credential"
 
 
-def test_dev_mode_payload_debug_log_is_unredacted_and_never_rotated(
+def test_dev_mode_payload_debug_log_restarts_without_creating_archives(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """No captured payload is discarded by rotation while dev mode is on."""
+    """Raw debugging remains bounded without timestamp/UUID archive files."""
     monkeypatch.setenv(_ENV, "1")
     path = _oversized_log(tmp_path)
 
     append_payload_debug_lines(path, [_SECRET_EVENT])
 
-    backup = path.with_suffix(f"{PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX}{path.suffix}")
-    assert not backup.exists()
+    segments = list(tmp_path.glob("jackery_solarvault_payload_debug.*.jsonl"))
+    assert not segments
+    assert path.stat().st_size <= PAYLOAD_DEBUG_LOG_MAX_BYTES
     event = json.loads(path.read_text(encoding="utf-8").splitlines()[-1])
     assert event["bluetoothKey"] == "k3y"
 
 
-def test_payload_debug_log_still_rotates_outside_dev_mode(
+@pytest.mark.parametrize("dev_mode", [False, True])
+def test_http_debug_event_is_a_complete_receipt_time_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    dev_mode: bool,
+) -> None:
+    """Later merges must not rewrite the HTTP body captured as raw evidence."""
+    monkeypatch.setenv(_ENV, "1" if dev_mode else "0")
+    client = JackeryApi(session=AsyncMock(), account="test", password="test")
+    series = [0.34, 0.72]
+    response = {"data": {"unit": "kWh", "y1": series}}
+    params = {"dateType": "week", "beginDate": "2026-09-28"}
+    event = client._http_payload_debug(  # ruff: ignore[private-member-access]
+        request=("GET", "/v1/device/stat/pv"),
+        params=params,
+        response=response,
+    )
+    series[1] = 120431.96
+    params["beginDate"] = "2026-10-05"
+
+    assert event["response"]["data"]["y1"] == [0.34, 0.72]
+    assert event["params"]["beginDate"] == "2026-09-28"
+
+
+def test_payload_debug_log_restarts_outside_dev_mode(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Normal operation keeps the bounded, redacted debug log."""
+    """Normal operation bounds the same file while retaining redaction."""
     monkeypatch.delenv(_ENV, raising=False)
     path = _oversized_log(tmp_path)
 
     append_payload_debug_lines(path, [_SECRET_EVENT])
 
-    backup = path.with_suffix(f"{PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX}{path.suffix}")
-    assert backup.exists()
+    segments = list(tmp_path.glob("jackery_solarvault_payload_debug.*.jsonl"))
+    assert not segments
     event = json.loads(path.read_text(encoding="utf-8").splitlines()[-1])
     assert event["bluetoothKey"] == REDACTED_VALUE
+
+
+def test_payload_debug_log_bounds_large_single_batch_without_archives(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """One queued executor batch must not bypass the per-file size limit."""
+    max_bytes = 120
+    monkeypatch.setattr(
+        "custom_components.jackery_solarvault.util.PAYLOAD_DEBUG_LOG_MAX_BYTES",
+        max_bytes,
+    )
+    path = tmp_path / "jackery_solarvault_payload_debug.jsonl"
+    events = [_SECRET_EVENT] * 8
+
+    append_payload_debug_lines(path, events, unredacted=True)
+
+    segments = list(tmp_path.glob("jackery_solarvault_payload_debug*.jsonl"))
+    assert segments == [path]
+    assert all(segment.stat().st_size <= max_bytes for segment in segments)
+    line_count = sum(
+        len(segment.read_text(encoding="utf-8").splitlines()) for segment in segments
+    )
+    assert line_count > 0
+    assert json.loads(path.read_text(encoding="utf-8").splitlines()[-1]) == {
+        "kind": "http",
+        "bluetoothKey": "k3y",
+        "series": [1, 2],
+    }
 
 
 def test_entry_debug_option_is_scoped_to_its_entry(
@@ -128,7 +180,7 @@ def test_entry_debug_option_is_scoped_to_its_entry(
     assert active_redact_keys(disabled) == REDACT_KEYS
     assert _payload_debug_capture_enabled(enabled)
     assert JackeryMqttPushClient._redact_topic(_TOPIC, enabled) == _TOPIC  # ruff: ignore[private-member-access]
-    assert JackeryMqttPushClient._redact_topic(_TOPIC, disabled) != _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC, disabled) == _TOPIC  # ruff: ignore[private-member-access]
 
     client = JackeryApi(session=AsyncMock(), account="test", password="test")
     client.dev_mode_entry = enabled

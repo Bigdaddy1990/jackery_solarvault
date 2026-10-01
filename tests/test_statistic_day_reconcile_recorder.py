@@ -21,6 +21,7 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.db_schema import (
+    Statistics,
     StatisticsMeta,
     StatisticsShortTerm,
 )
@@ -31,6 +32,7 @@ from homeassistant.components.recorder.statistics import (
 )
 from homeassistant.components.recorder.util import session_scope
 from homeassistant.const import UnitOfEnergy
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.unit_conversion import EnergyConverter
 
 if TYPE_CHECKING:
@@ -57,7 +59,7 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
 
 async def _seed_overcounted_day(hass: HomeAssistant) -> None:
     """Store the day as the live recorder held it: one +11.86 kWh hour."""
-    rows = [
+    rows: list[dict[str, datetime | float | None]] = [
         {
             "start": _DAY - timedelta(hours=1),
             "sum": 100.0,
@@ -67,7 +69,6 @@ async def _seed_overcounted_day(hass: HomeAssistant) -> None:
     ]
     stored = [100.0] * 9 + [103.12, 114.98] + [117.0] * 13
     rows.extend(
-        # pyrefly: ignore [bad-assignment]
         {
             "start": _DAY + timedelta(hours=hour),
             "sum": total,
@@ -146,6 +147,55 @@ async def _sums(hass: HomeAssistant) -> dict[datetime, float]:
         key=operator.itemgetter("start"),
     )
     return {datetime.fromtimestamp(row["start"], UTC): row["sum"] for row in series}
+
+
+async def test_backfill_creates_missing_native_statistic(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+) -> None:
+    """A daily target without Recorder history must receive its backfill."""
+    del recorder_mock
+    await hass.config.async_set_time_zone("UTC")
+    assert await _sums(hass) == {}
+
+    written = await _coordinator(hass)._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+        _STAT_ID, _HOURS, {_HOURS[-1]: 4.0}
+    )
+    await async_wait_recording_done(hass)
+    sums = await _sums(hass)
+
+    assert written > 0
+    assert sums[_NEXT - timedelta(hours=1)] == pytest.approx(4.0)
+
+
+def _remove_hourly_history(hass: HomeAssistant) -> None:
+    with session_scope(session=get_instance(hass).get_session()) as session:
+        session.query(Statistics).filter(
+            Statistics.metadata_id == _meta_id(session)
+        ).delete()
+
+
+async def test_backfill_defers_when_only_short_term_history_exists(
+    recorder_mock: Recorder,
+    hass: HomeAssistant,
+) -> None:
+    """No hourly rows does not mean a statistic's cumulative history is empty."""
+    del recorder_mock
+    await hass.config.async_set_time_zone("UTC")
+    await _seed_overcounted_day(hass)
+    recorder = get_instance(hass)
+    await recorder.async_add_executor_job(_remove_hourly_history, hass)
+
+    with pytest.raises(HomeAssistantError, match="hourly history"):
+        await _coordinator(hass)._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+            _STAT_ID, _HOURS, {_HOURS[-1]: 4.0}
+        )
+
+    await async_wait_recording_done(hass)
+    assert await _sums(hass) == {}
+    assert await recorder.async_add_executor_job(_last_short_term_sum, hass) == (
+        pytest.approx(117.5)
+    )
 
 
 async def test_overcounted_day_is_corrected_and_next_compile_stays_continuous(

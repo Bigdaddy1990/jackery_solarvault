@@ -232,7 +232,8 @@ async def test_historical_home_months_refresh_off_the_http_hot_path(
     repaired_result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
 
     repaired_year = repaired_result[DEVICE_ID][year_section]
-    assert repaired_year[APP_STAT_TOTAL_HOME_ENERGY] == 10  # ruff: ignore[magic-value-comparison]
+    # Preserve May's positive 7 and fill January-April with 2 each.
+    assert repaired_year[APP_STAT_TOTAL_HOME_ENERGY] == 15  # ruff: ignore[magic-value-comparison]
     await _teardown(hass, entry.entry_id)
 
 
@@ -282,7 +283,7 @@ async def test_historical_home_months_acquire_shared_http_gate_once(
 
         repaired_result = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
         assert (
-            repaired_result[DEVICE_ID][year_section][APP_STAT_TOTAL_HOME_ENERGY] == 10  # ruff: ignore[magic-value-comparison]
+            repaired_result[DEVICE_ID][year_section][APP_STAT_TOTAL_HOME_ENERGY] == 15  # ruff: ignore[magic-value-comparison]
         )
     finally:
         if slow_refresh_task is not None and not slow_refresh_task.done():
@@ -338,6 +339,7 @@ async def test_property_10600_without_prior_data_keeps_first_refresh_failed(
         async_get_sub_shadow=AsyncMock(return_value={}),
         async_get_smart_mode_info=AsyncMock(return_value={}),
         async_get_smart_schedule_prediction=AsyncMock(return_value={}),
+        async_get_aiems_energy_prediction=AsyncMock(return_value={}),
         async_query_tou_plan=AsyncMock(return_value={}),
     )
     coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)

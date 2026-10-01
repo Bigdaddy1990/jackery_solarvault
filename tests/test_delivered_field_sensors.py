@@ -122,10 +122,8 @@ def test_alarm_count_uses_documented_alert_counter_with_http_fallback() -> None:
     assert sensor.native_value is None
 
 
-def test_calculated_main_battery_energy_excludes_pack_counters() -> None:
-    """The system lifetime already includes all packs; subtract once for main."""
-    expected_charge = 382.3
-    expected_discharge = 361.74
+def test_head_lifetime_identity_never_uses_stack_or_subtracted_counters() -> None:
+    """Historical head IDs survive without claiming an unproven energy source."""
     properties = {"batNum": 3, "batChgEgy": 76514, "batDisChgEgy": 72468}
     packs = [
         {"inEgy": 1019, "outEgy": 939},
@@ -138,24 +136,15 @@ def test_calculated_main_battery_energy_excludes_pack_counters() -> None:
             properties if section == "properties" else {}
         ),
     )
-    assert (
-        _SENSORS["main_battery_charge_energy_derived"].value_fn(entity)
-        == expected_charge
-    )
-    assert (
-        _SENSORS["main_battery_discharge_energy_derived"].value_fn(entity)
-        == expected_discharge
-    )
-
-    packs.pop()
-    assert _SENSORS["main_battery_charge_energy_derived"].value_fn(entity) is None
-
-    packs.append({"inEgy": 36322, "outEgy": 34484})
-    properties.pop("batNum")
-    assert _SENSORS["main_battery_charge_energy_derived"].value_fn(entity) is None
-    properties["batNum"] = 3
-    entity.payload.pop("battery_packs")
-    assert _SENSORS["main_battery_charge_energy_derived"].value_fn(entity) is None
+    for key in (
+        "main_battery_charge_energy",
+        "main_battery_discharge_energy",
+        "main_battery_charge_energy_derived",
+        "main_battery_discharge_energy_derived",
+    ):
+        description = _SENSORS[key]
+        assert description.device_registry_role == "main_battery"
+        assert description.value_fn(entity) is None
 
 
 def test_calculated_main_battery_energy_has_valid_ha_metadata() -> None:

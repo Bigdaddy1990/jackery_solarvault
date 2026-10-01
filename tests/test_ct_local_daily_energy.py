@@ -8,7 +8,12 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.const import (
+    APP_DEVICE_STAT_AC_TO_BATTERY,
+    APP_DEVICE_STAT_AC_TO_ONGRID,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
     APP_DEVICE_STAT_PV_ENERGY,
+    APP_DEVICE_STAT_PV_TO_AC,
     DOMAIN,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
@@ -282,6 +287,36 @@ def test_jackery_main_daily_delta_uses_hundredths_of_kwh() -> None:
         _DEVICE_ID,
         APP_DEVICE_STAT_PV_ENERGY,
     ) == pytest.approx(18.17)
+
+
+@pytest.mark.parametrize(
+    "metric",
+    [
+        APP_DEVICE_STAT_AC_TO_BATTERY,
+        APP_DEVICE_STAT_AC_TO_ONGRID,
+        APP_DEVICE_STAT_BATTERY_TO_AC,
+        APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
+        APP_DEVICE_STAT_PV_TO_AC,
+    ],
+)
+def test_delivered_energy_flows_reach_local_day_deltas(metric: str) -> None:
+    """Known lifetime flows produce day energy from a full-day anchor."""
+    coordinator = _coordinator()
+    snapshot = coordinator._local_daily_snapshots[_DEVICE_ID]  # ruff: ignore[private-member-access]
+    snapshot["values"] = {metric: 1000}
+    snapshot["full_day_metrics"] = [metric]
+
+    deltas = coordinator._refresh_local_daily_for_device(  # ruff: ignore[private-member-access]
+        _DEVICE_ID,
+        {metric: 1125},
+        today=_TODAY,
+        allow_new_anchor_delta=False,
+    )
+
+    cast("Any", coordinator).data = {
+        _DEVICE_ID: {"local_daily_energy": deltas},
+    }
+    assert coordinator.local_daily_energy_kwh(_DEVICE_ID, metric) == pytest.approx(1.25)
 
 
 def test_cold_start_stays_partial_until_observed_day_rollover() -> None:

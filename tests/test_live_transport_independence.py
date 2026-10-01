@@ -191,6 +191,17 @@ async def test_discovered_accessory_sensors_register_before_live_push(
             },
         },
     }
+    coordinator._battery_pack_identity_overrides = {}  # ruff: ignore[private-member-access]
+    for method_name in (
+        "battery_pack_identity_serial",
+        "battery_pack_observed_serial",
+        "set_battery_pack_identity_override",
+    ):
+        setattr(
+            coordinator,
+            method_name,
+            MethodType(getattr(JackerySolarVaultCoordinator, method_name), coordinator),
+        )
     coordinator.has_smart_meter_accessory.return_value = False
     coordinator.async_add_listener.return_value = lambda: None
     entry = SimpleNamespace(
@@ -917,4 +928,66 @@ async def test_mqtt_pack_cell_temperature_push_reaches_its_pack(
     ]
     assert pack_rows
     assert pack_rows[0]["cellTemp"] == 251  # ruff: ignore[magic-value-comparison]
+    assert entry[PAYLOAD_PROPERTIES]["cellTemp"] == 179  # ruff: ignore[magic-value-comparison]
+
+
+@pytest.mark.parametrize("explicit_parent_id", [True, False])
+@pytest.mark.parametrize("explicit_pack_type", [True, False])
+async def test_flat_local_pack_update_keeps_serial_temperature_and_lifetimes(
+    explicit_parent_id: bool,
+    explicit_pack_type: bool,
+) -> None:
+    """A flattened HomeSubModel increment belongs to its serial, not pack one."""
+    coordinator = _source_priority_coordinator()
+    original_packs = [
+        {FIELD_DEVICE_SN: "PACK-1", "devType": 1, "inEgy": 10},
+        {FIELD_DEVICE_SN: "PACK-2", "devType": 1, "inEgy": 20},
+        {FIELD_DEVICE_SN: "PACK-3", "devType": 1, "inEgy": 36400},
+    ]
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {"cellTemp": 179},
+            PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "HEAD-SN"},
+            PAYLOAD_BATTERY_PACKS: original_packs,
+        }
+    }
+    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
+    _set_test_attr(coordinator, "_local_mqtt_last_device_message_monotonic", {})
+
+    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
+        for device_id, partial in new_data.items():
+            coordinator.data.setdefault(device_id, {}).update(partial)
+
+    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    payload = {
+        "type": 107,
+        "devType": 1,
+        "cmd": 107,
+        FIELD_DEVICE_SN: "PACK-3",
+        "cellTemp": 274,
+        "batSoc": 55,
+        "inPw": 300,
+        "outPw": 0,
+        "inEgy": 36435,
+        "outEgy": 34652,
+        "version": "1.2.3",
+    }
+    if explicit_parent_id:
+        payload[FIELD_DEVICE_ID] = "dev-1"
+    if not explicit_pack_type:
+        payload.pop("devType")
+
+    assert await coordinator.async_handle_local_mqtt_message(
+        "hb/device/HEAD-SN/event", payload
+    )
+    entry = coordinator.data["dev-1"]
+    rows = {row[FIELD_DEVICE_SN]: row for row in entry[PAYLOAD_BATTERY_PACKS]}
+    assert rows["PACK-1"] == original_packs[0]
+    assert rows["PACK-2"] == original_packs[1]
+    assert all(
+        rows["PACK-3"][key] == payload[key]
+        for key in ("cellTemp", "batSoc", "inPw", "outPw", "inEgy", "outEgy", "version")
+    )
     assert entry[PAYLOAD_PROPERTIES]["cellTemp"] == 179  # ruff: ignore[magic-value-comparison]

@@ -50,6 +50,45 @@ def test_battery_pack_dev_type_detects_identity_only_cmd110_payload() -> None:
     ]
 
 
+def test_named_pack_list_retains_partial_rows_and_positions() -> None:
+    """App batteryPacks lists retain identity-only rows beside telemetry."""
+    first_energy, second_energy, temperature = 100, 200, 259
+    rows = [
+        {FIELD_DEVICE_SN: "pack-1", "commState": 1},
+        {FIELD_DEVICE_SN: "pack-2", "cellTemp": temperature, "inEgy": 1200},
+    ]
+    extracted = battery_packs_from_source(
+        {"devType": 1, "batteryPacks": rows},
+        frozenset(),
+        BATTERY_PACK_HINT_KEYS,
+    )
+    assert extracted == rows
+    assert rows[0] == {FIELD_DEVICE_SN: "pack-1", "commState": 1}
+    assert extracted is not None
+    merged = merge_battery_pack_lists(
+        [{"outEgy": first_energy}, {"outEgy": second_energy}], extracted
+    )
+    assert merged[0][FIELD_DEVICE_SN] == "pack-1"
+    assert merged[0]["outEgy"] == first_energy
+    assert merged[1][FIELD_DEVICE_SN] == "pack-2"
+    assert merged[1]["outEgy"] == second_energy
+    assert merged[1]["cellTemp"] == temperature
+
+
+@pytest.mark.parametrize(
+    "bucket",
+    ["batteryPack", "batteryPackList", "battery_packs", "batteries", "packList"],
+)
+def test_generic_pack_alias_keeps_shape_detection(bucket: str) -> None:
+    """Generic aliases do not establish App BatteryPackSub row identity."""
+    pack = {FIELD_DEVICE_SN: "pack-2", "cellTemp": 259}
+    assert battery_packs_from_source(
+        {bucket: [{FIELD_DEVICE_SN: "unrelated", "commState": 1}, pack]},
+        frozenset(),
+        BATTERY_PACK_HINT_KEYS,
+    ) == [pack]
+
+
 def test_battery_pack_request_selector_is_not_a_pack() -> None:
     """A cmd=110 request selector has no pack identity or telemetry."""
     assert (

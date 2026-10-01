@@ -8,19 +8,26 @@ Layer-5 transport that must never gate the HTTP path or open HA reauth.
 """
 
 import asyncio
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.jackery_solarvault.const import (
     MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
     MQTT_CREDENTIAL_USERNAME,
     MQTT_CREDENTIAL_USER_ID,
+    PAYLOAD_DEVICE,
+    PAYLOAD_PROPERTIES,
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.util import dt as dt_util
 from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]
+    DEVICE_ID,
+    DEVICE_SN,
     make_update_cycle_api,
     setup_update_cycle_coordinator,
 )
@@ -70,6 +77,81 @@ async def coordinator(hass: HomeAssistant) -> AsyncGenerator[Any]:
     )
     yield coord
     await _teardown(hass, entry.entry_id)
+
+
+@pytest.mark.parametrize("interval_seconds", [30, 60])
+async def test_mqtt_pack_poll_clock_survives_http_stall(
+    hass: HomeAssistant,
+    coordinator: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    interval_seconds: int,
+) -> None:
+    """Connected MQTT requests packs while the independent HTTP call is stalled."""
+    interval = timedelta(seconds=interval_seconds)
+    coordinator.async_set_scan_interval(interval)
+    coordinator.async_set_updated_data({
+        DEVICE_ID: {
+            PAYLOAD_DEVICE: {"deviceSn": DEVICE_SN},
+            PAYLOAD_PROPERTIES: {"batNum": 3},
+        },
+    })
+    mqtt = _fake_mqtt(connected=True)
+    http_started = asyncio.Event()
+    http_release = asyncio.Event()
+    pack_requested = asyncio.Event()
+
+    async def stalled_property(_device_id: str) -> dict[str, Any]:
+        http_started.set()
+        await http_release.wait()
+        return {}
+
+    def published(
+        _topic: str, payload: dict[str, Any], *, qos: int, retain: bool
+    ) -> None:
+        del qos, retain
+        pack_action_id = 3014
+        if payload.get("actionId") == pack_action_id:
+            assert payload["body"] == {"cmd": 110, "devType": 1}
+            pack_requested.set()
+
+    mqtt.async_publish_json = AsyncMock(side_effect=published)
+    mqtt.async_stop = AsyncMock()
+    monkeypatch.setattr(coordinator, "_mqtt", mqtt)
+    coordinator.api.get_cached_mqtt_credentials.return_value = _credential_dict()
+    coordinator.api.async_get_device_property.side_effect = stalled_property
+
+    primary = hass.async_create_task(coordinator.async_refresh())
+    try:
+        await asyncio.wait_for(http_started.wait(), timeout=2)
+        async_fire_time_changed(
+            hass, dt_util.utcnow() + interval + timedelta(seconds=1)
+        )
+        await asyncio.wait_for(pack_requested.wait(), timeout=2)
+        assert not primary.done()
+    finally:
+        primary.cancel()
+        await asyncio.gather(primary, return_exceptions=True)
+
+
+async def test_http_failure_preserves_snapshot_for_mqtt(
+    coordinator: Any,
+) -> None:
+    """An unexpected property failure cannot erase data used by MQTT polling."""
+    snapshot = {
+        DEVICE_ID: {
+            PAYLOAD_DEVICE: {"deviceSn": DEVICE_SN},
+            PAYLOAD_PROPERTIES: {"batNum": 3},
+        },
+    }
+    coordinator.async_set_updated_data(snapshot)
+    coordinator.api.async_get_device_property.side_effect = RuntimeError(
+        "unexpected property failure"
+    )
+
+    await coordinator.async_refresh()
+
+    assert coordinator.last_update_success is False
+    assert coordinator.data == snapshot
 
 
 # ---------------------------------------------------------------------------

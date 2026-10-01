@@ -55,10 +55,12 @@ def test_app_240_uses_exact_dynamic_price_path() -> None:
     assert REST_ENDPOINTS["dynamic_price"] == DYNAMIC_PRICE_PATH
 
 
-def test_app_240_does_not_expose_unproven_aiems_endpoint() -> None:
-    """The unproven report endpoint is absent from API and service surfaces."""
-    assert not hasattr(JackeryApi, "async_get_aiems_energy_prediction")
-    assert not hasattr(const_module, "AIEMS_ENERGY_PREDICTION_PATH")
+def test_app_242_adds_proven_aiems_get_without_a_new_service() -> None:
+    """The current extracted App proves the GET omitted by the older contract."""
+    assert hasattr(JackeryApi, "async_get_aiems_energy_prediction")
+    assert const_module.AIEMS_ENERGY_PREDICTION_PATH == (
+        "/v1/api/aiems/report/energy/prediction"
+    )
     assert not hasattr(const_module, "SERVICE_GET_AIEMS_ENERGY_PREDICTION")
     assert "get_aiems_energy_prediction" not in {
         registration.name

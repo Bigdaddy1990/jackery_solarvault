@@ -289,8 +289,8 @@ def test_pack_tracks_by_serial_after_sorted_position_shifts() -> None:
         assert second["batSoc"] == _SOC_A
 
 
-def test_pinned_pack_uses_ordered_anonymous_rows_when_serials_disappear() -> None:
-    """A sparse group frame must not make every pinned pack unavailable."""
+def test_pinned_pack_does_not_reassign_anonymous_rows() -> None:
+    """Anonymous list positions cannot prove a serial-pinned pack's ownership."""
     sensor = JackeryBatteryPackSensor.__new__(JackeryBatteryPackSensor)
     sensor._pack_index = 2  # ruff: ignore[private-member-access]
     sensor._pack_sn = _SN_B  # ruff: ignore[private-member-access]
@@ -300,7 +300,7 @@ def test_pinned_pack_uses_ordered_anonymous_rows_when_serials_disappear() -> Non
         new_callable=PropertyMock,
         return_value={PAYLOAD_BATTERY_PACKS: [{"batSoc": _SOC_A}, {"batSoc": _SOC_B}]},
     ):
-        assert sensor._pack["batSoc"] == _SOC_B  # ruff: ignore[private-member-access]
+        assert sensor._pack == {}  # ruff: ignore[private-member-access]
 
 
 def test_pinned_pack_does_not_bind_to_another_identified_pack() -> None:
@@ -827,3 +827,91 @@ def test_frozen_registry_identity_overrides_live_payload(
     )
 
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == expected
+
+
+def test_collection_preserves_explicit_unknown_identity() -> None:
+    """Registration must not undo an ambiguity guard by rereading a raw serial."""
+    pack = {"deviceSn": _SN_A, "inEgy": 36541}
+    coordinator = _coordinator([pack])
+    coordinator.set_battery_pack_identity_override(_PARENT_ID, 1, None)
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+    _collect_battery_packs(
+        collection,
+        _PARENT_ID,
+        {PAYLOAD_BATTERY_PACKS: [pack]},
+        {FIELD_BAT_NUM: 1},
+    )
+    assert collection.entities == []
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) is None
+
+
+def test_registered_pack_numbers_survive_reversed_report_order(
+    hass: HomeAssistant,
+) -> None:
+    """A reload preserves serial-owned histories and their original pack numbers."""
+    serials = ["HQ2C01400094HP3", "HQ2C01600246HP3", "HQ2C01400955HP3"]
+    counters = [1232, 1127, 36541]
+    packs = [
+        {"deviceSn": serial, "inEgy": counter}
+        for serial, counter in zip(serials, counters, strict=True)
+    ]
+    coordinator = _coordinator(list(reversed(packs)))
+    entry = _entry(hass, coordinator)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    _parent_device(devices, entry)
+    for index, serial in enumerate(serials, start=1):
+        device = _pack_device(
+            devices, entry, _serial_identifier(serial), serial_number=serial
+        )
+        registered = _pack_entity(
+            entities,
+            entry,
+            device,
+            f"{_serial_identifier(serial)}_lifetime_charge_energy",
+        )
+        entities.async_update_entity(
+            registered.entity_id,
+            new_entity_id=(
+                f"sensor.solarvault_3_pro_max_zusatzbatterie_{index}_"
+                "zusatzbatterie_lebensenergie_geladen"
+            ),
+        )
+
+    _async_migrate_battery_pack_identities(hass, entry)
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+    _collect_battery_packs(
+        collection,
+        _PARENT_ID,
+        {PAYLOAD_BATTERY_PACKS: list(reversed(packs))},
+        {FIELD_BAT_NUM: 3},
+    )
+
+    for index, (serial, counter) in enumerate(
+        zip(serials, counters, strict=True), start=1
+    ):
+        assert collection.battery_pack_identities[_PARENT_ID, index][0] == serial
+        sensor = next(
+            entity
+            for entity in collection.entities
+            if entity.unique_id
+            == f"{_serial_identifier(serial)}_lifetime_charge_energy"
+        )
+        assert isinstance(sensor, JackeryBatteryPackSensor)
+        assert sensor._value_from_pack(sensor._pack) == pytest.approx(counter / 100)  # ruff: ignore[private-member-access]

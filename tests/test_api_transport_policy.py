@@ -63,12 +63,15 @@ async def test_json_decoder_redacts_non_json_failure() -> None:
     assert "secret-token" not in str(raised.value)
 
 
-def test_http_diagnostic_redacts_credentials_without_truncating_data() -> None:
+def test_http_diagnostic_redacts_credentials_without_truncating_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Redact credentials but keep every payload value and list item.
 
     The removed 100-item cap cut each 288-point day curve in the payload debug
     log to its first 100 points.
     """
+    monkeypatch.setenv("JACKERY_DEV_MODE", "0")
     curve = list(range(288))
     client = JackeryApi(session=AsyncMock(), account="test", password="test")
     event = client._http_payload_debug(  # ruff: ignore[private-member-access]
@@ -82,7 +85,7 @@ def test_http_diagnostic_redacts_credentials_without_truncating_data() -> None:
             }
         },
     )
-    assert event["request_body"]["account"] == REDACTED_VALUE
+    assert event["request_body"]["account"] == "owner@example.test"
     assert event["request_body"]["nested"]["apiToken"] == REDACTED_VALUE
     assert event["response"]["data"]["mqttPassWord"] == REDACTED_VALUE
     assert event["response"]["data"]["value"] == "x" * 20_000

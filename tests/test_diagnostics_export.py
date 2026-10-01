@@ -151,9 +151,9 @@ async def test_export_preserves_missing_values_and_documented_schema() -> None:
         "auth_token_expiry_rejections": 0,
     }
     assert metrics["last_rejection"] is None
-    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] is None
+    assert result["devices"]["dev-1"][PAYLOAD_PROPERTIES]["soc"] is None
     decoded = json.loads(json.dumps(result))
-    assert decoded["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] is None
+    assert decoded["devices"]["dev-1"][PAYLOAD_PROPERTIES]["soc"] is None
 
 
 @pytest.mark.asyncio()
@@ -203,8 +203,8 @@ async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
-    assert result["options"][CONF_THIRD_PARTY_MQTT_IP] == REDACTED
-    assert result["options"][CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
+    assert result["options"][CONF_THIRD_PARTY_MQTT_IP] == "192.168.1.50"
+    assert result["options"][CONF_THIRD_PARTY_MQTT_USERNAME] == "mqtt-user"
     assert result["options"][CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
 
 
@@ -214,8 +214,8 @@ async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None:
-    """Device ids are replaced with stable, sorted `device_N` labels."""
+async def test_export_devices_keep_identifiers_and_measurements() -> None:
+    """Device ids remain available to correlate transport payloads."""
     coordinator, entry = _diagnostics_rig(
         coordinator_data={
             "dev-b": {PAYLOAD_PROPERTIES: {"soc": 55}},
@@ -225,11 +225,10 @@ async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
-    assert set(result["devices"]) == {"device_1", "device_2"}
-    # "dev-a" sorts before "dev-b", so it becomes device_1.
-    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] == 42  # ruff: ignore[magic-value-comparison]
-    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES][FIELD_MAC_ID] == REDACTED
-    assert result["devices"]["device_2"][PAYLOAD_PROPERTIES]["soc"] == 55  # ruff: ignore[magic-value-comparison]
+    assert set(result["devices"]) == {"dev-a", "dev-b"}
+    assert result["devices"]["dev-a"][PAYLOAD_PROPERTIES]["soc"] == 42  # ruff: ignore[magic-value-comparison]
+    assert result["devices"]["dev-a"][PAYLOAD_PROPERTIES][FIELD_MAC_ID] == "AA:BB:CC"
+    assert result["devices"]["dev-b"][PAYLOAD_PROPERTIES]["soc"] == 55  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -238,8 +237,8 @@ async def test_export_devices_are_labeled_in_sorted_order_and_redacted() -> None
 
 
 @pytest.mark.asyncio()
-async def test_raw_api_login_redacted_and_property_responses_labeled() -> None:
-    """login_response secrets are redacted; per-device responses are labeled."""
+async def test_raw_api_login_redacted_and_property_responses_identified() -> None:
+    """Login secrets stay masked; property responses retain device identity."""
     coordinator, entry = _diagnostics_rig(
         api_overrides={
             "last_login_response": {FIELD_TOKEN: "abc123", "kept": "value"},
@@ -255,13 +254,9 @@ async def test_raw_api_login_redacted_and_property_responses_labeled() -> None:
     raw = result["raw_api"]
     assert raw["login_response"][FIELD_TOKEN] == REDACTED
     assert raw["login_response"]["kept"] == "value"
-    assert set(raw["property_responses"]) == {
-        "property_response_1",
-        "property_response_2",
-    }
-    # "dev-1" sorts before "dev-2".
-    assert raw["property_responses"]["property_response_1"]["soc"] == 10  # ruff: ignore[magic-value-comparison]
-    assert raw["property_responses"]["property_response_2"]["soc"] == 90  # ruff: ignore[magic-value-comparison]
+    assert set(raw["property_responses"]) == {"dev-1", "dev-2"}
+    assert raw["property_responses"]["dev-1"]["soc"] == 10  # ruff: ignore[magic-value-comparison]
+    assert raw["property_responses"]["dev-2"]["soc"] == 90  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.asyncio()
@@ -274,7 +269,7 @@ async def test_raw_api_non_dict_payload_is_wrapped_before_redaction() -> None:
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     ota = result["raw_api"]["ota_responses"]
-    assert ota["ota_response_1"] == {"value": "not-a-dict-payload"}
+    assert ota["dev-1"] == {"value": "not-a-dict-payload"}
 
 
 @pytest.mark.asyncio()
@@ -451,7 +446,7 @@ async def test_local_mqtt_diagnostics_redacts_broker_wide_topic() -> None:
     local_mqtt = result["raw_api"]["local_mqtt"]
     assert local_mqtt["disabled_reason"] == "client_not_started"
     assert (
-        local_mqtt["configured_local_mqtt"]["effective_topic_filter"] == REDACTED_VALUE
+        local_mqtt["configured_local_mqtt"]["effective_topic_filter"] == "#"
     )
 
 
@@ -469,8 +464,8 @@ async def test_local_mqtt_diagnostics_redacts_valid_prefixed_custom_topic() -> N
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     configured = result["raw_api"]["local_mqtt"]["configured_local_mqtt"]
-    assert configured["topic_filter"] == REDACTED_VALUE
-    assert configured["effective_topic_filter"] == REDACTED_VALUE
+    assert configured["topic_filter"] == "hb/app/custom"
+    assert configured["effective_topic_filter"] == "hb/app/custom"
 
 
 @pytest.mark.asyncio()
@@ -487,8 +482,8 @@ async def test_local_mqtt_diagnostics_redacts_local_device_topic() -> None:
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     configured = result["raw_api"]["local_mqtt"]["configured_local_mqtt"]
-    assert configured["topic_filter"] == REDACTED_VALUE
-    assert configured["effective_topic_filter"] == REDACTED_VALUE
+    assert configured["topic_filter"] == "homeassistant"
+    assert configured["effective_topic_filter"] == "homeassistant"
 
 
 @pytest.mark.asyncio()
@@ -505,8 +500,8 @@ async def test_local_mqtt_diagnostics_client_not_started_with_valid_config() -> 
 
     local_mqtt = result["raw_api"]["local_mqtt"]
     assert local_mqtt["disabled_reason"] == "client_not_started"
-    assert local_mqtt["configured_local_mqtt"]["host"] == REDACTED_VALUE
-    assert local_mqtt["configured_local_mqtt"]["port"] == REDACTED_VALUE
+    assert local_mqtt["configured_local_mqtt"]["host"] == "192.168.1.10"
+    assert local_mqtt["configured_local_mqtt"]["port"] == "1883"
 
 
 @pytest.mark.asyncio()
@@ -587,16 +582,12 @@ async def test_legacy_unredacted_option_cannot_disable_export_redaction() -> Non
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
-    _assert_secret_values_absent(
-        result,
-        token,
-        account_id,
-        password,
-        broker_secret,
-        bluetooth_key,
-        latitude,
-        longitude,
-    )
+    _assert_secret_values_absent(result, token, password, broker_secret)
+    rendered = json.dumps(result, default=str)
+    assert account_id in rendered
+    assert bluetooth_key not in rendered
+    assert latitude in rendered
+    assert longitude in rendered
     assert result["entry_data"][FIELD_TOKEN] in {REDACTED, REDACTED_VALUE}
     metadata = result["raw_api"]["coordinator"]
     assert metadata["redactions_enforced"] is True

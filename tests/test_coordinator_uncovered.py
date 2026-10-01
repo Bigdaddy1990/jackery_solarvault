@@ -175,6 +175,24 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         coordinator = self._create_coordinator()
         coordinator.async_start_statistics_imports()
 
+    def test_statistics_timer_checks_ttl_between_slow_cache_expirations(self) -> None:
+        """A completed 120s fetch must not wait for the next 120s timer tick."""
+        coordinator = self._create_coordinator()
+        coordinator.async_set_scan_interval(timedelta(seconds=15))
+        with patch(
+            "custom_components.jackery_solarvault.coordinator.async_track_time_interval"
+        ) as schedule:
+            coordinator.async_start_statistics_imports()
+            assert schedule.call_args.args[2] == timedelta(seconds=15)
+
+            coordinator.async_set_scan_interval(timedelta(seconds=300))
+            statistics_calls = [
+                call
+                for call in schedule.call_args_list
+                if call.args[1] == coordinator._async_poll_http_statistics  # ruff: ignore[private-member-access]
+            ]
+            assert statistics_calls[-1].args[2] == timedelta(seconds=30)
+
     def test_configured_update_interval_property(self) -> None:
         """Test configured_update_interval property."""
         coordinator = self._create_coordinator()

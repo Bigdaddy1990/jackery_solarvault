@@ -279,3 +279,30 @@ def test_setup_cleanup_retires_duplicate_alert_count(hass: HomeAssistant) -> Non
 
     assert registry.async_get(obsolete.entity_id) is None
     assert registry.async_get(canonical.entity_id) is not None
+
+
+@pytest.mark.parametrize(
+    "key", ["main_battery_charge_energy", "main_battery_discharge_energy"]
+)
+def test_setup_cleanup_preserves_main_battery_lifetime_identity(
+    hass: HomeAssistant,
+    key: str,
+) -> None:
+    """Setup must preserve head battery IDs and their Recorder consumers."""
+    entry = _config_entry(hass)
+    entry.runtime_data = SimpleNamespace(data={})
+    registry = er.async_get(hass)
+    original = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"12345_{key}",
+        config_entry=entry,
+        suggested_object_id=f"solarvault_hauptbatterie_{key}",
+    )
+
+    _async_clean_legacy_entities(hass, entry)
+
+    preserved = registry.async_get(original.entity_id)
+    assert preserved is not None
+    assert preserved.id == original.id
+    assert preserved.unique_id == original.unique_id

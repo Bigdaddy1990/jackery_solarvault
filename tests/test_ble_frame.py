@@ -87,6 +87,63 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    ["cmd", "flags"], [[107, 3031], [120, 3037], [120, 3042], [121, 3037]]
+)
+def test_ble_header_action_collisions_keep_telemetry(cmd: int, flags: int) -> None:
+    """Captured telemetry header values must not select MQTT feature routes."""
+
+    async def _run() -> None:
+        coordinator = object.__new__(JackerySolarVaultCoordinator)
+        coordinator._ble_listener = None  # ruff: ignore[private-member-access]
+        coordinator._device_index = {}  # ruff: ignore[private-member-access]
+        coordinator.data = {"dev": {"properties": {}}}
+        payload = {"batDisChgEgy": 72483, "pvEgy": 100, "acOtBatEgy": 0}
+        observation = BleFrameObservation(
+            received_at=datetime.now(UTC),
+            raw_bytes=b"frame",
+            base64_encoded="ZnJhbWU=",
+            parsed=BleBinaryFrame(
+                frame_index=1,
+                chunk_count=1,
+                flags=flags,
+                cmd=cmd,
+                body=json.dumps(payload).encode(),
+                trailer=b"\x00\x00\x00\x00",
+            ),
+        )
+        with (
+            patch.object(JackerySolarVaultCoordinator, "_schedule_payload_debug_event"),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_ble_partial_update_base",
+                return_value=coordinator.data["dev"],
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_merge_main_properties_for_device",
+                side_effect=lambda _device, current, incoming, **_options: {
+                    **current,
+                    **incoming,
+                },
+            ),
+            patch.object(
+                JackerySolarVaultCoordinator,
+                "_schedule_ble_partial_update",
+                return_value=True,
+            ) as commit,
+        ):
+            result = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]
+                "dev", observation
+            )
+
+        assert result is BleProcessDisposition.CONFIRMED
+        assert commit.call_args.args[1]["properties"] == payload
+        assert "device_alert" not in commit.call_args.args[1]
+
+    asyncio.run(_run())
+
+
 def test_wire_format_constants_match_smali() -> None:
     """Wire-format string literals match HomeControlFormat.smali."""
     assert BLE_FRAME_MAGIC == "DFED"

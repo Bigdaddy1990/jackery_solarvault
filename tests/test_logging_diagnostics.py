@@ -86,12 +86,12 @@ class TestPayloadRedaction:
         assert redacted["secret"] == "**REDACTED**"
         # pyrefly: ignore [bad-index]
         assert redacted["credentials"]["password"] == "**REDACTED**"
-        # username is also redacted (REDACT_KEYS contains username-related keys)
+        # Usernames are needed to correlate transport diagnostics.
         # pyrefly: ignore [bad-index]
-        assert redacted["credentials"]["username"] == "**REDACTED**"
+        assert redacted["credentials"]["username"] == "user"
 
     def test_redaction_removes_keys_and_coordinates(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
-        """Encryption keys, MAC IDs, coordinates must be redacted."""
+        """Credentials remain masked while device identity stays visible."""
         payload = {
             "aes_key": "base64encodedkey==",
             "rsa_key": "-----BEGIN PUBLIC KEY-----...",
@@ -108,17 +108,16 @@ class TestPayloadRedaction:
         # pyrefly: ignore [bad-index]
         assert redacted["rsa_key"] == "**REDACTED**"
         # pyrefly: ignore [bad-index]
-        assert redacted["mqtt_mac_id"] == "**REDACTED**"
+        assert redacted["mqtt_mac_id"] == payload["mqtt_mac_id"]
         # pyrefly: ignore [bad-index]
-        assert redacted["latitude"] == "**REDACTED**"
+        assert redacted["latitude"] == payload["latitude"]
         # pyrefly: ignore [bad-index]
-        assert redacted["longitude"] == "**REDACTED**"
-        # gps is a redacted key, so the entire dict is replaced
+        assert redacted["longitude"] == payload["longitude"]
         # pyrefly: ignore [bad-index]
-        assert redacted["gps"] == "**REDACTED**"
+        assert redacted["gps"] == payload["gps"]
 
     def test_redaction_removes_account_ids(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
-        """User IDs, account IDs, device IDs must be redacted."""
+        """Identity fields remain available for payload correlation."""
         payload = {
             "user_id": 123456789,
             "account_id": "acc_abc123",
@@ -130,15 +129,15 @@ class TestPayloadRedaction:
         assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
-        assert redacted["user_id"] == "**REDACTED**"
+        assert redacted["user_id"] == payload["user_id"]
         # pyrefly: ignore [bad-index]
-        assert redacted["account_id"] == "**REDACTED**"
+        assert redacted["account_id"] == payload["account_id"]
         # pyrefly: ignore [bad-index]
-        assert redacted["device_id"] == "**REDACTED**"
+        assert redacted["device_id"] == payload["device_id"]
         # pyrefly: ignore [bad-index]
-        assert redacted["device_sn"] == "**REDACTED**"
+        assert redacted["device_sn"] == payload["device_sn"]
         # pyrefly: ignore [bad-index]
-        assert redacted["bind_user_id"] == "**REDACTED**"
+        assert redacted["bind_user_id"] == payload["bind_user_id"]
 
     def test_redaction_preserves_non_sensitive_data(self, api: JackeryApi) -> None:  # ruff: ignore[no-self-use]
         """Non-sensitive fields (measurements, states, config) must be preserved."""
@@ -182,11 +181,11 @@ class TestPayloadRedaction:
         assert isinstance(redacted, dict)
 
         # pyrefly: ignore [bad-index]
-        assert redacted["devices"][0]["deviceId"] == "**REDACTED**"
+        assert redacted["devices"][0]["deviceId"] == "dev-1"
         # pyrefly: ignore [bad-index]
         assert redacted["devices"][0]["token"] == "**REDACTED**"
         # pyrefly: ignore [bad-index]
-        assert redacted["devices"][1]["deviceId"] == "**REDACTED**"
+        assert redacted["devices"][1]["deviceId"] == "dev-2"
         # pyrefly: ignore [bad-index]
         assert redacted["devices"][1]["token"] == "**REDACTED**"
         # Chart data preserved (not sensitive)
