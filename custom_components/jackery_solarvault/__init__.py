@@ -3033,27 +3033,37 @@ def _seed_battery_pack_registry_identities(
         )
 
         protected_indices = set(remaining_old_indices.get(parent_device_id, ()))
+        stored_indices = {index for _, index in records if index is not None}
         matched_keys: set[str] = set()
         blocked_keys = set(ambiguous_keys)
+        assigned_indices: set[int] = set()
         for serial, fallback_index in sorted(records, key=operator.itemgetter(0)):
-            # Use normalized serial to find the live index, not the registry
-            # fallback_index
             norm_serial = _battery_pack_serial_token(serial, fallback_index or 1)
             live_index = observed_serial_to_live_index.get(norm_serial)
             if live_index is None:
                 continue
             key = stable_subdevice_key("battery_pack", serial, live_index)
-            if live_index in protected_indices:
+            index = fallback_index if fallback_index is not None else live_index
+            if (
+                key in ambiguous_keys
+                or index in protected_indices
+                or index in assigned_indices
+                or (fallback_index is None and index in stored_indices)
+            ):
                 blocked_keys.add(key)
                 continue
             coordinator.set_battery_pack_identity_override(
-                parent_device_id, live_index, serial
+                parent_device_id, index, serial
             )
+            assigned_indices.add(index)
             matched_keys.add(key)
 
-        used_indices = protected_indices | {
-            index for indices in observed_indices.values() for index in indices
-        }
+        used_indices = (
+            protected_indices
+            | stored_indices
+            | assigned_indices
+            | {index for indices in observed_indices.values() for index in indices}
+        )
         free_indices = [
             index
             for index in range(1, _BATTERY_PACK_INDEX_MAX + 1)
@@ -3274,6 +3284,28 @@ def _migrate_battery_pack_registry_candidate(
     )
 
 
+def _registered_battery_pack_index(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    device_id: str,
+    identifier: str,
+) -> int | None:
+    """Read an unambiguous original pack number from its serial-owned entities."""
+    indices = {
+        int(match.group(1))
+        for entity in er.async_entries_for_device(
+            er.async_get(hass), device_id, include_disabled_entities=True
+        )
+        if entity.platform == DOMAIN
+        and entity.config_entry_id == entry.entry_id
+        and entity.unique_id.startswith(f"{identifier}_")
+        for match in re.finditer(
+            r"(?:battery_pack|zusatzbatterie)_([1-5])(?:_|$)", entity.entity_id
+        )
+    }
+    return next(iter(indices)) if len(indices) == 1 else None
+
+
 def _async_migrate_battery_pack_identities(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -3296,6 +3328,14 @@ def _async_migrate_battery_pack_identities(
             f"{parent_device_id}_"
             f"{stable_subdevice_key("battery_pack", stored_serial, numeric_index or 1)}"
         ):
+            # Entity IDs retain their original displayed pack number when a
+            # group report reorders the serial-owned rows after a restart.
+            numeric_index = (
+                _registered_battery_pack_index(
+                    hass, entry, device.id, current_identifier
+                )
+                or numeric_index
+            )
             serial_records.setdefault(parent_device_id, []).append((
                 stored_serial,
                 numeric_index,

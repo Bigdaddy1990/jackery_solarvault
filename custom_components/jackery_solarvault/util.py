@@ -105,7 +105,6 @@ from .const import (
     PAYLOAD_BATTERY_PACKS,
     PAYLOAD_CIRCUIT_PROPERTY,
     PAYLOAD_CT_METER,
-    PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
     PAYLOAD_DEVICE,
     PAYLOAD_DISCOVERY,
@@ -121,6 +120,7 @@ from .const import (
     PAYLOAD_SUBDEVICES,
     PAYLOAD_SYSTEM,
     PAYLOAD_SYSTEM_META,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     REDACTED_VALUE,
     REDACT_KEYS,
     SUBDEVICE_SCAN_NAME_LABELS,
@@ -428,7 +428,8 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
         in order: a tuple of smart-plug serials, battery pack count, meter head count, a
         boolean indicating presence of an
         alarm payload, a boolean indicating presence of an OTA current version, a
-        boolean indicating presence of a CT meter. **Live property keys and stat
+        boolean indicating presence of a CT meter, and a boolean indicating a
+        nonempty device MQTT configuration. **Live property keys and stat
         section usability are intentionally excluded** so routine poll updates do not
         re-trigger dynamic entity setup (which causes entity_registry spam).
     """
@@ -547,6 +548,7 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
             payload.get(PAYLOAD_ALARM) is not None,
             bool((payload.get(PAYLOAD_OTA) or {}).get(FIELD_CURRENT_VERSION)),
             payload.get(PAYLOAD_CT_METER) is not None,
+            bool(payload.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)),
         ))
     return tuple(sig)
 
@@ -1194,10 +1196,11 @@ def append_payload_debug_lines(
     events: list[dict[str, Any]] | tuple[dict[str, Any], ...],
     unredacted: bool | None = None,
 ) -> None:
-    """Write every JSONL event using one file open and rotation check.
+    """Write JSONL events into one bounded file, restarting at complete lines.
 
     Events are redacted unless the process or caller explicitly enables raw
-    debugging. In that mode the file is never rotated.
+    debugging. Older debug history is replaced at the size limit; no archives
+    are created. A single oversized event is kept intact.
     """
     if not events:
         return
@@ -1205,45 +1208,24 @@ def append_payload_debug_lines(
         unredacted = jackery_dev_mode_enabled()
     debug_path = Path(path)
     debug_path.parent.mkdir(parents=True, exist_ok=True)
+    file = debug_path.open("ab")
     try:
-        rotate_needed = (
-            not unredacted and debug_path.stat().st_size > PAYLOAD_DEBUG_LOG_MAX_BYTES
-        )
-    except FileNotFoundError:
-        rotate_needed = False
-    if rotate_needed:
-        backup = debug_path.with_suffix(
-            f"{PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX}{debug_path.suffix}"
-        )
-        try:
-            backup.unlink(missing_ok=True)
-        except OSError as err:
-            _LOGGER.warning(
-                "Jackery: could not remove old payload debug backup %s: %s",
-                backup,
-                err,
-            )
-        try:
-            debug_path.replace(backup)
-        except FileNotFoundError:
-            pass
-        except OSError as err:
-            _LOGGER.warning(
-                "Jackery: could not rotate payload debug log %s: %s",
-                debug_path,
-                err,
-            )
-    with debug_path.open("a", encoding="utf-8") as file:
         for event in events:
-            file.write(
+            line = (
                 json.dumps(
                     redacted_json_safe_payload(event, unredacted=unredacted),
                     ensure_ascii=False,
                     sort_keys=True,
                     default=str,
                 )
-            )
-            file.write("\n")
+                + "\n"
+            ).encode("utf-8")
+            if file.tell() and file.tell() + len(line) > PAYLOAD_DEBUG_LOG_MAX_BYTES:
+                file.seek(0)
+                file.truncate()
+            file.write(line)
+    finally:
+        file.close()
 
 
 def append_payload_debug_line(
@@ -1815,7 +1797,14 @@ def effective_trend_series_values(
     if not isinstance(series, list):
         return None
     if is_device_year_period_section(source, section):
-        values = expanded_year_series_values(source, section, stat_key)
+        expansion_source = source
+        if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
+            # An invalid scalar must not disambiguate compact month encoding:
+            # its large tolerance can shift an offset into the preceding month.
+            expansion_source = {
+                key: value for key, value in source.items() if key != stat_key
+            }
+        values = expanded_year_series_values(expansion_source, section, stat_key)
     else:
         values = [
             None if (val := safe_float(raw)) is None else round(val, 5)
@@ -1926,7 +1915,10 @@ def effective_period_total_value(
         can be determined.
     """
     if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
-        return None
+        values = effective_trend_series_values(source, section, stat_key)
+        if not values or any(value is None for value in values):
+            return None
+        return round(sum(value for value in values if value is not None), 2)
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
@@ -1995,6 +1987,31 @@ def year_payload_appears_current_month_only(
             continue
         nonzero = _nonzero_months(values)
         if not nonzero or set(nonzero).issubset({current_month}):
+            return True
+    return False
+
+
+def year_payload_omits_earlier_months(
+    source: dict[str, Any],
+    section: str,
+    stat_keys: tuple[str, ...],
+    *,
+    current_month: int,
+) -> bool:
+    """Flag leading zero year buckets for same-endpoint month verification.
+
+    A partially populated year can omit an earlier active month even when
+    several later months are nonzero. A zero bucket alone remains unproven;
+    the month response decides whether the year needs correction.
+    """
+    if current_month <= 1 or app_energy_unit_scale(source) is None:
+        return False
+    for stat_key in stat_keys:
+        values = effective_trend_series_values(source, section, stat_key)
+        if not isinstance(values, list) or len(values) < current_month:
+            continue
+        nonzero = _nonzero_months(values[:current_month])
+        if nonzero and nonzero[0] > 1:
             return True
     return False
 
@@ -2406,7 +2423,13 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
         if not series_key:
             continue
 
-        monthly_values = [0.0 for _ in range(12)]
+        raw_values = effective_trend_series_values(year_source, year_section, stat_key)
+        monthly_values = (
+            [round(value or 0.0, 5) for value in raw_values[:12]]
+            if isinstance(raw_values, list)
+            else [0.0 for _ in range(12)]
+        )
+        monthly_values.extend([0.0] * (12 - len(monthly_values)))
         found_months: list[int] = []
         for month, month_source in sorted(month_sources.items()):
             if month < 1 or month > _MONTHS_PER_YEAR:
@@ -2414,13 +2437,12 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
             value = _month_value(month_source, month_section, stat_key)
             if value is None:
                 continue
-            monthly_values[month - 1] = round(value, 5)
+            monthly_values[month - 1] = round(max(monthly_values[month - 1], value), 5)
             found_months.append(month)
         if not found_months:
             continue
 
         monthly_total = round(sum(monthly_values), 2)
-        raw_values = effective_trend_series_values(year_source, year_section, stat_key)
         raw_total = (
             round(sum(value for value in raw_values if value is not None), 2)
             if isinstance(raw_values, list)
@@ -2819,6 +2841,7 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
     today: date | None = None,
     now: datetime | None = None,
     keep_curve_over_smaller_scalar: bool = False,
+    require_complete_day: bool = False,
 ) -> list[TrendStatisticPoint]:
     """Convert a day chart curve into kWh statistic buckets for the requested day.
 
@@ -2832,6 +2855,10 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
     curve is treated as lagging and ignored. A scalar without a
     curve cannot establish when energy occurred and is therefore not imported into
     Recorder.
+
+    ``require_complete_day`` additionally requires all documented five-minute
+    slots before the result can certify a completed day's total. Partial curves
+    remain available to the normal Recorder bucket path.
 
     Parameters:
         source (dict[str, Any]): App payload containing chart series, optional labels
@@ -2896,7 +2923,7 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         scalar_total = None
 
     buckets: dict[int, float] = {}
-    last_bucket_minute: int | None = None
+    sample_minutes: set[int] = set()
     for index, raw in enumerate(series):
         minute = _day_power_sample_minute(parsed_labels, index)
         if minute is None or minute > current_day_limit_minute:
@@ -2909,6 +2936,7 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         )
         if sample_value is None:
             continue
+        sample_minutes.add(minute)
         sample_kwh = (
             sample_value
             if unit == APP_UNIT_KWH
@@ -2919,14 +2947,14 @@ def day_power_energy_points(  # ruff: ignore[too-many-arguments, too-many-locals
         )
 
         bucket_minute = (minute // bucket_minutes) * bucket_minutes
-        last_bucket_minute = (
-            bucket_minute
-            if last_bucket_minute is None
-            else max(last_bucket_minute, bucket_minute)
-        )
         buckets[bucket_minute] = buckets.get(bucket_minute, 0.0) + sample_kwh
 
-    if last_bucket_minute is None:
+    if not buckets:
+        return []
+    if require_complete_day and (
+        len(series) != _MINUTES_PER_DAY // _DAY_POWER_SAMPLE_MINUTES
+        or sample_minutes != set(range(0, _MINUTES_PER_DAY, _DAY_POWER_SAMPLE_MINUTES))
+    ):
         return []
 
     raw_total = sum(buckets.values())
@@ -3815,8 +3843,6 @@ def trend_series_total(  # ruff: ignore[too-many-return-statements]
         float: The period total rounded to 2 decimals, or `None` when a reliable total
         cannot be determined.
     """
-    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
-        return None
     if is_day_period_payload(source, section):
         total = effective_period_total_value(source, section, stat_key)
 
@@ -3834,6 +3860,11 @@ def trend_series_total(  # ruff: ignore[too-many-return-statements]
             # Zero is a valid reported value (no energy flow in that period).
             return None
         return round(total, 2) if total is not None else None
+
+    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
+        values = effective_trend_series_values(source, section, stat_key)
+        if not values or any(value is None for value in values):
+            return None
 
     series_key = trend_series_key(section, stat_key)
     if not series_key:
@@ -4166,6 +4197,8 @@ def plan_statistic_day_reconcile(
     hourly_energy: Mapping[float, float],
     existing: Mapping[float, StatisticRow],
     reset_start: Callable[[float], float],
+    *,
+    initialize_empty: bool = False,
 ) -> StatisticDayReconcile:
     """Plan one closed day's hourly rows of a daily-reset sensor from the curve.
 
@@ -4192,6 +4225,8 @@ def plan_statistic_day_reconcile(
         base = existing[before].sum
     elif after is not None:
         base = existing[after].sum - total
+    elif initialize_empty and not existing:
+        base = 0.0
     else:
         return StatisticDayReconcile(rows=[], shift_start=None, shift=0.0)
     previous = existing.get(before) if before is not None else None

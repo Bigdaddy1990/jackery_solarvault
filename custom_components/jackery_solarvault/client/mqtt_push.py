@@ -31,9 +31,7 @@ from ..const import (
     MQTT_TOPIC_COMMAND,
     MQTT_TOPIC_PREFIX,
     MQTT_TOPIC_SUFFIXES,
-    REDACTED_VALUE,
 )
-from ..util import jackery_dev_mode_enabled
 from .credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
@@ -54,7 +52,6 @@ _MQTT_OPERATION_TIMEOUT_SEC = 4.0
 # Getter response correlation constants
 _MAX_PENDING_RESPONSES = 100
 _MQTT_RESPONSE_TIMEOUT_SEC = 10.0
-_MQTT_TOPIC_REDACTION_MIN_PARTS = 4
 
 
 class MqttSessionState(StrEnum):
@@ -1352,10 +1349,7 @@ class JackeryMqttPushClient:
     def _redact_topic(
         topic: str | None, entry: ConfigEntry | None = None
     ) -> str | None:
-        """Redact a user identifier from a configured-prefix MQTT topic.
-
-        Replaces the third slash-separated segment with `REDACTED_VALUE` when the first
-        two segments joined by `/` equal `MQTT_TOPIC_PREFIX`.
+        """Return the exact MQTT topic for transport diagnostics.
 
         Parameters:
                 topic (str | None): MQTT topic to redact, or `None`.
@@ -1363,15 +1357,7 @@ class JackeryMqttPushClient:
         Returns:
                 None if `topic` is `None`; otherwise the possibly-redacted topic string.
         """
-        if topic is None or jackery_dev_mode_enabled(entry):
-            return topic
-        parts = topic.split("/")
-        if (
-            len(parts) >= _MQTT_TOPIC_REDACTION_MIN_PARTS
-            and "/".join(parts[:2]) == MQTT_TOPIC_PREFIX
-        ):
-            parts[2] = REDACTED_VALUE
-        return "/".join(parts)
+        return topic
 
     # Getter response correlation (bounded session state)
     @staticmethod
@@ -1490,7 +1476,7 @@ class JackeryMqttPushClient:
                 topic (str | None): MQTT topic to process; may be None.
 
             Returns:
-                str | None: The redacted topic, or `None` if `topic` is `None`.
+                str | None: The original topic, or `None` if `topic` is `None`.
             """
             return self._redact_topic(topic, self._config_entry)
 

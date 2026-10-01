@@ -86,8 +86,6 @@ from .const import (
     APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_REQUEST_BEGIN_DATE,
     APP_REQUEST_BEGIN_DATE_ALT,
-    APP_REQUEST_END_DATE,
-    APP_REQUEST_END_DATE_ALT,
     APP_REQUEST_META,
     APP_SAVINGS_CALC_META,
     APP_SECTION_CT_STAT,
@@ -290,7 +288,6 @@ from .util import (
     normalize_mac_address,
     pv_channel_scalar_is_lifetime_offset,
     redacted_json_safe_payload,
-    request_date as _request_date,
     safe_float,
     safe_int,
     signed_phase_power_values,
@@ -1094,51 +1091,6 @@ def _smart_meter_description_has_value(
     )
 
 
-def _chart_sum_for_date_range(
-    source: dict[str, Any],
-    section: str,
-    stat_key: str,
-    *,
-    start: date,
-    end: date,
-) -> float | None:
-    """Sum explicit kWh chart buckets for one fully covered date range."""
-    unit_scale = app_energy_unit_scale(source)
-    if end < start or unit_scale is None:
-        return None
-    request_begin = _request_date(
-        source,
-        APP_REQUEST_BEGIN_DATE,
-        APP_REQUEST_BEGIN_DATE_ALT,
-    )
-    request_end = _request_date(
-        source,
-        APP_REQUEST_END_DATE,
-        APP_REQUEST_END_DATE_ALT,
-    )
-    if (
-        request_begin is None
-        or request_begin > start
-        or (request_end is not None and request_end < end)
-    ):
-        return None
-    series_key = _trend_series_key(section, stat_key)
-    raw_series = source.get(series_key) if series_key is not None else None
-    if not isinstance(raw_series, list) or not raw_series:
-        return None
-    first = (start - request_begin).days
-    last = (end - request_begin).days
-    if first < 0 or last >= len(raw_series):
-        return None
-    values: list[float] = []
-    for raw_value in raw_series[first : last + 1]:
-        value = safe_float(raw_value)
-        if value is None or value < 0:
-            return None
-        values.append(value * unit_scale)
-    return round(sum(values), 5)
-
-
 # Flat has-value guard chain over stat variants; clearest as-is.
 def _stat_description_has_value(
     payload: dict[str, Any],
@@ -1570,6 +1522,11 @@ def _collect_property_entities(
     """Collect main, portable, and home-mode property sensors."""
     coordinator = collection.coordinator
     for description in SENSOR_DESCRIPTIONS:
+        if is_portable and description.key in {
+            "main_battery_charge_energy",
+            "main_battery_discharge_energy",
+        }:
+            continue
         if is_portable and not _sensor_description_has_value(payload, description):
             continue
         collection.add(JackerySensor(coordinator, dev_id, description))
@@ -1678,11 +1635,7 @@ def _collect_battery_packs(
         identity_key = (dev_id, index)
         identity = collection.battery_pack_identities.get(identity_key)
         if identity is None:
-            serial = (
-                battery_pack_serial(registration_packs[index - 1])
-                if index <= len(registration_packs)
-                else None
-            ) or coordinator.battery_pack_identity_serial(dev_id, index)
+            serial = coordinator.battery_pack_identity_serial(dev_id, index)
             if serial is None:
                 # An index-based identity flips to a serial-based unique_id on a
                 # later restart, which re-registers every pack entity and drops the
@@ -2070,8 +2023,13 @@ class JackerySensor(JackeryEntity, SensorEntity):
 
     def _refresh_cache(self) -> None:
         """Prepare one coherent value-and-attributes state-write snapshot."""
-        self._cached_native_value = self.entity_description.value_fn(self)
+        candidate = self.entity_description.value_fn(self)
+        self._cached_native_value = guard_total_increasing_jitter(
+            self._cached_native_value, candidate, self.entity_description
+        )
         self._cached_attrs = self._source_attributes()
+        if self._cached_native_value is not candidate:
+            self._cached_attrs["lifetime_value_retained"] = True
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -2490,14 +2448,14 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         today: date,
         local_daily_raw: tuple[float, str] | None,
         now: datetime | None = None,
-    ) -> tuple[float, str, dict[str, Any]] | None:
+    ) -> tuple[float, str, dict[str, Any], bool] | None:
         """Build the current open week from corroborated daily kWh buckets.
 
         Jackery can return a positive but stale week total, not only an empty
         placeholder.  Cross-check the week and month views day by day, use a
         verified historical day where available, and let the same-metric local
-        lifetime delta replace only today's lagging bucket.  A zero needs two
-        distinct period/day observations before it becomes entity data.
+        lifetime delta replace only today's lagging bucket.  Without a verified
+        complete day, a zero needs two distinct period/day observations.
         """
         if self._reset_period != DATE_TYPE_WEEK:
             return None
@@ -2542,6 +2500,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 )
                 break
         total = 0.0
+        completed_days_verified = week_start < today
         day = week_start
         while day <= today:
             week_value = _chart_value_for_day(
@@ -2565,9 +2524,15 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 if isinstance(prefix_totals, dict)
                 else None
             )
+            if day < today and verified_value is not None and verified_value >= 0:
+                total += verified_value
+                day += timedelta(days=1)
+                continue
+            if day < today:
+                completed_days_verified = False
             observations = [
                 value
-                for value in (week_value, month_value, verified_value)
+                for value in (week_value, month_value)
                 if value is not None and value >= 0
             ]
             if day == today and local_value is not None and local_value >= 0:
@@ -2587,118 +2552,53 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             day += timedelta(days=1)
 
         total = round(total, 5)
-        return total, section, week_source
+        return total, section, week_source, completed_days_verified
 
-    def _open_month_total_with_local_day(
+    def _month_total_from_daily_evidence(
         self,
-        section: str,
-        stat_key: str,
-        *,
-        payload: dict[str, Any],
-        today: date,
-        local_value: float,
-    ) -> tuple[float, dict[str, Any]] | None:
-        """Replace only today's month-chart bucket with a newer local total."""
-        month_source = self._source_for_section(section, payload)
-        month_total = _chart_sum_for_date_range(
-            month_source,
-            section,
-            stat_key,
-            start=today.replace(day=1),
-            end=today,
-        )
-        day_bucket = _chart_value_for_day(
-            month_source,
-            section,
-            stat_key,
-            today=today,
-        )
-        if month_total is None or day_bucket is None:
-            return None
-        reconciled = round(
-            month_total - day_bucket + max(day_bucket, local_value),
-            5,
-        )
-        return reconciled, month_source
-
-    def _current_open_month_with_local_day(
-        self,
-        section: str,
+        prefix: str,
         stat_key: str,
         *,
         context: _StatRefreshContext,
-        local_value: float,
-        cloud_total: float,
-    ) -> tuple[float, str, dict[str, Any], str] | None:
-        """Reconcile the open month bucket with today's local total."""
-        suffix = f"_{DATE_TYPE_MONTH}"
-        if not section.endswith(suffix):
-            return None
-        month = self._open_month_total_with_local_day(
-            section,
-            stat_key,
-            payload=context.payload,
-            today=context.local_today,
-            local_value=local_value,
-        )
-        if month is None:
-            return None
-        reconciled, month_source = month
-        return (
-            max(cloud_total, reconciled),
-            section,
-            month_source,
-            "current_open_month_with_local_day",
-        )
-
-    def _current_open_year_with_local_day(
-        self,
-        section: str,
-        stat_key: str,
-        *,
-        context: _StatRefreshContext,
-        local_value: float,
-        cloud_total: float,
-    ) -> tuple[float, str, dict[str, Any], str] | None:
-        """Reconcile the open year bucket with the current local month."""
-        suffix = f"_{DATE_TYPE_YEAR}"
-        if not section.endswith(suffix):
-            return None
-        prefix = section[: -len(suffix)]
+        month_start: date,
+    ) -> tuple[float, bool] | None:
+        """Sum dated daily evidence and report full past-day verification."""
         month_section = f"{prefix}_{DATE_TYPE_MONTH}"
-        month = self._open_month_total_with_local_day(
-            month_section,
-            stat_key,
-            payload=context.payload,
-            today=context.local_today,
-            local_value=local_value,
+        month_source = self._source_for_section(month_section, context.payload)
+        verified_days = self._source_for_section(
+            PAYLOAD_VERIFIED_DAY_STATISTICS, context.payload
         )
-        year_source = self._source_for_section(section, context.payload)
-        year_values = effective_trend_series_values(year_source, section, stat_key)
-        unit_scale = app_energy_unit_scale(year_source)
-        month_index = context.local_today.month - 1
-        if (
-            month is None
-            or not isinstance(year_values, list)
-            or month_index >= len(year_values)
-            or unit_scale is None
-        ):
-            return None
-        year_month_bucket = safe_float(year_values[month_index])
-        if year_month_bucket is None or year_month_bucket < 0:
-            return None
-        year_month_bucket *= unit_scale
-        reconciled_month, _month_source = month
-        reconciled = round(
-            cloud_total - year_month_bucket + max(year_month_bucket, reconciled_month),
-            5,
-        )
-        return (
-            max(cloud_total, reconciled),
-            section,
-            year_source,
-            "current_open_year_with_local_month",
-        )
+        next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        last_day = min(next_month - timedelta(days=1), context.local_today)
+        completed_days_verified = month_start < context.local_today
+        total = 0.0
+        day = month_start
+        while day <= last_day:
+            value = _chart_value_for_day(
+                month_source, month_section, stat_key, today=day
+            )
+            day_sources = verified_days.get(day.isoformat())
+            day_totals = (
+                day_sources.get(prefix) if isinstance(day_sources, dict) else None
+            )
+            verified = (
+                safe_float(day_totals.get(stat_key))
+                if day < context.local_today and isinstance(day_totals, dict)
+                else None
+            )
+            if verified is not None and verified >= 0:
+                value = verified
+            elif day < context.local_today:
+                completed_days_verified = False
+            if day == context.local_today and context.local_daily_raw is not None:
+                local = context.local_daily_raw[0]
+                if local >= 0:
+                    value = local if value is None else max(value, local)
+            if value is None or value < 0:
+                return None
+            total += value
+            day += timedelta(days=1)
+        return round(total, 5), completed_days_verified
 
     def _current_open_month_or_year_with_local_day(
         self,
@@ -2707,28 +2607,66 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         *,
         context: _StatRefreshContext,
         cloud_total: float | None,
-    ) -> tuple[float, str, dict[str, Any], str] | None:
-        """Reconcile an open month/year bucket with today's local total."""
-        local_daily_raw = context.local_daily_raw
-        if local_daily_raw is None or cloud_total is None or local_daily_raw[0] < 0:
+    ) -> tuple[float, str, dict[str, Any], str, bool] | None:
+        """Reconcile period buckets; lower only with complete verified past days."""
+        period = self._reset_period
+        if period not in {DATE_TYPE_MONTH, DATE_TYPE_YEAR}:
             return None
-        if self._reset_period == DATE_TYPE_MONTH:
-            return self._current_open_month_with_local_day(
-                section,
-                stat_key,
-                context=context,
-                local_value=local_daily_raw[0],
-                cloud_total=cloud_total,
+        suffix = f"_{period}"
+        if not section.endswith(suffix):
+            return None
+        prefix = section[: -len(suffix)]
+        source = self._source_for_section(section, context.payload)
+        today = context.local_today
+        if period == DATE_TYPE_MONTH:
+            rebuilt = self._month_total_from_daily_evidence(
+                prefix, stat_key, context=context, month_start=today.replace(day=1)
             )
-        if self._reset_period == DATE_TYPE_YEAR:
-            return self._current_open_year_with_local_day(
-                section,
-                stat_key,
-                context=context,
-                local_value=local_daily_raw[0],
-                cloud_total=cloud_total,
-            )
-        return None
+            if rebuilt is None:
+                return None
+            total, completed_days_verified = rebuilt
+            fallback = "current_open_month_from_daily_buckets"
+        else:
+            values = effective_trend_series_values(source, section, stat_key)
+            scale = app_energy_unit_scale(source)
+            total = 0.0
+            completed_days_verified = today.replace(month=1, day=1) < today
+            for month in range(1, today.month + 1):
+                value = (
+                    safe_float(values[month - 1])
+                    if values is not None and month <= len(values)
+                    else None
+                )
+                value = (
+                    value * scale
+                    if value is not None and value >= 0 and scale is not None
+                    else None
+                )
+                month_start = today.replace(month=month, day=1)
+                rebuilt = self._month_total_from_daily_evidence(
+                    prefix,
+                    stat_key,
+                    context=context,
+                    month_start=month_start,
+                )
+                if rebuilt is not None:
+                    rebuilt_value, month_verified = rebuilt
+                    completed_days_verified &= month_verified or month_start == today
+                    value = (
+                        rebuilt_value
+                        if month_verified or value is None
+                        else max(value, rebuilt_value)
+                    )
+                else:
+                    completed_days_verified = False
+                if value is None:
+                    return None
+                total += value
+            total = round(total, 5)
+            fallback = "current_open_year_from_month_and_daily_buckets"
+        if cloud_total is not None and not completed_days_verified:
+            total = max(cloud_total, total)
+        return total, section, source, fallback, completed_days_verified
 
     @staticmethod
     def _resolve_period_value(
@@ -2757,7 +2695,8 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         scalar_total = safe_float(source.get(stat_key))
         if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
             scalar_total = None
-            chart_series_sum = None
+            if not values or any(value is None for value in values):
+                chart_series_sum = None
         server_total = scalar_total
         if is_device_year_period_section(source, section) and values is not None:
             server_total = chart_series_sum
@@ -3292,9 +3231,13 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             now=context.local_now,
         )
         if week is not None:
-            value, section, source = week
+            value, section, source, completed_days_verified = week
             current = safe_float(state.raw)
-            if current is None or value > current:
+            if (
+                current is None
+                or value > current
+                or (completed_days_verified and value != current)
+            ):
                 state.raw = value
                 state.section = section
                 state.source = source
@@ -3311,9 +3254,13 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         )
         if period is None:
             return
-        value, section, source, fallback = period
+        value, section, source, fallback, completed_days_verified = period
         current = safe_float(state.raw)
-        if current is None or value > current:
+        if (
+            current is None
+            or value > current
+            or (completed_days_verified and value != current)
+        ):
             state.raw = value
             state.section = section
             state.source = source
@@ -3750,15 +3697,14 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         currency field fall back to the description's configured unit
         (CURRENCY_EURO for revenue), so the unit is never empty.
         """
+        native_unit: str | None = self.entity_description.native_unit_of_measurement
         if self.entity_description.device_class != SensorDeviceClass.MONETARY:
-            return cast(
-                "str | None", self.entity_description.native_unit_of_measurement
-            )
+            return native_unit
         source = self._source_for_section(self._cached_source_section)
         currency = source.get(FIELD_CURRENCY)
         if isinstance(currency, str) and currency.strip():
             return currency
-        return cast("str | None", self.entity_description.native_unit_of_measurement)
+        return native_unit
 
     # --- restored from 24.05\24.05\custom_components\jackery_solarvault\sensor.py ---
     def _local_daily_metric_key(self) -> str | None:
@@ -4249,15 +4195,6 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
                     == serial_key
                 ):
                     return pack
-            # Some Jackery group frames carry only positional pack rows. Keep
-            # the HTTP pack order when every current row lacks its own serial.
-            if pack_dicts and all(
-                battery_pack_serial(pack) is None for pack in pack_dicts
-            ):
-                try:
-                    return pack_dicts[self._pack_index - 1]
-                except IndexError:
-                    pass
             return {}
         try:
             pack = pack_dicts[self._pack_index - 1]

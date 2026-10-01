@@ -16,7 +16,6 @@ from .const import (
     DIAGNOSTICS_SCHEMA_VERSION,
     DOMAIN,
     LOCAL_MQTT_RUNTIME_KEY,
-    REDACTED_VALUE,
 )
 from .coordinator import JackerySolarVaultCoordinator
 from .util import (
@@ -63,10 +62,9 @@ def _redacted_payload_map(
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
     redacted: dict[str, Any] = {}
-    dev_mode = not redact_keys
-    for index, key in enumerate(sorted(payloads, key=str), start=1):
+    for _index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
-        label = str(key) if dev_mode else f"{prefix}_{index}"
+        label = str(key)
         if isinstance(payload, dict):
             redacted[label] = async_redact_data(payload, redact_keys)
         else:
@@ -262,12 +260,10 @@ def _local_mqtt_diagnostics(
         entry, CONF_THIRD_PARTY_MQTT_PASSWORD, ""
     ).strip()
     dev_mode = jackery_dev_mode_enabled(entry)
-    diagnostic_host = host if dev_mode else REDACTED_VALUE if host else ""
-    diagnostic_port = port if dev_mode else REDACTED_VALUE if port else ""
-    topic_filter = (
-        config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, "")
-        if dev_mode
-        else REDACTED_VALUE
+    diagnostic_host = host
+    diagnostic_port = port
+    topic_filter = config_entry_str_option(
+        entry, CONF_THIRD_PARTY_MQTT_TOPIC_FILTER, ""
     )
 
     # Bewusst als ``object`` gehalten: der Typ von ``runtime_data`` verspricht den

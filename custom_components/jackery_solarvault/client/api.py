@@ -21,6 +21,7 @@ import asyncio
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 import hashlib
@@ -52,6 +53,7 @@ from ..const import (
     ACCESSORIES_SYNC_PATH,
     ACCESSORIES_UNBIND_PATH,
     AC_NICKNAME_PATH,
+    AIEMS_ENERGY_PREDICTION_PATH,
     ALARM_DETAIL_PATH,
     ALARM_PATH,
     ALERT_SYNC_PATH,
@@ -635,7 +637,6 @@ _FAST_HTTP_POLICY: Final = HttpTransportPolicy(
 )
 _JSON_MEDIA_TYPES: Final = frozenset({"application/json", "text/json"})
 _SENSITIVE_KEY_PARTS: Final = (
-    "account",
     "authorization",
     "cookie",
     "jwt",
@@ -1568,7 +1569,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         if series_debug:
             event["chart_series_debug"] = series_debug
         if jackery_dev_mode_enabled(self.dev_mode_entry):
-            return event
+            return deepcopy(event)
         redacted = JackeryApi._redact_http_diagnostic(event)
         return redacted if isinstance(redacted, dict) else {}
 
@@ -3186,6 +3187,16 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             params={FIELD_SYSTEM_ID: str(system_id)},
         )
         return self._payload_dict(data, SMART_SCHEDULE_PATH)
+
+    async def async_get_aiems_energy_prediction(
+        self, *, system_id: str | int
+    ) -> dict[str, Any]:
+        """Return the complete 2.4.2 forecast body for one system."""
+        data = await self._get_json(
+            AIEMS_ENERGY_PREDICTION_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
+        )
+        return self._payload_dict(data, AIEMS_ENERGY_PREDICTION_PATH)
 
     async def async_set_single_mode(
         self,

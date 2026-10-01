@@ -727,6 +727,11 @@ class JackeryBleListener:
                 session=session,
                 notify_sequence=notify_sequence,
                 received_at=received_at,
+                received_monotonic=(
+                    session.notify_pending_metadata[0][0]
+                    if session.notify_pending_metadata
+                    else None
+                ),
                 accepted=True,
             )
             try:
@@ -2095,13 +2100,14 @@ class JackeryBleListener:
         )
 
     # Splitting this bounded state machine would fragment its ownership transaction.
-    def _reassemble_frame(  # ruff: ignore[complex-structure, too-many-locals, too-many-branches, too-many-statements]
+    def _reassemble_frame(  # ruff: ignore[complex-structure, too-many-locals, too-many-branches, too-many-statements, too-many-arguments]
         self,
         device_id: str,
         frame: ble.BleBinaryFrame,
         *,
         session: _GattSession | None = None,
         notify_sequence: int | None = None,
+        received_monotonic: float | None = None,
         accepted: bool = False,
     ) -> tuple[ble.BleBinaryFrame | None, int | None]:
         """Return a complete frame and its earliest queued notification sequence."""
@@ -2132,7 +2138,12 @@ class JackeryBleListener:
                         "notify_sequence": notify_sequence,
                     }
                 return None, None
-        now = self._hass.loop.time()
+        # Queue delivery latency must not count as a gap between received chunks.
+        now = (
+            received_monotonic
+            if received_monotonic is not None
+            else self._hass.loop.time()
+        )
         if session is not None:
             owner = self._frame_assembly_owners.get(device_id)
             if owner is not session:
@@ -2184,6 +2195,8 @@ class JackeryBleListener:
             raise ValueError(msg)
 
         assemblies = self._frame_assemblies.setdefault(device_id, {})
+        if session is not None:
+            self._frame_assembly_owners[device_id] = session
 
         key = (frame.cmd, frame.flags)
         assembly = assemblies.get(key)
@@ -2426,6 +2439,7 @@ class JackeryBleListener:
         session: _GattSession | None = None,
         notify_sequence: int | None = None,
         received_at: datetime | None = None,
+        received_monotonic: float | None = None,
         accepted: bool = False,
     ) -> None:
         """Process one BLE notification.
@@ -2482,6 +2496,7 @@ class JackeryBleListener:
                         parsed,
                         session=session,
                         notify_sequence=notify_sequence,
+                        received_monotonic=received_monotonic,
                         accepted=accepted,
                     )
                 except ValueError as err:

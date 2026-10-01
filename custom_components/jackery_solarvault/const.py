@@ -556,10 +556,8 @@ SMART_MODE_CHECK_PATH: Final = "/v1/device/smartMode/checkIfSet"
 SMART_MODE_INFO_PATH: Final = "/v1/device/smartMode/getSmartMode"
 SMART_MODE_START_PATH: Final = "/v1/device/smartMode/startSmartMode"
 SMART_SCHEDULE_PATH: Final = "/v1/device/stat/getSmartSchedulePrediction"
-# 2.4.0 AiEmsEnergyPredictionApi ("api/aiems/report/energy/prediction"):
-# request systemId only; distinct from getSmartSchedulePrediction above.
-# Deliberately NOT exposed as a constant — the endpoint is unproven, and
-# tests/test_app_2_4_0_contracts.py asserts its absence from the API surface.
+# 2.4.2 AiEmsEnergyPredictionVM uses GET; RequestServer prefixes v1/.
+AIEMS_ENERGY_PREDICTION_PATH: Final = "/v1/api/aiems/report/energy/prediction"
 
 # --- Miscellaneous endpoints -------------------------------------------------
 APP_VERSION_PATH: Final = "/v1/app/version/getNewVersion"
@@ -753,6 +751,7 @@ PAYLOAD_ELECTRICITY_STRATEGY: Final = "electricity_strategy"
 PAYLOAD_TOU_SCHEDULE: Final = "tou_schedule"
 PAYLOAD_SMART_MODE: Final = "smart_mode"
 PAYLOAD_SMART_SCHEDULE: Final = "smart_schedule"
+PAYLOAD_AIEMS_ENERGY_PREDICTION: Final = "aiems_energy_prediction"
 PAYLOAD_SYMMETRY_STAT: Final = "symmetry_stat"
 PAYLOAD_SOCKET_STAT: Final = "socket_stat"
 PAYLOAD_CIRCUIT_PROPERTY: Final = "circuit_property"
@@ -1791,11 +1790,11 @@ STORM_MINUTES_DEFAULT: Final = tuple(
 STORM_MINUTES_MIN_VALID: Final = 60
 PRICE_MODE_TO_OPTION: Final = {1: "dynamic", 2: "single"}
 
-# Diagnostics redaction keys. Keep this set broad because app/MQTT payloads can
-# include personal account data, device IDs, locations and tariff credentials.
+# Only authentication secrets are masked in ordinary diagnostics. Device
+# identities, telemetry and raw frames must remain available for mapping.
 REDACTED_VALUE: Final = "**REDACTED**"
 
-# Optional diagnostic payload debug log. It is redacted and size-limited, but it
+# Optional diagnostic payload debug log. Each active segment is size-limited; it
 # still contains detailed raw cloud/MQTT value shapes for troubleshooting parser
 # and mapping bugs.
 PAYLOAD_DEBUG_LOG_FILENAME: Final = "jackery_solarvault_payload_debug.jsonl"
@@ -1808,90 +1807,24 @@ PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX: Final = ".1"
 # emitted immediately because the dedup check runs *before* the throttle.
 PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 # Per-device BLE AES key from ``/v1/device/system/list``; used by BLE/MQTT
-# Layer-C payload encryption and always redacted from diagnostics.
+# Layer-C payload encryption.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
 REDACT_KEYS: Final = frozenset({
-    "p",
-    "s",
     FIELD_PASSWORD,
-    MQTT_CREDENTIAL_USERNAME,
-    "ssid",
-    "bssid",
-    CONF_MQTT_MAC_ID,
-    CONF_REGION_CODE,
-    ENTRY_BOOTSTRAP_MQTT_SESSION,
-    MQTT_SESSION_USER_ID,
     MQTT_SESSION_SEED_B64,
-    MQTT_SESSION_MAC_ID,
-    MQTT_SESSION_MAC_ID_SOURCE,
-    FIELD_MAC_ID,
     FIELD_TOKEN,
     FIELD_MQTT_PASSWORD,
-    FIELD_DEVICE_ID,
-    FIELD_SYSTEM_ID,
-    FIELD_DEVICE_NAME,
-    FIELD_SYSTEM_NAME,
-    "mqttPassword",
-    FIELD_DEVICE_SN,
-    FIELD_DEV_SN,
-    FIELD_SN,
-    FIELD_SYSTEM_SN,
-    "ACCOUNTID",
-    FIELD_WNAME,
-    FIELD_MAC,
-    FIELD_WIP,
     FIELD_BLUETOOTH_KEY,
+    "mqttPassword",
     "local_key",
     "localKey",
     FIELD_DEVICE_SECRET,
     FIELD_RANDOM_SALT,
-    "phone",
-    "mobPhone",
-    "email",
-    "mail",
-    FIELD_ACCOUNT,
-    "accountName",
-    "accountEmail",
-    "bindEmail",
-    "bindEmailAddress",
-    "bindPhone",
-    "avatar",
-    "appUserName",
-    "nickname",
-    FIELD_USER_ID,
-    MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
-    MQTT_CREDENTIAL_USER_ID,
-    MQTT_CREDENTIAL_USERNAME,
-    "clientId",
     "platformToken",
-    "platformApiParam",
     "contractAuth",
-    "powerPriceResource",
-    "address",
-    "addressDetail",
-    FIELD_TIMEZONE,
-    FIELD_COUNTRY,
-    FIELD_COUNTRY_CODE,
-    FIELD_GRID_STANDARD,
-    FIELD_LONGITUDE,
-    FIELD_LATITUDE,
-    FIELD_REGION,
-    "base64_encoded",
-    "body_preview",
-    "mqttUser",
-    "mqttUsername",
-    "mqttClientId",
-    "mqtt_user",
-    "mqtt_username",
-    "raw_bytes",
-    "raw_hex",
-    "trailer_hex",
-    CONF_THIRD_PARTY_MQTT_IP,
-    CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
-    # Additional redaction keys (covered by test_logging_diagnostics.py).
     "access_token",
     "refresh_token",
     "token",
@@ -1899,24 +1832,8 @@ REDACT_KEYS: Final = frozenset({
     "secret",
     "aes_key",
     "rsa_key",
-    "mqtt_mac_id",
-    "latitude",
-    "longitude",
-    "gps",
-    "lat",
-    "lon",
-    "account_id",
-    "bind_user_id",
     "mqtt_password",
-    "device_id",
-    "deviceId",
-    "device_sn",
-    "deviceSn",
     "nested_token",
-    # Legacy ``local_mqtt_*`` keys stay listed so diagnostics from entries that
-    # have not been migrated yet are still redacted.
-    "local_mqtt_host",
-    "local_mqtt_username",
     "local_mqtt_password",
 })
 
@@ -2024,6 +1941,7 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     # (the carry-forward alone cannot help — self.data is already rebuilt).
     PAYLOAD_SMART_MODE,
     PAYLOAD_SMART_SCHEDULE,
+    PAYLOAD_AIEMS_ENERGY_PREDICTION,
     PAYLOAD_TOU_SCHEDULE,
 )
 
@@ -2850,6 +2768,11 @@ LOCAL_DAILY_LIFETIME_METRICS: Final[tuple[str, ...]] = (
     APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_DEVICE_STAT_PV_TO_ONGRID,
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_AC_TO_BATTERY,
+    APP_DEVICE_STAT_AC_TO_ONGRID,
+    APP_DEVICE_STAT_BATTERY_TO_AC,
+    APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
+    APP_DEVICE_STAT_PV_TO_AC,
     APP_DEVICE_STAT_EPS_INPUT,
     APP_DEVICE_STAT_EPS_OUTPUT,
     FIELD_CT_TOTAL_PHASE_ENERGY,

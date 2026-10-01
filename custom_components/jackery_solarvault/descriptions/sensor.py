@@ -4,7 +4,7 @@ All descriptions follow HA-standard ``SensorEntityDescription`` with
 ``value_fn(entity) -> StateType``.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -323,7 +323,6 @@ from ..const import (
     FIELD_WSIG,
     FIELD_WSS,
     JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
-    PAYLOAD_BATTERY_PACKS,
     PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_CT_METER,
     PAYLOAD_DEVICE_ALERT,
@@ -443,29 +442,6 @@ def _get_payload_section(
 ) -> StateType:
     """Get value from a payload section."""
     return _state_value(entity.payload_section_for_sources(section).get(key))
-
-
-def _main_battery_energy(
-    entity: JackeryEntity, total_key: str, pack_key: str
-) -> float | None:
-    """Estimate main-battery energy from a system counter and current pack counters."""
-    total = safe_float(_get_payload_section(entity, PAYLOAD_PROPERTIES, total_key))
-    packs = entity.payload.get(PAYLOAD_BATTERY_PACKS)
-    count = safe_int(_get_payload_section(entity, PAYLOAD_PROPERTIES, FIELD_BAT_NUM))
-    if (
-        total is None
-        or count is None
-        or (packs is not None and not isinstance(packs, list))
-    ):
-        return None
-    rows = [pack for pack in packs or [] if isinstance(pack, dict)]
-    if count != len(rows):
-        return None
-    values = [safe_float(pack.get(pack_key)) for pack in rows]
-    if any(value is None for value in values):
-        return None
-    main = total - sum(value for value in values if value is not None)
-    return round(main / JACKERY_LIVE_ENERGY_UNITS_PER_KWH, 2) if main >= 0 else None
 
 
 def _get_ct_meter(entity: JackeryEntity) -> dict[str, Any]:
@@ -705,6 +681,11 @@ def _default_sensor_value(entity: JackerySensorEntity) -> StateType:
 @dataclass(frozen=True, kw_only=True)
 class _JackerySensorEntityDescription(SensorEntityDescription):
     """Apply integration-wide entity-registry defaults to sensor metadata."""
+
+    # HA generates these inherited fields dynamically; declare their exact
+    # public types for our dataclass constructor and replacement operations.
+    key: str
+    translation_key: str | None = None
 
     def __post_init__(self) -> None:
         """Disable diagnostic entities until a user explicitly enables them."""
@@ -1955,13 +1936,10 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
-        app_fields=(APP_DEVICE_STAT_BATTERY_CHARGE, FIELD_IN_EGY),
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_charge_energy_derived",
         device_registry_role="main_battery",
-        value_fn=lambda e: _main_battery_energy(
-            e, APP_DEVICE_STAT_BATTERY_CHARGE, FIELD_IN_EGY
-        ),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="main_battery_charge_energy",
         # pyrefly: ignore [unexpected-keyword]
@@ -1972,13 +1950,10 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
     ),
     JackerySensorDescription(
-        app_fields=(APP_DEVICE_STAT_BATTERY_DISCHARGE, FIELD_OUT_EGY),
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_discharge_energy_derived",
         device_registry_role="main_battery",
-        value_fn=lambda e: _main_battery_energy(
-            e, APP_DEVICE_STAT_BATTERY_DISCHARGE, FIELD_OUT_EGY
-        ),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="main_battery_discharge_energy",
         # pyrefly: ignore [unexpected-keyword]
@@ -2879,6 +2854,19 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     ),
 )
 
+# Preserve historical head IDs with the same energy and device metadata.
+# Both identities stay unknown until an independent head counter is resolved.
+SENSOR_DESCRIPTIONS += tuple(
+    replace(
+        description,
+        key=description.key.removesuffix("_derived"),
+        translation_key=f"{description.key.removesuffix("_derived")}_direct",
+    )
+    for description in SENSOR_DESCRIPTIONS
+    if description.key
+    in {"main_battery_charge_energy_derived", "main_battery_discharge_energy_derived"}
+)
+
 STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -2967,56 +2955,6 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
     JackeryStatSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="battery_discharge_energy",
-        stat_key=APP_DEVICE_STAT_BATTERY_DISCHARGE,
-        section=PAYLOAD_PROPERTIES,
-        value_fn=lambda e: _div(100)(
-            _get_payload_section(
-                e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_DISCHARGE
-            )
-        ),
-        transform=_div(100),
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="battery_discharge_energy",
-        data_sources=ALL_LIVE_DATA_SOURCES,
-        # pyrefly: ignore [unexpected-keyword]
-        device_class=SensorDeviceClass.ENERGY,
-        # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-    ),
-    JackeryStatSensorDescription(
-        # pyrefly: ignore [unexpected-keyword]
-        key="main_battery_charge_energy",
-        device_registry_role="main_battery",
-        # pyrefly: ignore [unexpected-keyword]
-        entity_registry_enabled_default=False,
-        # pyrefly: ignore [unexpected-keyword]
-        entity_category=EntityCategory.DIAGNOSTIC,
-        stat_key=APP_DEVICE_STAT_BATTERY_CHARGE,
-        section=PAYLOAD_PROPERTIES,
-        value_fn=lambda e: _div(100)(
-            _get_payload_section(e, PAYLOAD_PROPERTIES, APP_DEVICE_STAT_BATTERY_CHARGE)
-        ),
-        transform=_div(100),
-        # pyrefly: ignore [unexpected-keyword]
-        translation_key="battery_charge_energy",
-        data_sources=ALL_LIVE_DATA_SOURCES,
-        # pyrefly: ignore [unexpected-keyword]
-        device_class=SensorDeviceClass.ENERGY,
-        # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-    ),
-    JackeryStatSensorDescription(
-        # pyrefly: ignore [unexpected-keyword]
-        key="main_battery_discharge_energy",
-        device_registry_role="main_battery",
-        # pyrefly: ignore [unexpected-keyword]
-        entity_registry_enabled_default=False,
-        # pyrefly: ignore [unexpected-keyword]
-        entity_category=EntityCategory.DIAGNOSTIC,
         stat_key=APP_DEVICE_STAT_BATTERY_DISCHARGE,
         section=PAYLOAD_PROPERTIES,
         value_fn=lambda e: _div(100)(

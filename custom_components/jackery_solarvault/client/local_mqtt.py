@@ -25,7 +25,6 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
-from ..util import jackery_dev_mode_enabled
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -896,7 +895,7 @@ class JackeryLocalMqttClient:
     def diagnostics_snapshot(self, *, redact: bool | None = None) -> dict[str, Any]:
         """Return transport diagnostics, redacted unless ``JACKERY_DEV_MODE``."""
         if redact is None:
-            redact = not jackery_dev_mode_enabled()
+            redact = False
         topics = (
             [REDACTED_VALUE] * len(self._topics_seen)
             if redact

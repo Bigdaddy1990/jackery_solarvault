@@ -210,8 +210,11 @@ from .const import (
     BLE_CONNECT_BACKOFF_MAX_SEC,
     CONF_ENABLE_BLE_TRANSPORT,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    CONF_ENABLE_MONTH_STATISTICS,
     CONF_ENABLE_PAYLOAD_DEBUG_LOG,
     CONF_ENABLE_UNREDACTED_DEBUG,
+    CONF_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS,
     CONF_THIRD_PARTY_MQTT_IP,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_PORT,
@@ -231,6 +234,9 @@ from .const import (
     DEFAULT_BLE_ACK_TIMEOUT_SEC,
     DEFAULT_ENABLE_BLE_TRANSPORT,
     DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK,
+    DEFAULT_ENABLE_MONTH_STATISTICS,
+    DEFAULT_ENABLE_WEEK_STATISTICS,
+    DEFAULT_ENABLE_YEAR_STATISTICS,
     DEFAULT_THIRD_PARTY_MQTT_PORT,
     DEFAULT_THIRD_PARTY_MQTT_TOKEN,
     DIAGNOSTICS_SCHEMA_VERSION,
@@ -506,6 +512,7 @@ from .const import (
     MQTT_TRANSIENT_BACKOFF_STEPS_SEC,
     NON_BATTERY_SUBDEVICE_TYPES,
     PACK_FIELD_LAST_SEEN_AT,
+    PAYLOAD_AIEMS_ENERGY_PREDICTION,
     PAYLOAD_ALARM,
     PAYLOAD_BATTERY_BOUNDARY,
     PAYLOAD_BATTERY_PACKS,
@@ -609,8 +616,10 @@ from .models import BleProcessDisposition, Observation
 from .util import (
     WHOLE_INT_TEXT_RE,
     StatisticRow,
+    app_chart_period_meta,
     app_month_request_kwargs,
     app_period_request_kwargs,
+    app_year_request_kwargs,
     append_payload_debug_lines,
     apply_year_month_backfill,
     attach_calculated_savings_metadata,
@@ -626,6 +635,7 @@ from .util import (
     historical_day_payload_from_sources,
     iter_calendar_months,
     iter_calendar_weeks,
+    iter_calendar_years,
     jackery_dev_mode_enabled,
     local_mqtt_opt_in,
     parse_utc_datetime,
@@ -639,6 +649,7 @@ from .util import (
     trend_series_points,
     utc_now,
     year_payload_appears_current_month_only,
+    year_payload_omits_earlier_months,
 )
 
 if TYPE_CHECKING:
@@ -899,6 +910,29 @@ class BackfillStatus(StrEnum):
     PENDING = "pending"
     RETRYABLE = "retryable"
     IMPORTED = "imported"
+
+
+def _backfill_period_is_closed(
+    date_type: str,
+    period_start: date,
+    *,
+    today: date,
+) -> bool:
+    """Return whether a calendar bucket can no longer receive source data."""
+    if date_type == DATE_TYPE_WEEK:
+        period_end = period_start + timedelta(days=6)
+    elif date_type == DATE_TYPE_MONTH:
+        next_period = (
+            period_start.replace(year=period_start.year + 1, month=1, day=1)
+            if period_start.month == _MONTHS_PER_YEAR
+            else period_start.replace(month=period_start.month + 1, day=1)
+        )
+        period_end = next_period - timedelta(days=1)
+    elif date_type == DATE_TYPE_YEAR:
+        period_end = date(period_start.year, 12, 31)
+    else:
+        return False
+    return period_end < today
 
 
 def _normalize_backfill_status(
@@ -1551,6 +1585,10 @@ class JackeryMqttCredentialsPendingError(HomeAssistantError):
     """
 
 
+class JackeryStatisticHistoryPendingError(HomeAssistantError):
+    """Defer one native statistic until its hourly history is available."""
+
+
 _DICT_LIST_ID_KEYS = frozenset({"devId", "deviceId", "id", "idx"})
 _DICT_LIST_SERIAL_KEYS = frozenset({"devSn", "deviceSn", "sn"})
 
@@ -2126,7 +2164,14 @@ def battery_packs_from_source(
     ):
         packs = find_list_for_key(source, key)
         if packs:
-            normalized = [normalize_battery_pack_payload(item) for item in packs]
+            normalized = [
+                normalize_battery_pack_payload(item)
+                for item in packs
+                if isinstance(item, dict)
+            ]
+            if key == FIELD_BATTERY_PACKS:
+                # App BatteryPackBody identifies even partial status rows.
+                return normalized
             filtered = [
                 item
                 for item in normalized
@@ -2626,6 +2671,13 @@ def normalize_local_mqtt_payload(
         FIELD_DEV_SN,
         FIELD_SN,
     }
+    if (
+        first_nonblank_int(payload.get(FIELD_DEV_TYPE), payload.get(FIELD_DEVICE_TYPE))
+        == SUBDEVICE_DEV_TYPE_BATTERY_PACK
+    ):
+        # HomeSubModel uses the body serial to identify a pack increment.
+        # Its parent is identified separately by deviceId or the device topic.
+        envelope_keys -= {FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN}
     body = {
         key: value
         for key, value in payload.items()
@@ -3596,11 +3648,13 @@ _STATISTICS_HTTP_STARTUP_CYCLE_REQUEST_BUDGET = 400
 _STATISTICS_HTTP_STARTUP_CYCLE_TIME_BUDGET_SEC = 300.0
 _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC = SLOW_METRICS_INTERVAL_SEC
 _STATISTICS_HTTP_BACKFILL_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
+_STATISTICS_HTTP_TRANSPORT_ERROR_MAX_ATTEMPTS = 3
 _STATISTICS_HTTP_TRANSIENT_RETRY_SEC = SLOW_METRICS_INTERVAL_SEC
 # Legacy keys are cleared when old backfill state is read; no cooldown ladder.
 _STATISTICS_HTTP_EMPTY_DEFERRALS = "empty_deferrals"
 _STATISTICS_HTTP_RETRY_AFTER_EPOCH = "retry_after_epoch"
 _STATISTICS_HTTP_VERIFIED_TOTALS = "verified_totals"
+_STATISTICS_HTTP_VERIFIED_TOTALS_RULE = "complete_5_minute_day_v1"
 # Bump when the day-curve import changes; imported days of an older rule are
 # reopened once (2026-09-25: gap fill into the sensors' own statistics).
 # v2: day sensors fed through their documented fallback source (Netzbezug,
@@ -3851,6 +3905,7 @@ class _HttpDayBackfillProgress:
     window_days: int
     include_current_year: bool
     now_monotonic: float
+    verification_only: bool = False
     gap_filled_rows: int = 0
     source_days: int = 0
     terminal_transitions: int = 0
@@ -3870,6 +3925,47 @@ class _HttpDayBackfillProgress:
     month_sources: dict[tuple[str, str, str], dict[str, Any]] = dataclass_field(
         default_factory=dict
     )
+
+
+class _HttpDayBackfillOptions(TypedDict, total=False):
+    force: bool
+    window_days: int
+    include_current_year: bool
+    request_budget: int | None
+    verification_only: bool
+
+
+@dataclass(slots=True)
+class _HttpPeriodBackfillCandidate:
+    """One independently retryable closed source/period bucket."""
+
+    priority: int
+    attempted: int
+    last_attempt: str
+    period_start: date
+    device_id: str
+    section_prefix: str
+    date_type: str
+    payload: dict[str, Any]
+    bucket_state: dict[str, Any]
+    type_state: dict[str, Any]
+
+
+@dataclass(slots=True)
+class _HttpPeriodBackfillProgress:
+    """Mutable accounting for one bounded period-backfill pass."""
+
+    requests: int = 0
+    imported_sources: int = 0
+    terminal_transitions: int = 0
+    pending_sources: int = 0
+    actionable_sources: int = 0
+    open_sources: int = 0
+    state_changed: bool = False
+    rate_limited: bool = False
+    stopped: bool = False
+    empty_sources: int = 0
+    unmapped_sources: int = 0
 
 
 class _BleSendRequired(TypedDict):
@@ -3944,6 +4040,7 @@ class _DayChartPointsRequired(TypedDict):
 
 class _DayChartPointsOptions(_DayChartPointsRequired, total=False):
     use_local_day_guard: bool
+    require_complete_day: bool
 
     # Write into this ``sensor.*`` statistic (source ``recorder``) instead of
     # the external ``jackery_solarvault:`` series.
@@ -4387,6 +4484,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         self._slow_http_request_semaphore = self._http_request_semaphore
         self._system_info_cache_monotonic: dict[str, float] = {}
         self._statistics_http_unsub: Callable[[], None] | None = None
+        self._mqtt_poll_unsub: Callable[[], None] | None = async_track_time_interval(
+            hass, self._async_poll_cloud_mqtt, self._configured_update_interval
+        )
         self._poll_watchdog_unsub: Callable[[], None] | None = (
             async_track_time_interval(
                 hass,
@@ -5551,7 +5651,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self._statistics_http_unsub = async_track_time_interval(
                 self.hass,
                 self._async_poll_http_statistics,
-                timedelta(seconds=self._slow_metrics_interval_sec),
+                min(update_interval, timedelta(seconds=30)),
+            )
+        if self._mqtt_poll_unsub is not None:
+            self._mqtt_poll_unsub()
+            self._mqtt_poll_unsub = async_track_time_interval(
+                self.hass, self._async_poll_cloud_mqtt, update_interval
             )
         self._system_info_query_interval_sec = interval_sec
         self._subdevice_query_interval_sec = interval_sec
@@ -5747,6 +5852,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if self._poll_watchdog_unsub is not None:
             self._poll_watchdog_unsub()
             self._poll_watchdog_unsub = None
+        mqtt_poll_unsub = getattr(self, "_mqtt_poll_unsub", None)
+        if mqtt_poll_unsub is not None:
+            mqtt_poll_unsub()
+            self._mqtt_poll_unsub = None
         statistics_http_unsub = getattr(self, "_statistics_http_unsub", None)
         if statistics_http_unsub is not None:
             statistics_http_unsub()
@@ -6540,8 +6649,22 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Return the first matching BLE config-family update."""
         message_type = self._message_type_for_payload(payload)
         classified = {**payload, FIELD_CMD: cmd}
+        # Telemetry notifications reuse header numbers that also name App actions.
+        # Their command and body, not that header alone, identify the route.
+        route_action_id = (
+            None
+            if cmd in {
+                MQTT_CMD_QUERY_DEVICE_PROPERTY,
+                MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+                MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
+                MQTT_CMD_CONTROL_SUB_DEVICE,
+                MQTT_CMD_QUERY_COMBINE_DATA,
+                MQTT_CMD_CONTROL_COMBINE,
+            }
+            else action_id
+        )
         update: dict[str, Any] | None = None
-        if is_alarm_message(message_type, action_id, classified):
+        if is_alarm_message(message_type, route_action_id, classified):
             update = {
                 PAYLOAD_DEVICE_ALERT: merge_live_properties(
                     current.get(PAYLOAD_DEVICE_ALERT) or {}, payload
@@ -6549,7 +6672,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             }
         elif is_third_party_mqtt_config_message(
             message_type,
-            action_id,
+            route_action_id,
             classified,
         ):
             update = {
@@ -6561,11 +6684,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     )
                 )
             }
-        elif is_wifi_config_message(message_type, action_id, classified):
+        elif is_wifi_config_message(message_type, route_action_id, classified):
             update = {PAYLOAD_WIFI_CONFIG: payload}
-        elif is_wifi_list_message(action_id, classified):
+        elif is_wifi_list_message(route_action_id, classified):
             update = {PAYLOAD_WIFI_LIST: payload}
-        elif is_time_zone_config_message(action_id, classified):
+        elif is_time_zone_config_message(route_action_id, classified):
             update = {PAYLOAD_TIMEZONE_CONFIG: payload}
             timezone = payload.get(FIELD_TIMEZONE)
             if timezone is not None:
@@ -6576,7 +6699,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     device_id,
                     {FIELD_TIMEZONE: timezone},
                 )
-        elif is_grid_standard_sync_message(action_id, classified):
+        elif is_grid_standard_sync_message(route_action_id, classified):
             update = {}
             value = payload.get(FIELD_GRID_STANDARD)
             if value is None:
@@ -6589,9 +6712,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     device_id,
                     {FIELD_GRID_STANDARD: str(value)},
                 )
-        elif is_mqtt_connect_info_message(action_id, classified):
+        elif is_mqtt_connect_info_message(route_action_id, classified):
             update = {PAYLOAD_MQTT_CONNECT_INFO: payload}
-        elif is_device_ota_version_message(action_id, classified):
+        elif is_device_ota_version_message(route_action_id, classified):
             ota = dict(current.get(PAYLOAD_OTA) or {})
             ota.update(payload)
             update = {PAYLOAD_OTA: ota}
@@ -6654,7 +6777,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         action_id = parsed.flags
         message_type = self._message_type_for_payload(payload)
         classified = {**payload, FIELD_CMD: cmd}
-        envelope: dict[str, Any] = {FIELD_ACTION_ID: action_id}
+        envelope: dict[str, Any] = {}
+        if cmd == MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY:
+            envelope[FIELD_ACTION_ID] = action_id
         if message_type is not None:
             envelope[FIELD_MESSAGE_TYPE] = message_type
         is_subdevice = self._is_subdevice_payload(
@@ -7007,7 +7132,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             self._statistics_http_unsub = async_track_time_interval(
                 self.hass,
                 self._async_poll_http_statistics,
-                timedelta(seconds=self._slow_metrics_interval_sec),
+                min(self._configured_update_interval, timedelta(seconds=30)),
             )
         if self.data:
             self._schedule_statistics_import(self.data)
@@ -7026,8 +7151,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         system_ids: set[str] = set()
         refreshers: list[Callable[[], Awaitable[_CachePayload]]] = []
         for dev_id, idx in self._device_index.items():
-            if not isinstance(idx, dict):
-                continue
             payload = snapshot.get(dev_id) or {}
             sys_id = str(idx[FIELD_SYSTEM_ID]) if idx.get(FIELD_SYSTEM_ID) else None
             device = payload.get(PAYLOAD_DEVICE) or {}
@@ -7825,31 +7948,29 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         Returns:
             True only when shared ingest accepted the frame for one known device.
         """
+        ingress_payload = payload
+        self._schedule_payload_debug_event(
+            lambda: {
+                "kind": "local_mqtt_ingress",
+                "topic": topic,
+                "payload": ingress_payload,
+                "raw_hex": (
+                    raw_bytes.hex()
+                    if raw_bytes
+                    and jackery_dev_mode_enabled(getattr(self, "entry", None))
+                    else None
+                ),
+            },
+        )
         if not payload and raw_bytes:
             payload = self._decode_local_mqtt_binary_payload(raw_bytes)
         if not payload:
             return self._record_unrouted_local_mqtt_message("empty_payload")
 
         accepted_device_id = self._apply_shelly_rpc_local_update(topic, payload)
-        normalized = self._normalize_local_mqtt_payload(payload)
-        topic_serial = local_mqtt_topic_device_serial(topic)
-        explicit_serial = (
-            normalized.get(FIELD_DEVICE_SN)
-            or normalized.get(FIELD_DEV_SN)
-            or normalized.get(FIELD_SN)
-        )
-        if topic_serial and explicit_serial and str(explicit_serial) != topic_serial:
+        normalized = self._normalize_local_mqtt_payload(payload, topic)
+        if normalized is None:
             return self._record_unrouted_local_mqtt_message("unknown_device")
-        if explicit_serial is not None:
-            normalized[FIELD_DEVICE_SN] = explicit_serial
-        elif topic_serial:
-            normalized[FIELD_DEVICE_SN] = topic_serial
-        if topic_serial:
-            resolved = self._resolve_device_id_from_mqtt(
-                normalized, allow_single_device_fallback=False
-            )
-            if resolved and self._resolve_device_sn(resolved) != topic_serial:
-                return self._record_unrouted_local_mqtt_message("unknown_device")
         if "type" in payload:
             normalized["type"] = payload["type"]
 
@@ -7976,13 +8097,69 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 return decoded_payload
         return None
 
-    @classmethod
     def _normalize_local_mqtt_payload(
-        cls,
+        self,
         payload: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Normalize body-only LAN MQTT payloads into the cloud-MQTT envelope."""
-        return normalize_local_mqtt_payload(payload)
+        topic: str,
+    ) -> dict[str, Any] | None:
+        """Keep child identity in the body and verify the envelope's parent."""
+        normalized = normalize_local_mqtt_payload(payload)
+        topic_serial = local_mqtt_topic_device_serial(topic)
+        explicit_serial = (
+            normalized.get(FIELD_DEVICE_SN)
+            or normalized.get(FIELD_DEV_SN)
+            or normalized.get(FIELD_SN)
+        )
+        if topic_serial and explicit_serial and str(explicit_serial) != topic_serial:
+            body = normalized.get(FIELD_BODY)
+            is_flat = not any(
+                isinstance(payload.get(key), dict) for key in (FIELD_BODY, FIELD_DATA)
+            )
+            untyped = all(
+                payload.get(key) is None for key in (FIELD_DEV_TYPE, FIELD_DEVICE_TYPE)
+            )
+            if (
+                isinstance(body, dict)
+                and FIELD_CELL_TEMP in body
+                and is_flat
+                and untyped
+            ):
+                parent_id = self._resolve_device_id_from_mqtt(
+                    {FIELD_DEVICE_SN: topic_serial}, allow_single_device_fallback=False
+                )
+                packs = (
+                    (self.data or {})
+                    .get(parent_id or "", {})
+                    .get(PAYLOAD_BATTERY_PACKS)
+                )
+                if isinstance(packs, list) and any(
+                    isinstance(pack, dict)
+                    and battery_pack_serial(pack) == str(explicit_serial)
+                    for pack in packs
+                ):
+                    for key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN):
+                        if (serial_value := normalized.pop(key, None)) is not None:
+                            body[key] = serial_value
+                    explicit_serial = topic_serial
+            if str(explicit_serial) != topic_serial:
+                return None
+        if explicit_serial is not None:
+            normalized[FIELD_DEVICE_SN] = explicit_serial
+        elif topic_serial:
+            normalized[FIELD_DEVICE_SN] = topic_serial
+        if topic_serial:
+            if any(
+                (identifier := normalized.get(key)) is not None
+                and str(identifier) not in self._device_index
+                for key in (FIELD_DEVICE_ID, FIELD_DEV_ID)
+            ):
+                return None
+            resolved = self._resolve_device_id_from_mqtt(
+                normalized, allow_single_device_fallback=False
+            )
+            if resolved and self._resolve_device_sn(resolved) != topic_serial:
+                return None
+        return normalized
 
     def _resolve_device_sn(self, device_id: str) -> str | None:
         idx = self._device_index.get(device_id) or {}
@@ -8965,7 +9142,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         payload = (self.data or {}).get(parent_device_id)
         if not isinstance(payload, dict):
             return None
-        ordered = sorted_battery_pack_payloads(payload.get(PAYLOAD_BATTERY_PACKS))
+        packs = payload.get(PAYLOAD_BATTERY_PACKS)
+        if not isinstance(packs, list) or not packs:
+            packs = subdevice_accessories(
+                payload, dev_type=SUBDEVICE_DEV_TYPE_BATTERY_PACK
+            )
+        ordered = sorted_battery_pack_payloads(packs)
         serial_key = stable_subdevice_key("battery_pack", serial, pack_index)
         matching_serials = sum(
             stable_subdevice_key(
@@ -8991,8 +9173,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if not isinstance(payload, dict):
             return None
         packs = payload.get(PAYLOAD_BATTERY_PACKS)
-        if not isinstance(packs, list):
-            return None
+        if not isinstance(packs, list) or not packs:
+            packs = subdevice_accessories(
+                payload, dev_type=SUBDEVICE_DEV_TYPE_BATTERY_PACK
+            )
         ordered = sorted_battery_pack_payloads(packs)
         try:
             return battery_pack_serial(ordered[pack_index - 1])
@@ -9681,6 +9865,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             section,
             stat_keys,
             current_month=today.month,
+        ) or year_payload_omits_earlier_months(
+            source,
+            section,
+            stat_keys,
+            current_month=today.month,
         )
 
     def _apply_local_property_patch(
@@ -10308,7 +10497,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         merged_verified_days = merged.get(PAYLOAD_VERIFIED_DAY_STATISTICS)
         if isinstance(merged_verified_days, dict):
             merged[PAYLOAD_VERIFIED_DAY_STATISTICS] = (
-                self._current_week_verified_day_statistics(merged_verified_days)
+                self._completed_verified_day_statistics(merged_verified_days)
             )
         current_props = current.get(PAYLOAD_PROPERTIES)
         incoming_props = incoming.get(PAYLOAD_PROPERTIES)
@@ -10378,26 +10567,29 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         return merged
 
-    def _current_week_verified_day_statistics(
+    def _completed_verified_day_statistics(
         self,
         value: object,
     ) -> dict[str, Any]:
-        """Return only completed days in the coordinator's current week."""
+        """Retain completed evidence for the current year and crossing week."""
         if not isinstance(value, dict):
             return {}
         today = self._local_today()
-        week_start = today - timedelta(days=today.weekday())
+        window_start = min(
+            today.replace(month=1, day=1),
+            today - timedelta(days=today.weekday()),
+        )
         return {
             day_key: day_value
             for day_key, day_value in value.items()
-            if week_start.isoformat() <= day_key < today.isoformat()
+            if window_start.isoformat() <= day_key < today.isoformat()
             and isinstance(day_value, dict)
         }
 
     def _preserved_fast_payload_value(self, key: str, value: object) -> object:
         """Normalize one payload carried across a full HTTP rebuild."""
         if key == PAYLOAD_VERIFIED_DAY_STATISTICS:
-            return self._current_week_verified_day_statistics(value)
+            return self._completed_verified_day_statistics(value)
         return value
 
     def _merge_concurrent_coordinator_updates(
@@ -14234,16 +14426,45 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 if remaining <= 0 or self._statistics_backfill_should_stop():
                     all_devices_checked = False
                     break
+                day_budget = max(1, remaining // 2)
                 day = await self._async_http_backfill_recent_day_statistics(
                     {device_id: payload},
                     force=True,
                     include_current_year=True,
-                    request_budget=remaining,
+                    request_budget=day_budget,
                 )
                 remaining -= int(day.get("requests", 0))
                 actionable += int(day.get("actionable_sources", 0))
                 if day.get("rate_limited") or day.get("stopped"):
                     return
+                if remaining <= 0 or self._statistics_backfill_should_stop():
+                    all_devices_checked = False
+                    break
+                period = await self._async_http_backfill_period_statistics(
+                    {device_id: payload},
+                    request_budget=remaining,
+                )
+                remaining -= int(period.get("requests", 0))
+                actionable += int(period.get("actionable_sources", 0))
+                if period.get("rate_limited") or period.get("stopped"):
+                    return
+                if (
+                    not startup
+                    and remaining > 0
+                    and not self._statistics_backfill_should_stop()
+                ):
+                    verification = (
+                        await self._async_http_backfill_recent_day_statistics(
+                            {device_id: payload},
+                            force=True,
+                            include_current_year=True,
+                            request_budget=remaining,
+                            verification_only=True,
+                        )
+                    )
+                    remaining -= int(verification.get("requests", 0))
+                    if verification.get("rate_limited") or verification.get("stopped"):
+                        return
             if actionable == 0 and all_devices_checked:
                 self._statistics_startup_sync_pending = False
         finally:
@@ -14364,6 +14585,50 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Return Monday week starts intersecting an inclusive date range."""
         return iter_calendar_weeks(start_date, end_date)
 
+    @staticmethod
+    def _iter_calendar_years(start_date: date, end_date: date) -> list[int]:
+        """Return calendar years intersecting an inclusive date range."""
+        return iter_calendar_years(start_date, end_date)
+
+    @staticmethod
+    def _app_chart_period_meta(date_type: str) -> tuple[str, str] | None:
+        """Return the chart bucket id and label for an App period."""
+        return app_chart_period_meta(date_type)
+
+    @staticmethod
+    def _historical_app_period_kwargs(
+        date_type: str,
+        period_start: date,
+    ) -> dict[str, Any] | None:
+        """Build one explicit App period request."""
+        if date_type == DATE_TYPE_WEEK:
+            return app_period_request_kwargs(DATE_TYPE_WEEK, today=period_start)
+        if date_type == DATE_TYPE_MONTH:
+            return app_month_request_kwargs(period_start.year, period_start.month)
+        if date_type == DATE_TYPE_YEAR:
+            return app_year_request_kwargs(period_start.year)
+        return None
+
+    async def _async_fetch_historical_app_chart_source(
+        self,
+        **options: Unpack[_HistoricalAppChartFetchOptions],
+    ) -> dict[str, Any]:
+        """Fetch one explicit historical app chart source payload."""
+        kwargs = self._historical_app_period_kwargs(
+            options["date_type"],
+            options["period_start"],
+        )
+        if kwargs is None:
+            return {}
+        request_factory = self._historical_app_chart_request(options, kwargs)
+        if request_factory is None:
+            return {}
+        semaphore = getattr(self, "_slow_http_request_semaphore", None)
+        if semaphore is not None:
+            async with semaphore:
+                return await request_factory()
+        return await request_factory()
+
     def _day_chart_source_candidates(
         self,
         section_prefix: str,
@@ -14476,6 +14741,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 today=options["now"].date(),
                 now=options["now"],
                 keep_curve_over_smaller_scalar=True,
+                require_complete_day=options.get("require_complete_day", False),
             )
             if not points:
                 continue
@@ -16470,7 +16736,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         cycle: _GuardedUpdateCycle,
     ) -> None:
         """Build every device result from authoritative property responses."""
-        await asyncio.gather(
+        results = await asyncio.gather(
             *(
                 self._async_build_guarded_http_device(
                     dev_id,
@@ -16484,6 +16750,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             ),
             return_exceptions=True,
         )
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
 
     async def _async_create_guarded_update_cycle(
         self,
@@ -16618,7 +16887,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 self._async_ensure_mqtt,
                 name=f"{DOMAIN}_mqtt_ensure",
             )
-        self._schedule_mqtt_poll_queries(cycle.result)
         self._schedule_shadow_fallback(cycle.result)
         # The statistics timer owns system/device period fetches and imports.
         # Property failures must not postpone their cadence or backfill.
@@ -18387,6 +18655,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             results,
         )
 
+    async def _async_poll_cloud_mqtt(self, _now: datetime) -> None:
+        """Request MQTT data on its own clock, including while HTTP is stalled."""
+        self._schedule_mqtt_poll_queries(dict(self.data or {}))
+
     def _schedule_mqtt_poll_queries(self, snapshot: dict[str, dict[str, Any]]) -> None:
         """Queue Cloud-MQTT Layer-5 getters without blocking the HTTP result."""
         if self._shutdown_started:
@@ -18790,6 +19062,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             touched = True
         if await self._async_apply_smart_schedule(device_id, working):
             touched = True
+        if await self._async_apply_aiems_prediction(device_id, working):
+            touched = True
         if await self._async_apply_tou_plan(device_id, working):
             touched = True
         self._carry_forward_shadow_buckets(device_id, working)
@@ -18814,6 +19088,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         for bucket in (
             PAYLOAD_SMART_MODE,
             PAYLOAD_SMART_SCHEDULE,
+            PAYLOAD_AIEMS_ENERGY_PREDICTION,
             PAYLOAD_TOU_SCHEDULE,
         ):
             if working.get(bucket):
@@ -18934,6 +19209,34 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return False
         current = working.get(PAYLOAD_SMART_SCHEDULE)
         working[PAYLOAD_SMART_SCHEDULE] = (
+            {**current, **body} if isinstance(current, dict) else dict(body)
+        )
+        return True
+
+    async def _async_apply_aiems_prediction(
+        self,
+        device_id: str,
+        working: dict[str, Any],
+    ) -> bool:
+        """Fill the forecast bucket without importing predictions as energy."""
+        if not self._shadow_has_home_config_context(working):
+            return False
+        system_id = self._shadow_system_id(working)
+        if system_id is None:
+            return False
+        try:
+            body = await self.api.async_get_aiems_energy_prediction(system_id=system_id)
+        except (TimeoutError, HomeAssistantError, JackeryError) as err:
+            _LOGGER.debug(
+                "Jackery energy prediction query failed for %s: %s",
+                device_id,
+                exception_debug_message(err),
+            )
+            return False
+        if not isinstance(body, dict) or not body:
+            return False
+        current = working.get(PAYLOAD_AIEMS_ENERGY_PREDICTION)
+        working[PAYLOAD_AIEMS_ENERGY_PREDICTION] = (
             {**current, **body} if isinstance(current, dict) else dict(body)
         )
         return True
@@ -19283,8 +19586,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         statistic_id: str,
         hours: list[float],
         hourly_energy: dict[float, float],
+        *,
+        reset_period: str = DATE_TYPE_DAY,
     ) -> int:
-        """Rewrite one closed day of a daily energy sensor; return written rows.
+        """Rewrite one closed day of a native period energy sensor.
 
         Plan: ``util.plan_statistic_day_reconcile``. Rows go into the sensor's
         own statistic (``source="recorder"``); later rows shift by the corrected
@@ -19294,7 +19599,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         recorder = get_instance(self.hass)
         first, last = hours[0], hours[-1] + 3600
 
-        def _load() -> tuple[str | None, dict[float, StatisticRow]]:
+        def _load() -> tuple[str | None, dict[float, StatisticRow], bool]:
             with session_scope(session=recorder.get_session()) as session:
                 meta = (
                     session
@@ -19303,7 +19608,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     .first()
                 )
                 if meta is None:
-                    return None, {}
+                    # This path is selected for native kWh targets. The import
+                    # below creates their metadata together with the first rows.
+                    return UnitOfEnergy.KILO_WATT_HOUR, {}, True
                 base = session.query(
                     Statistics.start_ts,
                     Statistics.sum,
@@ -19325,22 +19632,32 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     .limit(1)
                     .all(),
                 ]
-                return meta[1], {
-                    float(start): StatisticRow(float(total), state, reset)
-                    for start, total, state, reset in found
-                }
+                return (
+                    meta[1],
+                    {
+                        float(start): StatisticRow(float(total), state, reset)
+                        for start, total, state, reset in found
+                    },
+                    False,
+                )
 
         # Earlier days' imports and adjusts are queued recorder tasks; read
         # only committed sums, or this day's shift is computed from stale rows.
         await recorder.async_block_till_done()
-        unit, existing = await recorder.async_add_executor_job(_load)
+        unit, existing, initialize_empty = await recorder.async_add_executor_job(_load)
         if unit != UnitOfEnergy.KILO_WATT_HOUR:
             return 0
+        if not existing and not initialize_empty:
+            # Metadata may already own 5-minute rows before hourly compilation.
+            # Defer instead of resetting their cumulative baseline to zero.
+            message = f"Waiting for hourly history of {statistic_id}"
+            raise JackeryStatisticHistoryPendingError(message)
         plan = plan_statistic_day_reconcile(
             hours,
             hourly_energy,
             existing,
-            lambda hour: self._period_reset_ts(hour, DATE_TYPE_DAY),
+            lambda hour: self._period_reset_ts(hour, reset_period),
+            initialize_empty=initialize_empty,
         )
         if plan.rows:
             async_import_statistics(
@@ -19364,6 +19681,71 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 UnitOfEnergy.KILO_WATT_HOUR,
             )
         return len(plan.rows)
+
+    async def _import_collected_repair_buckets(
+        self,
+        *,
+        device_id: str,
+        name_prefix: str,
+        collected: dict[tuple[str, str, date], dict[str, Any]],
+        period_meta_by_type: dict[str, tuple[str, str]],
+        to_date: date,
+    ) -> tuple[int, int]:
+        """Import closed App periods into their native Recorder sensor series."""
+        del name_prefix, period_meta_by_type
+        repaired = 0
+        failed = 0
+        for (section_prefix, date_type, _period_start), source in collected.items():
+            section = f"{section_prefix}_{date_type}"
+            for metric_section, stat_key, _metric_key, _label in APP_CHART_STAT_METRICS:
+                if metric_section != section_prefix:
+                    continue
+                points = trend_series_points(
+                    source,
+                    section,
+                    stat_key,
+                    today=to_date,
+                )
+                targets = [
+                    statistic_id
+                    for statistic_id, reset_period in self._energy_statistic_targets(
+                        device_id, section_prefix, stat_key
+                    )
+                    if reset_period == date_type
+                ]
+                for point in points:
+                    value = safe_float(point.value)
+                    if value is None or value < 0:
+                        continue
+                    point_start = point.start_date
+                    day = (
+                        point_start.astimezone(self._local_timezone()).date()
+                        if isinstance(point_start, datetime)
+                        else point_start
+                    )
+                    day_start = self._local_statistic_start(day).timestamp()
+                    day_end = self._local_statistic_start(
+                        day + timedelta(days=1)
+                    ).timestamp()
+                    hours = [
+                        float(hour)
+                        for hour in range(int(day_start), int(day_end), 3600)
+                    ]
+                    for statistic_id in targets:
+                        try:
+                            repaired += await self._async_reconcile_statistic_day(
+                                statistic_id,
+                                hours,
+                                {hours[-1]: value},
+                                reset_period=date_type,
+                            )
+                        except RECORDER_BACKGROUND_TASK_ERRORS:
+                            failed += 1
+                            _LOGGER.exception(
+                                "Jackery native period statistics repair failed for %s",
+                                statistic_id,
+                            )
+        return repaired, failed
 
     async def _async_fill_power_statistic_day(
         self,
@@ -19601,6 +19983,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 bucket_minutes=60,
                 now=now,
                 use_local_day_guard=False,
+                require_complete_day=True,
             )
             if points:
                 totals[stat_key] = round(sum(point.value for point in points), 5)
@@ -19617,9 +20000,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         device_id = window["device_id"]
         target_day = window["target_day"]
         section_prefix = window["section_prefix"]
-        week_start = window["week_start"]
         today = window["today"]
-        if not week_start <= target_day < today:
+        window_start = min(today.replace(month=1, day=1), window["week_start"])
+        if not window_start <= target_day < today:
             return
         if not day_totals:
             return
@@ -19637,7 +20020,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 for day_key, day_value in (
                     current_days.items() if isinstance(current_days, dict) else ()
                 )
-                if week_start.isoformat() <= day_key < today.isoformat()
+                if window_start.isoformat() <= day_key < today.isoformat()
                 and isinstance(day_value, dict)
             }
             updates[device_id] = device_days
@@ -19654,11 +20037,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         day_state: dict[str, Any],
         **window: Unpack[_VerifiedDayWindow],
     ) -> dict[str, float]:
-        """Convert and batch one completed current-week HTTP curve."""
+        """Convert and retain one completed HTTP day for period verification."""
         device_id = window["device_id"]
         target_day = window["target_day"]
         section_prefix = window["section_prefix"]
-        week_start = window["week_start"]
         today = window["today"]
         day_totals = self._verified_historical_day_totals(
             device_id=device_id,
@@ -19670,11 +20052,12 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             day_totals=day_totals,
             **window,
         )
-        if day_totals and week_start <= target_day < today:
+        if day_totals and target_day < today:
             # Persist the small derived totals alongside the source/day queue.
             # On restart, an already-imported Recorder bucket can restore
             # entity data without another cloud request.
             day_state[_STATISTICS_HTTP_VERIFIED_TOTALS] = day_totals
+            day_state["verified_totals_rule"] = _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
         return day_totals
 
     def _restore_or_reopen_imported_day_totals(
@@ -19691,11 +20074,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """
         target_day = window["target_day"]
         section_prefix = window["section_prefix"]
-        week_start = window["week_start"]
         today = window["today"]
-        in_current_week = week_start <= target_day < today
+        in_completed_window = (
+            min(today.replace(month=1, day=1), window["week_start"])
+            <= target_day
+            < today
+        )
         cached_totals = (
-            day_state.get(_STATISTICS_HTTP_VERIFIED_TOTALS) if in_current_week else None
+            day_state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
+            if in_completed_window
+            and day_state.get("verified_totals_rule")
+            == _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
+            else None
         )
         has_verified_totals = False
         if isinstance(cached_totals, dict) and cached_totals:
@@ -19774,6 +20164,40 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             source_state["empty_rule"] = _HTTP_DAY_EMPTY_IMPORT_RULE
         return source_state, days_state
 
+    @staticmethod
+    def _http_day_totals_verification_candidate(
+        progress: _HttpDayBackfillProgress,
+        candidate: _HttpDayBackfillCandidate,
+        today: date,
+    ) -> _HttpDayBackfillCandidate | None:
+        """Select old completed imports without reopening Recorder work."""
+        state = candidate.day_state
+        window_start = min(
+            today.replace(month=1, day=1), today - timedelta(days=today.weekday())
+        )
+        if not window_start <= candidate.target_day < today:
+            return None
+        if state.get("status") != BackfillStatus.IMPORTED.value:
+            return None
+        if state.get("totals_checked_date") == today.isoformat():
+            return None
+        expected = {
+            stat_key
+            for section, stat_key, _metric, _label in APP_CHART_STAT_METRICS
+            if section == candidate.section_prefix
+        }
+        if not expected:
+            return None
+        totals = state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
+        if (
+            state.get("verified_totals_rule") == _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
+            and isinstance(totals, dict)
+            and expected.issubset(totals)
+        ):
+            return None
+        progress.pending_sources += 1
+        return candidate
+
     def _http_day_backfill_candidate(
         self,
         progress: _HttpDayBackfillProgress,
@@ -19785,6 +20209,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> _HttpDayBackfillCandidate | None:
         """Select missing days, retaining completed imports and startup progress."""
         day_state = candidate.day_state
+        next_day = candidate.target_day + timedelta(days=1)
+        ready_epoch = self._local_statistic_start(next_day).timestamp() + 2 * 3600
+        if now_epoch < ready_epoch:
+            return None
+        if progress.verification_only:
+            return self._http_day_totals_verification_candidate(
+                progress, candidate, today
+            )
         key = (
             candidate.device_id,
             candidate.section_prefix,
@@ -19808,10 +20240,21 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             today=today,
         )
         progress.state_changed |= changed
-        if skip or (
+        checked_today = (
             day_state.get("status") in {"empty", "unmapped"}
             and day_state.get("checked_date") == today.isoformat()
-        ):
+        )
+        attempted_before_ready = False
+        if checked_today:
+            try:
+                attempted_at = datetime.fromisoformat(day_state["last_attempt_at"])
+                attempted_before_ready = (
+                    attempted_at.tzinfo is not None
+                    and attempted_at.timestamp() < ready_epoch
+                )
+            except KeyError, TypeError, ValueError:
+                pass
+        if skip or (checked_today and not attempted_before_ready):
             return None
         day_state["status"] = BackfillStatus.PENDING.value
         day_state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
@@ -19848,12 +20291,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     if not isinstance(day_state, dict):
                         day_state = {}
                         days_state[target_key] = day_state
+                    attempt_key = (
+                        "totals_last_attempt_at"
+                        if progress.verification_only
+                        else "last_attempt_at"
+                    )
+                    last_attempt = str(day_state.get(attempt_key) or "")
                     candidate = self._http_day_backfill_candidate(
                         progress,
                         _HttpDayBackfillCandidate(
                             priority=(0 if week_start <= target_day < today else 1),
-                            attempted=0,
-                            last_attempt="",
+                            attempted=int(bool(last_attempt)),
+                            last_attempt=last_attempt,
                             target_day=target_day,
                             attempts=0,
                             device_id=str(device_id),
@@ -19870,9 +20319,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         candidates.append(candidate)
         candidates.sort(
             key=lambda candidate: (
-                candidate.priority,
                 candidate.attempted,
                 candidate.last_attempt,
+                candidate.priority,
                 candidate.target_day.toordinal(),
                 candidate.attempts,
                 candidate.device_id,
@@ -19881,6 +20330,53 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         progress.actionable_sources = len(candidates)
         return candidates
+
+    async def _async_verify_imported_day_totals(
+        self,
+        candidate: _HttpDayBackfillCandidate,
+        progress: _HttpDayBackfillProgress,
+        *,
+        week_start: date,
+        today: date,
+    ) -> bool:
+        """Recover certified entity totals with no Recorder import or status rewrite."""
+        progress.requests += 1
+        status, source = await self._async_fetch_historical_day_chart_source(
+            device_id=candidate.device_id,
+            payload=candidate.payload,
+            target_day=candidate.target_day,
+            section_prefix=candidate.section_prefix,
+        )
+        state = candidate.day_state
+        state["totals_last_attempt_at"] = utc_now().isoformat()
+        progress.state_changed = True
+        if status not in {"fetched", "empty_ambiguous"}:
+            state["totals_last_error"] = status
+            progress.rate_limited = status == "rate_limited"
+            progress.stopped = status in {"rate_limited", "auth_error"}
+            return progress.stopped
+        totals = self._record_verified_day_totals_update(
+            progress.verified_day_updates,
+            device_id=candidate.device_id,
+            target_day=candidate.target_day,
+            section_prefix=candidate.section_prefix,
+            source=source,
+            day_state=state,
+            week_start=week_start,
+            today=today,
+        )
+        state["totals_checked_date"] = today.isoformat()
+        state["totals_last_error"] = None if totals else "incomplete_day_curve"
+        if totals:
+            progress.source_days += 1
+            progress.successful_devices.add(candidate.device_id)
+        else:
+            progress.unmapped_sources += 1
+        progress.pending_sources -= 1
+        progress.actionable_sources -= 1
+        progress.terminal_transitions += 1
+        await asyncio.sleep(0)
+        return False
 
     async def _async_process_http_day_backfill_candidate(
         self,
@@ -19911,7 +20407,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             progress.rate_limited = status == "rate_limited"
             progress.stopped = status in {"rate_limited", "auth_error"}
             return progress.stopped
-        imported = 0
+        imported = progress.gap_filled_rows
         ok: bool | None = False
         if status == "fetched":
             progress.source_days += 1
@@ -19943,6 +20439,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     return False
         else:
             ok = await self._async_import_month_chart_day(candidate, progress)
+            imported = progress.gap_filled_rows - imported
         state["status"] = (
             BackfillStatus.IMPORTED.value
             if ok
@@ -19988,6 +20485,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         today: date,
     ) -> None:
         """Process all selected days; honour explicit caller limits only."""
+        process = (
+            self._async_verify_imported_day_totals
+            if progress.verification_only
+            else self._async_process_http_day_backfill_candidate
+        )
         for candidate in (
             candidates
             if request_budget is None
@@ -19995,12 +20497,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         ):
             if self._statistics_backfill_should_stop():
                 break
-            if await self._async_process_http_day_backfill_candidate(
-                candidate,
-                progress,
-                week_start=week_start,
-                today=today,
-            ):
+            try:
+                stopped = await process(
+                    candidate,
+                    progress,
+                    week_start=week_start,
+                    today=today,
+                )
+            except JackeryStatisticHistoryPendingError as err:
+                candidate.day_state["last_error"] = str(err)
+                progress.state_changed = True
+                continue
+            if stopped:
                 break
 
     async def _async_finalize_http_day_backfill(
@@ -20016,6 +20524,21 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             })
         if progress.state_changed:
             await self._async_save_statistics_backfill_state()
+        if progress.verification_only:
+            verification_result = {
+                "requests": progress.requests,
+                "source_days": progress.source_days,
+                "pending_sources": progress.pending_sources,
+                "actionable_sources": progress.actionable_sources,
+                "rate_limited": progress.rate_limited,
+                "stopped": progress.stopped,
+                "unmapped_sources": progress.unmapped_sources,
+            }
+            self._statistics_import_diagnostics["last_http_totals_verification"] = {
+                "checked_at": utc_now().isoformat(),
+                **verification_result,
+            }
+            return verification_result
         backfill_had_source = progress.source_days > 0 and bool(
             progress.successful_devices
         )
@@ -20084,13 +20607,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     async def _async_http_backfill_recent_day_statistics(
         self,
         snapshot: dict[str, dict[str, Any]],
-        *,
-        force: bool = False,
-        window_days: int = _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS,
-        include_current_year: bool = False,
-        request_budget: int | None = None,
+        **options: Unpack[_HttpDayBackfillOptions],
     ) -> dict[str, Any]:
         """Fill every selected missing historical day."""
+        force = options.get("force", False)
+        window_days = options.get("window_days", _STATISTICS_HTTP_BACKFILL_WINDOW_DAYS)
+        include_current_year = options.get("include_current_year", False)
+        request_budget = options.get("request_budget")
+        verification_only = options.get("verification_only", False)
         diag = self._statistics_import_diagnostics
         now_monotonic = time.monotonic()
         since_last = now_monotonic - self._last_statistics_http_backfill_monotonic
@@ -20130,6 +20654,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             window_days=window_days,
             include_current_year=include_current_year,
             now_monotonic=now_monotonic,
+            verification_only=verification_only,
         )
         candidates = self._collect_http_day_backfill_candidates(
             snapshot,
@@ -20197,6 +20722,304 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                             starts.append(recorded)
         return min(starts, default=today.replace(month=1, day=1))
 
+    def _http_period_backfill_plan(
+        self,
+        today: date,
+        *,
+        from_date: date | None = None,
+    ) -> tuple[tuple[str, list[date]], ...]:
+        """Return enabled period ranges in queue priority order."""
+        from_date = from_date or date(today.year, 1, 1)
+        enabled = self._enabled_app_chart_date_types()
+        return tuple(
+            item
+            for item in (
+                (DATE_TYPE_MONTH, self._iter_calendar_months(from_date, today)),
+                (
+                    DATE_TYPE_YEAR,
+                    [
+                        date(year, 1, 1)
+                        for year in self._iter_calendar_years(from_date, today)
+                    ],
+                ),
+                (DATE_TYPE_WEEK, self._iter_calendar_weeks(from_date, today)),
+            )
+            if item[0] in enabled
+        )
+
+    def _http_period_backfill_sources_state(self, device_id: str) -> dict[str, Any]:
+        """Return normalized persistent period-source state for one device."""
+        device_state = self._statistics_backfill_device_state(device_id)
+        queue_state = device_state.setdefault("http_period_backfill", {})
+        if not isinstance(queue_state, dict):
+            queue_state = {}
+            device_state["http_period_backfill"] = queue_state
+        sources = queue_state.setdefault("sources", {})
+        if not isinstance(sources, dict):
+            sources = {}
+            queue_state["sources"] = sources
+        return sources
+
+    def _collect_http_period_backfill_candidates(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+        period_plan: tuple[tuple[str, list[date]], ...],
+        *,
+        today: date,
+        progress: _HttpPeriodBackfillProgress,
+    ) -> list[_HttpPeriodBackfillCandidate]:
+        """Build the persistent queue of missing closed App periods."""
+        priorities = {DATE_TYPE_MONTH: 0, DATE_TYPE_YEAR: 1, DATE_TYPE_WEEK: 2}
+        prefixes = tuple(dict.fromkeys(metric[0] for metric in APP_CHART_STAT_METRICS))
+        candidates: list[_HttpPeriodBackfillCandidate] = []
+        startup = getattr(self, "_statistics_startup_sync_pending", False)
+        visited: set[tuple[str, str, str]] = getattr(
+            self, "_statistics_startup_fetched", set()
+        )
+        for device_id in sorted(snapshot, key=str):  # ruff: ignore[too-many-nested-blocks]
+            payload = snapshot[device_id]
+            sources = self._http_period_backfill_sources_state(device_id)
+            for prefix in prefixes:
+                prefix_state = sources.setdefault(prefix, {})
+                if not isinstance(prefix_state, dict):
+                    prefix_state = {}
+                    sources[prefix] = prefix_state
+                for date_type, starts in period_plan:
+                    type_state = prefix_state.setdefault(date_type, {})
+                    if not isinstance(type_state, dict):
+                        type_state = {}
+                        prefix_state[date_type] = type_state
+                    for period_start in starts:
+                        key = period_start.isoformat()
+                        state = type_state.setdefault(key, {})
+                        if not isinstance(state, dict):
+                            state = {}
+                            type_state[key] = state
+                        closed = _backfill_period_is_closed(
+                            date_type, period_start, today=today
+                        )
+                        if not closed:
+                            state["period_open"] = True
+                            progress.open_sources += 1
+                            progress.state_changed = True
+                            continue
+                        visit_key = (device_id, f"{prefix}:{date_type}", key)
+                        if startup and visit_key in visited:
+                            continue
+                        status = _normalize_backfill_status(
+                            state.get("status"), closed=True
+                        )
+                        if not startup and state.get("period_open") is not True:
+                            if status is BackfillStatus.IMPORTED:
+                                continue
+                            if (
+                                state.get("status") in {"empty", "unmapped"}
+                                and state.get("checked_date") == today.isoformat()
+                            ):
+                                continue
+                        state.update({"status": "pending", "period_open": False})
+                        state.pop(_STATISTICS_HTTP_RETRY_AFTER_EPOCH, None)
+                        state.pop(_STATISTICS_HTTP_EMPTY_DEFERRALS, None)
+                        progress.pending_sources += 1
+                        progress.state_changed = True
+                        candidates.append(
+                            _HttpPeriodBackfillCandidate(
+                                priority=priorities[date_type],
+                                attempted=safe_int(state.get("attempts")) or 0,
+                                last_attempt=str(state.get("last_attempt_at") or ""),
+                                period_start=period_start,
+                                device_id=str(device_id),
+                                section_prefix=prefix,
+                                date_type=date_type,
+                                payload=payload,
+                                bucket_state=state,
+                                type_state=type_state,
+                            )
+                        )
+        candidates.sort(
+            key=lambda item: (
+                item.priority,
+                item.period_start,
+                item.device_id,
+                item.section_prefix,
+            )
+        )
+        progress.actionable_sources = len(candidates)
+        return candidates
+
+    async def _async_fetch_http_period_backfill_candidate(
+        self, candidate: _HttpPeriodBackfillCandidate
+    ) -> tuple[str, dict[str, Any]]:
+        """Fetch one period while keeping supplementary errors isolated."""
+        try:
+            fetched = await self._async_fetch_historical_app_chart_source(
+                device_id=candidate.device_id,
+                system_id=self._system_id_from_payload(
+                    candidate.device_id, candidate.payload
+                ),
+                ct_device_id=(
+                    self._smart_meter_accessory_device_id(candidate.payload)
+                    or self._smart_meter_accessory_device_id(
+                        getattr(self, "_device_index", {}).get(candidate.device_id)
+                        or {}
+                    )
+                ),
+                section_prefix=candidate.section_prefix,
+                date_type=candidate.date_type,
+                period_start=candidate.period_start,
+            )
+        except JackeryAuthError:
+            return "auth_error", {}
+        except (TimeoutError, HomeAssistantError, JackeryError) as err:
+            if _is_system_busy_error(err):
+                self._statistics_rate_limit_until = (
+                    time.time() + _rate_limit_retry_after_seconds(err)
+                )
+                return "rate_limited", {}
+            return "transport_error", {}
+        except Exception:  # ruff: ignore[blind-except]  # Dynamic endpoint errors remain retryable.
+            return "transport_error", {}
+        if isinstance(fetched, dict) and fetched:
+            return "fetched", dict(fetched)
+        return "empty_ambiguous", {}
+
+    async def _async_process_http_period_backfill_candidate(
+        self,
+        candidate: _HttpPeriodBackfillCandidate,
+        progress: _HttpPeriodBackfillProgress,
+        *,
+        today: date,
+    ) -> bool:
+        """Fetch and import one closed period; return whether the queue must stop."""
+        progress.requests += 1
+        state = candidate.bucket_state
+        status, source = await self._async_fetch_http_period_backfill_candidate(
+            candidate
+        )
+        state.update({
+            "last_attempt_at": utc_now().isoformat(),
+            "status": "pending",
+            "period_open": False,
+        })
+        if status not in {"fetched", "empty_ambiguous"}:
+            state["last_error"] = status
+            progress.rate_limited = status == "rate_limited"
+            progress.stopped = status in {"rate_limited", "auth_error"}
+            return progress.stopped
+        repaired = failed = 0
+        if status == "fetched":
+            period_meta = self._app_chart_period_meta(candidate.date_type)
+            repaired, failed = await self._import_collected_repair_buckets(
+                device_id=candidate.device_id,
+                name_prefix=candidate.device_id,
+                collected={
+                    (
+                        candidate.section_prefix,
+                        candidate.date_type,
+                        candidate.period_start,
+                    ): source
+                },
+                period_meta_by_type=(
+                    {candidate.date_type: period_meta}
+                    if period_meta is not None
+                    else {}
+                ),
+                to_date=today,
+            )
+        if failed:
+            state.update({"last_error": "recorder_error", "unimported_source": source})
+            return False
+        state["status"] = (
+            "imported" if repaired else "unmapped" if status == "fetched" else "empty"
+        )
+        state["checked_date"] = today.isoformat()
+        if repaired:
+            state.update({
+                "imported_rows": repaired,
+                "completed_at": utc_now().isoformat(),
+            })
+            state.pop("last_error", None)
+            state.pop("unimported_source", None)
+            progress.imported_sources += 1
+        elif state["status"] == "unmapped":
+            state.update({
+                "last_error": "no_mapped_points",
+                "unimported_source": source,
+            })
+            progress.unmapped_sources += 1
+        else:
+            state.pop("last_error", None)
+            progress.empty_sources += 1
+        visited = getattr(self, "_statistics_startup_fetched", None)
+        if visited is None:
+            visited = self._statistics_startup_fetched = set()
+        visited.add((
+            candidate.device_id,
+            f"{candidate.section_prefix}:{candidate.date_type}",
+            candidate.period_start.isoformat(),
+        ))
+        progress.pending_sources -= 1
+        progress.actionable_sources -= 1
+        progress.terminal_transitions += 1
+        await asyncio.sleep(0)
+        return False
+
+    async def _async_http_backfill_period_statistics(
+        self,
+        snapshot: dict[str, dict[str, Any]],
+        *,
+        request_budget: int | None = None,
+    ) -> dict[str, int]:
+        """Advance the independent closed week/month/year HTTP queue."""
+        await self._async_ensure_statistics_backfill_state_loaded()
+        today = self._local_today()
+        progress = _HttpPeriodBackfillProgress()
+        candidates = self._collect_http_period_backfill_candidates(
+            snapshot,
+            self._http_period_backfill_plan(
+                today, from_date=self._statistics_history_start(snapshot, today)
+            ),
+            today=today,
+            progress=progress,
+        )
+        selected = (
+            candidates
+            if request_budget is None
+            else candidates[: max(0, request_budget)]
+        )
+        for candidate in selected:
+            if self._statistics_backfill_should_stop():
+                progress.stopped = True
+                break
+            if await self._async_process_http_period_backfill_candidate(
+                candidate, progress, today=today
+            ):
+                break
+        if progress.state_changed:
+            await self._async_save_statistics_backfill_state()
+        self._statistics_import_diagnostics.update({
+            "last_period_backfill_requests": progress.requests,
+            "last_period_backfill_imported_sources": progress.imported_sources,
+            "last_period_backfill_pending_sources": progress.pending_sources,
+            "last_period_backfill_actionable_sources": progress.actionable_sources,
+            "last_period_backfill_open_sources": progress.open_sources,
+            "last_period_backfill_rate_limited": progress.rate_limited,
+            "last_period_backfill_empty_sources": progress.empty_sources,
+            "last_period_backfill_unmapped_sources": progress.unmapped_sources,
+        })
+        return {
+            "requests": progress.requests,
+            "imported_sources": progress.imported_sources,
+            "terminal_transitions": progress.terminal_transitions,
+            "pending_sources": progress.pending_sources,
+            "actionable_sources": progress.actionable_sources,
+            "open_sources": progress.open_sources,
+            "rate_limited": int(progress.rate_limited),
+            "stopped": int(progress.stopped),
+            "empty_sources": progress.empty_sources,
+            "unmapped_sources": progress.unmapped_sources,
+        }
+
     @property
     def local_mqtt_config_diagnostics(self) -> dict[str, Any]:
         """Device-side 3046/BLE-113 configuration lifecycle."""
@@ -20253,6 +21076,23 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             seen.add(candidate)
             deduped.append(candidate)
         return deduped
+
+    def _enabled_app_chart_date_types(self) -> set[str]:
+        """Return App period types enabled by the entry options."""
+        enabled = {DATE_TYPE_DAY}
+        if config_entry_bool_option(
+            self.entry, CONF_ENABLE_WEEK_STATISTICS, DEFAULT_ENABLE_WEEK_STATISTICS
+        ):
+            enabled.add(DATE_TYPE_WEEK)
+        if config_entry_bool_option(
+            self.entry, CONF_ENABLE_MONTH_STATISTICS, DEFAULT_ENABLE_MONTH_STATISTICS
+        ):
+            enabled.add(DATE_TYPE_MONTH)
+        if config_entry_bool_option(
+            self.entry, CONF_ENABLE_YEAR_STATISTICS, DEFAULT_ENABLE_YEAR_STATISTICS
+        ):
+            enabled.add(DATE_TYPE_YEAR)
+        return enabled
 
     def _derived_home_energy_fallback_enabled(self) -> bool:
         """Return whether derived home-energy fallback may be used."""
