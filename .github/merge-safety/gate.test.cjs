@@ -234,7 +234,7 @@ test('workflow_run with no associated PRs sweeps open bot PRs', async () => {
 
 test('ruleset contexts and completion triggers stay synchronized with policy', () => {
   const rules = ruleset.rules.find(r => r.type === 'required_status_checks');
-  assert.deepEqual(rules.parameters.required_status_checks.map(c => c.context), requiredContexts);
+  assert.deepEqual(rules.parameters.required_status_checks.map(c => c.context).sort(), [...requiredContexts].sort());
   const workflow = fs.readFileSync(path.join(__dirname, '../workflows/Auto-merge-Dependabot.yml'), 'utf8');
   for (const w of Object.values(policy.workflows)) assert.ok(workflow.includes(`      - ${w.name}\n`));
   assert.ok(workflow.includes('ref: ${{ github.sha }}'));
