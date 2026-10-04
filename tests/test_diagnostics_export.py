@@ -445,9 +445,7 @@ async def test_local_mqtt_diagnostics_redacts_broker_wide_topic() -> None:
 
     local_mqtt = result["raw_api"]["local_mqtt"]
     assert local_mqtt["disabled_reason"] == "client_not_started"
-    assert (
-        local_mqtt["configured_local_mqtt"]["effective_topic_filter"] == "#"
-    )
+    assert local_mqtt["configured_local_mqtt"]["effective_topic_filter"] == "#"
 
 
 @pytest.mark.asyncio()
