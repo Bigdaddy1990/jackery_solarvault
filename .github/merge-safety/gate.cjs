@@ -25,7 +25,8 @@ function protectedBy(ruleset, effectiveRules) {
     ruleset.target === 'branch' && ruleset.bypass_actors?.length === 0 &&
     ['pull_request', 'deletion', 'non_fast_forward'].every(type =>
       ruleset.rules?.some(rule => rule.type === type)) &&
-    ruleset.rules.some(requiredRule) && effectiveRules.some(requiredRule);
+    ruleset.rules.some(requiredRule) && Number.isInteger(ruleset.id) &&
+    effectiveRules.some(rule => rule.ruleset_id === ruleset.id && requiredRule(rule));
 }
 
 function latestRuns(runs, pr, repository) {

@@ -41,7 +41,7 @@ For each open, non-draft, same-repository Dependabot PR targeting main:
 1. Revoke any existing native auto-merge request.
 2. Require the active `main-required-ci` ruleset, no bypass actors, all app-bound
    required checks, strict up-to-date checks, a PR requirement, no deletion or
-   force pushes, and effective required checks on main. Missing/unreadable
+   force pushes, and effective required checks on main from this exact ruleset ID. Missing/unreadable
    protection blocks merging.
 3. Read all pages of PR workflow runs for the exact current head SHA and branch.
    Select the newest run of each workflow and jobs from its latest attempt.
@@ -108,7 +108,7 @@ workflows at the three historical incident SHAs. The positive case asserts the
 exact SHA sent to the merge API. The workflow makes this regression a required
 check on every PR, without a path filter or conditional skip.
 
-Local validation: 87 tests passed on Node 24.19.0; the three changed/new workflow
+Local validation: 88 tests passed on Node 24.19.0; the three changed/new workflow
 YAML files parsed successfully. This is local regression evidence, not a claim
 that the repository's full CI is green or that server-side rules are installed.
 

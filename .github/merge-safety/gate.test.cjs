@@ -6,7 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { policy, requiredContexts, eligible, protectedBy, latestRuns, successful,
   mergeCandidate, run } = require('./gate.cjs');
-const ruleset = require('./main-ruleset.json');
+const ruleset = { id: 1, ...require('./main-ruleset.json') };
+const effective = rules => rules.map(rule => ({ ...rule, ruleset_id: 1 }));
 const repository = 'Bigdaddy1990/jackery_solarvault';
 const repo = { owner: 'Bigdaddy1990', repo: 'jackery_solarvault' };
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -60,7 +61,7 @@ function client(f, change = () => {}) {
       return clone(f.jobs.get(args.run_id) || []);
     },
     request: async route => ({ data: route.includes('/rules/branches/') ?
-      clone(f.rules.rules) : clone(f.rules) }),
+      effective(clone(f.rules.rules)) : clone(f.rules) }),
     graphql: async () => { writes.push('disable-auto-merge'); f.pr.auto_merge = null; }
   };
   const errors = [];
@@ -188,16 +189,20 @@ test('conflict, behind, unknown mergeability and blocked state cannot merge', as
 });
 
 test('protection must be active, strict, complete, app-bound, effective and without bypass', () => {
-  assert.equal(protectedBy(ruleset, ruleset.rules), true);
+  assert.equal(protectedBy(ruleset, effective(ruleset.rules)), true);
   for (const mutate of [r => r.enforcement = 'evaluate',
     r => r.bypass_actors.push({ actor_id: 5, actor_type: 'Integration', bypass_mode: 'always' }),
     r => r.rules.pop(), r => r.rules[3].parameters.strict_required_status_checks_policy = false,
     r => r.rules[3].parameters.required_status_checks.pop(),
     r => r.rules[3].parameters.required_status_checks[0].integration_id = null]) {
     const r = clone(ruleset); mutate(r);
-    assert.equal(protectedBy(r, r.rules), false);
+    assert.equal(protectedBy(r, effective(r.rules)), false);
   }
   assert.equal(protectedBy(ruleset, []), false);
+});
+
+test('checks from another effective ruleset cannot prove the no-bypass ruleset applies', () => {
+  assert.equal(protectedBy(ruleset, ruleset.rules.map(rule => ({ ...rule, ruleset_id: 2 }))), false);
 });
 
 test('missing protection, API error or changed protection never merges', async () => {
