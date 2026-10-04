@@ -1,23 +1,50 @@
 name: Auto-merge Dependabot
-on: pull_request
+
+on:
+  # This privileged workflow never checks out or executes a PR head.
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main]
+  workflow_run:
+    workflows:
+      - CI
+      - Validate
+      - Pre-commit Lite
+      - pre-commit-autofix
+      - Python Modernization
+      - Pyrefly Type Check
+      - Dependency Review
+      - Merge Safety Regression
+    types: [completed]
+  workflow_dispatch:
 
 concurrency:
-  group: auto-mergen-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Serialize decisions, including dispatch sweeps and different completed checks.
+  group: dependabot-merge-safety
+  cancel-in-progress: false
 
 permissions:
-  contents: write # for actions/checkout, if you're in a private repo
+  contents: write
   pull-requests: write
-  actions: write
-  checks: write
-  id-token: write # for Trusted Publishing + attest-action
+  actions: read
 
 jobs:
   automerge:
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    timeout-minutes: 10
     steps:
-      - uses: peter-evans/enable-pull-request-automerge@v3
+      - name: Checkout trusted base code
+        uses: actions/checkout@v7
         with:
-          pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: squash
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify current head and merge only after all mandatory checks
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { run } = require('./.github/merge-safety/gate.cjs');
+            await run({ github, context, core });
