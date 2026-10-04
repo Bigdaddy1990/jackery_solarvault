@@ -1082,8 +1082,14 @@
       "main_battery_charge_energy": {
         "name": "Main battery lifetime charge energy"
       },
+      "main_battery_charge_energy_direct": {
+        "name": "Main battery lifetime charged energy"
+      },
       "main_battery_discharge_energy": {
         "name": "Main battery lifetime discharge energy"
+      },
+      "main_battery_discharge_energy_direct": {
+        "name": "Main battery lifetime discharged energy"
       },
       "max_feed_grid_read": {
         "name": "Puissance d'injection maximale (runtime)"
