@@ -1,7 +1,7 @@
 """Unit tests for shared Jackery entity metadata helpers."""
 
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
@@ -34,6 +34,9 @@ from custom_components.jackery_solarvault.sensor import (
     JackeryMeterHeadSensor,
     JackerySmartMeterSensor,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.device_registry import DeviceInfo
 
 
 def _entity(payload: dict[str, object]) -> JackeryEntity:
@@ -90,7 +93,7 @@ def test_device_info_ignores_blank_metadata_fields() -> None:
         PAYLOAD_OTA: {FIELD_CURRENT_VERSION: " "},
     })
 
-    info = entity.device_info
+    info = cast("DeviceInfo", entity.device_info)
 
     assert info["name"] == "Discovery Name"
     assert info["model"] == "Pro Model"
@@ -152,7 +155,7 @@ def test_battery_pack_device_info_ignores_blank_metadata_fields() -> None:
     entity._pack_sn = None  # ruff: ignore[private-member-access]
     entity._pack_key = "battery_pack_1"  # ruff: ignore[private-member-access]
 
-    info = entity.device_info
+    info = cast("DeviceInfo", entity.device_info)
 
     assert info["name"] == "Main Name Battery pack 1"
     assert info["model"] == "Battery Model"
@@ -183,7 +186,7 @@ def test_meter_head_device_info_ignores_blank_metadata_fields() -> None:
     )
     entity._meter_head_index = 1  # ruff: ignore[private-member-access]
 
-    info = entity.device_info
+    info = cast("DeviceInfo", entity.device_info)
 
     assert info["name"] == "Main Name Meter A"
     assert info["model"] == "Meter Model"
@@ -206,7 +209,7 @@ def test_smart_meter_device_info_ignores_blank_metadata_fields() -> None:
         },
     )
 
-    info = entity.device_info
+    info = cast("DeviceInfo", entity.device_info)
 
     assert info["name"] == "Main Name Smart Meter"
     assert info["model"] == "Smart Meter"
@@ -221,7 +224,7 @@ def test_smart_meter_device_info_uses_device_id_when_serial_is_absent() -> None:
         {PAYLOAD_CT_METER: {FIELD_DEVICE_ID: " CT-Device-42 "}},
     )
 
-    info = entity.device_info
+    info = cast("DeviceInfo", entity.device_info)
 
     assert info["serial_number"] == "CT-Device-42"
     assert info["identifiers"] == {(DOMAIN, "dev1_smart_meter_ct_device_42")}

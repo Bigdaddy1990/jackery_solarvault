@@ -77,6 +77,7 @@ def test_pack_cell_temperature_is_registered_from_complete_payload() -> None:
         for entity in collection.entities
         if entity.entity_description.key == "cell_temperature"
     )
+    assert isinstance(temperature, JackeryBatteryPackSensor)
     assert temperature._value_from_pack(pack) == pytest.approx(25.9)  # ruff: ignore[private-member-access]
 
 
@@ -236,7 +237,9 @@ def test_pack_firmware_version_updates_registered_device(
 
     sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
 
-    assert registry.async_get(device.id).sw_version == "1.4"
+    updated = registry.async_get(device.id)
+    assert isinstance(updated, dr.DeviceEntry)
+    assert updated.sw_version == "1.4"
 
 
 def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:

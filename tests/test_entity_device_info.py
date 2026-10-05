@@ -7,7 +7,7 @@ model/name always wins when present — only the fallback changes.
 """
 
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -42,6 +42,9 @@ from custom_components.jackery_solarvault.sensor import (
 from custom_components.jackery_solarvault.switch import JackeryBreakerSwitch
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+if TYPE_CHECKING:
+    from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 
 _DEVICE_ID = "home-power-3002"
 
@@ -82,7 +85,7 @@ def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:
 
 def test_device_info_model_falls_back_family_neutral() -> None:
     """Blank model source fields resolve to the neutral fallback, not "SolarVault"."""
-    info = _entity({}).device_info
+    info = cast("DeviceInfo", _entity({}).device_info)
 
     assert info["model"] == DEFAULT_DEVICE_MODEL_FALLBACK
     assert info["model"] != "SolarVault"
@@ -92,14 +95,14 @@ def test_device_info_model_uses_reported_model_when_present() -> None:
     """A real reported model always wins over the fallback."""
     payload = {PAYLOAD_DISCOVERY: {FIELD_DEV_MODEL: "HTH0132500A"}}
 
-    assert _entity(payload).device_info["model"] == "HTH0132500A"
+    assert cast("DeviceInfo", _entity(payload).device_info)["model"] == "HTH0132500A"
 
 
 def test_parent_device_info_exposes_normalized_mac_connection() -> None:
     """The native and MQTT registry entries share the parent device MAC."""
     payload = {PAYLOAD_PROPERTIES: {FIELD_MAC: "AA-BB-CC-11-22-33"}}
 
-    assert _entity(payload).device_info["connections"] == {
+    assert cast("DeviceInfo", _entity(payload).device_info)["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
     }
 
@@ -132,7 +135,7 @@ def test_main_battery_uses_child_device_without_changing_entity_identity(
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
-        info = entity.device_info
+        info = cast("ChildDeviceInfo", entity.device_info)
         assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_main_battery")}
         assert info["parent_device_id"] == parent.id
         assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
@@ -171,6 +174,7 @@ def test_ct_statistics_join_existing_smart_meter_device(hass: Any) -> None:
         config_entry_id=entry_id,
         identifiers=entity.device_info["identifiers"],
     )
+    assert entity.unique_id is not None
     er.async_get(hass).async_get_or_create(
         "sensor",
         DOMAIN,
@@ -203,7 +207,7 @@ def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> 
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
-        info = entity.device_info
+        info = cast("ChildDeviceInfo", entity.device_info)
         assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_pv_input_1")}
         assert info["parent_device_id"] == parent.id
         assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
