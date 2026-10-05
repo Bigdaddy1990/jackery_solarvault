@@ -1,42 +1,29 @@
-"""Real-recorder tests for app-chart external statistics upsert behavior.
+"""Real-recorder regression tests for native app-chart energy reconciliation.
 
-These exercise :meth:`JackerySolarVaultCoordinator._async_add_app_chart_statistics`
-against a genuine Home Assistant recorder (``recorder_mock``) and assert the
-actual stored ``state``/``sum`` rows via ``statistics_during_period``. The only
-mocked boundary is the recorder fixture itself; all statistic-import logic is
-real production code.
-
-The day-hourly ``statistic_id`` has no date part, so its cumulative ``sum``
-runs across every imported day. The bug under test dropped Jackery's historical
-corrections and left trailing rows with stale sums (a non-monotonic sequence HA
-reads as a spurious counter reset). Each test is written so it fails on the
-pre-fix behavior and passes once corrections are re-emitted from the first
-divergent bucket.
+The current importer writes the sensor's own Recorder statistic. These tests
+retain the historical correction, insertion, retry and user-adjustment cases
+from the former external-statistics importer, using complete closed-day curves.
 """
 
-import asyncio
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 import itertools
 import operator
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_homeassistant_custom_component.components.recorder.common import (
     async_wait_recording_done,
 )
 
-from custom_components.jackery_solarvault.const import (
-    DOMAIN,
-    EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-)
 import custom_components.jackery_solarvault.coordinator as coordinator_module
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
-from custom_components.jackery_solarvault.util import external_trend_statistic_id
 from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.db_schema import StatisticsMeta
+from homeassistant.components.recorder.models import StatisticMeanType
 from homeassistant.components.recorder.statistics import (
     adjust_statistics,
     statistics_during_period,
@@ -44,20 +31,12 @@ from homeassistant.components.recorder.statistics import (
 from homeassistant.const import UnitOfEnergy
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from homeassistant.components.recorder import Recorder
     from homeassistant.core import HomeAssistant
 
-_DEVICE_ID = "dev1"
-_METRIC_KEY = "pv_energy"
-_STAT_ID = external_trend_statistic_id(
-    DOMAIN,
-    _DEVICE_ID,
-    _METRIC_KEY,
-    EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-)
-_EXPECTED_FIRST_IMPORT_COUNT = 3
+_STAT_ID = "sensor.jackery_pv_energy_today"
+_EXPECTED_FIRST_IMPORT_COUNT = 24
+_BASELINE = datetime(2026, 6, 30, 23, tzinfo=UTC)
 
 
 def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
@@ -65,10 +44,6 @@ def _coordinator(hass: HomeAssistant) -> JackerySolarVaultCoordinator:
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     obj = cast("Any", coordinator)
     obj.hass = hass
-    obj._stat_import_last_sig = {}  # ruff: ignore[private-member-access]
-    obj._statistics_import_diagnostics = {}  # ruff: ignore[private-member-access]
-    obj._statistics_recorder_lock = asyncio.Lock()  # ruff: ignore[private-member-access]
-    obj._device_index = {}  # ruff: ignore[private-member-access]
     return coordinator  # pyrefly: ignore [no-any-return-implicit]
 
 
@@ -83,22 +58,19 @@ async def _import(
     points: list[SimpleNamespace],
 ) -> tuple[bool, int]:
     """Import a day-hourly series and block until the recorder has committed."""
-    result = await coordinator._async_add_app_chart_statistics(  # ruff: ignore[private-member-access]
-        device_id=_DEVICE_ID,
-        name_prefix="Jackery",
-        metric_key=_METRIC_KEY,
-        label="PV Energy",
-        bucket=EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-        bucket_label="Day (hourly)",
-        points=points,
+    day = points[0].start_date.replace(hour=0)
+    hours = [(day + timedelta(hours=hour)).timestamp() for hour in range(24)]
+    count = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+        _STAT_ID,
+        hours,
+        {point.start_date.timestamp(): point.value for point in points},
     )
     await async_wait_recording_done(hass)
-    # pyrefly: ignore [no-any-return-implicit]
-    return result
+    return True, count
 
 
 async def _read_rows(hass: HomeAssistant) -> list[dict[str, Any]]:
-    """Return the stored (start, state, sum) rows for the day-hourly series."""
+    """Return stored (start, state, sum) rows for the native sensor series."""
     rows = await get_instance(hass).async_add_executor_job(
         statistics_during_period,
         hass,
@@ -137,14 +109,33 @@ def mock_recorder_before_hass(recorder_db_url: str) -> None:
     del recorder_db_url
 
 
+@pytest.fixture(autouse=True)
+async def initial_native_history(recorder_mock: Recorder, hass: HomeAssistant) -> None:
+    """Anchor corrections on an existing native sensor history, as in production."""
+    del recorder_mock
+    coordinator_module.async_import_statistics(
+        hass,
+        {
+            "mean_type": StatisticMeanType.NONE,
+            "has_sum": True,
+            "name": None,
+            "source": "recorder",
+            "statistic_id": _STAT_ID,
+            "unit_class": "energy",
+            "unit_of_measurement": UnitOfEnergy.KILO_WATT_HOUR,
+        },
+        [{"start": _BASELINE, "sum": 0.0, "state": 0.0}],
+    )
+    await async_wait_recording_done(hass)
+
+
 async def test_corrected_bucket_sum_is_updated_not_dropped(
     recorder_mock: Recorder,
     hass: HomeAssistant,
 ) -> None:
     """A corrected interval re-import updates the cumulative sum chain.
 
-    External app-chart rows intentionally carry only ``sum``: the chart value
-    is an interval increment, not a second HA sensor-state channel.
+    Native rows carry both cumulative sums and daily-reset sensor states.
     """
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
@@ -165,7 +156,7 @@ async def test_corrected_bucket_sum_is_updated_not_dropped(
 
     assert ok is True
     rows = await _read_rows(hass)
-    assert _row_at(rows, hour11)["state"] is None
+    assert _row_at(rows, hour11)["state"] == pytest.approx(6.0)
     assert _row_at(rows, hour11)["sum"] == pytest.approx(6.0)
     # The trailing bucket is rebased on the correction, keeping the sum monotonic.
     assert _row_at(rows, hour12)["sum"] == pytest.approx(9.0)
@@ -177,35 +168,42 @@ async def test_import_waits_for_public_recorder_commit_before_success(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A queued external statistic is not successful until Recorder commits it."""
+    """The next import reads committed rows and writes no duplicates."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
-    queued_import = MagicMock()
-    recorder_commit = AsyncMock()
     recorder = get_instance(hass)
     assert recorder is recorder_mock
-    monkeypatch.setattr(
-        coordinator_module,
-        "async_add_external_statistics",
-        queued_import,
-    )
-    monkeypatch.setattr(recorder, "async_block_till_done", recorder_commit)
-    kwargs = {
-        "device_id": _DEVICE_ID,
-        "name_prefix": "Jackery",
-        "metric_key": "queued_live_energy",
-        "label": "Queued live energy",
-        "bucket": EXTERNAL_STAT_BUCKET_DAY_HOURLY,
-        "bucket_label": "Day (hourly)",
-        "points": [_point(datetime(2026, 7, 1, 18, tzinfo=UTC), 4.5)],
-    }
-    first = await coordinator._async_add_app_chart_statistics(**kwargs)  # ruff: ignore[private-member-access]
-    duplicate = await coordinator._async_add_app_chart_statistics(**kwargs)  # ruff: ignore[private-member-access]
+    events: list[str] = []
+    commit = recorder.async_block_till_done
+    import_statistics = coordinator_module.async_import_statistics
 
-    assert first == (True, 1)
-    assert duplicate == (True, 0)
-    assert queued_import.call_count == 1
-    recorder_commit.assert_awaited_once_with()
+    async def commit_pending() -> None:
+        events.append("commit")
+        await commit()
+
+    def enqueue(*args: Any, **kwargs: Any) -> None:
+        events.append("import")
+        import_statistics(*args, **kwargs)
+
+    monkeypatch.setattr(recorder, "async_block_till_done", commit_pending)
+    monkeypatch.setattr(coordinator_module, "async_import_statistics", enqueue)
+    day = datetime(2026, 7, 1, tzinfo=UTC)
+    hours = [(day + timedelta(hours=h)).timestamp() for h in range(24)]
+    energy = {hours[18]: 4.5}
+    first = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+        _STAT_ID, hours, energy
+    )
+    duplicate = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+        _STAT_ID, hours, energy
+    )
+
+    assert first == _EXPECTED_FIRST_IMPORT_COUNT
+    assert duplicate == 0
+    assert events == ["commit", "import", "commit"]
+    await async_wait_recording_done(hass)
+    assert _row_at(await _read_rows(hass), day + timedelta(hours=18))[
+        "sum"
+    ] == pytest.approx(4.5)
 
 
 async def test_mid_series_insertion_keeps_sum_monotonic(
@@ -233,7 +231,9 @@ async def test_mid_series_insertion_keeps_sum_monotonic(
     )
 
     rows = await _read_rows(hass)
-    assert [row["sum"] for row in rows] == pytest.approx([1.0, 5.0, 7.0])
+    assert [
+        _row_at(rows, hour)["sum"] for hour in (hour10, hour11, hour12)
+    ] == pytest.approx([1.0, 5.0, 7.0])
     _assert_monotonic(rows)
 
 
@@ -241,7 +241,7 @@ async def test_identical_reimport_is_idempotent(
     recorder_mock: Recorder,
     hass: HomeAssistant,
 ) -> None:
-    """Re-importing an unchanged series writes nothing (signature short-circuit)."""
+    """Re-importing an unchanged series writes nothing after reading stored rows."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
     base = datetime(2026, 7, 3, 10, tzinfo=UTC)
@@ -270,14 +270,7 @@ async def test_earlier_day_correction_rebases_later_day(
     recorder_mock: Recorder,
     hass: HomeAssistant,
 ) -> None:
-    """Cross-day: correcting day 1 re-bases day 2's shared-id cumulative sums.
-
-    The day-hourly ``statistic_id`` spans all days, so day 2's offset is day 1's
-    last sum. Pre-fix, re-importing day 2 (unchanged raw states) short-circuited
-    on the raw-only signature and its sums stayed stale, dropping below day 1's
-    corrected tail. Folding the offset into the signature forces day 2 to
-    re-import and rebase.
-    """
+    """A native day correction shifts later sums without changing their energy."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
     d1 = datetime(2026, 7, 4, 10, tzinfo=UTC)
@@ -351,7 +344,10 @@ async def test_late_historical_day_rebases_already_imported_future_day(
     )
 
     rows = await _read_rows(hass)
-    assert [row["sum"] for row in rows] == pytest.approx([
+    assert [
+        _row_at(rows, hour)["sum"]
+        for hour in (d0, d1, d1 + timedelta(hours=1), d2, d2 + timedelta(hours=1))
+    ] == pytest.approx([
         100.0,
         110.0,
         112.0,
@@ -361,38 +357,55 @@ async def test_late_historical_day_rebases_already_imported_future_day(
     _assert_monotonic(rows)
 
 
-@pytest.mark.parametrize(
-    "failed_query", ["_load_offset", "statistics_during_period", "_load_future"]
-)
+@pytest.mark.parametrize("failed_read", ["metadata", "day", "before", "after"])
 async def test_recorder_read_failure_preserves_rows_and_allows_retry(
     recorder_mock: Recorder,
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
-    failed_query: str,
+    failed_read: str,
 ) -> None:
-    """A failed read must not become an empty baseline or acknowledge an import."""
+    """Failure at any native history read preserves rows and permits retry."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
     start = datetime(2026, 7, 10, 10, tzinfo=UTC)
     await _import(coordinator, hass, [_point(start, 10.0)])
     await _import(coordinator, hass, [_point(start + timedelta(days=1), 2.0)])
     before = await _read_rows(hass)
-    execute = recorder_mock.async_add_executor_job
+    scope = coordinator_module.session_scope
+    method_name = "first" if failed_read == "metadata" else "all"
+    failure_index = {"metadata": 0, "day": 0, "before": 1, "after": 2}[failed_read]
 
-    async def fail_read(target: Callable[..., object], *args: object) -> object:
-        if getattr(target, "__name__", None) == failed_query:
-            message = "recorder read unavailable"
-            raise RuntimeError(message)
-        return await execute(target, *args)
+    @contextmanager
+    def failing_scope(*args: Any, **kwargs: Any) -> Any:
+        with scope(*args, **kwargs) as session:
+            query_class = type(session.query(StatisticsMeta))
+            original_read = getattr(query_class, method_name)
+            calls = 0
+
+            def read(query_self: Any, *read_args: Any, **read_kwargs: Any) -> Any:
+                nonlocal calls
+                current = calls
+                calls += 1
+                if current == failure_index:
+                    message = "recorder read unavailable"
+                    raise RuntimeError(message)
+                return original_read(query_self, *read_args, **read_kwargs)
+
+            with monkeypatch.context() as reader_patch:
+                reader_patch.setattr(query_class, method_name, read)
+                yield session
 
     with monkeypatch.context() as patch:
-        patch.setattr(recorder_mock, "async_add_executor_job", fail_read)
-        result = await _import(coordinator, hass, [_point(start, 3.0)])
+        # The executor runs the actual metadata/day/before/after SQL reads.
+        patch.setattr(coordinator_module, "session_scope", failing_scope)
+        with pytest.raises(RuntimeError, match="recorder read unavailable"):
+            await _import(coordinator, hass, [_point(start, 3.0)])
 
-    assert result == (False, 0)
     assert await _read_rows(hass) == before
     assert (await _import(coordinator, hass, [_point(start, 3.0)]))[0]
-    assert [row["sum"] for row in await _read_rows(hass)] == pytest.approx([3.0, 5.0])
+    rows = await _read_rows(hass)
+    assert _row_at(rows, start)["sum"] == pytest.approx(3.0)
+    assert _row_at(rows, start + timedelta(days=1))["sum"] == pytest.approx(5.0)
 
 
 async def test_user_adjusted_prior_sums_are_preserved(
@@ -431,7 +444,10 @@ async def test_user_adjusted_prior_sums_are_preserved(
     )
 
     continued = await _read_rows(hass)
-    assert [row["sum"] for row in continued] == pytest.approx(
+    assert [
+        _row_at(continued, hour)["sum"]
+        for hour in (d1, d1 + timedelta(hours=1), d2, d2 + timedelta(hours=1))
+    ] == pytest.approx(
         [100_001.0, 100_003.0, 100_007.0, 100_012.0],
     )
     _assert_monotonic(continued)

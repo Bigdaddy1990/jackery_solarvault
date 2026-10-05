@@ -1352,10 +1352,10 @@ class JackeryMqttPushClient:
         """Return the exact MQTT topic for transport diagnostics.
 
         Parameters:
-                topic (str | None): MQTT topic to redact, or `None`.
+                topic (str | None): MQTT topic to report, or `None`.
 
         Returns:
-                None if `topic` is `None`; otherwise the possibly-redacted topic string.
+                The complete topic string, or `None` if no topic is available.
         """
         return topic
 

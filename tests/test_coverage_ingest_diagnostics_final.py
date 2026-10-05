@@ -12,7 +12,6 @@ from custom_components.jackery_solarvault.const import (
     DOMAIN,
     LOCAL_MQTT_RUNTIME_KEY,
     PAYLOAD_PROPERTIES,
-    REDACTED_VALUE,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -364,7 +363,7 @@ def test_local_mqtt_diagnostics_reports_coordinator_not_ready() -> None:
     )
 
     assert result["disabled_reason"] == "coordinator_not_ready"
-    assert result["configured_local_mqtt"]["host"] == REDACTED_VALUE
+    assert result["configured_local_mqtt"]["host"] == "broker"
 
 
 def test_local_mqtt_diagnostics_uses_runtime_bucket_fallback() -> None:
