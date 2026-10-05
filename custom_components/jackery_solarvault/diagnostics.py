@@ -53,8 +53,7 @@ def _redacted_payload_map(
 
     Parameters:
         payloads (Mapping[Any, Any]): Identifier-to-payload mapping.
-        prefix (str): Prefix for generated ``<prefix>_<index>`` labels, starting
-            at index 1.
+        prefix (str): Legacy parameter retained for callers.
         redact_keys (frozenset[str]): Field names to redact from each payload.
 
     Returns:

@@ -5,6 +5,7 @@ retain the historical correction, insertion, retry and user-adjustment cases
 from the former external-statistics importer, using complete closed-day curves.
 """
 
+import asyncio
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 import itertools
@@ -163,47 +164,61 @@ async def test_corrected_bucket_sum_is_updated_not_dropped(
     _assert_monotonic(rows)
 
 
-async def test_import_waits_for_public_recorder_commit_before_success(
+async def test_reconcile_waits_for_public_recorder_commit_before_reading(
     recorder_mock: Recorder,
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The next import reads committed rows and writes no duplicates."""
+    """History reads wait for the public commit barrier before queuing repairs."""
     await hass.config.async_set_time_zone("UTC")
     coordinator = _coordinator(hass)
     recorder = get_instance(hass)
     assert recorder is recorder_mock
+    waiting = asyncio.Event()
+    release = asyncio.Event()
     events: list[str] = []
     commit = recorder.async_block_till_done
     import_statistics = coordinator_module.async_import_statistics
 
     async def commit_pending() -> None:
         events.append("commit")
+        waiting.set()
+        await release.wait()
         await commit()
 
     def enqueue(*args: Any, **kwargs: Any) -> None:
         events.append("import")
         import_statistics(*args, **kwargs)
 
-    monkeypatch.setattr(recorder, "async_block_till_done", commit_pending)
-    monkeypatch.setattr(coordinator_module, "async_import_statistics", enqueue)
     day = datetime(2026, 7, 1, tzinfo=UTC)
     hours = [(day + timedelta(hours=h)).timestamp() for h in range(24)]
     energy = {hours[18]: 4.5}
-    first = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
-        _STAT_ID, hours, energy
-    )
-    duplicate = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
-        _STAT_ID, hours, energy
-    )
+    with monkeypatch.context() as patch:
+        patch.setattr(recorder, "async_block_till_done", commit_pending)
+        patch.setattr(coordinator_module, "async_import_statistics", enqueue)
+        task = asyncio.create_task(
+            coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+                _STAT_ID, hours, energy
+            )
+        )
+        try:
+            await waiting.wait()
+            assert not task.done()
+            assert events == ["commit"]
+        finally:
+            release.set()
+            first = await task
 
     assert first == _EXPECTED_FIRST_IMPORT_COUNT
-    assert duplicate == 0
-    assert events == ["commit", "import", "commit"]
+    assert events == ["commit", "import"]
     await async_wait_recording_done(hass)
     assert _row_at(await _read_rows(hass), day + timedelta(hours=18))[
         "sum"
     ] == pytest.approx(4.5)
+    duplicate = await coordinator._async_reconcile_statistic_day(  # ruff: ignore[private-member-access]
+        _STAT_ID, hours, energy
+    )
+    assert duplicate == 0
 
 
 async def test_mid_series_insertion_keeps_sum_monotonic(
