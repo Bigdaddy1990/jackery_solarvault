@@ -55,5 +55,5 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
       - name: pre-commit-ci-lite automatic fixes
-        uses: pre-commit-ci/lite-action@v1.1.0
+        uses: pre-commit-ci/lite-action@v1.2.0
         if: always()
