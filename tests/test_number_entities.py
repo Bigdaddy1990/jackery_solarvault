@@ -176,8 +176,7 @@ async def test_setter_forwards_coerced_soc_limit() -> None:
 
     await entity.async_set_native_value(75.0)
 
-    assert isinstance(entity.coordinator.async_set_soc_limits, AsyncMock)
-    entity.coordinator.async_set_soc_limits.assert_awaited_once_with(
+    cast("AsyncMock", entity.coordinator.async_set_soc_limits).assert_awaited_once_with(
         _DEVICE_ID,
         charge_limit=75,
     )
@@ -192,8 +191,9 @@ async def test_setter_snaps_max_feed_grid_to_discrete_value() -> None:
 
     await entity.async_set_native_value(2500.0)
 
-    assert isinstance(entity.coordinator.async_set_max_feed_grid, AsyncMock)
-    entity.coordinator.async_set_max_feed_grid.assert_awaited_once_with(
+    cast(
+        "AsyncMock", entity.coordinator.async_set_max_feed_grid
+    ).assert_awaited_once_with(
         _DEVICE_ID,
         2500,
     )
@@ -207,10 +207,12 @@ async def test_portable_setter_forwards_action_and_field() -> None:
 
     await entity.async_set_native_value(600.0)
 
-    assert isinstance(entity.coordinator.async_portable_set_number, AsyncMock)
-    entity.coordinator.async_portable_set_number.assert_awaited_once()
-    assert isinstance(entity.coordinator.async_portable_set_number, AsyncMock)
-    _args, kwargs = entity.coordinator.async_portable_set_number.call_args
+    cast(
+        "AsyncMock", entity.coordinator.async_portable_set_number
+    ).assert_awaited_once()
+    _args, kwargs = cast(
+        "AsyncMock", entity.coordinator.async_portable_set_number
+    ).call_args
     assert kwargs["action_id"] == ACTION_ID_PORTABLE_SET_CHARGE_POWER
     assert kwargs["field"] == "csc"
     assert kwargs["value"] == 600  # ruff: ignore[magic-value-comparison]
@@ -257,8 +259,7 @@ async def test_out_of_range_value_raises_translated_error() -> None:
         await entity.async_set_native_value(150.0)
 
     assert err.value.translation_key == "invalid_number_range"
-    assert isinstance(entity.coordinator.async_set_soc_limits, AsyncMock)
-    entity.coordinator.async_set_soc_limits.assert_not_awaited()
+    cast("AsyncMock", entity.coordinator.async_set_soc_limits).assert_not_awaited()
 
 
 async def test_disallowed_discrete_value_raises_translated_error() -> None:

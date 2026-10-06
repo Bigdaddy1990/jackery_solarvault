@@ -1,5 +1,6 @@
 """HA fixture tests for the Jackery SolarVault config flow."""
 
+from ipaddress import IPv4Address
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, patch
 
@@ -22,6 +23,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.mqtt import MqttServiceInfo
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -463,10 +465,11 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
-    assert flow["data_schema"] is not None
+    schema = flow["data_schema"]
+    assert schema is not None
     defaults = {
         marker.schema: marker.default()
-        for marker in flow["data_schema"].schema
+        for marker in schema.schema
         if hasattr(marker, "default")
     }
     assert (
@@ -486,10 +489,89 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
 
     reopened = await hass.config_entries.options.async_init(entry.entry_id)
     assert reopened["type"] is FlowResultType.FORM
-    assert reopened["data_schema"] is not None
+    schema = reopened["data_schema"]
+    assert schema is not None
     defaults = {
         marker.schema: marker.default()
-        for marker in reopened["data_schema"].schema
+        for marker in schema.schema
         if hasattr(marker, "default")
     }
     assert defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == topic
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"deviceSn":"HR2C04000280HH3"}',
+        b'{"deviceSn":"HR2C04000280HH3"}',
+        bytearray(b'{"deviceSn":"HR2C04000280HH3"}'),
+    ],
+)
+async def test_mqtt_discovery_accepts_all_home_assistant_payload_types(
+    hass: HomeAssistant, payload: str | bytes | bytearray
+) -> None:
+    """Native MQTT text and binary payloads both reach the account form."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="jackery/discovery/head",
+            payload=payload,
+            qos=0,
+            retain=False,
+            subscribed_topic="jackery/discovery/+",
+            timestamp=0.0,
+        ),
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"null", b"[]", b"123", b"true", b'"device"', b'{"deviceSn":"   "}'],
+)
+async def test_mqtt_discovery_rejects_non_object_or_blank_identity(
+    hass: HomeAssistant, payload: bytes
+) -> None:
+    """Valid JSON without a real device identity aborts instead of crashing."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_MQTT},
+        data=MqttServiceInfo(
+            topic="jackery/discovery/head",
+            payload=payload,
+            qos=0,
+            retain=False,
+            subscribed_topic="jackery/discovery/+",
+            timestamp=0.0,
+        ),
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "invalid_discovery_info"
+
+
+@pytest.mark.parametrize(
+    "service_type",
+    ["_jackery-solarvault._tcp.local.", "_api._tcp.local.", "_http._tcp.local."],
+)
+async def test_mdns_discovery_still_reaches_account_setup(
+    hass: HomeAssistant, service_type: str
+) -> None:
+    """A real HA mDNS service object remains supported for every declared type."""
+    address = IPv4Address("192.0.2.10")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=ZeroconfServiceInfo(
+            ip_address=address,
+            ip_addresses=[address],
+            port=80,
+            hostname="jackery.local.",
+            type=service_type,
+            name=f"Jackery.{service_type}",
+            properties={"device": "solarvault"},
+        ),
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"

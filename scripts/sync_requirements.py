@@ -191,6 +191,7 @@ ALWAYS_TEST: list[str] = [
     'attrs',
     'autotyping',
     'coverage[toml]',
+    'cryptography',
     'homeassistant',
     'hypothesis',
     'ifaddr',

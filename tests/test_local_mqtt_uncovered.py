@@ -15,6 +15,7 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
+    REDACTED_VALUE,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -50,12 +51,12 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
     )
     assert client.matches_configuration(configuration)
     assert not client.matches_configuration(replace(configuration, host="other"))
-    redacted = client.diagnostics_snapshot()
+    redacted = client.diagnostics_snapshot(redact=True)
     plain = client.diagnostics_snapshot(redact=False)
     assert redacted["transport"] == "direct_mqtt"
-    assert redacted["configured_target"]["host"] == "192.0.2.10"
+    assert redacted["configured_target"]["host"] == REDACTED_VALUE
     assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
-    assert redacted["topic_filter"] == "jackery/device/#"
+    assert redacted["topic_filter"] == REDACTED_VALUE
     assert plain["topic_filter"] == "jackery/device/#"
     assert plain["qos"] == 2  # ruff: ignore[magic-value-comparison]
     assert plain["broker_connected"] is plain["connected"]
@@ -124,10 +125,10 @@ async def test_sink_rejection_and_failure_are_distinguished(
     assert failed_diagnostics["messages_dropped"] == 1
 
 
-async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
+async def test_oversized_payload_dropped_and_retained_payload_reaches_sink(
     hass: HomeAssistant,
 ) -> None:
-    """Broker-selected retained telemetry follows the same no-drop FIFO."""
+    """Reject oversized data while preserving ordinary retained telemetry."""
     sink = AsyncMock(return_value=True)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
@@ -205,3 +206,47 @@ def test_utc_timestamp_is_timezone_aware(hass: HomeAssistant) -> None:
 
     assert "T" in value
     assert value.endswith("+00:00")
+
+
+async def test_queue_rejects_oversized_frames_before_buffering(
+    hass: HomeAssistant,
+) -> None:
+    """Oversized broker frames never occupy the ingress queue or reach the sink."""
+    sink = AsyncMock()
+    client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
+    client._enqueue_message("jackery/large", b"x" * (LOCAL_MQTT_MAX_PAYLOAD_BYTES + 1))  # ruff: ignore[private-member-access]
+    await client.async_wait_message_queue_idle()
+    sink.assert_not_awaited()
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["message_queue_depth"] == 0
+    assert diagnostics["payload_too_large_count"] == 1
+    assert diagnostics["messages_dropped"] == 1
+
+
+async def test_slow_sink_has_bounded_fifo_and_reports_overflow(
+    hass: HomeAssistant,
+) -> None:
+    """Overload is counted while accepted frames retain their order."""
+    gate = asyncio.Event()
+    started = asyncio.Event()
+    received: list[str] = []
+
+    async def sink(topic: str, data: dict[str, Any] | None, raw: bytes) -> bool:
+        started.set()
+        await gate.wait()
+        received.append(topic)
+        return True
+
+    client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
+    client._enqueue_message("first", b"{}")  # ruff: ignore[private-member-access]
+    await started.wait()
+    limit = client.diagnostics_snapshot(redact=False)["message_queue_limit"]
+    for index in range(limit + 1):
+        client._enqueue_message(str(index), b"{}")  # ruff: ignore[private-member-access]
+    diagnostics = client.diagnostics_snapshot(redact=False)
+    assert diagnostics["message_queue_depth"] == limit
+    assert diagnostics["message_queue_full_count"] == 1
+    assert diagnostics["messages_dropped"] == 1
+    gate.set()
+    await client.async_wait_message_queue_idle()
+    assert received == ["first", *(str(index) for index in range(limit))]

@@ -37,23 +37,13 @@ from ..entity import (
     payload_properties_for_sources,
     property_data_sources,
 )
-from ..util import first_nonblank_int, safe_bool, task_plan_value
+from ..util import safe_bool, standby_is_on, task_plan_value
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from ..coordinator import JackerySolarVaultCoordinator
     from ..switch import JackerySwitch as JackerySwitchEntity
-
-
-def _standby_is_on(raw: bool | float | str | None) -> bool | None:
-    """Convert a raw autoStandby payload value into an on/off state."""
-    if raw is None:
-        return None
-    parsed = first_nonblank_int(raw)
-    if parsed is None:
-        return safe_bool(raw)
-    return parsed == 1
 
 
 def _default_switch_value(entity: JackerySwitchEntity) -> bool | None:
@@ -379,7 +369,7 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=(FIELD_AUTO_STANDBY,),
-        is_on_transform=_standby_is_on,
+        is_on_transform=standby_is_on,
         setter_fn=_set_standby,
     ),
     JackerySwitchDescription(

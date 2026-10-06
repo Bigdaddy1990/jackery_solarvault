@@ -6,10 +6,9 @@ descriptions/switch.py.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -89,12 +88,12 @@ from .entity import (
     LAYER5_DATA_SOURCES,
     JackeryEntity,
     payload_properties_for_sources,
+    raise_entity_action_error,
 )
 from .util import (
     append_unique_entity,
+    async_setup_entity_discovery,
     circuit_id,
-    coordinator_entity_signature,
-    first_nonblank_int,
     is_portable_payload as _is_portable_payload,
     safe_bool,
     smart_plug_serial,
@@ -151,18 +150,6 @@ PARALLEL_UPDATES = 1
 _LOGGER = logging.getLogger(__name__)
 
 
-def _standby_is_on(
-    raw: bool | float | str | None,
-) -> bool | None:
-    """Convert a raw autoStandby payload value into an on/off state."""
-    if raw is None:
-        return None
-    parsed = first_nonblank_int(raw)
-    if parsed is None:
-        return safe_bool(raw)
-    return parsed == 1
-
-
 class JackerySwitch(JackeryEntity, SwitchEntity):
     """Generic description-driven Jackery switch."""
 
@@ -181,18 +168,6 @@ class JackerySwitch(JackeryEntity, SwitchEntity):
         self.entity_description = description
         self.device_registry_role = description.device_registry_role
 
-    def _raise_action_error(self, error: object) -> NoReturn:
-        """Raise a translatable HA action error for this switch."""
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": self.entity_description.key,
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     @property
     def is_on(self) -> bool | None:
         """The entity's current state - delegates to description value_fn."""
@@ -201,7 +176,9 @@ class JackerySwitch(JackeryEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs: object) -> None:
         """Turn this switch on."""
         if self.entity_description.setter_fn is None:
-            self._raise_action_error("entity is not writable")
+            raise_entity_action_error(
+                self.entity_description.key, self._device_id, "entity is not writable"
+            )
         try:
             await self.entity_description.setter_fn(
                 self.coordinator,
@@ -215,14 +192,16 @@ class JackerySwitch(JackeryEntity, SwitchEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
     async def async_turn_off(self, **kwargs: object) -> None:
         """Turn the described switch off for the device."""
         if self.entity_description.setter_fn is None:
-            self._raise_action_error("entity is not writable")
+            raise_entity_action_error(
+                self.entity_description.key, self._device_id, "entity is not writable"
+            )
         try:
             await self.entity_description.setter_fn(
                 self.coordinator,
@@ -236,9 +215,9 @@ class JackerySwitch(JackeryEntity, SwitchEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
 
 class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
@@ -310,18 +289,6 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             return None
         return str(raw)
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a localized error for a failed smart-plug switch action."""
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": "smart_plug_switch",
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def _async_set_state(self, value: bool) -> None:
         """Set the linked plug state and request a coordinator refresh."""
         plug = self._plug
@@ -333,11 +300,15 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         if is_cloud:
             shelly_device_id = self._cloud_device_id(plug)
             if shelly_device_id is None:
-                self._raise_action_error("missing Shelly deviceId")
-                return
+                raise_entity_action_error(
+                    "smart_plug_switch", self._device_id, "missing Shelly deviceId"
+                )
             if safe_bool(plug.get(FIELD_CONTROL_ALLOWED)) is not True:
-                self._raise_action_error("Shelly control is not allowed")
-                return
+                raise_entity_action_error(
+                    "smart_plug_switch",
+                    self._device_id,
+                    "Shelly control is not allowed",
+                )
             write_coro = self.coordinator.async_set_shelly_cloud_switch(
                 self._device_id,
                 shelly_device_id=shelly_device_id,
@@ -345,8 +316,9 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
             )
         else:
             if plug_sn is None:
-                self._raise_action_error("missing deviceSn")
-                return
+                raise_entity_action_error(
+                    "smart_plug_switch", self._device_id, "missing deviceSn"
+                )
             write_coro = self.coordinator.async_set_smart_plug_switch(
                 self._device_id,
                 plug_sn=plug_sn,
@@ -361,9 +333,9 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error("smart_plug_switch", self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error("smart_plug_switch", self._device_id, err)
 
     async def async_turn_on(self, **kwargs: object) -> None:
         """Turn the bound smart plug on."""
@@ -529,24 +501,13 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         """Indicates whether the smart plug's priority is enabled."""
         return safe_bool(self._plug.get(FIELD_SOCKET_PRIORITY))
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a localized error for a failed smart-plug priority action."""
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": "smart_plug_priority_enabled",
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def _async_set_state(self, value: bool) -> None:
         """Set the smart plug's priority enabled state via the coordinator."""
         plug_sn = self._jackery_device_sn(self._plug)
         if plug_sn is None:
-            self._raise_action_error("missing deviceSn")
-            return
+            raise_entity_action_error(
+                "smart_plug_priority_enabled", self._device_id, "missing deviceSn"
+            )
         try:
             await self.coordinator.async_set_smart_plug_priority(
                 self._device_id,
@@ -560,9 +521,13 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                "smart_plug_priority_enabled", self._device_id, err
+            )
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                "smart_plug_priority_enabled", self._device_id, err
+            )
 
 
 # Home Assistant invokes platform setup as an awaitable callback.
@@ -720,22 +685,9 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         """Collect switches from the current coordinator payload."""
         return _collect_switch_entities(coordinator, seen_unique_ids)
 
-    last_signature: tuple[Any, ...] = ()
-
-    @callback
-    def _add_new_entities() -> None:
-        """Add switches discovered after an entity-signature change."""
-        nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
-        if sig == last_signature:
-            return
-        last_signature = sig
-        entities = _collect_entities()
-        if entities:
-            async_add_entities(entities)
-
-    _add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    async_setup_entity_discovery(
+        entry, coordinator, _collect_entities, async_add_entities
+    )
 
 
 # Compatibility alias retained for callers that imported the former generic

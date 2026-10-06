@@ -11,7 +11,6 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .client import JackeryAuthError
 from .const import (
-    DOMAIN,
     FIELD_ALERT_ID,
     FIELD_CMD,
     FIELD_DEVICE_SN,
@@ -39,6 +38,7 @@ from .entity import (
     LAYER5_DATA_SOURCES,
     JackeryEntity,
     payload_properties_for_sources,
+    raise_entity_action_error,
 )
 from .util import (
     append_unique_entity,
@@ -166,10 +166,6 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entities: list[ButtonEntity], entity: ButtonEntity) -> None:
-        """Append the entity unless its unique ID was already seen."""
-        append_unique_entity(entities, seen_unique_ids, entity)
-
     def _collect_entities() -> list[ButtonEntity]:
         """Collect reboot button entities for devices managed by the coordinator.
 
@@ -189,18 +185,21 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
             for description in BUTTON_DESCRIPTIONS:
                 if description.key.startswith("portable_") != is_portable:
                     continue
-                _append_unique(
+                append_unique_entity(
                     entities,
+                    seen_unique_ids,
                     JackeryQueryButton(coordinator, dev_id, description=description),
                 )
             if is_portable:
                 continue
-            _append_unique(
+            append_unique_entity(
                 entities,
+                seen_unique_ids,
                 JackeryRefreshWeatherPlanButton(coordinator, dev_id),
             )
-            _append_unique(
+            append_unique_entity(
                 entities,
+                seen_unique_ids,
                 JackeryReadScheduleButton(
                     coordinator,
                     dev_id,
@@ -211,8 +210,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     ),
                 ),
             )
-            _append_unique(
+            append_unique_entity(
                 entities,
+                seen_unique_ids,
                 JackeryReadScheduleButton(
                     coordinator,
                     dev_id,
@@ -224,7 +224,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 ),
             )
             if coordinator.device_supports_advanced(dev_id) or FIELD_REBOOT in props:
-                _append_unique(entities, JackeryRebootButton(coordinator, dev_id))
+                append_unique_entity(
+                    entities, seen_unique_ids, JackeryRebootButton(coordinator, dev_id)
+                )
             valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
             if not valid_plugs:
                 valid_plugs = sorted_smart_plugs(
@@ -237,8 +239,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 plug_sn = _smart_plug_device_sn(plug)
                 if plug_sn is None:
                     continue
-                _append_unique(
+                append_unique_entity(
                     entities,
+                    seen_unique_ids,
                     JackeryReadScheduleButton(
                         coordinator,
                         dev_id,
@@ -254,8 +257,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 alert_id = _storm_alert_id(alert)
                 if alert_id is None:
                     continue
-                _append_unique(
+                append_unique_entity(
                     entities,
+                    seen_unique_ids,
                     JackeryDeleteStormAlertButton(
                         coordinator,
                         dev_id,
@@ -342,18 +346,6 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             attrs[FIELD_DEV_TYPE] = description.dev_type
         return attrs
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable HA action error for this button."""
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": str(self._attr_translation_key),
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def _async_run_query(self) -> None:
         """Run the push query and optional documented HTTP read concurrently."""
         description = self.entity_description
@@ -401,7 +393,11 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             raise query_result
         if isinstance(http_result, BaseException):
             raise http_result
-        self._raise_action_error("No documented refresh transport returned data")
+        raise_entity_action_error(
+            self.entity_description.key,
+            self._device_id,
+            "No documented refresh transport returned data",
+        )
 
     async def async_press(self) -> None:
         """Forward a button press to the device."""
@@ -414,9 +410,9 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
 
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
@@ -443,31 +439,12 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         """
         super().__init__(coordinator, device_id, "reboot_device")
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable HomeAssistantError for a failed reboot action.
-
-        The exception uses translation_domain=DOMAIN and
-        translation_key="entity_action_failed" and includes translation placeholders:
-        - "entity": "reboot_device"
-        - "device_id": this entity's device id
-        - "error": str(error)
-        """
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": "reboot_device",
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def async_press(self) -> None:
         """Reboot the associated device through the coordinator.
 
         If authentication fails, the original ConfigEntryAuthFailed is propagated. A
         HomeAssistantError that already has a `translation_key` is re-raised unchanged;
-        all other exceptions are converted and surfaced via `_raise_action_error`.
+        all other exceptions are converted and surfaced via `raise_entity_action_error`.
         """
         try:
             await self.coordinator.async_reboot_device(self._device_id)
@@ -478,9 +455,9 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error("reboot_device", self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error("reboot_device", self._device_id, err)
 
 
 class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
@@ -503,32 +480,6 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
         """
         super().__init__(coordinator, device_id, "refresh_weather_plan")
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a translated Home AssistantError for a failed entity action on the.
-
-        target device.
-
-        Uses the integration translation domain and the "entity_action_failed"
-        translation key.
-        Placeholders set in the raised error:
-        - "entity": "refresh_weather_plan"
-        - "device_id": the target device identifier (self._device_id)
-        - "error": the string representation of `error`
-
-        Parameters:
-            error (object): The original error to include in the translation
-            placeholders.
-        """
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": "refresh_weather_plan",
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def async_press(self) -> None:
         """Query the device weather/storm plan through the coordinator.
 
@@ -540,7 +491,9 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
             action failed.
         """
         if not self.available:
-            self._raise_action_error("entity unavailable")
+            raise_entity_action_error(
+                "refresh_weather_plan", self._device_id, "entity unavailable"
+            )
         try:
             await self.coordinator.async_query_weather_plan(self._device_id)
         except JackeryAuthError as err:
@@ -550,9 +503,9 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error("refresh_weather_plan", self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error("refresh_weather_plan", self._device_id, err)
 
 
 class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
@@ -607,24 +560,6 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             attrs[FIELD_DEVICE_SN] = self._plug_sn
         return attrs
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a Home Assistant translated "action failed" error for this button.
-
-        Raises:
-            HomeAssistantError: Error with translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            and translation_placeholders containing `entity`, `device_id`, and `error`.
-        """
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": str(self._attr_translation_key),
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def async_press(self) -> None:
         """Trigger a device schedule read for the configured task bucket.
 
@@ -635,7 +570,9 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             `HomeAssistantError` indicating the entity action failed.
         """
         if not self.available:
-            self._raise_action_error("entity unavailable")
+            raise_entity_action_error(
+                str(self._attr_translation_key), self._device_id, "entity unavailable"
+            )
         try:
             await self.coordinator.async_read_device_schedule(
                 self._device_id,
@@ -649,9 +586,13 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                str(self._attr_translation_key), self._device_id, err
+            )
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                str(self._attr_translation_key), self._device_id, err
+            )
 
 
 class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
@@ -747,29 +688,6 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
                 attrs[key] = alert.get(key)
         return attrs
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a localized Home AssistantError indicating the delete-storm-alert.
-
-        action failed.
-
-        The error uses the integration translation domain and the
-        `entity_action_failed` translation key.
-        Placeholders provided: `entity` ("delete_storm_alert"), `device_id`, and
-        `error`.
-
-        Raises:
-            HomeAssistantError: localized error for a failed entity action.
-        """
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": "delete_storm_alert",
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def async_press(self) -> None:
         """Delete the associated storm alert through the coordinator.
 
@@ -778,10 +696,12 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             (re-raised).
             HomeAssistantError: If an error occurs; errors that already have a
             `translation_key` are re-raised, other exceptions are converted and raised
-            via the entity's `_raise_action_error`.
+            via the entity's `raise_entity_action_error`.
         """
         if not self.available:
-            self._raise_action_error("entity unavailable")
+            raise_entity_action_error(
+                "delete_storm_alert", self._device_id, "entity unavailable"
+            )
         try:
             await self.coordinator.async_delete_storm_alert(
                 self._device_id,
@@ -794,6 +714,6 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error("delete_storm_alert", self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error("delete_storm_alert", self._device_id, err)

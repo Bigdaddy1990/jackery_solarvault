@@ -246,6 +246,7 @@ from .const import (
     FIELD_ACC_CT_BODY,
     FIELD_ACTION_ID,
     FIELD_ACTION_TYPE,
+    FIELD_ALARM_ID,
     FIELD_ALERT_ID,
     FIELD_AUTO_STANDBY,
     FIELD_BATTERIES,
@@ -375,6 +376,7 @@ from .const import (
     FIELD_PV4,
     FIELD_PV_NAME,
     FIELD_PV_PW,
+    FIELD_RB,
     FIELD_REBOOT,
     FIELD_SAFETY,
     FIELD_SCAN_NAME,
@@ -394,6 +396,7 @@ from .const import (
     FIELD_STACK_OUT_PW,
     FIELD_STORM,
     FIELD_SUB_DEVICE,
+    FIELD_SUB_DEVICES,
     FIELD_SUB_TYPE,
     FIELD_SW,
     FIELD_SWITCH,
@@ -405,6 +408,7 @@ from .const import (
     FIELD_SYSTEM_ID,
     FIELD_SYSTEM_NAME,
     FIELD_SYSTEM_REGION,
+    FIELD_SYS_ALERT_COUNT,
     FIELD_SYS_SWITCH,
     FIELD_TARGET_MODULE_VERSION,
     FIELD_TARGET_VERSION,
@@ -645,6 +649,7 @@ from .util import (
     stable_subdevice_key,
     statistics_http_backfill_dates,
     sub_device_serial,
+    supplement_pv_day_curve,
     trend_series_points,
     utc_now,
     year_payload_appears_current_month_only,
@@ -2081,6 +2086,18 @@ def is_subdevice_payload(
     return any(key in body for key in subdevice_hint_keys)
 
 
+def _flatten_battery_pack_wrappers(item: dict[str, Any]) -> dict[str, Any]:
+    """Flatten known pack wrappers recursively, preserving their raw contents."""
+    normalized = dict(item)
+    for nested_key in (FIELD_UPDATES, FIELD_BODY, PAYLOAD_PROPERTIES):
+        nested = normalized.get(nested_key)
+        if isinstance(nested, dict):
+            normalized = merge_dict_values(
+                normalized, _flatten_battery_pack_wrappers(nested)
+            )
+    return normalized
+
+
 def normalize_battery_pack_payload(item: object) -> dict[str, Any]:
     """Flatten Jackery battery-pack payloads to BatteryPackSub fields.
 
@@ -2091,12 +2108,9 @@ def normalize_battery_pack_payload(item: object) -> dict[str, Any]:
     """
     if not isinstance(item, dict):
         return {}
-    normalized = dict(item)
-    for nested_key in (FIELD_UPDATES, FIELD_BODY, PAYLOAD_PROPERTIES):
-        nested = normalized.get(nested_key)
-        if isinstance(nested, dict):
-            normalized = merge_dict_values(normalized, nested)
+    normalized = _flatten_battery_pack_wrappers(item)
     aliases = {
+        FIELD_RB: FIELD_BAT_SOC,
         FIELD_IP: FIELD_IN_PW,
         FIELD_OP: FIELD_OUT_PW,
     }
@@ -2147,36 +2161,62 @@ def looks_like_battery_pack(
     )
 
 
+def battery_pack_source_lists(source: object) -> list[tuple[str, list[Any]]]:
+    """Collect the recognized, nonempty pack-list containers in one payload."""
+    return [
+        (key, packs)
+        for key in (
+            FIELD_BATTERY_PACKS,
+            FIELD_BATTERY_PACK,
+            FIELD_BATTERY_PACK_LIST,
+            FIELD_BATTERY_PACKS_UNDERSCORE,
+            FIELD_BATTERIES,
+            FIELD_PACK_LIST,
+            FIELD_SUB_DEVICES,
+            FIELD_SUB_DEVICE,
+        )
+        if (packs := find_list_for_key(source, key))
+    ]
+
+
 def battery_packs_from_source(
     source: object,
     ct_meter_keys: frozenset[str],
     battery_pack_hint_keys: frozenset[str],
 ) -> list[dict[str, Any]] | None:
     """Extract add-on battery pack payloads from known shapes."""
-    for key in (
-        FIELD_BATTERY_PACKS,
-        FIELD_BATTERY_PACK,
-        FIELD_BATTERY_PACK_LIST,
-        FIELD_BATTERY_PACKS_UNDERSCORE,
-        FIELD_BATTERIES,
-        FIELD_PACK_LIST,
+    if (
+        isinstance(source, dict)
+        and first_nonblank_int(
+            source.get(FIELD_DEV_TYPE), source.get(FIELD_DEVICE_TYPE)
+        )
+        == SUBDEVICE_DEV_TYPE_BATTERY_PACK
     ):
-        packs = find_list_for_key(source, key)
-        if packs:
-            normalized = [
-                normalize_battery_pack_payload(item)
-                for item in packs
-                if isinstance(item, dict)
-            ]
-            if key == FIELD_BATTERY_PACKS:
-                # App BatteryPackBody identifies even partial status rows.
-                return normalized
+        for field in (FIELD_BODY, FIELD_DATA):
+            if isinstance(rows := source.get(field), list):
+                source = rows
+                break
+    extracted: list[dict[str, Any]] = []
+    for key, packs in battery_pack_source_lists(source):
+        if key == FIELD_SUB_DEVICE:
+            continue
+        normalized = [
+            normalize_battery_pack_payload(item)
+            for item in packs
+            if isinstance(item, dict)
+        ]
+        if key != FIELD_BATTERY_PACKS:
             filtered = [
                 item
                 for item in normalized
                 if looks_like_battery_pack(item, ct_meter_keys, battery_pack_hint_keys)
             ]
-            return filtered or normalized
+            normalized = filtered or normalized
+        extracted = merge_battery_pack_lists(
+            extracted, normalized, allow_positional_matching=False
+        )
+    if extracted:
+        return extracted
     if isinstance(source, list):
         normalized = [normalize_battery_pack_payload(item) for item in source]
         packs = [
@@ -2216,11 +2256,17 @@ def subdevice_serial(item: dict[str, Any]) -> str | None:
 
 def battery_pack_serial(item: Mapping[str, Any]) -> str | None:
     """Return a battery pack's own serial without using its parent device id."""
-    identity = item.get(FIELD_DEVICE_SN) or item.get(FIELD_DEV_SN) or item.get(FIELD_SN)
-    if identity in {None, ""}:
-        return None
-    value = str(identity).strip()
-    return value or None
+    for key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN):
+        identity = item.get(key)
+        if identity is None:
+            continue
+        if not isinstance(identity, str):
+            return None
+        if not identity:
+            continue
+        value = identity.strip()
+        return value if value and value.isprintable() else None
+    return None
 
 
 def sorted_battery_pack_payloads(items: object) -> list[dict[str, Any]]:
@@ -2680,7 +2726,7 @@ def normalize_local_mqtt_payload(
     body = {
         key: value
         for key, value in payload.items()
-        if key not in envelope_keys and key not in {FIELD_BODY, FIELD_DATA, "ts"}
+        if key not in envelope_keys and key != "ts"
     }
     envelope: dict[str, Any] = {
         key: value
@@ -2941,6 +2987,8 @@ def _dict_list(value: object, *, limit: int | None = None) -> list[dict[str, Any
 def merge_battery_pack_lists(
     current: object,
     updates: list[dict[str, Any]],
+    *,
+    allow_positional_matching: bool = True,
 ) -> list[dict[str, Any]]:
     """Merge incremental battery-pack telemetry into an existing pack list while.
 
@@ -2950,6 +2998,9 @@ def merge_battery_pack_lists(
     different identified pack. Non-dict and None entries from the prior list are
     ignored. Values already learned from any transport remain available when a
     later partial frame omits them.
+
+    Separate list containers do not prove matching physical positions and must
+    disable positional matching; their anonymous rows remain independent.
 
     Every dict entry from the prior list is retained. The battery-pack *shape*
     predicate (``looks_like_battery_pack``) is intentionally NOT applied here: it is
@@ -2963,6 +3014,7 @@ def merge_battery_pack_lists(
         Merged list of battery pack dictionaries.
     """
     merged = [item for item in _dict_list(current) if isinstance(item, dict)]
+    identity_keys = (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN)
     index_by_sn: dict[str, int] = {}
     for idx, item in enumerate(merged):
         if (sn := battery_pack_serial(item)) is not None:
@@ -2970,22 +3022,36 @@ def merge_battery_pack_lists(
 
     for update_idx, raw_update in enumerate(updates):
         update = {key: value for key, value in raw_update.items() if value is not None}
-        for identity_key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN):
+        for identity_key in identity_keys:
             identity = update.get(identity_key)
-            if not identity or not str(identity).strip():
+            if identity is None or (isinstance(identity, str) and not identity.strip()):
                 update.pop(identity_key, None)
         sn = battery_pack_serial(update)
         target_idx = index_by_sn.get(sn) if sn is not None else None
-        if sn is None and update_idx < len(merged):
+        has_identity = any(key in update for key in identity_keys)
+        if sn is None and has_identity:
+            # Retain malformed identity evidence without assigning its telemetry
+            # to an unrelated pack through the anonymous positional fallback.
+            target_idx = next(
+                (
+                    idx
+                    for idx, item in enumerate(merged)
+                    if all(item.get(key) == update.get(key) for key in identity_keys)
+                ),
+                None,
+            )
+        elif allow_positional_matching and sn is None and update_idx < len(merged):
             target_idx = update_idx
         # If update has a serial, try to match by SN first.
         # If no match, check if there's a devType-only entry at the same position
         # (a devType-only entry has no serial but has FIELD_DEV_TYPE).
+        positional_target_available = allow_positional_matching and target_idx is None
         if (
-            target_idx is None
+            positional_target_available
             and sn is not None
             and update_idx < len(merged)
             and battery_pack_serial(merged[update_idx]) is None
+            and not any(merged[update_idx].get(key) for key in identity_keys)
         ):
             target_idx = update_idx
 
@@ -5230,15 +5296,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     def _unlink_removed_parent_devices(self, device_ids: set[str]) -> int:
         """Unlink removed parents and their descendants from this config entry."""
-        entry = self.config_entry
-        if entry is None:
+        if self.config_entry is None:
             return 0
         registry = dr.async_get(self.hass)
         unlinked = 0
         for device_id in sorted(device_ids):
             parent = registry.async_get_device_by_identifier(
                 (DOMAIN, device_id),
-                entry.entry_id,
+                self.config_entry.entry_id,
             )
             if parent is not None:
                 linked_device_ids = {parent.id}
@@ -5249,7 +5314,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         if (
                             device.id not in linked_device_ids
                             and device.via_device_id in linked_device_ids
-                            and device.config_entry_id == entry.entry_id
+                            and self.entry.entry_id in device.config_entries
                         ):
                             linked_device_ids.add(device.id)
                             changed = True
@@ -5262,7 +5327,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     registry_device = registry.async_get(registry_device_id)
                     if (
                         registry_device is None
-                        or registry_device.config_entry_id != entry.entry_id
+                        or self.entry.entry_id not in registry_device.config_entries
                     ):
                         continue
                     # HA 2026.9: a device belongs to exactly one config entry,
@@ -5730,11 +5795,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     eager_start=False,
                 ),
             )
-        return self.hass.async_create_background_task(
-            operation,
-            name=name,
-            eager_start=False,
+        task: asyncio.Task[Any] = self.hass.async_create_background_task(
+            operation, name=name, eager_start=False
         )
+        return task
 
     @callback
     def async_schedule_local_mqtt_device_config(self) -> asyncio.Task[Any] | None:
@@ -6589,7 +6653,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> dict[str, Any] | None:
         """Decode one BLE JSON body and remove its transport command field."""
         parsed = observation.parsed
-        if parsed is None or not parsed.body:
+        if observation.is_fragment or parsed is None or not parsed.body:
             return None
         try:
             decoded = json.loads(parsed.body.decode("utf-8"))
@@ -6871,16 +6935,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 "payload": payload,
                 "payload_chart_series_debug": chart_series_debug(payload),
                 "decode_error": observation.decode_error,
-                **(
-                    {
-                        "raw_hex": observation.raw_bytes.hex(),
-                        "received_at": observation.received_at.isoformat(),
-                        "session_generation": observation.session_generation,
-                        "notify_sequence": observation.notify_sequence,
-                    }
-                    if jackery_dev_mode_enabled(self.entry)
-                    else {}
-                ),
+                "raw_hex": observation.raw_bytes.hex(),
+                "received_at": observation.received_at.isoformat(),
+                "session_generation": observation.session_generation,
+                "notify_sequence": observation.notify_sequence,
             },
         )
         if payload is None:
@@ -7529,7 +7587,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """Apply every matching cumulative App shadow family."""
         value = context.body or context.payload
         touched = False
-        if context.is_alarm:
+        if context.is_alarm or (
+            not context.is_subdevice
+            and any(key in value for key in (FIELD_ALARM_ID, FIELD_SYS_ALERT_COUNT))
+        ):
             updated[PAYLOAD_DEVICE_ALERT] = merge_live_properties(
                 context.current.get(PAYLOAD_DEVICE_ALERT) or {}, value
             )
@@ -7594,7 +7655,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         ):
             return False
         return (
-            context.local_report_type in {2, 25, 106, 107}
+            (
+                context.source is TransportSource.LOCAL_MQTT
+                and bool(_LOCAL_MQTT_TOPIC_RE.search(context.topic))
+            )
+            or context.local_report_type in {2, 25, 106, 107}
             or context.message_type
             in {
                 MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
@@ -7695,7 +7760,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     ) -> bool:
         """Apply one matching subdevice payload without filtering its fields."""
         if not (
-            context.local_report_type == MQTT_CMD_NOTIFY_DEVICE_CAN_OTA
+            isinstance(context.body.get(FIELD_SUB_DEVICES), list)
+            or context.local_report_type == MQTT_CMD_NOTIFY_DEVICE_CAN_OTA
             or context.message_type
             in {
                 MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
@@ -7954,12 +8020,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 "kind": "local_mqtt_ingress",
                 "topic": topic,
                 "payload": ingress_payload,
-                "raw_hex": (
-                    raw_bytes.hex()
-                    if raw_bytes
-                    and jackery_dev_mode_enabled(getattr(self, "entry", None))
-                    else None
-                ),
+                "raw_hex": raw_bytes.hex() if raw_bytes is not None else None,
             },
         )
         if not payload and raw_bytes:
@@ -8017,7 +8078,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if not clean_prefix:
             return 0
         sent = 0
-        for device_id in sorted((self.data or {}).keys()):
+        for device_id in sorted(self.data or {}):
             device_sn = self._resolve_device_sn(device_id)
             if not device_sn:
                 continue
@@ -8112,6 +8173,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         )
         if topic_serial and explicit_serial and str(explicit_serial) != topic_serial:
             body = normalized.get(FIELD_BODY)
+            pack_body = normalize_battery_pack_payload(body)
             is_flat = not any(
                 isinstance(payload.get(key), dict) for key in (FIELD_BODY, FIELD_DATA)
             )
@@ -8120,10 +8182,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
             if (
                 isinstance(body, dict)
-                and FIELD_CELL_TEMP in body
+                and not self._BATTERY_PACK_HINT_KEYS.isdisjoint(pack_body)
                 and is_flat
                 and untyped
             ):
+                if (
+                    pack_serial := battery_pack_serial(pack_body)
+                ) is not None and pack_serial != str(explicit_serial):
+                    return None
                 parent_id = self._resolve_device_id_from_mqtt(
                     {FIELD_DEVICE_SN: topic_serial}, allow_single_device_fallback=False
                 )
@@ -8140,6 +8206,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     for key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN):
                         if (serial_value := normalized.pop(key, None)) is not None:
                             body[key] = serial_value
+                    body[FIELD_DEV_TYPE] = SUBDEVICE_DEV_TYPE_BATTERY_PACK
                     explicit_serial = topic_serial
             if str(explicit_serial) != topic_serial:
                 return None
@@ -8731,6 +8798,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         self,
         context: _SubdeviceMergeContext,
         packs: list[dict[str, Any]],
+        *,
+        allow_positional_matching: bool = True,
     ) -> None:
         """Merge battery packs while excluding the parent head unit."""
         packs = self._drop_head_unit_packs(
@@ -8749,6 +8818,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         context.updated[PAYLOAD_BATTERY_PACKS] = self._merge_battery_pack_lists(
             context.updated.get(PAYLOAD_BATTERY_PACKS),
             packs,
+            allow_positional_matching=allow_positional_matching,
         )
         if context.device_id is None:
             context.device_id = self._resolve_device_id_from_payload(context.updated)
@@ -8877,6 +8947,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         self,
         context: _SubdeviceMergeContext,
         source: dict[str, Any],
+        *,
+        allow_positional_matching: bool = True,
     ) -> None:
         """Split nested battery packs from regular subdevices and merge both."""
         items = source.get(FIELD_SUB_DEVICE)
@@ -8893,7 +8965,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             else:
                 subdevices.append(item)
         if packs:
-            self._merge_battery_pack_updates(context, packs)
+            self._merge_battery_pack_updates(
+                context, packs, allow_positional_matching=allow_positional_matching
+            )
         subdevices = self._filter_accessory_items(
             context,
             PAYLOAD_SUBDEVICES,
@@ -8955,9 +9029,14 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             observed_at=observed_at,
         )
 
+        allow_positional_matching = len(battery_pack_source_lists(source)) <= 1
         packs = self._battery_packs_from_source(source)
         if packs:
-            self._merge_battery_pack_updates(context, packs)
+            self._merge_battery_pack_updates(
+                context,
+                packs,
+                allow_positional_matching=allow_positional_matching,
+            )
 
         self._merge_ct_accessory_update(context, source)
 
@@ -8967,7 +9046,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         self._merge_circuit_updates(context, source)
 
-        self._merge_nested_subdevice_updates(context, source)
+        self._merge_nested_subdevice_updates(
+            context, source, allow_positional_matching=allow_positional_matching
+        )
 
         self._merge_subdevice_main_mirror(context, source)
         return context.touched
@@ -8996,6 +9077,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         cls,
         current: object,
         updates: list[dict[str, Any]],
+        *,
+        allow_positional_matching: bool = True,
     ) -> list[dict[str, Any]]:
         """Merge incremental pack telemetry without dropping static fields.
 
@@ -9005,7 +9088,9 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         fields and overlay the latest non-null telemetry by SN, falling back
         to list position.
         """
-        return merge_battery_pack_lists(current, updates)
+        return merge_battery_pack_lists(
+            current, updates, allow_positional_matching=allow_positional_matching
+        )
 
     def _head_unit_serials(
         self,
@@ -9122,9 +9207,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         serial: str | None,
     ) -> None:
         """Freeze one pack's registry identity for this coordinator session."""
-        normalized = str(serial).strip() if serial is not None else ""
         self._battery_pack_identity_overrides[parent_device_id, pack_index] = (
-            normalized or None
+            battery_pack_serial({FIELD_DEVICE_SN: serial})
         )
 
     def battery_pack_identity_serial(
@@ -9149,6 +9233,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             )
         ordered = sorted_battery_pack_payloads(packs)
         serial_key = stable_subdevice_key("battery_pack", serial, pack_index)
+        if any(
+            frozen_parent_id == parent_device_id
+            and frozen_index != pack_index
+            and frozen_serial is not None
+            and stable_subdevice_key("battery_pack", frozen_serial, frozen_index)
+            == serial_key
+            for (
+                frozen_parent_id,
+                frozen_index,
+            ), frozen_serial in self._battery_pack_identity_overrides.items()
+        ):
+            return None
         matching_serials = sum(
             stable_subdevice_key(
                 "battery_pack",
@@ -17318,31 +17414,27 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 raise
             except BACKGROUND_TASK_ERRORS as err:
                 _LOGGER.debug("Jackery: background slow-metric refresh failed: %s", err)
-            else:
-                # Consume the newly populated caches immediately. The follow-up
-                # coordinator cycle only performs the fast property request;
-                # every slow slot just filled above is still inside its TTL.
-                slow_cache = getattr(self, "_slow_cache", None)
-                if slow_cache is None:
-                    slow_cache = self._slow_cache = {}
-                periodic_cache_advanced = any(
-                    is_periodic_section(cache_key)
-                    and (safe_float(cache_entry[0]) or 0.0) >= started_monotonic
-                    for cache in slow_cache.values()
-                    for cache_key, cache_entry in cache.items()
-                )
-                if periodic_cache_advanced:
-                    self._publish_cached_http_statistics(started_monotonic)
-                    self._last_stat_import_monotonic = float("-inf")
-                    self._schedule_statistics_import(self.data or {})
-                # Do NOT request a refresh here - the scheduled HTTP poll timer
-                # must remain the sole driver of the regular cadence.
-                _LOGGER.debug(
-                    "Jackery: background slow-metric refresh completed in "
-                    "%.1fs; periodic cache advanced=%s",
-                    time.monotonic() - started_monotonic,
-                    periodic_cache_advanced,
-                )
+            # Publish successful slots even when an independent supplement failed.
+            slow_cache = getattr(self, "_slow_cache", None)
+            if slow_cache is None:
+                slow_cache = self._slow_cache = {}
+            periodic_cache_advanced = any(
+                is_periodic_section(cache_key)
+                and (safe_float(cache_entry[0]) or 0.0) >= started_monotonic
+                for cache in slow_cache.values()
+                for cache_key, cache_entry in cache.items()
+            )
+            if periodic_cache_advanced:
+                self._publish_cached_http_statistics(started_monotonic)
+                self._last_stat_import_monotonic = float("-inf")
+                self._schedule_statistics_import(self.data or {})
+            # The scheduled HTTP poll remains the sole driver of property requests.
+            _LOGGER.debug(
+                "Jackery: background slow-metric refresh finished in "
+                "%.1fs; periodic cache advanced=%s",
+                time.monotonic() - started_monotonic,
+                periodic_cache_advanced,
+            )
 
         self._slow_metrics_bg_task = self._create_entry_background_task(
             _background_refresh(),
@@ -17454,7 +17546,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         """
         now = self._local_now()
         devices: dict[str, Any] = {}
-        for index, device_id in enumerate(sorted((self.data or {}).keys()), start=1):
+        for index, device_id in enumerate(sorted(self.data or {}), start=1):
             payload = (self.data or {}).get(device_id) or {}
             metric_rows: dict[str, Any] = {}
             for section_prefix, stat_key, metric_key, label in APP_CHART_STAT_METRICS:
@@ -19425,13 +19517,48 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         async def fetch_with_system_fallback() -> object:
             fetched = await request_factory()
-            if isinstance(fetched, dict) and any(key != "_request" for key in fetched):
-                return fetched
-            fallback = await self._async_system_day_curve_fallback(
-                section_prefix=section_prefix,
-                system_id=system_id,
-                target_day=target_day,
+            device_has_points = isinstance(fetched, dict) and any(
+                isinstance(values, list)
+                and any(safe_float(value) is not None for value in values)
+                for key, values in fetched.items()
+                if key == APP_CHART_SERIES_Y
+                or (key.startswith(APP_CHART_SERIES_Y) and key[1:].isdigit())
             )
+            aggregate = (
+                fetched.get(APP_CHART_SERIES_Y) if isinstance(fetched, dict) else None
+            )
+            pv_aggregate_missing = section_prefix == APP_SECTION_PV_STAT and not (
+                isinstance(aggregate, list)
+                and any(safe_float(value) is not None for value in aggregate)
+            )
+            if device_has_points and not pv_aggregate_missing:
+                return fetched
+            try:
+                fallback = await self._async_system_day_curve_fallback(
+                    section_prefix=section_prefix,
+                    system_id=system_id,
+                    target_day=target_day,
+                )
+            except (JackeryError, TimeoutError, HomeAssistantError) as err:
+                if not device_has_points:
+                    raise
+                _LOGGER.debug(
+                    "Jackery supplementary system PV curve failed for %s on %s; "
+                    "device channels remain usable: %s",
+                    device_id,
+                    target_day.isoformat(),
+                    exception_debug_message(err),
+                )
+                return fetched
+            if fallback and isinstance(fetched, dict):
+                if section_prefix == APP_SECTION_PV_STAT:
+                    curve = fallback.get(APP_CHART_SERIES_Y)
+                    if not isinstance(curve, list) or not any(
+                        safe_float(value) is not None for value in curve
+                    ):
+                        return fetched
+                    return supplement_pv_day_curve(fetched, fallback)
+                return {**fetched, **fallback}
             return fallback or fetched
 
         semaphore = getattr(self, "_slow_http_request_semaphore", None)
@@ -20027,7 +20154,37 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
         target_sources = device_days.setdefault(target_day.isoformat(), {})
         if isinstance(target_sources, dict):
-            target_sources[section_prefix] = day_totals
+            retained_totals = target_sources.get(section_prefix)
+            target_sources[section_prefix] = {
+                **(retained_totals if isinstance(retained_totals, dict) else {}),
+                **day_totals,
+            }
+
+    @staticmethod
+    def _cached_verified_day_totals(
+        day_state: dict[str, Any],
+        section_prefix: str,
+    ) -> dict[str, float]:
+        """Read only finite, nonnegative totals certified by the current rule."""
+        if (
+            day_state.get("verified_totals_rule")
+            != _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
+        ):
+            return {}
+        cached_totals = day_state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
+        if not isinstance(cached_totals, dict):
+            return {}
+        expected_keys = {
+            stat_key
+            for metric_section, stat_key, _metric_key, _label in APP_CHART_STAT_METRICS
+            if metric_section == section_prefix
+        }
+        return {
+            key: value
+            for key, raw_value in cached_totals.items()
+            if key in expected_keys
+            if (value := safe_float(raw_value)) is not None and value >= 0
+        }
 
     def _record_verified_day_totals_update(
         self,
@@ -20047,6 +20204,11 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             section_prefix=section_prefix,
             source=source,
         )
+        if day_totals:
+            day_totals = {
+                **self._cached_verified_day_totals(day_state, section_prefix),
+                **day_totals,
+            }
         self._merge_verified_day_totals_update(
             updates,
             day_totals=day_totals,
@@ -20080,35 +20242,18 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             <= target_day
             < today
         )
-        cached_totals = (
-            day_state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
+        usable_totals = (
+            self._cached_verified_day_totals(day_state, section_prefix)
             if in_completed_window
-            and day_state.get("verified_totals_rule")
-            == _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
-            else None
+            else {}
         )
-        has_verified_totals = False
-        if isinstance(cached_totals, dict) and cached_totals:
-            expected_keys = {
-                stat_key
-                for metric_section, stat_key, _metric_key, _label in (
-                    APP_CHART_STAT_METRICS
-                )
-                if metric_section == section_prefix
-            }
-            usable_totals = {
-                key: value
-                for key, raw_value in cached_totals.items()
-                if key in expected_keys
-                if (value := safe_float(raw_value)) is not None and value >= 0
-            }
-            if usable_totals:
-                has_verified_totals = True
-                self._merge_verified_day_totals_update(
-                    updates,
-                    day_totals=usable_totals,
-                    **window,
-                )
+        has_verified_totals = bool(usable_totals)
+        if usable_totals:
+            self._merge_verified_day_totals_update(
+                updates,
+                day_totals=usable_totals,
+                **window,
+            )
         return state_status is BackfillStatus.IMPORTED, False, has_verified_totals
 
     def _statistics_backfill_should_stop(self) -> bool:
@@ -20169,6 +20314,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         progress: _HttpDayBackfillProgress,
         candidate: _HttpDayBackfillCandidate,
         today: date,
+        now_epoch: float,
     ) -> _HttpDayBackfillCandidate | None:
         """Select old completed imports without reopening Recorder work."""
         state = candidate.day_state
@@ -20179,8 +20325,6 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return None
         if state.get("status") != BackfillStatus.IMPORTED.value:
             return None
-        if state.get("totals_checked_date") == today.isoformat():
-            return None
         expected = {
             stat_key
             for section, stat_key, _metric, _label in APP_CHART_STAT_METRICS
@@ -20188,13 +20332,21 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         }
         if not expected:
             return None
-        totals = state.get(_STATISTICS_HTTP_VERIFIED_TOTALS)
-        if (
-            state.get("verified_totals_rule") == _STATISTICS_HTTP_VERIFIED_TOTALS_RULE
-            and isinstance(totals, dict)
-            and expected.issubset(totals)
-        ):
+        totals = JackerySolarVaultCoordinator._cached_verified_day_totals(
+            state, candidate.section_prefix
+        )
+        if expected.issubset(totals):
             return None
+        try:
+            attempted_at = datetime.fromisoformat(state["totals_last_attempt_at"])
+            if (
+                attempted_at.tzinfo is not None
+                and now_epoch - attempted_at.timestamp()
+                < _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC
+            ):
+                return None
+        except KeyError, TypeError, ValueError:
+            pass
         progress.pending_sources += 1
         return candidate
 
@@ -20215,7 +20367,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             return None
         if progress.verification_only:
             return self._http_day_totals_verification_candidate(
-                progress, candidate, today
+                progress, candidate, today, now_epoch
             )
         key = (
             candidate.device_id,
@@ -20825,7 +20977,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         candidates.append(
                             _HttpPeriodBackfillCandidate(
                                 priority=priorities[date_type],
-                                attempted=safe_int(state.get("attempts")) or 0,
+                                attempted=safe_int(state.get("attempts"))
+                                or int(bool(state.get("last_attempt_at"))),
                                 last_attempt=str(state.get("last_attempt_at") or ""),
                                 period_start=period_start,
                                 device_id=str(device_id),
@@ -20838,6 +20991,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         )
         candidates.sort(
             key=lambda item: (
+                item.attempted,
+                item.last_attempt,
                 item.priority,
                 item.period_start,
                 item.device_id,
@@ -20897,6 +21052,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             candidate
         )
         state.update({
+            "attempts": candidate.attempted + 1,
             "last_attempt_at": utc_now().isoformat(),
             "status": "pending",
             "period_open": False,

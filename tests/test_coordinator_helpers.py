@@ -5,6 +5,7 @@ control coercion, transport command parsing, and dict merging helpers
 without any Home Assistant recorder dependency.
 """
 
+import asyncio
 from collections import deque
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -28,27 +29,12 @@ from custom_components.jackery_solarvault.coordinator import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
-
-    from homeassistant.core import HomeAssistant
 
 # ---------------------------------------------------------------------------
 # _safe_enrich
 # ---------------------------------------------------------------------------
-
-
-def test_unlink_removed_parents_without_entry_preserves_registry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A detached coordinator cannot remove devices without an owning entry."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
-    coordinator.config_entry = None
-    get_registry = MagicMock()
-    monkeypatch.setattr(coordinator_module.dr, "async_get", get_registry)
-
-    assert coordinator._unlink_removed_parent_devices({"removed-parent"}) == 0  # ruff: ignore[private-member-access]
-
-    get_registry.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -491,12 +477,9 @@ async def test_payload_debug_shutdown_flush_writes_pending_events(
     """Shutdown must flush queued debug diagnostics before other tasks stop."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     executor_job = AsyncMock()
-    coordinator.hass = cast(
-        "HomeAssistant",
-        SimpleNamespace(
-            config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
-            async_add_executor_job=executor_job,
-        ),
+    cast("Any", coordinator).hass = SimpleNamespace(
+        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+        async_add_executor_job=executor_job,
     )
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="test-entry")
     coordinator._background_tasks = {}  # ruff: ignore[private-member-access]
@@ -522,12 +505,9 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
     """A burst must retain all debug events without one disk job per frame."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     executor_job = AsyncMock()
-    coordinator.hass = cast(
-        "HomeAssistant",
-        SimpleNamespace(
-            config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
-            async_add_executor_job=executor_job,
-        ),
+    cast("Any", coordinator).hass = SimpleNamespace(
+        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+        async_add_executor_job=executor_job,
     )
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="test-entry")
     coordinator._payload_debug_pending_events = deque([  # ruff: ignore[private-member-access]
@@ -550,3 +530,53 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
     assert unredacted is False
     assert [event["sequence"] for event in events] == [1, 2]
     assert all(event["entry_id"] == "test-entry" for event in events)
+
+
+@pytest.mark.parametrize("unredacted", [False, True])
+async def test_debug_capture_masks_credentials_and_raw_frames_without_opt_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, unredacted: bool
+) -> None:
+    """The actual capture boundary honors the separate unredacted option."""
+    import json  # ruff: ignore[import-outside-top-level]
+
+    from custom_components.jackery_solarvault.const import (  # ruff: ignore[import-outside-top-level]
+        CONF_ENABLE_PAYLOAD_DEBUG_LOG,
+        CONF_ENABLE_UNREDACTED_DEBUG,
+        REDACTED_VALUE,
+    )
+
+    monkeypatch.delenv("JACKERY_DEV_MODE", raising=False)
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    cast("Any", coordinator).entry = SimpleNamespace(
+        entry_id="test-entry",
+        options={
+            CONF_ENABLE_PAYLOAD_DEBUG_LOG: True,
+            CONF_ENABLE_UNREDACTED_DEBUG: unredacted,
+        },
+    )
+    path = tmp_path / "payload.jsonl"
+
+    async def executor(writer: Callable[..., None], *args: Any) -> None:
+        await asyncio.to_thread(writer, *args)
+
+    cast("Any", coordinator).hass = SimpleNamespace(
+        config=SimpleNamespace(path=lambda _filename: str(path)),
+        async_add_executor_job=executor,
+    )
+    await coordinator._async_payload_debug_events([  # ruff: ignore[private-member-access]
+        {
+            "password": "broker-secret",
+            "nested": {"token": "token-secret"},
+            "raw_hex": b"broker-secret".hex(),
+            "soc": 42,
+        }
+    ])
+    event = json.loads(path.read_text())
+    assert event["password"] == ("broker-secret" if unredacted else REDACTED_VALUE)
+    assert event["nested"]["token"] == (
+        "token-secret" if unredacted else REDACTED_VALUE
+    )
+    assert event["raw_hex"] == (
+        b"broker-secret".hex() if unredacted else REDACTED_VALUE
+    )
+    assert event["soc"] == 42  # ruff: ignore[magic-value-comparison]

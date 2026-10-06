@@ -123,11 +123,11 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
 
 
 @pytest.mark.asyncio()
-async def test_oversized_payload_is_rejected_before_decode(
+async def test_oversized_payload_is_dropped_before_decoding(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The receive limit must protect both the JSON decoder and coordinator."""
+    """The transport rejects frames exceeding its configured size budget."""
     sink = AsyncMock(return_value=True)
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_PAYLOAD_BYTES", 2)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
@@ -139,7 +139,7 @@ async def test_oversized_payload_is_rejected_before_decode(
     assert snapshot["messages_received"] == 1
     assert snapshot["messages_dropped"] == 1
     assert snapshot["messages_oversized"] == 1
-    assert "exceeds 2 byte limit" in cast_str(snapshot["last_error"])
+    assert snapshot["messages_forwarded"] == 0
 
 
 def cast_str(value: object) -> str:

@@ -1064,7 +1064,7 @@ def test_jackery_online_state_none_falls_through() -> None:
 def test_effective_period_total_value_year_section() -> None:
     """Year device sections sum their expanded series into a rounded total."""
     section = f"{APP_SECTION_PV_STAT}_{DATE_TYPE_YEAR}"
-    source = {APP_CHART_SERIES_Y: [1.0, 2.0, 3.0]}
+    source = {APP_CHART_SERIES_Y: [1.0, 2.0, 3.0] + [0.0] * 9}
     expected = 6.0
     total = util.effective_period_total_value(
         source, section, APP_STAT_TOTAL_SOLAR_ENERGY

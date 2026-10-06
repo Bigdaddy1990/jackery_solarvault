@@ -379,6 +379,49 @@ async def test_new_calendar_period_is_added_incrementally(
 
 
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("failure", ["transport", "recorder"])
+async def test_bounded_period_queue_rotates_failed_sources(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """A retryable old month cannot starve later months or weeks."""
+    monkeypatch.setattr(coordinator_module, "APP_CHART_STAT_METRICS", _ONE_PV_METRIC)
+    coordinator = _coordinator()
+    raw = cast("Any", coordinator)
+    january = date(2026, 1, 1)
+    february = date(2026, 2, 1)
+    week = date(2026, 7, 6)
+    raw._http_period_backfill_plan = lambda _today, *, from_date: (  # ruff: ignore[private-member-access]
+        (DATE_TYPE_MONTH, [january, february]),
+        (DATE_TYPE_WEEK, [week]),
+    )
+    requested: list[date] = []
+
+    def fetch(*, period_start: date, **_kwargs: object) -> dict[str, object]:
+        requested.append(period_start)
+        if failure == "transport" and period_start == january:
+            raise TimeoutError
+        return _source(period_start)
+
+    raw._async_fetch_historical_app_chart_source = AsyncMock(side_effect=fetch)  # ruff: ignore[private-member-access]
+    if failure == "recorder":
+        raw._import_collected_repair_buckets = AsyncMock(  # ruff: ignore[private-member-access]
+            side_effect=[(0, 1), (1, 0), (1, 0)]
+        )
+    for _ in range(3):
+        await coordinator._async_http_backfill_period_statistics(  # ruff: ignore[private-member-access]
+            {_DEVICE_ID: {}}, request_budget=1
+        )
+
+    assert requested == [january, february, week]
+    states = raw._statistics_backfill_state["devices"][_DEVICE_ID][  # ruff: ignore[private-member-access]
+        "http_period_backfill"
+    ]["sources"][APP_SECTION_PV_STAT]
+    assert states[DATE_TYPE_MONTH][january.isoformat()]["status"] == "pending"
+    assert states[DATE_TYPE_MONTH][february.isoformat()]["status"] == "imported"
+    assert states[DATE_TYPE_WEEK][week.isoformat()]["status"] == "imported"
+
+
+@pytest.mark.asyncio()
 async def test_period_transport_failure_remains_available_to_next_fill(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

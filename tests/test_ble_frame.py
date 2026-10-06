@@ -15,11 +15,11 @@ from collections import deque
 import contextlib
 from datetime import UTC, datetime
 import json
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.client.ble import (
     BLE_AES_IV_LEN,
@@ -884,13 +884,13 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
     asyncio.run(_run())
 
 
-def test_unparsed_ble_frame_is_captured_only_with_raw_debug() -> None:
+def test_unparsed_ble_frame_keeps_raw_bytes_without_redaction_switch() -> None:
     """A failed BLE decode still leaves its exact wire bytes in raw capture."""
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator.entry = MockConfigEntry(
-            domain="jackery_solarvault", options={"enable_unredacted_debug": True}
+        cast("Any", coordinator).entry = SimpleNamespace(
+            options={"enable_unredacted_debug": True}
         )
         received_at = datetime.now(UTC)
         observation = BleFrameObservation(
@@ -916,8 +916,8 @@ def test_unparsed_ble_frame_is_captured_only_with_raw_debug() -> None:
         assert event["notify_sequence"] == 4  # ruff: ignore[magic-value-comparison]
         assert event["decode_error"] == "invalid frame"
 
-        coordinator.entry = MockConfigEntry(domain="jackery_solarvault", options={})
-        assert "raw_hex" not in capture.call_args.args[0]()
+        cast("Any", coordinator).entry = SimpleNamespace(options={})
+        assert capture.call_args.args[0]()["raw_hex"] == "dead"
 
     asyncio.run(_run())
 

@@ -5,7 +5,6 @@ minimum state required to continue an already-observed local day after a Home
 Assistant restart; it never stores completed days, weeks, months, or years.
 """
 
-import asyncio
 from datetime import date
 import json
 import logging
@@ -21,6 +20,7 @@ from ..const import (
     LOCAL_DAILY_CACHE_STORAGE_KEY,
     LOCAL_DAILY_CACHE_VALUES_KEY,
 )
+from ..util import get_store_lock
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -35,15 +35,6 @@ _KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
 _KEY_DAY: Final = LOCAL_DAILY_CACHE_DAY_KEY
 _KEY_VALUES: Final = LOCAL_DAILY_CACHE_VALUES_KEY
 _KEY_FULL_DAY_METRICS: Final = LOCAL_DAILY_CACHE_FULL_DAY_METRICS_KEY
-
-
-def _store_lock(hass: HomeAssistant) -> asyncio.Lock:
-    """Return the runtime lock protecting the shared Store file."""
-    lock = hass.data.get(_LOCK_KEY)
-    if not isinstance(lock, asyncio.Lock):
-        lock = asyncio.Lock()
-        hass.data[_LOCK_KEY] = lock
-    return lock
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -131,7 +122,7 @@ async def async_load_daily_cache(
     entry_id: str,
 ) -> dict[str, dict[str, Any]]:
     """Load current-day anchors, recovering same-device rows after reauth."""
-    async with _store_lock(hass):
+    async with get_store_lock(hass, _LOCK_KEY):
         data = await _store(hass).async_load()
     if not isinstance(data, dict):
         return {}
@@ -172,7 +163,7 @@ async def async_save_daily_cache(
         normalized_id = str(device_id).strip()
         if snapshot is not None and normalized_id:
             cleaned[normalized_id] = snapshot
-    async with _store_lock(hass):
+    async with get_store_lock(hass, _LOCK_KEY):
         store = _store(hass)
         loaded = await store.async_load()
         data = dict(loaded) if isinstance(loaded, dict) else {}

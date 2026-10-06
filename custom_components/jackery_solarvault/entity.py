@@ -1,9 +1,10 @@
 """Shared entity base class."""
 
 import logging
-from typing import Any
+from typing import Any, NoReturn
 
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -114,6 +115,21 @@ def payload_properties_for_sources(
     if isinstance(props, dict):
         resolved.update(props)
     return resolved
+
+
+def raise_entity_action_error(
+    entity_key: str, device_id: str, error: object
+) -> NoReturn:
+    """Raise the shared translated action failure with its original context."""
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="entity_action_failed",
+        translation_placeholders={
+            "entity": entity_key,
+            "device_id": device_id,
+            "error": str(error),
+        },
+    )
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):

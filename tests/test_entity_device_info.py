@@ -7,7 +7,7 @@ model/name always wins when present — only the fallback changes.
 """
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -42,12 +42,6 @@ from custom_components.jackery_solarvault.sensor import (
 from custom_components.jackery_solarvault.switch import JackeryBreakerSwitch
 from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-
-if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-    from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 
 _DEVICE_ID = "home-power-3002"
 
@@ -88,7 +82,7 @@ def _bound(cls: type[Any], payload: dict[str, Any], **extra: Any) -> Any:
 
 def test_device_info_model_falls_back_family_neutral() -> None:
     """Blank model source fields resolve to the neutral fallback, not "SolarVault"."""
-    info = cast("DeviceInfo", _entity({}).device_info)
+    info: dict[str, Any] = dict(_entity({}).device_info)
 
     assert info["model"] == DEFAULT_DEVICE_MODEL_FALLBACK
     assert info["model"] != "SolarVault"
@@ -98,14 +92,14 @@ def test_device_info_model_uses_reported_model_when_present() -> None:
     """A real reported model always wins over the fallback."""
     payload = {PAYLOAD_DISCOVERY: {FIELD_DEV_MODEL: "HTH0132500A"}}
 
-    assert cast("DeviceInfo", _entity(payload).device_info)["model"] == "HTH0132500A"
+    assert dict(_entity(payload).device_info)["model"] == "HTH0132500A"
 
 
 def test_parent_device_info_exposes_normalized_mac_connection() -> None:
     """The native and MQTT registry entries share the parent device MAC."""
     payload = {PAYLOAD_PROPERTIES: {FIELD_MAC: "AA-BB-CC-11-22-33"}}
 
-    assert cast("DeviceInfo", _entity(payload).device_info)["connections"] == {
+    assert dict(_entity(payload).device_info)["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
     }
 
@@ -131,17 +125,14 @@ def test_main_battery_uses_child_device_without_changing_entity_identity(
     )
     for description in descriptions:
         entity = _entity({})
-        entity.coordinator = cast(
-            "JackerySolarVaultCoordinator",
-            SimpleNamespace(
-                data={_DEVICE_ID: {}},
-                hass=hass,
-                config_entry=SimpleNamespace(entry_id=entry_id),
-            ),
+        cast("Any", entity).coordinator = SimpleNamespace(
+            data={_DEVICE_ID: {}},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
-        info = cast("ChildDeviceInfo", entity.device_info)
+        info: dict[str, Any] = dict(entity.device_info)
         assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_main_battery")}
         assert info["parent_device_id"] == parent.id
         assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
@@ -164,13 +155,10 @@ def test_ct_statistics_join_existing_smart_meter_device(hass: Any) -> None:
     )
     ct = {"deviceSn": "CT-SERIAL-1"}
     entity = _entity({PAYLOAD_CT_METER: ct})
-    entity.coordinator = cast(
-        "JackerySolarVaultCoordinator",
-        SimpleNamespace(
-            data={_DEVICE_ID: {PAYLOAD_CT_METER: ct}},
-            hass=hass,
-            config_entry=SimpleNamespace(entry_id=entry_id),
-        ),
+    cast("Any", entity).coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {PAYLOAD_CT_METER: ct}},
+        hass=hass,
+        config_entry=SimpleNamespace(entry_id=entry_id),
     )
     entity.entity_description = next(
         d for d in STAT_DESCRIPTIONS if d.key == "ct_input_day_energy"
@@ -209,17 +197,14 @@ def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> 
         next(d for d in STAT_DESCRIPTIONS if d.key == "device_pv1_day_energy"),
     ):
         entity = _entity(payload)
-        entity.coordinator = cast(
-            "JackerySolarVaultCoordinator",
-            SimpleNamespace(
-                data={_DEVICE_ID: payload},
-                hass=hass,
-                config_entry=SimpleNamespace(entry_id=entry_id),
-            ),
+        cast("Any", entity).coordinator = SimpleNamespace(
+            data={_DEVICE_ID: payload},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
-        info = cast("ChildDeviceInfo", entity.device_info)
+        info: dict[str, Any] = dict(entity.device_info)
         assert info["identifiers"] == {(DOMAIN, f"{_DEVICE_ID}_pv_input_1")}
         assert info["parent_device_id"] == parent.id
         assert entity.unique_id == f"{_DEVICE_ID}_{description.key}"
@@ -231,13 +216,10 @@ def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> 
         )
 
     temporarily_missing = _entity({})
-    temporarily_missing.coordinator = cast(
-        "JackerySolarVaultCoordinator",
-        SimpleNamespace(
-            data={_DEVICE_ID: {}},
-            hass=hass,
-            config_entry=SimpleNamespace(entry_id=entry_id),
-        ),
+    cast("Any", temporarily_missing).coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {}},
+        hass=hass,
+        config_entry=SimpleNamespace(entry_id=entry_id),
     )
     temporarily_missing.entity_description = next(
         d for d in SENSOR_DESCRIPTIONS if d.key == "pv1_power"
@@ -361,7 +343,7 @@ def test_battery_pack_sensor_falls_back_to_jackery() -> None:
         _pack_sn=None,
         _pack_key=stable_subdevice_key("battery_pack", None, 1),
     )
-    info = entity.device_info
+    info: dict[str, Any] = dict(entity.device_info)
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert info["model"] == "Jackery battery pack"
@@ -400,7 +382,7 @@ def test_meter_head_sensor_base_name_falls_back_to_jackery() -> None:
         _meter_head_sn=None,
         _meter_head_key=None,
     )
-    info = entity.device_info
+    info: dict[str, Any] = dict(entity.device_info)
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in info["name"]
@@ -409,7 +391,7 @@ def test_meter_head_sensor_base_name_falls_back_to_jackery() -> None:
 def test_smart_meter_sensor_base_name_falls_back_to_jackery() -> None:
     """A HomePower CT/smart-meter with blank name fields is never "SolarVault"."""
     entity = _bound(JackerySmartMeterSensor, {})
-    info = entity.device_info
+    info: dict[str, Any] = dict(entity.device_info)
 
     assert info["name"].startswith(f"Jackery {_DEVICE_ID}")
     assert "SolarVault" not in info["name"]
@@ -422,7 +404,7 @@ def test_smart_meter_device_info_exposes_mac_connection() -> None:
         {PAYLOAD_CT_METER: {FIELD_MAC: "AABBCC445566"}},
     )
 
-    assert entity.device_info["connections"] == {
+    assert dict(entity.device_info)["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:44:55:66")
     }
 
@@ -434,7 +416,7 @@ def test_smart_meter_device_info_uses_device_sn_as_mac_fallback() -> None:
         {PAYLOAD_CT_METER: {FIELD_DEVICE_SN: "5c013b048e3c"}},
     )
 
-    assert entity.device_info["connections"] == {
+    assert dict(entity.device_info)["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "5c:01:3b:04:8e:3c")
     }
 
@@ -447,7 +429,7 @@ def test_smart_meter_device_info_uses_dev_id_as_mac_fallback() -> None:
         {PAYLOAD_CT_METER: {FIELD_DEV_ID: dev_id}},
     )
 
-    assert entity.device_info["connections"] == {
+    assert dict(entity.device_info)["connections"] == {
         (dr.CONNECTION_NETWORK_MAC, "5c:01:3b:04:8e:3c")
     }
     # The identifier is keyed on the accessory identity and must match the

@@ -116,6 +116,147 @@ def test_verified_day_totals_survive_week_and_month_rollover() -> None:
     )
 
 
+@pytest.mark.parametrize("already_batched", [False, True])
+def test_sparse_verified_day_update_preserves_other_channel_totals(
+    already_batched: bool,
+) -> None:
+    """A sparse response cannot erase earlier proof for the same completed day."""
+    coordinator = _ready_backfill_coordinator()
+    retained = {
+        "2026-07-08": {
+            APP_SECTION_PV_STAT: {"pv1Egy": 2.0, "pv2Egy": 3.0},
+            APP_SECTION_HOME_STAT: {APP_STAT_TOTAL_OUT_GRID_ENERGY: 4.0},
+        }
+    }
+    original = deepcopy(retained)
+    cast("Any", coordinator).data = {_DEV: {"verified_day_statistics": retained}}
+    updates: dict[str, dict[str, Any]] = (
+        {_DEV: deepcopy(retained)} if already_batched else {}
+    )
+
+    vars(JackerySolarVaultCoordinator)["_merge_verified_day_totals_update"](
+        coordinator,
+        updates,
+        day_totals={"pv1Egy": 2.5},
+        device_id=_DEV,
+        target_day=date(2026, 7, 8),
+        section_prefix=APP_SECTION_PV_STAT,
+        week_start=date(2026, 7, 6),
+        today=date(2026, 7, 9),
+    )
+
+    assert updates[_DEV]["2026-07-08"][APP_SECTION_PV_STAT] == {
+        "pv1Egy": 2.5,
+        "pv2Egy": 3.0,
+    }
+    assert updates[_DEV]["2026-07-08"][APP_SECTION_HOME_STAT] == {
+        APP_STAT_TOTAL_OUT_GRID_ENERGY: 4.0
+    }
+    assert retained == original
+
+
+@pytest.mark.parametrize("current_rule", [False, True])
+def test_sparse_day_verification_retains_only_certified_cached_metrics(
+    current_rule: bool,
+) -> None:
+    """New complete curves replace their metric, not unrelated certified proof."""
+    coordinator = _ready_backfill_coordinator()
+    state = {
+        "status": "imported",
+        "verified_totals_rule": (
+            vars(co)["_STATISTICS_HTTP_VERIFIED_TOTALS_RULE"]
+            if current_rule
+            else "legacy"
+        ),
+        "verified_totals": {
+            "totalSolarEnergy": 1.0,
+            "pv1Egy": 3.0,
+            "pv2Egy": 2.0,
+            "pv3Egy": float("nan"),
+            "pv4Egy": -1.0,
+            "totalCharge": 7.0,
+        },
+    }
+    source = {
+        "unit": "W",
+        "y": [800.0] * _FULL_DAY_SAMPLES,
+        "y1": [400.0] * _FULL_DAY_SAMPLES,
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-07-08",
+            "endDate": "2026-07-08",
+        },
+    }
+    updates: dict[str, dict[str, Any]] = {}
+
+    totals = vars(JackerySolarVaultCoordinator)["_record_verified_day_totals_update"](
+        coordinator,
+        updates,
+        source=source,
+        day_state=state,
+        device_id=_DEV,
+        target_day=date(2026, 7, 8),
+        section_prefix=APP_SECTION_PV_STAT,
+        week_start=date(2026, 7, 6),
+        today=date(2026, 7, 9),
+    )
+
+    expected = {"totalSolarEnergy": 19.2, "pv1Egy": 9.6}
+    if current_rule:
+        expected["pv2Egy"] = 2.0
+    assert totals == expected
+    assert state["verified_totals"] == expected
+    assert updates[_DEV]["2026-07-08"][APP_SECTION_PV_STAT] == expected
+    assert state["status"] == "imported"
+
+
+@pytest.mark.parametrize("invalid_value", [None, -1.0, float("nan"), float("inf")])
+def test_invalid_cached_channel_total_does_not_stop_verification(
+    invalid_value: float | None,
+) -> None:
+    """All expected keys alone cannot certify malformed persisted channel data."""
+    totals = {
+        "totalSolarEnergy": 24.0,
+        **{f"pv{index}Egy": 6.0 for index in range(1, 5)},
+    }
+    state: dict[str, Any] = {
+        "status": "imported",
+        "verified_totals_rule": vars(co)["_STATISTICS_HTTP_VERIFIED_TOTALS_RULE"],
+        "verified_totals": {**totals, "pv2Egy": invalid_value},
+    }
+    candidate = vars(co)["_HttpDayBackfillCandidate"](
+        priority=1,
+        attempted=0,
+        last_attempt="",
+        target_day=date(2026, 7, 8),
+        attempts=0,
+        device_id=_DEV,
+        section_prefix=APP_SECTION_PV_STAT,
+        payload={},
+        day_state=state,
+        days_state={},
+    )
+    progress = vars(co)["_HttpDayBackfillProgress"](
+        target_days=[candidate.target_day],
+        force=True,
+        window_days=1,
+        include_current_year=True,
+        now_monotonic=0.0,
+        verification_only=True,
+    )
+
+    selected = vars(JackerySolarVaultCoordinator)[
+        "_http_day_totals_verification_candidate"
+    ](
+        progress,
+        candidate,
+        date(2026, 7, 9),
+        datetime(2026, 7, 9, tzinfo=UTC).timestamp(),
+    )
+
+    assert selected is candidate
+
+
 def test_unversioned_cached_day_total_is_not_a_complete_day_proof() -> None:
     """Legacy sums have no evidence that all five-minute slots were present."""
     coordinator = _ready_backfill_coordinator()
@@ -132,6 +273,50 @@ def test_unversioned_cached_day_total_is_not_a_complete_day_proof() -> None:
     )
     assert not verified
     assert not updates
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_incomplete_verified_totals_retry_same_day(complete: bool) -> None:
+    """Missing channel evidence retries without reopening completed imports."""
+    coordinator = _ready_backfill_coordinator()
+    source, days = coordinator._http_day_backfill_days_state(_DEV, APP_SECTION_PV_STAT)  # ruff: ignore[private-member-access]
+    source["curve_rule"] = co._HTTP_DAY_CURVE_IMPORT_RULE  # ruff: ignore[private-member-access]
+    attempt = datetime(2026, 7, 9, 6, tzinfo=UTC)
+    totals = {"totalSolarEnergy": 24.0}
+    if complete:
+        totals.update({f"pv{i}Egy": 6.0 for i in range(1, 5)})
+    state = {
+        "status": "imported",
+        "imported_rows": 24,
+        "totals_checked_date": "2026-07-09",
+        "totals_last_attempt_at": attempt.isoformat(),
+        "verified_totals_rule": co._STATISTICS_HTTP_VERIFIED_TOTALS_RULE,  # ruff: ignore[private-member-access]
+        "verified_totals": totals,
+    }
+    days["2026-07-08"] = deepcopy(state)
+    progress = co._HttpDayBackfillProgress(  # ruff: ignore[private-member-access]
+        target_days=[date(2026, 7, 8)],
+        force=True,
+        window_days=1,
+        include_current_year=True,
+        now_monotonic=0.0,
+        verification_only=True,
+    )
+    for elapsed, expected in [
+        (0, False),
+        (co._STATISTICS_HTTP_BACKFILL_INTERVAL_SEC + 1, not complete),  # ruff: ignore[private-member-access]
+    ]:
+        candidates = coordinator._collect_http_day_backfill_candidates(  # ruff: ignore[private-member-access]
+            {_DEV: {"system_meta": {"id": "system-1"}}},
+            progress.target_days,
+            today=date(2026, 7, 9),
+            now_epoch=attempt.timestamp() + elapsed,
+            progress=progress,
+        )
+        assert (
+            any(c.section_prefix == APP_SECTION_PV_STAT for c in candidates) is expected
+        )
+        assert days["2026-07-08"] == state
 
 
 @pytest.mark.parametrize("samples", [288, 12, 0])

@@ -1,6 +1,7 @@
 """Regression tests for transport-independent entities and ordered live merges."""
 
 import asyncio
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 import logging
 from types import MethodType, SimpleNamespace
@@ -410,10 +411,10 @@ def _command_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def test_layer5_property_arrival_order_beats_same_tier_then_expires(
+def test_cloud_mqtt_replaces_unauthenticated_local_property_immediately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Layer-5 transports share one tier: later fresh L5 frames win."""
+    """Cloud values replace unauthenticated LAN values without a freshness delay."""
     clock = {"now": 100.0}
     monkeypatch.setattr(
         coordinator_module.time,
@@ -449,7 +450,7 @@ def test_layer5_property_arrival_order_beats_same_tier_then_expires(
     )
     assert merged[FIELD_PV_PW] == _LIVE_PV_W
 
-    clock["now"] = 161.0
+    clock["now"] = 101.0
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
@@ -484,10 +485,10 @@ def test_fresh_ble_property_beats_http_while_http_fills_missing_fields(
     assert merged[FIELD_PV_PW] == _HTTP_PV_W
 
 
-def test_layer5_ct_arrival_order_while_cloud_fills_missing_fields(
+def test_cloud_mqtt_replaces_unauthenticated_local_ct_property(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Layer-5 accessory telemetry follows arrival order and keeps filled gaps."""
+    """Cloud CT power replaces unauthenticated LAN values and supplies voltage."""
     monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: 100.0)
     coordinator = _source_priority_coordinator()
     updated: dict[str, Any] = {}
@@ -575,11 +576,8 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
 
-    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
-        for device_id, partial in new_data.items():
-            coordinator.data.setdefault(device_id, {}).update(partial)
-
-    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    coordinator._device_registry_observer = None  # ruff: ignore[private-member-access]
+    cast("Any", vars(coordinator))["_listeners"] = {}
 
     with caplog.at_level(
         logging.DEBUG,
@@ -606,36 +604,39 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     )
 
 
-async def test_stale_first_cloud_mqtt_snapshot_preserves_cached_state() -> None:
+@pytest.mark.parametrize("nested_pv", [False, True])
+async def test_stale_first_cloud_mqtt_snapshot_preserves_cached_state(
+    nested_pv: bool,
+) -> None:
     """A six-hour-old retained cloud frame cannot replace cached live state."""
     coordinator = _source_priority_coordinator()
+    field = FIELD_PV1 if nested_pv else FIELD_PV_PW
+    cached_value: Any = {FIELD_PV_PW: _LIVE_PV_W} if nested_pv else _LIVE_PV_W
+    replay_value: Any = {FIELD_PV_PW: 900, "pvVolt": 400} if nested_pv else 900
     coordinator.data = {
         "dev-1": {
-            PAYLOAD_PROPERTIES: {FIELD_PV_PW: _LIVE_PV_W},
+            PAYLOAD_PROPERTIES: {field: cached_value},
             PAYLOAD_DEVICE: {},
         }
     }
     coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
-
-    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
-        for device_id, partial in new_data.items():
-            coordinator.data.setdefault(device_id, {}).update(partial)
-
-    _set_test_attr(coordinator, "_push_partial_update", _capture)
+    _set_test_attr(coordinator, "_device_registry_observer", None)
+    cast("Any", vars(coordinator))["_listeners"] = {}
     accepted = await coordinator.async_handle_mqtt_message(
         "hb/app/user/device",
         {
             FIELD_DEVICE_ID: "dev-1",
             FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
             FIELD_TIMESTAMP: (datetime.now(UTC) - timedelta(hours=6)).timestamp(),
-            FIELD_BODY: {FIELD_PV_PW: 900},
+            FIELD_BODY: {field: replay_value},
         },
     )
 
     assert accepted == "dev-1"
-    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][FIELD_PV_PW] == _LIVE_PV_W
+    expected = {FIELD_PV_PW: _LIVE_PV_W, "pvVolt": 400} if nested_pv else _LIVE_PV_W
+    assert coordinator.data["dev-1"][PAYLOAD_PROPERTIES][field] == expected
 
 
 async def test_portable_write_uses_ble_before_cloud_mqtt() -> None:
@@ -931,11 +932,134 @@ async def test_mqtt_pack_cell_temperature_push_reaches_its_pack(
     assert entry[PAYLOAD_PROPERTIES]["cellTemp"] == 179  # ruff: ignore[magic-value-comparison]
 
 
+@pytest.mark.parametrize("local_mqtt", [False, True])
+@pytest.mark.parametrize("primary_serial", [None, "PACK-1", "PACK-3"])
+@pytest.mark.parametrize("supplementary_key", ["subDevices", "subDevice"])
+@pytest.mark.parametrize("anonymous_supplementary", [False, True])
+async def test_parallel_pack_lists_keep_all_serial_owned_fields(
+    local_mqtt: bool,
+    primary_serial: str | None,
+    supplementary_key: str,
+    anonymous_supplementary: bool,
+) -> None:
+    """One recognized pack list must not hide another list in the same frame."""
+    coordinator = _source_priority_coordinator()
+    original_packs = [
+        {FIELD_DEVICE_SN: "PACK-1", "devType": 1, "inEgy": 10},
+        {FIELD_DEVICE_SN: "PACK-2", "devType": 1, "inEgy": 20},
+        {FIELD_DEVICE_SN: "PACK-3", "devType": 1, "inEgy": 36400},
+    ]
+    coordinator.data = {
+        "dev-1": {
+            PAYLOAD_PROPERTIES: {"cellTemp": 179},
+            PAYLOAD_DEVICE: {FIELD_DEVICE_SN: "HEAD-SN"},
+            PAYLOAD_BATTERY_PACKS: original_packs,
+        }
+    }
+    coordinator._device_index = {"dev-1": {}}  # ruff: ignore[private-member-access]
+    _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
+    _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
+    _set_test_attr(coordinator, "_local_mqtt_last_device_message_monotonic", {})
+    _set_test_attr(coordinator, "_device_registry_observer", None)
+    cast("Any", vars(coordinator))["_listeners"] = {}
+    _set_test_attr(coordinator, "_mqtt_session_actions_seen", set())
+    primary: dict[str, Any] = {"batSoc": 55}
+    if primary_serial is not None:
+        primary[FIELD_DEVICE_SN] = primary_serial
+    supplementary = {
+        FIELD_DEVICE_SN: "PACK-3",
+        "cellTemp": 274,
+        "inPw": 300,
+        "outPw": 0,
+        "inEgy": 36435,
+        "outEgy": 34652,
+        "version": "1.2.3",
+    }
+    if anonymous_supplementary:
+        supplementary.pop(FIELD_DEVICE_SN)
+    payload = {
+        FIELD_DEVICE_ID: "dev-1",
+        FIELD_DEVICE_SN: "HEAD-SN",
+        FIELD_MESSAGE_TYPE: MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        "type": 107,
+        "actionId": 0,
+        FIELD_BODY: {
+            "devType": 1,
+            "batteryPacks": [primary],
+            supplementary_key: [supplementary],
+        },
+    }
+    original_payload = deepcopy(payload)
+
+    if local_mqtt:
+        assert await coordinator.async_handle_local_mqtt_message(
+            "hb/device/HEAD-SN/event", payload
+        )
+    else:
+        await coordinator.async_handle_mqtt_message("hb/app/user/device", payload)
+
+    entry = coordinator.data["dev-1"]
+    rows = {
+        row[FIELD_DEVICE_SN]: row
+        for row in entry[PAYLOAD_BATTERY_PACKS]
+        if row.get(FIELD_DEVICE_SN) is not None
+    }
+    if primary_serial is not None:
+        assert rows[primary_serial]["batSoc"] == primary["batSoc"]
+    else:
+        assert "batSoc" not in rows["PACK-3"]
+        assert any(
+            row.get(FIELD_DEVICE_SN) is None and row.get("batSoc") == primary["batSoc"]
+            for row in entry[PAYLOAD_BATTERY_PACKS]
+        )
+    if anonymous_supplementary:
+        assert any(
+            row.get(FIELD_DEVICE_SN) is None
+            and all(row.get(key) == value for key, value in supplementary.items())
+            for row in entry[PAYLOAD_BATTERY_PACKS]
+        )
+        for original_pack in original_packs:
+            serial = original_pack[FIELD_DEVICE_SN]
+            expected = dict(original_pack)
+            if serial == primary_serial:
+                expected.update(primary)
+            assert rows[serial] == expected
+    else:
+        assert all(rows["PACK-3"][key] == value for key, value in supplementary.items())
+    assert rows["PACK-2"] == original_packs[1]
+    if primary_serial != "PACK-1":
+        assert rows["PACK-1"] == original_packs[0]
+    assert entry[PAYLOAD_PROPERTIES] == {"cellTemp": 179}
+    assert payload == original_payload
+
+
+@pytest.mark.parametrize("anonymous_primary", [False, True])
+def test_parallel_pack_lists_do_not_identify_anonymous_rows(
+    anonymous_primary: bool,
+) -> None:
+    """Positions in different lists cannot prove a shared physical identity."""
+    identified = {FIELD_DEVICE_SN: "PACK-3", "cellTemp": 274}
+    anonymous = {"batSoc": 55}
+    primary = anonymous if anonymous_primary else identified
+    supplementary = identified if anonymous_primary else anonymous
+    payload = {"batteryPacks": [primary], "subDevices": [supplementary]}
+    original_payload = deepcopy(payload)
+
+    extracted = JackerySolarVaultCoordinator._battery_packs_from_source(payload)  # ruff: ignore[private-member-access]
+
+    assert extracted == [primary, supplementary]
+    assert payload == original_payload
+
+
 @pytest.mark.parametrize("explicit_parent_id", [True, False])
 @pytest.mark.parametrize("explicit_pack_type", [True, False])
+@pytest.mark.parametrize("temperature_present", [True, False])
+@pytest.mark.parametrize("wrapped_updates", [False, True])
 async def test_flat_local_pack_update_keeps_serial_temperature_and_lifetimes(
     explicit_parent_id: bool,
     explicit_pack_type: bool,
+    temperature_present: bool,
+    wrapped_updates: bool,
 ) -> None:
     """A flattened HomeSubModel increment belongs to its serial, not pack one."""
     coordinator = _source_priority_coordinator()
@@ -955,13 +1079,9 @@ async def test_flat_local_pack_update_keeps_serial_temperature_and_lifetimes(
     _set_test_attr(coordinator, "_async_payload_debug_event", AsyncMock())
     _set_test_attr(coordinator, "_schedule_battery_pack_ota_enrichment", MagicMock())
     _set_test_attr(coordinator, "_local_mqtt_last_device_message_monotonic", {})
-
-    def _capture(new_data: dict[str, dict[str, Any]], **_kwargs: object) -> None:
-        for device_id, partial in new_data.items():
-            coordinator.data.setdefault(device_id, {}).update(partial)
-
-    _set_test_attr(coordinator, "_push_partial_update", _capture)
-    payload = {
+    _set_test_attr(coordinator, "_device_registry_observer", None)
+    cast("Any", vars(coordinator))["_listeners"] = {}
+    payload: dict[str, Any] = {
         "type": 107,
         "devType": 1,
         "cmd": 107,
@@ -978,6 +1098,12 @@ async def test_flat_local_pack_update_keeps_serial_temperature_and_lifetimes(
         payload[FIELD_DEVICE_ID] = "dev-1"
     if not explicit_pack_type:
         payload.pop("devType")
+    if not temperature_present:
+        payload.pop("cellTemp")
+    pack_fields = ("cellTemp", "batSoc", "inPw", "outPw", "inEgy", "outEgy", "version")
+    expected_fields = {key: payload[key] for key in pack_fields if key in payload}
+    if wrapped_updates:
+        payload["updates"] = {key: payload.pop(key) for key in expected_fields}
 
     assert await coordinator.async_handle_local_mqtt_message(
         "hb/device/HEAD-SN/event", payload
@@ -986,8 +1112,5 @@ async def test_flat_local_pack_update_keeps_serial_temperature_and_lifetimes(
     rows = {row[FIELD_DEVICE_SN]: row for row in entry[PAYLOAD_BATTERY_PACKS]}
     assert rows["PACK-1"] == original_packs[0]
     assert rows["PACK-2"] == original_packs[1]
-    assert all(
-        rows["PACK-3"][key] == payload[key]
-        for key in ("cellTemp", "batSoc", "inPw", "outPw", "inEgy", "outEgy", "version")
-    )
+    assert all(rows["PACK-3"][key] == value for key, value in expected_fields.items())
     assert entry[PAYLOAD_PROPERTIES]["cellTemp"] == 179  # ruff: ignore[magic-value-comparison]

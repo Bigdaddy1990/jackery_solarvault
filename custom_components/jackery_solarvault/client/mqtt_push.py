@@ -32,6 +32,7 @@ from ..const import (
     MQTT_TOPIC_PREFIX,
     MQTT_TOPIC_SUFFIXES,
 )
+from ..util import async_create_message_task
 from .credentials import credential_fingerprint, redacted_error
 
 if TYPE_CHECKING:
@@ -907,10 +908,9 @@ class JackeryMqttPushClient:
                 are decoded as UTF-8, str is used as-is.
 
         Behavior:
-                Parses the payload as JSON and requires the top-level value to be an
-                object (dict). On decode or parse failure, or when the JSON value is not
-                an object, increments `_messages_dropped` and sets
-                `_last_message_error`. If the parsed object does not contain a dict at
+                Parses JSON objects for routing. Other shapes and decode failures
+                retain exact wire bytes and the error in a diagnostic envelope
+                delivered through the same FIFO. If the parsed object has no dict at
                 `FIELD_BODY` but does contain a dict at `FIELD_DATA`, copies
                 `FIELD_DATA` into `FIELD_BODY`. On successful validation increments
                 `_messages_seen`, records `_last_message_at` (UTC ISO), clears
@@ -923,32 +923,21 @@ class JackeryMqttPushClient:
             generation, runner_task
         ):
             return
+        raw = payload.encode("utf-8") if isinstance(payload, str) else bytes(payload)
         try:
-            if isinstance(payload, str):
-                text = payload
-            else:
-                text = bytes(payload).decode("utf-8")
-            data = json.loads(text)
+            text = raw.decode("utf-8")
+            decoded: Any = json.loads(text)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as err:
-            self._messages_dropped += 1
-            self._last_message_error = f"invalid JSON payload: {err}"
-            _LOGGER.warning(
-                "Jackery MQTT: dropped unparsable payload on %r (%s bytes): %s",
-                topic,
-                len(payload),
-                err,
-            )
-            return
-        if not isinstance(data, dict):
-            self._messages_dropped += 1
-            self._last_message_error = "non-object JSON payload"
-            _LOGGER.warning(
-                "Jackery MQTT: dropped non-object JSON on %r (%s): %.400s",
-                topic,
-                type(data).__name__,
-                data,
-            )
-            return
+            decoded = {"raw_hex": raw.hex(), "payload_decode_error": str(err)}
+        data: dict[str, Any]
+        if isinstance(decoded, dict):
+            data = cast("dict[str, Any]", decoded)
+        else:
+            data = {
+                "raw_hex": raw.hex(),
+                "raw_json": decoded,
+                "payload_decode_error": "non-object JSON payload",
+            }
         if not isinstance(data.get(FIELD_BODY), dict):
             alt_body = data.get(FIELD_DATA)
             if isinstance(alt_body, dict):
@@ -956,7 +945,7 @@ class JackeryMqttPushClient:
 
         self._messages_seen += 1
         self._last_message_at = self._utc_now_iso()
-        self._last_message_error = None
+        self._last_message_error = data.get("payload_decode_error")
         # Resolve any pending getter response correlation
         self._resolve_pending_response(data)
         body_value = data.get(FIELD_BODY)
@@ -967,7 +956,7 @@ class JackeryMqttPushClient:
         )
         _LOGGER.debug(
             "Jackery MQTT RX: bytes=%d keys=%s body_keys=%s",
-            len(text),
+            len(raw),
             sorted(str(key) for key in data)[:24],
             body_keys,
         )
@@ -1001,25 +990,6 @@ class JackeryMqttPushClient:
             eager_start=False,
         )
 
-    def _create_message_task(
-        self,
-        operation: Coroutine[Any, Any, None],
-        *,
-        name: str,
-    ) -> asyncio.Task[None]:
-        """Create finite message work owned by the config entry when available."""
-        if self._config_entry is not None:
-            return cast(  # ty: ignore[redundant-cast]
-                "asyncio.Task[None]",
-                self._config_entry.async_create_task(
-                    self._hass,
-                    operation,
-                    name=name,
-                    eager_start=False,
-                ),
-            )
-        return self._hass.async_create_task(operation, name=name, eager_start=False)
-
     def _ensure_message_consumer(self) -> None:
         """Start the sole FIFO consumer when accepted frames are waiting."""
         if not self._message_queue and self._message_delivery_task is None:
@@ -1027,7 +997,9 @@ class JackeryMqttPushClient:
         current = self._message_consumer_task
         if current is not None and not current.done():
             return
-        task = self._create_message_task(
+        task = async_create_message_task(
+            self._hass,
+            self._config_entry,
             self._async_consume_messages(),
             name="jackery_mqtt_message_fifo",
         )
@@ -1060,7 +1032,9 @@ class JackeryMqttPushClient:
                 return
             item = self._message_queue.popleft()
             self._message_delivery_item = item
-            self._message_delivery_task = self._create_message_task(
+            self._message_delivery_task = async_create_message_task(
+                self._hass,
+                self._config_entry,
                 self._async_deliver_message(item),
                 name="jackery_mqtt_message_delivery",
             )
@@ -1352,10 +1326,10 @@ class JackeryMqttPushClient:
         """Return the exact MQTT topic for transport diagnostics.
 
         Parameters:
-                topic (str | None): MQTT topic to report, or `None`.
+                topic (str | None): MQTT topic to redact, or `None`.
 
         Returns:
-                The complete topic string, or `None` if no topic is available.
+                None if `topic` is `None`; otherwise the possibly-redacted topic string.
         """
         return topic
 

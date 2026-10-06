@@ -863,6 +863,7 @@ FIELD_SPH: Final = "sph"
 FIELD_SPH_PC: Final = "sph_pc"
 FIELD_SW: Final = "sw"
 FIELD_SUB_DEVICE: Final = "subDevice"
+FIELD_SUB_DEVICES: Final = "subDevices"
 FIELD_ALARM_ID: Final = "alarmId"
 FIELD_DEVICE_ONLINE_TIME: Final = "onlineTime"
 FIELD_DEVICE_OFFLINE_TIME: Final = "offlineTime"
@@ -1809,8 +1810,6 @@ PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 # Per-device BLE AES key from ``/v1/device/system/list``; used by BLE/MQTT
 # Layer-C payload encryption.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
-# Normal diagnostics retain full identifiers and MQTT topics.
-# Mask authentication secrets independently of the identifier/export policy.
 REDACT_KEYS: Final = frozenset({
     FIELD_PASSWORD,
     MQTT_SESSION_SEED_B64,
@@ -1837,6 +1836,7 @@ REDACT_KEYS: Final = frozenset({
     "mqtt_password",
     "nested_token",
     "local_mqtt_password",
+    "raw_hex",
 })
 
 # MQTT client metadata and topic layout

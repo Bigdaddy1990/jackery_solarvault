@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 _DEVICE = "device-1"
 _NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+pytestmark = pytest.mark.freeze_time(_NOW)
 
 
 @pytest.mark.parametrize("local_total", [None, 0.0, -1.0])
@@ -346,7 +347,7 @@ def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:
 
 
 def test_local_mqtt_diagnostics_reports_coordinator_not_ready() -> None:
-    """A failed setup exports redacted configuration instead of raising."""
+    """A failed setup retains the configured broker for diagnosis."""
     hass = SimpleNamespace(data={})
     result = _local_mqtt_diagnostics(
         cast("Any", hass),

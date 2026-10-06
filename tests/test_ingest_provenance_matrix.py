@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 import pytest
 
@@ -30,6 +31,7 @@ _FIELD = "pvPw"
 _BASE_TIME = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
 _NEW_VALUE = 120
 _OLD_VALUE = 90
+_OLD_DETAIL_VALUE = 9
 
 
 def test_observation_rejects_naive_wall_clock_time() -> None:
@@ -75,13 +77,15 @@ def _ingest(
     received_at_monotonic: float = 100.0,
 ) -> IngestResult:
     """Ingest one observation with deterministic receive time."""
-    return ingest_observation(
-        observation,
-        current=current or {},
-        provenance=provenance or {},
-        freshness_window_seconds=60.0,
-        received_at_monotonic=received_at_monotonic,
-    )
+    with patch("custom_components.jackery_solarvault.ingest.datetime") as clock:
+        clock.now.return_value = _BASE_TIME + timedelta(seconds=10)
+        return ingest_observation(
+            observation,
+            current=current or {},
+            provenance=provenance or {},
+            freshness_window_seconds=60.0,
+            received_at_monotonic=received_at_monotonic,
+        )
 
 
 @pytest.mark.parametrize("source", list(DataSource))
@@ -183,19 +187,15 @@ def test_equal_timestamp_uses_explicit_live_source_priority() -> None:
 @pytest.mark.parametrize(
     ["first_source", "second_source"],
     [
-        [DataSource.CLOUD_MQTT, DataSource.BLE],
-        [DataSource.BLE, DataSource.CLOUD_MQTT],
         [DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT],
         [DataSource.LOCAL_MQTT, DataSource.CLOUD_MQTT],
-        [DataSource.BLE, DataSource.LOCAL_MQTT],
-        [DataSource.LOCAL_MQTT, DataSource.BLE],
     ],
 )
-def test_layer5_peers_update_in_arrival_order(
+def test_mqtt_peers_update_in_arrival_order(
     first_source: DataSource,
     second_source: DataSource,
 ) -> None:
-    """No Layer-5 connection may freshness-block another Layer-5 peer."""
+    """Independent MQTT connections update equal-priority fields in arrival order."""
     first = _ingest(_observation(first_source, _OLD_VALUE, observed_at=_BASE_TIME))
 
     second = _ingest(
@@ -212,6 +212,46 @@ def test_layer5_peers_update_in_arrival_order(
     assert second.payload[_FIELD] == _NEW_VALUE
     assert second.accepted_fields == frozenset({_FIELD})
     assert second.provenance[_FIELD].source is second_source
+
+
+@pytest.mark.parametrize(
+    ["local_source", "cloud_source"],
+    [
+        [DataSource.LOCAL_MQTT, DataSource.HTTP],
+        [DataSource.BLE, DataSource.HTTP],
+        [DataSource.BLE, DataSource.CLOUD_MQTT],
+    ],
+)
+def test_fresh_local_value_wins_but_cloud_fills_missing_fields(
+    local_source: DataSource,
+    cloud_source: DataSource,
+) -> None:
+    """A cloud fallback cannot reverse fresh local telemetry or lose extra fields."""
+    cloud = _ingest(_observation(cloud_source, _OLD_VALUE, observed_at=_BASE_TIME))
+    local = _ingest(
+        _observation(local_source, _NEW_VALUE, observed_at=_BASE_TIME),
+        current=cloud.payload,
+        provenance=cloud.provenance,
+        received_at_monotonic=101.0,
+    )
+    fallback = _ingest(
+        Observation(
+            source=cloud_source,
+            device_id=_DEVICE_ID,
+            section=_SECTION,
+            payload={_FIELD: _OLD_VALUE, "cellTemp": 240},
+            observed_at=_BASE_TIME + timedelta(seconds=1),
+        ),
+        current=local.payload,
+        provenance=local.provenance,
+        received_at_monotonic=102.0,
+    )
+
+    assert local.payload[_FIELD] == _NEW_VALUE
+    assert fallback.payload == {_FIELD: _NEW_VALUE, "cellTemp": 240}
+    assert fallback.accepted_fields == frozenset({"cellTemp"})
+    assert fallback.provenance[_FIELD].source is local_source
+    assert fallback.provenance["cellTemp"].source is cloud_source
 
 
 @pytest.mark.parametrize(
@@ -376,3 +416,106 @@ def test_stale_frame_fills_blank_fields_but_keeps_populated_unknown_age() -> Non
     )
     assert result.payload[_FIELD] == _NEW_VALUE
     assert result.payload["batSoc"] == 40  # ruff: ignore[magic-value-comparison]
+
+
+def test_stale_local_frame_cannot_replace_timestamped_cloud_value() -> None:
+    """An old local sample stays a fill source, not a live-value override."""
+    stale = datetime.now(UTC) - timedelta(hours=6)
+    cloud = ingest_observation(
+        _observation(DataSource.CLOUD_MQTT, _NEW_VALUE, observed_at=stale),
+        current={},
+        provenance={},
+        freshness_window_seconds=60.0,
+    )
+    local = ingest_observation(
+        Observation(
+            source=DataSource.LOCAL_MQTT,
+            device_id=_DEVICE_ID,
+            section=_SECTION,
+            payload={_FIELD: _OLD_VALUE, "cellTemp": 240},
+            observed_at=stale + timedelta(seconds=5),
+        ),
+        current=cloud.payload,
+        provenance=cloud.provenance,
+        freshness_window_seconds=60.0,
+    )
+
+    assert local.payload == {_FIELD: _NEW_VALUE, "cellTemp": 240}
+    assert local.accepted_fields == frozenset({"cellTemp"})
+
+
+def test_historical_periodic_updates_are_not_blocked_by_live_age() -> None:
+    """Historical statistics can still be corrected by a later old snapshot."""
+    section = f"{APP_SECTION_PV_STAT}_day"
+    stale = datetime.now(UTC) - timedelta(days=2)
+    previous = ingest_observation(
+        _observation(DataSource.HTTP, _OLD_VALUE, observed_at=stale, section=section),
+        current={},
+        provenance={},
+        freshness_window_seconds=60.0,
+    )
+    corrected = ingest_observation(
+        _observation(
+            DataSource.HTTP,
+            _NEW_VALUE,
+            observed_at=stale + timedelta(minutes=1),
+            section=section,
+        ),
+        current=previous.payload,
+        provenance=previous.provenance,
+        freshness_window_seconds=60.0,
+    )
+
+    assert corrected.payload[_FIELD] == _NEW_VALUE
+    assert corrected.accepted_fields == frozenset({_FIELD})
+
+
+@pytest.mark.parametrize("source", list(DataSource))
+@pytest.mark.parametrize("supplement_nested", [False, True])
+def test_stale_nested_frame_without_provenance_preserves_and_supplements(
+    source: DataSource,
+    supplement_nested: bool,
+) -> None:
+    """A retained first frame preserves cached fields without dropping new ones."""
+    current: dict[str, Any] = {
+        "pv1": {"pvPw": _NEW_VALUE, "details": {"known": 1}},
+    }
+    incoming_details: dict[str, Any] = {"known": _OLD_DETAIL_VALUE}
+    if supplement_nested:
+        incoming_details["measured_zero"] = 0
+    observation = Observation(
+        source=source,
+        device_id=_DEVICE_ID,
+        section=_SECTION,
+        payload={
+            "pv1": {"pvPw": _OLD_VALUE, "details": incoming_details},
+            "soc": 0,
+        },
+        observed_at=datetime.now(UTC) - timedelta(hours=6),
+    )
+
+    result = ingest_observation(
+        observation,
+        current=current,
+        provenance={},
+        freshness_window_seconds=60.0,
+    )
+
+    expected_details = {"known": 1}
+    expected_fields = {"soc"}
+    if supplement_nested:
+        expected_details["measured_zero"] = 0
+        expected_fields.add("pv1")
+        assert result.provenance["pv1", "details", "measured_zero"].source is source
+    assert result.payload == {
+        "pv1": {"pvPw": _NEW_VALUE, "details": expected_details},
+        "soc": 0,
+    }
+    assert result.accepted_fields == frozenset(expected_fields)
+    assert result.provenance["soc"].source is source
+    assert "pv1" not in result.provenance
+    assert ("pv1", "pvPw") not in result.provenance
+    assert ("pv1", "details", "known") not in result.provenance
+    assert current == {"pv1": {"pvPw": _NEW_VALUE, "details": {"known": 1}}}
+    assert observation.payload["pv1"]["pvPw"] == _OLD_VALUE
+    assert observation.payload["pv1"]["details"]["known"] == _OLD_DETAIL_VALUE

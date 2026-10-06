@@ -248,20 +248,21 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         assert callback_call is not None
         assert callback_call.args[1]["body"] == {"soc": 80}
 
-    def test_handle_message_invalid_json(self) -> None:
-        """Test _handle_message with invalid JSON."""
-        client = self._create_client(generation=0)
-        client._message_callback = AsyncMock()  # ruff: ignore[private-member-access]
+    @pytest.mark.asyncio()
+    async def test_handle_message_invalid_json(self, hass) -> None:  # ruff: ignore[no-self-use, missing-type-function-argument]
+        """Invalid JSON is preserved for the shared sink and debug capture."""
+        callback = AsyncMock()
+        client = JackeryMqttPushClient(hass, callback)
 
         client._handle_message(  # ruff: ignore[private-member-access]
             "jackery/device/123/status",
             b"invalid json",
-            generation=0,
-            runner_task=None,
         )
-        # Invalid JSON should be dropped
-        assert client._messages_seen == 0  # ruff: ignore[private-member-access]
-        assert client._messages_dropped == 1  # ruff: ignore[private-member-access]
+        await client.async_wait_message_queue_idle()
+        assert client._messages_seen == 1  # ruff: ignore[private-member-access]
+        assert client._messages_dropped == 0  # ruff: ignore[private-member-access]
+        assert callback.await_args is not None
+        assert callback.await_args.args[1]["raw_hex"] == b"invalid json".hex()
 
     @pytest.mark.asyncio()
     async def test_schedule_coroutine(self) -> None:

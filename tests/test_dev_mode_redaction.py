@@ -6,17 +6,16 @@ it, the mandatory credential redaction stays exactly as before.
 """
 
 import json
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.client.api import JackeryApi
 from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
 from custom_components.jackery_solarvault.const import (
     CONF_ENABLE_UNREDACTED_DEBUG,
-    DOMAIN,
     PAYLOAD_DEBUG_LOG_MAX_BYTES,
     REDACTED_VALUE,
     REDACT_KEYS,
@@ -173,17 +172,15 @@ def test_entry_debug_option_is_scoped_to_its_entry(
 ) -> None:
     """An explicit entry option unlocks its own capture without a process-wide leak."""
     monkeypatch.delenv(_ENV, raising=False)
-    enabled = MockConfigEntry(
-        domain=DOMAIN, options={CONF_ENABLE_UNREDACTED_DEBUG: True}, data={}
-    )
-    disabled = MockConfigEntry(domain=DOMAIN, options={}, data={})
+    enabled = SimpleNamespace(options={CONF_ENABLE_UNREDACTED_DEBUG: True}, data={})
+    disabled = SimpleNamespace(options={}, data={})
     assert jackery_dev_mode_enabled(enabled)
     assert not jackery_dev_mode_enabled(disabled)
     assert active_redact_keys(enabled) == frozenset()
     assert active_redact_keys(disabled) == REDACT_KEYS
     assert _payload_debug_capture_enabled(enabled)
-    assert JackeryMqttPushClient._redact_topic(_TOPIC, enabled) == _TOPIC  # ruff: ignore[private-member-access]
-    assert JackeryMqttPushClient._redact_topic(_TOPIC, disabled) == _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC, cast("Any", enabled)) == _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC, cast("Any", disabled)) == _TOPIC  # ruff: ignore[private-member-access]
 
     client = JackeryApi(session=AsyncMock(), account="test", password="test")
     client.dev_mode_entry = enabled
