@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 import pytest
+from scripts.sync_ha_test_baseline import check_baseline
 
 from homeassistant.loader import async_get_integration
 
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 _ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("baseline", ["2026.9.3", "installed"])
+@pytest.mark.parametrize("baseline", ["baseline", "installed"])
 def test_manifest_accepts_home_assistant_core_pins(baseline: str) -> None:
     """A test environment must not hide a Core runtime installation conflict."""
     manifest = json.loads(
@@ -32,14 +33,15 @@ def test_manifest_accepts_home_assistant_core_pins(baseline: str) -> None:
         marker = requirement.marker
         if marker is None or marker.evaluate():
             requirements[canonicalize_name(requirement.name)] = requirement
+    baseline_version = (_ROOT / ".HA_VERSION").read_text(encoding="utf-8").strip()
     constraints = (
         files("homeassistant")
         .joinpath("package_constraints.txt")
         .read_text(encoding="utf-8")
         if baseline == "installed"
-        else (_ROOT / "tests/fixtures/ha-2026.9.3-package-constraints.txt").read_text(
-            encoding="utf-8"
-        )
+        else (
+            _ROOT / "tests/fixtures" / f"ha-{baseline_version}-package-constraints.txt"
+        ).read_text(encoding="utf-8")
     )
     conflicts: list[str] = []
     for line in constraints.splitlines():
@@ -112,23 +114,12 @@ def test_optional_network_features_keep_their_core_domains() -> None:
     )
 
 
-def test_hacs_minimum_matches_tested_home_assistant_baseline() -> None:
-    """HACS must not install the integration below its supported HA baseline."""
+def test_hacs_does_not_duplicate_the_pytest_plugin_baseline() -> None:
+    """HACS must leave the HA version to the pytest plugin stack."""
     hacs = json.loads((_ROOT / "hacs.json").read_text(encoding="utf-8"))
-    assert (
-        hacs.get("homeassistant")
-        == (_ROOT / ".HA_VERSION").read_text(encoding="utf-8").strip()
-    )
+    assert "homeassistant" not in hacs
 
 
-def test_test_requirements_minimum_matches_supported_baseline() -> None:
-    """The declared test minimum must match the supported installation minimum."""
-    baseline = (_ROOT / ".HA_VERSION").read_text(encoding="utf-8").strip()
-    lines = (_ROOT / "requirements-test.txt").read_text(encoding="utf-8").splitlines()
-    requirements = [
-        Requirement(line.partition("#")[0].strip())
-        for line in lines
-        if line.partition("#")[0].strip()
-    ]
-    core = next(req for req in requirements if req.name == "homeassistant")
-    assert str(core.specifier) == f">={baseline}"
+def test_ha_baseline_matches_pytest_plugin_metadata() -> None:
+    """The installed pytest plugin determines the tested HA release."""
+    assert check_baseline(_ROOT) == []
