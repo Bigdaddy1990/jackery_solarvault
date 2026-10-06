@@ -15,18 +15,44 @@ Pre-commit Lite, pre-commit-autofix, Python Modernization and Pyrefly Type Check
 Dependency Review succeeded, but even it completed after the merge. These were
 merges before checks finished; the recorded failures are the later final results.
 
-The authenticated repository response reported `allow_auto_merge: true` and
+The initial authenticated repository response reported `allow_auto_merge: true` and
 repository-level push/admin permissions. `/rulesets?includes_parents=true` returned
 `[]`. The public `/rules/branches/main` response returned `[]`.
 `/branches/main` reported `protected: true`, status-check enforcement
 `non_admins`, and empty `contexts` and `checks` arrays.
-The full classic protection endpoint returned 403 through the integration;
-review requirements and its other settings have therefore not been verified.
-Repository-level admin permission does not give this installation the necessary
-administration API capability. No administration write endpoint is exposed here.
+The full classic protection endpoint initially returned 403 through the integration.
+On 2026-10-04, authorized Administration access installed and read back ruleset
+`24458330`, active on main with 14 app-bound checks, strict enforcement and no
+bypass actors. Classic protection was retained.
 
 The only open Dependabot PR at inspection was #455, with `auto_merge: null`.
 No other native auto-merge enabler was found in repository workflows.
+
+## Follow-up audit (2026-10-06)
+
+PR #458 remained blocked on head `e10f031806ddab8910101d1f2938b5a95862f457`,
+but a collaborator had re-enabled its native auto-merge request. GitHub accepts
+`skipped` and `neutral` as passing required checks. A completion-triggered workflow
+cannot disarm native auto-merge before GitHub itself acts on the final check.
+Repository-native auto-merge was therefore disabled and read back at
+2026-10-06 10:57:07 UTC. This also disables native auto-merge for human PRs, which
+can still be merged manually after server requirements pass. The custom Dependabot
+workflow continues to use the immediate, SHA-bound merge API.
+
+GitHub hides `bypass_actors` from tokens without ruleset write access. The previous
+workflow therefore blocked even correctly installed protection. `policy.json`
+now records the Administration-verified ruleset ID and full millisecond revision
+`2026-10-04T14:55:29.575Z`. A hidden bypass list is accepted only at this exact
+unchanged revision; a visible list must be an empty array. Any ruleset edit, missing
+revision or different ID blocks until a new administrative audit is recorded in
+trusted main code. UTC and offset representations are normalized without discarding
+milliseconds. No privileged token is added to Actions.
+
+Run #37370712000 failed one regression assertion because JSON autofix reordered
+policy keys. Contexts and integration IDs are now compared as complete sorted
+lists; missing, duplicate or wrong-source checks still fail. Workflow text checks
+also handle CRLF. The required regression now audits live settings and protection
+using its read-only workflow token.
 
 ## Enforced behavior
 
@@ -38,8 +64,9 @@ alive and no native auto-merge request is enabled.
 
 For each open, non-draft, same-repository Dependabot PR targeting main:
 
-1. Revoke any existing native auto-merge request.
-2. Require the active `main-required-ci` ruleset, no bypass actors, all app-bound
+1. Revoke any existing native auto-merge request and require repository-native
+   auto-merge to be disabled. Re-enabled requests also trigger a safety sweep.
+2. Require the active, admin-verified revision of `main-required-ci`, no bypass actors, all app-bound
    required checks, strict up-to-date checks, a PR requirement, no deletion or
    force pushes, and effective required checks on main from this exact ruleset ID. Missing/unreadable
    protection blocks merging.
@@ -64,9 +91,10 @@ allowed autofix; the initial manual typing check is no longer ignored.
 
 ## Required administration step
 
-Until this step is applied and read back, the new Dependabot merge workflow
-intentionally refuses all automatic merges. Existing unrelated branch rules are
-not removed. This repository patch does not by itself install a GitHub ruleset.
+The live repository already has the required ruleset and native auto-merge is
+disabled. The following procedure installs or refreshes the configuration elsewhere
+or after drift. Until its new revision is recorded on main, automatic merges are
+intentionally blocked. Existing unrelated branch rules are not removed.
 
 From a checkout containing this change, using Node 24 and GitHub CLI authenticated
 with repository Administration write permission:
@@ -76,17 +104,26 @@ node .github/merge-safety/apply-ruleset.cjs
 node .github/merge-safety/apply-ruleset.cjs --apply
 ```
 
-The first command audits classic protection and rulesets. The second creates the
+The first command audits native auto-merge, classic protection and rulesets. The second disables
+repository-native auto-merge, verifies that setting, and creates the
 active ruleset from `main-ruleset.json`, or updates the same named repository
 ruleset while retaining unrelated restrictions and stricter review settings.
 It removes bypass actors from this ruleset and reads back its effective rules.
 Other rulesets and classic branch-protection rules remain in place.
+It prints the verified ruleset ID and revision. Commit those exact values to
+`policy.json` through the normal reviewed PR path before dispatching the merge
+workflow. Never fill a missing bypass list with an assumed empty list during an
+administrative audit.
 
 Alternatively create a branch ruleset in Settings > Rules > Rulesets for
 `refs/heads/main`, import the exact JSON, set enforcement Active, leave the bypass
 list empty, and verify every context and its GitHub Actions app binding (15368).
 The JSON is also an exact REST create request body for
 `POST /repos/Bigdaddy1990/jackery_solarvault/rulesets`.
+Disable native auto-merge in Settings > General > Pull Requests, or apply
+`{"allow_auto_merge":false}` to `PATCH /repos/Bigdaddy1990/jackery_solarvault`.
+Read back both settings and rules with Administration permission, then record the
+exact returned ruleset ID and `updated_at` in the trusted policy.
 
 After enforcement is verified, dispatch `Auto-merge Dependabot` on main to audit
 open bot PRs. All existing red checks stay blocking; this change does not repair
@@ -103,20 +140,26 @@ node --test .github/merge-safety/gate.test.cjs
 The built-in Node tests exercise the same `mergeCandidate` entry point used in
 production, asserting that the merge API is never called for red/missing/stale
 checks, newer reruns, skipped jobs, untrusted PRs, changed heads, missing rules,
-API failures or bypassable rules. They include modeled replays of the six failed
+API failures, enabled native auto-merge, changed protection revisions or bypassable rules.
+They also cover the real read-only ruleset response shape and the administrative
+disable/readback procedure. They include modeled replays of the six failed
 workflows at the three historical incident SHAs. The positive case asserts the
 exact SHA sent to the merge API. The workflow makes this regression a required
 check on every PR, without a path filter or conditional skip.
 
-Local validation: 88 tests passed on Node 24.19.0; the three changed/new workflow
-YAML files parsed successfully. This is local regression evidence, not a claim
-that the repository's full CI is green or that server-side rules are installed.
+Local follow-up validation: 96 tests passed on Node 24.19.0. The live read-only
+audit runs separately in the required GitHub workflow. Passing this regression
+does not imply that the repository's dependency, lint, typing or HA checks pass.
+This follow-up must pass normal main protection before becoming the production gate.
 
 For a server-side acceptance test use a draft Dependabot-like test PR in an
 isolated test repository with the same ruleset. A failed required job, missing
 job or pushed replacement head must block merging, including through GitHub's
 UI/API; all required jobs passing on the current up-to-date head permits it.
 No deliberately failing or mergeable probe PR is opened in the production repo.
+Manual merges retain GitHub's native skipped/neutral semantics. The exact-success
+guarantee applies to the custom Dependabot automatic path; this change does not
+claim to prohibit every administrator-configured or manual merge.
 
 References:
 - https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request

@@ -19,8 +19,24 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - name: Reject red, missing, stale and skipped mandatory checks
         run: node --test .github/merge-safety/gate.test.cjs
+      - name: Verify live protection with the read-only workflow token
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const assert = require('node:assert/strict');
+            const { policy, protectedBy, nativeAutoMergeDisabled } = require('./.github/merge-safety/gate.cjs');
+            const repo = context.repo;
+            assert.ok(await nativeAutoMergeDisabled(github, repo), 'Native auto-merge must remain disabled');
+            const { data: ruleset } = await github.request(
+              'GET /repos/{owner}/{repo}/rulesets/{ruleset_id}',
+              { ...repo, ruleset_id: policy.verified_ruleset.id }
+            );
+            const effective = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}',
+              { ...repo, branch: policy.base, per_page: 100 });
+            assert.ok(protectedBy(ruleset, effective), 'Live ruleset differs from the admin-verified revision');
+            core.info(`Verified ruleset ${ruleset.id} revision ${ruleset.updated_at} with native auto-merge disabled`);

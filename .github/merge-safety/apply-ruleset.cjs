@@ -10,12 +10,18 @@ const api = (endpoint, method = 'GET', body) => JSON.parse(execFileSync('gh',
   ['api', endpoint, '--method', method, ...(body ? ['--input', '-'] : [])],
   { encoding: 'utf8', input: body ? JSON.stringify(body) : undefined }));
 
-if (!process.argv.includes('--apply')) {
-  console.log('Read-only audit. Add --apply to create/update main-required-ci.');
+function audit(api) {
+  console.log('Read-only audit. Add --apply to disable native auto-merge and enforce main-required-ci.');
+  console.log(JSON.stringify({ allow_auto_merge: api(prefix).allow_auto_merge }));
   console.log(JSON.stringify(api(`${prefix}/branches/main`), null, 2));
   console.log(JSON.stringify(api(`${prefix}/branches/main/protection`), null, 2));
   console.log(JSON.stringify(api(`${prefix}/rulesets?includes_parents=true`), null, 2));
-} else {
+}
+
+function apply(api) {
+  // Native auto-merge accepts skipped/neutral checks, unlike the exact-success gate.
+  api(prefix, 'PATCH', { allow_auto_merge: false });
+  if (api(prefix).allow_auto_merge !== false) throw new Error('Native auto-merge disable readback failed');
   const listed = api(`${prefix}/rulesets?includes_parents=true`);
   const existing = listed.find(r => r.name === policy.ruleset_name);
   let body = structuredClone(desired);
@@ -44,7 +50,20 @@ if (!process.argv.includes('--apply')) {
     existing ? 'PUT' : 'POST', body);
   const readback = api(`${prefix}/rulesets/${updated.id}`);
   const effective = api(`${prefix}/rules/branches/main`);
-  if (!protectedBy(readback, effective)) throw new Error('Ruleset readback/effective enforcement failed');
+  const verified = { id: readback.id, updated_at: readback.updated_at };
+  // An administrative read must expose the actual bypass list before attesting it.
+  if (!Array.isArray(readback.bypass_actors) || !protectedBy(readback, effective, verified) ||
+      api(prefix).allow_auto_merge !== false) throw new Error('Ruleset/settings readback failed');
   console.log(`Verified active strict ruleset ${updated.id} on main, no bypass actors.`);
-  console.log('Run Auto-merge Dependabot via workflow_dispatch to audit open bot PRs.');
+  console.log('Record this admin-verified revision in policy.json through a reviewed commit:');
+  console.log(JSON.stringify({ verified_ruleset: verified }, null, 2));
+  console.log('Until that revision is on main, the merge workflow remains blocked.');
+  return verified;
 }
+
+if (require.main === module) {
+  if (process.argv.includes('--apply')) apply(api);
+  else audit(api);
+}
+
+module.exports = { apply };
