@@ -109,7 +109,7 @@ def main() -> int:  # noqa: D103
 
     if missing:
         for file, modules in sorted(missing.items()):
-            ", ".join(sorted(modules))
+            print(f"{file}: missing test requirements: {', '.join(sorted(modules))}", file=sys.stderr)
         return 1
 
     return 0

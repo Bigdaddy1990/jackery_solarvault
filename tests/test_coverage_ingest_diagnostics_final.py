@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 _DEVICE = "device-1"
 _NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+pytestmark = pytest.mark.freeze_time(_NOW)
 
 
 @pytest.mark.parametrize("local_total", [None, 0.0, -1.0])

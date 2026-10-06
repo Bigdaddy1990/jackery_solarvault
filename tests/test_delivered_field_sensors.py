@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -49,7 +49,7 @@ def test_lifetime_counter_is_published_in_kwh(
     description = _SENSORS[key]
     entity = _entity({field: raw}, {}, description)
 
-    assert description.value_fn(entity) == pytest.approx(kwh)
+    assert description.value_fn(cast("Any", entity)) == pytest.approx(kwh)
 
 
 def test_today_energy_flow_shares_come_from_the_day_trend_sections() -> None:
@@ -66,12 +66,18 @@ def test_today_energy_flow_shares_come_from_the_day_trend_sections() -> None:
         },
     )
 
-    assert _SENSORS["today_pv_usage_home_share"].value_fn(entity) == _PV_HOME
-    assert _SENSORS["today_pv_usage_battery_share"].value_fn(entity) == _PV_BATTERY
     assert (
-        _SENSORS["today_battery_source_pv_share"].value_fn(entity) == _BATTERY_FROM_PV
+        _SENSORS["today_pv_usage_home_share"].value_fn(cast("Any", entity)) == _PV_HOME
     )
-    assert _SENSORS["today_home_source_pv_share"].value_fn(entity) is None
+    assert (
+        _SENSORS["today_pv_usage_battery_share"].value_fn(cast("Any", entity))
+        == _PV_BATTERY
+    )
+    assert (
+        _SENSORS["today_battery_source_pv_share"].value_fn(cast("Any", entity))
+        == _BATTERY_FROM_PV
+    )
+    assert _SENSORS["today_home_source_pv_share"].value_fn(cast("Any", entity)) is None
 
 
 @pytest.mark.parametrize(["state", "expected"], [[1, True], [0, False]])
@@ -79,8 +85,8 @@ def test_pv_channel_connectivity_follows_comm_state(state: int, expected: bool) 
     """Each MPPT channel's nested commState drives its connectivity sensor."""
     entity = _entity({"pv2": {"pvPw": 312, "commState": state}}, {})
 
-    assert _BINARY["pv2_connected"].value_fn(entity) is expected
-    assert _BINARY["pv3_connected"].value_fn(entity) is None
+    assert _BINARY["pv2_connected"].value_fn(cast("Any", entity)) is expected
+    assert _BINARY["pv3_connected"].value_fn(cast("Any", entity)) is None
 
 
 def test_ble_standby_typo_fills_the_standby_power_field() -> None:
@@ -96,9 +102,9 @@ def test_device_alert_frames_feed_alert_and_fault_code_sensors() -> None:
     )
 
     assert "alert_count" not in _SENSORS
-    assert _SENSORS["last_alarm_id"].value_fn(entity) == "402270"
-    assert _SENSORS["bms3_fault_code"].value_fn(entity) == _BMS3_FAULT
-    assert _SENSORS["pcs1_fault_code"].value_fn(entity) is None
+    assert _SENSORS["last_alarm_id"].value_fn(cast("Any", entity)) == "402270"
+    assert _SENSORS["bms3_fault_code"].value_fn(cast("Any", entity)) == _BMS3_FAULT
+    assert _SENSORS["pcs1_fault_code"].value_fn(cast("Any", entity)) is None
 
 
 def test_alarm_count_uses_documented_alert_counter_with_http_fallback() -> None:
@@ -112,7 +118,7 @@ def test_alarm_count_uses_documented_alert_counter_with_http_fallback() -> None:
             }
         }
     )
-    sensor = JackeryAlarmSensor(coordinator, "device")
+    sensor = JackeryAlarmSensor(cast("Any", coordinator), "device")
     assert sensor.native_value == expected_count
 
     coordinator.data["device"].pop("device_alert")
@@ -144,7 +150,7 @@ def test_head_lifetime_identity_never_uses_stack_or_subtracted_counters() -> Non
     ):
         description = _SENSORS[key]
         assert description.device_registry_role == "main_battery"
-        assert description.value_fn(entity) is None
+        assert description.value_fn(cast("Any", entity)) is None
 
 
 def test_calculated_main_battery_energy_has_valid_ha_metadata() -> None:
@@ -162,18 +168,20 @@ def test_period_flow_share_reads_its_own_period_section() -> None:
     """Week/month/year shares read the matching trend period, not today's."""
     entity = _entity({}, {"pv_trends_week": {"pvUsage": {"home": _PV_HOME}}})
 
-    assert _SENSORS["week_pv_usage_home_share"].value_fn(entity) == _PV_HOME
-    assert _SENSORS["today_pv_usage_home_share"].value_fn(entity) is None
+    assert (
+        _SENSORS["week_pv_usage_home_share"].value_fn(cast("Any", entity)) == _PV_HOME
+    )
+    assert _SENSORS["today_pv_usage_home_share"].value_fn(cast("Any", entity)) is None
 
 
 def test_last_online_is_a_utc_timestamp_from_epoch_milliseconds() -> None:
     """Cloud device meta reports online/offline times as epoch milliseconds."""
     entity = SimpleNamespace(device_meta={"onlineTime": 1787963325000})
 
-    value = _SENSORS["last_online"].value_fn(entity)
+    value = _SENSORS["last_online"].value_fn(cast("Any", entity))
 
     assert value == datetime(2026, 8, 29, 0, 28, 45, tzinfo=UTC)
-    assert _SENSORS["last_offline"].value_fn(entity) is None
+    assert _SENSORS["last_offline"].value_fn(cast("Any", entity)) is None
 
 
 def test_today_flow_shares_are_user_facing_not_diagnostic() -> None:

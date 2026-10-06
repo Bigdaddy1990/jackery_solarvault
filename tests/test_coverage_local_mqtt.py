@@ -129,18 +129,18 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
     assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
 
-    # Size is diagnostic only; complete frames still reach the sink.
+    # Oversized frames are counted and dropped before decoding.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
     await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         large_payload,
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_dropped"] == 0
+    assert diag["messages_dropped"] == 1
     assert diag["messages_oversized"] == 1
-    assert diag["messages_forwarded"] == 3  # ruff: ignore[magic-value-comparison]
-    assert len(forwarded) == 3  # ruff: ignore[magic-value-comparison]
-    assert forwarded[-1][2] == large_payload
+    assert diag["messages_forwarded"] == 2  # ruff: ignore[magic-value-comparison]
+    assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
+    assert forwarded[-1][2] == valid_payload
 
 
 @pytest.mark.asyncio()

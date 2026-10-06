@@ -151,9 +151,9 @@ async def test_export_preserves_missing_values_and_documented_schema() -> None:
         "auth_token_expiry_rejections": 0,
     }
     assert metrics["last_rejection"] is None
-    assert result["devices"]["dev-1"][PAYLOAD_PROPERTIES]["soc"] is None
+    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] is None
     decoded = json.loads(json.dumps(result))
-    assert decoded["devices"]["dev-1"][PAYLOAD_PROPERTIES]["soc"] is None
+    assert decoded["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] is None
 
 
 @pytest.mark.asyncio()
@@ -214,7 +214,7 @@ async def test_export_redacts_local_mqtt_credentials_from_options() -> None:
 
 
 @pytest.mark.asyncio()
-async def test_export_devices_keep_identifiers_and_measurements() -> None:
+async def test_export_devices_label_identifiers_and_keep_measurements() -> None:
     """Device ids remain available to correlate transport payloads."""
     coordinator, entry = _diagnostics_rig(
         coordinator_data={
@@ -225,10 +225,10 @@ async def test_export_devices_keep_identifiers_and_measurements() -> None:
 
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
-    assert set(result["devices"]) == {"dev-a", "dev-b"}
-    assert result["devices"]["dev-a"][PAYLOAD_PROPERTIES]["soc"] == 42  # ruff: ignore[magic-value-comparison]
-    assert result["devices"]["dev-a"][PAYLOAD_PROPERTIES][FIELD_MAC_ID] == "AA:BB:CC"
-    assert result["devices"]["dev-b"][PAYLOAD_PROPERTIES]["soc"] == 55  # ruff: ignore[magic-value-comparison]
+    assert set(result["devices"]) == {"device_1", "device_2"}
+    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES]["soc"] == 42  # ruff: ignore[magic-value-comparison]
+    assert result["devices"]["device_1"][PAYLOAD_PROPERTIES][FIELD_MAC_ID] == "AA:BB:CC"
+    assert result["devices"]["device_2"][PAYLOAD_PROPERTIES]["soc"] == 55  # ruff: ignore[magic-value-comparison]
 
 
 # ---------------------------------------------------------------------------
@@ -254,9 +254,12 @@ async def test_raw_api_login_redacted_and_property_responses_identified() -> Non
     raw = result["raw_api"]
     assert raw["login_response"][FIELD_TOKEN] == REDACTED
     assert raw["login_response"]["kept"] == "value"
-    assert set(raw["property_responses"]) == {"dev-1", "dev-2"}
-    assert raw["property_responses"]["dev-1"]["soc"] == 10  # ruff: ignore[magic-value-comparison]
-    assert raw["property_responses"]["dev-2"]["soc"] == 90  # ruff: ignore[magic-value-comparison]
+    assert set(raw["property_responses"]) == {
+        "property_response_1",
+        "property_response_2",
+    }
+    assert raw["property_responses"]["property_response_1"]["soc"] == 10  # ruff: ignore[magic-value-comparison]
+    assert raw["property_responses"]["property_response_2"]["soc"] == 90  # ruff: ignore[magic-value-comparison]
 
 
 @pytest.mark.asyncio()
@@ -269,7 +272,7 @@ async def test_raw_api_non_dict_payload_is_wrapped_before_redaction() -> None:
     result = await async_get_config_entry_diagnostics(coordinator.hass, entry)
 
     ota = result["raw_api"]["ota_responses"]
-    assert ota["dev-1"] == {"value": "not-a-dict-payload"}
+    assert ota["ota_response_1"] == {"value": "not-a-dict-payload"}
 
 
 @pytest.mark.asyncio()

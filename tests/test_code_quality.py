@@ -691,11 +691,11 @@ def test_diagnostics_redaction_preserves_routing_and_raw_frame_fields() -> None:
         "email",
         "phone",
         "raw_bytes",
-        "raw_hex",
         "trailer_hex",
     }
 
     assert isinstance(util.REDACT_KEYS, frozenset)
+    assert "raw_hex" in util.REDACT_KEYS
     assert required <= util.REDACT_KEYS
     assert preserved.isdisjoint(util.REDACT_KEYS)
 

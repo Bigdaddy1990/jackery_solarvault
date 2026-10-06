@@ -46,7 +46,6 @@ from typing import (
     cast,
 )
 
-from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.db_schema import Statistics, StatisticsMeta
 from homeassistant.components.recorder.models import StatisticMeanType
 from homeassistant.components.recorder.statistics import (
@@ -62,7 +61,7 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.recorder import session_scope
+from homeassistant.helpers.recorder import get_instance, session_scope
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -4692,7 +4691,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
             append_payload_debug_lines,
             path,
             events,
-            True,
+            jackery_dev_mode_enabled(self.entry),
         )
 
     def _reset_discovery_removal_confirmations(
@@ -5297,6 +5296,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     def _unlink_removed_parent_devices(self, device_ids: set[str]) -> int:
         """Unlink removed parents and their descendants from this config entry."""
+        if self.config_entry is None:
+            return 0
         registry = dr.async_get(self.hass)
         unlinked = 0
         for device_id in sorted(device_ids):
@@ -5794,14 +5795,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     eager_start=False,
                 ),
             )
-        return cast(
-            "asyncio.Task[Any]",
-            self.hass.async_create_background_task(
-                operation,
-                name=name,
-                eager_start=False,
-            ),
+        task: asyncio.Task[Any] = self.hass.async_create_background_task(
+            operation, name=name, eager_start=False
         )
+        return task
 
     @callback
     def async_schedule_local_mqtt_device_config(self) -> asyncio.Task[Any] | None:

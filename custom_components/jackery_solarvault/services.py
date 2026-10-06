@@ -3657,7 +3657,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # ruff: ignore[unu
                     )
                 elif system_id := call.data.get(SERVICE_FIELD_SYSTEM_ID):
                     coordinator = _coordinator_for_system(hass, str(system_id))
-                if coordinator is not None:
+                if coordinator is not None and coordinator.config_entry is not None:
                     coordinator.config_entry.async_start_reauth(hass)
                 raise
 
