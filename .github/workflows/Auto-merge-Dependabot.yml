@@ -43,7 +43,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Verify current head and merge only after all mandatory checks
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { run } = require('./.github/merge-safety/gate.cjs');
