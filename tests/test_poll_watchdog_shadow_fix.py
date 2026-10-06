@@ -8,7 +8,7 @@ These tests verify that:
 
 from datetime import datetime
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.jackery_solarvault.const import PAYLOAD_PROPERTIES
@@ -16,6 +16,9 @@ from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
 )
 from custom_components.jackery_solarvault.models import DataSource as TransportSource
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 def _make_coordinator_stub() -> JackerySolarVaultCoordinator:
@@ -192,7 +195,9 @@ async def test_shadow_queries_do_not_block_primary_http() -> None:  # ruff: igno
     coordinator._device_index = {"sys1": ["dev1"]}  # ruff: ignore[private-member-access]
     coordinator.data = {"dev1": {"device_sn": "sn1"}}
     # Add hass for _local_timezone
-    coordinator.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
+    coordinator.hass = cast(
+        "HomeAssistant", SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
+    )
     # Add _local_today method mock
     coordinator._local_today = Mock(return_value=datetime.now().date())  # ruff: ignore[private-member-access]
     # Add _cached_date for _async_update_data_guarded

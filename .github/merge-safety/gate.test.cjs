@@ -110,10 +110,17 @@ for (const conclusion of ['failure', 'cancelled', 'neutral', 'skipped', null]) {
 }
 
 test('missing expected job or empty job list fails closed', async () => {
-  for (const jobs of [[], fixture().jobs.get(1).slice(1)]) {
+  const sample = fixture();
+  const target = sample.runs.find(run => sample.jobs.get(run.id).length > 1);
+  assert.ok(target, 'fixture must include a workflow with multiple required jobs');
+  const partial = sample.jobs.get(target.id).slice(1);
+  assert.ok(partial.length > 0);
+  for (const jobs of [[], partial]) {
     const f = fixture();
-    f.jobs.set(1, jobs);
-    assert.equal((await attempt(f)).merged, false);
+    f.jobs.set(target.id, jobs);
+    const c = await attempt(f);
+    assert.equal(c.merged, false);
+    assert.deepEqual(c.writes, []);
   }
 });
 
@@ -234,7 +241,7 @@ test('workflow_run with no associated PRs sweeps open bot PRs', async () => {
 
 test('ruleset contexts and completion triggers stay synchronized with policy', () => {
   const rules = ruleset.rules.find(r => r.type === 'required_status_checks');
-  assert.deepEqual(rules.parameters.required_status_checks.map(c => c.context), requiredContexts);
+  assert.deepEqual(rules.parameters.required_status_checks.map(c => c.context).sort(), [...requiredContexts].sort());
   const workflow = fs.readFileSync(path.join(__dirname, '../workflows/Auto-merge-Dependabot.yml'), 'utf8');
   for (const w of Object.values(policy.workflows)) assert.ok(workflow.includes(`      - ${w.name}\n`));
   assert.ok(workflow.includes('ref: ${{ github.sha }}'));

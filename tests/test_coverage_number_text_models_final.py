@@ -386,10 +386,12 @@ async def test_grid_standard_success_writes_integer_and_refreshes() -> None:
 
     await entity.async_set_value(" 103 ")
 
+    assert isinstance(entity.coordinator.async_sync_grid_standard, AsyncMock)
     entity.coordinator.async_sync_grid_standard.assert_awaited_once_with(
         _DEVICE_ID,
         103,
     )
+    assert isinstance(entity.coordinator.async_request_refresh, AsyncMock)
     entity.coordinator.async_request_refresh.assert_awaited_once_with()
 
 

@@ -31,12 +31,15 @@ async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore
     diagnostics = client.diagnostics_snapshot()
     assert diagnostics["transport"] == "direct_mqtt"
     assert diagnostics["library"] == "aiomqtt"
-    assert diagnostics["topic_filter"] == "**REDACTED**"
-    assert diagnostics["configured_target"]["host"] == "**REDACTED**"
+    assert diagnostics["topic_filter"] == "jackery/#"
+    assert (
+        diagnostics["configured_target"]["host"]
+        == client.diagnostics_snapshot(redact=False)["configured_target"]["host"]
+    )
     assert diagnostics["subscribed"] is False
     assert diagnostics["connected"] is False
     rendered = repr(diagnostics)
-    assert "jackery/#" not in rendered
+    assert "jackery/#" in rendered
 
 
 def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:

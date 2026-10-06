@@ -15,11 +15,11 @@ from collections import deque
 import contextlib
 from datetime import UTC, datetime
 import json
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.jackery_solarvault.client.ble import (
     BLE_AES_IV_LEN,
@@ -889,7 +889,9 @@ def test_unparsed_ble_frame_is_captured_only_with_raw_debug() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator.entry = SimpleNamespace(options={"enable_unredacted_debug": True})
+        coordinator.entry = MockConfigEntry(
+            domain="jackery_solarvault", options={"enable_unredacted_debug": True}
+        )
         received_at = datetime.now(UTC)
         observation = BleFrameObservation(
             received_at=received_at,
@@ -914,7 +916,7 @@ def test_unparsed_ble_frame_is_captured_only_with_raw_debug() -> None:
         assert event["notify_sequence"] == 4  # ruff: ignore[magic-value-comparison]
         assert event["decode_error"] == "invalid frame"
 
-        coordinator.entry = SimpleNamespace(options={})
+        coordinator.entry = MockConfigEntry(domain="jackery_solarvault", options={})
         assert "raw_hex" not in capture.call_args.args[0]()
 
     asyncio.run(_run())

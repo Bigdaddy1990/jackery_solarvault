@@ -468,7 +468,6 @@ async def test_completed_supplemental_task_handles_are_reaped(hass) -> None:  # 
         eager_start=False,
     )
     await completed
-    coordinator._statistics_import_task = None  # ruff: ignore[private-member-access]
     coordinator._statistics_backfill_task = None  # ruff: ignore[private-member-access]
     coordinator._slow_metrics_bg_task = completed  # ruff: ignore[private-member-access]
     coordinator._mqtt_poll_task = None  # ruff: ignore[private-member-access]

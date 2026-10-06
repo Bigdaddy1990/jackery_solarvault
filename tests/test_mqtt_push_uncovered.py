@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.jackery_solarvault.client.mqtt_push import JackeryMqttPushClient
-from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX, REDACTED_VALUE
+from custom_components.jackery_solarvault.const import MQTT_TOPIC_PREFIX
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -371,8 +371,7 @@ class TestJackeryMqttPushClient:  # ruff: ignore[too-many-public-methods]
         topic = f"{MQTT_TOPIC_PREFIX}/user123/status"
         redacted = JackeryMqttPushClient._redact_topic(topic)  # ruff: ignore[private-member-access]
         assert redacted is not None
-        assert REDACTED_VALUE in redacted
-        assert "user123" not in redacted
+        assert redacted == topic
 
         # Non-matching topic
         topic2 = "other/prefix/user123/status"

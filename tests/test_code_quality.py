@@ -676,35 +676,22 @@ def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
     assert "interval_sec = max(15, int(" not in interval_setup_block
 
 
-def test_diagnostics_redaction_keys_cover_sensitive_jackery_fields() -> None:
-    """Keep diagnostics aligned with HA's share-safe diagnostics rule."""
-    required = {
-        getattr(const_module, name)
-        for name in (
-            "CONF_MQTT_MAC_ID",
-            "CONF_REGION_CODE",
-            "FIELD_TOKEN",
-            "FIELD_MQTT_PASSWORD",
-            "FIELD_DEVICE_ID",
-            "FIELD_SYSTEM_ID",
-            "FIELD_DEVICE_SN",
-            "FIELD_SYSTEM_SN",
-            "FIELD_LONGITUDE",
-            "FIELD_LATITUDE",
-        )
-    }
-    required.update({
-        "base64_encoded",
-        "body_preview",
-        "email",
-        "phone",
-        "raw_bytes",
-        "raw_hex",
-        "trailer_hex",
-    })
-
+def test_diagnostics_redaction_keys_preserve_identifiers_and_mask_secrets() -> None:
+    """Normal exports retain identifiers; authentication secrets stay masked."""
     assert isinstance(util.REDACT_KEYS, frozenset)
-    assert required <= util.REDACT_KEYS
+    for name in ("FIELD_TOKEN", "FIELD_MQTT_PASSWORD", "FIELD_BLUETOOTH_KEY"):
+        assert getattr(const_module, name) in util.REDACT_KEYS
+    for name in (
+        "CONF_MQTT_MAC_ID",
+        "CONF_REGION_CODE",
+        "FIELD_DEVICE_ID",
+        "FIELD_SYSTEM_ID",
+        "FIELD_DEVICE_SN",
+        "FIELD_SYSTEM_SN",
+        "FIELD_LONGITUDE",
+        "FIELD_LATITUDE",
+    ):
+        assert getattr(const_module, name) not in util.REDACT_KEYS
 
 
 def test_ble_transport_debug_logs_do_not_expose_raw_payloads() -> None:
@@ -802,11 +789,11 @@ def test_payload_debug_redaction_is_recursive_casefolded_and_mandatory() -> None
     assert util.append_payload_debug_line.__code__.co_argcount == 2  # ruff: ignore[magic-value-comparison]
     assert redacted["password"] == "**REDACTED**"
     assert redacted["nested"]["MQTTPASSWORD"] == "**REDACTED**"
-    assert redacted["nested"]["LATITUDE"] == "**REDACTED**"
+    assert redacted["nested"]["LATITUDE"] == event["nested"]["LATITUDE"]
     assert redacted["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
     assert entity_attrs["password"] == "**REDACTED**"
     assert entity_attrs["nested"]["MQTTPASSWORD"] == "**REDACTED**"
-    assert entity_attrs["nested"]["LATITUDE"] == "**REDACTED**"
+    assert entity_attrs["nested"]["LATITUDE"] == event["nested"]["LATITUDE"]
     assert entity_attrs["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
 
 
@@ -1086,17 +1073,17 @@ def test_property_setters_keep_local_override_during_stale_refresh_window() -> N
     assert "return self._merge_main_properties(merged, overrides)" in coordinator_source
 
 
-def test_redact_keys_cover_mqtt_credential_aliases() -> None:
-    """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
+def test_redact_keys_cover_mqtt_password_aliases_and_preserve_identifiers() -> None:
+    """MQTT passwords are secret; usernames and client IDs remain diagnostic data."""
+    for key_name in ("FIELD_MQTT_PASSWORD", "MQTT_CREDENTIAL_PASSWORD"):
+        assert getattr(const_module, key_name) in util.REDACT_KEYS
     for key_name in (
-        "FIELD_MQTT_PASSWORD",
         "FIELD_USER_ID",
         "MQTT_CREDENTIAL_CLIENT_ID",
-        "MQTT_CREDENTIAL_PASSWORD",
         "MQTT_CREDENTIAL_USER_ID",
         "MQTT_CREDENTIAL_USERNAME",
     ):
-        assert getattr(const_module, key_name) in util.REDACT_KEYS
+        assert getattr(const_module, key_name) not in util.REDACT_KEYS
 
 
 def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:

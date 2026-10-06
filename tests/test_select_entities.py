@@ -117,6 +117,7 @@ async def test_select_work_mode_forwards_mapped_code() -> None:
 
     await entity.async_select_option("self_use")
 
+    assert isinstance(entity.coordinator.async_set_work_model, AsyncMock)
     entity.coordinator.async_set_work_model.assert_awaited_once_with(_DEVICE_ID, 2)
 
 
@@ -129,6 +130,7 @@ async def test_select_temp_unit_forwards_mapped_code() -> None:
 
     await entity.async_select_option("celsius")
 
+    assert isinstance(entity.coordinator.async_set_temp_unit, AsyncMock)
     entity.coordinator.async_set_temp_unit.assert_awaited_once_with(_DEVICE_ID, 0)
 
 
@@ -143,6 +145,7 @@ async def test_invalid_option_raises_translated_error() -> None:
         await entity.async_select_option("kelvin")
 
     assert err.value.translation_key == "invalid_select_option"
+    assert isinstance(entity.coordinator.async_set_temp_unit, AsyncMock)
     entity.coordinator.async_set_temp_unit.assert_not_awaited()
 
 
@@ -155,6 +158,7 @@ async def test_ct_phase_select_forwards_phase_and_serial() -> None:
 
     await entity.async_select_option("phase_2")
 
+    assert isinstance(entity.coordinator.async_set_ct_phase, AsyncMock)
     entity.coordinator.async_set_ct_phase.assert_awaited_once_with(
         _DEVICE_ID,
         "CT-1",
@@ -181,7 +185,9 @@ async def test_portable_ups_model_forwards_via_portable_setter() -> None:
 
     await entity.async_select_option("lifepo4")
 
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_awaited_once()
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     _args, kwargs = entity.coordinator.async_portable_set_select.call_args
     assert kwargs["field"] == FIELD_UPS
     assert kwargs["value"] == 1
@@ -212,7 +218,9 @@ async def test_portable_power_mode_forwards_via_portable_setter() -> None:
 
     await entity.async_select_option("performance")
 
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_awaited_once()
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     _args, kwargs = entity.coordinator.async_portable_set_select.call_args
     assert kwargs["field"] == FIELD_PM
     assert kwargs["value"] == 2  # ruff: ignore[magic-value-comparison]
@@ -270,6 +278,7 @@ async def test_portable_screen_forwards_wire_value_and_updates_sltb(
 
     await entity.async_select_option(option)
 
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_awaited_once_with(
         _DEVICE_ID,
         action_id=ACTION_ID_PORTABLE_SCREEN,
@@ -290,6 +299,7 @@ async def test_portable_screen_rejects_unknown_option() -> None:
         await entity.async_select_option("5min")
 
     assert err.value.translation_key == "invalid_select_option"
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_not_awaited()
 
 

@@ -247,7 +247,9 @@ class JackeryMqttSensorPublisher:
             self._link_mqtt_device(device.id)
 
     @callback
-    def _async_link_mqtt_device(self, event: Event) -> None:
+    def _async_link_mqtt_device(
+        self, event: Event[dr.EventDeviceRegistryUpdatedData]
+    ) -> None:
         """Attach newly discovered MQTT mirrors to their native device."""
         device_id = event.data.get("device_id")
         if device_id:
@@ -679,7 +681,7 @@ def async_release_native_entity_ids(hass: HomeAssistant) -> None:
         native_id = registry.async_get_entity_id(
             "sensor", DOMAIN, mirror.unique_id.removeprefix(_MIRROR_UNIQUE_ID_PREFIX)
         )
-        if native_id != f"{mirror.entity_id}_2":
+        if native_id is None or native_id != f"{mirror.entity_id}_2":
             continue
         target = f"sensor.jackery_mqtt_{mirror.entity_id.removeprefix("sensor.")}"
         if registry.async_is_registered(target):
