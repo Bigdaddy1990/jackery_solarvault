@@ -20,9 +20,9 @@ transport layer.
 
 The non-blank merge rule is deliberately connection-neutral: HTTP, cloud MQTT,
 local MQTT and BLE may all update or fill the same live field. Per-field source
-provenance only protects a fresh local BLE/MQTT live value from being reversed
-by an immediate cloud fallback snapshot; it never stops independent transports
-from continuing to publish.
+provenance protects fresh BLE live values from cloud fallback snapshots. Local
+MQTT publishers are unauthenticated, so local and cloud MQTT share a tier and
+update in arrival order; independent transports continue to publish.
 """
 
 from dataclasses import dataclass
