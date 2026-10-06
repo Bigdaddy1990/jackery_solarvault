@@ -3,6 +3,20 @@
 const policy = require('./policy.json');
 const requiredContexts = Object.values(policy.workflows).flatMap(w => w.jobs);
 
+function revision(value) {
+  return typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2})$/.test(value) &&
+    Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+}
+
+async function nativeAutoMergeDisabled(github, repo) {
+  const result = await github.graphql(
+    'query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { autoMergeAllowed } }',
+    { owner: repo.owner, name: repo.repo }
+  );
+  return result.repository?.autoMergeAllowed === false;
+}
+
 function eligible(pr, repository) {
   return pr.state === 'open' && !pr.draft &&
     pr.user?.login === 'dependabot[bot]' &&
@@ -20,9 +34,16 @@ function requiredRule(rule) {
     ));
 }
 
-function protectedBy(ruleset, effectiveRules) {
+function protectedBy(ruleset, effectiveRules, verified = policy.verified_ruleset) {
+  // GitHub hides bypass actors from GITHUB_TOKEN. Only the exact revision
+  // inspected with Administration permission may stand in for that hidden field.
+  const attested = Number.isInteger(verified?.id) &&
+    revision(verified.updated_at) !== null && ruleset?.id === verified.id &&
+    revision(ruleset.updated_at) === revision(verified.updated_at);
+  const noBypass = ruleset && (Object.hasOwn(ruleset, 'bypass_actors') ?
+    Array.isArray(ruleset.bypass_actors) && ruleset.bypass_actors.length === 0 : attested);
   return ruleset?.name === policy.ruleset_name && ruleset.enforcement === 'active' &&
-    ruleset.target === 'branch' && ruleset.bypass_actors?.length === 0 &&
+    ruleset.target === 'branch' && attested && noBypass &&
     ['pull_request', 'deletion', 'non_fast_forward'].every(type =>
       ruleset.rules?.some(rule => rule.type === type)) &&
     ruleset.rules.some(requiredRule) && Number.isInteger(ruleset.id) &&
@@ -55,10 +76,14 @@ function successful(runs, jobsByRun) {
 
 async function inspect(github, repo, pr) {
   const repository = `${repo.owner}/${repo.repo}`;
+  if (!await nativeAutoMergeDisabled(github, repo)) {
+    return { ok: false, reason: 'Repository-native auto-merge must be disabled' };
+  }
   const summaries = await github.paginate('GET /repos/{owner}/{repo}/rulesets', {
     ...repo, includes_parents: true, per_page: 100
   });
-  const summary = summaries.find(item => item.name === policy.ruleset_name);
+  const summary = summaries.find(item => item.name === policy.ruleset_name &&
+    item.id === policy.verified_ruleset?.id);
   if (!summary) return { ok: false, reason: 'Mandatory active ruleset is missing' };
   const { data: ruleset } = await github.request(
     'GET /repos/{owner}/{repo}/rulesets/{ruleset_id}', { ...repo, ruleset_id: summary.id }
@@ -67,7 +92,7 @@ async function inspect(github, repo, pr) {
     'GET /repos/{owner}/{repo}/rules/branches/{branch}', { ...repo, branch: policy.base }
   );
   if (!protectedBy(ruleset, effectiveRules)) {
-    return { ok: false, reason: 'Ruleset is inactive, bypassable, incomplete or not effective' };
+    return { ok: false, reason: 'Ruleset revision is unverified, bypassable, incomplete or not effective' };
   }
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
     ...repo, head_sha: pr.head.sha, event: 'pull_request', per_page: 100
@@ -152,5 +177,5 @@ async function run({ github, context, core }) {
   }
 }
 
-module.exports = { policy, requiredContexts, eligible, protectedBy, latestRuns, successful,
+module.exports = { policy, requiredContexts, eligible, protectedBy, nativeAutoMergeDisabled, latestRuns, successful,
   inspect, mergeCandidate, run };

@@ -3,7 +3,7 @@ name: Auto-merge Dependabot
 on:
   # This privileged workflow never checks out or executes a PR head.
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, auto_merge_enabled]
     branches: [main]
   workflow_run:
     workflows:
