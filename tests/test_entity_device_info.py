@@ -44,6 +44,9 @@ from custom_components.jackery_solarvault.util import stable_subdevice_key
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 if TYPE_CHECKING:
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
     from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
 
 _DEVICE_ID = "home-power-3002"
@@ -128,10 +131,13 @@ def test_main_battery_uses_child_device_without_changing_entity_identity(
     )
     for description in descriptions:
         entity = _entity({})
-        entity.coordinator = SimpleNamespace(
-            data={_DEVICE_ID: {}},
-            hass=hass,
-            config_entry=SimpleNamespace(entry_id=entry_id),
+        entity.coordinator = cast(
+            "JackerySolarVaultCoordinator",
+            SimpleNamespace(
+                data={_DEVICE_ID: {}},
+                hass=hass,
+                config_entry=SimpleNamespace(entry_id=entry_id),
+            ),
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
@@ -158,10 +164,13 @@ def test_ct_statistics_join_existing_smart_meter_device(hass: Any) -> None:
     )
     ct = {"deviceSn": "CT-SERIAL-1"}
     entity = _entity({PAYLOAD_CT_METER: ct})
-    entity.coordinator = SimpleNamespace(
-        data={_DEVICE_ID: {PAYLOAD_CT_METER: ct}},
-        hass=hass,
-        config_entry=SimpleNamespace(entry_id=entry_id),
+    entity.coordinator = cast(
+        "JackerySolarVaultCoordinator",
+        SimpleNamespace(
+            data={_DEVICE_ID: {PAYLOAD_CT_METER: ct}},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
+        ),
     )
     entity.entity_description = next(
         d for d in STAT_DESCRIPTIONS if d.key == "ct_input_day_energy"
@@ -200,10 +209,13 @@ def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> 
         next(d for d in STAT_DESCRIPTIONS if d.key == "device_pv1_day_energy"),
     ):
         entity = _entity(payload)
-        entity.coordinator = SimpleNamespace(
-            data={_DEVICE_ID: payload},
-            hass=hass,
-            config_entry=SimpleNamespace(entry_id=entry_id),
+        entity.coordinator = cast(
+            "JackerySolarVaultCoordinator",
+            SimpleNamespace(
+                data={_DEVICE_ID: payload},
+                hass=hass,
+                config_entry=SimpleNamespace(entry_id=entry_id),
+            ),
         )
         entity.entity_description = description
         entity._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
@@ -219,10 +231,13 @@ def test_pv_channel_entities_share_child_only_when_channel_exists(hass: Any) -> 
         )
 
     temporarily_missing = _entity({})
-    temporarily_missing.coordinator = SimpleNamespace(
-        data={_DEVICE_ID: {}},
-        hass=hass,
-        config_entry=SimpleNamespace(entry_id=entry_id),
+    temporarily_missing.coordinator = cast(
+        "JackerySolarVaultCoordinator",
+        SimpleNamespace(
+            data={_DEVICE_ID: {}},
+            hass=hass,
+            config_entry=SimpleNamespace(entry_id=entry_id),
+        ),
     )
     temporarily_missing.entity_description = next(
         d for d in SENSOR_DESCRIPTIONS if d.key == "pv1_power"

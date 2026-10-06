@@ -7,9 +7,8 @@ annotatedyaml>=1.0.2
 astroid
 attrs>=26.1.0
 autotyping>=24.9.0
-coverage[toml]
+coverage[toml]>=7.10.6
 homeassistant>=2026.9.4
-homeassistant-stubs>=2026.9.4
 hypothesis>=6.168.3
 ifaddr>=0.2.0
 iniconfig>=2.3.0
@@ -25,7 +24,7 @@ pytest
 pytest-asyncio
 pytest-cov
 pytest-github-actions-annotate-failures>=0.4.2
-pytest-homeassistant-custom-component  # follows daily HA version
+pytest-homeassistant-custom-component>=0.13.367  # HA 2026.9.4 or newer
 pytest-mock
 pytest-socket
 python-dateutil
