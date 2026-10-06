@@ -129,10 +129,12 @@ async def test_home_device_name_uses_explicit_diy_http_setter() -> None:
 
     await entity.async_set_value("  New Device  ")
 
+    assert isinstance(entity.coordinator.async_set_device_name, AsyncMock)
     entity.coordinator.async_set_device_name.assert_awaited_once_with(
         _DEVICE_ID,
         "New Device",
     )
+    assert isinstance(entity.coordinator.async_set_device_nickname, AsyncMock)
     entity.coordinator.async_set_device_nickname.assert_not_awaited()
     cast("MagicMock", entity.async_write_ha_state).assert_called_once()
 
@@ -150,10 +152,12 @@ async def test_portable_device_name_uses_explicit_bind_nickname_setter() -> None
 
     await entity.async_set_value("Portable")
 
+    assert isinstance(entity.coordinator.async_set_device_nickname, AsyncMock)
     entity.coordinator.async_set_device_nickname.assert_awaited_once_with(
         _DEVICE_ID,
         "Portable",
     )
+    assert isinstance(entity.coordinator.async_set_device_name, AsyncMock)
     entity.coordinator.async_set_device_name.assert_not_awaited()
 
 
@@ -174,6 +178,7 @@ async def test_system_name_set_trims_and_forwards() -> None:
 
     await entity.async_set_value("  New Name  ")
 
+    assert isinstance(entity.coordinator.async_set_system_name, AsyncMock)
     entity.coordinator.async_set_system_name.assert_awaited_once_with(
         "sys-1",
         "New Name",
@@ -191,6 +196,7 @@ async def test_system_name_missing_id_raises() -> None:
         await entity.async_set_value("New")
 
     assert err.value.translation_key == "missing_system_id"
+    assert isinstance(entity.coordinator.async_set_system_name, AsyncMock)
     entity.coordinator.async_set_system_name.assert_not_awaited()
 
 
@@ -245,6 +251,9 @@ async def test_third_party_set_forwards_field_update() -> None:
 
     await entity.async_set_value("  10.0.0.9  ")
 
+    assert isinstance(
+        entity.coordinator.async_update_third_party_mqtt_config, AsyncMock
+    )
     entity.coordinator.async_update_third_party_mqtt_config.assert_awaited_once_with(
         _DEVICE_ID,
         {FIELD_THIRD_PARTY_MQTT_IP: "10.0.0.9"},
@@ -353,6 +362,7 @@ async def test_pv_name_set_trims_and_forwards_index_and_name() -> None:
 
     await entity.async_set_value("  Carport  ")
 
+    assert isinstance(entity.coordinator.async_set_pv_name, AsyncMock)
     entity.coordinator.async_set_pv_name.assert_awaited_once_with(
         device_id=_DEVICE_ID,
         index=2,
@@ -373,6 +383,7 @@ async def test_pv_name_empty_value_raises() -> None:
         await entity.async_set_value("   ")
 
     assert err.value.translation_key == "invalid_text_value"
+    assert isinstance(entity.coordinator.async_set_pv_name, AsyncMock)
     entity.coordinator.async_set_pv_name.assert_not_awaited()
 
 

@@ -414,13 +414,12 @@ hass = "homeassistant.__main__:main"
 
 [dependency-groups]
 dev = [
-    "homeassistant",
-    "homeassistant-stubs",
+    "homeassistant>=2026.9.4",
     "pyrefly",
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-homeassistant-custom-component>=0.13.363",
+    "pytest-homeassistant-custom-component>=0.13.367",
     "pytest-mock",
     "ruff",
 ]

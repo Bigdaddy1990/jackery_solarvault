@@ -4274,10 +4274,13 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
         hass = getattr(self, "hass", None)
         if version is None or hass is None:
             return
+        entry = self.coordinator.config_entry
+        if entry is None:
+            return
         registry = dr.async_get(hass)
         device = registry.async_get_device_by_identifier(
             (DOMAIN, f"{self._device_id}_{self._pack_key}"),
-            self.coordinator.config_entry.entry_id,
+            entry.entry_id,
         )
         if device is not None and device.sw_version != version:
             registry.async_update_device(device.id, sw_version=version)
@@ -5149,10 +5152,13 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         hass = getattr(self, "hass", None)
         if hass is None:
             return
+        entry = self.coordinator.config_entry
+        if entry is None:
+            return
         registry = dr.async_get(hass)
         device = registry.async_get_device_by_identifier(
             self._smart_meter_identifier(ct),
-            self.coordinator.config_entry.entry_id,
+            entry.entry_id,
         )
         if device is None:
             return
@@ -5160,9 +5166,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         # a module-load cycle while reconciling identities learned after setup.
         from . import _async_migrate_smart_meter_identity  # ruff: ignore[import-outside-top-level]
 
-        entry = self.coordinator.config_entry
-        if entry is not None:
-            _async_migrate_smart_meter_identity(hass, entry)
+        _async_migrate_smart_meter_identity(hass, entry)
         connections = {(dr.CONNECTION_NETWORK_MAC, mac)} if mac else set()
         if (serial and serial != device.serial_number) or not connections.issubset(
             device.connections

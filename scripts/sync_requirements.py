@@ -192,7 +192,6 @@ ALWAYS_TEST: list[str] = [
     'autotyping',
     'coverage[toml]',
     'homeassistant',
-    'homeassistant-stubs',
     'hypothesis',
     'ifaddr',
     'iniconfig',

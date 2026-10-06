@@ -365,7 +365,9 @@ def test_mqtt_pack_device_links_to_native_pack(hass: HomeAssistant) -> None:
         identifiers={("mqtt", "jackery_solarvault:device_battery_pack_1")},
     )
     publisher._link_mqtt_device(mirror.id)  # ruff: ignore[private-member-access]
-    assert registry.async_get(mirror.id).via_device_id == native.id
+    linked = registry.async_get(mirror.id)
+    assert isinstance(linked, dr.DeviceEntry)
+    assert linked.via_device_id == native.id
     publisher.async_retire()
 
 
@@ -394,7 +396,9 @@ def test_mqtt_mirror_of_child_pack_links_to_head_unit(hass: HomeAssistant) -> No
     publisher._link_mqtt_device(mirror.id)  # ruff: ignore[private-member-access]
     publisher._link_mqtt_device(pack.id)  # ruff: ignore[private-member-access]
 
-    assert registry.async_get(mirror.id).via_device_id == head.id
+    linked = registry.async_get(mirror.id)
+    assert isinstance(linked, dr.DeviceEntry)
+    assert linked.via_device_id == head.id
     publisher.async_retire()
 
 

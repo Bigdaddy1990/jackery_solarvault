@@ -6,7 +6,7 @@ those fields exist only on Jackery's own CT clamp (App model AccCTBody).
 """
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -16,6 +16,9 @@ from custom_components.jackery_solarvault.const import DOMAIN, PAYLOAD_CT_METER
 from homeassistant.helpers import entity_registry as er
 
 if TYPE_CHECKING:
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
     from homeassistant.core import HomeAssistant
 
 _DEV = "dev"
@@ -23,7 +26,10 @@ _DEV = "dev"
 
 def _collect(hass: HomeAssistant, ct: dict[str, Any]) -> set[str]:
     collection = sensor_module._SensorCollection(  # ruff: ignore[private-member-access]
-        SimpleNamespace(hass=hass, has_smart_meter_accessory=lambda _payload: True),
+        cast(
+            "JackerySolarVaultCoordinator",
+            SimpleNamespace(hass=hass, has_smart_meter_accessory=lambda _payload: True),
+        ),
         set(),
         {},
         True,

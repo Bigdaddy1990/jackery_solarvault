@@ -48,7 +48,9 @@ class SyncRequirementsTests(unittest.TestCase):
         return next(
             line
             for line in content.splitlines(keepends=True)
-            if line.strip() and sync_requirements.requirement_name(line) == name
+            if line.strip()
+            and sync_requirements.requirement_name(line)
+            == sync_requirements.requirement_name(name)
         )
 
     def test_write_preserves_future_dependabot_version_bumps(self) -> None:
@@ -58,6 +60,10 @@ class SyncRequirementsTests(unittest.TestCase):
         updated = updated.replace(
             self.requirement_line(updated, "hypothesis"), "hypothesis>=999.0.0\n"
         )
+        for name in ("coverage[toml]", "pytest-homeassistant-custom-component"):
+            updated = updated.replace(
+                self.requirement_line(updated, name), f"{name}>=999.0.0\n"
+            )
         self.test_path.write_text(updated, encoding="utf-8")
 
         assert sync_requirements.main(["--check"]) == 0

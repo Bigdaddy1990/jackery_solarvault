@@ -129,6 +129,7 @@ async def test_options_form_has_single_bridge_mask(hass: HomeAssistant) -> None:
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
+    assert result["data_schema"] is not None
     schema_keys = {str(key) for key in result["data_schema"].schema}
 
     assert CONF_THIRD_PARTY_MQTT_ENABLE in schema_keys

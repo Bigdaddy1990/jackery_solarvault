@@ -229,9 +229,11 @@ def test_late_ct_payload_moves_period_sensors_from_head_device(
 
 
 @pytest.mark.parametrize("serial", ["AABBCCDDEEFF", "CT-SERIAL-42"])
+@pytest.mark.parametrize("entry_available", [True, False])
 def test_late_ct_identity_updates_existing_registry_device(
     hass: HomeAssistant,
     serial: str,
+    entry_available: bool,
 ) -> None:
     """Late identity enriches the same device without replacing its connections."""
     coordinator = _coordinator({FIELD_DEVICE_SN: serial})
@@ -249,6 +251,15 @@ def test_late_ct_identity_updates_existing_registry_device(
         coordinator, _PARENT_ID, SMART_METER_SENSOR_DESCRIPTIONS[0]
     )
     sensor.hass = hass
+    if not entry_available:
+        coordinator.config_entry = None
+        sensor._sync_device_mac_connection({FIELD_DEVICE_SN: serial})  # ruff: ignore[private-member-access]
+        unchanged = registry.async_get(device.id)
+        assert isinstance(unchanged, dr.DeviceEntry)
+        assert unchanged.serial_number is None
+        assert unchanged.connections == {connection}
+        coordinator.config_entry = entry
+
     sensor._sync_device_mac_connection({FIELD_DEVICE_SN: serial})  # ruff: ignore[private-member-access]
     updated = registry.async_get(device.id)
     assert updated is not None

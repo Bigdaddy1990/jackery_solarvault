@@ -791,12 +791,16 @@ _RERAISE_CASES = tuple(case for case in _CASES if case.name in _RERAISE_NAMES)
 
 @pytest.mark.parametrize("case", _RERAISE_CASES, ids=lambda case: case.name)
 @pytest.mark.asyncio()
+@pytest.mark.parametrize("entry_available", [True, False])
 async def test_service_reraises_config_entry_auth_failed(
     hass: HomeAssistant,
     case: _HandlerCase,
+    entry_available: bool,
 ) -> None:
     """A ConfigEntryAuthFailed from the coordinator propagates unwrapped."""
     coordinator = _coordinator(case.method, error=ConfigEntryAuthFailed("reauth"))
+    if not entry_available:
+        coordinator.config_entry = None
 
     with pytest.raises(ConfigEntryAuthFailed):
         await _call(hass, case, coordinator)
