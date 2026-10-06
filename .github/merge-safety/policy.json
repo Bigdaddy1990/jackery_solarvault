@@ -2,6 +2,10 @@
   "base": "main",
   "integration_id": 15368,
   "ruleset_name": "main-required-ci",
+  "verified_ruleset": {
+    "id": 24458330,
+    "updated_at": "2026-10-04T14:55:29.575Z"
+  },
   "workflows": {
     "autofix.yml": {
       "jobs": [
