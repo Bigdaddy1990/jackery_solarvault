@@ -14,6 +14,11 @@ updates:
       prefix: "deps"
       prefix-development: "deps"
       include: "scope"
+    # HA 2026.9.4 uses pytest plugin 0.13.367, which pins coverage==7.15.4.
+    # Revisit with an explicitly reviewed HA minimum / pytest-stack upgrade.
+    ignore:
+      - dependency-name: "coverage"
+        versions: [">7.15.4"]
     groups:
       security:
         applies-to: "security-updates"
