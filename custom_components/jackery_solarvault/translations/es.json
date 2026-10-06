@@ -1080,16 +1080,16 @@
         "name": "Dirección MAC"
       },
       "main_battery_charge_energy": {
-        "name": "Main battery lifetime charge energy"
+        "name": "Energía de carga de la batería principal desde la instalación (calculada)"
       },
       "main_battery_charge_energy_direct": {
-        "name": "Main battery lifetime charged energy"
+        "name": "Energía de carga acumulada de la batería principal"
       },
       "main_battery_discharge_energy": {
-        "name": "Main battery lifetime discharge energy"
+        "name": "Energía de descarga de la batería principal desde la instalación (calculada)"
       },
       "main_battery_discharge_energy_direct": {
-        "name": "Main battery lifetime discharged energy"
+        "name": "Energía de descarga acumulada de la batería principal"
       },
       "max_feed_grid_read": {
         "name": "Potencia máxima de inyección (runtime)"
@@ -2126,9 +2126,9 @@
     "device_not_activated": {
       "fix_flow": {
         "error": {
-          "integration_unavailable": "The Jackery integration is not loaded. Restore the integration before trying again.",
-          "issue_still_present": "Jackery still reports the activation issue. Check the device in the Jackery app and try again.",
-          "refresh_failed": "The cloud refresh failed. The issue remains open. Check the connection and try again."
+          "integration_unavailable": "La integración de Jackery no está cargada. Restablécela antes de volver a intentarlo.",
+          "issue_still_present": "Jackery sigue notificando el problema de activación. Revisa el dispositivo en la aplicación de Jackery e inténtalo de nuevo.",
+          "refresh_failed": "La actualización de la nube ha fallado. El problema sigue abierto. Comprueba la conexión e inténtalo de nuevo."
         },
         "step": {
           "confirm": {

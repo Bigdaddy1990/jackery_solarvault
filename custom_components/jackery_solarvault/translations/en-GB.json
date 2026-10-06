@@ -1080,13 +1080,13 @@
         "name": "MAC address"
       },
       "main_battery_charge_energy": {
-        "name": "Main battery lifetime charge energy"
+        "name": "Main battery charge energy since installation (calculated)"
       },
       "main_battery_charge_energy_direct": {
         "name": "Main battery lifetime charged energy"
       },
       "main_battery_discharge_energy": {
-        "name": "Main battery lifetime discharge energy"
+        "name": "Main battery discharge energy since installation (calculated)"
       },
       "main_battery_discharge_energy_direct": {
         "name": "Main battery lifetime discharged energy"

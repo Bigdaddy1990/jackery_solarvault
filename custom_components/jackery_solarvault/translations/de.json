@@ -1083,13 +1083,13 @@
         "name": "Hauptbatterie Energie seit Inbetriebnahme geladen (berechnet)"
       },
       "main_battery_charge_energy_direct": {
-        "name": "Main battery lifetime charged energy"
+        "name": "Hauptbatterie Lebensenergie geladen"
       },
       "main_battery_discharge_energy": {
         "name": "Hauptbatterie Energie seit Inbetriebnahme entladen (berechnet)"
       },
       "main_battery_discharge_energy_direct": {
-        "name": "Main battery lifetime discharged energy"
+        "name": "Hauptbatterie Lebensenergie entladen"
       },
       "max_feed_grid_read": {
         "name": "Max. Einspeiseleistung (Laufzeit)"
@@ -2126,9 +2126,9 @@
     "device_not_activated": {
       "fix_flow": {
         "error": {
-          "integration_unavailable": "The Jackery integration is not loaded. Restore the integration before trying again.",
-          "issue_still_present": "Jackery still reports the activation issue. Check the device in the Jackery app and try again.",
-          "refresh_failed": "The cloud refresh failed. The issue remains open. Check the connection and try again."
+          "integration_unavailable": "Die Jackery-Integration ist nicht geladen. Stelle die Integration wieder her und versuche es erneut.",
+          "issue_still_present": "Jackery meldet das Aktivierungsproblem weiterhin. Prüfe das Gerät in der Jackery-App und versuche es erneut.",
+          "refresh_failed": "Die Cloud-Aktualisierung ist fehlgeschlagen. Das Problem bleibt offen. Prüfe die Verbindung und versuche es erneut."
         },
         "step": {
           "confirm": {
