@@ -48,6 +48,7 @@ coverage/
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+.mandatory-tool-gate/
 
 # System
 .DS_Store
