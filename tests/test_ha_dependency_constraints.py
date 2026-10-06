@@ -119,3 +119,16 @@ def test_hacs_minimum_matches_tested_home_assistant_baseline() -> None:
         hacs.get("homeassistant")
         == (_ROOT / ".HA_VERSION").read_text(encoding="utf-8").strip()
     )
+
+
+def test_test_requirements_minimum_matches_supported_baseline() -> None:
+    """The declared test minimum must match the supported installation minimum."""
+    baseline = (_ROOT / ".HA_VERSION").read_text(encoding="utf-8").strip()
+    lines = (_ROOT / "requirements-test.txt").read_text(encoding="utf-8").splitlines()
+    requirements = [
+        Requirement(line.partition("#")[0].strip())
+        for line in lines
+        if line.partition("#")[0].strip()
+    ]
+    core = next(req for req in requirements if req.name == "homeassistant")
+    assert str(core.specifier) == f">={baseline}"
