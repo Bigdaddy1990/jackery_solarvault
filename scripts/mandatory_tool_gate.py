@@ -48,10 +48,11 @@ def _read_only_shell(command: Any) -> bool:
     """Allow a small read-only grammar; opaque commands require preflight."""
     if not isinstance(command, str) or not command.strip():
         return False
-    if any(token in command for token in (">", "<", "$", "`", "\n", "\\")):
+    if any(token in command for token in (">", "<", "$", "`", "\n", "\\", "*", "?", "[", "#")):
         return False
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars="|;&")
+        lexer.commenters = ""
         lexer.whitespace_split = True
         tokens = list(lexer)
     except ValueError:
@@ -87,7 +88,7 @@ def _read_only_shell(command: Any) -> bool:
         elif part[0] not in {"pwd", "ls", "cat", "head", "tail", "rg", "sort", "wc"}:
             return False
         elif any(
-            arg.startswith(("-o", "--output", "--pre", "--compress-program"))
+            arg.startswith(("-o", "--output", "--pre", "--compress-program", "--hostname-bin"))
             for arg in part
         ):
             return False
@@ -300,6 +301,13 @@ def main() -> int:
         event = json.load(sys.stdin)
         if not isinstance(event, dict):
             raise ValueError("Expected a hook object")
+        if event.get("hook_event_name") not in {"PreToolUse", "PostToolUse"}:
+            raise ValueError("Missing or unsupported hook event")
+        for field in ("session_id", "cwd", "tool_name"):
+            if not isinstance(event.get(field), str) or not event[field].strip():
+                raise ValueError(f"Missing hook field: {field}")
+        if not _SESSION.fullmatch(event["session_id"]):
+            raise ValueError("Invalid hook session")
         result = handle(event, PROJECT / ".mandatory-tool-gate")
     except OSError, ValueError, TypeError:
         result = _deny("Invalid mandatory preflight hook input.")
