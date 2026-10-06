@@ -213,8 +213,10 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
     assert battery_pack_serial({"batSoc": 5}) is None
 
 
+@pytest.mark.parametrize("entry_available", [True, False])
 def test_pack_firmware_version_updates_registered_device(
     hass: HomeAssistant,
+    entry_available: bool,
 ) -> None:
     """Late BatteryPackSub version must reach device properties."""
     coordinator = _coordinator()
@@ -234,6 +236,14 @@ def test_pack_firmware_version_updates_registered_device(
     sensor._device_id = _PARENT_ID  # ruff: ignore[private-member-access]
     sensor._pack_key = pack_key  # ruff: ignore[private-member-access]
     sensor.coordinator = coordinator
+
+    if not entry_available:
+        coordinator.config_entry = None
+        sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
+        unchanged = registry.async_get(device.id)
+        assert isinstance(unchanged, dr.DeviceEntry)
+        assert unchanged.sw_version is None
+        coordinator.config_entry = entry
 
     sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
 
