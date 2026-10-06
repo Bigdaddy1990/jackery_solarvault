@@ -25,7 +25,7 @@ jobs:
       - name: Reject red, missing, stale and skipped mandatory checks
         run: node --test .github/merge-safety/gate.test.cjs
       - name: Verify live protection with the read-only workflow token
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const assert = require('node:assert/strict');
