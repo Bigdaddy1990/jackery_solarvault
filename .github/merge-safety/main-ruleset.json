@@ -1,15 +1,16 @@
 {
+  "name": "main-required-ci",
+  "target": "branch",
+  "enforcement": "active",
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "exclude": [],
       "include": [
         "refs/heads/main"
-      ]
+      ],
+      "exclude": []
     }
   },
-  "enforcement": "active",
-  "name": "main-required-ci",
   "rules": [
     {
       "type": "deletion"
@@ -18,28 +19,26 @@
       "type": "non_fast_forward"
     },
     {
+      "type": "pull_request",
       "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
         "allowed_merge_methods": [
           "squash",
           "merge",
           "rebase"
-        ],
-        "dismiss_stale_reviews_on_push": true,
-        "require_code_owner_review": false,
-        "require_last_push_approval": false,
-        "required_approving_review_count": 0,
-        "required_review_thread_resolution": true
-      },
-      "type": "pull_request"
+        ]
+      }
     },
     {
+      "type": "required_status_checks",
       "parameters": {
+        "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          {
-            "context": "autofix",
-            "integration_id": 15368
-          },
           {
             "context": "Hassfest",
             "integration_id": 15368
@@ -50,26 +49,6 @@
           },
           {
             "context": "Tests (Python 3.14) / Run pytest with coverage",
-            "integration_id": 15368
-          },
-          {
-            "context": "dependency-review",
-            "integration_id": 15368
-          },
-          {
-            "context": "Merge safety regression",
-            "integration_id": 15368
-          },
-          {
-            "context": "pre-commit",
-            "integration_id": 15368
-          },
-          {
-            "context": "typecheck",
-            "integration_id": 15368
-          },
-          {
-            "context": "Modernization gate (Python 3.14)",
             "integration_id": 15368
           },
           {
@@ -91,12 +70,33 @@
           {
             "context": "Unit / source-only tests",
             "integration_id": 15368
+          },
+          {
+            "context": "pre-commit",
+            "integration_id": 15368
+          },
+          {
+            "context": "autofix",
+            "integration_id": 15368
+          },
+          {
+            "context": "Modernization gate (Python 3.14)",
+            "integration_id": 15368
+          },
+          {
+            "context": "typecheck",
+            "integration_id": 15368
+          },
+          {
+            "context": "dependency-review",
+            "integration_id": 15368
+          },
+          {
+            "context": "Merge safety regression",
+            "integration_id": 15368
           }
-        ],
-        "strict_required_status_checks_policy": true
-      },
-      "type": "required_status_checks"
+        ]
+      }
     }
-  ],
-  "target": "branch"
+  ]
 }
