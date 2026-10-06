@@ -80,7 +80,6 @@ jobs:
           pyrefly infer tests/ || true
           pyrefly infer custom_components/jackery_solarvault || true
           pre-commit run --all-files || true
-          pre-commit run --hook-stage manual python-typing-update --check --py314-plus --ruff || true
 
       - uses: pre-commit/action@v3.0.1
       - run: uvx pre-commit run --all-files
