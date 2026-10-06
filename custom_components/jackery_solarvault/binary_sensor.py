@@ -3,10 +3,7 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -51,6 +48,7 @@ from .util import (
 )
 
 if TYPE_CHECKING:
+    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -60,6 +58,9 @@ if TYPE_CHECKING:
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
 PARALLEL_UPDATES = 0
+
+if not TYPE_CHECKING:
+    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 _LOGGER = logging.getLogger(__name__)
 

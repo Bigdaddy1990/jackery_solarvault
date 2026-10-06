@@ -3,11 +3,10 @@
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
-import voluptuous as vol
-
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ACTIVATED
 from .coordinator import BACKGROUND_TASK_ERRORS, JackerySolarVaultCoordinator
@@ -58,7 +57,7 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
             "data_entry_flow.FlowResult",
             self.async_show_form(
                 step_id="confirm",
-                data_schema=vol.Schema({}),
+                data_schema=type(cv.PLATFORM_SCHEMA)({}),
                 description_placeholders=self._description_placeholders,
             ),
         )

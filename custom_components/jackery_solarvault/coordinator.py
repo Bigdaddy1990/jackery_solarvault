@@ -46,7 +46,6 @@ from typing import (
     cast,
 )
 
-from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.db_schema import Statistics, StatisticsMeta
 from homeassistant.components.recorder.models import StatisticMeanType
 from homeassistant.components.recorder.statistics import (
@@ -62,7 +61,7 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.recorder import session_scope
+from homeassistant.helpers.recorder import get_instance, session_scope
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -5231,12 +5230,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
 
     def _unlink_removed_parent_devices(self, device_ids: set[str]) -> int:
         """Unlink removed parents and their descendants from this config entry."""
+        entry = self.config_entry
+        if entry is None:
+            return 0
         registry = dr.async_get(self.hass)
         unlinked = 0
         for device_id in sorted(device_ids):
             parent = registry.async_get_device_by_identifier(
                 (DOMAIN, device_id),
-                self.config_entry.entry_id,
+                entry.entry_id,
             )
             if parent is not None:
                 linked_device_ids = {parent.id}
@@ -5247,7 +5249,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         if (
                             device.id not in linked_device_ids
                             and device.via_device_id in linked_device_ids
-                            and self.entry.entry_id in device.config_entries
+                            and device.config_entry_id == entry.entry_id
                         ):
                             linked_device_ids.add(device.id)
                             changed = True
@@ -5260,7 +5262,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     registry_device = registry.async_get(registry_device_id)
                     if (
                         registry_device is None
-                        or self.entry.entry_id not in registry_device.config_entries
+                        or registry_device.config_entry_id != entry.entry_id
                     ):
                         continue
                     # HA 2026.9: a device belongs to exactly one config entry,
@@ -5728,13 +5730,10 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     eager_start=False,
                 ),
             )
-        return cast(
-            "asyncio.Task[Any]",
-            self.hass.async_create_background_task(
-                operation,
-                name=name,
-                eager_start=False,
-            ),
+        return self.hass.async_create_background_task(
+            operation,
+            name=name,
+            eager_start=False,
         )
 
     @callback

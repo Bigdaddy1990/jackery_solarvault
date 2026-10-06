@@ -1809,6 +1809,8 @@ PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 # Per-device BLE AES key from ``/v1/device/system/list``; used by BLE/MQTT
 # Layer-C payload encryption.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
+# Normal diagnostics retain full identifiers and MQTT topics.
+# Mask authentication secrets independently of the identifier/export policy.
 REDACT_KEYS: Final = frozenset({
     FIELD_PASSWORD,
     MQTT_SESSION_SEED_B64,

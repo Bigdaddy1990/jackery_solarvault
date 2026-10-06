@@ -114,10 +114,17 @@ for (const conclusion of ['failure', 'cancelled', 'neutral', 'skipped', null]) {
 }
 
 test('missing expected job or empty job list fails closed', async () => {
-  for (const jobs of [[], fixture().jobs.get(1).slice(1)]) {
+  const sample = fixture();
+  const target = sample.runs.find(run => sample.jobs.get(run.id).length > 1);
+  assert.ok(target, 'fixture must include a workflow with multiple required jobs');
+  const partial = sample.jobs.get(target.id).slice(1);
+  assert.ok(partial.length > 0);
+  for (const jobs of [[], partial]) {
     const f = fixture();
-    f.jobs.set(1, jobs);
-    assert.equal((await attempt(f)).merged, false);
+    f.jobs.set(target.id, jobs);
+    const c = await attempt(f);
+    assert.equal(c.merged, false);
+    assert.deepEqual(c.writes, []);
   }
 });
 

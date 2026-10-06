@@ -30,9 +30,25 @@ from custom_components.jackery_solarvault.coordinator import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from homeassistant.core import HomeAssistant
+
 # ---------------------------------------------------------------------------
 # _safe_enrich
 # ---------------------------------------------------------------------------
+
+
+def test_unlink_removed_parents_without_entry_preserves_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A detached coordinator cannot remove devices without an owning entry."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator.config_entry = None
+    get_registry = MagicMock()
+    monkeypatch.setattr(coordinator_module.dr, "async_get", get_registry)
+
+    assert coordinator._unlink_removed_parent_devices({"removed-parent"}) == 0  # ruff: ignore[private-member-access]
+
+    get_registry.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -475,9 +491,12 @@ async def test_payload_debug_shutdown_flush_writes_pending_events(
     """Shutdown must flush queued debug diagnostics before other tasks stop."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     executor_job = AsyncMock()
-    coordinator.hass = SimpleNamespace(
-        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
-        async_add_executor_job=executor_job,
+    coordinator.hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+            async_add_executor_job=executor_job,
+        ),
     )
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="test-entry")
     coordinator._background_tasks = {}  # ruff: ignore[private-member-access]
@@ -503,9 +522,12 @@ async def test_payload_debug_drain_uses_one_executor_batch_for_pending_events(
     """A burst must retain all debug events without one disk job per frame."""
     coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     executor_job = AsyncMock()
-    coordinator.hass = SimpleNamespace(
-        config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
-        async_add_executor_job=executor_job,
+    coordinator.hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            config=SimpleNamespace(path=lambda filename: str(tmp_path / filename)),
+            async_add_executor_job=executor_job,
+        ),
     )
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="test-entry")
     coordinator._payload_debug_pending_events = deque([  # ruff: ignore[private-member-access]
