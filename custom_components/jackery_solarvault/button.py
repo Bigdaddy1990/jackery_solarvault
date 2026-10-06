@@ -394,7 +394,7 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         if isinstance(http_result, BaseException):
             raise http_result
         raise_entity_action_error(
-            str(self._attr_translation_key),
+            self.entity_description.key,
             self._device_id,
             "No documented refresh transport returned data",
         )
@@ -410,13 +410,9 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            raise_entity_action_error(
-                str(self._attr_translation_key), self._device_id, err
-            )
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
-            raise_entity_action_error(
-                str(self._attr_translation_key), self._device_id, err
-            )
+            raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
 
 class JackeryRebootButton(JackeryEntity, ButtonEntity):

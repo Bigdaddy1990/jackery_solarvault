@@ -12,7 +12,12 @@ from custom_components.jackery_solarvault.binary_sensor import (
     JackerySubdeviceAlarmBinarySensor,
     async_setup_entry,
 )
-from custom_components.jackery_solarvault.const import SOLAR_VAULT_HEAD_UNIT_MODEL_CODE
+from custom_components.jackery_solarvault.const import (
+    PAYLOAD_SMART_PLUGS,
+    PAYLOAD_SUBDEVICES,
+    SOLAR_VAULT_HEAD_UNIT_MODEL_CODE,
+    SUBDEVICE_DEV_TYPE_WATER_LEAK,
+)
 
 
 class TestBinarySensor:
@@ -70,6 +75,30 @@ class TestBinarySensor:
         async_add_entities.assert_called_once()
         args = async_add_entities.call_args[0][0]
         assert len(args) > 0
+
+    async def test_setup_registers_accessory_entities_without_duplicates(self) -> None:
+        """Smart plugs and leak sensors are registered once across data updates."""
+        entry = self._bare_entry()
+        coordinator = self._bare_coordinator(entry)
+        payload = coordinator.data["test-device"]
+        payload[PAYLOAD_SMART_PLUGS] = [{"deviceSn": "plug-1"}]
+        payload[PAYLOAD_SUBDEVICES] = [
+            {
+                "devSn": "leak-1",
+                "devType": SUBDEVICE_DEV_TYPE_WATER_LEAK,
+            }
+        ]
+        coordinator.get_device_data.return_value = payload
+        add_entities = MagicMock()
+
+        await async_setup_entry(self._bare_hass(), entry, add_entities)
+
+        entities = add_entities.call_args.args[0]
+        assert any(isinstance(e, JackerySmartPlugStateBinarySensor) for e in entities)
+        assert any(isinstance(e, JackerySubdeviceAlarmBinarySensor) for e in entities)
+        assert len({e.unique_id for e in entities}) == len(entities)
+        coordinator.async_add_listener.call_args.args[0]()
+        add_entities.assert_called_once()
 
     def test_jackery_binary_sensor_creation(self) -> None:
         """Test JackeryBinarySensor creation."""
