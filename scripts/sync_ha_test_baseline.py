@@ -47,13 +47,31 @@ def baseline_files(root: Path) -> dict[Path, str]:
     }
 
 
+def constraint_values(content: str) -> list[str]:
+    """Compare dependency semantics independently of formatter order/comments."""
+    return sorted(
+        str(Requirement(value))
+        for line in content.splitlines()
+        if (value := line.partition("#")[0].strip())
+    )
+
+
 def check_baseline(root: Path) -> list[str]:
     """Return missing or stale artifacts without changing the repository."""
-    return [
-        str(path.relative_to(root))
-        for path, expected in baseline_files(root).items()
-        if not path.exists() or path.read_text(encoding="utf-8") != expected
-    ]
+    stale = []
+    for path, expected in baseline_files(root).items():
+        if not path.exists():
+            stale.append(str(path.relative_to(root)))
+            continue
+        actual = path.read_text(encoding="utf-8")
+        matches = (
+            actual.strip() == expected.strip()
+            if path.name == ".HA_VERSION"
+            else constraint_values(actual) == constraint_values(expected)
+        )
+        if not matches:
+            stale.append(str(path.relative_to(root)))
+    return stale
 
 
 def main() -> int:
