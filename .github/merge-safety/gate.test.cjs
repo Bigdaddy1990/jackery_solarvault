@@ -4,10 +4,11 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { apply } = require('./apply-ruleset.cjs');
 const { policy, requiredContexts, eligible, protectedBy, latestRuns, successful,
   mergeCandidate, run } = require('./gate.cjs');
-const ruleset = { id: 1, ...require('./main-ruleset.json') };
-const effective = rules => rules.map(rule => ({ ...rule, ruleset_id: 1 }));
+const ruleset = { ...policy.verified_ruleset, ...require('./main-ruleset.json') };
+const effective = rules => rules.map(rule => ({ ...rule, ruleset_id: ruleset.id }));
 const repository = 'Bigdaddy1990/jackery_solarvault';
 const repo = { owner: 'Bigdaddy1990', repo: 'jackery_solarvault' };
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -28,7 +29,7 @@ function fixture() {
     Object.values(policy.workflows)[i].jobs.map(name => ({
       run_id: run.id, name, status: 'completed', conclusion: 'success'
     }))]));
-  return { pr, runs, jobs, rules: clone(ruleset) };
+  return { pr, runs, jobs, rules: clone(ruleset), settings: { allow_auto_merge: false } };
 }
 
 function client(f, change = () => {}) {
@@ -55,14 +56,17 @@ function client(f, change = () => {}) {
         return clone(f.runs);
       }
       if (route === 'pulls') return [clone(f.pr)];
-      if (route.includes('/rulesets')) return [{ id: 1, name: policy.ruleset_name }];
+      if (route.includes('/rulesets')) return [{ id: ruleset.id, name: policy.ruleset_name }];
       assert.ok(route.includes('/attempts/{attempt_number}/jobs'));
       assert.equal(args.attempt_number, f.runs.find(r => r.id === args.run_id).run_attempt);
       return clone(f.jobs.get(args.run_id) || []);
     },
-    request: async route => ({ data: route.includes('/rules/branches/') ?
-      effective(clone(f.rules.rules)) : clone(f.rules) }),
-    graphql: async () => { writes.push('disable-auto-merge'); f.pr.auto_merge = null; }
+    request: async route => ({ data: route === 'GET /repos/{owner}/{repo}' ? clone(f.settings) :
+      route.includes('/rules/branches/') ? effective(clone(f.rules.rules)) : clone(f.rules) }),
+    graphql: async query => {
+      if (query.startsWith('query')) return { repository: { autoMergeAllowed: f.settings.allow_auto_merge } };
+      writes.push('disable-auto-merge'); f.pr.auto_merge = null;
+    }
   };
   const errors = [];
   return { github, writes, errors, core: { info() {}, setFailed: msg => errors.push(msg) } };
@@ -205,6 +209,99 @@ test('checks from another effective ruleset cannot prove the no-bypass ruleset a
   assert.equal(protectedBy(ruleset, ruleset.rules.map(rule => ({ ...rule, ruleset_id: 2 }))), false);
 });
 
+test('hidden bypass actors require the exact admin-verified ruleset revision', () => {
+  const hidden = clone(ruleset); delete hidden.bypass_actors;
+  hidden.updated_at = '2026-10-04T16:55:29.575+02:00';
+  assert.equal(protectedBy(hidden, effective(hidden.rules)), true);
+  for (const mutate of [r => r.id++, r => delete r.updated_at,
+    r => r.updated_at = '2026-10-04T16:55:29.576+02:00',
+    r => r.updated_at = 'invalid', r => r.bypass_actors = null,
+    r => r.bypass_actors = {}, r => r.bypass_actors = [{ actor_id: 5 }]]) {
+    const changed = clone(hidden); mutate(changed);
+    assert.equal(protectedBy(changed, effective(changed.rules)), false);
+  }
+  assert.equal(protectedBy(hidden, effective(hidden.rules), {}), false);
+});
+
+test('all green with the real read-only ruleset shape merges the exact current head', async () => {
+  const f = fixture(); delete f.rules.bypass_actors;
+  const c = await attempt(f);
+  assert.equal(c.merged, true);
+  assert.deepEqual(c.writes, [{ ...repo, pull_number: 999, sha: 'head-a', merge_method: 'squash' }]);
+});
+
+test('changed protection revision cannot merge even with a visible empty bypass list', async () => {
+  const f = fixture();
+  const c = await attempt(f, (state, reads) => {
+    if (reads === 2) state.rules.updated_at = '2026-10-06T11:00:00Z';
+  });
+  assert.equal(c.merged, false); assert.deepEqual(c.writes, []);
+});
+
+test('native auto-merge enabled, missing, or re-enabled during inspection blocks merge', async () => {
+  for (const value of [true, null, undefined]) {
+    const f = fixture(); f.settings.allow_auto_merge = value;
+    const c = await attempt(f);
+    assert.equal(c.merged, false); assert.deepEqual(c.writes, []);
+  }
+  const f = fixture();
+  const c = await attempt(f, (state, reads) => {
+    if (reads === 2) state.settings.allow_auto_merge = true;
+  });
+  assert.equal(c.merged, false); assert.deepEqual(c.writes, []);
+});
+
+test('unreadable repository settings fail closed', async () => {
+  const f = fixture(); const c = client(f);
+  c.github.graphql = async () => { throw new Error('403 repository metadata'); };
+  await run({ ...c, context: { repo, eventName: 'pull_request_target', payload: { pull_request: f.pr } } });
+  assert.equal(c.errors.length, 1); assert.deepEqual(c.writes, []);
+});
+
+test('red or skipped CI stays blocked when bypass actors are hidden', async () => {
+  for (const conclusion of ['failure', 'skipped', 'neutral']) {
+    const f = fixture(); delete f.rules.bypass_actors; f.runs[0].conclusion = conclusion;
+    const c = await attempt(f);
+    assert.equal(c.merged, false); assert.deepEqual(c.writes, []);
+  }
+});
+
+function administrativeClient(mutate = () => {}) {
+  const writes = [];
+  let current = { ...clone(ruleset), source: repository };
+  let settings = { allow_auto_merge: true };
+  const api = (endpoint, method = 'GET', body) => {
+    if (method === 'PATCH') { writes.push({ method, body: clone(body) }); settings = clone(body); }
+    if (method === 'PUT') {
+      writes.push({ method, body: clone(body) });
+      current = { ...clone(body), id: ruleset.id, updated_at: '2026-10-06T11:00:00.123Z' };
+    }
+    mutate({ current, settings, method, endpoint });
+    if (endpoint.endsWith('/rules/branches/main')) return effective(current.rules);
+    if (endpoint.includes('/rulesets?')) return [{ id: current.id, name: current.name, source: repository }];
+    if (endpoint.includes('/rulesets/')) return clone(current);
+    return clone(settings);
+  };
+  return { api, writes };
+}
+
+test('administrative apply disables native auto-merge before rules and returns a fresh attestation', () => {
+  const c = administrativeClient();
+  assert.deepEqual(apply(c.api), { id: ruleset.id, updated_at: '2026-10-06T11:00:00.123Z' });
+  assert.deepEqual(c.writes[0], { method: 'PATCH', body: { allow_auto_merge: false } });
+  assert.equal(c.writes[1].method, 'PUT');
+});
+
+test('administrative apply refuses failed setting readback and uninspectable bypass actors', () => {
+  const enabled = administrativeClient(({ settings }) => settings.allow_auto_merge = true);
+  assert.throws(() => apply(enabled.api), /disable readback failed/);
+  assert.equal(enabled.writes.length, 1);
+  const hidden = administrativeClient(({ current, method }) => {
+    if (method === 'PUT') delete current.bypass_actors;
+  });
+  assert.throws(() => apply(hidden.api), /readback failed/);
+});
+
 test('missing protection, API error or changed protection never merges', async () => {
   const f = fixture(); const c = client(f);
   c.github.paginate = async () => [];
@@ -234,13 +331,17 @@ test('workflow_run with no associated PRs sweeps open bot PRs', async () => {
 
 test('ruleset contexts and completion triggers stay synchronized with policy', () => {
   const rules = ruleset.rules.find(r => r.type === 'required_status_checks');
-  assert.deepEqual(rules.parameters.required_status_checks.map(c => c.context), requiredContexts);
-  const workflow = fs.readFileSync(path.join(__dirname, '../workflows/Auto-merge-Dependabot.yml'), 'utf8');
+  const pairs = checks => checks.map(c => JSON.stringify([c.context, c.integration_id])).sort();
+  assert.deepEqual(pairs(rules.parameters.required_status_checks),
+    pairs(requiredContexts.map(context => ({ context, integration_id: policy.integration_id }))));
+  assert.equal(new Set(requiredContexts).size, requiredContexts.length);
+  const workflow = fs.readFileSync(path.join(__dirname, '../workflows/Auto-merge-Dependabot.yml'), 'utf8').replace(/\r\n/g, '\n');
   for (const w of Object.values(policy.workflows)) assert.ok(workflow.includes(`      - ${w.name}\n`));
   assert.ok(workflow.includes('ref: ${{ github.sha }}'));
   assert.ok(workflow.includes('persist-credentials: false'));
   assert.ok(!workflow.includes('enable-pull-request-automerge'));
   assert.ok(!workflow.includes('github.event.pull_request.head.sha'));
+  assert.ok(workflow.includes('auto_merge_enabled'));
   const modern = fs.readFileSync(path.join(__dirname, '../workflows/python-modernization.yml'), 'utf8');
   const enforcement = modern.split('name: Enforce strict failure when checks did not pass')[1];
   assert.ok(enforcement.includes('exit 1'));
