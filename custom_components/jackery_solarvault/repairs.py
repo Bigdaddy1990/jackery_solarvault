@@ -3,10 +3,12 @@
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
+import voluptuous as vol
+
 from homeassistant import data_entry_flow
 from homeassistant.components.repairs import RepairsFlow
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN, REPAIR_ISSUE_DEVICE_NOT_ACTIVATED
 from .coordinator import BACKGROUND_TASK_ERRORS, JackerySolarVaultCoordinator
@@ -47,31 +49,47 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
         user_input: dict[str, Any] | None = None,
     ) -> data_entry_flow.FlowResult:
         """Show the confirmation form and refresh cloud data after submit."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            await self._async_force_refresh()
-            return cast(
-                "data_entry_flow.FlowResult",
-                self.async_create_entry(data={}),
-            )
+            if (error := await self._async_force_refresh()) is None:
+                return cast(
+                    "data_entry_flow.FlowResult",
+                    self.async_create_entry(data={}),
+                )
+            errors["base"] = error
         return cast(
             "data_entry_flow.FlowResult",
             self.async_show_form(
                 step_id="confirm",
-                data_schema=type(cv.PLATFORM_SCHEMA)({}),
+                data_schema=vol.Schema({}),
                 description_placeholders=self._description_placeholders,
+                errors=errors,
             ),
         )
 
-    async def _async_force_refresh(self) -> None:
+    async def _async_force_refresh(self) -> str | None:
+        """Return a retryable error until a completed refresh resolves the issue."""
         coordinator = self._coordinator()
         if coordinator is None:
-            return
+            return "integration_unavailable"
         try:
-            await coordinator.async_request_refresh()
+            # A debounced request may return before the next update runs.
+            await coordinator.async_refresh()
         except ConfigEntryAuthFailed:
             raise
         except BACKGROUND_TASK_ERRORS as err:
             _LOGGER.debug("Force refresh from repair flow failed: %s", err)
+            return "refresh_failed"
+        if not coordinator.last_update_success:
+            return "refresh_failed"
+        if (
+            ir.async_get(self.hass).async_get_issue(
+                DOMAIN, getattr(self, "issue_id", "")
+            )
+            is not None
+        ):
+            return "issue_still_present"
+        return None
 
     def _coordinator(self) -> JackerySolarVaultCoordinator | None:
         if not self._entry_id:

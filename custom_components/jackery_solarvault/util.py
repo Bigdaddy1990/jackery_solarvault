@@ -1,5 +1,6 @@
 """Shared helpers for Jackery SolarVault entities."""
 
+import asyncio
 import calendar
 import contextlib
 from dataclasses import dataclass
@@ -12,6 +13,8 @@ import os
 from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, cast
+
+from homeassistant.core import callback
 
 from .const import (
     APP_CHART_LABELS,
@@ -130,7 +133,13 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Coroutine, Mapping, Sequence
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity import Entity
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -576,6 +585,64 @@ def append_unique_entity[EntityT](
         seen_unique_ids.add(uid)
     entities.append(entity)
     return True
+
+
+@callback
+def async_setup_entity_discovery(
+    entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[dict[str, Any]],
+    collect_entities: Callable[[], Sequence[Entity]],
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Register ordinary platform discovery and bind its listener to entry unload."""
+    last_signature: tuple[Any, ...] = ()
+
+    @callback
+    def _add_new_entities() -> None:
+        nonlocal last_signature
+        signature = coordinator_entity_signature(coordinator.data)
+        if signature == last_signature:
+            return
+        last_signature = signature
+        entities = collect_entities()
+        if entities:
+            async_add_entities(entities)
+
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+
+
+def get_store_lock(hass: HomeAssistant, key: str) -> asyncio.Lock:
+    """Reuse one runtime lock per Store key without coupling independent stores."""
+    lock = hass.data.get(key)
+    if not isinstance(lock, asyncio.Lock):
+        lock = asyncio.Lock()
+        hass.data[key] = lock
+    return lock
+
+
+@callback
+def async_create_message_task(
+    hass: HomeAssistant,
+    entry: ConfigEntry | None,
+    operation: Coroutine[Any, Any, None],
+    *,
+    name: str,
+) -> asyncio.Task[None]:
+    """Keep MQTT work entry-owned and defer execution until FIFO state is set."""
+    if entry is not None:
+        return entry.async_create_task(hass, operation, name=name, eager_start=False)
+    return hass.async_create_task(operation, name=name, eager_start=False)
+
+
+def standby_is_on(raw: bool | float | str | None) -> bool | None:
+    """Interpret manual standby mode one without treating other modes as true."""
+    if raw is None:
+        return None
+    parsed = first_nonblank_int(raw)
+    if parsed is None:
+        return safe_bool(raw)
+    return parsed == 1
 
 
 def validate_app_period_date_type(date_type: str) -> str:
@@ -1897,6 +1964,15 @@ def chart_value_for_day(
     return safe_float(values[index])
 
 
+def _complete_year_series_total(
+    values: list[float | None], scalar: float | None
+) -> float | None:
+    """Sum twelve known months; an incomplete chart needs a separate scalar."""
+    if len(values) != _MONTHS_PER_YEAR or any(value is None for value in values):
+        return scalar
+    return round(sum(value for value in values if value is not None), 2)
+
+
 def effective_period_total_value(
     source: dict[str, Any],
     section: str,
@@ -1906,9 +1982,10 @@ def effective_period_total_value(
 
     Resolve the total within the given period section.
 
-    When the section represents a device year period, uses the section's trend-series
-    values (expanded when applicable) and returns their sum rounded to 2 decimals;
-    otherwise returns the parsed scalar value found at `stat_key`.
+    Device-year charts are summed only with twelve known monthly values. An
+    incomplete chart uses only an independent scalar; a complete zero-placeholder
+    chart retains the existing positive-scalar fallback. Other periods return the
+    parsed scalar value found at ``stat_key``.
 
     Returns:
         float: The period total rounded to 2 decimals when available, `None` if no value
@@ -1916,19 +1993,24 @@ def effective_period_total_value(
     """
     if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
         values = effective_trend_series_values(source, section, stat_key)
-        if not values or any(value is None for value in values):
+        if (
+            not values
+            or any(value is None for value in values)
+            or (
+                _trend_date_type(section, source) == DATE_TYPE_YEAR
+                and len(values) != _MONTHS_PER_YEAR
+            )
+        ):
             return None
         return round(sum(value for value in values if value is not None), 2)
     if is_device_year_period_section(source, section):
         values = effective_trend_series_values(source, section, stat_key)
         if values is not None:
-            series_total = round(sum(value for value in values if value is not None), 2)
             direct_total = safe_float(source.get(stat_key))
+            series_total = _complete_year_series_total(values, direct_total)
             if series_total or direct_total is None:
                 return series_total
-            if direct_total > 0:
-                return direct_total
-            return series_total
+            return direct_total if direct_total > 0 else series_total
     return safe_float(source.get(stat_key))
 
 
@@ -2021,10 +2103,19 @@ def _month_value(
     month_section: str,
     stat_key: str,
 ) -> float | None:
+    """Use a complete monthly curve or an independently valid monthly scalar."""
+    unit_scale = app_energy_unit_scale(month_source)
+    if unit_scale is None:
+        return None
+    values = effective_trend_series_values(month_source, month_section, stat_key)
+    if values is not None and any(value is None for value in values):
+        scalar = effective_period_total_value(month_source, month_section, stat_key)
+        return scalar * unit_scale if scalar is not None else None
     value = trend_series_total(month_source, month_section, stat_key)
     if value is not None:
         return value
-    return safe_float(month_source.get(stat_key))
+    scalar = effective_period_total_value(month_source, month_section, stat_key)
+    return scalar * unit_scale if scalar is not None else None
 
 
 def _pv_revenue_value(source: dict[str, Any]) -> float | None:
@@ -2315,12 +2406,9 @@ def _backfill_pv_revenue(
 ) -> None:
     """Backfill yearly PV revenue fields from monthly values.
 
-    Apply the derived total when it differs from the yearly source.
-
-    Iterates `month_sources` (keys 1-12) to collect per-month PV revenue values, sums
-    them, and - if the derived monthly total exceeds the yearly `year_source` total
-    beyond the computed tolerance - writes corrected values into `out` and records
-    metadata in `meta`.
+    Keep known yearly revenue buckets and fill only observed monthly values.
+    Unreported months remain ``None``. Replace annual revenue and profit only when
+    all twelve buckets are known and their sum exceeds the independent year total.
 
     Parameters:
         out (dict[str, Any]): Mutable output payload to update with corrected yearly PV
@@ -2337,7 +2425,16 @@ def _backfill_pv_revenue(
         - May set total revenue, PV profit and chart series ``y6``.
         - May add correction details under `meta["corrected"]["totalSolarRevenue"]`.
     """
-    revenue_values = [0.0 for _ in range(12)]
+    raw_series = year_source.get(APP_CHART_SERIES_Y6)
+    raw_values = (
+        [
+            None if (value := safe_float(raw)) is None else value / 10_000_000
+            for raw in raw_series[:12]
+        ]
+        if isinstance(raw_series, list)
+        else []
+    )
+    revenue_values = raw_values + [None] * (12 - len(raw_values))
     found_months: list[int] = []
     for month, month_source in sorted(month_sources.items()):
         if month < 1 or month > _MONTHS_PER_YEAR:
@@ -2345,28 +2442,54 @@ def _backfill_pv_revenue(
         revenue = _pv_revenue_value(month_source)
         if revenue is None:
             continue
-        revenue_values[month - 1] = round(revenue, 5)
+        previous = revenue_values[month - 1]
+        revenue_values[month - 1] = round(
+            revenue if previous is None else max(previous, revenue), 5
+        )
         found_months.append(month)
     if not found_months:
         return
 
-    monthly_total = round(sum(revenue_values), 2)
     raw_total = _pv_revenue_value(year_source)
-    if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-        raw_total, monthly_total
-    ):
+    missing_months = [
+        index + 1 for index, value in enumerate(revenue_values) if value is None
+    ]
+    monthly_total = round(
+        sum(value for value in revenue_values if value is not None), 2
+    )
+    replace_total = not missing_months and (
+        raw_total is None
+        or monthly_total > raw_total + _tolerance_for_values(raw_total, monthly_total)
+    )
+    if not replace_total and revenue_values == raw_values:
         return
 
-    out["totalSolarRevenue"] = monthly_total
-    out["pvProfit"] = round(monthly_total * 10_000_000, 1)
+    if replace_total:
+        out["totalSolarRevenue"] = monthly_total
+        out["pvProfit"] = round(monthly_total * 10_000_000, 1)
     out[APP_CHART_SERIES_Y6] = [
-        round(value * 10_000_000, 1) for value in revenue_values
+        None if value is None else round(value * 10_000_000, 1)
+        for value in revenue_values
     ]
     meta.setdefault("corrected", {})["totalSolarRevenue"] = {
         "raw_total": raw_total,
-        "corrected_total": monthly_total,
+        "corrected_total": monthly_total if replace_total else raw_total,
         "months": found_months,
+        "missing_months": missing_months,
     }
+
+
+def _year_backfill_total_baseline(
+    source: dict[str, Any], section: str, stat_key: str
+) -> float | None:
+    """Protect existing annual scalars without changing chart-authoritative reads."""
+    total = effective_period_total_value(source, section, stat_key)
+    scalar = safe_float(source.get(stat_key))
+    if scalar is None or pv_channel_scalar_is_lifetime_offset(
+        source, section, stat_key
+    ):
+        return total
+    return max(total, scalar) if total is not None else scalar
 
 
 def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
@@ -2380,9 +2503,9 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
     Apply corrections when monthly data show incomplete or inconsistent year totals.
 
     For each requested statistic key this function:
-    - Collects up to 12 monthly values from provided month_sources.
-    - Replaces an incomplete year total only when monthly data exceed it beyond
-      tolerance, then records correction metadata.
+    - Fills reported months while retaining known yearly buckets and missing values.
+    - Replaces a year total only with twelve known buckets exceeding the independent
+      scalar beyond tolerance; partial chart repairs retain the scalar unchanged.
     - Adds aliases for corrected PV, grid and discharge totals.
 
     Behavior notes:
@@ -2407,7 +2530,8 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
 
     year_section = _period_section(section_prefix, DATE_TYPE_YEAR)
     month_section = _period_section(section_prefix, DATE_TYPE_MONTH)
-    if app_energy_unit_scale(year_source) is None:
+    unit_scale = app_energy_unit_scale(year_source)
+    if unit_scale is None:
         return year_source
 
     out = dict(year_source)
@@ -2424,12 +2548,8 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
             continue
 
         raw_values = effective_trend_series_values(year_source, year_section, stat_key)
-        monthly_values = (
-            [round(value or 0.0, 5) for value in raw_values[:12]]
-            if isinstance(raw_values, list)
-            else [0.0 for _ in range(12)]
-        )
-        monthly_values.extend([0.0] * (12 - len(monthly_values)))
+        monthly_values = list(raw_values[:12]) if isinstance(raw_values, list) else []
+        monthly_values.extend([None] * (12 - len(monthly_values)))
         found_months: list[int] = []
         for month, month_source in sorted(month_sources.items()):
             if month < 1 or month > _MONTHS_PER_YEAR:
@@ -2437,38 +2557,48 @@ def backfill_year_payload_from_months(  # ruff: ignore[too-many-branches]
             value = _month_value(month_source, month_section, stat_key)
             if value is None:
                 continue
-            monthly_values[month - 1] = round(max(monthly_values[month - 1], value), 5)
+            value /= unit_scale
+            previous = monthly_values[month - 1]
+            monthly_values[month - 1] = round(
+                value if previous is None else max(previous, value), 5
+            )
             found_months.append(month)
         if not found_months:
             continue
 
-        monthly_total = round(sum(monthly_values), 2)
-        raw_total = (
-            round(sum(value for value in raw_values if value is not None), 2)
-            if isinstance(raw_values, list)
-            else safe_float(year_source.get(stat_key))
+        monthly_total = round(
+            sum(value for value in monthly_values if value is not None), 2
         )
-        if raw_total is not None and monthly_total <= raw_total + _tolerance_for_values(
-            raw_total, monthly_total
-        ):
+        raw_total = _year_backfill_total_baseline(year_source, year_section, stat_key)
+        missing_months = [
+            index + 1 for index, value in enumerate(monthly_values) if value is None
+        ]
+        replace_total = not missing_months and (
+            raw_total is None
+            or monthly_total
+            > raw_total + _tolerance_for_values(raw_total, monthly_total)
+        )
+        if not replace_total and monthly_values == raw_values:
             continue
 
         out[series_key] = monthly_values
-        out[stat_key] = monthly_total
-        if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
-            out["pvEgy"] = monthly_total
-        elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
-            out["inOngridEgy"] = monthly_total
-        elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
-            out["outOngridEgy"] = monthly_total
-        elif stat_key == APP_STAT_TOTAL_DISCHARGE:
-            out["batOtGridEgy"] = monthly_total
+        if replace_total:
+            out[stat_key] = monthly_total
+            if stat_key == APP_STAT_TOTAL_SOLAR_ENERGY:
+                out["pvEgy"] = monthly_total
+            elif stat_key == APP_STAT_TOTAL_IN_GRID_ENERGY:
+                out["inOngridEgy"] = monthly_total
+            elif stat_key == APP_STAT_TOTAL_OUT_GRID_ENERGY:
+                out["outOngridEgy"] = monthly_total
+            elif stat_key == APP_STAT_TOTAL_DISCHARGE:
+                out["batOtGridEgy"] = monthly_total
 
         meta.setdefault("corrected", {})[stat_key] = {
             "raw_total": raw_total,
-            "corrected_total": monthly_total,
+            "corrected_total": monthly_total if replace_total else raw_total,
             "series_key": series_key,
             "months": found_months,
+            "missing_months": missing_months,
         }
 
     if section_prefix in {APP_SECTION_PV_STAT, APP_SECTION_PV_TRENDS}:
@@ -2717,6 +2847,53 @@ def _day_power_sample_minute(
             return minute
     minute = index * 5
     return minute if 0 <= minute < 24 * 60 else None
+
+
+def supplement_pv_day_curve(
+    source: dict[str, Any], fallback: dict[str, Any]
+) -> dict[str, Any]:
+    """Align a missing aggregate PV curve with independently measured channels."""
+    series = {
+        key: values
+        for key, values in source.items()
+        if (key == APP_CHART_SERIES_Y or (key.startswith("y") and key[1:].isdigit()))
+        and isinstance(values, list)
+    }
+    if not any(
+        safe_float(value) is not None for values in series.values() for value in values
+    ):
+        return {**source, **fallback}
+    source_unit = str(source.get(APP_STAT_UNIT) or "W").strip().lower()
+    fallback_unit = str(fallback.get(APP_STAT_UNIT) or "W").strip().lower()
+    if source_unit != fallback_unit:
+        return source
+    aligned: dict[str, dict[int, Any]] = {}
+    for payload, curves in (
+        (source, series),
+        (fallback, {APP_CHART_SERIES_Y: fallback[APP_CHART_SERIES_Y]}),
+    ):
+        raw_labels = payload.get(APP_CHART_LABELS)
+        labels = raw_labels if isinstance(raw_labels, list) else None
+        for key, values in curves.items():
+            samples: dict[int, Any] = {}
+            for index, value in enumerate(values):
+                minute = (
+                    _parse_day_chart_minute(labels[index])
+                    if labels is not None and index < len(labels)
+                    else None
+                )
+                if minute is None or minute in samples:
+                    return source
+                samples[minute] = value
+            aligned[key] = samples
+    minutes = sorted({minute for samples in aligned.values() for minute in samples})
+    merged = {**source, **fallback}
+    merged[APP_CHART_LABELS] = [
+        f"{minute // 60:02}:{minute % 60:02}" for minute in minutes
+    ]
+    for key, samples in aligned.items():
+        merged[key] = [samples.get(minute) for minute in minutes]
+    return merged
 
 
 def _day_power_sample_energy_value(
@@ -3861,10 +4038,11 @@ def trend_series_total(  # ruff: ignore[too-many-return-statements]
             return None
         return round(total, 2) if total is not None else None
 
-    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key):
-        values = effective_trend_series_values(source, section, stat_key)
-        if not values or any(value is None for value in values):
-            return None
+    values = effective_trend_series_values(source, section, stat_key) or []
+    if pv_channel_scalar_is_lifetime_offset(source, section, stat_key) and (
+        not values or any(value is None for value in values)
+    ):
+        return None
 
     series_key = trend_series_key(section, stat_key)
     if not series_key:
@@ -3890,7 +4068,10 @@ def trend_series_total(  # ruff: ignore[too-many-return-statements]
             return round(server_total * unit_scale, 2)
         return None
 
-    values = effective_trend_series_values(source, section, stat_key) or []
+    if _trend_date_type(section, source) == DATE_TYPE_YEAR:
+        server_total = effective_period_total_value(source, section, stat_key)
+        year_total = _complete_year_series_total(values, server_total)
+        return round(year_total * unit_scale, 2) if year_total is not None else None
     valid_values = [v for v in values if v is not None]
 
     if not valid_values:
@@ -3956,7 +4137,7 @@ def trend_series_has_value(  # ruff: ignore[too-many-return-statements]
         if is_ct_eps and server_total is not None and server_total >= 0:
             # Check if we have any series data at all
             series = source.get(series_key) if series_key else None
-            if isinstance(series, list) and len(series) == 0:
+            if isinstance(series, list) and not series:
                 # Empty series but valid total - this is a valid no-chart-data case
                 return True
         return False

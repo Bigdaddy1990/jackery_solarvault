@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
-from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 
 from .client import JackeryAuthError
@@ -69,7 +68,7 @@ from .descriptions.select import (
 from .entity import JackeryEntity, payload_properties_for_sources
 from .util import (
     append_unique_entity,
-    coordinator_entity_signature,
+    async_setup_entity_discovery,
     is_portable_payload as _is_portable_payload,
 )
 
@@ -239,9 +238,6 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entities: list[SelectEntity], entity: SelectEntity) -> None:
-        append_unique_entity(entities, seen_unique_ids, entity)
-
     # Gating predicates per description key. Each predicate returns True when
     # the device is known to expose / accept the corresponding selector.
     def _gate(key: str, payload: dict[str, Any], supports_advanced: bool) -> bool:
@@ -297,25 +293,13 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                     payload,
                     supports_advanced,
                 ):
-                    _append_unique(
+                    append_unique_entity(
                         entities,
+                        seen_unique_ids,
                         JackerySelect(coordinator, dev_id, description),
                     )
         return entities
 
-    last_signature: tuple[Any, ...] = ()
-
-    @callback
-    def _add_new_entities() -> None:
-        """Register selects discovered after a payload-signature change."""
-        nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
-        if sig == last_signature:
-            return
-        last_signature = sig
-        entities = _collect_entities()
-        if entities:
-            async_add_entities(entities)
-
-    _add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    async_setup_entity_discovery(
+        entry, coordinator, _collect_entities, async_add_entities
+    )

@@ -104,8 +104,9 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     App 2.4.0 distinguishes its pagination format from byte-fragment
     transport framing. Live SolarVault notifications confirm that each
     numbered page can contain an independently decodable command body, while
-    later page numbers are not guaranteed to arrive. Only bodies that are not
-    complete JSON objects need byte reassembly.
+    later page numbers are not guaranteed to arrive. A complete nested JSON
+    object can also be one fragment of a larger body; pending byte assemblies
+    must therefore take precedence over this standalone-page fast path.
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
@@ -170,6 +171,7 @@ class BleFrameObservation:
     session_generation: int | None = None
     notify_sequence: int | None = None
     delivery_id: str | None = None
+    is_fragment: bool = False
 
 
 @dataclass(slots=True)
@@ -2431,6 +2433,59 @@ class JackeryBleListener:
         stats.last_decode_error = error
         stats.last_error = error
 
+    def _continues_pending_assembly(
+        self,
+        device_id: str,
+        frame: ble.BleBinaryFrame,
+        session: _GattSession | None,
+        received_monotonic: float | None,
+    ) -> bool:
+        """Recognize an owned, unexpired continuation before treating JSON as a page."""
+        assembly = self._frame_assemblies.get(device_id, {}).get((
+            frame.cmd,
+            frame.flags,
+        ))
+        if (
+            frame.frame_index <= 1
+            or assembly is None
+            or assembly.chunk_count != frame.chunk_count
+            or 1 not in assembly.frames
+        ):
+            return False
+        if session is not None and (
+            self._frame_assembly_owners.get(device_id) is not session
+        ):
+            return False
+        now = (
+            received_monotonic
+            if received_monotonic is not None
+            else self._hass.loop.time()
+        )
+        return now - assembly.updated_at <= _REASSEMBLY_TIMEOUT_SEC
+
+    def _reset_assembly_for_standalone_page(
+        self,
+        device_id: str,
+        frame: ble.BleBinaryFrame,
+        session: _GattSession | None,
+    ) -> None:
+        """Release only the owned stale prefix superseded by a new page one."""
+        if frame.frame_index != 1 or (
+            session is not None
+            and self._frame_assembly_owners.get(device_id) is not session
+        ):
+            return
+        pending = self._frame_assemblies.get(device_id, {})
+        if pending.pop((frame.cmd, frame.flags), None) is None:
+            return
+        stats = self.stats_for(device_id)
+        self._record_multi_chunk_drop_reason(
+            stats, frame.cmd, "standalone_page_restart"
+        )
+        stats.multi_chunk_assemblies_dropped += 1
+        if not pending:
+            self._clear_frame_assemblies(device_id, session)
+
     async def _handle_notification(  # ruff: ignore[too-many-arguments]
         self,
         device_id: str,
@@ -2487,7 +2542,12 @@ class JackeryBleListener:
 
         if parsed is not None:
             assembled: ble.BleBinaryFrame | None
-            if _body_is_complete_json_object(parsed.body):
+            if _body_is_complete_json_object(
+                parsed.body
+            ) and not self._continues_pending_assembly(
+                device_id, parsed, session, received_monotonic
+            ):
+                self._reset_assembly_for_standalone_page(device_id, parsed, session)
                 assembled = parsed
             else:
                 try:
@@ -2514,6 +2574,7 @@ class JackeryBleListener:
                         session_generation=session_generation,
                         notify_sequence=notify_sequence,
                         delivery_id=delivery_id,
+                        is_fragment=True,
                     )
                     stats.last_frame = observation
                     # A fragment reaches diagnostics immediately but resolves no
