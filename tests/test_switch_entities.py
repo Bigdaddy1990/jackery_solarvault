@@ -124,6 +124,7 @@ async def test_turn_on_forwards_true() -> None:
 
     await entity.async_turn_on()
 
+    assert isinstance(entity.coordinator.async_set_eps, AsyncMock)
     entity.coordinator.async_set_eps.assert_awaited_once_with(_DEVICE_ID, True)
 
 
@@ -135,6 +136,7 @@ async def test_turn_off_forwards_false() -> None:
 
     await entity.async_turn_off()
 
+    assert isinstance(entity.coordinator.async_set_eps, AsyncMock)
     entity.coordinator.async_set_eps.assert_awaited_once_with(_DEVICE_ID, False)
 
 
@@ -146,7 +148,9 @@ async def test_portable_switch_routes_through_toggle_output() -> None:
 
     await entity.async_turn_on()
 
+    assert isinstance(entity.coordinator.async_portable_toggle_output, AsyncMock)
     entity.coordinator.async_portable_toggle_output.assert_awaited_once()
+    assert isinstance(entity.coordinator.async_portable_toggle_output, AsyncMock)
     _args, kwargs = entity.coordinator.async_portable_toggle_output.call_args
     assert kwargs["action_id"] == 10  # ACTION_ID_PORTABLE_OUTPUT_DC  # ruff: ignore[magic-value-comparison]
     assert kwargs["field"] == "odc"
@@ -240,6 +244,7 @@ async def test_local_smart_plug_routes_by_serial() -> None:
 
     await entity.async_turn_on()
 
+    assert isinstance(entity.coordinator.async_set_smart_plug_switch, AsyncMock)
     entity.coordinator.async_set_smart_plug_switch.assert_awaited_once_with(
         _DEVICE_ID,
         plug_sn="SN-PLUG-1",
@@ -260,6 +265,7 @@ async def test_cloud_shelly_plug_routes_through_cloud_setter() -> None:
 
     await entity.async_turn_off()
 
+    assert isinstance(entity.coordinator.async_set_shelly_cloud_switch, AsyncMock)
     entity.coordinator.async_set_shelly_cloud_switch.assert_awaited_once_with(
         _DEVICE_ID,
         shelly_device_id="shelly-123",
@@ -281,6 +287,7 @@ async def test_cloud_plug_without_control_permission_raises() -> None:
         await entity.async_turn_on()
 
     assert err.value.translation_key == "entity_action_failed"
+    assert isinstance(entity.coordinator.async_set_shelly_cloud_switch, AsyncMock)
     entity.coordinator.async_set_shelly_cloud_switch.assert_not_awaited()
 
 

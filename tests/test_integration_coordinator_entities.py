@@ -77,10 +77,11 @@ def _finalize_coordinator(
     data: dict[str, dict[str, object]],
 ) -> JackerySolarVaultCoordinator:
     """Set the current wrapper seam and clean constructor background hooks."""
-    poll_unsub = getattr(coordinator, "_poll_watchdog_unsub", None)
-    if poll_unsub is not None:
-        poll_unsub()
-        coordinator._poll_watchdog_unsub = None  # ruff: ignore[private-member-access]  # isort: skip
+    for name in ("_poll_watchdog_unsub", "_mqtt_poll_unsub"):
+        unsubscribe = getattr(coordinator, name, None)
+        if unsubscribe is not None:
+            unsubscribe()
+            setattr(coordinator, name, None)
     coordinator.data = data
     coordinator._async_update_data_with_timeout = AsyncMock(return_value=data)  # ruff: ignore[private-member-access]  # isort: skip
     return coordinator

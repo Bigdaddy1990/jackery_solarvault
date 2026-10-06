@@ -143,3 +143,5 @@ data:
 ## 📜 Lizenz
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](../LICENSE) Datei für Details.
+
+Normale Diagnoseexporte enthalten vollständige Geräte- und Systemkennungen, Seriennummern, Brokeradressen, MQTT-Benutzernamen und Client-IDs sowie MQTT-Topics. Passwörter, Tokens und kryptografische Schlüssel bleiben maskiert. Für Kennungen und Topics ist die Entwickler-Debugoption nicht erforderlich.

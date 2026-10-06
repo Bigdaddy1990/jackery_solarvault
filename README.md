@@ -144,3 +144,5 @@ data:
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Normal diagnostic exports include complete device/system identifiers, serial numbers, broker addresses, MQTT usernames/client IDs and MQTT topics. Passwords, tokens and cryptographic keys remain masked. The developer debug option is not required to export identifiers or topics.

@@ -77,6 +77,7 @@ def test_pack_cell_temperature_is_registered_from_complete_payload() -> None:
         for entity in collection.entities
         if entity.entity_description.key == "cell_temperature"
     )
+    assert isinstance(temperature, JackeryBatteryPackSensor)
     assert temperature._value_from_pack(pack) == pytest.approx(25.9)  # ruff: ignore[private-member-access]
 
 
@@ -236,7 +237,9 @@ def test_pack_firmware_version_updates_registered_device(
 
     sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
 
-    assert registry.async_get(device.id).sw_version == "1.4"
+    updated = registry.async_get(device.id)
+    assert isinstance(updated, dr.DeviceEntry)
+    assert updated.sw_version == "1.4"
 
 
 def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
@@ -516,10 +519,10 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
     _async_remove_phantom_battery_pack_devices(hass, entry)
 
     assert device_registry.async_get(serial_device.id) is not None
-    assert entry.entry_id in serial_device.config_entries
+    assert serial_device.config_entry_id == entry.entry_id
     removed_fallback = device_registry.async_get(numeric_device.id)
-    assert removed_fallback is None or entry.entry_id not in (
-        removed_fallback.config_entries
+    assert (
+        removed_fallback is None or removed_fallback.config_entry_id != entry.entry_id
     )
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
     for key, legacy_entity in numeric_entities.items():
@@ -636,7 +639,7 @@ def test_duplicate_legacy_serial_targets_keep_one_canonical_pack(
     assert serial_entity_id in {first_entity.entity_id, second_entity.entity_id}
     duplicate_id = ({first_device.id, second_device.id} - {serial_device.id}).pop()
     duplicate = device_registry.async_get(duplicate_id)
-    assert duplicate is None or entry.entry_id not in duplicate.config_entries
+    assert duplicate is None or duplicate.config_entry_id != entry.entry_id
 
 
 def test_registry_migration_skips_stored_live_serial_conflict(

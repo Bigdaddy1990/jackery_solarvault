@@ -280,7 +280,7 @@ async def test_publish_uses_compact_unicode_json_and_tracks_success(
         ("hb/app/user/action", '{"name":"Süd","enabled":true}', 1, True)
     ]
     snapshot = client.diagnostics_snapshot()
-    assert snapshot["last_published_topic"] == "hb/app/**REDACTED**/action"
+    assert snapshot["last_published_topic"] == "hb/app/user/action"
     assert snapshot["last_publish_at"] is not None
 
 

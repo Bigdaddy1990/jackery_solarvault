@@ -27,29 +27,27 @@ def test_local_and_third_party_mqtt_credentials_redacted_from_options() -> None:
     """
     entry = SimpleNamespace(
         options={
-            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.50",
-            CONF_THIRD_PARTY_MQTT_USERNAME: "mqtt-user",
-            CONF_THIRD_PARTY_MQTT_PASSWORD: "super-secret",
-            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.60",  # ruff: ignore[multi-value-repeated-key-variable]
-            CONF_THIRD_PARTY_MQTT_USERNAME: "third-party-user",  # ruff: ignore[multi-value-repeated-key-variable]
-            CONF_THIRD_PARTY_MQTT_PASSWORD: "third-party-secret",  # ruff: ignore[multi-value-repeated-key-variable]
+            CONF_THIRD_PARTY_MQTT_IP: "192.168.1.60",
+            CONF_THIRD_PARTY_MQTT_USERNAME: "third-party-user",
+            CONF_THIRD_PARTY_MQTT_PASSWORD: "third-party-secret",
             CONF_THIRD_PARTY_MQTT_TOKEN: "third-party-token",
         },
     )
 
     redacted = async_redact_data(dict(entry.options), active_redact_keys())
 
-    assert redacted[CONF_THIRD_PARTY_MQTT_IP] == REDACTED
-    assert redacted[CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
-    assert redacted[CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
-    assert redacted[CONF_THIRD_PARTY_MQTT_IP] == REDACTED
-    assert redacted[CONF_THIRD_PARTY_MQTT_USERNAME] == REDACTED
+    assert redacted[CONF_THIRD_PARTY_MQTT_IP] == entry.options[CONF_THIRD_PARTY_MQTT_IP]
+    assert (
+        redacted[CONF_THIRD_PARTY_MQTT_USERNAME]
+        == entry.options[CONF_THIRD_PARTY_MQTT_USERNAME]
+    )
     assert redacted[CONF_THIRD_PARTY_MQTT_PASSWORD] == REDACTED
     assert redacted[CONF_THIRD_PARTY_MQTT_TOKEN] == REDACTED
+    assert entry.options[CONF_THIRD_PARTY_MQTT_PASSWORD] == "third-party-secret"
 
 
 def test_redaction_key_contract_is_immutable_and_mandatory() -> None:
-    """The share-safe redaction key set cannot be cleared per config entry."""
+    """Normal exports use an immutable authentication-secret redaction set."""
     assert isinstance(REDACT_KEYS, frozenset)
     assert active_redact_keys() == REDACT_KEYS
     assert REDACT_KEYS

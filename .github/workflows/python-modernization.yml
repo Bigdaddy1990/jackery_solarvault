@@ -48,9 +48,9 @@ jobs:
         continue-on-error: true
         run: |
           set -e
+          # Includes the registered pyupgrade, autotyping, Ruff and Pyrefly hooks.
           pre-commit run --all-files
-          pre-commit run --hook-stage manual python-typing-update --all-files
-          python -m pyrefly custom_components/jackery_solarvault
+          python -m pyrefly check custom_components/jackery_solarvault
 
       - name: Determine auto-fix eligibility
         if: steps.initial_checks.outcome == 'failure'
@@ -70,7 +70,6 @@ jobs:
       - name: Apply modernization fixes
         if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix == 'true'
         run: |
-          pre-commit run --hook-stage manual python-typing-update --all-files || true
           pre-commit run --all-files || true
 
       - name: Commit and push modernization fixes
@@ -90,8 +89,7 @@ jobs:
         if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix == 'true'
         run: |
           pre-commit run --all-files
-          pre-commit run --hook-stage manual python-typing-update --all-files
-          python -m pyrefly custom_components/jackery_solarvault
+          python -m pyrefly check custom_components/jackery_solarvault
 
       - name: Enforce strict failure when checks did not pass
         if: steps.initial_checks.outcome == 'failure' && steps.autofix_guard.outputs.allow_autofix != 'true'

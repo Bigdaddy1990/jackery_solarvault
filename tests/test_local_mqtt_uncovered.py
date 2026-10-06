@@ -15,7 +15,6 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
-    REDACTED_VALUE,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -54,9 +53,9 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
     redacted = client.diagnostics_snapshot()
     plain = client.diagnostics_snapshot(redact=False)
     assert redacted["transport"] == "direct_mqtt"
-    assert redacted["configured_target"]["host"] == REDACTED_VALUE
+    assert redacted["configured_target"]["host"] == "192.0.2.10"
     assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
-    assert redacted["topic_filter"] == REDACTED_VALUE
+    assert redacted["topic_filter"] == "jackery/device/#"
     assert plain["topic_filter"] == "jackery/device/#"
     assert plain["qos"] == 2  # ruff: ignore[magic-value-comparison]
     assert plain["broker_connected"] is plain["connected"]

@@ -383,17 +383,20 @@ async def test_smart_plug_write_error_branches() -> None:
         translation_domain="jackery_solarvault",
         translation_key="already_translated",
     )
+    assert isinstance(entity.coordinator.async_set_smart_plug_switch, AsyncMock)
     entity.coordinator.async_set_smart_plug_switch.side_effect = translated
     with pytest.raises(HomeAssistantError) as err:
         await entity.async_turn_off()
     assert err.value is translated
 
+    assert isinstance(entity.coordinator.async_set_smart_plug_switch, AsyncMock)
     entity.coordinator.async_set_smart_plug_switch.side_effect = (
         switch_mod.JackeryAuthError("expired")
     )
     with pytest.raises(ConfigEntryAuthFailed):
         await entity.async_turn_on()
 
+    assert isinstance(entity.coordinator.async_set_smart_plug_switch, AsyncMock)
     entity.coordinator.async_set_smart_plug_switch.side_effect = TimeoutError("slow")
     with pytest.raises(HomeAssistantError) as err:
         await entity.async_turn_on()
@@ -411,6 +414,7 @@ async def test_priority_switch_state_write_and_errors() -> None:
     )
     assert entity.is_on is True
     await entity.async_turn_off()
+    assert isinstance(entity.coordinator.async_set_smart_plug_priority, AsyncMock)
     entity.coordinator.async_set_smart_plug_priority.assert_awaited_once_with(
         _DEVICE_ID,
         plug_sn="plug-1",
@@ -425,6 +429,7 @@ async def test_priority_switch_state_write_and_errors() -> None:
         await missing.async_turn_on()
     assert err.value.translation_key == "entity_action_failed"
 
+    assert isinstance(entity.coordinator.async_set_smart_plug_priority, AsyncMock)
     entity.coordinator.async_set_smart_plug_priority.side_effect = TimeoutError("slow")
     with pytest.raises(HomeAssistantError) as err:
         await entity.async_turn_on()
@@ -447,11 +452,13 @@ async def test_breaker_lookup_state_writes_metadata_and_attributes() -> None:
     assert entity.is_on is True
     await entity.async_turn_on()
     await entity.async_turn_off()
+    assert isinstance(entity.coordinator.async_set_breaker_switch, AsyncMock)
     assert entity.coordinator.async_set_breaker_switch.await_args_list[0].args == (
         _DEVICE_ID,
         "3",
         True,
     )
+    assert isinstance(entity.coordinator.async_set_breaker_switch, AsyncMock)
     assert entity.coordinator.async_set_breaker_switch.await_args_list[1].args == (
         _DEVICE_ID,
         "3",

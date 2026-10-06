@@ -120,6 +120,7 @@ async def test_island_auto_off_reads_minutes_and_writes_selected_hours() -> None
     assert entity.current_option == "h_2"
     await entity.async_select_option("h_8")
 
+    assert isinstance(entity.coordinator.async_set_off_grid_time, AsyncMock)
     entity.coordinator.async_set_off_grid_time.assert_awaited_once_with(
         _DEVICE_ID,
         480,
@@ -134,6 +135,7 @@ async def test_dynamic_price_mode_rejects_missing_provider_without_writing() -> 
         await entity.async_select_option("dynamic")
 
     assert error.value.translation_key == "dynamic_tariff_unavailable"
+    assert isinstance(entity.coordinator.async_set_price_mode_dynamic, AsyncMock)
     entity.coordinator.async_set_price_mode_dynamic.assert_not_awaited()
 
 
@@ -147,6 +149,7 @@ async def test_active_dynamic_price_mode_remains_selectable_without_sources() ->
     assert entity.current_option == "dynamic"
     await entity.async_select_option("dynamic")
 
+    assert isinstance(entity.coordinator.async_set_price_mode_dynamic, AsyncMock)
     entity.coordinator.async_set_price_mode_dynamic.assert_awaited_once_with(_DEVICE_ID)
 
 
@@ -172,6 +175,7 @@ async def test_price_provider_options_keep_current_and_write_offered_source() ->
     assert entity.options == ["Grid Eight (DE) #8", "Current Nine (AT) #9"]
     await entity.async_select_option("Grid Eight (DE) #8")
 
+    assert isinstance(entity.coordinator.async_set_price_source, AsyncMock)
     entity.coordinator.async_set_price_source.assert_awaited_once_with(
         _DEVICE_ID,
         offered,
@@ -189,6 +193,7 @@ async def test_ct_phase_write_requires_a_nonblank_meter_serial() -> None:
         await entity.async_select_option("phase_1")
 
     assert error.value.translation_key == "entity_action_failed"
+    assert isinstance(entity.coordinator.async_set_ct_phase, AsyncMock)
     entity.coordinator.async_set_ct_phase.assert_not_awaited()
 
 
@@ -299,7 +304,9 @@ async def test_portable_select_families_map_current_and_wire_values(  # ruff: ig
     assert entity.current_option == current_option
     await entity.async_select_option(option)
 
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_awaited_once()
+    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     _args, kwargs = entity.coordinator.async_portable_set_select.call_args
     assert kwargs["action_id"] == action_id
     assert kwargs["field"] == field

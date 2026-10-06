@@ -3657,8 +3657,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # ruff: ignore[unu
                     )
                 elif system_id := call.data.get(SERVICE_FIELD_SYSTEM_ID):
                     coordinator = _coordinator_for_system(hass, str(system_id))
-                if coordinator is not None:
-                    coordinator.config_entry.async_start_reauth(hass)
+                if (
+                    coordinator is not None
+                    and (entry := coordinator.config_entry) is not None
+                ):
+                    entry.async_start_reauth(hass)
                 raise
 
         return _handle
@@ -3669,7 +3672,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # ruff: ignore[unu
                 DOMAIN,
                 registration.name,
                 _make_handler(registration.handler),
-                schema=registration.schema,
+                schema=type(cv.PLATFORM_SCHEMA)(
+                    registration.schema.schema,
+                    extra=registration.schema.extra,
+                    required=registration.schema.required,
+                ),
                 supports_response=registration.supports_response,
             )
 

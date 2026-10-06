@@ -13,6 +13,8 @@ from custom_components.jackery_solarvault.const import (
 from custom_components.jackery_solarvault.descriptions.sensor import SENSOR_DESCRIPTIONS
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from custom_components.jackery_solarvault.sensor import JackerySensor
     from homeassistant.helpers.typing import StateType
 
@@ -25,7 +27,7 @@ def _description_value(
     *,
     merged_properties: dict[str, object] | None = None,
     payload: dict[str, object] | None = None,
-) -> StateType:
+) -> StateType | datetime:
     """Evaluate one migrated sensor description against a minimal entity stub."""
     description = next(item for item in SENSOR_DESCRIPTIONS if item.key == key)
     assert description.value_fn is not None
