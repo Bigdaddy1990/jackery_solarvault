@@ -1080,16 +1080,16 @@
         "name": "Dirección MAC"
       },
       "main_battery_charge_energy": {
-        "name": "Main battery lifetime charge energy"
+        "name": "Energía de carga de la batería principal desde la instalación (calculada)"
       },
       "main_battery_charge_energy_direct": {
-        "name": "Main battery lifetime charged energy"
+        "name": "Energía de carga acumulada de la batería principal"
       },
       "main_battery_discharge_energy": {
-        "name": "Main battery lifetime discharge energy"
+        "name": "Energía de descarga de la batería principal desde la instalación (calculada)"
       },
       "main_battery_discharge_energy_direct": {
-        "name": "Main battery lifetime discharged energy"
+        "name": "Energía de descarga acumulada de la batería principal"
       },
       "max_feed_grid_read": {
         "name": "Potencia máxima de inyección (runtime)"
@@ -2125,6 +2125,11 @@
   "issues": {
     "device_not_activated": {
       "fix_flow": {
+        "error": {
+          "integration_unavailable": "La integración de Jackery no está cargada. Restablécela antes de volver a intentarlo.",
+          "issue_still_present": "Jackery sigue notificando el problema de activación. Revisa el dispositivo en la aplicación de Jackery e inténtalo de nuevo.",
+          "refresh_failed": "La actualización de la nube ha fallado. El problema sigue abierto. Comprueba la conexión e inténtalo de nuevo."
+        },
         "step": {
           "confirm": {
             "description": "El dispositivo Jackery {device_id} reporta activated=0 en el sistema de nube. Es una señal de calidad de datos del lado de la nube, no una prueba de que el dispositivo no esté emparejado localmente. Algunos endpoints de tendencias, estadísticas e historial de Jackery pueden devolver datos vacíos o cero mientras la nube reporte esta señal.\n\nPara comprobarlo:\n1. Abra la aplicación móvil Jackery\n2. Confirme que el dispositivo esté registrado y aparezca como 'En línea'\n3. Vuelva aquí y fuerce una actualización de la nube\n\nEl problema de reparación se eliminará cuando la nube de Jackery reporte activated=1 o deje de devolver la señal inconsistente.",

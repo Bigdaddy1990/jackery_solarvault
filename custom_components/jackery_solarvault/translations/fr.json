@@ -1080,16 +1080,16 @@
         "name": "Adresse MAC"
       },
       "main_battery_charge_energy": {
-        "name": "Main battery lifetime charge energy"
+        "name": "Énergie de charge de la batterie principale depuis l’installation (calculée)"
       },
       "main_battery_charge_energy_direct": {
-        "name": "Main battery lifetime charged energy"
+        "name": "Énergie de charge cumulée de la batterie principale"
       },
       "main_battery_discharge_energy": {
-        "name": "Main battery lifetime discharge energy"
+        "name": "Énergie de décharge de la batterie principale depuis l’installation (calculée)"
       },
       "main_battery_discharge_energy_direct": {
-        "name": "Main battery lifetime discharged energy"
+        "name": "Énergie de décharge cumulée de la batterie principale"
       },
       "max_feed_grid_read": {
         "name": "Puissance d'injection maximale (runtime)"
@@ -2125,6 +2125,11 @@
   "issues": {
     "device_not_activated": {
       "fix_flow": {
+        "error": {
+          "integration_unavailable": "L’intégration Jackery n’est pas chargée. Rétablissez-la avant de réessayer.",
+          "issue_still_present": "Jackery signale toujours le problème d’activation. Vérifiez l’appareil dans l’application Jackery et réessayez.",
+          "refresh_failed": "L’actualisation du cloud a échoué. Le problème reste ouvert. Vérifiez la connexion et réessayez."
+        },
         "step": {
           "confirm": {
             "description": "L'appareil Jackery {device_id} indique activated=0 dans le système cloud. C'est un signal de qualité des données côté cloud, pas une preuve que l'appareil n'est pas appairé localement. Certains endpoints Jackery de tendances, statistiques et historique peuvent renvoyer des données vides ou nulles tant que le cloud signale cet état.\n\nPour vérifier :\n1. Ouvrez l'application mobile Jackery\n2. Confirmez que l'appareil est enregistré et affiché comme 'En ligne'\n3. Revenez ici et forcez une actualisation cloud\n\nLe problème de réparation sera supprimé lorsque le cloud Jackery indiquera activated=1 ou cessera de renvoyer le signal incohérent.",

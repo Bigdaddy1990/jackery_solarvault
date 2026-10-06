@@ -1083,13 +1083,13 @@
         "name": "Hauptbatterie Energie seit Inbetriebnahme geladen (berechnet)"
       },
       "main_battery_charge_energy_direct": {
-        "name": "Main battery lifetime charged energy"
+        "name": "Hauptbatterie Lebensenergie geladen"
       },
       "main_battery_discharge_energy": {
         "name": "Hauptbatterie Energie seit Inbetriebnahme entladen (berechnet)"
       },
       "main_battery_discharge_energy_direct": {
-        "name": "Main battery lifetime discharged energy"
+        "name": "Hauptbatterie Lebensenergie entladen"
       },
       "max_feed_grid_read": {
         "name": "Max. Einspeiseleistung (Laufzeit)"
@@ -2125,6 +2125,11 @@
   "issues": {
     "device_not_activated": {
       "fix_flow": {
+        "error": {
+          "integration_unavailable": "Die Jackery-Integration ist nicht geladen. Stelle die Integration wieder her und versuche es erneut.",
+          "issue_still_present": "Jackery meldet das Aktivierungsproblem weiterhin. Prüfe das Gerät in der Jackery-App und versuche es erneut.",
+          "refresh_failed": "Die Cloud-Aktualisierung ist fehlgeschlagen. Das Problem bleibt offen. Prüfe die Verbindung und versuche es erneut."
+        },
         "step": {
           "confirm": {
             "description": "Das Jackery-Gerät {device_id} meldet activated=0 im Cloud-System. Das ist ein Cloud-seitiges Datenqualitäts-Signal und kein Beweis, dass das Gerät lokal nicht gekoppelt ist. Einige Jackery-Trend-, Statistik- und Verlaufsendpunkte können leere oder Null-Daten liefern, solange die Cloud dieses Signal meldet.\n\nZur Prüfung:\n1. Öffnen Sie die Jackery-Mobile-App\n2. Bestätigen Sie, dass das Gerät registriert ist und als 'Online' angezeigt wird\n3. Kehren Sie hierher zurück und erzwingen Sie einen Cloud-Refresh\n\nDas Reparatur-Problem wird entfernt, sobald die Jackery-Cloud activated=1 meldet oder das widersprüchliche Signal nicht mehr zurückgibt.",
