@@ -336,7 +336,9 @@ def test_other_project_does_not_authorize_this_project(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("payload", ["not json", "[]"])
+@pytest.mark.parametrize(
+    "payload", ["not json", "[]", "{}", '{"hook_event_name": "PreToolUse"}']
+)
 def test_cli_invalid_input_stops_hook(
     monkeypatch: pytest.MonkeyPatch, payload: str
 ) -> None:
@@ -371,5 +373,43 @@ def test_unreadable_receipt_content_denies_edits(tmp_path: Path, payload: str) -
         handle(_event("PreToolUse", "apply_patch"), tmp_path)["hookSpecificOutput"][
             "permissionDecision"
         ]
+        == "deny"
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git diff --no-textconv *",
+        "git diff --no-textconv ?.py",
+        "git diff --no-textconv [ab].py",
+        "cat /dev/null#; touch owned",
+        "rg --hostname-bin=./payload --hyperlink-format='file://{host}{path}' pattern",
+        "rg --hostname-bin ./payload pattern",
+    ],
+)
+def test_shell_expansion_and_process_options_require_receipts(
+    tmp_path: Path, command: str
+) -> None:
+    """Shell expansion and ripgrep helpers cannot bypass preflight."""
+    result = handle(
+        _event("PreToolUse", "exec_command", tool_input={"cmd": command}), tmp_path
+    )
+    assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+@pytest.mark.parametrize("field", ["hook_event_name", "cwd", "session_id", "tool_name"])
+def test_cli_missing_common_hook_fields_blocks_even_read_commands(
+    monkeypatch: pytest.MonkeyPatch, field: str
+) -> None:
+    """Incomplete host events must fail closed before the read-only shortcut."""
+    event = _event("PreToolUse", "exec_command", tool_input={"cmd": "git status"})
+    event.pop(field)
+    output = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(event)))
+    monkeypatch.setattr(sys, "stdout", output)
+    assert mandatory_tool_gate.main() == _HOOK_FAILURE
+    assert (
+        json.loads(output.getvalue())["hookSpecificOutput"]["permissionDecision"]
         == "deny"
     )
