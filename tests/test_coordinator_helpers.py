@@ -37,6 +37,20 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+def test_unlink_removed_parents_without_entry_preserves_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A detached coordinator cannot remove devices without an owning entry."""
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator.config_entry = None
+    get_registry = MagicMock()
+    monkeypatch.setattr(coordinator_module.dr, "async_get", get_registry)
+
+    assert coordinator._unlink_removed_parent_devices({"removed-parent"}) == 0  # ruff: ignore[private-member-access]
+
+    get_registry.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # _stable_payload_debug_signature
 # ---------------------------------------------------------------------------
