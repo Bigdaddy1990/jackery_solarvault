@@ -1,15 +1,61 @@
 {
-  "ruleset_name": "main-required-ci",
   "base": "main",
   "integration_id": 15368,
+  "ruleset_name": "main-required-ci",
   "workflows": {
-    "ci.yml": {"name": "CI", "jobs": ["Hassfest", "HACS Validation", "Tests (Python 3.14) / Run pytest with coverage"]},
-    "validate.yml": {"name": "Validate", "jobs": ["Requirements source check", "Home Assistant hassfest", "HACS validation", "Ruff lint + format check", "Unit / source-only tests"]},
-    "pre-commit-ci-lite.yml": {"name": "Pre-commit Lite", "jobs": ["pre-commit"]},
-    "autofix.yml": {"name": "pre-commit-autofix", "jobs": ["autofix"]},
-    "python-modernization.yml": {"name": "Python Modernization", "jobs": ["Modernization gate (Python 3.14)"]},
-    "pyrefly.yml": {"name": "Pyrefly Type Check", "jobs": ["typecheck"]},
-    "dependency-review.yml": {"name": "Dependency Review", "jobs": ["dependency-review"]},
-    "merge-safety-regression.yml": {"name": "Merge Safety Regression", "jobs": ["Merge safety regression"]}
+    "autofix.yml": {
+      "jobs": [
+        "autofix"
+      ],
+      "name": "pre-commit-autofix"
+    },
+    "ci.yml": {
+      "jobs": [
+        "Hassfest",
+        "HACS Validation",
+        "Tests (Python 3.14) / Run pytest with coverage"
+      ],
+      "name": "CI"
+    },
+    "dependency-review.yml": {
+      "jobs": [
+        "dependency-review"
+      ],
+      "name": "Dependency Review"
+    },
+    "merge-safety-regression.yml": {
+      "jobs": [
+        "Merge safety regression"
+      ],
+      "name": "Merge Safety Regression"
+    },
+    "pre-commit-ci-lite.yml": {
+      "jobs": [
+        "pre-commit"
+      ],
+      "name": "Pre-commit Lite"
+    },
+    "pyrefly.yml": {
+      "jobs": [
+        "typecheck"
+      ],
+      "name": "Pyrefly Type Check"
+    },
+    "python-modernization.yml": {
+      "jobs": [
+        "Modernization gate (Python 3.14)"
+      ],
+      "name": "Python Modernization"
+    },
+    "validate.yml": {
+      "jobs": [
+        "Requirements source check",
+        "Home Assistant hassfest",
+        "HACS validation",
+        "Ruff lint + format check",
+        "Unit / source-only tests"
+      ],
+      "name": "Validate"
+    }
   }
 }
