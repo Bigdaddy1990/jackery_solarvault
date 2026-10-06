@@ -10,6 +10,7 @@ from homeassistant.components.mqtt.util import valid_subscribe_topic
 from homeassistant.config_entries import ConfigFlow, OptionsFlowWithReload, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import _async_entry_updated
@@ -527,7 +528,10 @@ def _reconfigure_options(
     return merged
 
 
-USER_SCHEMA: vol.Schema = vol.Schema({
+# Use the installed HA validation class (voluptuous or its probatio replacement).
+# This follows HA's runtime shim and its native type information together.
+_SCHEMA = type(cv.PLATFORM_SCHEMA)
+USER_SCHEMA = _SCHEMA({
     vol.Required(CONF_USERNAME): str,
     vol.Required(CONF_PASSWORD): str,
     vol.Optional(
@@ -622,7 +626,7 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
-        schema = vol.Schema({
+        schema = _SCHEMA({
             vol.Optional(
                 CONF_SCAN_INTERVAL,
                 default=current_options[CONF_SCAN_INTERVAL],
@@ -1026,7 +1030,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
-        schema = vol.Schema({
+        schema = _SCHEMA({
             vol.Required(CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD): str,
             vol.Optional(
@@ -1139,7 +1143,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_ACCEPT_SHARED,
-            data_schema=vol.Schema({
+            data_schema=_SCHEMA({
                 vol.Required(CONF_SHARED_DEV_ID): vol.All(str, vol.Length(min=1)),
                 vol.Required(CONF_SHARED_QR_CODE_ID): vol.All(str, vol.Length(min=1)),
             }),
@@ -1218,7 +1222,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=_SCHEMA({vol.Required(CONF_PASSWORD): str}),
             description_placeholders={
                 "username": entry.data[CONF_USERNAME],
             },

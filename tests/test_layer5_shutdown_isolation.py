@@ -267,8 +267,11 @@ async def test_ble_start_rechecks_shutdown_after_executor_import() -> None:
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
-    coordinator.hass = SimpleNamespace(
-        async_add_executor_job=_async_add_executor_job,
+    coordinator.hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            async_add_executor_job=_async_add_executor_job,
+        ),
     )
     cast("Any", coordinator).entry = SimpleNamespace(
         entry_id="ble-start-shutdown-race",
@@ -317,8 +320,11 @@ async def test_partial_ble_start_cleanup_failure_retains_exact_owner() -> None:
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
-    coordinator.hass = SimpleNamespace(
-        async_add_executor_job=_async_add_executor_job,
+    coordinator.hass = cast(
+        "HomeAssistant",
+        SimpleNamespace(
+            async_add_executor_job=_async_add_executor_job,
+        ),
     )
     cast("Any", coordinator).entry = SimpleNamespace(
         entry_id="ble-partial-start-failure",
@@ -372,7 +378,7 @@ async def test_layer5_stop_task_factory_failure_keeps_transport_retryable() -> N
     coordinator = JackerySolarVaultCoordinator.__new__(
         JackerySolarVaultCoordinator,
     )
-    coordinator.hass = _RejectingHass()
+    coordinator.hass = cast("HomeAssistant", _RejectingHass())
     cast("Any", coordinator).entry = SimpleNamespace(entry_id="rejected-stop-owner")
     vars(coordinator)["_mqtt"] = transport
     coordinator._ble_listener = None  # ruff: ignore[private-member-access]

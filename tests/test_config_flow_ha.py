@@ -463,6 +463,7 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
+    assert flow["data_schema"] is not None
     defaults = {
         marker.schema: marker.default()
         for marker in flow["data_schema"].schema
@@ -485,6 +486,7 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
 
     reopened = await hass.config_entries.options.async_init(entry.entry_id)
     assert reopened["type"] is FlowResultType.FORM
+    assert reopened["data_schema"] is not None
     defaults = {
         marker.schema: marker.default()
         for marker in reopened["data_schema"].schema

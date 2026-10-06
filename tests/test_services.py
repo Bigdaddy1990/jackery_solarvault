@@ -51,7 +51,7 @@ from homeassistant.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
     from homeassistant.core import HomeAssistant, ServiceCall
 
@@ -96,7 +96,7 @@ def _translation_placeholder(exc: HomeAssistantError, key: str = "error") -> str
 
 # pyrefly: ignore [deprecated]
 @contextmanager
-def _ignore_private() -> Iterator[None]:
+def _ignore_private() -> Generator[None]:
     """Mark deliberate private service-helper access in tests.
 
     The per-line ``# ruff: ignore[private-member-access]`` comments carry the

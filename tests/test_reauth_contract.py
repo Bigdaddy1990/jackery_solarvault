@@ -116,7 +116,7 @@ def test_reauth_step_uses_only_password_field_not_username() -> None:
     body = match.group(0)
     assert "CONF_PASSWORD" in body, body
     # Username appears only as placeholder, not as a Required form field
-    schema_block = re.search(r"data_schema=vol\.Schema\(\{(.*?)\}\)", body, re.DOTALL)
+    schema_block = re.search(r"data_schema=_SCHEMA\(\{(.*?)\}\)", body, re.DOTALL)
     assert schema_block is not None, body
     schema_body = schema_block.group(1)
     assert "CONF_USERNAME" not in schema_body, schema_body

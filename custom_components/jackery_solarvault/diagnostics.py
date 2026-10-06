@@ -45,21 +45,19 @@ def _redacted_payload_map(
 ) -> dict[str, Any]:
     """Build a deterministic labeled mapping of redacted payloads.
 
-    Replace original mapping keys with stable generated labels.
+    Preserve original identifiers as string keys in a stable order.
 
     Payloads are processed in a stable order, sorted by the string form of each
     original key. Every value is redacted with ``redact_keys``; non-mappings are
     wrapped as ``{"value": payload}`` before redaction.
 
     Parameters:
-        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated
-        labels; values are payloads to redact.
-        prefix (str): Prefix for generated ``<prefix>_<index>`` labels, starting
-            at index 1.
+        payloads (Mapping[Any, Any]): Identifier-to-payload mapping.
+        prefix (str): Legacy parameter retained for callers.
         redact_keys (frozenset[str]): Field names to redact from each payload.
 
     Returns:
-        dict[str, Any]: Mapping of generated labels to redacted payloads.
+        dict[str, Any]: Mapping of complete identifiers to redacted payloads.
     """
     redacted: dict[str, Any] = {}
     for _index, key in enumerate(sorted(payloads, key=str), start=1):
@@ -79,14 +77,15 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
 
     The returned payload contains redacted copies of the entry's stored data and
     options, a stable mapping of labeled device payloads, and diagnostics from the
-    coordinator, API responses, and transports. Redaction is mandatory and a final
-    recursive boundary pass protects nested and differently-cased sensitive keys.
+    coordinator, API responses, and transports. Complete identifiers and MQTT
+    topics remain visible in normal exports. Authentication-secret redaction is
+    enforced by a final recursive pass over nested and differently-cased keys.
 
     Returns:
         dict[str, Any]: Diagnostics export with keys:
             - `entry_data`: redacted copy of the config entry's stored data.
             - `options`: redacted copy of the config entry's options.
-            - `devices`: stable local labels mapped to redacted device payloads.
+            - `devices`: complete identifiers mapped to redacted device payloads.
             - `raw_api`: redacted coordinator, API, transport, and statistics
               diagnostics.
     """
