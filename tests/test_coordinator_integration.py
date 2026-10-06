@@ -30,11 +30,11 @@ _TEST_HTTP_DATA = {
 
 def _cancel_poll_watchdog(coordinator: JackerySolarVaultCoordinator) -> None:
     """Cancel constructor-owned timers in these lightweight coordinator tests."""
-    for name in ("_poll_watchdog_unsub", "_mqtt_poll_unsub"):
-        unsubscribe = getattr(coordinator, name, None)
-        if unsubscribe is not None:
-            unsubscribe()
-            setattr(coordinator, name, None)
+    for attribute in ("_poll_watchdog_unsub", "_mqtt_poll_unsub"):
+        obj = getattr(coordinator, attribute, None)
+        if obj is not None:
+            obj()
+            setattr(coordinator, attribute, None)
 
 
 def _make_coordinator() -> JackerySolarVaultCoordinator:

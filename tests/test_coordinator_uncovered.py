@@ -118,7 +118,6 @@ class TestJackerySolarVaultCoordinator:  # ruff: ignore[too-many-public-methods]
         """Test coordinator creation."""
         coordinator = self._create_coordinator()
         assert coordinator is not None
-        assert coordinator.config_entry is not None
         assert coordinator.config_entry.entry_id == "test_entry"
 
     def test_update_interval_property(self) -> None:

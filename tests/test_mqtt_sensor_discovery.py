@@ -253,6 +253,30 @@ def test_release_native_entity_ids_swaps_mirror_out_of_native_id(
     assert registry.async_get(untouched.entity_id) is not None
 
 
+def test_release_native_entity_ids_keeps_mirror_without_native_sensor(
+    hass: HomeAssistant,
+) -> None:
+    """A mirror cannot be renamed when there is no matching native entity."""
+    mqtt_entry = MockConfigEntry(domain="mqtt", data={})
+    mqtt_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    mirror = registry.async_get_or_create(
+        "sensor",
+        "mqtt",
+        "jackery_solarvault_mqtt_dev_cloud_mqtt",
+        config_entry=mqtt_entry,
+        suggested_object_id="solarvault_cloud_mqtt",
+    )
+
+    with patch.object(
+        registry, "async_update_entity", wraps=registry.async_update_entity
+    ) as update:
+        async_release_native_entity_ids(hass)
+
+    update.assert_not_called()
+    assert registry.async_get(mirror.entity_id) is mirror
+
+
 @pytest.mark.asyncio()
 async def test_unavailable_pack_keeps_retained_discovery(hass: HomeAssistant) -> None:
     """A missing pack value must not remove its MQTT entity or history."""
@@ -365,9 +389,9 @@ def test_mqtt_pack_device_links_to_native_pack(hass: HomeAssistant) -> None:
         identifiers={("mqtt", "jackery_solarvault:device_battery_pack_1")},
     )
     publisher._link_mqtt_device(mirror.id)  # ruff: ignore[private-member-access]
-    linked = registry.async_get(mirror.id)
-    assert isinstance(linked, dr.DeviceEntry)
-    assert linked.via_device_id == native.id
+    linked_mirror = registry.async_get(mirror.id)
+    assert isinstance(linked_mirror, dr.DeviceEntry)
+    assert linked_mirror.via_device_id == native.id
     publisher.async_retire()
 
 
@@ -396,9 +420,9 @@ def test_mqtt_mirror_of_child_pack_links_to_head_unit(hass: HomeAssistant) -> No
     publisher._link_mqtt_device(mirror.id)  # ruff: ignore[private-member-access]
     publisher._link_mqtt_device(pack.id)  # ruff: ignore[private-member-access]
 
-    linked = registry.async_get(mirror.id)
-    assert isinstance(linked, dr.DeviceEntry)
-    assert linked.via_device_id == head.id
+    linked_mirror = registry.async_get(mirror.id)
+    assert isinstance(linked_mirror, dr.DeviceEntry)
+    assert linked_mirror.via_device_id == head.id
     publisher.async_retire()
 
 

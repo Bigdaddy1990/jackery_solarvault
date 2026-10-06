@@ -12,11 +12,38 @@ from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
     TransportSource,
     local_mqtt_topic_device_serial,
+    normalize_local_mqtt_payload,
 )
 
 _DEVICE_ID = "device-1"
 _DEVICE_SN = "SV3PM123456"
 _TOKEN = "123456789012"
+
+
+@pytest.mark.parametrize("field", ["body", "data"])
+@pytest.mark.parametrize("value", [[{"deviceSn": "PACK-3", "cellTemp": 274}], None])
+def test_local_normalization_preserves_non_object_payload_fields(
+    field: str, value: object
+) -> None:
+    """Normalization must not delete list-shaped App bodies or explicit nulls."""
+    payload = {"deviceSn": _DEVICE_SN, field: value, "devType": 1}
+    normalized = normalize_local_mqtt_payload(payload)
+    assert normalized["body"][field] == value
+    assert payload[field] == value
+
+
+@pytest.mark.parametrize("field", ["body", "data"])
+def test_local_pack_list_body_reaches_pack_extraction(field: str) -> None:
+    """A typed pack list keeps its own serial and cellTemp through ingest."""
+    pack = {"deviceSn": "PACK-3", "cellTemp": 274, "batSoc": 40}
+    normalized = normalize_local_mqtt_payload({
+        "deviceSn": _DEVICE_SN,
+        "devType": 1,
+        field: [pack],
+    })
+    assert JackerySolarVaultCoordinator._battery_packs_from_source(  # ruff: ignore[private-member-access]
+        normalized["body"]
+    ) == [pack]
 
 
 def _coordinator_shell() -> JackerySolarVaultCoordinator:
@@ -38,6 +65,83 @@ def _coordinator_shell() -> JackerySolarVaultCoordinator:
     coordinator._shutdown_started = False  # ruff: ignore[private-member-access]
     cast("Any", coordinator)._local_mqtt_device_token = lambda _device_id: _TOKEN  # ruff: ignore[private-member-access]
     return coordinator  # pyrefly: ignore [no-any-return-implicit]
+
+
+def test_local_alarm_fields_route_without_cloud_command_metadata() -> None:
+    """The App HomeAlarmBody fields remain readable in a LAN report body."""
+    coordinator = _coordinator_shell()
+    context = coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
+        f"hb/device/{_DEVICE_SN}/status",
+        {
+            "deviceSn": _DEVICE_SN,
+            "body": {"sysAlertCount": 2, "alarmId": "402270", "batSoc": 40},
+        },
+        TransportSource.LOCAL_MQTT,
+    )
+    assert context is not None
+    updated: dict[str, Any] = {}
+    assert coordinator._apply_mqtt_app_shadow_updates(context, updated)  # ruff: ignore[private-member-access]
+    assert updated["device_alert"]["alarmId"] == "402270"
+    assert updated["device_alert"]["sysAlertCount"] == 2  # ruff: ignore[magic-value-comparison]
+    assert updated["device_alert"]["batSoc"] == 40  # ruff: ignore[magic-value-comparison]
+    assert context.is_alarm is False
+
+
+def test_body_only_official_status_is_a_property_snapshot() -> None:
+    """The documented LAN topic identifies a host report without cloud type."""
+    coordinator = _coordinator_shell()
+    payload = coordinator._normalize_local_mqtt_payload(  # ruff: ignore[private-member-access]
+        {"batSoc": 55, "cellTemp": 274}, f"hb/device/{_DEVICE_SN}/status"
+    )
+    assert payload is not None
+    context = coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
+        f"hb/device/{_DEVICE_SN}/status", payload, TransportSource.LOCAL_MQTT
+    )
+    assert context is not None
+    assert coordinator._mqtt_is_device_property_snapshot(context)  # ruff: ignore[private-member-access]
+
+
+def test_app_mqtt_subdevices_keeps_pack_identity_and_soc() -> None:
+    """App MqttBody.subDevices carries BatteryPackBody rb/ip/op fields."""
+    coordinator = _coordinator_shell()
+    body = {"subDevices": [{"deviceSn": "PACK-3", "rb": 45, "ip": 100, "op": 0}]}
+    payload = coordinator._normalize_local_mqtt_payload(  # ruff: ignore[private-member-access]
+        body, f"hb/device/{_DEVICE_SN}/status"
+    )
+    assert payload is not None
+    context = coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
+        f"hb/device/{_DEVICE_SN}/status", payload, TransportSource.LOCAL_MQTT
+    )
+    assert context is not None
+    assert context.is_subdevice is False
+    merge = MagicMock(return_value=True)
+    cast("Any", coordinator)._merge_subdevice_data = merge  # ruff: ignore[private-member-access]
+    assert coordinator._apply_mqtt_subdevice_update(context, {})  # ruff: ignore[private-member-access]
+    assert merge.call_args.args[1] == context.body
+    packs = coordinator._battery_packs_from_source(context.body)  # ruff: ignore[private-member-access]
+    assert packs is not None
+    assert packs[0]["deviceSn"] == "PACK-3"
+    assert packs[0]["batSoc"] == 45  # ruff: ignore[magic-value-comparison]
+    assert packs[0]["inPw"] == 100  # ruff: ignore[magic-value-comparison]
+    assert packs[0]["outPw"] == 0
+
+
+@pytest.mark.parametrize("children", [[], [{"deviceSn": "PACK-3", "rb": 45}]])
+def test_app_mqtt_subdevices_does_not_hide_head_fields(
+    children: list[dict[str, Any]],
+) -> None:
+    """An accessory container cannot suppress genuine top-level head values."""
+    coordinator = _coordinator_shell()
+    payload = coordinator._normalize_local_mqtt_payload(  # ruff: ignore[private-member-access]
+        {"batInPw": 120, "batSoc": 55, "subDevices": children},
+        f"hb/device/{_DEVICE_SN}/status",
+    )
+    assert payload is not None
+    context = coordinator._mqtt_route_context(  # ruff: ignore[private-member-access]
+        f"hb/device/{_DEVICE_SN}/status", payload, TransportSource.LOCAL_MQTT
+    )
+    assert context is not None
+    assert coordinator._mqtt_is_device_property_snapshot(context)  # ruff: ignore[private-member-access]
 
 
 @pytest.mark.parametrize(
@@ -109,6 +213,31 @@ async def test_device_topic_serial_routes_body_only_report() -> None:
         {"deviceId": "other-device", "type": 2, "body": {"batSoc": 55}},
         {"deviceId": "unregistered-device", "type": 2, "body": {"batSoc": 55}},
         {"deviceSn": "UNKNOWN-PACK", "type": 107, "cellTemp": 274},
+        {"deviceSn": "UNKNOWN-PACK", "type": 107, "updates": {"cellTemp": 274}},
+        {"deviceSn": "FOREIGN-PACK", "type": 107, "updates": {"cellTemp": 274}},
+        {
+            "deviceSn": "PACK-3",
+            "type": 107,
+            "updates": {"deviceSn": "FOREIGN-PACK", "cellTemp": 274},
+        },
+        {
+            "deviceSn": "PACK-3",
+            "deviceId": "other-device",
+            "type": 107,
+            "updates": {"cellTemp": 274},
+        },
+        {
+            "deviceSn": "PACK-3",
+            "deviceId": "unregistered-device",
+            "type": 107,
+            "updates": {"cellTemp": 274},
+        },
+        {
+            "deviceSn": "PACK-3",
+            "devType": 0,
+            "type": 107,
+            "updates": {"cellTemp": 274},
+        },
     ],
 )
 async def test_device_topic_rejects_conflicting_payload_identity(
@@ -117,12 +246,38 @@ async def test_device_topic_rejects_conflicting_payload_identity(
     """A shared broker cannot reassign a conflicting device frame."""
     coordinator = _coordinator_shell()
     coordinator._device_index["other-device"] = {"device_meta": {"deviceSn": "FOREIGN"}}  # ruff: ignore[private-member-access]
+    coordinator.data[_DEVICE_ID]["battery_packs"] = [{"deviceSn": "PACK-3"}]
+    coordinator.data["other-device"] = {
+        "device": {"deviceSn": "FOREIGN"},
+        "battery_packs": [{"deviceSn": "FOREIGN-PACK"}],
+    }
     coordinator.async_handle_mqtt_message = AsyncMock()
 
     assert not await coordinator.async_handle_local_mqtt_message(
         f"hb/device/{_DEVICE_SN}/status", payload
     )
     coordinator.async_handle_mqtt_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio()
+async def test_device_topic_accepts_matching_nested_pack_identity() -> None:
+    """Repeated matching pack identity does not hide nested measurements."""
+    coordinator = _coordinator_shell()
+    coordinator.data[_DEVICE_ID]["battery_packs"] = [{"deviceSn": "PACK-3"}]
+    handler = AsyncMock(return_value=_DEVICE_ID)
+    coordinator.async_handle_mqtt_message = handler
+    updates = {"deviceSn": "PACK-3", "cellTemp": 274, "outPw": 0}
+
+    assert await coordinator.async_handle_local_mqtt_message(
+        f"hb/device/{_DEVICE_SN}/event",
+        {"deviceSn": "PACK-3", "type": 107, "updates": updates},
+    )
+
+    assert handler.await_args is not None
+    normalized = handler.await_args.args[1]
+    assert normalized["deviceSn"] == _DEVICE_SN
+    assert normalized["body"]["deviceSn"] == "PACK-3"
+    assert normalized["body"]["updates"] == updates
 
 
 @pytest.mark.asyncio()

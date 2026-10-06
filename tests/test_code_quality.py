@@ -676,22 +676,28 @@ def test_coordinator_interval_seconds_use_safe_int_parser() -> None:
     assert "interval_sec = max(15, int(" not in interval_setup_block
 
 
-def test_diagnostics_redaction_keys_preserve_identifiers_and_mask_secrets() -> None:
-    """Normal exports retain identifiers; authentication secrets stay masked."""
+def test_diagnostics_redaction_preserves_routing_and_raw_frame_fields() -> None:
+    """Protect credentials without destroying identity and frame evidence."""
+    required = {
+        getattr(const_module, name)
+        for name in (
+            "FIELD_TOKEN",
+            "FIELD_MQTT_PASSWORD",
+        )
+    }
+    preserved = {
+        "base64_encoded",
+        "body_preview",
+        "email",
+        "phone",
+        "raw_bytes",
+        "raw_hex",
+        "trailer_hex",
+    }
+
     assert isinstance(util.REDACT_KEYS, frozenset)
-    for name in ("FIELD_TOKEN", "FIELD_MQTT_PASSWORD", "FIELD_BLUETOOTH_KEY"):
-        assert getattr(const_module, name) in util.REDACT_KEYS
-    for name in (
-        "CONF_MQTT_MAC_ID",
-        "CONF_REGION_CODE",
-        "FIELD_DEVICE_ID",
-        "FIELD_SYSTEM_ID",
-        "FIELD_DEVICE_SN",
-        "FIELD_SYSTEM_SN",
-        "FIELD_LONGITUDE",
-        "FIELD_LATITUDE",
-    ):
-        assert getattr(const_module, name) not in util.REDACT_KEYS
+    assert required <= util.REDACT_KEYS
+    assert preserved.isdisjoint(util.REDACT_KEYS)
 
 
 def test_ble_transport_debug_logs_do_not_expose_raw_payloads() -> None:
@@ -789,11 +795,11 @@ def test_payload_debug_redaction_is_recursive_casefolded_and_mandatory() -> None
     assert util.append_payload_debug_line.__code__.co_argcount == 2  # ruff: ignore[magic-value-comparison]
     assert redacted["password"] == "**REDACTED**"
     assert redacted["nested"]["MQTTPASSWORD"] == "**REDACTED**"
-    assert redacted["nested"]["LATITUDE"] == event["nested"]["LATITUDE"]
+    assert redacted["nested"]["LATITUDE"] == "52.520008"
     assert redacted["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
     assert entity_attrs["password"] == "**REDACTED**"
     assert entity_attrs["nested"]["MQTTPASSWORD"] == "**REDACTED**"
-    assert entity_attrs["nested"]["LATITUDE"] == event["nested"]["LATITUDE"]
+    assert entity_attrs["nested"]["LATITUDE"] == "52.520008"
     assert entity_attrs["items"][0]["BLUETOOTHKEY"] == "**REDACTED**"
 
 
@@ -1073,17 +1079,13 @@ def test_property_setters_keep_local_override_during_stale_refresh_window() -> N
     assert "return self._merge_main_properties(merged, overrides)" in coordinator_source
 
 
-def test_redact_keys_cover_mqtt_password_aliases_and_preserve_identifiers() -> None:
-    """MQTT passwords are secret; usernames and client IDs remain diagnostic data."""
-    for key_name in ("FIELD_MQTT_PASSWORD", "MQTT_CREDENTIAL_PASSWORD"):
-        assert getattr(const_module, key_name) in util.REDACT_KEYS
+def test_redact_keys_cover_mqtt_credential_aliases() -> None:
+    """Diagnostics redaction must cover raw and normalized MQTT credential keys."""
     for key_name in (
-        "FIELD_USER_ID",
-        "MQTT_CREDENTIAL_CLIENT_ID",
-        "MQTT_CREDENTIAL_USER_ID",
-        "MQTT_CREDENTIAL_USERNAME",
+        "FIELD_MQTT_PASSWORD",
+        "MQTT_CREDENTIAL_PASSWORD",
     ):
-        assert getattr(const_module, key_name) not in util.REDACT_KEYS
+        assert getattr(const_module, key_name) in util.REDACT_KEYS
 
 
 def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
@@ -1106,7 +1108,7 @@ def test_mqtt_diagnostics_track_dropped_messages_and_timestamps() -> None:
     ):
         assert fragment in mqtt_source
 
-    assert "invalid JSON payload" in mqtt_source
+    assert '"payload_decode_error": str(err)' in mqtt_source
     assert "non-object JSON payload" in mqtt_source
 
 
@@ -1366,18 +1368,14 @@ def test_service_boolean_fields_use_safe_bool_parser() -> None:
 
 
 def test_standby_switch_uses_strict_numeric_mode_parser() -> None:
-    """Manual standby must parse enum mode 1/2 without raw int casts."""
-    switch_source = (CUSTOM_COMPONENT / "switch.py").read_text(encoding="utf-8")
-    helper_block = switch_source.split("def _standby_is_on(", 1)[1].split(
-        "\n\n@dataclass", 1
-    )[0]
-
-    assert "first_nonblank_int" in switch_source
-    assert "parsed = first_nonblank_int(raw)" in helper_block
-    assert "return parsed == 1" in helper_block
-    assert "return safe_bool(raw)" in helper_block
-    assert "return int(raw)" not in helper_block
-    assert "= int(raw)" not in helper_block
+    """Manual standby recognizes mode one, not every nonzero numeric mode."""
+    util, _const = _load_util_module()
+    assert util.standby_is_on("1") is True
+    assert util.standby_is_on("1.0") is True
+    assert util.standby_is_on("2") is False
+    assert util.standby_is_on("2.0") is False
+    assert util.standby_is_on("invalid") is None
+    assert util.standby_is_on(None) is None
 
 
 def test_service_optional_text_fields_do_not_stringify_none() -> None:

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 import pytest
 
@@ -13,12 +13,6 @@ from custom_components.jackery_solarvault.descriptions.sensor import SENSOR_DESC
 from custom_components.jackery_solarvault.filters import sanitize_main_properties
 from custom_components.jackery_solarvault.sensor import JackeryAlarmSensor
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-
-if TYPE_CHECKING:
-    from custom_components.jackery_solarvault.coordinator import (
-        JackerySolarVaultCoordinator,
-    )
-    from custom_components.jackery_solarvault.sensor import JackerySensor
 
 _SENSORS = {d.key: d for d in SENSOR_DESCRIPTIONS}
 _BINARY = {d.key: d for d in BINARY_SENSOR_DESCRIPTIONS}
@@ -118,10 +112,7 @@ def test_alarm_count_uses_documented_alert_counter_with_http_fallback() -> None:
             }
         }
     )
-    # This unit fixture supplies only the coordinator data read by the alarm sensor.
-    sensor = JackeryAlarmSensor(
-        cast("JackerySolarVaultCoordinator", coordinator), "device"
-    )
+    sensor = JackeryAlarmSensor(coordinator, "device")
     assert sensor.native_value == expected_count
 
     coordinator.data["device"].pop("device_alert")
@@ -153,7 +144,7 @@ def test_head_lifetime_identity_never_uses_stack_or_subtracted_counters() -> Non
     ):
         description = _SENSORS[key]
         assert description.device_registry_role == "main_battery"
-        assert description.value_fn(cast("JackerySensor", entity)) is None
+        assert description.value_fn(entity) is None
 
 
 def test_calculated_main_battery_energy_has_valid_ha_metadata() -> None:
@@ -179,10 +170,10 @@ def test_last_online_is_a_utc_timestamp_from_epoch_milliseconds() -> None:
     """Cloud device meta reports online/offline times as epoch milliseconds."""
     entity = SimpleNamespace(device_meta={"onlineTime": 1787963325000})
 
-    value = _SENSORS["last_online"].value_fn(cast("JackerySensor", entity))
+    value = _SENSORS["last_online"].value_fn(entity)
 
     assert value == datetime(2026, 8, 29, 0, 28, 45, tzinfo=UTC)
-    assert _SENSORS["last_offline"].value_fn(cast("JackerySensor", entity)) is None
+    assert _SENSORS["last_offline"].value_fn(entity) is None
 
 
 def test_today_flow_shares_are_user_facing_not_diagnostic() -> None:
