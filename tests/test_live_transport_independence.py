@@ -411,10 +411,10 @@ def _command_coordinator() -> JackerySolarVaultCoordinator:
     return coordinator
 
 
-def test_local_property_priority_expires_for_cloud_fallback(
+def test_cloud_mqtt_replaces_unauthenticated_local_property_immediately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Fresh local values win while cloud fills gaps, then cloud resumes."""
+    """Cloud values replace unauthenticated LAN values without a freshness delay."""
     clock = {"now": 100.0}
     monkeypatch.setattr(
         coordinator_module.time,
@@ -439,7 +439,7 @@ def test_local_property_priority_expires_for_cloud_fallback(
         source=TransportSource.CLOUD_MQTT,
     )
 
-    assert merged[FIELD_PV_PW] == _LIVE_PV_W
+    assert merged[FIELD_PV_PW] == _CLOUD_PV_W
     assert merged[FIELD_CHARGE_PLAN_PW] == _PLAN_POWER_W
 
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
@@ -450,7 +450,7 @@ def test_local_property_priority_expires_for_cloud_fallback(
     )
     assert merged[FIELD_PV_PW] == _LIVE_PV_W
 
-    clock["now"] = 161.0
+    clock["now"] = 101.0
     merged = coordinator._merge_main_properties_for_device(  # ruff: ignore[private-member-access]
         "dev-1",
         merged,
@@ -485,10 +485,10 @@ def test_fresh_ble_property_beats_http_while_http_fills_missing_fields(
     assert merged[FIELD_PV_PW] == _HTTP_PV_W
 
 
-def test_local_ct_priority_while_cloud_fills_missing_fields(
+def test_cloud_mqtt_replaces_unauthenticated_local_ct_property(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Local CT power stays preferred while cloud supplies missing voltage."""
+    """Cloud CT power replaces unauthenticated LAN values and supplies voltage."""
     monkeypatch.setattr(coordinator_module.time, "monotonic", lambda: 100.0)
     coordinator = _source_priority_coordinator()
     updated: dict[str, Any] = {}
@@ -509,7 +509,7 @@ def test_local_ct_priority_while_cloud_fills_missing_fields(
         source_transport=TransportSource.CLOUD_MQTT,
     )
 
-    assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _LIVE_CT_POWER_W
+    assert updated[PAYLOAD_CT_METER][FIELD_CT_POWER] == _SHELLY_CT_POWER_W
     assert updated[PAYLOAD_CT_METER][FIELD_CT_VOLT] == _CT_VOLTAGE_V
 
     coordinator._merge_subdevice_data(  # ruff: ignore[private-member-access]
@@ -600,7 +600,7 @@ async def test_cloud_subdevice_frame_is_ingested_once(
     ]
     assert not rejections
     assert coordinator.data["dev-1"][PAYLOAD_CT_METER][FIELD_CT_POWER] == (
-        _LIVE_CT_POWER_W
+        _SHELLY_CT_POWER_W
     )
 
 
