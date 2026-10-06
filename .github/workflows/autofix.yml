@@ -48,9 +48,11 @@ jobs:
 
       - name: Install deps
         run: |
-          pip install -r requirements.txt --upgrade
-          pip install -r requirements-test.txt --upgrade
-          pip install --upgrade uv ruff pyupgrade pyrefly flake8-type-checking reorder-python-imports
+          # Resolve helper tools together with HA's pinned transitive dependencies.
+          python -m pip install --upgrade \
+            -r requirements.txt -r requirements-test.txt \
+            pyupgrade flake8-type-checking reorder-python-imports
+          python -m pip check
 
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -82,4 +84,5 @@ jobs:
           pre-commit run --all-files || true
 
       - uses: pre-commit/action@v3.0.1
-      - run: uvx pre-commit run --all-files
+      # Keep system hooks in the interpreter containing HA and its native types.
+      - run: python -m pre_commit run --all-files
