@@ -45,7 +45,7 @@ from .entity import (
 )
 from .util import (
     append_unique_entity,
-    coordinator_entity_signature,
+    async_setup_entity_discovery,
     is_portable_payload as _is_portable_payload,
     safe_float,
 )
@@ -58,8 +58,6 @@ if TYPE_CHECKING:
 
     from . import JackeryConfigEntry
     from .coordinator import JackerySolarVaultCoordinator
-
-from homeassistant.core import callback
 
 
 def _rounded_int(value: float | str | None) -> int:
@@ -359,9 +357,6 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entities: list[NumberEntity], entity: NumberEntity) -> None:
-        append_unique_entity(entities, seen_unique_ids, entity)
-
     def _collect_entities() -> list[NumberEntity]:
         """Collect and instantiate all number entities for each device payload."""
         entities: list[NumberEntity] = []
@@ -378,24 +373,13 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                 if description.key == "single_tariff_price_set" and is_portable:
                     continue
 
-                _append_unique(
-                    entities, JackeryNumber(coordinator, dev_id, description)
+                append_unique_entity(
+                    entities,
+                    seen_unique_ids,
+                    JackeryNumber(coordinator, dev_id, description),
                 )
         return entities
 
-    last_signature: tuple[Any, ...] = ()
-
-    @callback
-    def _add_new_entities() -> None:
-        """Add number entities discovered after an entity-signature change."""
-        nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
-        if sig == last_signature:
-            return
-        last_signature = sig
-        entities = _collect_entities()
-        if entities:
-            async_add_entities(entities)
-
-    _add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    async_setup_entity_discovery(
+        entry, coordinator, _collect_entities, async_add_entities
+    )

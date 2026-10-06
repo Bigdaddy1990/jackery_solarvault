@@ -25,6 +25,7 @@ from ..const import (
     LOCAL_MQTT_RECONNECT_MAX_SEC,
     REDACTED_VALUE,
 )
+from ..util import async_create_message_task
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -495,25 +496,6 @@ class JackeryLocalMqttClient:
             result.append(topic)
         return result
 
-    def _create_message_task(
-        self,
-        operation: Coroutine[Any, Any, None],
-        *,
-        name: str,
-    ) -> asyncio.Task[None]:
-        """Create finite message work owned by the config entry when available."""
-        if self._config_entry is not None:
-            return cast(  # ty: ignore[redundant-cast]
-                "asyncio.Task[None]",
-                self._config_entry.async_create_task(
-                    self._hass,
-                    operation,
-                    name=name,
-                    eager_start=False,
-                ),
-            )
-        return self._hass.async_create_task(operation, name=name, eager_start=False)
-
     def _ensure_background_message_drain(self) -> None:
         """Keep accepted frames draining after broker ingress has stopped."""
         self._hass.async_create_background_task(
@@ -562,7 +544,9 @@ class JackeryLocalMqttClient:
                 return
             item = self._message_queue.popleft()
             self._message_delivery_item = item
-            self._message_delivery_task = self._create_message_task(
+            self._message_delivery_task = async_create_message_task(
+                self._hass,
+                self._config_entry,
                 self._async_deliver_message(item),
                 name="jackery_local_mqtt_message_delivery",
             )
@@ -693,11 +677,6 @@ class JackeryLocalMqttClient:
         )
         if self._consume_self_publish_echo(topic, raw):
             self._self_publish_echoes_ignored += 1
-        # Filter out Home Assistant RPC events (Shelly RPC) which flood the broker
-        # but are not Jackery device telemetry. These come on homeassistant/events/rpc.
-        if topic.startswith("homeassistant/events/"):
-            self._messages_filtered += 1
-            return
         if topic not in self._topics_seen_set:
             if len(self._topics_seen_set) < LOCAL_MQTT_MAX_TOPIC_NAMES:
                 self._topics_seen_set.add(topic)
@@ -709,11 +688,6 @@ class JackeryLocalMqttClient:
         self._last_message_at = self._utc_now_iso()
         if len(raw) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
             self._payload_too_large_count += 1
-            self._messages_dropped += 1
-            self._last_error = (
-                f"MQTT payload exceeds {LOCAL_MQTT_MAX_PAYLOAD_BYTES} byte limit"
-            )
-            return
         # No content gate here. docs/AGENTS.md §1.1 Data Integrity First:
         # "live MQTT/BLE ingress is not filtered or dropped merely because a
         # field is unknown or incomplete." Scoping is the topic filter's job;
@@ -893,7 +867,7 @@ class JackeryLocalMqttClient:
         return False
 
     def diagnostics_snapshot(self, *, redact: bool | None = None) -> dict[str, Any]:
-        """Return transport diagnostics, redacted unless ``JACKERY_DEV_MODE``."""
+        """Return exact diagnostics unless redaction is explicitly requested."""
         if redact is None:
             redact = False
         topics = (

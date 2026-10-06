@@ -6,6 +6,7 @@ All descriptions follow HA-standard ``SensorEntityDescription`` with
 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from math import isfinite
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from homeassistant.components.sensor import (
@@ -642,11 +643,46 @@ def _section_share(
     """Return one percentage of an App energy-flow share object (e.g. pvUsage)."""
     shares = entity.payload_section_for_sources(section).get(key)
     # An all-zero split is the cloud's "not aggregated yet" placeholder, not 0 %.
-    if not isinstance(shares, dict) or not any(
-        safe_float(value) for value in shares.values()
+    if isinstance(shares, dict) and any(
+        (reported_value := safe_float(value)) is not None
+        and isfinite(reported_value)
+        and reported_value != 0
+        for value in shares.values()
     ):
+        requested_value = safe_float(shares.get(part))
+        if requested_value is None or not isfinite(requested_value):
+            return None
+        return _state_value(shares.get(part))
+    metrics = {
+        (PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_SOURCES): {
+            "pv": APP_DEVICE_STAT_PV_TO_BATTERY,
+            "home": APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+            "ac": APP_DEVICE_STAT_AC_TO_BATTERY,
+        },
+        (PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_USAGE): {
+            "home": APP_DEVICE_STAT_BATTERY_TO_GRID,
+            "ac": APP_DEVICE_STAT_BATTERY_TO_AC,
+        },
+        (PAYLOAD_PV_TRENDS, FIELD_PV_USAGE): {
+            "home": APP_DEVICE_STAT_PV_TO_ONGRID,
+            "battery": APP_DEVICE_STAT_PV_TO_BATTERY,
+            "ac": APP_DEVICE_STAT_PV_TO_AC,
+        },
+    }.get((section, key))
+    if metrics is None or part not in metrics:
         return None
-    return _state_value(shares.get(part))
+    # Only the coordinator's current-day deltas form a complete local split.
+    daily = entity.payload_section_for_sources(PAYLOAD_LOCAL_DAILY_ENERGY)
+    flows: dict[str, float] = {}
+    for name, metric in metrics.items():
+        delta = safe_float(daily.get(metric))
+        if delta is None or not isfinite(delta) or delta < 0:
+            return None
+        flows[name] = delta
+    total = sum(flows.values())
+    return (
+        round(100 * (flows[part] / total), 2) if total > 0 and isfinite(total) else None
+    )
 
 
 def _device_meta_timestamp(entity: JackeryEntity, key: str) -> datetime | None:
@@ -1638,7 +1674,10 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TEMP_UNIT,),
         # pyrefly: ignore [unexpected-keyword]
         key="temp_unit",
-        value_fn=lambda e: _get_prop(e, FIELD_TEMP_UNIT),
+        value_fn=lambda e: {
+            "0": UnitOfTemperature.CELSIUS,
+            "1": UnitOfTemperature.FAHRENHEIT,
+        }.get(str(_get_prop(e, FIELD_TEMP_UNIT))),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="temp_unit",
         # pyrefly: ignore [unexpected-keyword]

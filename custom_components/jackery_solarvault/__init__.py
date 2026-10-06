@@ -3040,10 +3040,10 @@ def _seed_battery_pack_registry_identities(
         for serial, fallback_index in sorted(records, key=operator.itemgetter(0)):
             norm_serial = _battery_pack_serial_token(serial, fallback_index or 1)
             live_index = observed_serial_to_live_index.get(norm_serial)
-            if live_index is None:
-                continue
-            key = stable_subdevice_key("battery_pack", serial, live_index)
             index = fallback_index if fallback_index is not None else live_index
+            if index is None:
+                continue
+            key = stable_subdevice_key("battery_pack", serial, index)
             if (
                 key in ambiguous_keys
                 or index in protected_indices
@@ -3613,7 +3613,19 @@ def _matching_serial_battery_pack_target(
     """Return a verified serial target for one duplicate numeric pack device."""
     entry_id, parent_device_id = scope
     child_serial = nonblank_text(device.serial_number)
-    live_serial = battery_pack_serial(packs[numeric_index - 1])
+    live_serial: str | None = None
+    if child_serial is not None:
+        child_key = stable_subdevice_key("battery_pack", child_serial, numeric_index)
+        observed_serials = {
+            serial
+            for pack in packs
+            if (serial := battery_pack_serial(pack)) is not None
+            and stable_subdevice_key("battery_pack", serial, numeric_index) == child_key
+        }
+        if len(observed_serials) == 1:
+            live_serial = observed_serials.pop()
+    elif 1 <= numeric_index <= len(packs):
+        live_serial = battery_pack_serial(packs[numeric_index - 1])
     if live_serial is None:
         return None
     live_key = stable_subdevice_key("battery_pack", live_serial, numeric_index)
@@ -3625,7 +3637,7 @@ def _matching_serial_battery_pack_target(
     if (
         serial_device is None
         or serial_device.id == device.id
-        or serial_device.config_entry_id != entry_id
+        or entry_id not in serial_device.config_entries
     ):
         return None
     stored_serial = nonblank_text(serial_device.serial_number)
@@ -3727,13 +3739,23 @@ def _async_remove_phantom_battery_pack_device(
         return
 
     packs = _complete_battery_pack_topology(coordinator, parent_device_id)
-    if packs is None or current_identifier in _live_battery_pack_identifiers(
-        parent_device_id,
-        packs,
-    ):
+    live_identifiers = (
+        _live_battery_pack_identifiers(parent_device_id, packs)
+        if packs is not None
+        else set()
+    )
+    if packs is None or current_identifier in live_identifiers:
         return
     numeric_index = int(suffix) if suffix.isdecimal() else None
-    if numeric_index is not None and 1 <= numeric_index <= len(packs):
+    # A historical number can exceed a shorter roster or refer to a moved row.
+    # Verify the stored hardware identity before deleting its history owners.
+    serial_key = stable_subdevice_key(
+        "battery_pack", device.serial_number, numeric_index or 1
+    )
+    if numeric_index is not None and (
+        1 <= numeric_index <= len(packs)
+        or f"{parent_device_id}_{serial_key}" in live_identifiers
+    ):
         target = _matching_serial_battery_pack_target(
             device_registry,
             (entry.entry_id, parent_device_id),

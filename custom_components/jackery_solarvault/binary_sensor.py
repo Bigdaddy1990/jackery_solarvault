@@ -3,8 +3,10 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.core import callback
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+)
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
@@ -37,7 +39,7 @@ from .descriptions import (
 from .entity import ALL_LIVE_DATA_SOURCES, JackeryEntity
 from .util import (
     append_unique_entity,
-    coordinator_entity_signature,
+    async_setup_entity_discovery,
     safe_bool,
     safe_int,
     smart_plug_serial,
@@ -48,7 +50,6 @@ from .util import (
 )
 
 if TYPE_CHECKING:
-    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -58,9 +59,6 @@ if TYPE_CHECKING:
 # Coordinator-backed read-only platform: entities never perform their own
 # refresh I/O, so disable per-entity parallel update scheduling.
 PARALLEL_UPDATES = 0
-
-if not TYPE_CHECKING:
-    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,13 +111,6 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(
-        entities: list[BinarySensorEntity],
-        entity: BinarySensorEntity,
-    ) -> None:
-        """Append the entity unless its unique ID was already seen."""
-        append_unique_entity(entities, seen_unique_ids, entity)
-
     def _collect_entities() -> list[BinarySensorEntity]:
         """Collect binary sensor entities for every device in the coordinator payload.
 
@@ -135,7 +126,11 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
         entities: list[BinarySensorEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             for desc in BINARY_DESCRIPTIONS:
-                _append_unique(entities, JackeryBinarySensor(coordinator, dev_id, desc))
+                append_unique_entity(
+                    entities,
+                    seen_unique_ids,
+                    JackeryBinarySensor(coordinator, dev_id, desc),
+                )
             valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
             if not valid_plugs:
                 valid_plugs = sorted_smart_plugs(
@@ -149,8 +144,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 if plug_sn is None:
                     continue
                 plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
-                _append_unique(
+                append_unique_entity(
                     entities,
+                    seen_unique_ids,
                     JackerySmartPlugStateBinarySensor(
                         coordinator,
                         dev_id,
@@ -185,8 +181,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     "sub_device", sub_device_sn, index
                 )
                 for alarm_desc in SUBDEVICE_ALARM_DESCRIPTIONS:
-                    _append_unique(
+                    append_unique_entity(
                         entities,
+                        seen_unique_ids,
                         JackerySubdeviceAlarmBinarySensor(
                             coordinator,
                             dev_id,
@@ -197,29 +194,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
 
         return entities
 
-    last_signature: tuple[Any, ...] = ()
-
-    @callback
-    def _add_new_entities() -> None:
-        """Register binary sensors after the entity signature changes.
-
-        Only newly discovered entities are registered.
-
-        Compute the coordinator entity signature and, if it differs from the previously
-        recorded signature, collect entities and register them via `async_add_entities`;
-        update the stored signature. No action is taken when the signature is unchanged.
-        """
-        nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
-        if sig == last_signature:
-            return
-        last_signature = sig
-        entities = _collect_entities()
-        if entities:
-            async_add_entities(entities)
-
-    _add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    async_setup_entity_discovery(
+        entry, coordinator, _collect_entities, async_add_entities
+    )
 
 
 class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
