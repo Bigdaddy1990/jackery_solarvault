@@ -10,7 +10,6 @@ from homeassistant.components.mqtt.util import valid_subscribe_topic
 from homeassistant.config_entries import ConfigFlow, OptionsFlowWithReload, UnknownEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import _async_entry_updated
@@ -528,10 +527,7 @@ def _reconfigure_options(
     return merged
 
 
-# Use the installed HA validation class (voluptuous or its probatio replacement).
-# This follows HA's runtime shim and its native type information together.
-_SCHEMA = type(cv.PLATFORM_SCHEMA)
-USER_SCHEMA = _SCHEMA({
+USER_SCHEMA: vol.Schema = vol.Schema({
     vol.Required(CONF_USERNAME): str,
     vol.Required(CONF_PASSWORD): str,
     vol.Optional(
@@ -626,7 +622,7 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
-        schema = _SCHEMA({
+        schema = vol.Schema({
             vol.Optional(
                 CONF_SCAN_INTERVAL,
                 default=current_options[CONF_SCAN_INTERVAL],
@@ -755,18 +751,21 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
             return abort_result
 
         # Validate payload contains a Jackery device identity (devSn)
-        payload = discovery_info.payload
-        if not isinstance(payload, (bytes, bytearray)):
+        payload: object = discovery_info.payload
+        if not isinstance(payload, (str, bytes, bytearray)):
             return self.async_abort(reason="invalid_discovery_info")
 
         try:
-            payload_dict = json.loads(payload.decode())
+            payload_dict = json.loads(payload)
         except json.JSONDecodeError, UnicodeDecodeError:
+            return self.async_abort(reason="invalid_discovery_info")
+
+        if not isinstance(payload_dict, dict):
             return self.async_abort(reason="invalid_discovery_info")
 
         # MQTT discovery payloads use "deviceSn" (FIELD_DEVICE_SN), not "devSn"
         dev_sn = payload_dict.get("deviceSn") or payload_dict.get("devSn")
-        if not isinstance(dev_sn, str) or not dev_sn:
+        if not isinstance(dev_sn, str) or not dev_sn.strip():
             return self.async_abort(reason="invalid_discovery_info")
 
         discovered_name = _mqtt_discovery_name(discovery_info.topic)
@@ -1030,7 +1029,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
-        schema = _SCHEMA({
+        schema = vol.Schema({
             vol.Required(CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD): str,
             vol.Optional(
@@ -1143,7 +1142,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_ACCEPT_SHARED,
-            data_schema=_SCHEMA({
+            data_schema=vol.Schema({
                 vol.Required(CONF_SHARED_DEV_ID): vol.All(str, vol.Length(min=1)),
                 vol.Required(CONF_SHARED_QR_CODE_ID): vol.All(str, vol.Length(min=1)),
             }),
@@ -1222,7 +1221,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
-            data_schema=_SCHEMA({vol.Required(CONF_PASSWORD): str}),
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
             description_placeholders={
                 "username": entry.data[CONF_USERNAME],
             },

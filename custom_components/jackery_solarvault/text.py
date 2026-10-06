@@ -1,7 +1,7 @@
 """Text platform for Jackery SolarVault — editable system name."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.const import EntityCategory
@@ -40,10 +40,11 @@ from .entity import (
     LAYER5_COMMAND_SOURCES,
     LAYER5_DATA_SOURCES,
     JackeryEntity,
+    raise_entity_action_error,
 )
 from .util import (
     append_unique_entity,
-    coordinator_entity_signature,
+    async_setup_entity_discovery,
     is_portable_payload as _is_portable_payload,
 )
 
@@ -120,10 +121,6 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _append_unique(entities: list[TextEntity], entity: TextEntity) -> None:
-        """Append the entity unless its unique ID was already seen."""
-        append_unique_entity(entities, seen_unique_ids, entity)
-
     def _collect_entities() -> list[TextEntity]:
         """Collects text entities for devices that expose a system identifier.
 
@@ -138,20 +135,31 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
             is_portable = _is_portable_payload(payload)
-            _append_unique(entities, JackeryDeviceNameText(coordinator, dev_id))
+            append_unique_entity(
+                entities, seen_unique_ids, JackeryDeviceNameText(coordinator, dev_id)
+            )
             # The rename endpoint in PROTOCOL.md §2 needs the system id.
             if system.get(FIELD_ID) or system.get(FIELD_SYSTEM_ID):
-                _append_unique(entities, JackerySystemNameText(coordinator, dev_id))
+                append_unique_entity(
+                    entities,
+                    seen_unique_ids,
+                    JackerySystemNameText(coordinator, dev_id),
+                )
             # Restored from the 3005 baseline (review 2026-07-25): the app
             # exposes the inverter grid-standard code as a writable setting.
             if isinstance(system, dict) and FIELD_GRID_STANDARD in system:
-                _append_unique(entities, JackeryGridStandardText(coordinator, dev_id))
+                append_unique_entity(
+                    entities,
+                    seen_unique_ids,
+                    JackeryGridStandardText(coordinator, dev_id),
+                )
             if not is_portable:
                 props = payload.get(PAYLOAD_PROPERTIES) or {}
                 for index, field in enumerate(_PV_FIELDS):
                     if isinstance(props, dict) and isinstance(props.get(field), dict):
-                        _append_unique(
+                        append_unique_entity(
                             entities,
+                            seen_unique_ids,
                             JackeryPvNameText(coordinator, dev_id, index=index),
                         )
             if not is_portable and (
@@ -159,8 +167,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 or coordinator.device_bluetooth_key(dev_id)
             ):
                 for config in _THIRD_PARTY_MQTT_TEXT_FIELDS:
-                    _append_unique(
+                    append_unique_entity(
                         entities,
+                        seen_unique_ids,
                         JackeryThirdPartyMqttText(
                             coordinator,
                             dev_id,
@@ -169,27 +178,9 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     )
         return entities
 
-    last_signature: tuple[Any, ...] = ()
-
-    @callback
-    def _add_new_entities() -> None:
-        """Add newly discovered text entities when the coordinator's data changes.
-
-        Checks the current signature of the coordinator data against the last seen
-        signature; if different, collect entities and register them with
-        `async_add_entities`, and update the stored signature.
-        """
-        nonlocal last_signature
-        sig = coordinator_entity_signature(coordinator.data)
-        if sig == last_signature:
-            return
-        last_signature = sig
-        entities = _collect_entities()
-        if entities:
-            async_add_entities(entities)
-
-    _add_new_entities()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))
+    async_setup_entity_discovery(
+        entry, coordinator, _collect_entities, async_add_entities
+    )
 
 
 class JackeryDeviceNameText(JackeryEntity, TextEntity):
@@ -585,18 +576,6 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
             return None
         return str(value)
 
-    def _raise_action_error(self, error: object) -> None:
-        """Raise a translatable HA action error for this text entity."""
-        raise HomeAssistantError(
-            translation_domain=DOMAIN,
-            translation_key="entity_action_failed",
-            translation_placeholders={
-                "entity": str(self._attr_translation_key),
-                "device_id": self._device_id,
-                "error": str(error),
-            },
-        )
-
     async def async_set_value(self, value: str) -> None:
         """Write this ThirdPartMQTTConfig string field."""
         new_value = str(value or "").strip()
@@ -612,6 +591,10 @@ class JackeryThirdPartyMqttText(JackeryEntity, TextEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                str(self._attr_translation_key), self._device_id, err
+            )
         except ACTION_WRITE_ERRORS as err:
-            self._raise_action_error(err)
+            raise_entity_action_error(
+                str(self._attr_translation_key), self._device_id, err
+            )

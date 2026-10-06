@@ -247,9 +247,7 @@ class JackeryMqttSensorPublisher:
             self._link_mqtt_device(device.id)
 
     @callback
-    def _async_link_mqtt_device(
-        self, event: Event[dr.EventDeviceRegistryUpdatedData]
-    ) -> None:
+    def _async_link_mqtt_device(self, event: Event) -> None:
         """Attach newly discovered MQTT mirrors to their native device."""
         device_id = event.data.get("device_id")
         if device_id:

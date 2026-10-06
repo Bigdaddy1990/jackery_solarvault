@@ -13,6 +13,7 @@ from ..const import (
     DISCOVERY_CACHE_STORAGE_KEY,
     DOMAIN,
 )
+from ..util import get_store_lock
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -22,15 +23,6 @@ _STORAGE_KEY: Final = DISCOVERY_CACHE_STORAGE_KEY
 _LOCK_KEY: Final = f"{_STORAGE_KEY}.lock"
 _KEY_ENTRIES: Final = CACHE_ENTRIES_KEY
 _KEY_DEVICE_INDEX: Final = DISCOVERY_CACHE_DEVICE_INDEX_KEY
-
-
-def _store_lock(hass: HomeAssistant) -> asyncio.Lock:
-    """Return the disposable runtime lock protecting this shared Store file."""
-    lock = hass.data.get(_LOCK_KEY)
-    if not isinstance(lock, asyncio.Lock):
-        lock = asyncio.Lock()
-        hass.data[_LOCK_KEY] = lock
-    return lock
 
 
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
@@ -50,7 +42,7 @@ async def async_load_discovery_cache(
         Mapping of device ID (as `str`) to a shallow copy of the stored metadata `dict`
         for each device. Returns an empty dict if no valid cache exists.
     """
-    async with _store_lock(hass):
+    async with get_store_lock(hass, _LOCK_KEY):
         data = await _store(hass).async_load()
     if not isinstance(data, dict):
         return {}
@@ -100,7 +92,7 @@ async def async_save_discovery_cache(
 
     async def _async_persist() -> None:
         """Finish the serialized Store transaction even if setup is cancelled."""
-        async with _store_lock(hass):
+        async with get_store_lock(hass, _LOCK_KEY):
             store = _store(hass)
             loaded = await store.async_load()
             data = dict(loaded) if isinstance(loaded, dict) else {}

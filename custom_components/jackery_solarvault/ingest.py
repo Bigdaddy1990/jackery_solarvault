@@ -56,13 +56,11 @@ if TYPE_CHECKING:
 TransportSource = DataSource
 
 
-# docs/AGENTS.md §1.2 keeps HTTP cloud data active as the complete fallback,
-# treats every Layer-5 connection as an independent, equal live-data peer.
 _LIVE_SOURCE_TIER: Final[dict[DataSource, int]] = {
     DataSource.HTTP: 0,
     DataSource.CLOUD_MQTT: 1,
-    DataSource.LOCAL_MQTT: 1,
-    DataSource.BLE: 1,
+    DataSource.LOCAL_MQTT: 2,
+    DataSource.BLE: 2,
 }
 
 
@@ -192,16 +190,16 @@ def _provenance_keeps_current(
 ) -> bool:
     """Return whether provenance protects one populated live value.
 
-    A timestamped observation older than the freshness window (e.g. a retained
-    broker frame from hours ago) never overwrites a populated value whose own
-    age is unknown, but it still fills blank fields: the decision is made per
-    field here, never by dropping a whole frame before ingest.
+    A timestamped live observation older than the freshness window (e.g. a
+    retained broker frame from hours ago) never overwrites a populated value,
+    but it still fills blank fields. Historical periodic sections are exempt.
+    The decision is per field, never a whole-frame pre-filter.
     """
     if is_blank(current_value):
         return False
-    if (
-        current_provenance is None or current_provenance.observed_at is None
-    ) and _incoming_is_stale(incoming, freshness_window_seconds):
+    if not is_periodic_section(incoming.section) and _incoming_is_stale(
+        incoming, freshness_window_seconds
+    ):
         return True
     if current_provenance is None:
         return False
@@ -313,14 +311,15 @@ def ingest_observation(
     The returned payload contains protocol data only. Source, timestamps and
     request identifiers are retained solely in the parallel ``provenance``
     mapping, so Home Assistant entities never expose ingest bookkeeping.
-    Neither input mapping is mutated. Layer-5 live fields remain authoritative
-    over the HTTP fallback for ``freshness_window_seconds``. Equal-tier
-    transports update in arrival order when no protocol timestamp is available,
-    so BLE, cloud MQTT and local MQTT remain independent peers. When both
+    Neither input mapping is mutated. Fresh local live fields take priority over
+    cloud MQTT and HTTP for ``freshness_window_seconds``. Equal-tier transports
+    update in arrival order when no protocol timestamp is available. When both
     observations carry trustworthy timestamps, an older frame can never reverse
     a newer live value, regardless of which independent transport delivered it.
     Sparse lower-tier dictionaries may fill missing nested fields but cannot
     reverse a fresh live value.
+    Cached dictionaries need not have source metadata: a stale first observation
+    preserves their populated fields and may still supply missing nested values.
     """
     received_at = received_at_monotonic
     if received_at is None:
@@ -358,7 +357,6 @@ def ingest_observation(
 
         if keep_current:
             if isinstance(current_value, dict) and isinstance(value, dict):
-                assert current_provenance is not None
                 # HTTP remains a complete independent fallback: while a fresh
                 # L5 dictionary owns overlapping live keys, HTTP may still fill
                 # fields that the sparse L5 frame did not contain.

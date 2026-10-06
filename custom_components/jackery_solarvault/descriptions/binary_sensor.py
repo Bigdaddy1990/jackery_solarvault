@@ -3,7 +3,10 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntityDescription,
+)
 from homeassistant.const import EntityCategory
 
 from ..const import (
@@ -24,18 +27,12 @@ from ..util import safe_int
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
-
     from ..entity import JackeryEntity
 
 
 def _default_binary_value(_entity: object) -> None:
     """Return no state when a compatibility description has no reader."""
     return
-
-
-if not TYPE_CHECKING:
-    from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
 
 @dataclass(frozen=True, kw_only=True)

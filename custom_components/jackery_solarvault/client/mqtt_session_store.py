@@ -39,6 +39,7 @@ from ..const import (
     MQTT_SESSION_SEED_LEN,
     MQTT_SESSION_USER_ID,
 )
+from ..util import get_store_lock
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -114,15 +115,6 @@ def normalize_mqtt_session_snapshot(
     return result
 
 
-def _store_lock(hass: HomeAssistant) -> asyncio.Lock:
-    """Return the disposable runtime lock protecting this shared Store file."""
-    lock = hass.data.get(_LOCK_KEY)
-    if not isinstance(lock, asyncio.Lock):
-        lock = asyncio.Lock()
-        hass.data[_LOCK_KEY] = lock
-    return lock
-
-
 def _store(hass: HomeAssistant) -> Store[dict[str, Any]]:
     """Return the persistent Home Assistant store."""
     return Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
@@ -143,7 +135,7 @@ async def async_load_mqtt_session(
         None: If storage is missing or malformed, or any required field is missing or
         empty.
     """
-    async with _store_lock(hass):
+    async with get_store_lock(hass, _LOCK_KEY):
         data = await _store(hass).async_load()
     if not isinstance(data, dict):
         return None
@@ -201,7 +193,7 @@ async def async_save_mqtt_session(
 
     async def _async_persist() -> None:
         """Finish the serialized Store transaction even if setup is cancelled."""
-        async with _store_lock(hass):
+        async with get_store_lock(hass, _LOCK_KEY):
             store = _store(hass)
             loaded = await store.async_load()
             data = dict(loaded) if isinstance(loaded, dict) else {}
@@ -237,7 +229,7 @@ async def async_clear_mqtt_session(hass: HomeAssistant, entry_id: str) -> None:
 
     async def _async_persist() -> None:
         """Finish the serialized Store transaction even if cleanup is cancelled."""
-        async with _store_lock(hass):
+        async with get_store_lock(hass, _LOCK_KEY):
             store = _store(hass)
             loaded = await store.async_load()
             if not isinstance(loaded, dict):

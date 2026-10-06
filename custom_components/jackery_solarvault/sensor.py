@@ -1631,6 +1631,17 @@ def _collect_battery_packs(
         else min(5, max(len(registration_packs), 0, bat_num))
     )
     coordinator = collection.coordinator
+    count = max(
+        count,
+        max(
+            (
+                index
+                for index in range(1, 6)
+                if coordinator.battery_pack_identity_serial(dev_id, index) is not None
+            ),
+            default=0,
+        ),
+    )
     for index in range(1, count + 1):
         identity_key = (dev_id, index)
         identity = collection.battery_pack_identities.get(identity_key)
@@ -2500,6 +2511,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
                 )
                 break
         total = 0.0
+        skipped_days = False
         completed_days_verified = week_start < today
         day = week_start
         while day <= today:
@@ -2537,22 +2549,27 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
             ]
             if day == today and local_value is not None and local_value >= 0:
                 observations.append(local_value)
-            if not observations:
-                return None
             positive_observations = [value for value in observations if value > 0]
             if positive_observations:
                 value = max(positive_observations)
             elif len(observations) >= _MIN_ZERO_CORROBORATION_SOURCES:
                 value = 0.0
             else:
-                # One zero from one request is still Jackery's known no-data
-                # placeholder shape, not proof of a genuine zero-energy day.
-                return None
+                # Keep the known lower bound; one placeholder cannot certify
+                # this day or erase another day's verified energy.
+                skipped_days = True
+                completed_days_verified = False
+                day += timedelta(days=1)
+                continue
             total += value
             day += timedelta(days=1)
 
         total = round(total, 5)
-        return total, section, week_source, completed_days_verified
+        return (
+            None
+            if skipped_days and total <= (local_value or 0)
+            else (total, section, week_source, completed_days_verified)
+        )
 
     def _month_total_from_daily_evidence(
         self,
@@ -4274,13 +4291,10 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
         hass = getattr(self, "hass", None)
         if version is None or hass is None:
             return
-        entry = self.coordinator.config_entry
-        if entry is None:
-            return
         registry = dr.async_get(hass)
         device = registry.async_get_device_by_identifier(
             (DOMAIN, f"{self._device_id}_{self._pack_key}"),
-            entry.entry_id,
+            self.coordinator.config_entry.entry_id,
         )
         if device is not None and device.sw_version != version:
             registry.async_update_device(device.id, sw_version=version)
@@ -5152,13 +5166,10 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         hass = getattr(self, "hass", None)
         if hass is None:
             return
-        entry = self.coordinator.config_entry
-        if entry is None:
-            return
         registry = dr.async_get(hass)
         device = registry.async_get_device_by_identifier(
             self._smart_meter_identifier(ct),
-            entry.entry_id,
+            self.coordinator.config_entry.entry_id,
         )
         if device is None:
             return
@@ -5166,7 +5177,9 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         # a module-load cycle while reconciling identities learned after setup.
         from . import _async_migrate_smart_meter_identity  # ruff: ignore[import-outside-top-level]
 
-        _async_migrate_smart_meter_identity(hass, entry)
+        entry = self.coordinator.config_entry
+        if entry is not None:
+            _async_migrate_smart_meter_identity(hass, entry)
         connections = {(dr.CONNECTION_NETWORK_MAC, mac)} if mac else set()
         if (serial and serial != device.serial_number) or not connections.issubset(
             device.connections
