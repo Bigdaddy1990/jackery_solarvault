@@ -15,6 +15,7 @@ from custom_components.jackery_solarvault.client.local_mqtt import (
 from custom_components.jackery_solarvault.const import (
     DOMAIN,
     LOCAL_MQTT_MAX_PAYLOAD_BYTES,
+    REDACTED_VALUE,
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
@@ -50,12 +51,12 @@ def test_constructor_and_diagnostics_use_direct_broker_transport(
     )
     assert client.matches_configuration(configuration)
     assert not client.matches_configuration(replace(configuration, host="other"))
-    redacted = client.diagnostics_snapshot()
+    redacted = client.diagnostics_snapshot(redact=True)
     plain = client.diagnostics_snapshot(redact=False)
     assert redacted["transport"] == "direct_mqtt"
-    assert redacted["configured_target"]["host"] == "192.0.2.10"
+    assert redacted["configured_target"]["host"] == REDACTED_VALUE
     assert plain["configured_target"] == {"host": "192.0.2.10", "port": 1884}
-    assert redacted["topic_filter"] == "jackery/device/#"
+    assert redacted["topic_filter"] == REDACTED_VALUE
     assert plain["topic_filter"] == "jackery/device/#"
     assert plain["qos"] == 2  # ruff: ignore[magic-value-comparison]
     assert plain["broker_connected"] is plain["connected"]
@@ -124,7 +125,7 @@ async def test_sink_rejection_and_failure_are_distinguished(
     assert failed_diagnostics["messages_dropped"] == 1
 
 
-async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
+async def test_oversized_and_retained_payloads_reach_sink(
     hass: HomeAssistant,
 ) -> None:
     """Broker-selected retained telemetry follows the same no-drop FIFO."""
@@ -146,12 +147,17 @@ async def test_oversized_is_dropped_but_retained_payload_reaches_sink(
     await client._async_consume_session(broker, ["#"])  # ruff: ignore[private-member-access]
     await client.async_wait_message_queue_idle()
 
-    sink.assert_awaited_once_with("jackery/retained", {}, b"{}")
+    assert sink.await_args_list[0].args == (
+        "jackery/oversized",
+        None,
+        b"x" * (LOCAL_MQTT_MAX_PAYLOAD_BYTES + 1),
+    )
+    assert sink.await_args_list[1].args == ("jackery/retained", {}, b"{}")
     diagnostics = client.diagnostics_snapshot(redact=False)
     assert diagnostics["payload_too_large_count"] == 1
     assert diagnostics["retained_messages_dropped"] == 0
-    assert diagnostics["messages_dropped"] == 1
-    assert diagnostics["messages_forwarded"] == 1
+    assert diagnostics["messages_dropped"] == 0
+    assert diagnostics["messages_forwarded"] == 2  # ruff: ignore[magic-value-comparison]
 
 
 async def test_stop_cancels_direct_broker_reconnect_supervisor(

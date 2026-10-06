@@ -23,11 +23,16 @@ from custom_components.jackery_solarvault.const import (
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     FIELD_CT_TOTAL_PHASE_ENERGY,
+    PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_LOCAL_DAILY_ENERGY,
 )
-from custom_components.jackery_solarvault.descriptions.sensor import _section_share  # ruff: ignore[import-private-name]
+from custom_components.jackery_solarvault.descriptions.sensor import (
+    SENSOR_DESCRIPTIONS,
+    _section_share,  # ruff: ignore[import-private-name]
+)
 from custom_components.jackery_solarvault.sensor import (
     STAT_DESCRIPTIONS,
+    JackerySensor,
     JackeryStatSensor,
     _period_from_stat_description,  # ruff: ignore[import-private-name]
 )
@@ -67,6 +72,19 @@ def _stat_sensor() -> JackeryStatSensor:
     mutable._cached_last_reset = sensor._compute_period_start(description.reset_period)  # ruff: ignore[private-member-access]
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
     return sensor  # pyrefly: ignore [no-any-return-implicit]
+
+
+@pytest.mark.parametrize(
+    ["raw", "expected"], [[0, "°C"], [1, "°F"], ["0", "°C"], [None, None], [2, None]]
+)
+def test_temperature_unit_is_a_readable_setting(
+    raw: object, expected: str | None
+) -> None:
+    """App enum codes are displayed as units, never as temperature readings."""
+    description = next(d for d in SENSOR_DESCRIPTIONS if d.key == "temp_unit")
+    assert description.value_fn is not None
+    entity = cast("Any", SimpleNamespace(merged_properties={"tempUnit": raw}))
+    assert description.value_fn(entity) == expected
 
 
 def test_stat_entity_does_not_clamp_negative_period_values() -> None:
@@ -543,6 +561,44 @@ def test_week_period_uses_verified_completed_days(
         sensor.extra_state_attributes["fallback"]
         == "current_open_week_from_daily_buckets"
     )
+
+
+def test_home_week_keeps_verified_day_when_another_day_is_missing() -> None:
+    """A missing day must not discard an already certified weekly lower bound."""
+    description = next(
+        desc for desc in STAT_DESCRIPTIONS if desc.section == "home_trends_week"
+    )
+    sensor = JackeryStatSensor.__new__(JackeryStatSensor)
+    mutable = cast("Any", sensor)
+    mutable.entity_description = description
+    mutable._reset_period = DATE_TYPE_WEEK  # ruff: ignore[private-member-access]
+    payload: dict[str, Any] = {
+        "home_trends_week": {
+            "unit": "kWh",
+            "totalHomeEgy": "4.84",
+            "x": ["1", "2", "3", "4", "5", "6", "7"],
+            "y": [3.11, 1.73, 0, 0, 0, 0, 0],
+            "_request": {
+                "dateType": "week",
+                "beginDate": "2026-09-28",
+                "endDate": "2026-10-04",
+            },
+        },
+        "home_trends_month": {"unit": "kWh", "x": None, "y": []},
+        "verified_day_statistics": {
+            "2026-09-30": {"home_trends": {"totalHomeEgy": 7.82748}},
+        },
+    }
+    result = sensor._current_open_week_from_month_chart(  # ruff: ignore[private-member-access]
+        "home_trends_week",
+        "totalHomeEgy",
+        payload=payload,
+        today=datetime(2026, 10, 2, tzinfo=UTC).date(),
+        local_daily_raw=None,
+    )
+    assert result is not None
+    assert result[0] == pytest.approx(12.66748)
+    assert result[3] is False
 
 
 def test_battery_week_replaces_stale_today_bucket_with_local_day_total() -> None:
@@ -1120,3 +1176,208 @@ def test_all_zero_share_split_is_unknown(
     )
     value = _section_share(cast("Any", entity), "battery", "batterySources", "pv")
     assert value == expected
+
+
+@pytest.mark.parametrize(
+    ["key", "part", "expected"],
+    [
+        ["batterySources", "pv", 60.0],
+        ["batterySources", "home", 30.0],
+        ["batterySources", "ac", 10.0],
+        ["batteryUsage", "home", 70.0],
+        ["batteryUsage", "ac", 30.0],
+    ],
+)
+def test_battery_share_uses_complete_local_day_flows(
+    key: str, part: str, expected: float
+) -> None:
+    """Documented daily flow deltas fill the App's all-zero share placeholder."""
+    sensor = _battery_share_sensor()
+    assert _section_share(sensor, PAYLOAD_BATTERY_TRENDS, key, part) == expected
+
+
+def _battery_share_sensor() -> JackerySensor:
+    """Build a real sensor with the exported day-cache and App section shapes."""
+    sensor = cast("JackerySensor", JackerySensor.__new__(JackerySensor))
+    mutable = cast("Any", sensor)
+    mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable.coordinator = SimpleNamespace(
+        data={
+            _DEVICE_ID: {
+                PAYLOAD_BATTERY_TRENDS: {
+                    "batterySources": {"pv": 0, "home": 0, "ac": 0},
+                    "batteryUsage": {"home": 0, "ac": 0},
+                },
+                PAYLOAD_LOCAL_DAILY_ENERGY: {
+                    "pvOtBatEgy": 600,
+                    "ongridOtBatEgy": 300,
+                    "acOtBatEgy": 100,
+                    "batOtGridEgy": 350,
+                    "batOtAcEgy": 150,
+                },
+            }
+        }
+    )
+
+    return sensor
+
+
+@pytest.mark.parametrize("delta", [None, -1, float("nan"), float("inf"), "bad"])
+def test_battery_share_rejects_incomplete_or_invalid_day_flows(
+    delta: object,
+) -> None:
+    """One unknown or invalid source cannot silently become a zero share."""
+    sensor = _battery_share_sensor()
+    sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY]["acOtBatEgy"] = delta
+    assert (
+        _section_share(sensor, PAYLOAD_BATTERY_TRENDS, "batterySources", "pv") is None
+    )
+
+
+def test_battery_share_ignores_lifetime_flows() -> None:
+    """Lifetime energy must not supply a missing daily source or denominator."""
+    sensor = _battery_share_sensor()
+    daily = sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY]
+    sensor.payload["properties"] = dict(daily)
+    del daily["acOtBatEgy"]
+    assert (
+        _section_share(sensor, PAYLOAD_BATTERY_TRENDS, "batterySources", "pv") is None
+    )
+
+
+def test_battery_share_all_zero_day_flows_remain_unknown() -> None:
+    """No energy flow means no defined usage percentage."""
+    sensor = _battery_share_sensor()
+    sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY] = dict.fromkeys(
+        sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY], 0
+    )
+    assert (
+        _section_share(sensor, PAYLOAD_BATTERY_TRENDS, "batteryUsage", "home") is None
+    )
+
+
+@pytest.mark.parametrize(["part", "expected"], [["pv", 98], ["ac", None]])
+def test_battery_share_keeps_reported_cloud_percentage(
+    part: str, expected: int | None
+) -> None:
+    """A populated App split keeps its original value ahead of local derivation."""
+    sensor = _battery_share_sensor()
+    sensor.payload[PAYLOAD_BATTERY_TRENDS]["batterySources"] = {
+        "pv": 98,
+        "home": 2,
+    }
+    assert (
+        _section_share(sensor, PAYLOAD_BATTERY_TRENDS, "batterySources", part)
+        == expected
+    )
+
+
+def _pv_usage_share_sensor() -> JackerySensor:
+    """Build a sensor with complete daily PV destinations and empty cloud shares."""
+    sensor = _battery_share_sensor()
+    sensor.payload["pv_trends"] = {
+        "pvUsage": {"home": 0, "battery": 0, "ac": 0},
+    }
+    sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY] = {
+        "pvOtOngridEgy": 600,
+        "pvOtBatEgy": 300,
+        "pvOtAcEgy": 100,
+    }
+    return sensor
+
+
+@pytest.mark.parametrize(
+    ["key", "expected"],
+    [
+        ["today_pv_usage_home_share", 60.0],
+        ["today_pv_usage_battery_share", 30.0],
+        ["today_pv_usage_ac_share", 10.0],
+    ],
+)
+def test_pv_usage_shares_fall_back_to_complete_day_flows(
+    key: str, expected: float
+) -> None:
+    """All three PV destinations use the same verified daily denominator."""
+    sensor = _pv_usage_share_sensor()
+    description = next(item for item in SENSOR_DESCRIPTIONS if item.key == key)
+
+    assert description.value_fn(sensor) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("delta", [None, -1, float("nan"), float("inf"), "bad"])
+def test_pv_usage_share_rejects_incomplete_or_invalid_day_flows(
+    delta: object,
+) -> None:
+    """A missing PV destination cannot become a measured zero share."""
+    sensor = _pv_usage_share_sensor()
+    sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY]["pvOtAcEgy"] = delta
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", "home") is None
+
+
+def test_pv_usage_share_ignores_lifetime_flows() -> None:
+    """A lifetime counter cannot fill a missing current-day destination."""
+    sensor = _pv_usage_share_sensor()
+    daily = sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY]
+    sensor.payload["properties"] = dict(daily)
+    del daily["pvOtAcEgy"]
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", "home") is None
+
+
+def test_pv_usage_share_all_zero_day_flows_remain_unknown() -> None:
+    """No measured PV flow leaves the distribution undefined."""
+    sensor = _pv_usage_share_sensor()
+    sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY] = dict.fromkeys(
+        sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY], 0
+    )
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", "home") is None
+
+
+@pytest.mark.parametrize(["part", "expected"], [["home", 98], ["ac", None]])
+def test_pv_usage_share_keeps_reported_cloud_percentage(
+    part: str, expected: int | None
+) -> None:
+    """A populated cloud split is preserved without mixing in local parts."""
+    sensor = _pv_usage_share_sensor()
+    sensor.payload["pv_trends"]["pvUsage"] = {"home": 98, "battery": 2}
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", part) == expected
+
+
+@pytest.mark.parametrize("period", ["week", "month", "year"])
+def test_pv_usage_share_does_not_use_daily_flows_for_other_periods(
+    period: str,
+) -> None:
+    """Current-day destinations cannot stand in for historical periods."""
+    sensor = _pv_usage_share_sensor()
+    section = f"pv_trends_{period}"
+    sensor.payload[section] = {"pvUsage": {"home": 0, "battery": 0, "ac": 0}}
+
+    assert _section_share(sensor, section, "pvUsage", "home") is None
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
+@pytest.mark.parametrize(["part", "expected"], [["home", 60.0], ["ac", 10.0]])
+def test_pv_usage_share_ignores_nonfinite_cloud_placeholders(
+    invalid: float, part: str, expected: float
+) -> None:
+    """A nonfinite part cannot turn an empty cloud split into a measured value."""
+    sensor = _pv_usage_share_sensor()
+    sensor.payload["pv_trends"]["pvUsage"]["home"] = invalid
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", part) == pytest.approx(
+        expected
+    )
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
+def test_pv_usage_share_rejects_nonfinite_part_of_populated_cloud_split(
+    invalid: float,
+) -> None:
+    """A populated cloud split never publishes NaN or borrows a local part."""
+    sensor = _pv_usage_share_sensor()
+    sensor.payload["pv_trends"]["pvUsage"] = {"home": invalid, "battery": 2, "ac": 0}
+
+    assert _section_share(sensor, "pv_trends", "pvUsage", "home") is None

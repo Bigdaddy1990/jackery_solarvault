@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -284,10 +284,9 @@ async def test_historical_http_sources_route_independently(
 ) -> None:
     """Every supported statistics source invokes only its matching HTTP getter."""
     coordinator = _bare_coordinator()
-    api = MagicMock()
-    method = AsyncMock(return_value={"series": [1]})
-    setattr(api, api_method, method)
-    coordinator.api = api
+    chart = {coord_mod.APP_CHART_SERIES_Y: [1]}
+    method = AsyncMock(return_value=chart)
+    coordinator.api = SimpleNamespace(**{api_method: method})
     payload = {coord_mod.PAYLOAD_SYSTEM: {coord_mod.FIELD_ID: "system-1"}}
 
     status, result = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
@@ -298,7 +297,7 @@ async def test_historical_http_sources_route_independently(
     )
 
     assert status == "fetched"
-    assert result == {"series": [1]}
+    assert result == chart
     method.assert_awaited_once()
 
 

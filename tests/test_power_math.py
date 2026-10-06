@@ -1567,7 +1567,11 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
 
     year = payload["device_pv_stat_year"]
     assert year["totalSolarEnergy"] == 228.02  # ruff: ignore[magic-value-comparison, float-equality-comparison]
-    assert year["totalSolarRevenue"] == 63.86  # ruff: ignore[magic-value-comparison, float-equality-comparison]
+    assert year["totalSolarRevenue"] == "22.82"
+    assert year["pvProfit"] == pytest.approx(228228000.0)
+    assert year["y6"] == (
+        [None] * 3 + [pytest.approx(410400000), pytest.approx(228200000)] + [None] * 7
+    )
     assert year["y"] == [
         0.0,
         0.0,
@@ -1587,6 +1591,7 @@ def test_year_month_backfill_reconstructs_cloud_month_only_year_payload() -> Non
         "corrected_total": 228.02,
         "series_key": "y",
         "months": [4, 5],
+        "missing_months": [],
     }
     # Chart backfill repairs only the explicit period payload. It must not
     # rewrite the independent lifetime KPI or synthesize savings metadata.
@@ -1640,7 +1645,12 @@ def test_year_month_backfill_keeps_larger_correct_cloud_year_payload() -> None:
     util.apply_year_month_backfill(payload, month_history)
 
     assert payload["device_pv_stat_year"]["totalSolarEnergy"] == "228.02"
-    assert "_year_month_backfill" not in payload["device_pv_stat_year"]
+    corrected = payload["device_pv_stat_year"]["_year_month_backfill"]["corrected"]
+    assert "totalSolarEnergy" not in corrected
+    assert payload["device_pv_stat_year"]["totalSolarRevenue"] == "63.86"
+    assert payload["device_pv_stat_year"]["y6"] == (
+        [None] * 4 + [pytest.approx(228200000)] + [None] * 7
+    )
     assert payload["statistic"]["totalGeneration"] == "300.00"
     assert payload["statistic"]["totalRevenue"] == "84.00"
     assert "_savings_calculation" not in payload["statistic"]

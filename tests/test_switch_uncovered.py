@@ -10,34 +10,34 @@ from custom_components.jackery_solarvault.switch import (
     JackerySmartPlugPrioritySwitch,
     JackerySmartPlugSwitch,
     JackerySwitchDescription,
-    _standby_is_on,  # ruff: ignore[import-private-name]
     async_setup_entry,
 )
+from custom_components.jackery_solarvault.util import standby_is_on
 from homeassistant.helpers.entity import EntityCategory
 
 
 class TestStandbyIsOn:
-    """Test _standby_is_on helper function."""
+    """Test standby_is_on helper function."""
 
     def test_none_returns_none(self) -> None:  # ruff: ignore[no-self-use]
         """Test None returns None."""
-        assert _standby_is_on(None) is None
+        assert standby_is_on(None) is None
 
     def test_one_returns_true(self) -> None:  # ruff: ignore[no-self-use]
         """Test 1 returns True."""
-        assert _standby_is_on(1) is True
+        assert standby_is_on(1) is True
 
     def test_zero_returns_false(self) -> None:  # ruff: ignore[no-self-use]
         """Test 0 returns False."""
-        assert _standby_is_on(0) is False
+        assert standby_is_on(0) is False
 
     def test_true_returns_true(self) -> None:  # ruff: ignore[no-self-use]
         """Test True returns True."""
-        assert _standby_is_on(True) is True
+        assert standby_is_on(True) is True
 
     def test_false_returns_false(self) -> None:  # ruff: ignore[no-self-use]
         """Test False returns False."""
-        assert _standby_is_on(False) is False
+        assert standby_is_on(False) is False
 
 
 class TestJackeryDescriptionSwitch:

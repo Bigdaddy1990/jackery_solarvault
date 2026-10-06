@@ -883,6 +883,42 @@ async def test_statistics_timer_fetches_after_property_polls_stop(
 
 
 @pytest.mark.asyncio()
+async def test_statistics_publish_system_cache_after_device_failure(
+    hass: HomeAssistant,
+) -> None:
+    """A failed device supplement must not hide successfully fetched home stats."""
+    api = make_update_cycle_api()
+    coordinator, entry, _api = await setup_update_cycle_coordinator(hass, api=api)
+    try:
+        snapshot = await coordinator._async_update_data_guarded()  # ruff: ignore[private-member-access]
+        if coordinator._slow_metrics_bg_task is not None:  # ruff: ignore[private-member-access]
+            await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+        coordinator.async_set_updated_data(snapshot)
+        coordinator._slow_cache.clear()  # ruff: ignore[private-member-access]
+        api.async_get_device_property.reset_mock()
+        api.async_get_home_trends.return_value = {
+            APP_STAT_TOTAL_HOME_ENERGY: 2.75,
+            APP_STAT_UNIT: APP_UNIT_KWH,
+        }
+        cast("Any", coordinator)._fetch_device_extras = AsyncMock(  # ruff: ignore[private-member-access]
+            side_effect=RuntimeError("device supplement unavailable")
+        )
+
+        await coordinator._async_poll_http_statistics(datetime.now(UTC))  # ruff: ignore[private-member-access]
+        assert coordinator._slow_metrics_bg_task is not None  # ruff: ignore[private-member-access]
+        await coordinator._slow_metrics_bg_task  # ruff: ignore[private-member-access]
+
+        api.async_get_device_property.assert_not_awaited()
+        assert coordinator.data is not None
+        assert coordinator.data[DEVICE_ID][APP_SECTION_HOME_TRENDS][
+            APP_STAT_TOTAL_HOME_ENERGY
+        ] == pytest.approx(2.75)
+    finally:
+        await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+
+
+@pytest.mark.asyncio()
 async def test_http_only_cycle_reconciles_today_home_load_from_home_trends(
     hass: HomeAssistant,
 ) -> None:

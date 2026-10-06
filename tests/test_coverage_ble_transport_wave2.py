@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import inspect
+import json
 import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
@@ -18,6 +19,9 @@ from custom_components.jackery_solarvault.client.ble_transport import (
     JackeryBleListener,
     _GattSession,  # ruff: ignore[import-private-name]
     _body_is_complete_json_object,  # ruff: ignore[import-private-name]
+)
+from custom_components.jackery_solarvault.coordinator import (
+    JackerySolarVaultCoordinator,
 )
 
 if TYPE_CHECKING:
@@ -695,3 +699,154 @@ async def test_stop_clears_session_owned_state_and_pending_ack() -> None:
     assert "dev" not in listener._mtu  # ruff: ignore[private-member-access]
     assert "dev" not in listener._frame_assemblies  # ruff: ignore[private-member-access]
     assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 1
+
+
+async def test_complete_json_fragment_remains_in_its_pending_ble_message() -> None:
+    """A complete nested object is still a fragment of the enclosing report."""
+    key = b"k" * 16
+    observations: list[BleFrameObservation] = []
+
+    async def sink(_device_id: str, observation: BleFrameObservation) -> bool:
+        observations.append(observation)
+        await asyncio.sleep(0)
+        return True
+
+    listener = _listener(key=key, sink=sink)
+    bodies = [
+        b'{"cmd":110,"batteryPacks":[',
+        b'{"deviceSn":"PACK-A","cellTemp":251}',
+        b"]}",
+    ]
+    for index, body in enumerate(bodies, start=1):
+        raw = ble.encrypt_binary_notify(
+            ble.build_binary_frame(
+                cmd=110,
+                flags=3014,
+                frame_index=index,
+                chunk_count=len(bodies),
+                body=body,
+                security=1,
+            ),
+            key,
+            iv=bytes(16),
+        )
+        await listener._handle_notification(  # ruff: ignore[private-member-access]
+            "dev", raw, notify_sequence=index, received_monotonic=float(index)
+        )
+    assert observations[-1].parsed is not None
+    assert observations[-1].parsed.body == b"".join(bodies)
+    decode = JackerySolarVaultCoordinator._decode_ble_payload  # ruff: ignore[private-member-access]
+    assert all(item.is_fragment for item in observations[:-1])
+    assert not observations[-1].is_fragment
+    assert all(decode("dev", item) is None for item in observations[:-1])
+    assert decode("dev", observations[-1]) == {
+        "batteryPacks": [{"deviceSn": "PACK-A", "cellTemp": 251}]
+    }
+    assert json.loads(observations[-1].parsed.body) == {
+        "cmd": 110,
+        "batteryPacks": [{"deviceSn": "PACK-A", "cellTemp": 251}],
+    }
+    assert listener.stats_for("dev").multi_chunk_messages_assembled == 1
+    assert listener.stats_for("dev").multi_chunk_assemblies_dropped == 0
+
+
+@pytest.mark.parametrize("index", [1, 2, 3])
+async def test_independent_complete_ble_page_is_delivered_without_waiting(
+    index: int,
+) -> None:
+    """Independent complete App pages must not start waiting for other pages."""
+    observations: list[BleFrameObservation] = []
+
+    async def sink(_device_id: str, observation: BleFrameObservation) -> bool:
+        observations.append(observation)
+        await asyncio.sleep(0)
+        return True
+
+    listener = _listener(sink=sink)
+    body = b'{"cmd":120,"pvPw":123}'
+    raw = ble.encrypt_binary_notify(
+        ble.build_binary_frame(
+            cmd=120, flags=3019, body=body, frame_index=index, chunk_count=3, security=1
+        ),
+        b"k" * 16,
+        iv=bytes(16),
+    )
+    await listener._handle_notification("dev", raw)  # ruff: ignore[private-member-access]
+    assert len(observations) == 1
+    assert observations[0].parsed is not None
+    assert observations[0].parsed.body == body
+    assert listener.stats_for("dev").multi_chunk_frames_buffered == 0
+
+
+async def test_new_first_page_replaces_an_incomplete_ble_message() -> None:
+    """A new standalone page one must not let an old prefix capture later pages."""
+    observations: list[BleFrameObservation] = []
+
+    async def sink(_device_id: str, observation: BleFrameObservation) -> bool:
+        observations.append(observation)
+        await asyncio.sleep(0)
+        return True
+
+    listener = _listener(sink=sink)
+    for sequence, (index, body) in enumerate(
+        [
+            (1, b'{"cmd":120,"values":['),
+            (1, b'{"cmd":120,"pvPw":123}'),
+            (2, b'{"cmd":120,"pvPw":124}'),
+        ],
+        start=1,
+    ):
+        raw = ble.encrypt_binary_notify(
+            ble.build_binary_frame(
+                cmd=120,
+                flags=3019,
+                body=body,
+                frame_index=index,
+                chunk_count=3,
+                security=1,
+            ),
+            b"k" * 16,
+            iv=bytes(16),
+        )
+        await listener._handle_notification(  # ruff: ignore[private-member-access]
+            "dev", raw, notify_sequence=sequence, received_monotonic=float(sequence)
+        )
+    decode = JackerySolarVaultCoordinator._decode_ble_payload  # ruff: ignore[private-member-access]
+    assert decode("dev", observations[-2]) == {"pvPw": 123}
+    assert decode("dev", observations[-1]) == {"pvPw": 124}
+    assert listener.stats_for("dev").multi_chunk_drop_reasons == {
+        "cmd120:standalone_page_restart": 1
+    }
+
+
+async def test_expired_ble_prefix_does_not_capture_a_complete_page() -> None:
+    """Unrelated old partial data must not delay a new complete command body."""
+    observations: list[BleFrameObservation] = []
+
+    async def sink(_device_id: str, observation: BleFrameObservation) -> bool:
+        observations.append(observation)
+        await asyncio.sleep(0)
+        return True
+
+    listener = _listener(sink=sink)
+    for index, body, at in (
+        (1, b'{"cmd":120,"values":[', 1.0),
+        (2, b'{"cmd":120,"pvPw":123}', 20.0),
+    ):
+        raw = ble.encrypt_binary_notify(
+            ble.build_binary_frame(
+                cmd=120,
+                flags=3019,
+                body=body,
+                frame_index=index,
+                chunk_count=3,
+                security=1,
+            ),
+            b"k" * 16,
+            iv=bytes(16),
+        )
+        await listener._handle_notification(  # ruff: ignore[private-member-access]
+            "dev", raw, notify_sequence=index, received_monotonic=at
+        )
+    decode = JackerySolarVaultCoordinator._decode_ble_payload  # ruff: ignore[private-member-access]
+    assert decode("dev", observations[-1]) == {"pvPw": 123}

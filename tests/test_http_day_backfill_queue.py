@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from custom_components.jackery_solarvault import coordinator as coordinator_module
+from custom_components.jackery_solarvault.client.api import JackeryAuthError
 from custom_components.jackery_solarvault.const import (
     APP_SECTION_BATTERY_STAT,
     APP_SECTION_CT_STAT,
@@ -18,6 +19,10 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+)
+from custom_components.jackery_solarvault.util import (
+    day_power_energy_points,
+    supplement_pv_day_curve,
 )
 
 _DEVICE_ID = "device-1"
@@ -659,6 +664,151 @@ async def test_device_day_curve_wins_over_system_curve() -> None:
     assert status == "fetched"
     assert source == device_pv
     assert not any(call.startswith("sys_") for call in calls)
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("empty_series", [None, [], [None]])
+async def test_metadata_only_device_day_uses_system_curve(
+    empty_series: list[None] | None,
+) -> None:
+    """Empty chart fields must not block the documented system day source."""
+    coordinator = _coordinator()
+    cast("Any", coordinator)._device_index = {}  # ruff: ignore[private-member-access]
+    calls: list[str] = []
+    cast("Any", coordinator).api = _system_day_api(
+        device_pv={
+            "unit": "W",
+            "y": empty_series,
+            "currency": "€",
+            "_request": _day_request("2026-09-22"),
+        },
+        device_battery={},
+        pv_trends={"x": ["12:00"], "y": [1200], "unit": "W"},
+        battery_trends={},
+        calls=calls,
+    )
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={"system": {"id": "sys-1"}},
+        target_day=date(2026, 9, 22),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+    assert status == "fetched"
+    assert source["y"] == [1200]
+    assert source["currency"] == "€"
+    assert any(call.startswith("sys_pv:") for call in calls)
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("empty_series", [None, [], [None]])
+async def test_pv_channel_cannot_block_missing_aggregate_day_curve(
+    empty_series: list[None] | None,
+) -> None:
+    """System PV fills the aggregate without retiming the device's PV1 samples."""
+    coordinator = _coordinator()
+    calls: list[str] = []
+    device_pv = {
+        "x": ["12:05", "12:10"],
+        "y": empty_series,
+        "y1": [0, 300],
+        "unit": "W",
+        "currency": "€",
+        "_request": _day_request("2026-09-22"),
+    }
+    cast("Any", coordinator).api = _system_day_api(
+        device_pv=device_pv,
+        device_battery={},
+        pv_trends={"x": ["12:00", "12:05"], "y": [1200, 1500], "unit": "W"},
+        battery_trends={},
+        calls=calls,
+    )
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={"system": {"id": "sys-1"}},
+        target_day=date(2026, 9, 22),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+
+    assert status == "fetched"
+    assert source["x"] == ["12:00", "12:05", "12:10"]
+    assert source["y"] == [1200, 1500, None]
+    assert source["y1"] == [None, 0, 300]
+    assert source["currency"] == "€"
+    assert source["_request"] == device_pv["_request"]
+    assert device_pv["y1"] == [0, 300]
+    assert any(call.startswith("sys_pv:") for call in calls)
+    points = day_power_energy_points(
+        source,
+        "device_pv_stat_day",
+        "pv1Egy",
+        bucket_minutes=5,
+        today=date(2026, 9, 23),
+    )
+    assert [(point.start_date.strftime("%H:%M"), point.value) for point in points] == [
+        ("12:05", 0.0),
+        ("12:10", 0.025),
+    ]
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("error", [JackeryAuthError("expired"), TimeoutError()])
+async def test_system_pv_failure_preserves_device_channel_curve(
+    error: Exception,
+) -> None:
+    """A supplementary system failure does not discard usable device PV1 data."""
+    coordinator = _coordinator()
+    device_pv = {
+        "x": ["12:05"],
+        "y1": [300],
+        "unit": "W",
+        "_request": _day_request("2026-09-22"),
+    }
+    api = _system_day_api(
+        device_pv=device_pv,
+        device_battery={},
+        pv_trends={},
+        battery_trends={},
+        calls=[],
+    )
+    api.async_get_pv_trends = AsyncMock(side_effect=error)
+    cast("Any", coordinator).api = api
+
+    status, source = await coordinator._async_fetch_historical_day_chart_source(  # ruff: ignore[private-member-access]
+        device_id=_DEVICE_ID,
+        payload={"system": {"id": "sys-1"}},
+        target_day=date(2026, 9, 22),
+        section_prefix=APP_SECTION_PV_STAT,
+    )
+
+    assert status == "fetched"
+    assert source == device_pv
+    api.async_get_pv_trends.assert_awaited_once()
+
+
+@pytest.mark.parametrize("unit", ["kWh", "Wh"])
+def test_pv_curve_fallback_never_relabels_other_units(unit: str) -> None:
+    """A unit conflict leaves device measurements intact instead of rescaling."""
+    source = {"x": ["12:00"], "y1": [1.0], "unit": unit}
+    fallback = {"x": ["12:00"], "y": [1200], "unit": "W"}
+    assert supplement_pv_day_curve(source, fallback) == source
+
+
+def test_pv_curve_fallback_preserves_duplicate_device_samples() -> None:
+    """An ambiguous device axis cannot silently collapse measured samples."""
+    source = {"x": ["12:00", "12:00"], "y1": [100, 200], "unit": "W"}
+    fallback = {"x": ["12:00"], "y": [1200], "unit": "W"}
+    assert supplement_pv_day_curve(source, fallback) == source
+
+
+@pytest.mark.parametrize("labels", [None, ["12:00"], ["12:00", "bad"]])
+def test_pv_curve_fallback_never_guesses_missing_sample_times(
+    labels: list[str] | None,
+) -> None:
+    """Independent curve alignment needs a known timestamp for every sample."""
+    source = {"x": labels, "y1": [100, 200], "unit": "W"}
+    fallback = {"x": ["12:00", "12:05"], "y": [1200, 1500], "unit": "W"}
+    assert supplement_pv_day_curve(source, fallback) == source
 
 
 @pytest.mark.asyncio()

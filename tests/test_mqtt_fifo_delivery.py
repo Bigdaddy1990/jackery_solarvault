@@ -19,6 +19,27 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
+@pytest.mark.parametrize(
+    "raw", [b"invalid json", b"[1,2]", b"\xff\x00", b'{"value":"\xff"}']
+)
+async def test_cloud_mqtt_keeps_undecodable_ingress(
+    hass: HomeAssistant, raw: bytes
+) -> None:
+    """Unknown wire shapes reach the sink intact rather than disappearing."""
+    received: list[dict[str, Any]] = []
+
+    async def _callback(_topic: str, data: dict[str, Any]) -> None:  # ruff: ignore[unused-async]
+        received.append(data)
+
+    client = JackeryMqttPushClient(hass, message_callback=_callback)
+    client._handle_message("hb/app/user/device", raw)  # ruff: ignore[private-member-access]
+    await client.async_wait_message_queue_idle()
+    assert len(received) == 1
+    assert received[0]["raw_hex"] == raw.hex()
+    assert received[0]["payload_decode_error"]
+    assert client.diagnostics_snapshot()["messages_dropped"] == 0
+
+
 async def test_cloud_mqtt_uses_one_fifo_consumer_for_a_b_a(
     hass: HomeAssistant,
 ) -> None:

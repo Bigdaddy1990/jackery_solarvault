@@ -346,7 +346,7 @@ def _entry(runtime_data: object, options: dict[str, Any] | None = None) -> Any:
 
 
 def test_local_mqtt_diagnostics_reports_coordinator_not_ready() -> None:
-    """A failed setup exports redacted configuration instead of raising."""
+    """A failed setup retains the configured broker for diagnosis."""
     hass = SimpleNamespace(data={})
     result = _local_mqtt_diagnostics(
         cast("Any", hass),

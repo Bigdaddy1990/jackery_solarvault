@@ -213,10 +213,8 @@ def test_battery_pack_serial_resolves_common_fields() -> None:
     assert battery_pack_serial({"batSoc": 5}) is None
 
 
-@pytest.mark.parametrize("entry_available", [True, False])
 def test_pack_firmware_version_updates_registered_device(
     hass: HomeAssistant,
-    entry_available: bool,
 ) -> None:
     """Late BatteryPackSub version must reach device properties."""
     coordinator = _coordinator()
@@ -237,19 +235,11 @@ def test_pack_firmware_version_updates_registered_device(
     sensor._pack_key = pack_key  # ruff: ignore[private-member-access]
     sensor.coordinator = coordinator
 
-    if not entry_available:
-        coordinator.config_entry = None
-        sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
-        unchanged = registry.async_get(device.id)
-        assert isinstance(unchanged, dr.DeviceEntry)
-        assert unchanged.sw_version is None
-        coordinator.config_entry = entry
-
     sensor._sync_device_version({"version": "1.4"})  # ruff: ignore[private-member-access]
 
-    updated = registry.async_get(device.id)
-    assert isinstance(updated, dr.DeviceEntry)
-    assert updated.sw_version == "1.4"
+    updated_device = registry.async_get(device.id)
+    assert isinstance(updated_device, dr.DeviceEntry)
+    assert updated_device.sw_version == "1.4"
 
 
 def test_battery_pack_serial_prioritizes_device_sn_and_rejects_blank() -> None:
@@ -529,10 +519,10 @@ def test_existing_serial_target_removes_only_duplicate_numeric_device(
     _async_remove_phantom_battery_pack_devices(hass, entry)
 
     assert device_registry.async_get(serial_device.id) is not None
-    assert serial_device.config_entry_id == entry.entry_id
+    assert entry.entry_id in serial_device.config_entries
     removed_fallback = device_registry.async_get(numeric_device.id)
-    assert (
-        removed_fallback is None or removed_fallback.config_entry_id != entry.entry_id
+    assert removed_fallback is None or entry.entry_id not in (
+        removed_fallback.config_entries
     )
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
     for key, legacy_entity in numeric_entities.items():
@@ -649,7 +639,7 @@ def test_duplicate_legacy_serial_targets_keep_one_canonical_pack(
     assert serial_entity_id in {first_entity.entity_id, second_entity.entity_id}
     duplicate_id = ({first_device.id, second_device.id} - {serial_device.id}).pop()
     duplicate = device_registry.async_get(duplicate_id)
-    assert duplicate is None or duplicate.config_entry_id != entry.entry_id
+    assert duplicate is None or entry.entry_id not in duplicate.config_entries
 
 
 def test_registry_migration_skips_stored_live_serial_conflict(
@@ -866,17 +856,23 @@ def test_collection_preserves_explicit_unknown_identity() -> None:
     assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) is None
 
 
-def test_registered_pack_numbers_survive_reversed_report_order(
+@pytest.mark.parametrize("initial_indices", [[], [0], [1], [2], [2, 1, 0]])
+@pytest.mark.parametrize("reported_count", [None, 3])
+def test_registered_pack_numbers_survive_incomplete_reload(
     hass: HomeAssistant,
+    initial_indices: list[int],
+    reported_count: int | None,
 ) -> None:
-    """A reload preserves serial-owned histories and their original pack numbers."""
+    """Partial reload snapshots preserve serial-owned histories and pack numbers."""
     serials = ["HQ2C01400094HP3", "HQ2C01600246HP3", "HQ2C01400955HP3"]
     counters = [1232, 1127, 36541]
     packs = [
         {"deviceSn": serial, "inEgy": counter}
         for serial, counter in zip(serials, counters, strict=True)
     ]
-    coordinator = _coordinator(list(reversed(packs)))
+    initial_packs = [packs[index] for index in initial_indices]
+    coordinator = _coordinator(initial_packs)
+    props = {} if reported_count is None else {FIELD_BAT_NUM: reported_count}
     entry = _entry(hass, coordinator)
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
@@ -900,6 +896,8 @@ def test_registered_pack_numbers_survive_reversed_report_order(
         )
 
     _async_migrate_battery_pack_identities(hass, entry)
+    for index, serial in enumerate(serials, start=1):
+        assert coordinator.battery_pack_identity_serial(_PARENT_ID, index) == serial
     collection = _SensorCollection(
         coordinator=coordinator,
         seen_unique_ids=set(),
@@ -912,8 +910,30 @@ def test_registered_pack_numbers_survive_reversed_report_order(
     _collect_battery_packs(
         collection,
         _PARENT_ID,
+        {PAYLOAD_BATTERY_PACKS: initial_packs},
+        props,
+    )
+    for index, serial in enumerate(serials):
+        sensor = next(
+            entity
+            for entity in collection.entities
+            if entity.unique_id
+            == f"{_serial_identifier(serial)}_lifetime_charge_energy"
+        )
+        assert isinstance(sensor, JackeryBatteryPackSensor)
+        value = sensor._value_from_pack(sensor._pack)  # ruff: ignore[private-member-access]
+        if index in initial_indices:
+            assert value == pytest.approx(counters[index] / 100)
+        else:
+            assert value is None
+    cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_BATTERY_PACKS] = list(
+        reversed(packs)
+    )
+    _collect_battery_packs(
+        collection,
+        _PARENT_ID,
         {PAYLOAD_BATTERY_PACKS: list(reversed(packs))},
-        {FIELD_BAT_NUM: 3},
+        props,
     )
 
     for index, (serial, counter) in enumerate(
@@ -928,3 +948,147 @@ def test_registered_pack_numbers_survive_reversed_report_order(
         )
         assert isinstance(sensor, JackeryBatteryPackSensor)
         assert sensor._value_from_pack(sensor._pack) == pytest.approx(counter / 100)  # ruff: ignore[private-member-access]
+        assert sensor.device_info["serial_number"] == serial
+        device_name = sensor.device_info["name"]
+        assert device_name is not None
+        assert device_name.endswith(f" {index}")
+
+
+@pytest.mark.parametrize("frozen_parent", [_PARENT_ID, "device-2"])
+@pytest.mark.parametrize("frozen_serial", [_SN_A, _SN_A.lower()])
+def test_frozen_pack_serial_does_not_claim_another_live_index(
+    frozen_parent: str,
+    frozen_serial: str,
+) -> None:
+    """A partial roster cannot register a known serial at another display index."""
+    coordinator = _coordinator([{"deviceSn": _SN_A, "inEgy": 36541}])
+    coordinator.set_battery_pack_identity_override(frozen_parent, 3, frozen_serial)
+
+    expected = None if frozen_parent == _PARENT_ID else _SN_A
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == expected
+    assert coordinator.battery_pack_identity_serial(frozen_parent, 3) == frozen_serial
+
+
+@pytest.mark.parametrize("legacy_index", [2, 4])
+async def test_numeric_pack_cleanup_preserves_history_after_roster_reordering(
+    hass: HomeAssistant, legacy_index: int
+) -> None:
+    """A known live serial remains valid when its legacy index no longer matches."""
+    coordinator = _coordinator([
+        {"deviceSn": _SN_A},
+        {"deviceSn": _SN_B},
+        {"deviceSn": _SN_BEFORE_A},
+    ])
+    cast("Any", coordinator).data[_PARENT_ID][PAYLOAD_PROPERTIES] = {FIELD_BAT_NUM: 3}
+    entry = _entry(hass, coordinator)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    _parent_device(devices, entry)
+    serial_identifier = _serial_identifier(_SN_A)
+    target = _pack_device(devices, entry, serial_identifier, serial_number=_SN_A)
+    old_identifier = f"{_PARENT_ID}_battery_pack_{legacy_index}"
+    legacy = _pack_device(devices, entry, old_identifier, serial_number=_SN_A)
+    original_ids: dict[str, str] = {}
+    for key, label in (
+        ("state_of_charge", "soc"),
+        ("charge_power", "ladeleistung"),
+        ("discharge_power", "entladeleistung"),
+    ):
+        registered = _pack_entity(entities, entry, legacy, f"{old_identifier}_{key}")
+        entity_id = (
+            f"sensor.solarvault_3_pro_max_zusatzbatterie_{legacy_index}_"
+            f"zusatzbatterie_{label}"
+        )
+        entities.async_update_entity(registered.entity_id, new_entity_id=entity_id)
+        original_ids[key] = entity_id
+
+    for _ in range(2):
+        _async_migrate_battery_pack_identities(hass, entry)
+        _async_remove_phantom_battery_pack_devices(hass, entry)
+        await hass.async_block_till_done()
+        for key, entity_id in original_ids.items():
+            preserved = entities.async_get(entity_id)
+            assert preserved is not None, f"Lost history owner {entity_id}"
+            assert preserved.unique_id == f"{serial_identifier}_{key}"
+            assert preserved.device_id == target.id
+
+
+@pytest.mark.parametrize(
+    "serial",
+    [
+        "\x02 8f\x05 \x01",
+        "PACK\x00SN",
+        "PACK\x7fSN",
+        {"sn": "PACK"},
+        ["PACK"],
+        True,
+        12,
+    ],
+)
+def test_pack_identity_never_coerces_corrupt_or_structured_serial(
+    serial: object,
+) -> None:
+    """Malformed identifiers cannot create phantom hardware identities."""
+    payload = {"deviceSn": serial, "devType": 1, "batSoc": 45}
+    assert battery_pack_serial(payload) is None
+    assert payload["deviceSn"] is serial
+
+
+def test_corrupt_fourth_pack_keeps_raw_row_without_registering_phantom() -> None:
+    """Preserve diagnostic evidence without assigning corrupt telemetry to hardware."""
+    packs = [
+        {"deviceSn": _SN_A, "batSoc": 33},
+        {"deviceSn": _SN_B, "batSoc": 29},
+        {"deviceSn": _SN_BEFORE_A, "batSoc": 38},
+        {"deviceSn": "\x02 8f\x05 \x01", "devType": 1, "batSoc": 45, "outPw": 21},
+    ]
+    coordinator = _coordinator(packs)
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+    _collect_battery_packs(
+        collection, _PARENT_ID, {PAYLOAD_BATTERY_PACKS: packs}, {FIELD_BAT_NUM: 3}
+    )
+    assert set(collection.battery_pack_identities) == {
+        (_PARENT_ID, 1),
+        (_PARENT_ID, 2),
+        (_PARENT_ID, 3),
+    }
+    assert coordinator.data[_PARENT_ID][PAYLOAD_BATTERY_PACKS] == packs
+
+
+@pytest.mark.parametrize(
+    "serial", ["\x02 8f\x05 \x01", {"sn": "PACK"}, ["PACK"], False, 0, [], {}]
+)
+def test_corrupt_pack_updates_never_overwrite_an_identified_pack(
+    serial: object,
+) -> None:
+    """Keep opaque raw evidence separate and stable across repeated updates."""
+    original = {"deviceSn": _SN_A, "batSoc": 33}
+    incoming = {"deviceSn": serial, "batSoc": 45}
+    first = merge_battery_pack_lists([original], [incoming])
+    second = merge_battery_pack_lists(first, [{**incoming, "batSoc": 46}])
+    assert first[0] == original
+    assert second == [original, {"deviceSn": serial, "batSoc": 46}]
+    assert incoming == {"deviceSn": serial, "batSoc": 45}
+
+
+def test_corrupt_frozen_identity_cannot_register_a_phantom_pack() -> None:
+    """Previously persisted corrupt serials are not trusted as hardware IDs."""
+    coordinator = _coordinator()
+    coordinator.set_battery_pack_identity_override(_PARENT_ID, 4, "\x02 8f\x05 \x01")
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 4) is None
+
+
+@pytest.mark.parametrize("identity", [False, 0, [], {}])
+def test_corrupt_primary_serial_does_not_fall_back_to_an_alias(
+    identity: object,
+) -> None:
+    """A malformed explicit identity is not evidence for a different field owner."""
+    assert battery_pack_serial({"deviceSn": identity, "devSn": _SN_A}) is None

@@ -2,7 +2,7 @@
 
 import asyncio
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -28,18 +28,15 @@ async def test_local_mqtt_client_initialization_and_diagnostics(  # ruff: ignore
     assert client.is_connected is False
     assert client.is_started is False
 
-    diagnostics = client.diagnostics_snapshot()
+    diagnostics = client.diagnostics_snapshot(redact=True)
     assert diagnostics["transport"] == "direct_mqtt"
     assert diagnostics["library"] == "aiomqtt"
-    assert diagnostics["topic_filter"] == "jackery/#"
-    assert (
-        diagnostics["configured_target"]["host"]
-        == client.diagnostics_snapshot(redact=False)["configured_target"]["host"]
-    )
+    assert diagnostics["topic_filter"] == "**REDACTED**"
+    assert diagnostics["configured_target"]["host"] == "**REDACTED**"
     assert diagnostics["subscribed"] is False
     assert diagnostics["connected"] is False
     rendered = repr(diagnostics)
-    assert "jackery/#" in rendered
+    assert "jackery/#" not in rendered
 
 
 def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:
@@ -70,6 +67,24 @@ def test_local_mqtt_configuration_matching(hass: HomeAssistant) -> None:
         topic_filter="jackery/+/telemetry",
         qos=1,
     )
+
+
+@pytest.mark.asyncio()
+async def test_local_mqtt_rpc_event_is_forwarded_complete(hass: HomeAssistant) -> None:
+    """The Coordinator must see RPC events before deciding their identity."""
+    sink = AsyncMock(return_value=True)
+    client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="homeassistant/#")
+    raw = b'{"method":"NotifyStatus","params":{"em:0":{"total_act_power":42.5}}}'
+    await client._handle_message("homeassistant/events/rpc", raw)  # ruff: ignore[private-member-access]
+    sink.assert_awaited_once_with(
+        "homeassistant/events/rpc",
+        {"method": "NotifyStatus", "params": {"em:0": {"total_act_power": 42.5}}},
+        raw,
+    )
+    diagnostics = client.diagnostics_snapshot()
+    assert diagnostics["messages_received"] == 1
+    assert diagnostics["messages_filtered"] == 0
+    assert diagnostics["messages_forwarded"] == 1
 
 
 @pytest.mark.asyncio()
@@ -114,18 +129,18 @@ async def test_local_mqtt_message_handling(hass: HomeAssistant) -> None:
     assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
     assert forwarded[1][1] == {"devSn": "12345", "batSoc": 95}
 
-    # Oversized frames are rejected at the transport boundary before JSON
-    # decoding so a broker cannot force unbounded memory/CPU work.
+    # Size is diagnostic only; complete frames still reach the sink.
     large_payload = b'{"batSoc": 100, "extra": "' + b"A" * (130 * 1024) + b'"}'
     await client._handle_message(  # ruff: ignore[private-member-access]
         "jackery/device1",
         large_payload,
     )
     diag = client.diagnostics_snapshot()
-    assert diag["messages_dropped"] == 1
+    assert diag["messages_dropped"] == 0
     assert diag["messages_oversized"] == 1
-    assert diag["messages_forwarded"] == 2  # ruff: ignore[magic-value-comparison]
-    assert len(forwarded) == 2  # ruff: ignore[magic-value-comparison]
+    assert diag["messages_forwarded"] == 3  # ruff: ignore[magic-value-comparison]
+    assert len(forwarded) == 3  # ruff: ignore[magic-value-comparison]
+    assert forwarded[-1][2] == large_payload
 
 
 @pytest.mark.asyncio()
