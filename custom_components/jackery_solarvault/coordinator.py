@@ -6653,7 +6653,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         # Their command and body, not that header alone, identify the route.
         route_action_id = (
             None
-            if cmd in {
+            if cmd
+            in {
                 MQTT_CMD_QUERY_DEVICE_PROPERTY,
                 MQTT_CMD_DEVICE_PROPERTY_CHANGE,
                 MQTT_CMD_QUERY_SUBDEVICE_GROUP_PROPERTY,
