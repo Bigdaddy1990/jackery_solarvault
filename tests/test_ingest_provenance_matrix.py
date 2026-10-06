@@ -187,15 +187,15 @@ def test_equal_timestamp_uses_explicit_live_source_priority() -> None:
 @pytest.mark.parametrize(
     ["first_source", "second_source"],
     [
-        [DataSource.BLE, DataSource.LOCAL_MQTT],
-        [DataSource.LOCAL_MQTT, DataSource.BLE],
+        [DataSource.CLOUD_MQTT, DataSource.LOCAL_MQTT],
+        [DataSource.LOCAL_MQTT, DataSource.CLOUD_MQTT],
     ],
 )
-def test_local_peers_update_in_arrival_order(
+def test_mqtt_peers_update_in_arrival_order(
     first_source: DataSource,
     second_source: DataSource,
 ) -> None:
-    """Independent local connections update equal-priority fields in arrival order."""
+    """Independent MQTT connections update equal-priority fields in arrival order."""
     first = _ingest(_observation(first_source, _OLD_VALUE, observed_at=_BASE_TIME))
 
     second = _ingest(
@@ -214,8 +214,14 @@ def test_local_peers_update_in_arrival_order(
     assert second.provenance[_FIELD].source is second_source
 
 
-@pytest.mark.parametrize("local_source", [DataSource.LOCAL_MQTT, DataSource.BLE])
-@pytest.mark.parametrize("cloud_source", [DataSource.HTTP, DataSource.CLOUD_MQTT])
+@pytest.mark.parametrize(
+    ["local_source", "cloud_source"],
+    [
+        [DataSource.LOCAL_MQTT, DataSource.HTTP],
+        [DataSource.BLE, DataSource.HTTP],
+        [DataSource.BLE, DataSource.CLOUD_MQTT],
+    ],
+)
 def test_fresh_local_value_wins_but_cloud_fills_missing_fields(
     local_source: DataSource,
     cloud_source: DataSource,

@@ -59,7 +59,7 @@ TransportSource = DataSource
 _LIVE_SOURCE_TIER: Final[dict[DataSource, int]] = {
     DataSource.HTTP: 0,
     DataSource.CLOUD_MQTT: 1,
-    DataSource.LOCAL_MQTT: 2,
+    DataSource.LOCAL_MQTT: 1,
     DataSource.BLE: 2,
 }
 
@@ -311,8 +311,9 @@ def ingest_observation(
     The returned payload contains protocol data only. Source, timestamps and
     request identifiers are retained solely in the parallel ``provenance``
     mapping, so Home Assistant entities never expose ingest bookkeeping.
-    Neither input mapping is mutated. Fresh local live fields take priority over
-    cloud MQTT and HTTP for ``freshness_window_seconds``. Equal-tier transports
+    Neither input mapping is mutated. Fresh BLE live fields take priority over
+    MQTT and HTTP for ``freshness_window_seconds``. Local and cloud MQTT share
+    a tier because local publishers are not authenticated. Equal-tier transports
     update in arrival order when no protocol timestamp is available. When both
     observations carry trustworthy timestamps, an older frame can never reverse
     a newer live value, regardless of which independent transport delivered it.
