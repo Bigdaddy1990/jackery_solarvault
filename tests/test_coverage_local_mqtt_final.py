@@ -123,23 +123,23 @@ async def test_topic_tracking_truncation_does_not_drop_payload(
 
 
 @pytest.mark.asyncio()
-async def test_oversized_payload_reaches_sink_complete(
+async def test_oversized_payload_is_dropped_before_decoding(
     hass: HomeAssistant,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The size diagnostic cannot discard a complete frame before processing."""
+    """The transport rejects frames exceeding its configured size budget."""
     sink = AsyncMock(return_value=True)
     monkeypatch.setattr(local_mqtt, "LOCAL_MQTT_MAX_PAYLOAD_BYTES", 2)
     client = JackeryLocalMqttClient(hass, sink=sink, topic_filter="#")
 
     await client._handle_message("jackery/device", b"{} ")  # ruff: ignore[private-member-access]
 
-    sink.assert_awaited_once_with("jackery/device", {}, b"{} ")
+    sink.assert_not_awaited()
     snapshot = client.diagnostics_snapshot(redact=False)
     assert snapshot["messages_received"] == 1
-    assert snapshot["messages_dropped"] == 0
+    assert snapshot["messages_dropped"] == 1
     assert snapshot["messages_oversized"] == 1
-    assert snapshot["messages_forwarded"] == 1
+    assert snapshot["messages_forwarded"] == 0
 
 
 def cast_str(value: object) -> str:

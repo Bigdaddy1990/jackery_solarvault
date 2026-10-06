@@ -3041,7 +3041,11 @@ def _seed_battery_pack_registry_identities(
             norm_serial = _battery_pack_serial_token(serial, fallback_index or 1)
             live_index = observed_serial_to_live_index.get(norm_serial)
             index = fallback_index if fallback_index is not None else live_index
-            if index is None:
+            if index is None or (
+                live_index is None
+                and _complete_battery_pack_topology(coordinator, parent_device_id)
+                is not None
+            ):
                 continue
             key = stable_subdevice_key("battery_pack", serial, index)
             if (

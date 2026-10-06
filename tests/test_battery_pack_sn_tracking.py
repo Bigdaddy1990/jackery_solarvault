@@ -1092,3 +1092,50 @@ def test_corrupt_primary_serial_does_not_fall_back_to_an_alias(
 ) -> None:
     """A malformed explicit identity is not evidence for a different field owner."""
     assert battery_pack_serial({"deviceSn": identity, "devSn": _SN_A}) is None
+
+
+def test_complete_topology_does_not_recreate_a_stale_registered_pack(
+    hass: HomeAssistant,
+) -> None:
+    """A removed pack's stored entity index cannot override complete live data."""
+    coordinator = _coordinator([{"deviceSn": _SN_A}])
+    assert coordinator.data is not None
+    coordinator.data[_PARENT_ID][PAYLOAD_PROPERTIES] = {FIELD_BAT_NUM: 1}
+    entry = _entry(hass, coordinator)
+    devices = dr.async_get(hass)
+    entities = er.async_get(hass)
+    _parent_device(devices, entry)
+    for index, serial in enumerate([_SN_A, _SN_B], start=1):
+        device = _pack_device(
+            devices, entry, _serial_identifier(serial), serial_number=serial
+        )
+        registered = _pack_entity(
+            entities,
+            entry,
+            device,
+            f"{_serial_identifier(serial)}_lifetime_charge_energy",
+        )
+        entities.async_update_entity(
+            registered.entity_id,
+            new_entity_id=f"sensor.zusatzbatterie_{index}_lebensenergie_geladen",
+        )
+    _async_migrate_battery_pack_identities(hass, entry)
+    _async_remove_phantom_battery_pack_devices(hass, entry)
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 1) == _SN_A
+    assert coordinator.battery_pack_identity_serial(_PARENT_ID, 2) is None
+    collection = _SensorCollection(
+        coordinator=coordinator,
+        seen_unique_ids=set(),
+        battery_pack_identities={},
+        create_smart_meter_derived=False,
+        create_calculated_power=False,
+        create_savings_details=False,
+        entities=[],
+    )
+    _collect_battery_packs(
+        collection, _PARENT_ID, coordinator.data[_PARENT_ID], {FIELD_BAT_NUM: 1}
+    )
+    assert all(
+        entity.unique_id is not None and _SN_B.lower() not in entity.unique_id
+        for entity in collection.entities
+    )

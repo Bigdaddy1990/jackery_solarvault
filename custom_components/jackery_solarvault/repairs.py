@@ -32,9 +32,11 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
         self,
         entry_id: str | None,
         description_placeholders: dict[str, str],
+        issue_id: str,
     ) -> None:
         """Initialize the repair flow for one config entry."""
         self._entry_id = entry_id
+        self._issue_id = issue_id
         self._description_placeholders = description_placeholders
 
     async def async_step_init(
@@ -82,12 +84,7 @@ class DeviceNotActivatedRepairFlow(RepairsFlow):
             return "refresh_failed"
         if not coordinator.last_update_success:
             return "refresh_failed"
-        if (
-            ir.async_get(self.hass).async_get_issue(
-                DOMAIN, getattr(self, "issue_id", "")
-            )
-            is not None
-        ):
+        if ir.async_get(self.hass).async_get_issue(DOMAIN, self._issue_id) is not None:
             return "issue_still_present"
         return None
 
@@ -116,6 +113,8 @@ async def async_create_fix_flow(  # ruff: ignore[unused-async]  # HA requires an
         description_placeholders = {
             "device_id": device_id,
         }
-        return DeviceNotActivatedRepairFlow(entry_id, description_placeholders)
+        return DeviceNotActivatedRepairFlow(
+            entry_id, description_placeholders, issue_id
+        )
     msg = f"No repair flow registered for issue '{issue_id}' under domain '{DOMAIN}'"
     raise data_entry_flow.UnknownFlow(msg)

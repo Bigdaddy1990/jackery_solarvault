@@ -889,7 +889,9 @@ def test_unparsed_ble_frame_keeps_raw_bytes_without_redaction_switch() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator.entry = SimpleNamespace(options={"enable_unredacted_debug": True})
+        cast("Any", coordinator).entry = SimpleNamespace(
+            options={"enable_unredacted_debug": True}
+        )
         received_at = datetime.now(UTC)
         observation = BleFrameObservation(
             received_at=received_at,
@@ -914,7 +916,7 @@ def test_unparsed_ble_frame_keeps_raw_bytes_without_redaction_switch() -> None:
         assert event["notify_sequence"] == 4  # ruff: ignore[magic-value-comparison]
         assert event["decode_error"] == "invalid frame"
 
-        coordinator.entry = SimpleNamespace(options={})
+        cast("Any", coordinator).entry = SimpleNamespace(options={})
         assert capture.call_args.args[0]()["raw_hex"] == "dead"
 
     asyncio.run(_run())

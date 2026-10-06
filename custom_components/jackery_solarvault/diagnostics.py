@@ -62,9 +62,9 @@ def _redacted_payload_map(
         dict[str, Any]: Mapping of generated labels to redacted payloads.
     """
     redacted: dict[str, Any] = {}
-    for _index, key in enumerate(sorted(payloads, key=str), start=1):
+    for index, key in enumerate(sorted(payloads, key=str), start=1):
         payload = payloads[key]
-        label = str(key)
+        label = f"{prefix}_{index}" if redact_keys else str(key)
         if isinstance(payload, dict):
             redacted[label] = async_redact_data(payload, redact_keys)
         else:

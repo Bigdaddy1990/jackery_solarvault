@@ -1836,6 +1836,7 @@ REDACT_KEYS: Final = frozenset({
     "mqtt_password",
     "nested_token",
     "local_mqtt_password",
+    "raw_hex",
 })
 
 # MQTT client metadata and topic layout

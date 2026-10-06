@@ -62,7 +62,7 @@ async def test_init_step_routes_to_the_confirm_form(
     flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """The init step is a pass-through that immediately shows confirmation."""
-    flow = flow_cls(None, {"key": "value"})
+    flow = flow_cls(None, {"key": "value"}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_init()
@@ -78,7 +78,7 @@ async def test_confirm_step_without_input_shows_the_form(
     flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """Calling confirm with no submission redisplays the confirmation form."""
-    flow = flow_cls(None, {"key": "value"})
+    flow = flow_cls(None, {"key": "value"}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm()
@@ -99,7 +99,7 @@ async def test_confirm_submission_refreshes_the_coordinator_and_completes(
     """Submitting the form refreshes cloud data and finishes the flow."""
     coordinator, refresh = _bare_coordinator()
     entry = _entry_with_coordinator(hass, coordinator)
-    flow = flow_cls(entry.entry_id, {})
+    flow = flow_cls(entry.entry_id, {}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm({})
@@ -118,7 +118,7 @@ async def test_confirm_submission_keeps_issue_open_after_refresh_error(
     coordinator, refresh = _bare_coordinator()
     refresh.side_effect = TimeoutError("cloud stalled")
     entry = _entry_with_coordinator(hass, coordinator)
-    flow = flow_cls(entry.entry_id, {})
+    flow = flow_cls(entry.entry_id, {}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm({})
@@ -140,7 +140,7 @@ async def test_confirm_submission_propagates_auth_failure(
     coordinator, refresh = _bare_coordinator()
     refresh.side_effect = ConfigEntryAuthFailed("expired")
     entry = _entry_with_coordinator(hass, coordinator)
-    flow = flow_cls(entry.entry_id, {})
+    flow = flow_cls(entry.entry_id, {}, "test-issue")
     flow.hass = hass
 
     with pytest.raises(ConfigEntryAuthFailed):
@@ -156,7 +156,7 @@ async def test_confirm_submission_without_entry_id_stays_open(
     flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """An unavailable integration cannot claim that a cloud repair succeeded."""
-    flow = flow_cls(None, {})
+    flow = flow_cls(None, {}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm({})
@@ -171,7 +171,7 @@ async def test_confirm_submission_with_unknown_entry_id_stays_open(
     flow_cls: type[DeviceNotActivatedRepairFlow],
 ) -> None:
     """An unavailable integration cannot claim that a cloud repair succeeded."""
-    flow = flow_cls("stale-entry-id", {})
+    flow = flow_cls("stale-entry-id", {}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm({})
@@ -188,7 +188,7 @@ async def test_confirm_submission_with_unset_up_entry_stays_open(
     """An unavailable integration cannot claim that a cloud repair succeeded."""
     entry = MockConfigEntry(domain=DOMAIN)
     entry.add_to_hass(hass)
-    flow = flow_cls(entry.entry_id, {})
+    flow = flow_cls(entry.entry_id, {}, "test-issue")
     flow.hass = hass
 
     result = await flow.async_step_confirm({})
@@ -255,7 +255,7 @@ async def test_failed_update_flag_keeps_repair_open(hass: HomeAssistant) -> None
     coordinator, _refresh = _bare_coordinator()
     coordinator.last_update_success = False
     entry = _entry_with_coordinator(hass, coordinator)
-    flow = DeviceNotActivatedRepairFlow(entry.entry_id, {})
+    flow = DeviceNotActivatedRepairFlow(entry.entry_id, {}, "test-issue")
     flow.hass = hass
     result = await flow.async_step_confirm({})
     assert result["type"] is FlowResultType.FORM
@@ -277,9 +277,11 @@ async def test_successful_refresh_with_unresolved_issue_stays_open(
         severity=ir.IssueSeverity.WARNING,
         translation_key=REPAIR_ISSUE_DEVICE_NOT_ACTIVATED,
     )
-    flow = DeviceNotActivatedRepairFlow(entry.entry_id, {"device_id": "device"})
+    flow = await async_create_fix_flow(
+        hass, issue_id, {"entry_id": entry.entry_id, "device_id": "device"}
+    )
+    assert isinstance(flow, DeviceNotActivatedRepairFlow)
     flow.hass = hass
-    flow.issue_id = issue_id
     result = await flow.async_step_confirm({})
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "issue_still_present"}

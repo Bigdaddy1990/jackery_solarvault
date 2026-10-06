@@ -43,6 +43,7 @@ _DEFAULT_MQTT_PORT = 1883
 _MAX_MQTT_PORT = 65_535
 _SELF_PUBLISH_ECHO_TTL_SEC = 30.0
 _MAX_PENDING_SELF_PUBLISH_ECHOES = 128
+_MAX_QUEUED_MESSAGES = 256
 # MQTT 3.1.1 SUBACK: granted QoS 0..2, anything from 0x80 up means the broker
 # refused the subscription (MQTT-3.9.3-2).
 _SUBACK_FAILURE_CODE = 0x80
@@ -211,7 +212,9 @@ class JackeryLocalMqttClient:
         self._configuration_error = False
         self._messages_received = self._messages_dropped = 0
         self._messages_forwarded = self._messages_filtered = 0
-        self._messages_rejected_by_sink = self._sink_errors = 0
+        self._messages_rejected_by_sink = self._sink_errors = (
+            self._message_queue_full_count
+        ) = 0
         self._payload_too_large_count = self._retained_messages_dropped = 0
         self._topics_seen: list[str] = []
         self._topics_seen_set: set[str] = set()
@@ -454,8 +457,21 @@ class JackeryLocalMqttClient:
             self._enqueue_message(str(message.topic), bytes(message.payload))
 
     def _enqueue_message(self, topic: str, payload: bytes | str) -> None:
-        """Accept one broker frame into the ordered no-drop FIFO."""
+        """Queue a size-limited frame in order, rejecting overload explicitly."""
         if self._stopping:
+            return
+        size = (
+            len(payload.encode("utf-8")) if isinstance(payload, str) else len(payload)
+        )
+        if size > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
+            self._payload_too_large_count += 1
+            self._messages_received += 1
+            self._messages_dropped += 1
+            return
+        if len(self._message_queue) >= _MAX_QUEUED_MESSAGES:
+            self._message_queue_full_count += 1
+            self._messages_received += 1
+            self._messages_dropped += 1
             return
         self._message_queue.append((topic, payload))
         self._ensure_message_consumer()
@@ -688,6 +704,8 @@ class JackeryLocalMqttClient:
         self._last_message_at = self._utc_now_iso()
         if len(raw) > LOCAL_MQTT_MAX_PAYLOAD_BYTES:
             self._payload_too_large_count += 1
+            self._messages_dropped += 1
+            return
         # No content gate here. docs/AGENTS.md §1.1 Data Integrity First:
         # "live MQTT/BLE ingress is not filtered or dropped merely because a
         # field is unknown or incomplete." Scoping is the topic filter's job;
@@ -930,7 +948,9 @@ class JackeryLocalMqttClient:
             "payload_too_large_count": self._payload_too_large_count,
             "messages_oversized": self._payload_too_large_count,
             "pending_message_tasks": len(self._message_tasks),
-            "message_queue_unbounded": True,
+            "message_queue_unbounded": False,
+            "message_queue_limit": _MAX_QUEUED_MESSAGES,
+            "message_queue_full_count": self._message_queue_full_count,
             "message_queue_depth": len(self._message_queue),
             "message_consumer_running": bool(
                 self._message_consumer_task is not None

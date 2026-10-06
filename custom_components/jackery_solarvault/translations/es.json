@@ -2125,6 +2125,11 @@
   "issues": {
     "device_not_activated": {
       "fix_flow": {
+        "error": {
+          "integration_unavailable": "The Jackery integration is not loaded. Restore the integration before trying again.",
+          "issue_still_present": "Jackery still reports the activation issue. Check the device in the Jackery app and try again.",
+          "refresh_failed": "The cloud refresh failed. The issue remains open. Check the connection and try again."
+        },
         "step": {
           "confirm": {
             "description": "El dispositivo Jackery {device_id} reporta activated=0 en el sistema de nube. Es una señal de calidad de datos del lado de la nube, no una prueba de que el dispositivo no esté emparejado localmente. Algunos endpoints de tendencias, estadísticas e historial de Jackery pueden devolver datos vacíos o cero mientras la nube reporte esta señal.\n\nPara comprobarlo:\n1. Abra la aplicación móvil Jackery\n2. Confirme que el dispositivo esté registrado y aparezca como 'En línea'\n3. Vuelva aquí y fuerce una actualización de la nube\n\nEl problema de reparación se eliminará cuando la nube de Jackery reporte activated=1 o deje de devolver la señal inconsistente.",

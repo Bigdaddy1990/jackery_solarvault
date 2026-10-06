@@ -465,9 +465,11 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
     entry.add_to_hass(hass)
 
     flow = await hass.config_entries.options.async_init(entry.entry_id)
+    schema = flow["data_schema"]
+    assert schema is not None
     defaults = {
         marker.schema: marker.default()
-        for marker in flow["data_schema"].schema
+        for marker in schema.schema
         if hasattr(marker, "default")
     }
     assert (
@@ -487,9 +489,11 @@ async def test_options_flow_persists_and_reopens_local_mqtt_topic_and_qos(
 
     reopened = await hass.config_entries.options.async_init(entry.entry_id)
     assert reopened["type"] is FlowResultType.FORM
+    schema = reopened["data_schema"]
+    assert schema is not None
     defaults = {
         marker.schema: marker.default()
-        for marker in reopened["data_schema"].schema
+        for marker in schema.schema
         if hasattr(marker, "default")
     }
     assert defaults[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] == topic

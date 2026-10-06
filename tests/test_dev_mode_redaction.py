@@ -7,7 +7,7 @@ it, the mandatory credential redaction stays exactly as before.
 
 import json
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -179,8 +179,8 @@ def test_entry_debug_option_is_scoped_to_its_entry(
     assert active_redact_keys(enabled) == frozenset()
     assert active_redact_keys(disabled) == REDACT_KEYS
     assert _payload_debug_capture_enabled(enabled)
-    assert JackeryMqttPushClient._redact_topic(_TOPIC, enabled) == _TOPIC  # ruff: ignore[private-member-access]
-    assert JackeryMqttPushClient._redact_topic(_TOPIC, disabled) == _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC, cast("Any", enabled)) == _TOPIC  # ruff: ignore[private-member-access]
+    assert JackeryMqttPushClient._redact_topic(_TOPIC, cast("Any", disabled)) == _TOPIC  # ruff: ignore[private-member-access]
 
     client = JackeryApi(session=AsyncMock(), account="test", password="test")
     client.dev_mode_entry = enabled

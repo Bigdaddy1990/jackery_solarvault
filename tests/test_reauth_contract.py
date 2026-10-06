@@ -17,7 +17,15 @@ Together these are the Silver-tier ``reauthentication-flow`` rule.
 import ast
 import json
 from pathlib import Path
-import re
+from unittest.mock import patch
+
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
+
+from custom_components.jackery_solarvault.config_flow import JackeryConfigFlow
+from custom_components.jackery_solarvault.const import DOMAIN
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.data_entry_flow import FlowResultType
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "custom_components" / "jackery_solarvault"
@@ -98,29 +106,14 @@ def test_translations_cover_reauth_step_for_all_locales() -> None:
         )
 
 
-def test_reauth_step_uses_only_password_field_not_username() -> None:
-    """Reauth must ask only for the new password.
-
-    The username is the unique-id key — changing it would create a
-    different entry. The reauth confirm form must therefore present a
-    password-only schema and surface the existing username as a
-    description placeholder.
-    """
-    src = _read("config_flow.py")
-    match = re.search(
-        r"async def async_step_reauth_confirm.*?(?=\n    async def |\n    @|\nclass )",
-        src,
-        re.DOTALL,
-    )
-    assert match is not None
-    body = match.group(0)
-    assert "CONF_PASSWORD" in body, body
-    # Username appears only as placeholder, not as a Required form field
-    schema_block = re.search(r"data_schema=_SCHEMA\(\{(.*?)\}\)", body, re.DOTALL)
-    assert schema_block is not None, body
-    schema_body = schema_block.group(1)
-    assert "CONF_USERNAME" not in schema_body, schema_body
-    # Username is rendered as a placeholder so the user knows which
-    # account they're re-authenticating.
-    assert "description_placeholders=" in body, body
-    assert "username" in body, body
+async def test_reauth_step_uses_only_password_field_not_username() -> None:
+    """The form asks for a new password while keeping the account identity."""
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_USERNAME: "account@example.com"})
+    flow = JackeryConfigFlow()
+    with patch.object(flow, "_get_reauth_entry", return_value=entry):
+        result = await flow.async_step_reauth_confirm()
+    assert result["type"] is FlowResultType.FORM
+    schema = result["data_schema"]
+    assert schema is not None
+    assert set(schema.schema) == {vol.Required(CONF_PASSWORD)}
+    assert result["description_placeholders"] == {"username": "account@example.com"}

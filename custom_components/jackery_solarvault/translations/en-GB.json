@@ -2125,6 +2125,11 @@
   "issues": {
     "device_not_activated": {
       "fix_flow": {
+        "error": {
+          "integration_unavailable": "The Jackery integration is not loaded. Restore the integration before trying again.",
+          "issue_still_present": "Jackery still reports the activation issue. Check the device in the Jackery app and try again.",
+          "refresh_failed": "The cloud refresh failed. The issue remains open. Check the connection and try again."
+        },
         "step": {
           "confirm": {
             "description": "The Jackery device {device_id} reports activated=0 in the cloud system. This is a cloud-side data-quality flag, not proof that the device is unpaired locally. Some Jackery trend, statistic, and history endpoints may return empty or zero data while the cloud reports this flag.\n\nTo check this:\n1. Open the Jackery mobile app\n2. Confirm the device is registered and shows as 'Online'\n3. Return here and force a cloud refresh\n\nThe repair issue will be dismissed once Jackery cloud reports activated=1, or when the cloud stops returning the inconsistent flag.",
