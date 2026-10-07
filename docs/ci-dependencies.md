@@ -20,9 +20,14 @@ to a stable release or prohibit a newer compatible pytest plugin.
 
 Coverage compatibility: https://coverage.readthedocs.io/en/7.10.6/changes.html
 
-`multidict` follows the Home Assistant/aiohttp constraints. Runtime minima for
-`bleak-retry-connector` (4.7.1) and `segno` (1.6.6) remain in the manifest.
-Home Assistant supplies `cryptography`.
+`multidict` follows the Home Assistant/aiohttp constraints. The runtime minimum
+for `segno` (1.6.6) remains in the manifest. Home Assistant supplies `cryptography`.
+`bleak-retry-connector` is supplied by Home Assistant's `bluetooth` integration,
+which is already listed in `after_dependencies`. Home Assistant installs the
+requirements of these optional integrations even when they are not configured,
+so SolarVault must not declare a separate connector version constraint.
+
+Source: https://developers.home-assistant.io/docs/creating_integration_manifest/#after-dependencies
 
 ## Native Home Assistant typing
 
