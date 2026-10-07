@@ -23,7 +23,7 @@
           "dev_id": "Geräte-ID",
           "qr_code_id": "QR-Code-ID"
         },
-        "description": "Nimm eine SolarVault an, die mit dem Jackery-Konto {username} geteilt wurde. Gib die Geräte-ID und die QR-Code-ID aus der Freigabeeinladung ein. Die Integration wird anschließend neu geladen, damit die Entitäten des geteilten Geräts erscheinen.",
+        "description": "Nimm ein dafür geeignetes Jackery-Gerät an, das mit dem Konto {username} geteilt wurde. SolarVault-Systeme unterstützen keine Gerätefreigabe. Gib für ein unterstütztes Gerät die Geräte-ID und die QR-Code-ID aus der Einladung ein. Die Integration wird anschließend neu geladen, um das angenommene Gerät zu erkennen.",
         "title": "Geteiltes Gerät annehmen"
       },
       "reauth_confirm": {
@@ -93,7 +93,7 @@
           "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener für decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
         },
-        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Halte die Jackery-App vom SolarVault-Account abgemeldet, solange Home Assistant Live-MQTT-Updates empfangen soll. Wenn die App kurz geöffnet wird, pausiert Home Assistant MQTT-Reconnects kurzzeitig, pollt weiter per HTTP und nimmt Live-Updates danach automatisch wieder auf.",
+        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nNutze das Konto, das dein SolarVault-System hinzugefügt hat. Jackery unterstützt das Teilen von SolarVault-Systemen mit einem zweiten Konto nicht. Gleichzeitiger Cloud-Zugriff über App und Home Assistant wird nicht zuverlässig unterstützt: Anmeldungen können Sitzungen ersetzen, und Wiederherstellungsversuche garantieren weder durchgehenden App-Zugriff noch Live-Updates. Optionales lokales MQTT/BLE und gespeicherte Bootstrap-Daten deaktivieren die Cloud-Anmeldung in dieser Integration nicht.",
         "title": "Jackery SolarVault"
       }
     }

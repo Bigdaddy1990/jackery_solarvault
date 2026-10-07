@@ -18,8 +18,8 @@ Eine benutzerdefinierte [Home Assistant](https://www.home-assistant.io/) Integra
 
 Vielleicht hast du von anderen manuellen MQTT-Workarounds oder älteren Integrationen gehört. Hier ist der Grund, warum diese Integration die klar bessere Lösung ist:
 
-1. **Kein manuelles Auslesen von Tokens:** Wir benötigen bei der Einrichtung deine Cloud-Zugangsdaten. **Warum?** Weil die Integration dadurch vollautomatisch alle deine Geräte findet und im Hintergrund die extrem komplexen Verschlüsselungs-Keys und Tokens generiert, die für die lokale Kommunikation zwingend notwendig sind. Du musst keinen Netzwerkverkehr abhören oder JSON-Payloads manuell basteln.
-2. **Echte lokale Steuerung:** Sobald der initiale Handshake mit der Cloud erledigt ist, verbindet sich die Integration direkt lokal über **MQTT** und **Bluetooth (BLE)** mit deinem Gerät! Das bedeutet: blitzschnelle, lokale Updates im Millisekunden-Bereich und Steuerung ohne Cloud-Latenz.
+1. **Kein manuelles Auslesen von Tokens:** Die Einrichtung nutzt deine Cloud-Zugangsdaten, um Geräte zu finden und Schlüssel sowie MQTT-Sitzungsmaterial aus der Cloud abzurufen. Du musst dafür keinen Netzwerkverkehr abhören oder JSON-Payloads manuell erstellen.
+2. **Optionale lokale Steuerung:** Bei unterstützten Geräten können ein eingerichteter lokaler MQTT-Broker und aktiviertes **Bluetooth (BLE)** lokale Daten und Befehle übertragen. Diese zusätzlichen Wege ersetzen die Cloud-Anmeldung nicht und deaktivieren weder HTTP noch Cloud-MQTT. Ein rein lokaler Einrichtungsmodus ist in dieser Integration nicht vorhanden.
 3. **100 % App-Funktionalität:** Im Gegensatz zu rein lokalen Bastellösungen, die nur den Akkustand auslesen können, bietet diese Integration *alles*, was auch die Jackery-App kann. Inklusive Time-of-Use-Ladeplänen, Shelly-Integration, Firmware-Checks und erweiterten Ladeeinstellungen.
 
 ---
@@ -51,7 +51,7 @@ Die Integration erstellt Dutzende Entitäten pro Gerät, um dir volle Sichtbarke
 ### 🛠️ Erweiterte Services (Dienste)
 
 Wir stellen außerdem über 60 benutzerdefinierte Services in Home Assistant zur Verfügung, die dir die volle Macht der Jackery-App in deinen Automatisierungen geben:
-- **Geräte-Management:** `bind_device`, `unbind_device`, `get_share_qr_code`
+- **Geräte-Management:** `bind_device`, `unbind_device`, `get_share_qr_code` (geräteabhängig; die Sharing-Dienste bestätigen keine SolarVault-Sharing-Unterstützung)
 - **Cloud-to-Cloud:** `get_shelly_auth_url`, `list_shelly_devices`
 - **Energie-Planung:** `save_tou_plan`, `insert_electricity_strategy`, `bind_currency`
 - **Statistiken:** `query_charge_report`, `query_soc_stat`, `query_profit_stat`
@@ -86,14 +86,14 @@ Wir stellen außerdem über 60 benutzerdefinierte Services in Home Assistant zur
 3. Folge dem Einrichtungsassistenten und gib deine Jackery-Cloud-Zugangsdaten ein.
 
 > [!WARNING]
-> **Wichtige Account-Einschränkung:** Jackery erlaubt normalerweise nur eine aktive Sitzung pro Account. Wenn du dich mit einem anderen Gerät anmeldest (z. B. deiner Haupt-App auf dem Handy), wird die MQTT-Verbindung der Integration vorübergehend pausiert und kurz danach automatisch wiederhergestellt.
-> **Empfohlene Lösung:** Für die beste Erfahrung erstelle einen **zweiten, dedizierten Jackery-Account** nur für Home Assistant. Teile deine Jackery-Geräte aus deinem Haupt-App-Account mit diesem neuen, dedizierten HA-Account!
+> **SolarVault-Kontonutzung:** Laut Jackery-App-Handbuch können SolarVault-Systeme nicht geteilt werden; nur der Besitzer kann sie verwalten. Verwende für diese Integration den Jackery-Account, dem dein SolarVault gehört. Ein zweiter HA-Account mit einem geteilten SolarVault ist keine unterstützte Lösung.
+> **App und Home Assistant gleichzeitig:** Eine erneute Anmeldung kann die Sitzung des anderen Clients ersetzen. Die Integration versucht, Verbindungen wiederherzustellen, garantiert aber keine stabile gleichzeitige Nutzung mit der mobilen App. Auch BLE, lokales MQTT und vorhandenes Bootstrap-Material deaktivieren die Cloud-Anmeldung nicht. Siehe [Kontonutzung und lokale Alternativen (englisch)](./account-sessions.md) für Quellen, Einschränkungen und die separate offizielle MQTT-Anbindung.
 
 ### Konfigurationsoptionen
 
-- **E-Mail & Passwort:** Die Zugangsdaten deines dedizierten Jackery-Cloud-Accounts.
-- **Bluetooth (BLE):** Optional. Erlaubt die direkte Kommunikation, wenn sich dein HA-Server in Bluetooth-Reichweite der Jackery befindet.
-- **Lokales MQTT:** Optional. Nutze dies, wenn dein Gerät so konfiguriert ist, dass es Daten an einen lokalen MQTT-Broker sendet.
+- **E-Mail & Passwort:** Die Zugangsdaten des Jackery-Cloud-Accounts, dem dein SolarVault gehört.
+- **Bluetooth (BLE):** Optional. Benötigt Bluetooth-Reichweite und einen gültigen Geräteschlüssel aus der Cloud-Einrichtung oder dem Cache.
+- **Lokales MQTT:** Optional. Benötigt unterstützte Geräte-Firmware und einen eingerichteten lokalen Broker. Seine Zugangsdaten sind unabhängig vom Jackery-Cloud-Account; die Cloud-Anmeldung dieser Integration bleibt aktiv.
 
 ---
 
@@ -133,8 +133,8 @@ data:
 
 ## ❓ Fehlerbehebung (FAQ)
 
-- **Meine Integration verliert ständig die Verbindung oder Sensoren sind "nicht verfügbar":**
-  Dies passiert in der Regel, weil du denselben Account in der Jackery-App auf deinem Handy und in Home Assistant verwendest. Bitte erstelle einen dedizierten Account für Home Assistant und teile deine Geräte mit diesem.
+- **Die mobile App meldet mich ab oder die Integration verliert nach einer App-Anmeldung die Verbindung:**
+  Ein Sitzungskonflikt ist möglich, wenn App und Integration denselben Besitzer-Account nutzen. Ein zweiter Account löst dies bei SolarVault nicht, weil das System nicht geteilt werden kann. Zum Wechseln zwischen den Clients deaktiviere die Integration vor der App-Anmeldung und beende die App-Sitzung, bevor du die Integration wieder aktivierst. Wiederholte Anmeldungen und Neustarts schaffen keine zuverlässige gleichzeitige Nutzung. Prüfe bei anderen Verbindungsfehlern auch Netzwerk, Broker und BLE-Reichweite. [Details und offizielle MQTT-Alternative (englisch)](./account-sessions.md).
 - **Wo sind die Sensoren für die gesamte Lebensdauer-Energie?**
   Die bereitgestellten Sensoren für Woche, Monat und Jahr sind *Periodensummen* und werden automatisch zurückgesetzt. Für das Home Assistant Energie-Dashboard nutze bitte die kumulativen Energie-Sensoren, die von der Integration bereitgestellt werden.
 

@@ -23,7 +23,7 @@
           "dev_id": "ID de l'appareil",
           "qr_code_id": "ID du code QR"
         },
-        "description": "Acceptez une SolarVault partagée avec le compte Jackery {username}. Saisissez l'ID de l'appareil et l'ID du code QR figurant dans l'invitation de partage. L'intégration est ensuite rechargée afin que les entités de l'appareil partagé apparaissent.",
+        "description": "Acceptez un appareil Jackery éligible partagé avec le compte {username}. Les systèmes SolarVault ne permettent pas le partage d'appareils. Pour un appareil compatible, saisissez l'ID de l'appareil et l'ID du code QR de l'invitation. L'intégration est ensuite rechargée pour découvrir l'appareil accepté.",
         "title": "Accepter un appareil partagé"
       },
       "reauth_confirm": {
@@ -93,7 +93,7 @@
           "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut."
         },
-        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nJackery autorise généralement une seule session active par compte. Gardez l'application Jackery déconnectée du compte SolarVault lorsque Home Assistant doit recevoir les mises à jour MQTT en direct. Si l'application est ouverte brièvement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises à jour en direct.",
+        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nUtilisez le compte qui a ajouté votre système SolarVault. Jackery ne permet pas de partager les systèmes SolarVault avec un deuxième compte. L'accès cloud simultané depuis l'application et Home Assistant n'est pas pris en charge de manière fiable : les connexions peuvent remplacer les sessions et les tentatives de récupération ne garantissent ni l'accès continu à l'application ni les mises à jour en direct. Le MQTT local/BLE facultatif et les données de démarrage enregistrées ne désactivent pas la connexion cloud dans cette intégration.",
         "title": "Jackery SolarVault"
       }
     }
