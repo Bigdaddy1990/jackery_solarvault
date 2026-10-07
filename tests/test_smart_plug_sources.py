@@ -221,7 +221,9 @@ async def test_temporary_absence_is_unknown_and_never_rebinds_to_another_plug(
         with pytest.raises(HomeAssistantError) as err:
             await entity.async_turn_on()
         assert err.value.translation_key == "entity_action_failed"
-        assert err.value.translation_placeholders["error"] == "missing deviceSn"
+        placeholders = err.value.translation_placeholders
+        assert placeholders is not None
+        assert placeholders["error"] == "missing deviceSn"
     coordinator.async_set_smart_plug_switch.assert_not_awaited()
     coordinator.async_set_smart_plug_priority.assert_not_awaited()
     assert [(entity.unique_id, entity.device_info) for entity in entities] == identities
@@ -296,7 +298,11 @@ def _assert_plug_registration(
     assert len(smart_binaries) == 2  # ruff: ignore[magic-value-comparison]
     assert len(smart_buttons) == 2  # ruff: ignore[magic-value-comparison]
     for entities in (sensors, switches, smart_binaries, smart_buttons):
-        unique_ids = [entity.unique_id for entity in entities]
+        unique_ids: list[str] = []
+        for entity in entities:
+            unique_id = entity.unique_id
+            assert unique_id is not None
+            unique_ids.append(unique_id)
         assert len(unique_ids) == len(set(unique_ids))
         assert any(
             "plug_a" in unique_id.lower() or "plug-a" in unique_id.lower()
@@ -363,9 +369,9 @@ async def test_cloud_control_metadata_survives_partial_bucket(source: str) -> No
     with pytest.raises(HomeAssistantError) as err:
         await relay.async_turn_on()
     assert err.value.translation_key == "entity_action_failed"
-    assert (
-        err.value.translation_placeholders["error"] == "Shelly control is not allowed"
-    )
+    placeholders = err.value.translation_placeholders
+    assert placeholders is not None
+    assert placeholders["error"] == "Shelly control is not allowed"
     coordinator.async_set_shelly_cloud_switch.assert_not_awaited()
     coordinator.async_set_smart_plug_switch.assert_not_awaited()
 
