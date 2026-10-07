@@ -433,7 +433,7 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padded = padder.update(plaintext) + padder.finalize()
     # codeql[py/weak-cryptographic-algorithm]
     # AES-ECB is mandatory for the Jackery Cloud API wire protocol.
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
