@@ -23,14 +23,12 @@ from .const import (
     FIELD_VERSION,
     FIELD_WNAME,
     MANUFACTURER,
-    PAYLOAD_SMART_PLUGS,
     PAYLOAD_SUBDEVICES,
     SUBDEVICE_DEV_TYPE_SMOKE,
-    SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
 )
-from .coordinator import subdevice_accessories
+from .coordinator import smart_plug_payload, smart_plug_payloads, subdevice_accessories
 from .descriptions import (
     BINARY_SENSOR_DESCRIPTIONS,
     JackeryBinaryDescription,
@@ -43,7 +41,6 @@ from .util import (
     safe_bool,
     safe_int,
     smart_plug_serial,
-    sorted_smart_plugs,
     sorted_sub_devices,
     stable_subdevice_key,
     sub_device_serial,
@@ -131,14 +128,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     seen_unique_ids,
                     JackeryBinarySensor(coordinator, dev_id, desc),
                 )
-            valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
-            if not valid_plugs:
-                valid_plugs = sorted_smart_plugs(
-                    subdevice_accessories(
-                        payload,
-                        dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
-                    )
-                )
+            valid_plugs = smart_plug_payloads(payload)
             for index, plug in enumerate(valid_plugs, start=1):
                 plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
@@ -234,6 +224,7 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
 
     _attr_translation_key = "smart_plug_switch_state"
     _attr_device_class = BinarySensorDeviceClass.POWER
+    _attr_device_info: DeviceInfo
     data_sources = ALL_LIVE_DATA_SOURCES
     app_fields = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
 
@@ -276,24 +267,14 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         )
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Keep this entity attached to its captured smart-plug device."""
+        return self._attr_device_info
+
+    @property
     def _plug(self) -> dict[str, Any]:
-        # Look the plug up by its captured serial so cloud-side re-ordering of
-        # the plug array cannot reassign this entity to a different device.
-        """Find the smart-plug payload matching the captured serial.
-
-        Keep the entity bound to the same physical plug if the cloud-side plug list is
-        reordered.
-
-        Returns:
-            dict[str, Any]: The matching smart-plug dictionary from the current payload,
-            or an empty dict if no match is found.
-        """
-        payload = self._payload
-        if payload:
-            for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
-                if smart_plug_serial(plug) == self._plug_sn:
-                    return plug
-        return {}
+        """Resolve current data without rebinding the captured plug identity."""
+        return smart_plug_payload(self._payload, self._plug_sn)
 
     @property
     def is_on(self) -> bool | None:

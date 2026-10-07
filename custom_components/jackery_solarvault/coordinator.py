@@ -646,6 +646,8 @@ from .util import (
     safe_bool,
     safe_float,
     safe_int,
+    smart_plug_serial,
+    sorted_smart_plugs,
     stable_subdevice_key,
     statistics_http_backfill_dates,
     sub_device_serial,
@@ -2584,6 +2586,66 @@ def subdevice_accessories(
         and str(item.get(FIELD_DEV_TYPE) or item.get(FIELD_DEVICE_TYPE) or "")
         == target_type
     ]
+
+
+def _smart_plug_source_payload(plug: dict[str, Any]) -> dict[str, Any]:
+    """Resolve equivalent fields within one source before applying priority."""
+    normalized = dict(plug)
+    for canonical, alias in (
+        (FIELD_IN_PW, FIELD_IP),
+        (FIELD_OUT_PW, FIELD_OP),
+        (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH),
+    ):
+        if is_blank(normalized.get(canonical)) and not is_blank(plug.get(alias)):
+            normalized[canonical] = plug[alias]
+    return normalized
+
+
+def smart_plug_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Resolve each identified socket from discovery and accepted telemetry.
+
+    Discovery metadata fills gaps per plug, even when another plug already has
+    telemetry. Present ``smart_plugs`` fields take precedence. Match only the
+    existing exact serial/cloud-id key; never infer identity from list position.
+    The returned dictionaries are copies and do not modify coordinator data.
+    """
+    by_serial: dict[str, dict[str, Any]] = {}
+    for section in (
+        payload.get(PAYLOAD_SYSTEM_META),
+        payload.get(PAYLOAD_SYSTEM),
+        payload,
+    ):
+        if not isinstance(section, dict):
+            continue
+        accessories = subdevice_accessories(
+            {FIELD_ACCESSORIES: section.get(FIELD_ACCESSORIES)},
+            dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
+        )
+        for plug in sorted_smart_plugs(accessories):
+            serial = smart_plug_serial(plug)
+            if serial is not None:
+                by_serial[serial] = merge_present_dict_values(
+                    by_serial.get(serial, {}), _smart_plug_source_payload(plug)
+                )
+    for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
+        serial = smart_plug_serial(plug)
+        if serial is not None:
+            by_serial[serial] = merge_present_dict_values(
+                by_serial.get(serial, {}), _smart_plug_source_payload(plug)
+            )
+    return [by_serial[serial] for serial in sorted(by_serial)]
+
+
+def smart_plug_payload(payload: dict[str, Any], serial: str) -> dict[str, Any]:
+    """Return the current data for one captured plug identity, or no data."""
+    return next(
+        (
+            plug
+            for plug in smart_plug_payloads(payload)
+            if smart_plug_serial(plug) == serial
+        ),
+        {},
+    )
 
 
 def subdevice_stat_id(
@@ -14024,28 +14086,32 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if not self.data or device_id not in self.data:
             return
         payload = dict(self.data[device_id])
-        plugs = payload.get(PAYLOAD_SMART_PLUGS)
-        if not isinstance(plugs, list):
+        plugs = smart_plug_payloads(payload)
+        if not plugs:
             return
-        updated_plugs = []
-        touched = False
-        for plug in plugs:
-            if not isinstance(plug, dict):
-                updated_plugs.append(plug)
-                continue
-            plug_ids = self._subdevice_identity_values(plug)
-            if str(plug_sn) in plug_ids:
-                next_plug = dict(plug)
-                next_plug.update(updates)
-                updated_plugs.append(next_plug)
-                touched = True
-            else:
-                updated_plugs.append(plug)
-        if touched:
-            payload[PAYLOAD_SMART_PLUGS] = updated_plugs
-            new_data = dict(self.data)
-            new_data[device_id] = payload
-            self._push_partial_update(new_data)
+        matches = [
+            index
+            for index, plug in enumerate(plugs)
+            if str(plug_sn)
+            in {
+                smart_plug_serial(plug),
+                smart_plug_serial({
+                    FIELD_DEVICE_ID: plug.get(FIELD_DEVICE_ID),
+                    FIELD_ID: plug.get(FIELD_ID),
+                    FIELD_DEV_ID: plug.get(FIELD_DEV_ID),
+                }),
+            }
+        ]
+        # A command target must identify exactly one plug, never every plug
+        # sharing an ambiguous alias or unrelated bindId/deviceCode metadata.
+        if len(matches) != 1:
+            return
+        index = matches[0]
+        plugs[index] = {**plugs[index], **updates}
+        payload[PAYLOAD_SMART_PLUGS] = plugs
+        new_data = dict(self.data)
+        new_data[device_id] = payload
+        self._push_partial_update(new_data)
 
     async def async_query_subdevice_combo(
         self,
@@ -15206,22 +15272,17 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         stale_ok: bool = False,
     ) -> None:
         """Attach read-only app socket statistics to known smart plugs."""
-        plugs = entry.get(PAYLOAD_SMART_PLUGS)
-        if not isinstance(plugs, list) or not plugs:
+        plugs = smart_plug_payloads(entry)
+        if not plugs:
             return
         cache = self._slow_cache.setdefault(f"dev:{device_id}:smart_plug", {})
         changed = False
-        updated_plugs: list[Any] = []
+        updated_plugs: list[dict[str, Any]] = []
         for plug in plugs:
-            if not isinstance(plug, dict):
-                updated_plugs.append(plug)
-                continue
             updated = dict(plug)
-            stat_id = self._subdevice_stat_id(
-                entry,
-                updated,
-                dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
-            )
+            # Discovery has already been matched by exact plug identity.
+            # Never borrow the sole accessory's id for an unmatched plug.
+            stat_id = subdevice_id(updated)
             if stat_id is None:
                 updated_plugs.append(updated)
                 continue

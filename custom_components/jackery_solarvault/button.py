@@ -24,14 +24,12 @@ from .const import (
     FIELD_START_TS,
     FIELD_STATUS,
     FIELD_STORM,
-    PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
-    SUBDEVICE_DEV_TYPE_SOCKET,
     TIMER_TASK_TYPE_CUSTOM_MODE,
     TIMER_TASK_TYPE_SMART_PLUG,
     TIMER_TASK_TYPE_TIME_ELEC,
 )
-from .coordinator import ACTION_WRITE_ERRORS, subdevice_accessories
+from .coordinator import ACTION_WRITE_ERRORS, smart_plug_payloads
 from .descriptions import BUTTON_DESCRIPTIONS, JackeryButtonDescription
 from .entity import (
     LAYER5_COMMAND_SOURCES,
@@ -44,7 +42,6 @@ from .util import (
     append_unique_entity,
     coordinator_entity_signature,
     is_portable_payload as _is_portable_payload,
-    sorted_smart_plugs,
 )
 
 if TYPE_CHECKING:
@@ -227,14 +224,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 append_unique_entity(
                     entities, seen_unique_ids, JackeryRebootButton(coordinator, dev_id)
                 )
-            valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
-            if not valid_plugs:
-                valid_plugs = sorted_smart_plugs(
-                    subdevice_accessories(
-                        payload,
-                        dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
-                    )
-                )
+            valid_plugs = smart_plug_payloads(payload)
             for plug in valid_plugs:
                 plug_sn = _smart_plug_device_sn(plug)
                 if plug_sn is None:

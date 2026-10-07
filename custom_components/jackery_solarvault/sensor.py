@@ -214,7 +214,6 @@ from .const import (
     PAYLOAD_METER_HEADS,
     PAYLOAD_PRICE,
     PAYLOAD_PV_TRENDS,
-    PAYLOAD_SMART_PLUGS,
     PAYLOAD_STATISTIC,
     PAYLOAD_SUBDEVICES,
     PAYLOAD_SYSTEM,
@@ -228,7 +227,6 @@ from .const import (
     SUBDEVICE_DEV_TYPE_METER,
     SUBDEVICE_DEV_TYPE_METER_HEAD,
     SUBDEVICE_DEV_TYPE_SMOKE,
-    SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
     TASK_PLAN_BODY,
@@ -240,6 +238,8 @@ from .const import (
 from .coordinator import (
     battery_pack_serial,
     smart_meter_accessories,
+    smart_plug_payload,
+    smart_plug_payloads,
     sorted_battery_pack_payloads,
     subdevice_accessories,
 )
@@ -296,7 +296,6 @@ from .util import (
     smart_plug_serial,
     sorted_circuits,
     sorted_meter_heads,
-    sorted_smart_plugs,
     sorted_sub_devices,
     stable_subdevice_key,
     sub_device_serial,
@@ -1679,11 +1678,7 @@ def _collect_smart_plugs(
     payload: dict[str, Any],
 ) -> None:
     """Collect smart-plug accessory sensors."""
-    plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
-    if not plugs:
-        plugs = sorted_smart_plugs(
-            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
-        )
+    plugs = smart_plug_payloads(payload)
     for index, plug in enumerate(plugs, start=1):
         serial = smart_plug_serial(plug)
         if serial is None:
@@ -4449,6 +4444,7 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
     """Per smart-plug sensor from MQTT PlugSub payloads."""
 
     entity_description: JackerySmartPlugSensorDescription
+    _attr_device_info: DeviceInfo
 
     def __init__(
         self,
@@ -4504,25 +4500,14 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
         )
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Keep this entity attached to its captured smart-plug device."""
+        return self._attr_device_info
+
+    @property
     def _plug(self) -> dict[str, Any]:
-        # Look up by captured serial; cloud-side re-ordering of the plug
-        # array must not switch this entity to a different physical plug.
-        """Implementation details.
-
-        Find the smart-plug payload that matches this entity's captured serial
-        number.
-
-        Searches the payload's smart plug list (sorted for stable ordering) and returns
-        the plug dictionary whose serial equals the entity's stored plug serial.
-
-        Returns:
-            dict: The matching plug payload dictionary, or an empty dict if no match is
-            found.
-        """
-        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
-            if smart_plug_serial(plug) == self._plug_sn:
-                return plug
-        return {}
+        """Resolve current data without rebinding the captured plug identity."""
+        return smart_plug_payload(self._payload, self._plug_sn)
 
     def _value_from_plug(self, plug: dict[str, Any]) -> StateType:
         """Return the transformed sensor value from one plug payload."""

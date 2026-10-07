@@ -353,6 +353,7 @@ def test_smart_plug_identity_state_and_attributes_fallbacks() -> None:
         "deviceName": "Office",
         "commState": 1,
         "id": "cloud-id",
+        "switchSta": "1",
         "sysSwitch": "1",
     }
 

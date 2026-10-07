@@ -55,11 +55,14 @@ from .const import (
     FIELD_WPS,
     MANUFACTURER,
     PAYLOAD_CIRCUIT_PROPERTY,
-    PAYLOAD_SMART_PLUGS,
     SUBDEVICE_DEV_TYPE_BREAKER,
-    SUBDEVICE_DEV_TYPE_SOCKET,
 )
-from .coordinator import ACTION_WRITE_ERRORS, subdevice_accessories
+from .coordinator import (
+    ACTION_WRITE_ERRORS,
+    smart_plug_payload,
+    smart_plug_payloads,
+    subdevice_accessories,
+)
 from .descriptions import SWITCH_DESCRIPTIONS, JackerySwitchDescription
 from .descriptions.switch import (
     _set_auto_standby,
@@ -98,7 +101,6 @@ from .util import (
     safe_bool,
     smart_plug_serial,
     sorted_circuits,
-    sorted_smart_plugs,
     stable_subdevice_key,
 )
 
@@ -224,6 +226,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     """Writable switch for one smart-plug subdevice."""
 
     _attr_translation_key = "smart_plug_switch"
+    _attr_device_info: DeviceInfo
     data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES
     command_sources: tuple[str, ...] = HTTP_AND_LAYER5_COMMAND_SOURCES
     app_fields: tuple[str, ...] = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
@@ -258,12 +261,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         )
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Keep this entity attached to its captured smart-plug device."""
+        return self._attr_device_info
+
+    @property
     def _plug(self) -> dict[str, Any]:
         """Smart-plug payload matching this entity's captured serial."""
-        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
-            if smart_plug_serial(plug) == self._plug_sn:
-                return plug
-        return {}
+        return smart_plug_payload(self._payload, self._plug_sn)
 
     @property
     def is_on(self) -> bool | None:
@@ -565,11 +570,7 @@ def _collect_smart_plug_switches(
     seen_unique_ids: set[str],
 ) -> None:
     """Collect relay and optional priority switches for smart plugs."""
-    plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
-    if not plugs:
-        plugs = sorted_smart_plugs(
-            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
-        )
+    plugs = smart_plug_payloads(payload)
     for index, plug in enumerate(plugs, start=1):
         serial = smart_plug_serial(plug)
         if serial is None:
