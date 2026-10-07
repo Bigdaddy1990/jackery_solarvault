@@ -567,7 +567,7 @@ async def _async_restored_lifetime_energy_value(
         return None
     try:
         value = float(native_value)
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):  # fmt: skip
         return None
     if not isfinite(value) or value < 0:
         return None
@@ -612,7 +612,7 @@ async def _async_restored_pack_measurement_value(
         return None
     try:
         value = float(native_value)
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):  # fmt: skip
         return None
     return value if isfinite(value) else None
 
@@ -3668,7 +3668,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         self._cache_initializing = True
         try:
             await super().async_added_to_hass()
-        except Exception, asyncio.CancelledError:
+        except (Exception, asyncio.CancelledError):  # fmt: skip
             batch.discard(self)
             raise
         finally:
@@ -6136,7 +6136,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except TypeError, ValueError, OSError:
+        except (TypeError, ValueError, OSError):  # fmt: skip
             return None
 
 

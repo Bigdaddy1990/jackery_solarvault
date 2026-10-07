@@ -325,7 +325,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):  # fmt: skip
         return default
 
 
@@ -992,7 +992,7 @@ def safe_float(
         return _parse_float_string(value)
     try:
         parsed = float(value)
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):  # fmt: skip
         return None
     return parsed if math.isfinite(parsed) else None
 

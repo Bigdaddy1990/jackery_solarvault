@@ -1405,7 +1405,7 @@ class JackeryMqttPushClient:
             return
         try:
             request_id = int(raw_request_id)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):  # fmt: skip
             return
         response_type = self._normalize_response_type(
             data.get("response_type", data.get(FIELD_ACTION_ID))

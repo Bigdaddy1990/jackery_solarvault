@@ -100,7 +100,7 @@ def normalize_mqtt_session_snapshot(
     assert isinstance(mac_id, str)
     try:
         seed = base64.b64decode(seed_b64, validate=True)
-    except binascii.Error, ValueError:
+    except (binascii.Error, ValueError):  # fmt: skip
         return None
     if len(seed) != _MQTT_SEED_LEN:
         return None

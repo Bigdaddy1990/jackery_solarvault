@@ -1127,7 +1127,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):  # fmt: skip
             return None
 
         if len(seed) != _MQTT_SEED_LEN:

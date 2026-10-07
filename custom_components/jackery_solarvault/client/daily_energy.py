@@ -52,7 +52,7 @@ def _clean_values(value: object) -> dict[str, int]:
             continue
         try:
             cleaned[metric] = int(raw)
-        except OverflowError, TypeError, ValueError:
+        except (OverflowError, TypeError, ValueError):  # fmt: skip
             continue
     return cleaned
 
@@ -194,7 +194,7 @@ def daily_delta(
         return None
     try:
         current = int(current_lifetime_value)
-    except OverflowError, TypeError, ValueError:
+    except (OverflowError, TypeError, ValueError):  # fmt: skip
         return None
     return current - anchor if current >= anchor else None
 

@@ -5,6 +5,8 @@ value_fn delegation. Inline helpers removed; all current/select logic lives in
 descriptions/select.py.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 import logging
 from typing import TYPE_CHECKING, Any
