@@ -741,7 +741,7 @@ def test_manifest_declares_bluetooth_matcher_without_core_requirement() -> None:
         matchers
     )
     assert "bluetooth" in (manifest.get("after_dependencies") or [])
-    assert any(
+    assert not any(
         req.startswith("bleak-retry-connector")
         for req in manifest.get("requirements", [])
     ), manifest.get("requirements")
