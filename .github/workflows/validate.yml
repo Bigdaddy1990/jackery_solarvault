@@ -24,6 +24,11 @@ jobs:
           python-version: "3.14"
       - name: Install requirement parser
         run: python -m pip install packaging
+      - name: Verify supported Home Assistant minimum resolves
+        run: |
+          python -m pip install --dry-run --ignore-installed \
+            -r requirements.txt -r requirements-test.txt \
+            "homeassistant==$(cat .HA_VERSION)"
       - name: Verify requirement sources
         run: python -m scripts.sync_requirements --check
 

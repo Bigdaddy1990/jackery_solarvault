@@ -152,6 +152,7 @@ jobs:
         run: |
           python -c "import homeassistant, pytest_homeassistant_custom_component"
           python -m pip check
+          python -m scripts.sync_ha_test_baseline --check
 
       - name: Prepare coverage directories
         env:
