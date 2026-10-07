@@ -954,6 +954,12 @@ warn_return_any = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
+module = ["homeassistant.components.binary_sensor"]
+# HA 2026.10 moved the enum to .const but deliberately retains its public export.
+# Respect that one upstream re-export without relaxing integration annotations.
+implicit_reexport = true
+
+[[tool.mypy.overrides]]
 module = ["custom_components.jackery_solarvault.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
