@@ -1,4 +1,4 @@
-"""Compile and import every shipped integration module before publishing.
+"""Compile repository scripts and import every shipped module before publishing.
 
 Run with the supported Python runtime and the real HA/test dependencies:
     python -m scripts.check_integration_imports
@@ -42,6 +42,7 @@ def module_name(path: Path) -> str:
 def main() -> None:
     """Fail immediately on any compilation or real dependency import error."""
     sources = compile_sources(INTEGRATION)
+    compile_sources(ROOT / "scripts")
     for path in sources:
         importlib.import_module(module_name(path))
     const = importlib.import_module("custom_components.jackery_solarvault.const")

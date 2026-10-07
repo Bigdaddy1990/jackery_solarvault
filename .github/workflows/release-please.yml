@@ -17,10 +17,15 @@ permissions:
   id-token: write # for Trusted Publishing + attest-action
 
 jobs:
-  release:
+  integration-imports:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Set up minimum supported Python
         uses: actions/setup-python@v7
         with:
@@ -36,6 +41,14 @@ jobs:
           python -m scripts.sync_ha_test_baseline --check
       - name: Compile and import every shipped integration module
         run: python -m scripts.check_integration_imports
+
+  release:
+    needs: integration-imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
       - uses: googleapis/release-please-action@v5
         id: release
         with:

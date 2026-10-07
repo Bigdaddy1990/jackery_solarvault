@@ -186,3 +186,31 @@ def test_release_gate_rejects_removed_select_future_import(tmp_path: Path) -> No
     )
     assert result.returncode != 0
     assert "must preserve its deferred forward reference" in result.stderr
+
+
+def test_release_gate_checks_unimported_repository_scripts(tmp_path: Path) -> None:
+    """A legacy handler in an unused repository script must block publication."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "__init__.py").touch()
+    (scripts / "check_integration_imports.py").write_bytes(
+        (ROOT / "scripts" / "check_integration_imports.py").read_bytes()
+    )
+    (scripts / "unused.py").write_text(
+        "try:\n    pass\nexcept ValueError, TypeError:\n    pass\n",
+        encoding="utf-8",
+    )
+    integration = tmp_path / "custom_components" / "jackery_solarvault"
+    integration.mkdir(parents=True)
+    (integration / "__init__.py").touch()
+    result = subprocess.run(
+        [sys.executable, "-m", "scripts.check_integration_imports"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "unused.py" in result.stderr
+    assert "SyntaxError" in result.stderr
