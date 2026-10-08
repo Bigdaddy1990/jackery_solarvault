@@ -19,6 +19,9 @@ REQUIREMENT_EQUIVALENTS: dict[str, set[str]] = {
     # tests importing `homeassistant` are satisfied when only the plugin is
     # listed in requirements_test.txt.
     "homeassistant": {"pytest_homeassistant_custom_component"},
+    # Core provides bleak through home-assistant-bluetooth / habluetooth. Do not
+    # introduce an independent pin just to satisfy the source-only import gate.
+    "bleak": {"homeassistant", "pytest_homeassistant_custom_component"},
     "yaml": {"pyyaml"},
 }
 

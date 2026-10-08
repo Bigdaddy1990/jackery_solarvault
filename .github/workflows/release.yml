@@ -14,17 +14,50 @@ permissions:
   issues: write
 
 jobs:
-  release:
+  integration-imports:
+    name: Verify integration imports before release
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up minimum supported Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14.2"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install the verified Home Assistant test stack
+        run: |
+          python -m pip install -r requirements.txt -r requirements-test.txt
+          python -m pip check
+          python -m scripts.sync_ha_test_baseline --check
+
+      - name: Compile and import every shipped integration module
+        run: python -m scripts.check_integration_imports
+
+  release:
+    needs: integration-imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Verify manifest version matches tag
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          MANIFEST_VERSION=$(python3 -c "import json; print(json.load(open('custom_components/jackery_solarvault/manifest.json'))['version'])")
+          MANIFEST_VERSION=$(git show "$GITHUB_SHA:custom_components/jackery_solarvault/manifest.json" | python3 -c "import json, sys; print(json.load(sys.stdin)['version'])")
           if [ "$TAG" != "$MANIFEST_VERSION" ]; then
             echo "::error::Tag '${TAG}' does not match manifest version '${MANIFEST_VERSION}'"
             exit 1
@@ -33,10 +66,9 @@ jobs:
 
       - name: Build release zip
         run: |
-          cd custom_components/jackery_solarvault
-          zip -r "$GITHUB_WORKSPACE/jackery_solarvault.zip" . \
-            -x "*.pyc" "*/__pycache__/*" "*.pytest_cache*" "*.ruff_cache*"
-          cd "$GITHUB_WORKSPACE"
+          git archive --format=zip \
+            --output="$GITHUB_WORKSPACE/jackery_solarvault.zip" \
+            "$GITHUB_SHA:custom_components/jackery_solarvault"
           ls -la jackery_solarvault.zip
 
       - name: Publish release with auto-generated notes

@@ -605,7 +605,7 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except TimeoutError, OSError:
+            except (TimeoutError, OSError):  # fmt: skip
                 # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
@@ -715,7 +715,7 @@ class JackeryLocalMqttClient:
             parsed = json.loads(raw.decode())
             if isinstance(parsed, dict):
                 data = parsed
-        except UnicodeDecodeError, json.JSONDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):  # fmt: skip
             pass
         if self._sink is None:
             self._messages_dropped += 1
