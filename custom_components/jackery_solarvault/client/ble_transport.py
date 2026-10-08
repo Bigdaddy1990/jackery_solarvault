@@ -51,6 +51,7 @@ from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
 from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
+from .ble import BleFrameObservation
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -151,27 +152,6 @@ _UINT16_MAX: int = 0xFFFF
 # ---------------------------------------------------------------------------
 # Public data classes
 # ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True)
-class BleFrameObservation:
-    """One frame observed on the notify characteristic.
-
-    Carries both the parsed view and the original raw bytes so the
-    diagnostics surface can show what we received even if decoding failed.
-    ``parsed`` is set when AES decrypt + header parse succeeded; otherwise
-    ``decode_error`` carries the reason and ``parsed`` is None.
-    """
-
-    received_at: datetime
-    raw_bytes: bytes
-    base64_encoded: str
-    parsed: ble.BleBinaryFrame | None
-    decode_error: str | None = None
-    session_generation: int | None = None
-    notify_sequence: int | None = None
-    delivery_id: str | None = None
-    is_fragment: bool = False
 
 
 @dataclass(slots=True)

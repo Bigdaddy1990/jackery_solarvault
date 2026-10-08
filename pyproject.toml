@@ -431,6 +431,11 @@ max-complexity = 20
 "**/__init__.py" = ["module-import-not-at-top-of-file"]
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 "tests/**" = ["any-type"]  # Allow Any in tests
+# Python 3.14 signature introspection needs concrete coordinator types at runtime.
+"custom_components/jackery_solarvault/coordinator.py" = [
+  "typing-only-first-party-import",
+  "typing-only-standard-library-import",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google" # Accepts: "google", "numpy", or "pep257".
@@ -952,6 +957,12 @@ warn_unused_ignores = true
 warn_unused_configs = true
 warn_return_any = true
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.components.binary_sensor"]
+# HA 2026.10 moved the enum to .const but deliberately retains its public export.
+# Respect that one upstream re-export without relaxing integration annotations.
+implicit_reexport = true
 
 [[tool.mypy.overrides]]
 module = ["custom_components.jackery_solarvault.*"]
