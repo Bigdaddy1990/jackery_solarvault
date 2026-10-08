@@ -238,7 +238,9 @@ from .const import (
 from .coordinator import (
     battery_pack_serial,
     smart_meter_accessories,
-    smart_plug_payload,
+    smart_plug_entity_identity,
+    smart_plug_entity_key,
+    smart_plug_entity_payload,
     smart_plug_payloads,
     sorted_battery_pack_payloads,
     subdevice_accessories,
@@ -293,7 +295,6 @@ from .util import (
     signed_phase_power_values,
     smart_meter_identity,
     smart_meter_net_power,
-    smart_plug_serial,
     sorted_circuits,
     sorted_meter_heads,
     sorted_sub_devices,
@@ -1680,10 +1681,14 @@ def _collect_smart_plugs(
     """Collect smart-plug accessory sensors."""
     plugs = smart_plug_payloads(payload)
     for index, plug in enumerate(plugs, start=1):
-        serial = smart_plug_serial(plug)
+        serial = smart_plug_entity_identity(collection.coordinator, dev_id, plug)
         if serial is None:
             continue
-        identity = (index, serial, stable_subdevice_key("smart_plug", serial, index))
+        identity = (
+            index,
+            serial,
+            smart_plug_entity_key(collection.coordinator, dev_id, serial),
+        )
         for description in SMART_PLUG_SENSOR_DESCRIPTIONS:
             collection.add(
                 JackerySmartPlugSensor(
@@ -4507,7 +4512,9 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
     @property
     def _plug(self) -> dict[str, Any]:
         """Resolve current data without rebinding the captured plug identity."""
-        return smart_plug_payload(self._payload, self._plug_sn)
+        return smart_plug_entity_payload(
+            self.coordinator, self._device_id, self._plug_sn
+        )
 
     def _value_from_plug(self, plug: dict[str, Any]) -> StateType:
         """Return the transformed sensor value from one plug payload."""
@@ -4515,8 +4522,6 @@ class JackerySmartPlugSensor(JackeryEntity, RestoreSensor):
         raw = plug.get(field)
         if raw is None:
             alias_map = {
-                FIELD_IN_PW: FIELD_IP,
-                FIELD_OUT_PW: FIELD_OP,
                 FIELD_SWITCH_STATE: FIELD_SYS_SWITCH,
             }
             alias = alias_map.get(field)

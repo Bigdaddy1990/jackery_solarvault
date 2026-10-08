@@ -28,7 +28,13 @@ from .const import (
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
 )
-from .coordinator import smart_plug_payload, smart_plug_payloads, subdevice_accessories
+from .coordinator import (
+    smart_plug_entity_identity,
+    smart_plug_entity_key,
+    smart_plug_entity_payload,
+    smart_plug_payloads,
+    subdevice_accessories,
+)
 from .descriptions import (
     BINARY_SENSOR_DESCRIPTIONS,
     JackeryBinaryDescription,
@@ -40,7 +46,6 @@ from .util import (
     async_setup_entity_discovery,
     safe_bool,
     safe_int,
-    smart_plug_serial,
     sorted_sub_devices,
     stable_subdevice_key,
     sub_device_serial,
@@ -130,10 +135,10 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 )
             valid_plugs = smart_plug_payloads(payload)
             for index, plug in enumerate(valid_plugs, start=1):
-                plug_sn = smart_plug_serial(plug)
+                plug_sn = smart_plug_entity_identity(coordinator, dev_id, plug)
                 if plug_sn is None:
                     continue
-                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
+                plug_key = smart_plug_entity_key(coordinator, dev_id, plug_sn)
                 append_unique_entity(
                     entities,
                     seen_unique_ids,
@@ -274,7 +279,9 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     @property
     def _plug(self) -> dict[str, Any]:
         """Resolve current data without rebinding the captured plug identity."""
-        return smart_plug_payload(self._payload, self._plug_sn)
+        return smart_plug_entity_payload(
+            self.coordinator, self._device_id, self._plug_sn
+        )
 
     @property
     def is_on(self) -> bool | None:

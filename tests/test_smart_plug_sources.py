@@ -37,6 +37,7 @@ from custom_components.jackery_solarvault.const import (
 )
 from custom_components.jackery_solarvault.coordinator import (
     JackerySolarVaultCoordinator,
+    smart_plug_payloads,
 )
 from custom_components.jackery_solarvault.util import smart_plug_serial
 from homeassistant.exceptions import HomeAssistantError
@@ -398,7 +399,7 @@ def test_coordinator_local_patch_resolves_discovery_and_keeps_other_devices(
 
     mirrored = {
         smart_plug_serial(plug): plug
-        for plug in mutable.data[_DEVICE].get(PAYLOAD_SMART_PLUGS, [])
+        for plug in smart_plug_payloads(mutable.data[_DEVICE])
     }
     assert mirrored[_SERIAL][FIELD_SWITCH_STATE] == 1
     assert mirrored[_SERIAL][FIELD_SYS_SWITCH] == 1
@@ -548,7 +549,7 @@ async def test_statistics_never_borrow_the_only_other_socket_id() -> None:
 
     await coordinator._async_enrich_smart_plug_statistics(_DEVICE, entry)  # ruff: ignore[private-member-access]
 
-    enriched = {smart_plug_serial(plug): plug for plug in entry[PAYLOAD_SMART_PLUGS]}
+    enriched = {smart_plug_serial(plug): plug for plug in smart_plug_payloads(entry)}
     assert enriched[_SERIAL][FIELD_TOTAL_ENERGY] == pytest.approx(8.5)
     assert enriched["PLUG-B"][FIELD_TOTAL_ENERGY] == pytest.approx(9.5)
     mutable._async_get_with_ttl_for.assert_awaited_once()  # ruff: ignore[private-member-access]

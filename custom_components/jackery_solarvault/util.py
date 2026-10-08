@@ -510,9 +510,8 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
                     plugs.append(plug)
         plug_fields: dict[str, set[str]] = {}
         for plug in plugs:
-            serial = smart_plug_serial(plug)
-            if serial is not None:
-                plug_fields.setdefault(serial, set()).update(_present_fields(plug))
+            serial = cast("str", smart_plug_serial(plug))
+            plug_fields.setdefault(serial, set()).update(_present_fields(plug))
         plug_keys = tuple(
             (serial, tuple(sorted(fields)))
             for serial, fields in sorted(plug_fields.items())
@@ -1351,6 +1350,28 @@ def safe_bool(
             with contextlib.suppress(ValueError):
                 result = int(value) != 0
     return result
+
+
+def smart_plug_serial_aliases(plug: object) -> frozenset[str]:
+    """Return only explicitly supplied, case-sensitive physical serial aliases."""
+    if not isinstance(plug, dict):
+        return frozenset()
+    return frozenset(
+        text
+        for field in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN)
+        if (text := first_nonblank_text(plug.get(field))) is not None
+    )
+
+
+def smart_plug_identity_aliases(plug: object) -> frozenset[str]:
+    """Return exact serial/cloud aliases explicitly co-occurring in one record."""
+    if not isinstance(plug, dict):
+        return frozenset()
+    return smart_plug_serial_aliases(plug) | frozenset(
+        text
+        for field in (FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID)
+        if (text := first_nonblank_text(plug.get(field))) is not None
+    )
 
 
 def smart_plug_serial(plug: object) -> str | None:

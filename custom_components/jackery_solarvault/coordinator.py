@@ -22,6 +22,7 @@ from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
 from functools import partial, wraps
+import hashlib
 import importlib
 import inspect
 import json
@@ -53,7 +54,7 @@ from homeassistant.components.recorder.statistics import (
     statistics_during_period,
 )
 from homeassistant.const import UnitOfEnergy, UnitOfPower
-from homeassistant.core import CoreState, callback
+from homeassistant.core import CoreState, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import (
     device_registry as dr,
@@ -646,7 +647,9 @@ from .util import (
     safe_bool,
     safe_float,
     safe_int,
+    smart_plug_identity_aliases,
     smart_plug_serial,
+    smart_plug_serial_aliases,
     sorted_smart_plugs,
     stable_subdevice_key,
     statistics_http_backfill_dates,
@@ -672,7 +675,6 @@ if TYPE_CHECKING:
     from datetime import tzinfo
 
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
 
     from .client.api import JackeryApi, MqttSessionSnapshot
     from .client.ble_transport import BleFrameObservation
@@ -2596,9 +2598,31 @@ def _smart_plug_source_payload(plug: dict[str, Any]) -> dict[str, Any]:
         (FIELD_OUT_PW, FIELD_OP),
         (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH),
     ):
-        if is_blank(normalized.get(canonical)) and not is_blank(plug.get(alias)):
-            normalized[canonical] = plug[alias]
+        if not is_blank(normalized.get(canonical)):
+            continue
+        value = plug.get(alias)
+        if canonical != FIELD_SWITCH_STATE:
+            value = safe_float(value)
+        if not is_blank(value):
+            normalized[canonical] = value
     return normalized
+
+
+def _smart_plug_alias_groups(
+    records: list[dict[str, Any]], *, serial_only: bool
+) -> dict[str, set[str]]:
+    """Group identities linked within records without guessing from position."""
+    groups: dict[str, set[str]] = {}
+    for record in records:
+        aliases = smart_plug_serial_aliases(record)
+        if not serial_only:
+            aliases = smart_plug_identity_aliases(record) - aliases
+        linked = set(aliases)
+        for alias in aliases:
+            linked.update(groups.get(alias, ()))
+        for alias in linked:
+            groups[alias] = linked
+    return groups
 
 
 def smart_plug_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -2606,10 +2630,10 @@ def smart_plug_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
     Discovery metadata fills gaps per plug, even when another plug already has
     telemetry. Present ``smart_plugs`` fields take precedence. Match only the
-    existing exact serial/cloud-id key; never infer identity from list position.
+    explicit, unambiguous serial/cloud-id aliases; never infer identity from position.
     The returned dictionaries are copies and do not modify coordinator data.
     """
-    by_serial: dict[str, dict[str, Any]] = {}
+    records: list[dict[str, Any]] = []
     for section in (
         payload.get(PAYLOAD_SYSTEM_META),
         payload.get(PAYLOAD_SYSTEM),
@@ -2621,31 +2645,329 @@ def smart_plug_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
             {FIELD_ACCESSORIES: section.get(FIELD_ACCESSORIES)},
             dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
         )
-        for plug in sorted_smart_plugs(accessories):
-            serial = smart_plug_serial(plug)
-            if serial is not None:
-                by_serial[serial] = merge_present_dict_values(
-                    by_serial.get(serial, {}), _smart_plug_source_payload(plug)
-                )
-    for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
-        serial = smart_plug_serial(plug)
-        if serial is not None:
-            by_serial[serial] = merge_present_dict_values(
-                by_serial.get(serial, {}), _smart_plug_source_payload(plug)
+        records.extend(sorted_smart_plugs(accessories))
+    records.extend(sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)))
+    serial_groups = _smart_plug_alias_groups(records, serial_only=True)
+    cloud_groups = _smart_plug_alias_groups(records, serial_only=False)
+    alias_owners: dict[str, set[str]] = {}
+    for plug in records:
+        serials = smart_plug_serial_aliases(plug)
+        if not serials:
+            continue
+        owner = min(serial_groups[next(iter(serials))])
+        for alias in smart_plug_identity_aliases(plug):
+            for linked in cloud_groups.get(alias, {alias}):
+                alias_owners.setdefault(linked, set()).add(owner)
+    by_serial: dict[str, dict[str, Any]] = {}
+    for plug in records:
+        serials = smart_plug_serial_aliases(plug)
+        if serials:
+            serial = min(serial_groups[next(iter(serials))])
+        else:
+            aliases = smart_plug_identity_aliases(plug)
+            owners = set().union(*(alias_owners.get(alias, set()) for alias in aliases))
+            if len(owners) > 1:
+                continue
+            serial = (
+                next(iter(owners)) if owners else min(cloud_groups[next(iter(aliases))])
             )
+        by_serial[serial] = merge_present_dict_values(
+            by_serial.get(serial, {}), _smart_plug_source_payload(plug)
+        )
     return [by_serial[serial] for serial in sorted(by_serial)]
 
 
 def smart_plug_payload(payload: dict[str, Any], serial: str) -> dict[str, Any]:
     """Return the current data for one captured plug identity, or no data."""
-    return next(
-        (
-            plug
-            for plug in smart_plug_payloads(payload)
-            if smart_plug_serial(plug) == serial
-        ),
-        {},
+    matches = [
+        plug
+        for plug in smart_plug_payloads(payload)
+        if serial in smart_plug_identity_aliases(plug)
+    ]
+    return matches[0] if len(matches) == 1 else {}
+
+
+@dataclass
+class _SmartPlugEntityAliases:
+    """Explicit aliases retained for one entity identity during its lifetime."""
+
+    aliases: set[str]
+    serials: set[str]
+    key: str
+
+
+def _smart_plug_entity_alias_registry(
+    coordinator: JackerySolarVaultCoordinator, device_id: str
+) -> dict[str, _SmartPlugEntityAliases]:
+    """Share captured socket identities between the entity platforms."""
+    registry = getattr(coordinator, "_smart_plug_entity_aliases", None)
+    if not isinstance(registry, dict):
+        registry = {}
+        coordinator._smart_plug_entity_aliases = registry  # ruff: ignore[private-member-access]  # Shared coordinator-owned runtime cache.
+    return cast("dict[str, dict[str, _SmartPlugEntityAliases]]", registry).setdefault(
+        device_id, {}
     )
+
+
+def _unambiguous_smart_plug_aliases(
+    plugs: list[dict[str, Any]], plug: dict[str, Any]
+) -> set[str]:
+    """Exclude aliases explicitly claimed by more than one resolved socket."""
+    return {
+        alias
+        for alias in smart_plug_identity_aliases(plug)
+        if sum(alias in smart_plug_identity_aliases(candidate) for candidate in plugs)
+        == 1
+    }
+
+
+def _registered_smart_plug_identities(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    aliases: set[str],
+    serials: frozenset[str],
+) -> dict[str, _SmartPlugEntityAliases]:
+    """Recover exact captured identities from HA registries after a reload."""
+    entry = getattr(coordinator, "config_entry", None)
+    hass = getattr(coordinator, "hass", None)
+    if entry is None or not isinstance(hass, HomeAssistant):
+        return {}
+    devices = dr.async_get(hass)
+    entities = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    identities: dict[str, _SmartPlugEntityAliases] = {}
+    for alias in aliases:
+        key = stable_subdevice_key("smart_plug", alias, 1)
+        for identifier in (
+            f"{device_id}_{key}",
+            f"{device_id}_smart_plug_serial:{alias}",
+            f"{device_id}_smart_plug_identity:{alias}",
+        ):
+            device = devices.async_get_device_by_identifier(
+                (DOMAIN, identifier), entry.entry_id
+            )
+            if device is None:
+                continue
+            marker = f"{device_id}_smart_plug_identity:"
+            persisted = {
+                value.removeprefix(marker)
+                for domain, value in device.identifiers
+                if domain == DOMAIN and value.startswith(marker)
+            }
+            serial_marker = f"{device_id}_smart_plug_serial:"
+            proven_serials = {
+                value.removeprefix(serial_marker)
+                for domain, value in device.identifiers
+                if domain == DOMAIN and value.startswith(serial_marker)
+            }
+            if serials and proven_serials and not serials & proven_serials:
+                continue
+            if (
+                device.serial_number not in aliases
+                and not persisted & aliases
+                and not proven_serials & aliases
+            ):
+                continue
+            captured = persisted or {alias}
+            for identity in captured:
+                key_marker = f"{device_id}_smart_plug_key:"
+                keys = {
+                    value.removeprefix(key_marker)
+                    for domain, value in device.identifiers
+                    if domain == DOMAIN and value.startswith(key_marker)
+                } or {stable_subdevice_key("smart_plug", identity, 1)}
+                for captured_key in keys:
+                    prefix = f"{device_id}_{captured_key}_"
+                    if any(
+                        entity.device_id == device.id
+                        and entity.unique_id.startswith(prefix)
+                        for entity in entities
+                    ):
+                        identities[identity] = _SmartPlugEntityAliases(
+                            captured | proven_serials,
+                            proven_serials,
+                            captured_key,
+                        )
+    return identities
+
+
+def _persist_smart_plug_serial_aliases(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    identity: str,
+    known: _SmartPlugEntityAliases,
+    plug: dict[str, Any],
+) -> None:
+    """Persist a captured key and proven serial aliases on its registered HA device."""
+    entry = getattr(coordinator, "config_entry", None)
+    hass = getattr(coordinator, "hass", None)
+    if entry is None or not isinstance(hass, HomeAssistant):
+        return
+    devices = dr.async_get(hass)
+    device = devices.async_get_device_by_identifier(
+        (DOMAIN, f"{device_id}_{known.key}"), entry.entry_id
+    )
+    if device is None or device.serial_number not in known.aliases:
+        return
+    identifiers = device.identifiers | {
+        (DOMAIN, f"{device_id}_smart_plug_identity:{identity}"),
+        (DOMAIN, f"{device_id}_smart_plug_key:{known.key}"),
+        *(
+            (DOMAIN, f"{device_id}_smart_plug_serial:{serial}")
+            for serial in known.serials
+        ),
+    }
+    if any(
+        owner.id != device.id
+        for owner in devices.async_get_devices(
+            identifiers=identifiers, config_entry_id=entry.entry_id
+        )
+    ):
+        return
+    serial = (
+        smart_plug_serial(plug)
+        if smart_plug_serial_aliases(plug)
+        else device.serial_number
+    )
+    if identifiers != device.identifiers or serial != device.serial_number:
+        devices.async_update_device(
+            device.id, new_identifiers=identifiers, serial_number=serial
+        )
+
+
+def _new_smart_plug_entity_key(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    identity: str,
+    aliases: set[str],
+    registry: dict[str, _SmartPlugEntityAliases],
+) -> str:
+    """Preserve existing keys and disambiguate a new exact identity's slug."""
+    key = stable_subdevice_key("smart_plug", identity, 1)
+    occupied = any(known.key == key for known in registry.values())
+    entry = getattr(coordinator, "config_entry", None)
+    hass = getattr(coordinator, "hass", None)
+    if not occupied and entry is not None and isinstance(hass, HomeAssistant):
+        device = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, f"{device_id}_{key}"), entry.entry_id
+        )
+        occupied = device is not None and device.serial_number not in aliases
+    if occupied:
+        key = f"{key}_{hashlib.sha256(identity.encode()).hexdigest()[:12]}"
+    return key
+
+
+def smart_plug_entity_identity(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    plug: dict[str, Any],
+) -> str | None:
+    """Retain the first registered identity when a proven alias arrives later."""
+    registry = _smart_plug_entity_alias_registry(coordinator, device_id)
+    plugs = smart_plug_payloads((coordinator.data or {}).get(device_id, {}))
+    aliases = _unambiguous_smart_plug_aliases(plugs, plug)
+    serials = smart_plug_serial_aliases(plug)
+    matches = [
+        identity
+        for identity, known in registry.items()
+        if aliases & known.aliases
+        and (not serials or not known.serials or serials & known.serials)
+    ]
+    registered = {}
+    if not matches:
+        registered = _registered_smart_plug_identities(
+            coordinator, device_id, aliases, serials
+        )
+        matches = sorted(registered)
+    if len(matches) > 1:
+        return None
+    identity = matches[0] if matches else smart_plug_serial(plug)
+    if identity is not None:
+        known = registry.get(identity)
+        if known is None:
+            known = registered.get(identity)
+            if known is None:
+                key = _new_smart_plug_entity_key(
+                    coordinator, device_id, identity, aliases, registry
+                )
+                known = _SmartPlugEntityAliases(set(), set(), key)
+            registry[identity] = known
+        known.aliases.update(aliases)
+        known.serials.update(serials)
+        _persist_smart_plug_serial_aliases(
+            coordinator, device_id, identity, known, plug
+        )
+    return identity
+
+
+def smart_plug_entity_key(
+    coordinator: JackerySolarVaultCoordinator, device_id: str, identity: str
+) -> str:
+    """Return the captured collision-safe key shared by socket platforms."""
+    return _smart_plug_entity_alias_registry(coordinator, device_id)[identity].key
+
+
+def smart_plug_entity_payload(
+    coordinator: JackerySolarVaultCoordinator, device_id: str, identity: str
+) -> dict[str, Any]:
+    """Follow retained exact aliases while refusing an ambiguous or replaced socket."""
+    payload = (coordinator.data or {}).get(device_id, {})
+    registry = _smart_plug_entity_alias_registry(coordinator, device_id)
+    known = registry.get(identity)
+    if known is None:
+        plug = smart_plug_payload(payload, identity)
+        if plug:
+            smart_plug_entity_identity(coordinator, device_id, plug)
+        return plug
+    plugs = smart_plug_payloads(payload)
+    matches = [
+        plug
+        for plug in plugs
+        if known.aliases & _unambiguous_smart_plug_aliases(plugs, plug)
+        and (
+            not known.serials
+            or not (serials := smart_plug_serial_aliases(plug))
+            or known.serials & serials
+        )
+    ]
+    if len(matches) != 1:
+        return {}
+    plug = matches[0]
+    known.aliases.update(_unambiguous_smart_plug_aliases(plugs, plug))
+    known.serials.update(smart_plug_serial_aliases(plug))
+    _persist_smart_plug_serial_aliases(coordinator, device_id, identity, known, plug)
+    return plug
+
+
+def _smart_plug_telemetry_patch(
+    payload: dict[str, Any],
+    plug: dict[str, Any],
+    updates: dict[str, Any],
+) -> list[Any]:
+    """Patch accepted telemetry without copying a resolved discovery snapshot."""
+    existing = payload.get(PAYLOAD_SMART_PLUGS)
+    telemetry = list(existing) if isinstance(existing, list) else []
+    touched = False
+    for index, record in enumerate(telemetry):
+        identity = smart_plug_serial(record)
+        if identity is not None and smart_plug_payload(payload, identity) == plug:
+            telemetry[index] = {**record, **updates}
+            touched = True
+    if not touched:
+        identity_field = next(
+            key
+            for key in (
+                FIELD_DEVICE_SN,
+                FIELD_DEV_SN,
+                FIELD_SN,
+                FIELD_DEVICE_ID,
+                FIELD_ID,
+                FIELD_DEV_ID,
+            )
+            if not is_blank(plug.get(key))
+        )
+        # Keep one routing identity, not discovery's changing cloud binding.
+        telemetry.append({identity_field: plug[identity_field], **updates})
+    return telemetry
 
 
 def subdevice_stat_id(
@@ -4220,6 +4542,8 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
     DataUpdateCoordinator[dict[str, dict[str, Any]]]
 ):
     """Polls all known Jackery devices."""
+
+    _smart_plug_entity_aliases: dict[str, dict[str, _SmartPlugEntityAliases]]
 
     @staticmethod
     def _merge_dict_values(
@@ -14092,23 +14416,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         matches = [
             index
             for index, plug in enumerate(plugs)
-            if str(plug_sn)
-            in {
-                smart_plug_serial(plug),
-                smart_plug_serial({
-                    FIELD_DEVICE_ID: plug.get(FIELD_DEVICE_ID),
-                    FIELD_ID: plug.get(FIELD_ID),
-                    FIELD_DEV_ID: plug.get(FIELD_DEV_ID),
-                }),
-            }
+            if str(plug_sn) in smart_plug_identity_aliases(plug)
         ]
         # A command target must identify exactly one plug, never every plug
         # sharing an ambiguous alias or unrelated bindId/deviceCode metadata.
         if len(matches) != 1:
             return
-        index = matches[0]
-        plugs[index] = {**plugs[index], **updates}
-        payload[PAYLOAD_SMART_PLUGS] = plugs
+        payload[PAYLOAD_SMART_PLUGS] = _smart_plug_telemetry_patch(
+            payload, plugs[matches[0]], updates
+        )
         new_data = dict(self.data)
         new_data[device_id] = payload
         self._push_partial_update(new_data)
@@ -15276,20 +15592,15 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         if not plugs:
             return
         cache = self._slow_cache.setdefault(f"dev:{device_id}:smart_plug", {})
-        changed = False
-        updated_plugs: list[dict[str, Any]] = []
         for plug in plugs:
-            updated = dict(plug)
             # Discovery has already been matched by exact plug identity.
             # Never borrow the sole accessory's id for an unmatched plug.
-            stat_id = subdevice_id(updated)
-            if stat_id is None:
-                updated_plugs.append(updated)
+            stat_id = subdevice_id(plug)
+            if stat_id is None or smart_plug_payload(entry, stat_id) != plug:
                 continue
             cache_key = f"smart_socket_statistic:{stat_id}"
             if stale_ok and cache_key not in cache:
                 cache[cache_key] = (0.0, {})
-                updated_plugs.append(updated)
                 continue
             panel = await self._async_get_with_ttl_for(
                 cache,
@@ -15302,15 +15613,16 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                 {},
                 stale_ok=stale_ok,
             )
+            updates: dict[str, Any] = {}
             if isinstance(panel, dict):
                 for key in (FIELD_TODAY_ENERGY, FIELD_TOTAL_ENERGY):
                     value = panel.get(key)
-                    if value is not None and updated.get(key) != value:
-                        updated[key] = value
-                        changed = True
-            updated_plugs.append(updated)
-        if changed:
-            entry[PAYLOAD_SMART_PLUGS] = updated_plugs
+                    if value is not None and plug.get(key) != value:
+                        updates[key] = value
+            if updates:
+                entry[PAYLOAD_SMART_PLUGS] = _smart_plug_telemetry_patch(
+                    entry, plug, updates
+                )
 
     async def _async_enrich_meter_head_statistics(
         self,
