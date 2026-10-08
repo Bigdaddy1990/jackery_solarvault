@@ -290,7 +290,7 @@ class JackeryMqttSensorPublisher:
                                 mirror.id, via_device_id=via_id
                             )
             return
-        if self._entry_id in device.config_entries:
+        if device.config_entry_id == self._entry_id:
             return
         for namespace, identifier in device.identifiers:
             prefix = f"{DOMAIN}:"

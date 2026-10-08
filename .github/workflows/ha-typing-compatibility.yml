@@ -24,8 +24,8 @@ jobs:
           - homeassistant: "2026.9.4"
             pytest-plugin: "0.13.367"
             coverage: "7.15.4"
-          - homeassistant: "2026.10.0b0"
-            pytest-plugin: "0.13.368"
+          - homeassistant: "2026.10.0"
+            pytest-plugin: "0.13.371"
             coverage: "7.16.2"
     env:
       EXPECTED_HOMEASSISTANT: ${{ matrix.homeassistant }}
@@ -101,6 +101,9 @@ jobs:
               print(f"{package}=={actual}")
           PY
 
+      - name: Derive lane baseline from the installed pytest plugin
+        run: python -m scripts.sync_ha_test_baseline --write
+
       - name: Check Mypy
         run: python -m mypy custom_components/jackery_solarvault
 
@@ -109,15 +112,6 @@ jobs:
           python -m pyrefly check
           --python-version=3.14 --output-format=github
 
-      - name: Run affected Home Assistant tests
+      - name: Run complete Home Assistant regression suite
         run: |
-          python -m pytest -o addopts='' \
-            tests/test_config_flow*.py \
-            tests/test_options_flow*.py \
-            tests/test_repair*.py \
-            tests/test_services*.py \
-            tests/test_binary_sensor*.py \
-            tests/test_schema_compatibility.py \
-            tests/test_coordinator_annotations.py \
-            tests/test_local_mqtt_annotations.py \
-            tests/test_battery_pack_sn_tracking.py
+          python -m pytest -o addopts='' tests
