@@ -34,6 +34,7 @@ pyyaml>=6.0.3
 ruff>=0.16.8
 serialx==1.11.0
 smellcheck>=0.3.10
+sqlalchemy
 ty<=0.0.84
 types-aiofiles>=25.1.0.20260518
 types-atomicwrites>=1.4.5.1
