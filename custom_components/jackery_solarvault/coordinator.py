@@ -14,11 +14,11 @@ import asyncio
 import base64
 import binascii
 from collections import deque
-from collections.abc import Hashable, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Hashable, Mapping, Sequence
 import contextlib
 import copy
 from dataclasses import dataclass, field as dataclass_field, replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from email.utils import parsedate_to_datetime
 from enum import StrEnum
 from functools import partial, wraps
@@ -34,7 +34,6 @@ import re
 import sys
 import time
 from typing import (
-    TYPE_CHECKING,
     Any,
     ClassVar,
     Final,
@@ -47,13 +46,14 @@ from typing import (
 )
 
 from homeassistant.components.recorder.db_schema import Statistics, StatisticsMeta
-from homeassistant.components.recorder.models import StatisticMeanType
+from homeassistant.components.recorder.models import StatisticData, StatisticMeanType
 from homeassistant.components.recorder.statistics import (
     async_import_statistics,
     statistics_during_period,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy, UnitOfPower
-from homeassistant.core import CoreState, callback
+from homeassistant.core import CoreState, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import (
     device_registry as dr,
@@ -68,7 +68,8 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import EnergyConverter, PowerConverter
 
 from .client import DevicePeriodQuery, JackeryAuthError, JackeryError
-from .client.ble import decrypt_binary_notify
+from .client.api import JackeryApi, MqttSessionSnapshot
+from .client.ble import BleFrameObservation, decrypt_binary_notify
 from .client.daily_energy import (
     async_load_daily_cache,
     async_save_daily_cache,
@@ -81,6 +82,7 @@ from .client.discovery_store import (
     async_save_discovery_cache,
 )
 from .client.local_mqtt import JackeryLocalMqttClient
+from .client.mqtt_push import JackeryMqttPushClient
 from .client.mqtt_session_store import async_save_mqtt_session
 from .client.third_party_mqtt_codec import (
     decode_third_party_mqtt_config_body,
@@ -615,7 +617,7 @@ from .ingest import (
     local_period_total_supersedes_cloud,
     merge_live_properties,
 )
-from .models import BleProcessDisposition, Observation
+from .models import BleProcessDisposition, FieldProvenance, Observation, ProvenanceKey
 from .util import (
     WHOLE_INT_TEXT_RE,
     StatisticRow,
@@ -656,27 +658,9 @@ from .util import (
     year_payload_omits_earlier_months,
 )
 
-if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine
-
-    from homeassistant.components.recorder.models import StatisticData
-
-
-# Helper for safe background enrichment
-
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Sequence
-    from datetime import tzinfo
-
-    from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
-
-    from .client.api import JackeryApi, MqttSessionSnapshot
-    from .client.ble_transport import BleFrameObservation
-    from .client.mqtt_push import JackeryMqttPushClient
-    from .models import FieldProvenance, ProvenanceKey
-
+# Python 3.14 evaluates these concrete types when inspect.signature, annotationlib
+# or unittest.mock reads coordinator annotations. Keep their imports at runtime;
+# the lightweight BLE observation type does not load the optional BLE transport.
 _LOGGER = logging.getLogger(__name__)
 _MQTT_V5_REASON_CODE_MIN = 128
 _LAYER5_STOP_RECORD_FIELDS = 2

@@ -23,7 +23,10 @@ _RECORDED_DAY = date(2025, 12, 1)
 
 def _coordinator() -> JackerySolarVaultCoordinator:
     """Initialize only the real state used by the synchronous policy helpers."""
-    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
+    coordinator = cast(
+        "JackerySolarVaultCoordinator",
+        JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator),
+    )
     cast("Any", coordinator).hass = SimpleNamespace(
         config=SimpleNamespace(time_zone="UTC")
     )

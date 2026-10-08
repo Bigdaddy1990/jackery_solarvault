@@ -43,7 +43,10 @@ def test_loaded_coordinators_finds_valid_coordinator(
     mock_entry.domain = DOMAIN
     mock_entry.state = ConfigEntryState.LOADED
 
-    coordinator = Mock(spec=services.JackerySolarVaultCoordinator)
+    # Routing needs a real coordinator type, without constructor introspection.
+    coordinator = services.JackerySolarVaultCoordinator.__new__(
+        services.JackerySolarVaultCoordinator
+    )
     mock_entry.runtime_data = coordinator
 
     monkeypatch.setattr(

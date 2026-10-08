@@ -1,0 +1,123 @@
+name: Home Assistant Typing Compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ha-typing-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compatibility:
+    name: HA ${{ matrix.homeassistant }} typing and runtime
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - homeassistant: "2026.9.4"
+            pytest-plugin: "0.13.367"
+            coverage: "7.15.4"
+          - homeassistant: "2026.10.0b0"
+            pytest-plugin: "0.13.368"
+            coverage: "7.16.2"
+    env:
+      EXPECTED_HOMEASSISTANT: ${{ matrix.homeassistant }}
+      EXPECTED_PYTEST_PLUGIN: ${{ matrix.pytest-plugin }}
+      EXPECTED_COVERAGE: ${{ matrix.coverage }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14.2"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Prepare stack-specific test requirements
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import re
+
+          # The plugin owns the HA and coverage pins for each test stack.
+          # Keep every other dependency from the checked-in baseline unchanged.
+          stack_packages = {
+              "homeassistant",
+              "pytest-homeassistant-custom-component",
+              "coverage",
+          }
+          removed = set()
+          retained = []
+          for line in Path("requirements-test.txt").read_text().splitlines():
+              match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", line.strip())
+              name = re.sub(r"[-_.]+", "-", match[1]).lower() if match else None
+              if name in stack_packages:
+                  removed.add(name)
+              else:
+                  retained.append(line)
+          if removed != stack_packages:
+              raise SystemExit(f"Unexpected stack requirement inventory: {removed}")
+          (Path(os.environ["RUNNER_TEMP"]) / "ha-typing-requirements.txt").write_text(
+              "\n".join(retained) + "\n"
+          )
+          PY
+
+      - name: Install compatible test stack
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            -r requirements.txt \
+            -r "$RUNNER_TEMP/ha-typing-requirements.txt" \
+            "pytest-homeassistant-custom-component==$EXPECTED_PYTEST_PLUGIN"
+
+      - name: Verify resolved stack
+        run: |
+          python -m pip check
+          python - <<'PY'
+          from importlib.metadata import version
+          import os
+
+          for package, variable in (
+              ("homeassistant", "EXPECTED_HOMEASSISTANT"),
+              ("pytest-homeassistant-custom-component", "EXPECTED_PYTEST_PLUGIN"),
+              ("coverage", "EXPECTED_COVERAGE"),
+          ):
+              actual = version(package)
+              expected = os.environ[variable]
+              if actual != expected:
+                  raise SystemExit(f"{package}: expected {expected}, resolved {actual}")
+              print(f"{package}=={actual}")
+          PY
+
+      - name: Check Mypy
+        run: python -m mypy custom_components/jackery_solarvault
+
+      - name: Check Pyrefly
+        run: >-
+          python -m pyrefly check
+          --python-version=3.14 --output-format=github
+
+      - name: Run affected Home Assistant tests
+        run: |
+          python -m pytest -o addopts='' \
+            tests/test_config_flow*.py \
+            tests/test_options_flow*.py \
+            tests/test_repair*.py \
+            tests/test_services*.py \
+            tests/test_binary_sensor*.py \
+            tests/test_schema_compatibility.py \
+            tests/test_coordinator_annotations.py \
+            tests/test_local_mqtt_annotations.py \
+            tests/test_battery_pack_sn_tracking.py
