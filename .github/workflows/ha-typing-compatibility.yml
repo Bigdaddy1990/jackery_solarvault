@@ -28,6 +28,7 @@ jobs:
             pytest-plugin: "0.13.371"
             coverage: "7.16.2"
     env:
+      HA_TEST_ROOT: ${{ github.workspace }}
       EXPECTED_HOMEASSISTANT: ${{ matrix.homeassistant }}
       EXPECTED_PYTEST_PLUGIN: ${{ matrix.pytest-plugin }}
       EXPECTED_COVERAGE: ${{ matrix.coverage }}
@@ -101,17 +102,30 @@ jobs:
               print(f"{package}=={actual}")
           PY
 
-      - name: Derive lane baseline from the installed pytest plugin
-        run: python -m scripts.sync_ha_test_baseline --write
+      - name: Check the committed minimum baseline before generation
+        if: matrix.homeassistant == '2026.9.4'
+        run: python -m scripts.sync_ha_test_baseline --check
+
+      - name: Prepare the alternate baseline in an isolated checkout
+        if: matrix.homeassistant != '2026.9.4'
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/ha-stack" HEAD
+          cd "$RUNNER_TEMP/ha-stack"
+          python -m scripts.sync_ha_test_baseline --write
+          python -m scripts.sync_ha_test_baseline --check
+          echo "HA_TEST_ROOT=$RUNNER_TEMP/ha-stack" >> "$GITHUB_ENV"
 
       - name: Check Mypy
+        working-directory: ${{ env.HA_TEST_ROOT }}
         run: python -m mypy custom_components/jackery_solarvault
 
       - name: Check Pyrefly
+        working-directory: ${{ env.HA_TEST_ROOT }}
         run: >-
           python -m pyrefly check
           --python-version=3.14 --output-format=github
 
       - name: Run complete Home Assistant regression suite
+        working-directory: ${{ env.HA_TEST_ROOT }}
         run: |
           python -m pytest -o addopts='' tests
