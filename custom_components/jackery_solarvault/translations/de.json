@@ -23,7 +23,7 @@
           "dev_id": "Geräte-ID",
           "qr_code_id": "QR-Code-ID"
         },
-        "description": "Nimm ein dafür geeignetes Jackery-Gerät an, das mit dem Konto {username} geteilt wurde. SolarVault-Systeme unterstützen keine Gerätefreigabe. Gib für ein unterstütztes Gerät die Geräte-ID und die QR-Code-ID aus der Einladung ein. Die Integration wird anschließend neu geladen, um das angenommene Gerät zu erkennen.",
+        "description": "Sende Geräte-ID und QR-Code-ID aus einem unterstützten Jackery-Freigabevorgang über das Konto {username}. SolarVault-Systeme unterstützen keine Gerätefreigabe. Dieses Formular nutzt die Cloud-Anmeldung und plant nach Erfolg die Gerätesuche; es scannt keine Bilder und lädt die Integration nicht neu.",
         "title": "Geteiltes Gerät annehmen"
       },
       "reauth_confirm": {
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Nimmt ein geteiltes Jackery-Gerät im Konto an, dem das ausgewaehlte Gerät gehoert, und aktualisiert danach.",
+      "description": "Sendet Geräte-ID und QR-Code-ID über das ausgewählte Konto an den Cloud-Freigabe-Endpunkt und fordert danach eine Aktualisierung an. Nur geeignete Geräte können geteilt werden; SolarVault-Systeme nicht.",
       "fields": {
         "device_id": {
-          "description": "Waehle ein Jackery-Gerät aus dem Konto, das die Freigabe annehmen soll.",
+          "description": "Wähle ein Gerät, um das Jackery-Konto für diese Cloud-Anfrage festzulegen.",
           "name": "Geräte-ID"
         },
         "qr_code_id": {
-          "description": "QR-Code-ID aus der Freigabeeinladung.",
+          "description": "QR-Code-ID aus einem unterstützten Jackery-Freigabevorgang.",
           "name": "QR-Code-ID"
         },
         "target_dev_id": {
-          "description": "Jackery-Geräte-ID aus der Freigabeeinladung.",
+          "description": "Jackery-Geräte-ID aus einem unterstützten Freigabevorgang. Eine rohe ID kann in YAML eingegeben werden.",
           "name": "Ziel-Geräte-ID"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Push-Konfiguration abrufen"
     },
     "get_share_qr_code": {
-      "description": "Ruft den Freigabe-QR-Code für das Jackery-Konto ab, dem das ausgewählte Gerät gehört. Gibt nur die Antwort zurück.",
+      "description": "Ruft den Konto-QR-Code über das Jackery-Cloud-Konto des ausgewählten Geräts ab. Gibt qr_code_id und user_id zurück und versucht, ein QR-Bild als dauerhafte Benachrichtigung anzuzeigen. Die Scan-Kompatibilität ist ungeprüft; SolarVault-Sharing wird nicht unterstützt.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Der QR-Code wird auf dem besitzenden Konto aufgelöst; Automationen können auch direkt die numerische Jackery-Geräte-ID übergeben.",
+          "description": "Wähle ein Gerät, um dessen konfiguriertes Jackery-Konto festzulegen. Die QR-Anfrage hat keinen Geräteparameter; eine rohe Jackery-Geräte-ID kann ebenfalls übergeben werden.",
           "name": "Geräte-ID"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "Benachrichtigungen auflisten"
     },
     "list_shared_devices": {
-      "description": "Listet die Geräte auf, die mit dem Jackery-Konto geteilt sind, dem das ausgewählte Gerät gehört. Gibt nur die Antwort zurück.",
+      "description": "Gibt empfangene und ausgehende Freigabedatensätze des Jackery-Kontos des ausgewählten Geräts zurück. Gibt nur die Antwort zurück; dies ist keine reine Liste zur Suche empfangener Geräte.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Die Liste der geteilten Geräte wird auf dem besitzenden Konto aufgelöst; Automationen können auch direkt die numerische Jackery-Geräte-ID übergeben.",
+          "description": "Wähle ein Gerät, um dessen konfiguriertes Jackery-Konto festzulegen. Die Liste enthält empfangene und ausgehende Freigabedatensätze; eine rohe Jackery-Geräte-ID kann ebenfalls übergeben werden.",
           "name": "Geräte-ID"
         }
       },

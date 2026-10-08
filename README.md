@@ -9,7 +9,7 @@ Languages:
 
 A custom [Home Assistant](https://www.home-assistant.io/) integration that brings your Jackery SolarVault, HomePower, and Explorer power stations directly into your smart home.
 
-**This is the ultimate (non-plus-ultra) Jackery integration for Home Assistant.** It combines 100% of the official App's functionality (Cloud API) with the speed and reliability of **Local MQTT** and **Bluetooth (BLE)**.
+It combines Jackery Cloud API features with optional **Local MQTT** and **Bluetooth (BLE)** telemetry and supported commands. Feature availability depends on the device, firmware and backend; initial device provisioning still uses the Jackery app.
 
 ---
 
@@ -19,7 +19,7 @@ You might have heard of other manual MQTT workarounds or older integrations. Her
 
 1. **Automatic Cloud Setup:** Setup uses your cloud credentials to discover devices and obtain available device keys and MQTT session material. You do not need to intercept network traffic or build JSON payloads for that discovery.
 2. **Local Transports:** Optional **Local MQTT** and **Bluetooth (BLE)** provide local telemetry and supported commands after cloud setup. They do not disable cloud authentication or guarantee simultaneous use of the mobile app; see [Account sessions and local access](./docs/account-sessions.md).
-3. **100% App Functionality:** Unlike basic local-only scripts that only read battery levels, this integration supports *everything* the Jackery App does, including Time-of-Use scheduling, Shelly integration, firmware checks, and advanced charging settings.
+3. **Cloud Features:** The integration exposes Time-of-Use scheduling, Shelly integration, firmware checks and advanced charging settings where supported. It does not implement the app's initial BLE Wi-Fi provisioning; QR, binding and sharing services are described in [Account sessions and local access](./docs/account-sessions.md#qr-codes-account-binding-and-sharing).
 
 ---
 
@@ -55,7 +55,7 @@ We also expose 60+ custom services in Home Assistant, giving you the power of th
 - **Energy Scheduling:** `save_tou_plan`, `insert_electricity_strategy`, `bind_currency`
 - **Statistics:** `query_charge_report`, `query_soc_stat`, `query_profit_stat`
 
-Sharing services apply only to models that Jackery allows to be shared. Their presence does not enable SolarVault sharing.
+Jackery supports sharing only for eligible models. These generic cloud API services do not check model eligibility or enable SolarVault sharing.
 
 ---
 
@@ -86,7 +86,7 @@ Sharing services apply only to models that Jackery allows to be shared. Their pr
 
 1. Go to **Settings → Devices & Services**.
 2. Click **Add Integration** and search for **Jackery SolarVault**.
-3. Follow the setup wizard and enter your Jackery Cloud credentials.
+3. Add and provision the device in the Jackery app first. Follow the HA setup wizard using the Jackery Cloud account that added it.
 
 > [!WARNING]
 > **SolarVault account limitation:** Use the account that added the SolarVault system. Jackery's App User Manual (§7.2) excludes SolarVault from device sharing, so a second Home Assistant account is not a workaround.

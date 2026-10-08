@@ -1,7 +1,7 @@
 # SolarVault account sessions and local access
 
-Verified against `main` commit `64abce49b540d9a18a436a016b01b2794bbe1bb9`
-on 7 October 2026. This is a source and code audit; simultaneous app/device
+Verified against PR #476 commit `7abd5ce9b0541ac62f44724ca9fe7428e5e5bd2d`
+on 8 October 2026, including its merged `main` revision. This is a source and code audit; simultaneous app/device
 operation was not tested with a live SolarVault account.
 
 ## Account ownership and sharing
@@ -22,6 +22,54 @@ reports Android app disconnections, and the
 already withdraws the second-account workaround. Generic sharing services
 and the “Accept a shared device” form expose API operations for eligible
 devices; they do not override the SolarVault restriction.
+
+## QR codes, account binding and sharing
+
+These operations use the authenticated cloud HTTP API. They are separate
+from MQTT bootstrap hydration, BLE device keys and the local-MQTT device
+token. The API and coordinator wrappers do not check model eligibility;
+their availability is not evidence that Jackery allows a SolarVault share.
+
+| HA operation | Actual request and behavior | What it does not establish |
+| --- | --- | --- |
+| `get_share_qr_code` | Uses the selected device to choose a loaded account, then sends `GET /v1/device/bind/qrcode` without device parameters. Returns `qr_code_id` and `user_id`; attempts to display a PNG QR code in an HA persistent notification. | A device-specific permission, an independent login or support for SolarVault sharing. |
+| `accept_shared_device` / “Accept a shared device” | Sends `POST /v1/device/accept_bind` with `devId` and `qrCodeId` through the configured account. The coordinator requests a refresh; the form also schedules HTTP discovery to surface any newly accessible device. | A camera scanner, QR-image import, local onboarding or an eligibility override. The form does not reload the integration. |
+| `bind_device` | Sends `POST /v1/device/bind` with `bindKey`, `devId`, `guid` and `timezoneOffset`, then requests a refresh. The service requires an existing device to select the account and separately supplied target provisioning values. | Obtaining those provisioning values, provisioning Wi-Fi on a factory-fresh unit, sharing ownership or creating a second session. |
+| `unbind_device` | Sends `POST /v1/device/unbind` with `deviceId`, then requests a refresh. | Preserving access while solving an app/HA session conflict. It removes the account binding. |
+
+The QR renderer encodes only the raw `qrCodeId` using `segno`. Its scan
+format is reconstructed from the app contract, not vendor-documented or
+live-validated by this audit. `userId` and `devId` are not embedded in the
+image. A rendering failure leaves the service response available. Do not
+treat the QR image or a successful QR-code request as confirmation that
+the complete sharing workflow will work for a given model or account.
+
+The HA form takes the device ID and QR-code ID as text. There is no
+implemented camera scan or image decoder. Existing tests check request
+fields, QR rendering/notification behavior, error handling and refresh
+scheduling with mocked cloud responses; they do not prove backend sharing
+eligibility or app scan compatibility.
+
+The service actions request an ordinary coordinator refresh; they do not
+force immediate HTTP rediscovery or reload. Newly accessible devices can
+therefore appear only after subsequent rediscovery. The form explicitly
+schedules discovery. `list_shared_devices` returns both received and outgoing
+sharing records (`receive` and `share`), not a receive-only discovery list.
+
+For a new SolarVault, complete initial account and Wi-Fi setup in the Jackery
+app, then let HA discover the device using that owning account. The bind
+endpoint wrapper does not implement the app's BLE Wi-Fi provisioning
+exchange or derive its `bindKey` and `guid`. Do not unbind a working system
+to try to obtain a separate HA session.
+
+Implementation references: [`services.py`](../custom_components/jackery_solarvault/services.py)
+(`_render_share_qr_png_data_uri`, `_notify_share_qr_code`, bind/share handlers),
+[`config_flow.py`](../custom_components/jackery_solarvault/config_flow.py)
+(`async_step_accept_shared`),
+[`coordinator.py`](../custom_components/jackery_solarvault/coordinator.py)
+(bind/share forwarding and `async_schedule_discovery_refresh`), and
+[`client/api.py`](../custom_components/jackery_solarvault/client/api.py)
+(the corresponding HTTP wrappers).
 
 ## What the current integration supports
 
@@ -58,6 +106,9 @@ All paths below refer to the audited commit linked above:
   rejected HTTP session. `_derive_mqtt_credentials` generates the
   account-bound cloud client ID `userId@APP`; a different `mac_id` changes
   the username but does not produce a separate client ID.
+  `async_get_generated_jwt` itself uses authenticated HTTP and is not called
+  by onboarding or the session-recovery paths; it is not an implemented
+  account-free login or concurrency mechanism.
 - [`client/mqtt_push.py`](../custom_components/jackery_solarvault/client/mqtt_push.py):
   `_async_open_session` passes that client ID unchanged to the cloud broker.
   MQTT 3.1.1 [§3.1.4, MQTT-3.1.4-2](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html)

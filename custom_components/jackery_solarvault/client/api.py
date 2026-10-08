@@ -2524,15 +2524,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         )
 
     async def async_get_device_shared_list(self) -> list[dict[str, Any]]:
-        """Return the list of devices shared with the current account.
+        """Return received and outgoing sharing records for the current account.
 
         The backend bean is ``{receive: list, share: list}`` (see
         ``DeviceSharedListApi$Bean`` in the reference), but older/edge
         responses may also return a bare list. Both shapes are unwrapped
-        leniently so a shape change never breaks shared-device discovery.
+        leniently to tolerate these shapes during sharing-list handling.
 
         Returns:
-            list[dict[str, Any]]: Shared device entries as extracted from the
+            list[dict[str, Any]]: Sharing records as extracted from the
             backend payload.
         """
         data = await self._get_json(DEVICE_SHARED_LIST_PATH)

@@ -10,7 +10,7 @@ Languages:
 
 Une intégration personnalisée pour [Home Assistant](https://www.home-assistant.io/) qui intègre vos stations d'énergie Jackery SolarVault, HomePower et Explorer directement dans votre maison intelligente.
 
-**Ceci est l'intégration Jackery ultime (non-plus-ultra) pour Home Assistant.** Elle combine 100 % des fonctionnalités de l'application officielle (Cloud API) avec la vitesse et la fiabilité du **MQTT local** et du **Bluetooth (BLE)**.
+Elle combine les fonctions de l’API cloud Jackery avec la télémétrie et les commandes compatibles via **MQTT local** et **Bluetooth (BLE)** en option. Les fonctions disponibles dépendent de l’appareil, du firmware et du service cloud ; la configuration initiale reste dans l’application Jackery.
 
 ---
 
@@ -20,7 +20,7 @@ Vous avez peut-être entendu parler d'autres solutions MQTT manuelles ou d'inté
 
 1. **Aucune extraction manuelle de tokens :** La configuration utilise vos identifiants cloud pour découvrir les appareils et récupérer les clés et les données de session MQTT. Vous n'avez pas à intercepter le trafic réseau ni à créer manuellement des charges utiles JSON.
 2. **Contrôle local optionnel :** Sur les appareils compatibles, un courtier MQTT local configuré et le **Bluetooth (BLE)** activé peuvent transmettre des données et des commandes locales. Ces canaux supplémentaires ne remplacent pas la connexion au cloud et ne désactivent ni HTTP ni le MQTT cloud. Cette intégration ne propose pas de configuration entièrement locale.
-3. **100 % des Fonctionnalités de l'App :** Contrairement aux scripts locaux basiques qui ne lisent que les niveaux de batterie, cette intégration prend en charge *tout* ce que fait l'application Jackery, y compris la planification de l'Heure d'Utilisation, l'intégration Shelly, les vérifications de firmware et les paramètres de charge avancés.
+3. **Fonctions cloud :** L’intégration expose la planification horaire, l’intégration Shelly, les vérifications de firmware et les paramètres de charge avancés lorsque ces fonctions sont prises en charge. Elle n’implémente pas la configuration Wi-Fi initiale via BLE. Consultez [les parcours QR, association et partage (en anglais)](./account-sessions.md#qr-codes-account-binding-and-sharing).
 
 ---
 
@@ -83,7 +83,7 @@ Nous exposons également plus de 60 services personnalisés dans Home Assistant,
 
 1. Allez dans **Paramètres → Appareils et services**.
 2. Cliquez sur **Ajouter une intégration** et recherchez **Jackery SolarVault**.
-3. Suivez l'assistant de configuration et entrez vos identifiants Cloud Jackery.
+3. Ajoutez et configurez d’abord l’appareil dans l’application Jackery. Utilisez ensuite dans l’assistant HA le compte cloud Jackery qui l’a ajouté.
 
 > [!WARNING]
 > **Compte SolarVault :** Selon le manuel de l'application Jackery, les systèmes SolarVault ne peuvent pas être partagés ; seul leur propriétaire peut les gérer. Utilisez le compte Jackery propriétaire de votre SolarVault pour cette intégration. Un deuxième compte HA auquel partager le SolarVault n'est pas une solution prise en charge.

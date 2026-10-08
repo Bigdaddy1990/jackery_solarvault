@@ -23,7 +23,7 @@
           "dev_id": "ID del dispositivo",
           "qr_code_id": "ID del código QR"
         },
-        "description": "Acepta un dispositivo Jackery compatible compartido con la cuenta {username}. Los sistemas SolarVault no permiten compartir dispositivos. Para un dispositivo compatible, introduce el ID del dispositivo y el ID del código QR de la invitación. La integración se recarga después para detectar el dispositivo aceptado.",
+        "description": "Envía los ID del dispositivo y del código QR de un proceso de uso compartido compatible con Jackery mediante la cuenta {username}. Los sistemas SolarVault no se pueden compartir. Este formulario utiliza autenticación en la nube y programa la búsqueda tras el éxito; no escanea imágenes ni recarga la integración.",
         "title": "Aceptar un dispositivo compartido"
       },
       "reauth_confirm": {
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Acepta un dispositivo Jackery compartido en la cuenta propietaria del dispositivo seleccionado y luego actualiza.",
+      "description": "Envía los ID del dispositivo y del código QR al servicio de uso compartido de la nube mediante la cuenta seleccionada y solicita una actualización. Solo se pueden compartir dispositivos compatibles; los sistemas SolarVault están excluidos.",
       "fields": {
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery de la cuenta que debe aceptar el uso compartido.",
+          "description": "Selecciona un dispositivo para elegir la cuenta de Jackery utilizada en esta solicitud a la nube.",
           "name": "ID de dispositivo"
         },
         "qr_code_id": {
-          "description": "ID del codigo QR de la invitacion de uso compartido.",
+          "description": "ID del código QR de un proceso de uso compartido compatible con Jackery.",
           "name": "ID del codigo QR"
         },
         "target_dev_id": {
-          "description": "ID de dispositivo Jackery de la invitacion de uso compartido.",
+          "description": "ID del dispositivo Jackery de un proceso de uso compartido compatible. Se puede introducir un ID sin procesar en YAML.",
           "name": "ID del dispositivo destino"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Obtener configuracion push"
     },
     "get_share_qr_code": {
-      "description": "Obtiene el código QR de uso compartido de la cuenta de Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
+      "description": "Obtiene el código QR de la cuenta de la nube de Jackery del dispositivo seleccionado. Devuelve qr_code_id y user_id e intenta mostrar una imagen QR en una notificación persistente. La compatibilidad del escaneo no está verificada; SolarVault no admite uso compartido.",
       "fields": {
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. El código QR se resuelve en la cuenta propietaria; las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery.",
+          "description": "Selecciona un dispositivo para elegir su cuenta de Jackery configurada. La solicitud QR no tiene parámetro de dispositivo; también se puede pasar un ID de dispositivo Jackery sin procesar.",
           "name": "ID de dispositivo"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "Listar notificaciones"
     },
     "list_shared_devices": {
-      "description": "Lista los dispositivos compartidos con la cuenta de Jackery propietaria del dispositivo seleccionado. Solo devuelve la respuesta.",
+      "description": "Devuelve registros de uso compartido recibidos y enviados de la cuenta de Jackery del dispositivo seleccionado. Solo devuelve la respuesta; no es una lista de búsqueda de dispositivos recibidos.",
       "fields": {
         "device_id": {
-          "description": "Selecciona un dispositivo Jackery. La lista de dispositivos compartidos se resuelve en la cuenta propietaria; las automatizaciones también pueden pasar directamente el ID numérico del dispositivo Jackery.",
+          "description": "Selecciona un dispositivo para elegir su cuenta de Jackery configurada. La lista contiene registros de uso compartido recibidos y enviados; también se puede pasar un ID de dispositivo Jackery sin procesar.",
           "name": "ID de dispositivo"
         }
       },

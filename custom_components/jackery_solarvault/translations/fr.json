@@ -23,7 +23,7 @@
           "dev_id": "ID de l'appareil",
           "qr_code_id": "ID du code QR"
         },
-        "description": "Acceptez un appareil Jackery éligible partagé avec le compte {username}. Les systèmes SolarVault ne permettent pas le partage d'appareils. Pour un appareil compatible, saisissez l'ID de l'appareil et l'ID du code QR de l'invitation. L'intégration est ensuite rechargée pour découvrir l'appareil accepté.",
+        "description": "Envoyez les ID de l’appareil et du code QR d’un processus de partage Jackery compatible via le compte {username}. Les systèmes SolarVault ne peuvent pas être partagés. Ce formulaire utilise l’authentification cloud et planifie la découverte après succès ; il ne scanne pas les images et ne recharge pas l’intégration.",
         "title": "Accepter un appareil partagé"
       },
       "reauth_confirm": {
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Accepte un appareil Jackery partage sur le compte proprietaire de l'appareil selectionne, puis actualise.",
+      "description": "Envoie les ID de l’appareil et du code QR au service cloud de partage via le compte sélectionné, puis demande une actualisation. Seuls les appareils compatibles peuvent être partagés ; les systèmes SolarVault sont exclus.",
       "fields": {
         "device_id": {
-          "description": "Selectionnez un appareil Jackery du compte qui doit accepter le partage.",
+          "description": "Choisissez un appareil pour sélectionner le compte Jackery utilisé pour cette requête cloud.",
           "name": "ID de l'appareil"
         },
         "qr_code_id": {
-          "description": "ID du code QR de l'invitation de partage.",
+          "description": "ID du code QR d’un processus de partage Jackery compatible.",
           "name": "ID du code QR"
         },
         "target_dev_id": {
-          "description": "ID de l'appareil Jackery dans l'invitation de partage.",
+          "description": "ID de l’appareil Jackery d’un processus de partage compatible. Un ID brut peut être saisi en YAML.",
           "name": "ID de l'appareil cible"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Recuperer la configuration push"
     },
     "get_share_qr_code": {
-      "description": "Récupère le code QR de partage du compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
+      "description": "Récupère le code QR du compte cloud Jackery de l’appareil sélectionné. Renvoie qr_code_id et user_id et tente d’afficher une image QR dans une notification persistante. La compatibilité du scan n’est pas vérifiée ; le partage SolarVault n’est pas pris en charge.",
       "fields": {
         "device_id": {
-          "description": "Sélectionnez un appareil Jackery. Le code QR est résolu sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
+          "description": "Choisissez un appareil pour sélectionner son compte Jackery configuré. La requête QR n’a pas de paramètre d’appareil ; un ID Jackery brut peut également être transmis.",
           "name": "ID de l'appareil"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "Lister les notifications"
     },
     "list_shared_devices": {
-      "description": "Liste les appareils partagés avec le compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
+      "description": "Renvoie les données de partage reçues et envoyées du compte Jackery de l’appareil sélectionné. Renvoie uniquement la réponse ; ce n’est pas une liste de découverte des seuls appareils reçus.",
       "fields": {
         "device_id": {
-          "description": "Sélectionnez un appareil Jackery. La liste des appareils partagés est résolue sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
+          "description": "Choisissez un appareil pour sélectionner son compte Jackery configuré. La liste contient les partages reçus et envoyés ; un ID d’appareil Jackery brut peut également être transmis.",
           "name": "ID de l'appareil"
         }
       },

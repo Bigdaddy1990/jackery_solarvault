@@ -2448,13 +2448,10 @@ async def _async_handle_unbind_smart_part(
 def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
     """Return a base64 PNG ``data:`` URI encoding the share ``qrCodeId``.
 
-    The Jackery app's accept-bind flow scans a QR, extracts only the
-    ``qrCodeId`` string, and pairs it with the *scanner's* own device id
-    (``device/accept_bind`` takes ``devId`` + ``qrCodeId``). The displayed QR
-    therefore carries just the ``qrCodeId``; ``userId`` and ``devId`` are not
-    part of the scanned payload. This exact scan format is reverse-engineered,
-    not vendor-documented, so the rendering is best-effort.
-
+    The renderer encodes only ``qrCodeId``. The API exposes an account QR
+    envelope and an accept-bind operation, but does not establish the exact
+    scan format or the participating account roles. Rendering is best-effort
+    and does not prove app compatibility or device-sharing eligibility.
     """
     buffer = io.BytesIO()
     segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
@@ -2468,13 +2465,12 @@ async def _notify_share_qr_code(
     qr_code_id: object,
     user_id: object,
 ) -> None:
-    """Create a persistent notification with a scannable share QR image.
+    """Create a persistent notification with an account QR image and limits.
 
     Best-effort: a render or notification failure must never fail the service,
     which still returns the ``{qr_code_id, user_id}`` envelope. The notification
-    documents that the encoded payload (the ``qrCodeId`` string) is a
-    reverse-engineered assumption so the owner can correct it if it does not
-    scan in the Jackery app.
+    documents the device-sharing limits and unverified scan format without
+    promising that the image can be used to share a SolarVault.
     """
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
@@ -2485,17 +2481,19 @@ async def _notify_share_qr_code(
         )
         message = (
             f"![Share QR code]({data_uri})\n\n"
-            f"Scan this QR code with a second Jackery account to share the "
-            f"SolarVault.\n\n"
+            f"Account QR code for eligible Jackery device-sharing workflows. "
+            f"SolarVault systems cannot be shared. This integration still "
+            f"requires cloud account authentication.\n\n"
             f"qrCodeId: `{qr_code_id}`\n"
             f"userId: `{user_id}`\n\n"
-            f"Note: The QR code encodes `qrCodeId` based on the reconstructed "
-            f"app contract. If scanning fails, use the value above manually."
+            f"Note: The rendered QR format is reconstructed and is not guaranteed "
+            f"to scan in the Jackery app. Use these identifiers only with a "
+            f"documented sharing procedure for an eligible device."
         )
         persistent_notification.async_create(
             hass,
             message,
-            title="Jackery SolarVault share QR code",
+            title="Jackery account QR code",
         )
     except Exception:
         _LOGGER.debug(
@@ -2508,7 +2506,7 @@ async def _async_handle_get_share_qr_code(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> ServiceResponse:
-    """Return the share QR code for the account that owns the selected device."""
+    """Return the account QR code using the selected device's configured account."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2770,7 +2768,7 @@ async def _async_handle_list_shared_devices(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> ServiceResponse:
-    """Return the devices shared with the account that owns the selected device."""
+    """Return received and outgoing sharing records using the selected account."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],

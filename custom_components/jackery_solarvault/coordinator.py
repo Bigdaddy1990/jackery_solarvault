@@ -12363,7 +12363,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
         return await self.api.async_get_qr_code()
 
     async def async_list_shared_devices(self) -> list[Any]:
-        """Return devices shared with this Jackery account."""
+        """Return received and outgoing sharing records for this Jackery account."""
         return await self.api.async_get_device_shared_list()
 
     async def async_list_shared_managers(
