@@ -110,7 +110,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
-    except UnicodeDecodeError, json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):  # fmt: skip
         return False
 
 
@@ -2395,7 +2395,7 @@ class JackeryBleListener:
             try:
                 decoded = base64.b64decode(raw, validate=False)
                 return ble.decrypt_binary_notify(decoded, key), None
-            except ValueError, binascii.Error:
+            except (ValueError, binascii.Error):  # fmt: skip
                 return None, str(first_error)
 
     @staticmethod

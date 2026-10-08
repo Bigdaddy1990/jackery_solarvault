@@ -28,6 +28,9 @@ repos:
     rev: v3.21.2
     hooks:
       - id: pyupgrade
+        # py314 removes the deliberate annotations future import (issue #278).
+        # Ruff still checks this platform; its forward reference has a regression.
+        exclude: ^custom_components/jackery_solarvault/select\.py$
         args:
           - --py314-plus
 

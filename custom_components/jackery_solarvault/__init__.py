@@ -391,7 +391,7 @@ def _get_stable_entry_id(entry: ConfigEntry) -> str:
     try:
         if hasattr(entry_id, "__str__") and not isinstance(entry_id, str):
             return str(entry_id)
-    except AttributeError, TypeError:
+    except (AttributeError, TypeError):  # fmt: skip
         pass
     # Fallback to object id for stable identity
     return str(id(entry))
@@ -1341,7 +1341,7 @@ async def _async_prepare_primary_http(
     """Authenticate, discover, and complete HA's mandatory first HTTP refresh."""
     try:
         await _async_run_primary_http_startup(hass, entry, coordinator)
-    except ConfigEntryAuthFailed, ConfigEntryNotReady:
+    except (ConfigEntryAuthFailed, ConfigEntryNotReady):  # fmt: skip
         raise
     except JackeryAuthError as err:
         msg = f"Jackery credentials were rejected by the HTTP API: {err}"
@@ -1815,7 +1815,7 @@ async def _async_start_new_local_mqtt_client(
 
     try:
         await client.async_start()
-    except asyncio.CancelledError, Exception:
+    except (asyncio.CancelledError, Exception):  # fmt: skip
         await _async_detach_local_mqtt_client(hass, entry, coordinator, client)
         raise
     if not _entry_owns_coordinator(hass, entry, coordinator):

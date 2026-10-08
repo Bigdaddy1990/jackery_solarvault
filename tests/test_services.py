@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, ClassVar, cast
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 import voluptuous as vol
@@ -1740,7 +1740,8 @@ def test_loaded_coordinators_keeps_only_typed_runtime_data(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Entries without a coordinator runtime_data are skipped."""
-    coordinator = Mock(spec=JackerySolarVaultCoordinator)
+    # Routing needs a real coordinator type, without constructor introspection.
+    coordinator = JackerySolarVaultCoordinator.__new__(JackerySolarVaultCoordinator)
     entries = [
         SimpleNamespace(runtime_data=coordinator),
         SimpleNamespace(runtime_data=object()),

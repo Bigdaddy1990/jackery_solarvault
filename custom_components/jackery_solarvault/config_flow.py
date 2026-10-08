@@ -758,7 +758,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             payload_dict = json.loads(payload)
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):  # fmt: skip
             return self.async_abort(reason="invalid_discovery_info")
 
         if not isinstance(payload_dict, dict):
@@ -857,7 +857,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     field="password",
                     max_length=MAX_PASSWORD_LENGTH,
                 )
-            except KeyError, vol.Invalid, TypeError:
+            except (KeyError, vol.Invalid, TypeError):  # fmt: skip
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
                 return self.async_show_form(
                     step_id=FLOW_STEP_USER,
@@ -925,7 +925,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
         return self.async_show_menu(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -964,7 +964,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1107,7 +1107,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1174,7 +1174,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)
