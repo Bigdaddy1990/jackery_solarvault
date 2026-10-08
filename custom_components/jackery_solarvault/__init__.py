@@ -3641,7 +3641,7 @@ def _matching_serial_battery_pack_target(
     if (
         serial_device is None
         or serial_device.id == device.id
-        or entry_id not in serial_device.config_entries
+        or serial_device.config_entry_id != entry_id
     ):
         return None
     stored_serial = nonblank_text(serial_device.serial_number)

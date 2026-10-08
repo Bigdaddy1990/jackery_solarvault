@@ -55,6 +55,7 @@ with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
 from dataclasses import dataclass
+from datetime import datetime  # ruff: ignore[typing-only-standard-library-import] - runtime observation annotations
 import logging
 import os
 import secrets
@@ -334,6 +335,28 @@ class BleBinaryFrame:
     cmd: int
     body: bytes
     trailer: bytes
+
+
+# ---------------------------------------------------------------------------
+@dataclass(slots=True)
+class BleFrameObservation:
+    """One frame observed on the notify characteristic.
+
+    Carries both the parsed view and the original raw bytes so the
+    diagnostics surface can show what we received even if decoding failed.
+    ``parsed`` is set when AES decrypt + header parse succeeded; otherwise
+    ``decode_error`` carries the reason and ``parsed`` is None.
+    """
+
+    received_at: datetime
+    raw_bytes: bytes
+    base64_encoded: str
+    parsed: BleBinaryFrame | None
+    decode_error: str | None = None
+    session_generation: int | None = None
+    notify_sequence: int | None = None
+    delivery_id: str | None = None
+    is_fragment: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -790,6 +813,7 @@ __all__ = [
     "DEFAULT_BLE_MTU",
     "BleBinaryFrame",
     "BleFrame",
+    "BleFrameObservation",
     "aes_decrypt",
     "aes_encrypt",
     "build_binary_frame",

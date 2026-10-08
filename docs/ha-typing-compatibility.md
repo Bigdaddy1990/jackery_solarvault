@@ -34,12 +34,26 @@ remain in the definition. Construction happens once per registered service.
 HA still intentionally exports `BinarySensorDeviceClass` from the public
 `binary_sensor` module after relocating its definition. The Mypy override enables
 implicit re-exports only for that upstream module. It changes neither integration
-typing strictness nor the enum's annotations. There are no new typing ignores,
-casts, package-wide alias stubs or runtime version branches.
+typing strictness nor the enum's annotations. The schema/enum implementation adds
+no typing ignores, casts, package-wide alias stubs or runtime version branches.
+
+Python 3.14.2 runtime introspection also needs the coordinator's annotation
+types to exist outside `TYPE_CHECKING`. Its concrete imports now remain available
+to `inspect.signature`, `annotationlib` VALUE evaluation and `get_type_hints`.
+Only Ruff's import-relocation rules are exempted for this module; both type
+checkers retain their existing rules. `BleFrameObservation` lives alongside
+`BleBinaryFrame` in the lightweight BLE codec module and remains re-exported by
+the transport module, preserving class identity without eagerly importing the
+optional BLE transport.
+
+The local MQTT client's signatures use the same concrete-runtime import policy.
+Device-registry ownership checks use `config_entry_id`, available in both pinned
+stacks, instead of the deprecated `config_entries` property exposed by the newer
+stack's full tests. No supported-version or dependency-baseline changes are needed.
 
 ## Validation
 
-On Python 3.14.7 with HA 2026.9.4/plugin 0.13.367 and
+On Python 3.14.2 with HA 2026.9.4/plugin 0.13.367 and
 HA 2026.10.0b0/plugin 0.13.368:
 
 - Mypy 2.4.0: all 42 integration source files pass. Local commands use
@@ -47,18 +61,33 @@ HA 2026.10.0b0/plugin 0.13.368:
   PID during native-parser worker discovery; this changes no typing rules.
 - Pyrefly 1.3.2: integration and complete configured project pass with zero errors;
   existing project suppressions remain active; this change adds none.
-- 698 affected runtime tests pass on each stack, including 20 new compatibility
-  cases covering service validation policies and actual binary sensor enum identity.
+- 769 affected runtime tests pass on each stack, including 20 schema/enum
+  compatibility cases, six coordinator annotation regressions, three local MQTT
+  annotation regressions and 62 existing device-registry ownership cases. The
+  coordinator cases
+  reproduced failures before the fix and verify concrete constructor types,
+  every owned method/property, Mock specs, autospec arity, the lazy BLE transport
+  import in a fresh interpreter and observation re-export identity.
 - Negative probes for a dictionary passed as a form schema, a string returned as
   an enum and a string used as a description's device class each fail under both
   checkers on both stacks. The actual type contracts remain enforced.
-- The 20 compatibility cases also pass on the minimum supported Python 3.14.2.
+- Both stacks use the workflow's exact Python 3.14.2 minimum.
 - `pip check`, focused Ruff lint/format and `git diff --check` pass.
 
 The compatibility CI matrix resolves each exact pytest-plugin stack independently.
 Only its HA, coverage and plugin requirement rows replace the baseline test pins;
 all remaining test requirements retain the repository's source values. The normal
 minimum-stack checks and plugin-derived baseline checks remain in place.
+
+An additional exploratory full-suite run on Python 3.14.2 encounters an upstream
+Recorder test-fixture issue: the plugin's autospec evaluates HA's
+`recorder.migration._find_schema_errors` annotation for its TYPE_CHECKING-only
+`Recorder` import. The same failure reproduces on unchanged PR head `1fc48956`.
+The alternate-stack full suite also deliberately disagrees with the checked-in
+minimum-stack baseline assertion. Neither result is treated as a passing full
+suite or suppressed; the compatibility workflow runs the expanded affected-test
+selection, and regular CI runs the complete minimum-stack suite on current
+Python 3.14.
 
 ## Primary sources
 

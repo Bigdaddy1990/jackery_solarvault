@@ -117,4 +117,7 @@ jobs:
             tests/test_repair*.py \
             tests/test_services*.py \
             tests/test_binary_sensor*.py \
-            tests/test_schema_compatibility.py
+            tests/test_schema_compatibility.py \
+            tests/test_coordinator_annotations.py \
+            tests/test_local_mqtt_annotations.py \
+            tests/test_battery_pack_sn_tracking.py
