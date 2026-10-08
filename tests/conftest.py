@@ -21,6 +21,28 @@ from unittest.mock import patch
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def recorder_migration_runtime_annotation(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Expose Recorder for Python 3.14 autospec in the upstream test fixture.
+
+    HA imports this type only under TYPE_CHECKING, while the pytest plugin
+    autospecs migration._find_schema_errors and evaluates its lazy annotations.
+    Bind the real class in tests; no recorder implementation is replaced.
+    """
+    if "async_test_recorder" not in request.fixturenames:
+        return
+    from sqlalchemy.orm import Session  # ruff: ignore[import-outside-top-level] - upstream fixture boundary
+
+    from homeassistant.components.recorder import Recorder, migration  # ruff: ignore[import-outside-top-level] - only recorder tests require HA
+    from homeassistant.helpers import recorder as recorder_helper  # ruff: ignore[import-outside-top-level] - upstream fixture boundary
+
+    monkeypatch.setattr(migration, "Recorder", Recorder, raising=False)
+    monkeypatch.setattr(recorder_helper, "Session", Session, raising=False)
+
+
 if TYPE_CHECKING:
     from collections.abc import Generator, Mapping
 

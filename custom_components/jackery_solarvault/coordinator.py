@@ -5858,7 +5858,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                         if (
                             device.id not in linked_device_ids
                             and device.via_device_id in linked_device_ids
-                            and self.entry.entry_id in device.config_entries
+                            and device.config_entry_id == self.entry.entry_id
                         ):
                             linked_device_ids.add(device.id)
                             changed = True
@@ -5871,7 +5871,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     registry_device = registry.async_get(registry_device_id)
                     if (
                         registry_device is None
-                        or self.entry.entry_id not in registry_device.config_entries
+                        or registry_device.config_entry_id != self.entry.entry_id
                     ):
                         continue
                     # HA 2026.9: a device belongs to exactly one config entry,
