@@ -109,7 +109,7 @@ def _broker_port(options: Mapping[str, Any]) -> int:
     )
     try:
         return int(raw)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):  # fmt: skip
         return DEFAULT_THIRD_PARTY_MQTT_PORT
 
 

@@ -154,6 +154,9 @@ jobs:
           python -m pip check
           python -m scripts.sync_ha_test_baseline --check
 
+      - name: Compile and import every shipped integration module
+        run: python -m scripts.check_integration_imports
+
       - name: Prepare coverage directories
         env:
           PUBLISH_PAGES: ${{ inputs.publish-pages }}

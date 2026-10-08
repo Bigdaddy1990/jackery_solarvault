@@ -159,7 +159,7 @@ def _has_error(value: Any) -> bool:
     if isinstance(value, str):
         try:
             decoded = json.loads(value)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):  # fmt: skip
             return bool(_ERROR.search(value))
         if isinstance(decoded, (dict, list)):
             return _has_error(decoded)
@@ -222,7 +222,7 @@ def _valid_receipt(marker: Path, session: str, kind: str, now: datetime) -> bool
             and at.tzinfo is not None
             and timedelta(0) <= now - at <= MAX_AGE
         )
-    except OSError, ValueError, TypeError, KeyError:
+    except (OSError, ValueError, TypeError, KeyError):  # fmt: skip
         return False
 
 
@@ -254,7 +254,7 @@ def handle(event: dict[str, Any], state_dir: Path) -> dict[str, Any]:
         try:
             if not Path(cwd).resolve().is_relative_to(PROJECT):
                 return {}
-        except OSError, ValueError:
+        except (OSError, ValueError):  # fmt: skip
             cwd = None
     hook = event.get("hook_event_name")
     if hook == "PreToolUse" and _read_only(event):
@@ -309,7 +309,7 @@ def main() -> int:
         if not _SESSION.fullmatch(event["session_id"]):
             raise ValueError("Invalid hook session")
         result = handle(event, PROJECT / ".mandatory-tool-gate")
-    except OSError, ValueError, TypeError:
+    except (OSError, ValueError, TypeError):  # fmt: skip
         result = _deny("Invalid mandatory preflight hook input.")
         json.dump(result, sys.stdout)
         sys.stdout.write("\n")
