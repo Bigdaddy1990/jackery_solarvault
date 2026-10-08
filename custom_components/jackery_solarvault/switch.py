@@ -6,7 +6,7 @@ descriptions/switch.py.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -55,11 +55,17 @@ from .const import (
     FIELD_WPS,
     MANUFACTURER,
     PAYLOAD_CIRCUIT_PROPERTY,
-    PAYLOAD_SMART_PLUGS,
     SUBDEVICE_DEV_TYPE_BREAKER,
-    SUBDEVICE_DEV_TYPE_SOCKET,
 )
-from .coordinator import ACTION_WRITE_ERRORS, subdevice_accessories
+from .coordinator import (
+    ACTION_WRITE_ERRORS,
+    smart_plug_entity_identity,
+    smart_plug_entity_key,
+    smart_plug_entity_payload,
+    smart_plug_payload,
+    smart_plug_payloads,
+    subdevice_accessories,
+)
 from .descriptions import SWITCH_DESCRIPTIONS, JackerySwitchDescription
 from .descriptions.switch import (
     _set_auto_standby,
@@ -81,7 +87,6 @@ from .descriptions.switch import (
 )
 from .entity import (
     ALL_LIVE_DATA_SOURCES,
-    HTTP_AND_LAYER5_COMMAND_SOURCES,
     HTTP_COMMAND_SOURCES,
     HTTP_DATA_SOURCES,
     LAYER5_COMMAND_SOURCES,
@@ -96,9 +101,7 @@ from .util import (
     circuit_id,
     is_portable_payload as _is_portable_payload,
     safe_bool,
-    smart_plug_serial,
     sorted_circuits,
-    sorted_smart_plugs,
     stable_subdevice_key,
 )
 
@@ -224,8 +227,9 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     """Writable switch for one smart-plug subdevice."""
 
     _attr_translation_key = "smart_plug_switch"
+    _attr_device_info: DeviceInfo
     data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES
-    command_sources: tuple[str, ...] = HTTP_AND_LAYER5_COMMAND_SOURCES
+    command_sources: tuple[str, ...] = HTTP_COMMAND_SOURCES
     app_fields: tuple[str, ...] = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
 
     def __init__(
@@ -242,14 +246,7 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         self._plug_index = plug_index
         self._plug_sn = plug_sn
         self._plug_key = plug_key
-        plug = self._plug
-        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
-        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
-            "shelly",
-        )
-        self.command_sources = (
-            HTTP_COMMAND_SOURCES if is_cloud else LAYER5_COMMAND_SOURCES
-        )
+        self.command_sources = self._current_command_sources()
         # Build the per-plug device_info once at construction.
         self._attr_device_info = self._build_smart_plug_device_info(
             plug_index,
@@ -258,12 +255,40 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         )
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Keep this entity attached to its captured smart-plug device."""
+        return self._attr_device_info
+
+    @property
     def _plug(self) -> dict[str, Any]:
         """Smart-plug payload matching this entity's captured serial."""
-        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
-            if smart_plug_serial(plug) == self._plug_sn:
-                return plug
-        return {}
+        return smart_plug_entity_payload(
+            self.coordinator, self._device_id, self._plug_sn
+        )
+
+    def _current_command_sources(self) -> tuple[str, ...]:
+        """Use the current classification for both availability and writes."""
+        return (
+            HTTP_COMMAND_SOURCES
+            if self._is_cloud_plug(self._plug)
+            else LAYER5_COMMAND_SOURCES
+        )
+
+    @override
+    def _source_capability_contract(
+        self,
+    ) -> tuple[bool, tuple[str, ...], tuple[str, ...], tuple[str, ...], bool]:
+        """Refresh executable sources before availability or capability checks."""
+        self.command_sources = self._current_command_sources()
+        return super()._source_capability_contract()
+
+    @staticmethod
+    def _is_cloud_plug(plug: dict[str, Any]) -> bool:
+        """Identify Shelly control from the current merged socket payload."""
+        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
+        return safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+            "shelly",
+        )
 
     @property
     def is_on(self) -> bool | None:
@@ -293,15 +318,15 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """Set the linked plug state and request a coordinator refresh."""
         plug = self._plug
         plug_sn = self._jackery_device_sn(plug)
-        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
-        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
-            "shelly",
-        )
-        if is_cloud:
+        if self._is_cloud_plug(plug):
             shelly_device_id = self._cloud_device_id(plug)
             if shelly_device_id is None:
                 raise_entity_action_error(
                     "smart_plug_switch", self._device_id, "missing Shelly deviceId"
+                )
+            if smart_plug_payload(self._payload, shelly_device_id) != plug:
+                raise_entity_action_error(
+                    "smart_plug_switch", self._device_id, "ambiguous Shelly deviceId"
                 )
             if safe_bool(plug.get(FIELD_CONTROL_ALLOWED)) is not True:
                 raise_entity_action_error(
@@ -470,6 +495,11 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
     command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
     app_fields: tuple[str, ...] = (FIELD_SOCKET_PRIORITY,)
 
+    @override
+    def _current_command_sources(self) -> tuple[str, ...]:
+        """Priority writes always use Jackery's independent Layer 5 transports."""
+        return LAYER5_COMMAND_SOURCES
+
     def __init__(
         self,
         coordinator: JackerySolarVaultCoordinator,
@@ -565,16 +595,12 @@ def _collect_smart_plug_switches(
     seen_unique_ids: set[str],
 ) -> None:
     """Collect relay and optional priority switches for smart plugs."""
-    plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
-    if not plugs:
-        plugs = sorted_smart_plugs(
-            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
-        )
+    plugs = smart_plug_payloads(payload)
     for index, plug in enumerate(plugs, start=1):
-        serial = smart_plug_serial(plug)
+        serial = smart_plug_entity_identity(coordinator, dev_id, plug)
         if serial is None:
             continue
-        key = stable_subdevice_key("smart_plug", serial, index)
+        key = smart_plug_entity_key(coordinator, dev_id, serial)
         _append_switch_entity(
             entities,
             seen_unique_ids,

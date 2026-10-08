@@ -126,6 +126,7 @@ from .const import (
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
     REDACTED_VALUE,
     REDACT_KEYS,
+    SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_SCAN_NAME_LABELS,
     SUBDEVICE_SCAN_NAME_MANUFACTURERS,
     TASK_PLAN_BODY,
@@ -492,8 +493,28 @@ def coordinator_entity_signature(  # ruff: ignore[too-many-locals] - one field p
             )
         )
         plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+        # Socket discovery resolves every supported metadata location. Its
+        # signature must see those same locations when a plug arrives later.
+        for section in (
+            payload.get(PAYLOAD_SYSTEM_META),
+            payload.get(PAYLOAD_SYSTEM),
+            payload,
+        ):
+            if not isinstance(section, dict):
+                continue
+            items = section.get(FIELD_ACCESSORIES)
+            for plug in sorted_smart_plugs(items):
+                if str(plug.get(FIELD_DEV_TYPE) or plug.get(FIELD_DEVICE_TYPE)) == str(
+                    SUBDEVICE_DEV_TYPE_SOCKET
+                ):
+                    plugs.append(plug)
+        plug_fields: dict[str, set[str]] = {}
+        for plug in plugs:
+            serial = cast("str", smart_plug_serial(plug))
+            plug_fields.setdefault(serial, set()).update(_present_fields(plug))
         plug_keys = tuple(
-            (smart_plug_serial(plug), _present_fields(plug)) for plug in plugs
+            (serial, tuple(sorted(fields)))
+            for serial, fields in sorted(plug_fields.items())
         )
         packs = payload.get(PAYLOAD_BATTERY_PACKS) or []
         valid_packs = (
@@ -1329,6 +1350,28 @@ def safe_bool(
             with contextlib.suppress(ValueError):
                 result = int(value) != 0
     return result
+
+
+def smart_plug_serial_aliases(plug: object) -> frozenset[str]:
+    """Return only explicitly supplied, case-sensitive physical serial aliases."""
+    if not isinstance(plug, dict):
+        return frozenset()
+    return frozenset(
+        text
+        for field in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN)
+        if (text := first_nonblank_text(plug.get(field))) is not None
+    )
+
+
+def smart_plug_identity_aliases(plug: object) -> frozenset[str]:
+    """Return exact serial/cloud aliases explicitly co-occurring in one record."""
+    if not isinstance(plug, dict):
+        return frozenset()
+    return smart_plug_serial_aliases(plug) | frozenset(
+        text
+        for field in (FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID)
+        if (text := first_nonblank_text(plug.get(field))) is not None
+    )
 
 
 def smart_plug_serial(plug: object) -> str | None:
