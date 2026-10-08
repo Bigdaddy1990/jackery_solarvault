@@ -433,7 +433,7 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padded = padder.update(plaintext) + padder.finalize()
     # codeql[py/weak-cryptographic-algorithm]
     # AES-ECB is mandatory for the Jackery Cloud API wire protocol.
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -1127,7 +1127,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):  # fmt: skip
             return None
 
         if len(seed) != _MQTT_SEED_LEN:

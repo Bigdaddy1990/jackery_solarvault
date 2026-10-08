@@ -51,6 +51,7 @@ from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
 from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
 from . import ble
+from .ble import BleFrameObservation
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -110,7 +111,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
-    except UnicodeDecodeError, json.JSONDecodeError:
+    except (UnicodeDecodeError, json.JSONDecodeError):  # fmt: skip
         return False
 
 
@@ -151,27 +152,6 @@ _UINT16_MAX: int = 0xFFFF
 # ---------------------------------------------------------------------------
 # Public data classes
 # ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True)
-class BleFrameObservation:
-    """One frame observed on the notify characteristic.
-
-    Carries both the parsed view and the original raw bytes so the
-    diagnostics surface can show what we received even if decoding failed.
-    ``parsed`` is set when AES decrypt + header parse succeeded; otherwise
-    ``decode_error`` carries the reason and ``parsed`` is None.
-    """
-
-    received_at: datetime
-    raw_bytes: bytes
-    base64_encoded: str
-    parsed: ble.BleBinaryFrame | None
-    decode_error: str | None = None
-    session_generation: int | None = None
-    notify_sequence: int | None = None
-    delivery_id: str | None = None
-    is_fragment: bool = False
 
 
 @dataclass(slots=True)
@@ -2395,7 +2375,7 @@ class JackeryBleListener:
             try:
                 decoded = base64.b64decode(raw, validate=False)
                 return ble.decrypt_binary_notify(decoded, key), None
-            except ValueError, binascii.Error:
+            except (ValueError, binascii.Error):  # fmt: skip
                 return None, str(first_error)
 
     @staticmethod

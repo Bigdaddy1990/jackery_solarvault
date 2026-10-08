@@ -82,6 +82,7 @@ from .const import (
     _OPTION_DEFAULTS,
     _RECONFIGURE_IN_PLACE_OPTION_KEYS,
 )
+from .schema_compat import Schema
 from .util import (
     config_entry_bool_option,
     config_entry_int_option,
@@ -527,7 +528,7 @@ def _reconfigure_options(
     return merged
 
 
-USER_SCHEMA: vol.Schema = vol.Schema({
+USER_SCHEMA = Schema({
     vol.Required(CONF_USERNAME): str,
     vol.Required(CONF_PASSWORD): str,
     vol.Optional(
@@ -622,7 +623,7 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
         current_enable_derived_home_fallback = current_options[
             CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
         ]
-        schema = vol.Schema({
+        schema = Schema({
             vol.Optional(
                 CONF_SCAN_INTERVAL,
                 default=current_options[CONF_SCAN_INTERVAL],
@@ -757,7 +758,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             payload_dict = json.loads(payload)
-        except json.JSONDecodeError, UnicodeDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):  # fmt: skip
             return self.async_abort(reason="invalid_discovery_info")
 
         if not isinstance(payload_dict, dict):
@@ -856,7 +857,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     field="password",
                     max_length=MAX_PASSWORD_LENGTH,
                 )
-            except KeyError, vol.Invalid, TypeError:
+            except (KeyError, vol.Invalid, TypeError):  # fmt: skip
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
                 return self.async_show_form(
                     step_id=FLOW_STEP_USER,
@@ -924,7 +925,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
         return self.async_show_menu(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -963,7 +964,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1029,7 +1030,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         current_options = _current_option_values(entry)
         current_local_mqtt = _current_local_mqtt_options(entry)
-        schema = vol.Schema({
+        schema = Schema({
             vol.Required(CONF_USERNAME, default=entry.data.get(CONF_USERNAME, "")): str,
             vol.Required(CONF_PASSWORD): str,
             vol.Optional(
@@ -1106,7 +1107,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1142,7 +1143,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_ACCEPT_SHARED,
-            data_schema=vol.Schema({
+            data_schema=Schema({
                 vol.Required(CONF_SHARED_DEV_ID): vol.All(str, vol.Length(min=1)),
                 vol.Required(CONF_SHARED_QR_CODE_ID): vol.All(str, vol.Length(min=1)),
             }),
@@ -1173,7 +1174,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except UnknownEntry, ValueError:
+        except (UnknownEntry, ValueError):  # fmt: skip
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)
@@ -1221,7 +1222,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id=FLOW_STEP_REAUTH_CONFIRM,
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=Schema({vol.Required(CONF_PASSWORD): str}),
             description_placeholders={
                 "username": entry.data[CONF_USERNAME],
             },

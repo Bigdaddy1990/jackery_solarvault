@@ -2,18 +2,20 @@
 
 import asyncio
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine  # ruff: ignore[typing-only-standard-library-import] - runtime signature introspection
 import contextlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Literal, Self, TypedDict, Unpack, cast
+from typing import Any, Literal, Self, TypedDict, Unpack, cast
 
 from aiomqtt import Client as MqttClient, MqttError
 
 from homeassistant.components.mqtt.util import valid_subscribe_topic
+from homeassistant.config_entries import ConfigEntry  # ruff: ignore[typing-only-first-party-import] - runtime signature introspection
+from homeassistant.core import HomeAssistant  # ruff: ignore[typing-only-first-party-import] - runtime signature introspection
 
 from ..const import (
     DOMAIN,
@@ -26,12 +28,6 @@ from ..const import (
     REDACTED_VALUE,
 )
 from ..util import async_create_message_task
-
-if TYPE_CHECKING:
-    from collections.abc import Coroutine
-
-    from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 _AIOMQTT_LOGGER = logging.getLogger(f"{__name__}.aiomqtt")
@@ -605,7 +601,7 @@ class JackeryLocalMqttClient:
                 if current is not None:
                     while current.cancelling():
                         current.uncancel()
-            except TimeoutError, OSError:
+            except (TimeoutError, OSError):  # fmt: skip
                 # Let the outer transport logic handle reconnects.
                 break
         return task.cancelled()
@@ -715,7 +711,7 @@ class JackeryLocalMqttClient:
             parsed = json.loads(raw.decode())
             if isinstance(parsed, dict):
                 data = parsed
-        except UnicodeDecodeError, json.JSONDecodeError:
+        except (UnicodeDecodeError, json.JSONDecodeError):  # fmt: skip
             pass
         if self._sink is None:
             self._messages_dropped += 1

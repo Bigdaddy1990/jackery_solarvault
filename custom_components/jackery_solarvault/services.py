@@ -205,6 +205,7 @@ from .const import (
     _BLE_SERVICE_CONNECT_TIMEOUT_SEC,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .schema_compat import Schema
 from .util import (
     payload_has_home_payload_evidence as _payload_has_home_payload_evidence,
     safe_bool,
@@ -3669,7 +3670,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:  # ruff: ignore[unu
                 DOMAIN,
                 registration.name,
                 _make_handler(registration.handler),
-                schema=registration.schema,
+                schema=Schema(
+                    registration.schema.schema,
+                    required=registration.schema.required,
+                    extra=registration.schema.extra,
+                ),
                 supports_response=registration.supports_response,
             )
 
