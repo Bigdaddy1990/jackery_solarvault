@@ -976,6 +976,7 @@ warn_return_any = true
 no_implicit_reexport = true
 
 [tool.pyrefly]
+project-includes = ["custom_components/jackery_solarvault"]
 python-version = "3.14.0"
 preset = "legacy"
 ignore-missing-imports = ["*"]

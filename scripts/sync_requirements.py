@@ -217,6 +217,7 @@ ALWAYS_TEST: list[str] = [
     'ruff',
     'serialx',
     'smellcheck',
+    'sqlalchemy',
     'ty',
     'types-aiofiles',
     'types-atomicwrites',
