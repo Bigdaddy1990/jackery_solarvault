@@ -219,3 +219,48 @@ def test_shared_cloud_alias_is_not_persisted_for_two_serial_owners(hass: Any) ->
         DOMAIN,
         f"{_PARENT}_smart_plug_identity:{identity}",
     ) in registered.identifiers
+
+
+def test_foreign_cloud_marker_cannot_merge_or_route_a_same_entry_socket(
+    hass: Any,
+) -> None:
+    """Global compatibility metadata cannot override entry-scoped alias ownership."""
+    foreign_entry = MockConfigEntry(domain=DOMAIN)
+    foreign_entry.add_to_hass(hass)
+    cloud_marker = (DOMAIN, f"{_PARENT}_smart_plug_cloud:{_CLOUD}")
+    foreign = dr.async_get(hass).async_get_or_create(
+        config_entry_id=foreign_entry.entry_id,
+        identifiers={(DOMAIN, f"{_PARENT}_foreign_socket"), cloud_marker},
+        serial_number="FOREIGN-SERIAL",
+    )
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{_PARENT}_foreign_socket_input_power",
+        config_entry=foreign_entry,
+        device_id=foreign.id,
+    )
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    plug = {FIELD_DEVICE_SN: _SERIAL, FIELD_DEVICE_ID: _CLOUD, FIELD_IN_PW: 5}
+    _, identity, key, own, entity = _register_socket(hass, entry, plug)
+
+    assert own.id != foreign.id
+    assert cloud_marker not in own.identifiers
+    assert (
+        DOMAIN,
+        f"{_PARENT}_smart_plug_alias:{entry.entry_id}:{_CLOUD}",
+    ) in own.identifiers
+    unchanged = dr.async_get(hass).async_get(foreign.id)
+    assert unchanged is not None
+    assert unchanged.identifiers == foreign.identifiers
+    assert unchanged.config_entries == {foreign_entry.entry_id}
+    cloud = {FIELD_DEVICE_ID: _CLOUD, FIELD_IN_PW: _POWER}
+    replacement = _coordinator(hass, entry, {PAYLOAD_SMART_PLUGS: [cloud]})
+
+    assert smart_plug_entity_identity(replacement, _PARENT, cloud) == identity
+    assert smart_plug_entity_key(replacement, _PARENT, identity) == key
+    assert (
+        smart_plug_entity_payload(replacement, _PARENT, identity)[FIELD_IN_PW] == _POWER
+    )
+    assert er.async_get(hass).async_get(entity.entity_id) == entity
