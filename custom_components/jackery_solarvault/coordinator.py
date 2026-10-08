@@ -2593,6 +2593,13 @@ def _smart_plug_source_payload(plug: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _smart_plug_cloud_aliases(plug: dict[str, Any]) -> frozenset[str]:
+    """Retain cloud fields even when their text also appears in serial fields."""
+    return smart_plug_identity_aliases({
+        key: plug.get(key) for key in (FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID)
+    })
+
+
 def _smart_plug_alias_groups(
     records: list[dict[str, Any]], *, serial_only: bool
 ) -> dict[str, set[str]]:
@@ -2601,7 +2608,7 @@ def _smart_plug_alias_groups(
     for record in records:
         aliases = smart_plug_serial_aliases(record)
         if not serial_only:
-            aliases = smart_plug_identity_aliases(record) - aliases
+            aliases = _smart_plug_cloud_aliases(record)
         linked = set(aliases)
         for alias in aliases:
             linked.update(groups.get(alias, ()))
@@ -2640,26 +2647,28 @@ def smart_plug_payloads(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if not serials:
             continue
         owner = min(serial_groups[next(iter(serials))])
-        for alias in smart_plug_identity_aliases(plug):
+        for alias in _smart_plug_cloud_aliases(plug):
             for linked in cloud_groups.get(alias, {alias}):
                 alias_owners.setdefault(linked, set()).add(owner)
-    by_serial: dict[str, dict[str, Any]] = {}
+    by_identity: dict[tuple[str, str], dict[str, Any]] = {}
     for plug in records:
         serials = smart_plug_serial_aliases(plug)
         if serials:
-            serial = min(serial_groups[next(iter(serials))])
+            identity = ("serial", min(serial_groups[next(iter(serials))]))
         else:
-            aliases = smart_plug_identity_aliases(plug)
+            aliases = _smart_plug_cloud_aliases(plug)
             owners = set().union(*(alias_owners.get(alias, set()) for alias in aliases))
             if len(owners) > 1:
                 continue
-            serial = (
-                next(iter(owners)) if owners else min(cloud_groups[next(iter(aliases))])
+            identity = (
+                ("serial", next(iter(owners)))
+                if owners
+                else ("cloud", min(cloud_groups[next(iter(aliases))]))
             )
-        by_serial[serial] = merge_present_dict_values(
-            by_serial.get(serial, {}), _smart_plug_source_payload(plug)
+        by_identity[identity] = merge_present_dict_values(
+            by_identity.get(identity, {}), _smart_plug_source_payload(plug)
         )
-    return [by_serial[serial] for serial in sorted(by_serial)]
+    return sorted_smart_plugs(list(by_identity.values()))
 
 
 def smart_plug_payload(payload: dict[str, Any], serial: str) -> dict[str, Any]:
@@ -2850,6 +2859,8 @@ def smart_plug_entity_identity(
     registry = _smart_plug_entity_alias_registry(coordinator, device_id)
     plugs = smart_plug_payloads((coordinator.data or {}).get(device_id, {}))
     aliases = _unambiguous_smart_plug_aliases(plugs, plug)
+    if not aliases:
+        return None
     serials = smart_plug_serial_aliases(plug)
     matches = [
         identity
@@ -2868,6 +2879,8 @@ def smart_plug_entity_identity(
     identity = matches[0] if matches else smart_plug_serial(plug)
     if identity is not None:
         known = registry.get(identity)
+        if known is not None and not matches and not serials & known.serials:
+            return None
         if known is None:
             known = registered.get(identity)
             if known is None:
