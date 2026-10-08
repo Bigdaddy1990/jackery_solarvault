@@ -1092,9 +1092,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Accept a device shared with the configured Jackery account.
 
         Calls the cloud accept-bind endpoint with the supplied device and QR
-        identifiers, then reloads the entry so the newly shared device's
-        entities are surfaced. Authentication failures start a reauth flow; other
-        backend or input errors re-show the form.
+        identifiers, then schedules HTTP discovery so any newly accessible
+        device can be surfaced. Authentication failures abort with a
+        reauth-required reason; other backend errors re-show the form.
 
         Parameters:
             user_input (dict[str, Any] | None): Form data containing
@@ -1103,7 +1103,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: The accept-shared form (possibly with errors), an
-            update-and-reload abort on success, or a reauth start on auth failure.
+            success abort after scheduling discovery, or a reauth-required abort.
         """
         try:
             entry = self._get_reconfigure_entry()

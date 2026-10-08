@@ -23,7 +23,7 @@
           "dev_id": "ID de l'appareil",
           "qr_code_id": "ID du code QR"
         },
-        "description": "Acceptez une SolarVault partagée avec le compte Jackery {username}. Saisissez l'ID de l'appareil et l'ID du code QR figurant dans l'invitation de partage. L'intégration est ensuite rechargée afin que les entités de l'appareil partagé apparaissent.",
+        "description": "Envoyez les ID de l’appareil et du code QR d’un processus de partage Jackery compatible via le compte {username}. Les systèmes SolarVault ne peuvent pas être partagés. Ce formulaire utilise l’authentification cloud et planifie la découverte après succès ; il ne scanne pas les images et ne recharge pas l’intégration.",
         "title": "Accepter un appareil partagé"
       },
       "reauth_confirm": {
@@ -93,7 +93,7 @@
           "create_smart_meter_derived_sensors": "Crée des capteurs nets supplémentaires, des capteurs de flux brut par phase et la consommation domestique calculée à partir de la charge domestique instantanée signalée par Jackery lorsqu'elle est disponible ; sinon, utilise les valeurs de phase du Smart Meter plus l'entrée/sortie côté réseau Jackery. Désactivez cette option si vous voulez uniquement les valeurs brutes Jackery.",
           "enable_ble_transport": "Demarre le lecteur BLE local experimental pour les diagnostics SolarVault BLE decodes/bruts. Necessite l'acces Bluetooth sur l'hote Home Assistant et reste desactive par defaut."
         },
-        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nJackery autorise généralement une seule session active par compte. Gardez l'application Jackery déconnectée du compte SolarVault lorsque Home Assistant doit recevoir les mises à jour MQTT en direct. Si l'application est ouverte brièvement, Home Assistant suspend les reconnexions MQTT pendant un court moment, continue la consultation HTTP et reprend automatiquement les mises à jour en direct.",
+        "description": "Saisissez vos identifiants cloud Jackery. L'appareil, la région et les identifiants MQTT sont découverts automatiquement à partir du protocole cloud/application de Jackery ; les ID manuels ne sont volontairement pas exposés.\n\nLes capteurs facultatifs de puissance nette calculée sont des dérivations locales des valeurs brutes Jackery. Activez-les uniquement si vous avez besoin d'une valeur nette signée supplémentaire pour les tableaux de bord.\n\nUtilisez le compte qui a ajouté votre système SolarVault. Jackery ne permet pas de partager les systèmes SolarVault avec un deuxième compte. L'accès cloud simultané depuis l'application et Home Assistant n'est pas pris en charge de manière fiable : les connexions peuvent remplacer les sessions et les tentatives de récupération ne garantissent ni l'accès continu à l'application ni les mises à jour en direct. Le MQTT local/BLE facultatif et les données de démarrage enregistrées ne désactivent pas la connexion cloud dans cette intégration.",
         "title": "Jackery SolarVault"
       }
     }
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Accepte un appareil Jackery partage sur le compte proprietaire de l'appareil selectionne, puis actualise.",
+      "description": "Envoie les ID de l’appareil et du code QR au service cloud de partage via le compte sélectionné, puis demande une actualisation. Seuls les appareils compatibles peuvent être partagés ; les systèmes SolarVault sont exclus.",
       "fields": {
         "device_id": {
-          "description": "Selectionnez un appareil Jackery du compte qui doit accepter le partage.",
+          "description": "Choisissez un appareil pour sélectionner le compte Jackery utilisé pour cette requête cloud.",
           "name": "ID de l'appareil"
         },
         "qr_code_id": {
-          "description": "ID du code QR de l'invitation de partage.",
+          "description": "ID du code QR d’un processus de partage Jackery compatible.",
           "name": "ID du code QR"
         },
         "target_dev_id": {
-          "description": "ID de l'appareil Jackery dans l'invitation de partage.",
+          "description": "ID de l’appareil Jackery d’un processus de partage compatible. Un ID brut peut être saisi en YAML.",
           "name": "ID de l'appareil cible"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Recuperer la configuration push"
     },
     "get_share_qr_code": {
-      "description": "Récupère le code QR de partage du compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
+      "description": "Récupère le code QR du compte cloud Jackery de l’appareil sélectionné. Renvoie qr_code_id et user_id et tente d’afficher une image QR dans une notification persistante. La compatibilité du scan n’est pas vérifiée ; le partage SolarVault n’est pas pris en charge.",
       "fields": {
         "device_id": {
-          "description": "Sélectionnez un appareil Jackery. Le code QR est résolu sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
+          "description": "Choisissez un appareil pour sélectionner son compte Jackery configuré. La requête QR n’a pas de paramètre d’appareil ; un ID Jackery brut peut également être transmis.",
           "name": "ID de l'appareil"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "Lister les notifications"
     },
     "list_shared_devices": {
-      "description": "Liste les appareils partagés avec le compte Jackery propriétaire de l'appareil sélectionné. Renvoie uniquement la réponse.",
+      "description": "Renvoie les données de partage reçues et envoyées du compte Jackery de l’appareil sélectionné. Renvoie uniquement la réponse ; ce n’est pas une liste de découverte des seuls appareils reçus.",
       "fields": {
         "device_id": {
-          "description": "Sélectionnez un appareil Jackery. La liste des appareils partagés est résolue sur le compte propriétaire ; les automatisations peuvent aussi transmettre directement l'ID numérique de l'appareil Jackery.",
+          "description": "Choisissez un appareil pour sélectionner son compte Jackery configuré. La liste contient les partages reçus et envoyés ; un ID d’appareil Jackery brut peut également être transmis.",
           "name": "ID de l'appareil"
         }
       },

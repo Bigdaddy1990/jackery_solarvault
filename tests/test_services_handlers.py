@@ -1030,10 +1030,10 @@ def test_payload_home_evidence_recognizes_system_body() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_notify_share_qr_code_publishes_scannable_image(
+async def test_notify_share_qr_code_publishes_image_and_support_limits(
     hass: HomeAssistant,
 ) -> None:
-    """A valid qrCodeId renders a data-URI image into a persistent notification."""
+    """The account QR notification preserves identifiers and explains sharing limits."""
     with (
         patch(
             "custom_components.jackery_solarvault.services."
@@ -1051,6 +1051,18 @@ async def test_notify_share_qr_code_publishes_scannable_image(
         )
 
     create.assert_called_once()
+    args, kwargs = create.call_args
+    assert args[0] is hass
+    message = args[1]
+    assert "![Share QR code](data:image/png;base64,AAAA)" in message
+    assert "qrCodeId: `qr-1`" in message
+    assert "userId: `user-1`" in message
+    assert "eligible Jackery device-sharing workflows" in message
+    assert "SolarVault systems cannot be shared" in message
+    assert "requires cloud account authentication" in message
+    assert "not guaranteed to scan in the Jackery app" in message
+    assert "documented sharing procedure for an eligible device" in message
+    assert kwargs["title"] == "Jackery account QR code"
 
 
 async def test_notify_share_qr_code_skips_when_qr_code_missing(

@@ -23,7 +23,7 @@
           "dev_id": "Device ID",
           "qr_code_id": "QR code ID"
         },
-        "description": "Accept a SolarVault that was shared with the Jackery account {username}. Enter the device ID and QR code ID from the sharing invitation. The integration reloads afterwards so the shared device's entities appear.",
+        "description": "Send the device ID and QR-code ID from an eligible Jackery sharing workflow using account {username}. SolarVault systems do not support device sharing. This form uses cloud authentication and schedules discovery after success; it does not scan images or reload the integration.",
         "title": "Accept a shared device"
       },
       "reauth_confirm": {
@@ -93,7 +93,7 @@
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
         },
-        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. Keep the Jackery app signed out of the SolarVault account while Home Assistant should receive live MQTT updates. If the app is opened briefly, Home Assistant pauses MQTT reconnects for a short time, keeps polling over HTTP, and resumes live updates automatically.",
+        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nUse the account that added your SolarVault system. Jackery does not support sharing SolarVault systems with a second account. Concurrent cloud access from the app and Home Assistant is not reliably supported: logins can replace sessions, and recovery attempts do not guarantee continuous app access or live updates. Optional local MQTT/BLE and saved bootstrap data do not disable cloud login in this integration.",
         "title": "Jackery SolarVault"
       }
     }
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Accept a shared Jackery device on the account that owns the selected device, then refresh.",
+      "description": "Send device and QR-code IDs to the cloud sharing endpoint using the selected account, then request a refresh. Sharing is limited to eligible devices; SolarVault systems cannot be shared.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device from the account that should accept the share.",
+          "description": "Pick a device to select the Jackery account used for this cloud request.",
           "name": "Device ID"
         },
         "qr_code_id": {
-          "description": "QR code ID from the sharing invitation.",
+          "description": "QR-code ID from a supported Jackery sharing workflow.",
           "name": "QR code ID"
         },
         "target_dev_id": {
-          "description": "Jackery device ID from the sharing invitation.",
+          "description": "Jackery device ID from a supported sharing workflow. A raw ID can be entered in YAML.",
           "name": "Target device ID"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Get push config"
     },
     "get_share_qr_code": {
-      "description": "Fetch the share QR code for the Jackery account that owns the selected device. Returns the response only.",
+      "description": "Fetch the account QR code through the selected device’s Jackery cloud account. Returns qr_code_id and user_id and attempts to display a QR image in a persistent notification. Scan compatibility is unverified; SolarVault sharing is unsupported.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device. The QR code is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "description": "Select a device to choose its configured Jackery account. The QR request has no device parameter; a raw Jackery device ID can also be passed.",
           "name": "Device ID"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "List notifications"
     },
     "list_shared_devices": {
-      "description": "List the devices shared with the Jackery account that owns the selected device. Returns the response only.",
+      "description": "Return received and outgoing sharing records for the selected device’s Jackery account. Returns the response only; it is not a receive-only device discovery list.",
       "fields": {
         "device_id": {
-          "description": "Pick a Jackery device. The shared-device list is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
+          "description": "Select a device to choose its configured Jackery account. The list contains received and outgoing sharing records; a raw Jackery device ID can also be passed.",
           "name": "Device ID"
         }
       },

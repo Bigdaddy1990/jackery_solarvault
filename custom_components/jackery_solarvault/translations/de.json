@@ -23,7 +23,7 @@
           "dev_id": "Geräte-ID",
           "qr_code_id": "QR-Code-ID"
         },
-        "description": "Nimm eine SolarVault an, die mit dem Jackery-Konto {username} geteilt wurde. Gib die Geräte-ID und die QR-Code-ID aus der Freigabeeinladung ein. Die Integration wird anschließend neu geladen, damit die Entitäten des geteilten Geräts erscheinen.",
+        "description": "Sende Geräte-ID und QR-Code-ID aus einem unterstützten Jackery-Freigabevorgang über das Konto {username}. SolarVault-Systeme unterstützen keine Gerätefreigabe. Dieses Formular nutzt die Cloud-Anmeldung und plant nach Erfolg die Gerätesuche; es scannt keine Bilder und lädt die Integration nicht neu.",
         "title": "Geteiltes Gerät annehmen"
       },
       "reauth_confirm": {
@@ -93,7 +93,7 @@
           "create_smart_meter_derived_sensors": "Erstellt zusätzliche saldierte Sensoren, Brutto-Phasenflüsse und den Hausverbrauch. Wenn Jackery `otherLoadPw` liefert, wird dieser gemeldete Live-Hausverbrauch genutzt; sonst wird aus Smart-Meter-Phasenwerten plus Jackery-Netzseite Eingang/Ausgang berechnet. Deaktivieren, wenn nur rohe Jackery-Werte gewünscht sind.",
           "enable_ble_transport": "Startet den experimentellen lokalen BLE-Listener für decodierte/rohe SolarVault-BLE-Diagnosen. Benotigt Bluetooth-Zugriff auf dem Home-Assistant-Host und ist standardmaessig deaktiviert."
         },
-        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nJackery erlaubt üblicherweise nur eine aktive Sitzung pro Konto. Halte die Jackery-App vom SolarVault-Account abgemeldet, solange Home Assistant Live-MQTT-Updates empfangen soll. Wenn die App kurz geöffnet wird, pausiert Home Assistant MQTT-Reconnects kurzzeitig, pollt weiter per HTTP und nimmt Live-Updates danach automatisch wieder auf.",
+        "description": "Trage deine Jackery-Cloud-Zugangsdaten ein. Gerät, Region und MQTT-Zugangsdaten werden automatisch aus Jackery-Cloud/App-Protokoll ermittelt; manuelle IDs werden bewusst nicht mehr abgefragt.\n\nDie optionalen berechneten Netto-Leistungssensoren sind lokale Ableitungen aus Jackery-Rohwerten. Aktiviere sie nur, wenn du zusätzlich zu den App-Werten einen vorzeichenbehafteten Nettowert für Dashboards brauchst.\n\nNutze das Konto, das dein SolarVault-System hinzugefügt hat. Jackery unterstützt das Teilen von SolarVault-Systemen mit einem zweiten Konto nicht. Gleichzeitiger Cloud-Zugriff über App und Home Assistant wird nicht zuverlässig unterstützt: Anmeldungen können Sitzungen ersetzen, und Wiederherstellungsversuche garantieren weder durchgehenden App-Zugriff noch Live-Updates. Optionales lokales MQTT/BLE und gespeicherte Bootstrap-Daten deaktivieren die Cloud-Anmeldung in dieser Integration nicht.",
         "title": "Jackery SolarVault"
       }
     }
@@ -2186,18 +2186,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Nimmt ein geteiltes Jackery-Gerät im Konto an, dem das ausgewaehlte Gerät gehoert, und aktualisiert danach.",
+      "description": "Sendet Geräte-ID und QR-Code-ID über das ausgewählte Konto an den Cloud-Freigabe-Endpunkt und fordert danach eine Aktualisierung an. Nur geeignete Geräte können geteilt werden; SolarVault-Systeme nicht.",
       "fields": {
         "device_id": {
-          "description": "Waehle ein Jackery-Gerät aus dem Konto, das die Freigabe annehmen soll.",
+          "description": "Wähle ein Gerät, um das Jackery-Konto für diese Cloud-Anfrage festzulegen.",
           "name": "Geräte-ID"
         },
         "qr_code_id": {
-          "description": "QR-Code-ID aus der Freigabeeinladung.",
+          "description": "QR-Code-ID aus einem unterstützten Jackery-Freigabevorgang.",
           "name": "QR-Code-ID"
         },
         "target_dev_id": {
-          "description": "Jackery-Geräte-ID aus der Freigabeeinladung.",
+          "description": "Jackery-Geräte-ID aus einem unterstützten Freigabevorgang. Eine rohe ID kann in YAML eingegeben werden.",
           "name": "Ziel-Geräte-ID"
         }
       },
@@ -2458,10 +2458,10 @@
       "name": "Push-Konfiguration abrufen"
     },
     "get_share_qr_code": {
-      "description": "Ruft den Freigabe-QR-Code für das Jackery-Konto ab, dem das ausgewählte Gerät gehört. Gibt nur die Antwort zurück.",
+      "description": "Ruft den Konto-QR-Code über das Jackery-Cloud-Konto des ausgewählten Geräts ab. Gibt qr_code_id und user_id zurück und versucht, ein QR-Bild als dauerhafte Benachrichtigung anzuzeigen. Die Scan-Kompatibilität ist ungeprüft; SolarVault-Sharing wird nicht unterstützt.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Der QR-Code wird auf dem besitzenden Konto aufgelöst; Automationen können auch direkt die numerische Jackery-Geräte-ID übergeben.",
+          "description": "Wähle ein Gerät, um dessen konfiguriertes Jackery-Konto festzulegen. Die QR-Anfrage hat keinen Geräteparameter; eine rohe Jackery-Geräte-ID kann ebenfalls übergeben werden.",
           "name": "Geräte-ID"
         }
       },
@@ -2640,10 +2640,10 @@
       "name": "Benachrichtigungen auflisten"
     },
     "list_shared_devices": {
-      "description": "Listet die Geräte auf, die mit dem Jackery-Konto geteilt sind, dem das ausgewählte Gerät gehört. Gibt nur die Antwort zurück.",
+      "description": "Gibt empfangene und ausgehende Freigabedatensätze des Jackery-Kontos des ausgewählten Geräts zurück. Gibt nur die Antwort zurück; dies ist keine reine Liste zur Suche empfangener Geräte.",
       "fields": {
         "device_id": {
-          "description": "Jackery-Gerät auswählen. Die Liste der geteilten Geräte wird auf dem besitzenden Konto aufgelöst; Automationen können auch direkt die numerische Jackery-Geräte-ID übergeben.",
+          "description": "Wähle ein Gerät, um dessen konfiguriertes Jackery-Konto festzulegen. Die Liste enthält empfangene und ausgehende Freigabedatensätze; eine rohe Jackery-Geräte-ID kann ebenfalls übergeben werden.",
           "name": "Geräte-ID"
         }
       },

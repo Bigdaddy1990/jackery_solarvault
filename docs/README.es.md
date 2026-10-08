@@ -10,7 +10,7 @@ Languages:
 
 Una integración personalizada de [Home Assistant](https://www.home-assistant.io/) que lleva tus estaciones de energía Jackery SolarVault, HomePower y Explorer directamente a tu hogar inteligente.
 
-**Esta es la integración definitiva (non-plus-ultra) de Jackery para Home Assistant.** Combina el 100% de la funcionalidad de la aplicación oficial (Cloud API) con la velocidad y fiabilidad de **MQTT Local** y **Bluetooth (BLE)**.
+Combina funciones de la API de la nube de Jackery con telemetría y comandos compatibles mediante **MQTT Local** y **Bluetooth (BLE)** opcionales. Las funciones disponibles dependen del dispositivo, del firmware y del servicio de la nube; la configuración inicial sigue realizándose en la aplicación Jackery.
 
 ---
 
@@ -18,9 +18,9 @@ Una integración personalizada de [Home Assistant](https://www.home-assistant.io
 
 Es posible que hayas oído hablar de otras soluciones MQTT manuales o integraciones más antiguas. Aquí te explicamos por qué esta integración es claramente la opción superior:
 
-1. **Sin Extracción Manual de Tokens:** Requerimos tus credenciales de la Nube durante la configuración. **¿Por qué?** Porque la integración descubre automáticamente todos tus dispositivos y obtiene de forma segura las complejas claves de encriptación y tokens necesarios para la comunicación local. No tienes que interceptar tráfico de red ni configurar payloads JSON manualmente.
-2. **Verdadero Control Local:** Una vez completado el intercambio inicial con la nube, la integración se conecta directamente a tu dispositivo a través de **MQTT Local** y **Bluetooth (BLE)** para actualizaciones instantáneas en milisegundos y control local.
-3. **100% de la Funcionalidad de la App:** A diferencia de los scripts básicos de solo lectura local que solo obtienen los niveles de batería, esta integración admite *todo* lo que hace la aplicación Jackery, incluyendo programación de Tiempo de Uso, integración con Shelly, comprobaciones de firmware y ajustes de carga avanzados.
+1. **Sin extracción manual de tokens:** La configuración utiliza tus credenciales de la nube para descubrir los dispositivos y obtener las claves y los datos de sesión MQTT. No tienes que interceptar tráfico de red ni crear payloads JSON manualmente.
+2. **Control local opcional:** En dispositivos compatibles, un bróker MQTT local configurado y **Bluetooth (BLE)** activado pueden transmitir datos y comandos locales. Estos canales adicionales no sustituyen el inicio de sesión en la nube ni desactivan HTTP o MQTT en la nube. Esta integración no ofrece una configuración completamente local.
+3. **Funciones de la nube:** La integración ofrece programación por horarios, integración con Shelly, comprobaciones de firmware y ajustes de carga avanzados cuando son compatibles. No implementa la configuración Wi-Fi inicial mediante BLE. Consulta [los procesos de QR, vinculación y uso compartido (en inglés)](./account-sessions.md#qr-codes-account-binding-and-sharing).
 
 ---
 
@@ -51,7 +51,7 @@ La integración crea docenas de entidades por dispositivo para brindarte visibil
 ### 🛠️ Servicios Avanzados
 
 También exponemos más de 60 servicios personalizados en Home Assistant, brindándote el poder de la App Jackery en tus automatizaciones:
-- **Gestión de Dispositivos:** `bind_device`, `unbind_device`, `get_share_qr_code`
+- **Gestión de Dispositivos:** `bind_device`, `unbind_device`, `get_share_qr_code` (según el dispositivo; los servicios para compartir no demuestran que SolarVault admita compartir sistemas)
 - **Cloud-to-Cloud:** `get_shelly_auth_url`, `list_shelly_devices`
 - **Programación de Energía:** `save_tou_plan`, `insert_electricity_strategy`, `bind_currency`
 - **Estadísticas:** `query_charge_report`, `query_soc_stat`, `query_profit_stat`
@@ -83,17 +83,17 @@ También exponemos más de 60 servicios personalizados en Home Assistant, brind�
 
 1. Ve a **Ajustes → Dispositivos y servicios**.
 2. Haz clic en **Añadir integración** y busca **Jackery SolarVault**.
-3. Sigue el asistente de configuración e introduce tus credenciales de la Nube de Jackery.
+3. Añade y configura primero el dispositivo en la aplicación Jackery. Utiliza después en el asistente de HA la cuenta de la nube de Jackery que lo añadió.
 
 > [!WARNING]
-> **Limitación Importante de la Cuenta:** Jackery normalmente permite una sesión activa por cuenta. Si inicias sesión con otro dispositivo (por ejemplo, tu aplicación principal en tu teléfono), la conexión MQTT de la integración se pausará temporalmente y se reconectará automáticamente poco después.
-> **Solución Recomendada:** Para obtener la mejor experiencia, crea una **segunda cuenta de Jackery dedicada** solo para Home Assistant. Comparte tus dispositivos Jackery desde tu cuenta principal de la aplicación con esta nueva cuenta dedicada para HA.
+> **Cuenta SolarVault:** Según el manual de la aplicación Jackery, los sistemas SolarVault no se pueden compartir; solo el propietario puede gestionarlos. Utiliza la cuenta Jackery propietaria de tu SolarVault para esta integración. Una segunda cuenta de HA con un SolarVault compartido no es una solución admitida.
+> **Aplicación y Home Assistant simultáneamente:** Un nuevo inicio de sesión puede sustituir la sesión del otro cliente. La integración intenta restablecer las conexiones, pero no garantiza un uso simultáneo estable con la aplicación móvil. BLE, MQTT local y los datos de sesión en caché tampoco desactivan el inicio de sesión en la nube. Consulta [las cuentas y las alternativas locales (en inglés)](./account-sessions.md) para ver las fuentes, las limitaciones y la integración MQTT oficial independiente.
 
 ### Opciones de Configuración
 
-- **Correo Electrónico y Contraseña:** Las credenciales de tu cuenta dedicada de la Nube de Jackery.
-- **Bluetooth (BLE):** Opcional. Permite la comunicación directa cuando tu servidor de HA está dentro del alcance Bluetooth de la Jackery.
-- **MQTT Local:** Opcional. Usa esto si tu dispositivo está configurado para publicar datos a un bróker MQTT local.
+- **Correo Electrónico y Contraseña:** Las credenciales de la cuenta de la nube Jackery propietaria de tu SolarVault.
+- **Bluetooth (BLE):** Opcional. Requiere alcance Bluetooth y una clave de dispositivo válida obtenida durante la configuración en la nube o desde la caché.
+- **MQTT Local:** Opcional. Requiere firmware compatible y un bróker local configurado. Sus credenciales son independientes de la cuenta de la nube Jackery; el inicio de sesión en la nube de esta integración sigue activo.
 
 ---
 
@@ -133,8 +133,8 @@ data:
 
 ## ❓ Solución de Problemas (FAQ)
 
-- **Mi integración se desconecta continuamente o los sensores dicen "no disponible":**
-  Esto suele suceder porque estás usando la misma cuenta en la App Jackery de tu teléfono y en Home Assistant. Por favor, crea una cuenta dedicada para Home Assistant y compártele tus dispositivos.
+- **La aplicación móvil cierra mi sesión o la integración pierde la conexión después de iniciar sesión en la aplicación:**
+  Puede haber un conflicto de sesiones cuando la aplicación y la integración usan la misma cuenta propietaria. Una segunda cuenta no resuelve este problema para SolarVault porque el sistema no se puede compartir. Para alternar entre clientes, desactiva la integración antes de iniciar sesión en la aplicación y termina la sesión de la aplicación antes de reactivar la integración. Iniciar sesión o reiniciar repetidamente no permite un uso simultáneo fiable. Para otros errores de conexión, revisa también la red, el bróker y el alcance BLE. [Detalles y alternativa MQTT oficial (en inglés)](./account-sessions.md).
 - **¿Dónde están los sensores de energía acumulada de por vida?**
   Los sensores proporcionados de semana, mes y año son *totales del período* y se reinician automáticamente. Para el Panel de Energía de Home Assistant, por favor usa los sensores de energía acumulativa provistos por la integración.
 
