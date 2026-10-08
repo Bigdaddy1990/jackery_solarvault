@@ -394,3 +394,157 @@ def test_collision_keys_and_exact_aliases_survive_real_registry_reload(
     for plug, identity in ((physical, second), (cloud, first)):
         assert smart_plug_entity_identity(replacement, _PARENT, plug) == identity
         assert smart_plug_entity_key(replacement, _PARENT, identity) == keys[identity]
+
+
+@pytest.mark.parametrize("platform_name", ["sensor", "switch", "binary_sensor"])
+@pytest.mark.parametrize("cloud_field", [FIELD_DEVICE_ID, FIELD_ID, FIELD_DEV_ID])
+async def test_serial_first_entities_recover_every_cloud_alias_after_reload(
+    platform_name: str,
+    cloud_field: str,
+    hass: Any,
+) -> None:
+    """Serial-first registrations retain all explicitly linked cloud aliases."""
+    platform = {"sensor": sensor, "switch": switch, "binary_sensor": binary_sensor}[
+        platform_name
+    ]
+    entity_type = {
+        "sensor": sensor.JackerySmartPlugSensor,
+        "switch": switch.JackerySmartPlugSwitch,
+        "binary_sensor": binary_sensor.JackerySmartPlugStateBinarySensor,
+    }[platform_name]
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    linked = {
+        FIELD_DEVICE_SN: _SERIAL,
+        FIELD_DEV_SN: "exact-serial-alias",
+        FIELD_SN: "EXACT-SN",
+        FIELD_DEVICE_ID: _CLOUD_ID,
+        FIELD_ID: "exact-cloud-id",
+        FIELD_DEV_ID: "EXACT-CLOUD-ID",
+        FIELD_IN_PW: 5,
+        FIELD_SWITCH_STATE: 0,
+    }
+    original: list[Any] = []
+    recovered: list[Any] = []
+    for payload, added in (
+        (_discovery(linked), original),
+        (
+            _discovery({
+                cloud_field: linked[cloud_field],
+                FIELD_IN_PW: 42,
+                FIELD_SWITCH_STATE: 1,
+            }),
+            recovered,
+        ),
+    ):
+        coordinator = MagicMock()
+        coordinator.hass = hass
+        coordinator.config_entry = entry
+        coordinator.data = {_PARENT: payload}
+        coordinator.last_update_success = True
+        coordinator.is_device_reachable.return_value = True
+        coordinator.device_supports_advanced.return_value = False
+        coordinator.async_add_listener.return_value = lambda: None
+        entry.runtime_data = coordinator
+        await cast("Any", platform.async_setup_entry)(hass, entry, added.extend)
+        entities = [entity for entity in added if isinstance(entity, entity_type)]
+        assert entities
+        if added is original:
+            info = entities[0].device_info
+            device = dr.async_get(hass).async_get_or_create(
+                config_entry_id=entry.entry_id,
+                identifiers=info["identifiers"],
+                serial_number=info["serial_number"],
+            )
+            for entity in entities:
+                assert entity.unique_id is not None
+                er.async_get(hass).async_get_or_create(
+                    platform_name,
+                    DOMAIN,
+                    entity.unique_id,
+                    config_entry=entry,
+                    device_id=device.id,
+                )
+                assert entity._plug[FIELD_DEVICE_SN] == _SERIAL  # ruff: ignore[private-member-access]
+        else:
+            prior = [entity for entity in original if isinstance(entity, entity_type)]
+            assert [entity.unique_id for entity in entities] == [
+                entity.unique_id for entity in prior
+            ]
+            assert all(entity._plug[FIELD_IN_PW] == 42 for entity in entities)  # ruff: ignore[private-member-access,magic-value-comparison]
+
+
+def test_historical_cloud_reuse_cannot_feed_two_physical_entities() -> None:
+    """ID-only telemetry cannot revive both physical owners of a reused cloud ID."""
+    coordinator = MagicMock()
+    coordinator.config_entry = None
+    for serial in (_SERIAL, "PLUG-B"):
+        linked = {FIELD_DEVICE_SN: serial, FIELD_DEVICE_ID: _CLOUD_ID}
+        coordinator.data = {_PARENT: _discovery(linked)}
+        assert smart_plug_entity_identity(coordinator, _PARENT, linked) == serial
+    coordinator.data = {
+        _PARENT: _discovery({FIELD_DEVICE_ID: _CLOUD_ID, FIELD_IN_PW: 42})
+    }
+
+    assert smart_plug_entity_payload(coordinator, _PARENT, _SERIAL) == {}
+    assert smart_plug_entity_payload(coordinator, _PARENT, "PLUG-B") == {}
+    assert smart_plug_entity_payload(coordinator, _PARENT, _CLOUD_ID) == {}
+    assert (
+        smart_plug_entity_identity(coordinator, _PARENT, {FIELD_DEVICE_ID: _CLOUD_ID})
+        is None
+    )
+
+
+@pytest.mark.parametrize("shared_snapshot", [False, True])
+def test_shared_persisted_cloud_alias_stays_unavailable_after_reload(
+    shared_snapshot: bool,
+    hass: Any,
+) -> None:
+    """Persist a cloud ambiguity without merging devices or assigning an old owner."""
+    entry = MockConfigEntry(domain=DOMAIN)
+    entry.add_to_hass(hass)
+    coordinator = MagicMock()
+    coordinator.hass = hass
+    coordinator.config_entry = entry
+    first = {FIELD_DEVICE_SN: _SERIAL, FIELD_DEVICE_ID: _CLOUD_ID}
+    second = {FIELD_DEVICE_SN: "PLUG-B", FIELD_DEVICE_ID: _CLOUD_ID}
+    original_device_ids: list[str] = []
+    for linked in (first, second):
+        coordinator.data = {_PARENT: _discovery(linked)}
+        if linked is second and shared_snapshot:
+            coordinator.data[_PARENT] = _discovery(first, second)
+        identity = smart_plug_entity_identity(coordinator, _PARENT, linked)
+        assert identity is not None
+        assert identity == linked[FIELD_DEVICE_SN]
+        key = smart_plug_entity_key(coordinator, _PARENT, identity)
+        device = dr.async_get(hass).async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, f"{_PARENT}_{key}")},
+            serial_number=identity,
+        )
+        original_device_ids.append(device.id)
+        er.async_get(hass).async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{_PARENT}_{key}_input_power",
+            config_entry=entry,
+            device_id=device.id,
+        )
+        assert smart_plug_entity_payload(coordinator, _PARENT, identity)
+    cloud = {FIELD_DEVICE_ID: _CLOUD_ID}
+    coordinator.data = {_PARENT: _discovery(cloud)}
+    replacement = MagicMock()
+    replacement.hass = hass
+    replacement.config_entry = entry
+    replacement.data = coordinator.data
+
+    assert smart_plug_entity_identity(replacement, _PARENT, cloud) is None
+    assert smart_plug_entity_payload(replacement, _PARENT, _CLOUD_ID) == {}
+    assert smart_plug_entity_payload(coordinator, _PARENT, _SERIAL) == {}
+    assert smart_plug_entity_payload(coordinator, _PARENT, "PLUG-B") == {}
+    assert {
+        device.id
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), entry.entry_id
+        )
+    } == set(original_device_ids)
