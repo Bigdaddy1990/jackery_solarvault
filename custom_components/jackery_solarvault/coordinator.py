@@ -2715,12 +2715,25 @@ def _unambiguous_smart_plug_aliases(
     }
 
 
+def _smart_plug_registry_markers(
+    device: dr.DeviceEntry, device_id: str, kind: str
+) -> set[str]:
+    """Read one kind of exact persisted socket identity proof."""
+    marker = f"{device_id}_smart_plug_{kind}:"
+    return {
+        value.removeprefix(marker)
+        for domain, value in device.identifiers
+        if domain == DOMAIN and value.startswith(marker)
+    }
+
+
 def _registered_smart_plug_identities(
     coordinator: JackerySolarVaultCoordinator,
     device_id: str,
     aliases: set[str],
     serials: frozenset[str],
-) -> dict[str, _SmartPlugEntityAliases]:
+    clouds: frozenset[str],
+) -> dict[str, _SmartPlugEntityAliases] | None:
     """Recover exact captured identities from HA registries after a reload."""
     entry = getattr(coordinator, "config_entry", None)
     hass = getattr(coordinator, "hass", None)
@@ -2729,11 +2742,13 @@ def _registered_smart_plug_identities(
     devices = dr.async_get(hass)
     entities = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
     identities: dict[str, _SmartPlugEntityAliases] = {}
+    namespace_conflict = False
     for alias in aliases:
         key = stable_subdevice_key("smart_plug", alias, 1)
         for identifier in (
             f"{device_id}_{key}",
             f"{device_id}_smart_plug_serial:{alias}",
+            f"{device_id}_smart_plug_cloud:{alias}",
             f"{device_id}_smart_plug_identity:{alias}",
         ):
             device = devices.async_get_device_by_identifier(
@@ -2741,34 +2756,32 @@ def _registered_smart_plug_identities(
             )
             if device is None:
                 continue
-            marker = f"{device_id}_smart_plug_identity:"
-            persisted = {
-                value.removeprefix(marker)
-                for domain, value in device.identifiers
-                if domain == DOMAIN and value.startswith(marker)
-            }
-            serial_marker = f"{device_id}_smart_plug_serial:"
-            proven_serials = {
-                value.removeprefix(serial_marker)
-                for domain, value in device.identifiers
-                if domain == DOMAIN and value.startswith(serial_marker)
-            }
+            persisted = _smart_plug_registry_markers(device, device_id, "identity")
+            proven_serials = _smart_plug_registry_markers(device, device_id, "serial")
+            proven_clouds = _smart_plug_registry_markers(device, device_id, "cloud")
             if serials and proven_serials and not serials & proven_serials:
+                continue
+            # Preserve legacy cloud-first captures while requiring an explicit
+            # cloud proof for a previously captured physical serial's equal text.
+            if (
+                (proven_serials or proven_clouds)
+                and not serials & proven_serials
+                and not clouds & (proven_clouds | (persisted - proven_serials))
+            ):
+                namespace_conflict |= bool(aliases & (proven_serials | proven_clouds))
                 continue
             if (
                 device.serial_number not in aliases
                 and not persisted & aliases
                 and not proven_serials & aliases
+                and not proven_clouds & aliases
             ):
                 continue
             captured = persisted or {alias}
             for identity in captured:
-                key_marker = f"{device_id}_smart_plug_key:"
-                keys = {
-                    value.removeprefix(key_marker)
-                    for domain, value in device.identifiers
-                    if domain == DOMAIN and value.startswith(key_marker)
-                } or {stable_subdevice_key("smart_plug", identity, 1)}
+                keys = _smart_plug_registry_markers(device, device_id, "key") or {
+                    stable_subdevice_key("smart_plug", identity, 1)
+                }
                 for captured_key in keys:
                     prefix = f"{device_id}_{captured_key}_"
                     if any(
@@ -2777,11 +2790,11 @@ def _registered_smart_plug_identities(
                         for entity in entities
                     ):
                         identities[identity] = _SmartPlugEntityAliases(
-                            captured | proven_serials,
+                            captured | proven_serials | proven_clouds,
                             proven_serials,
                             captured_key,
                         )
-    return identities
+    return identities if identities or not namespace_conflict else None
 
 
 def _persist_smart_plug_serial_aliases(
@@ -2791,7 +2804,7 @@ def _persist_smart_plug_serial_aliases(
     known: _SmartPlugEntityAliases,
     plug: dict[str, Any],
 ) -> None:
-    """Persist a captured key and proven serial aliases on its registered HA device."""
+    """Persist one captured key and its proven serial/cloud aliases on the HA device."""
     entry = getattr(coordinator, "config_entry", None)
     hass = getattr(coordinator, "hass", None)
     if entry is None or not isinstance(hass, HomeAssistant):
@@ -2802,6 +2815,10 @@ def _persist_smart_plug_serial_aliases(
     )
     if device is None or device.serial_number not in known.aliases:
         return
+    plugs = smart_plug_payloads((coordinator.data or {}).get(device_id, {}))
+    clouds = _smart_plug_cloud_aliases(plug) & _unambiguous_smart_plug_aliases(
+        plugs, plug
+    )
     identifiers = device.identifiers | {
         (DOMAIN, f"{device_id}_smart_plug_identity:{identity}"),
         (DOMAIN, f"{device_id}_smart_plug_key:{known.key}"),
@@ -2809,6 +2826,7 @@ def _persist_smart_plug_serial_aliases(
             (DOMAIN, f"{device_id}_smart_plug_serial:{serial}")
             for serial in known.serials
         ),
+        *((DOMAIN, f"{device_id}_smart_plug_cloud:{cloud}") for cloud in clouds),
     }
     if any(
         owner.id != device.id
@@ -2868,11 +2886,18 @@ def smart_plug_entity_identity(
         if aliases & known.aliases
         and (not serials or not known.serials or serials & known.serials)
     ]
-    registered = {}
+    registered: dict[str, _SmartPlugEntityAliases] = {}
     if not matches:
-        registered = _registered_smart_plug_identities(
-            coordinator, device_id, aliases, serials
+        recovered = _registered_smart_plug_identities(
+            coordinator,
+            device_id,
+            aliases,
+            serials,
+            _smart_plug_cloud_aliases(plug).intersection(aliases),
         )
+        if recovered is None:
+            return None
+        registered = recovered
         matches = sorted(registered)
     if len(matches) > 1:
         return None
@@ -2913,8 +2938,8 @@ def smart_plug_entity_payload(
     known = registry.get(identity)
     if known is None:
         plug = smart_plug_payload(payload, identity)
-        if plug:
-            smart_plug_entity_identity(coordinator, device_id, plug)
+        if plug and smart_plug_entity_identity(coordinator, device_id, plug) is None:
+            return {}
         return plug
     plugs = smart_plug_payloads(payload)
     matches = [
