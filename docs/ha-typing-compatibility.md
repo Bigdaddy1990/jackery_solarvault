@@ -54,23 +54,22 @@ stack's full tests. No supported-version or dependency-baseline changes are need
 ## Validation
 
 On Python 3.14.2 with HA 2026.9.4/plugin 0.13.367 and
-HA 2026.10.0b0/plugin 0.13.368:
+HA 2026.10.0/plugin 0.13.371:
+
+| Tested HA release | Pytest plugin | Coverage | Python | Complete suite |
+| --- | --- | --- | --- | --- |
+| 2026.9.4 | 0.13.367 | 7.15.4 | 3.14.2 | 4,598 passed |
+| 2026.10.0 | 0.13.371 | 7.16.2 | 3.14.2 | 4,598 passed |
 
 - Mypy 2.4.0: all 42 integration source files pass. Local commands use
-  `--num-workers 0 --no-native-parser` to avoid the container's unavailable parent
-  PID during native-parser worker discovery; this changes no typing rules.
+  `MYPY_NUM_WORKERS=0` to avoid unavailable worker sockets in the container;
+  this changes no typing rules.
 - Pyrefly 1.3.2: integration and complete configured project pass with zero errors;
   existing project suppressions remain active; this change adds none.
-- 769 affected runtime tests pass on each stack, including 20 schema/enum
-  compatibility cases, six coordinator annotation regressions, three local MQTT
-  annotation regressions and 62 existing device-registry ownership cases. The
-  coordinator cases
-  reproduced failures before the fix and verify concrete constructor types,
-  every owned method/property, Mock specs, autospec arity, the lazy BLE transport
-  import in a fresh interpreter and observation re-export identity.
-- Negative probes for a dictionary passed as a form schema, a string returned as
-  an enum and a string used as a description's device class each fail under both
-  checkers on both stacks. The actual type contracts remain enforced.
+- All 4,598 runtime tests pass on each stable stack, including schema/enum,
+  annotation, ownership, discovery-order and parent-removal regressions.
+  Native and MQTT discovery keep one owner, repeated discovery remains
+  idempotent, and unrelated registry devices survive parent removal.
 - Both stacks use the workflow's exact Python 3.14.2 minimum.
 - `pip check`, focused Ruff lint/format and `git diff --check` pass.
 
@@ -79,24 +78,30 @@ Only its HA, coverage and plugin requirement rows replace the baseline test pins
 all remaining test requirements retain the repository's source values. The normal
 minimum-stack checks and plugin-derived baseline checks remain in place.
 
-An additional exploratory full-suite run on Python 3.14.2 encounters an upstream
-Recorder test-fixture issue: the plugin's autospec evaluates HA's
-`recorder.migration._find_schema_errors` annotation for its TYPE_CHECKING-only
-`Recorder` import. The same failure reproduces on unchanged PR head `1fc48956`.
-The alternate-stack full suite also deliberately disagrees with the checked-in
-minimum-stack baseline assertion. Neither result is treated as a passing full
-suite or suppressed; the compatibility workflow runs the expanded affected-test
-selection, and regular CI runs the complete minimum-stack suite on current
-Python 3.14.
+The minimum lane first runs `scripts.sync_ha_test_baseline --check` against
+committed artifacts. A stale or missing baseline fails without rewriting it.
+The 2026.10 stable lane creates a separate Git worktree, generates its own
+plugin-derived baseline there, and runs typing checks and the complete suite
+from that isolated checkout. The committed minimum remains unchanged.
+
+The earlier exploratory full-suite failure came from Python 3.14 autospec
+resolving type-only imports in HA's Recorder fixtures. An autouse test fixture
+now binds the real `Recorder` and SQLAlchemy `Session` classes only for tests
+requesting `async_test_recorder`; production Recorder code is not replaced.
+Both complete stable-stack runs now pass, including in GitHub Actions.
+
+The unused `_device_stable_identity` helper was removed because it read
+`suggested_area` and mutable metadata. Discovery and coordinator cleanup now
+use `config_entry_id`; no identifier is rebuilt from user-editable metadata.
 
 ## Primary sources
 
 - [Probatio runtime migration and alias guarantee](https://developers.home-assistant.io/blog/2026/09/30/probatio-validation-engine/)
 - [HA 2026.9.4 flow annotations](https://github.com/home-assistant/core/blob/2026.9.4/homeassistant/data_entry_flow.py)
-- [HA 2026.10.0b0 flow annotations](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/data_entry_flow.py)
+- [HA 2026.10.0 stable flow annotations](https://github.com/home-assistant/core/blob/2026.10.0/homeassistant/data_entry_flow.py)
 - [Schema annotation migration commit](https://github.com/home-assistant/core/commit/06ac207c22a8359c3d10f90eac593e60bf9ab78d)
 - [Plugin 0.13.367 exact HA pin](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component/blob/0.13.367/requirements_test.txt)
-- [Plugin 0.13.368 exact HA pin](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component/blob/0.13.368/requirements_test.txt)
+- [Plugin 0.13.371 exact HA pin](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component/blob/0.13.371/requirements_test.txt)
 - [New binary sensor public re-export](https://github.com/home-assistant/core/blob/2026.10.0b0/homeassistant/components/binary_sensor/__init__.py)
 - [Historical removal of string device classes](https://github.com/home-assistant/core/commit/cb69364ad2f36b68fa5404400b88948e8bdd7173)
 

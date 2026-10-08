@@ -254,7 +254,7 @@ def test_foreign_cloud_marker_cannot_merge_or_route_a_same_entry_socket(
     unchanged = dr.async_get(hass).async_get(foreign.id)
     assert unchanged is not None
     assert unchanged.identifiers == foreign.identifiers
-    assert unchanged.config_entries == {foreign_entry.entry_id}
+    assert unchanged.config_entry_id == foreign_entry.entry_id
     cloud = {FIELD_DEVICE_ID: _CLOUD, FIELD_IN_PW: _POWER}
     replacement = _coordinator(hass, entry, {PAYLOAD_SMART_PLUGS: [cloud]})
 

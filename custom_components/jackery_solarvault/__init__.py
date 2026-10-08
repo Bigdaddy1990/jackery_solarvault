@@ -6,7 +6,6 @@
 # ruff: file-ignore[non-empty-init-module]
 import asyncio
 from datetime import timedelta
-import hashlib
 import logging
 import operator
 import re
@@ -2763,31 +2762,6 @@ def _async_migrate_portable_screen_entity(
             old_entry.entity_id,
             target_entry.entity_id,
         )
-
-
-def _device_stable_identity(device: dr.DeviceEntry) -> str:
-    """Generate a stable identity hash from device info when serial is unavailable.
-
-    Uses a combination of model, firmware, hardware, scan_name, and type_name
-    to create a deterministic identifier that persists across HA restarts.
-    """
-    parts = []
-    if device.model:
-        parts.append(f"model:{device.model}")
-    if device.sw_version:
-        parts.append(f"fw:{device.sw_version}")
-    if device.hw_version:
-        parts.append(f"hw:{device.hw_version}")
-    # These are from device entry attributes if available
-    # We also check the device's name/suggested_area as fallback
-    if device.name:
-        parts.append(f"name:{device.name}")
-    if device.suggested_area:
-        parts.append(f"area:{device.suggested_area}")
-
-    # Create deterministic hash from available info
-    raw = "|".join(sorted(parts)) if parts else "unknown"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _battery_pack_registry_identity(
