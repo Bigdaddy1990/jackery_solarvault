@@ -17,7 +17,7 @@ session against accidental regressions:
    not the generic "disconnected" message.
 """
 
-import datetime
+import datetime as dt
 from pathlib import Path
 import re
 
@@ -221,22 +221,22 @@ def test_silent_threshold_logic_unit() -> None:
         connected: bool,
         last_msg_iso: str | None,
         last_connect_iso: str | None,
-        now: datetime.datetime,
+        now: dt.datetime,
     ) -> bool:
         if not connected:
             return False
         if last_msg_iso is None:
             if last_connect_iso is None:
                 return False
-            then = datetime.datetime.fromisoformat(last_connect_iso)
+            then = dt.datetime.fromisoformat(last_connect_iso)
             return (now - then).total_seconds() > threshold_seconds
-        then = datetime.datetime.fromisoformat(last_msg_iso)
+        then = dt.datetime.fromisoformat(last_msg_iso)
         elapsed = max(0.0, (now - then).total_seconds())
         return elapsed > threshold_seconds
 
-    now = datetime.datetime(2026, 5, 5, 12, 0, 0, tzinfo=datetime.UTC)
-    fresh = (now - datetime.timedelta(seconds=10)).isoformat()
-    stale = (now - datetime.timedelta(seconds=900)).isoformat()
+    now = dt.datetime(2026, 5, 5, 12, 0, 0, tzinfo=dt.UTC)
+    fresh = (now - dt.timedelta(seconds=10)).isoformat()
+    stale = (now - dt.timedelta(seconds=900)).isoformat()
 
     # Healthy: just received a message
     assert silent(True, fresh, fresh, now) is False

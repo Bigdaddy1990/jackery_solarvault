@@ -42,10 +42,14 @@ repos:
         types: [python]
         args: [--safe] # or alternatively, --aggressive, or any of the other flags mentioned above
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.10
+  # Both workflow passes use this environment, never a second Ruff version.
+  - repo: local
     hooks:
       - id: ruff-check
+        name: ruff check
+        entry: ruff check
+        language: python
+        additional_dependencies: ["ruff>=0.17.0"]
         args:
           - --fix
           - --unsafe-fixes
@@ -55,6 +59,10 @@ repos:
           - python
           - pyi
       - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: python
+        additional_dependencies: ["ruff>=0.17.0"]
         types_or:
           - python
           - pyi
