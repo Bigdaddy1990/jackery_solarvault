@@ -34,6 +34,19 @@ def test_autofix_uses_one_ruff_hook_environment() -> None:
     assert not any("ruff-action" in step.get("uses", "") for step in steps)
     assert "pre-commit run --all-files || true" in commands
     assert "python -m pre_commit run --all-files" in commands
+    assert "python -m pre_commit clean" in commands
+    for filename in ("autofix.yml", "pre-commit-ci-lite.yml"):
+        other = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+        for job in other["jobs"].values():
+            assert not any(
+                "pre-commit/action" in step.get("uses", "") for step in job["steps"]
+            )
+            hook_commands = "\n".join(step.get("run", "") for step in job["steps"])
+            assert hook_commands.index("python -m pre_commit clean") < (
+                hook_commands.index("run --all-files")
+            )
+    validate = (ROOT / ".github/workflows/validate.yml").read_text()
+    assert "ruff check --no-fix custom_components/ tests/" in validate
     verify = next(
         index
         for index, step in enumerate(steps)

@@ -61,11 +61,13 @@ jobs:
 
       - name: Run pre-commit with fixes
         run: |
+          # Resolve open-ended tool dependencies afresh for this job. Do not
+          # restore an older hook environment between fixing and verification.
+          python -m pre_commit clean
           # A fixing pass may return 1 after modifying files. The next pass
           # must pass every hook using these same cached hook environments.
           pre-commit run --all-files || true
 
-      - uses: pre-commit/action@v3.0.1
       # Keep system hooks in the interpreter containing HA and its native types.
       - run: python -m pre_commit run --all-files
       - uses: pre-commit-ci/lite-action@v1.2.0

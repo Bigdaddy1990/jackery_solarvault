@@ -40,6 +40,14 @@ Speculative `pyrefly infer` rewrites were removed from the formatting job;
 the existing mandatory Pyrefly hook and dedicated type-check workflows remain.
 The lite action runs only after mandatory verification succeeds.
 
+Review follow-up: the cached `pre-commit/action` environment could retain an
+older resolution of the open-ended dependency. Both Actions hook runners now
+explicitly clean hook environments before the initial resolution and use the
+CLI directly, with no cache restoration between passes. The standalone Validate
+lint check uses `--no-fix`, preventing verification from rewriting suppressions.
+External pre-commit.ci remains an additional required-success observation; its
+service-managed cache cannot change the fresh Actions environment.
+
 Regression tests cover the shared hook configuration, verification-before-write
 ordering, preserved necessary ignores over repeated fixing passes, continued
 SLF001 enforcement on unguarded access, and linting the original failing file.

@@ -52,7 +52,10 @@ jobs:
         run: uv pip install --system --prerelease disallow -r requirements.txt -r requirements-test.txt
 
       - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
+        run: |
+          # A cached environment cannot refresh an open-ended tool requirement.
+          python -m pre_commit clean
+          python -m pre_commit run --all-files
 
       - name: pre-commit-ci-lite automatic fixes
         uses: pre-commit-ci/lite-action@v1.2.0
