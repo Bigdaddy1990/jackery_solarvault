@@ -309,6 +309,14 @@ test('administrative apply refuses failed setting readback and uninspectable byp
   assert.throws(() => apply(hidden.api), /readback failed/);
 });
 
+test('administrative apply rejects auto-merge re-enabled after the initial setting readback', () => {
+  const c = administrativeClient(({ settings, method }) => {
+    if (method === 'PUT') settings.allow_auto_merge = true;
+  });
+  assert.throws(() => apply(c.api), /Ruleset\/settings readback failed/);
+  assert.equal(c.writes.length, 2);
+});
+
 test('missing protection, API error or changed protection never merges', async () => {
   const f = fixture(); const c = client(f);
   c.github.paginate = async () => [];

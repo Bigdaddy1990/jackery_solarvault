@@ -95,8 +95,8 @@ def test_ble_header_action_collisions_keep_telemetry(cmd: int, flags: int) -> No
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_listener = None  # ruff: ignore[private-member-access]
-        coordinator._device_index = {}  # ruff: ignore[private-member-access]
+        coordinator._ble_listener = None
+        coordinator._device_index = {}
         coordinator.data = {"dev": {"properties": {}}}
         payload = {"batDisChgEgy": 72483, "pvEgy": 100, "acOtBatEgy": 0}
         observation = BleFrameObservation(
@@ -133,7 +133,7 @@ def test_ble_header_action_collisions_keep_telemetry(cmd: int, flags: int) -> No
                 return_value=True,
             ) as commit,
         ):
-            result = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]
+            result = await coordinator._async_ingest_ble_observation_once(
                 "dev", observation
             )
 
@@ -788,8 +788,8 @@ def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_delivery_results = {}  # ruff: ignore[private-member-access]  # isort: skip
-        coordinator._ble_delivery_result_order = deque()  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_delivery_results = {}  # isort: skip
+        coordinator._ble_delivery_result_order = deque()  # isort: skip
         calls = 0
 
         async def _once(  # ruff: ignore[unused-async]  # isort: skip
@@ -813,8 +813,8 @@ def test_coordinator_ble_delivery_id_is_applied_exactly_once() -> None:
             "_async_ingest_ble_observation_once",
             new=_once,
         ):
-            first = await coordinator._async_ingest_ble_observation("dev", observation)  # ruff: ignore[private-member-access]  # isort: skip
-            retry = await coordinator._async_ingest_ble_observation("dev", observation)  # ruff: ignore[private-member-access]  # isort: skip
+            first = await coordinator._async_ingest_ble_observation("dev", observation)  # isort: skip
+            retry = await coordinator._async_ingest_ble_observation("dev", observation)  # isort: skip
 
         assert first is BleProcessDisposition.CONFIRMED
         assert retry is BleProcessDisposition.CONFIRMED
@@ -828,7 +828,7 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_listener = None  # isort: skip
         observation = BleFrameObservation(
             received_at=datetime.now(UTC),
             raw_bytes=b"frame",
@@ -874,7 +874,7 @@ def test_coordinator_ble_ingest_returns_actual_commit_result() -> None:
                 return_value=False,
             ),
         ):
-            committed = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]  # isort: skip
+            committed = await coordinator._async_ingest_ble_observation_once(  # isort: skip
                 "dev",
                 observation,
             )
@@ -905,7 +905,7 @@ def test_unparsed_ble_frame_keeps_raw_bytes_without_redaction_switch() -> None:
         with patch.object(
             JackerySolarVaultCoordinator, "_schedule_payload_debug_event"
         ) as capture:
-            result = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]
+            result = await coordinator._async_ingest_ble_observation_once(
                 "dev", observation
             )
         assert result is BleProcessDisposition.INVALID
@@ -927,8 +927,8 @@ def test_coordinator_ble_retry_result_is_not_cached() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_delivery_results = {}  # ruff: ignore[private-member-access]  # isort: skip
-        coordinator._ble_delivery_result_order = deque()  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_delivery_results = {}  # isort: skip
+        coordinator._ble_delivery_result_order = deque()  # isort: skip
         results = deque((
             BleProcessDisposition.RETRY,
             BleProcessDisposition.CONFIRMED,
@@ -956,11 +956,11 @@ def test_coordinator_ble_retry_result_is_not_cached() -> None:
             "_async_ingest_ble_observation_once",
             new=_once,
         ):
-            first = await coordinator._async_ingest_ble_observation(  # ruff: ignore[private-member-access]  # isort: skip
+            first = await coordinator._async_ingest_ble_observation(  # isort: skip
                 "dev",
                 observation,
             )
-            second = await coordinator._async_ingest_ble_observation(  # ruff: ignore[private-member-access]  # isort: skip
+            second = await coordinator._async_ingest_ble_observation(  # isort: skip
                 "dev",
                 observation,
             )
@@ -977,7 +977,7 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
 
     async def _run() -> None:
         coordinator = object.__new__(JackerySolarVaultCoordinator)
-        coordinator._ble_listener = None  # ruff: ignore[private-member-access]  # isort: skip
+        coordinator._ble_listener = None  # isort: skip
         observation = BleFrameObservation(
             received_at=datetime.now(UTC),
             raw_bytes=b"frame",
@@ -1023,7 +1023,7 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
                 "_schedule_ble_partial_update",
             ) as schedule,
         ):
-            disposition = await coordinator._async_ingest_ble_observation_once(  # ruff: ignore[private-member-access]  # isort: skip
+            disposition = await coordinator._async_ingest_ble_observation_once(  # isort: skip
                 "dev",
                 observation,
             )
@@ -1037,8 +1037,8 @@ def test_coordinator_ble_valid_unchanged_frame_is_confirmed() -> None:
 def test_coordinator_ble_shutdown_drain_allows_accepted_commit() -> None:
     """Shutdown fencing still commits a frame accepted before the BLE cutoff."""
     coordinator = object.__new__(JackerySolarVaultCoordinator)
-    coordinator._shutdown_started = True  # ruff: ignore[private-member-access]  # isort: skip
-    coordinator._ble_shutdown_drain_active = True  # ruff: ignore[private-member-access]  # isort: skip
+    coordinator._shutdown_started = True  # isort: skip
+    coordinator._ble_shutdown_drain_active = True  # isort: skip
     coordinator.data = {"dev": {"properties": {"outPw": 0}}}
     pushed: list[dict[str, dict[str, object]]] = []
 
@@ -1055,7 +1055,7 @@ def test_coordinator_ble_shutdown_drain_allows_accepted_commit() -> None:
         "_push_partial_update",
         new=_push,
     ):
-        committed = coordinator._schedule_ble_partial_update(  # ruff: ignore[private-member-access]  # isort: skip
+        committed = coordinator._schedule_ble_partial_update(  # isort: skip
             "dev",
             {"properties": {"outPw": 596}},
             observed_at=datetime.now(UTC),
