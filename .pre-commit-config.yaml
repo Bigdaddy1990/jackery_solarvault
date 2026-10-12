@@ -20,12 +20,12 @@ default_install_hook_types:
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.12.23
+    rev: 0.13.0
     hooks:
       - id: uv-sync
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
+    rev: v3.22.0
     hooks:
       - id: pyupgrade
         # py314 removes the deliberate annotations future import (issue #278).
