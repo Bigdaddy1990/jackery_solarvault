@@ -20,6 +20,7 @@ def main() -> None:
             *uv,
             "pip",
             "install",
+            "--exact",
             "--python",
             str(environment),
             "-r",

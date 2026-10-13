@@ -27,6 +27,7 @@ def test_sync_targets_project_despite_hook_environment(
     )
     sync_dev_requirements.main()
     assert len(calls) == 1
+    assert "--exact" in calls[0]
     assert calls[0][calls[0].index("--python") + 1] == str(environment)
     assert "requirements.txt" in calls[0]
     assert "requirements-test.txt" in calls[0]
