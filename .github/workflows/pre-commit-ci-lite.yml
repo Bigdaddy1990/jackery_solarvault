@@ -58,8 +58,6 @@ jobs:
           python -m pre_commit run --all-files
 
       - name: Verify dependency synchronization event hook
-        env:
-          UV_SYSTEM_PYTHON: "true"
         run: python -m pre_commit run uv-sync --hook-stage post-merge --all-files
 
       - name: pre-commit-ci-lite automatic fixes
