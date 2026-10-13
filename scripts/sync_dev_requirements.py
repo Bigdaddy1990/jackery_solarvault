@@ -33,7 +33,7 @@ def main() -> None:
     uv = [sys.executable, "-m", "uv"]
     if not compatible_environment(environment):
         subprocess.run(
-            [*uv, "venv", "--python", ">=3.14.2,<3.15", str(environment)],
+            [*uv, "venv", "--clear", "--python", ">=3.14.2,<3.15", str(environment)],
             check=True,
             cwd=ROOT,
         )

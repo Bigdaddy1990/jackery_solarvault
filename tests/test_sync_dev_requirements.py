@@ -54,6 +54,7 @@ def test_sync_recreates_unsupported_or_missing_interpreter(
     sync_dev_requirements.main()
     assert calls[1][3:] == [
         "venv",
+        "--clear",
         "--python",
         ">=3.14.2,<3.15",
         str(tmp_path / ".venv"),
