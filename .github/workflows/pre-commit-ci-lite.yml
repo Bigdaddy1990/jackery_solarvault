@@ -57,6 +57,9 @@ jobs:
           python -m pre_commit clean
           python -m pre_commit run --all-files
 
+      - name: Verify dependency synchronization event hook
+        run: python -m pre_commit run uv-sync --hook-stage post-merge --all-files
+
       - name: pre-commit-ci-lite automatic fixes
         uses: pre-commit-ci/lite-action@v1.2.0
         if: always()
