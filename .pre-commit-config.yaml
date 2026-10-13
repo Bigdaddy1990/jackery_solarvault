@@ -23,6 +23,10 @@ repos:
     rev: 0.13.0
     hooks:
       - id: uv-sync
+        name: Install repository requirements
+        # This repository uses requirements files rather than uv.lock.
+        entry: uv pip install
+        args: [-r, requirements.txt, -r, requirements-test.txt]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.22.0
