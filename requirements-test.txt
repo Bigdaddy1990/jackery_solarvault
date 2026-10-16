@@ -32,7 +32,7 @@ python-dateutil
 python_discovery>=1.6.2
 pyyaml>=6.0.3
 ruff>=0.17.0
-serialx==1.11.0
+serialx==1.13.0
 smellcheck>=0.3.10
 sqlalchemy
 ty<=0.0.86
