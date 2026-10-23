@@ -20,7 +20,7 @@ default_install_hook_types:
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.13.1
+    rev: 0.13.4
     hooks:
       - id: uv-sync
         name: Install repository requirements
