@@ -29,7 +29,7 @@ pytest-homeassistant-custom-component>=0.13.367  # HA 2026.9.4 or newer
 pytest-mock
 pytest-socket
 python-dateutil
-python_discovery>=1.6.4
+python_discovery>=1.6.6
 pyyaml>=6.0.3
 ruff>=0.17.0
 serialx==1.15.0
