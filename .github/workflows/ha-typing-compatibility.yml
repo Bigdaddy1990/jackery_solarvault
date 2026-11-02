@@ -24,14 +24,17 @@ jobs:
           - homeassistant: "2026.9.4"
             pytest-plugin: "0.13.367"
             coverage: "7.15.4"
+            serialx: "1.10.0"
           - homeassistant: "2026.10.0"
             pytest-plugin: "0.13.371"
             coverage: "7.16.2"
+            serialx: "1.11.0"
     env:
       HA_TEST_ROOT: ${{ github.workspace }}
       EXPECTED_HOMEASSISTANT: ${{ matrix.homeassistant }}
       EXPECTED_PYTEST_PLUGIN: ${{ matrix.pytest-plugin }}
       EXPECTED_COVERAGE: ${{ matrix.coverage }}
+      EXPECTED_SERIALX: ${{ matrix.serialx }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -58,6 +61,7 @@ jobs:
               "homeassistant",
               "pytest-homeassistant-custom-component",
               "coverage",
+              "serialx",
           }
           removed = set()
           retained = []
@@ -81,7 +85,8 @@ jobs:
           python -m pip install \
             -r requirements.txt \
             -r "$RUNNER_TEMP/ha-typing-requirements.txt" \
-            "pytest-homeassistant-custom-component==$EXPECTED_PYTEST_PLUGIN"
+            "pytest-homeassistant-custom-component==$EXPECTED_PYTEST_PLUGIN" \
+            "serialx==$EXPECTED_SERIALX"
 
       - name: Verify resolved stack
         run: |
@@ -94,12 +99,24 @@ jobs:
               ("homeassistant", "EXPECTED_HOMEASSISTANT"),
               ("pytest-homeassistant-custom-component", "EXPECTED_PYTEST_PLUGIN"),
               ("coverage", "EXPECTED_COVERAGE"),
+              ("serialx", "EXPECTED_SERIALX"),
           ):
               actual = version(package)
               expected = os.environ[variable]
               if actual != expected:
                   raise SystemExit(f"{package}: expected {expected}, resolved {actual}")
               print(f"{package}=={actual}")
+          from importlib.resources import files
+          from packaging.requirements import Requirement
+
+          constraints = files("homeassistant").joinpath("package_constraints.txt").read_text()
+          serialx_constraints = [
+              Requirement(line.strip())
+              for line in constraints.splitlines()
+              if line.strip().lower().startswith("serialx==")
+          ]
+          if len(serialx_constraints) != 1 or version("serialx") not in serialx_constraints[0].specifier:
+              raise SystemExit("Installed serialx does not match the Home Assistant constraint")
           PY
 
       - name: Check the committed minimum baseline before generation
