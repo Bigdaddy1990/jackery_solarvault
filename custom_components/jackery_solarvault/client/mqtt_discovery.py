@@ -52,7 +52,7 @@ class _EntityDeviceLike(Protocol):
     """
 
     @property
-    def device_info(self) -> Mapping[str, Any] | None: ...
+    def device_info(self) -> object | None: ...
 
     @property
     def native_value(self) -> StateType | date | datetime | Decimal: ...
@@ -109,10 +109,21 @@ def _reset_timestamp(entity: _EntityDeviceLike) -> str | None:
     return reset.isoformat() if isinstance(reset, datetime) else None
 
 
+def _device_info_as_dict(raw: object | None) -> dict[str, Any]:
+    """Return JSON-building metadata from old mapping or HA 2026.11 DeviceInfo."""
+    if raw is None:
+        return {}
+    as_dict = getattr(raw, "as_dict", None)
+    if callable(as_dict):
+        values = as_dict()
+        return dict(values) if isinstance(values, Mapping) else {}
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
 def _device_config(entity: _EntityDeviceLike) -> tuple[str, dict[str, Any]]:
     """Build a JSON-safe MQTT device block and return its stable identifier."""
     raw = getattr(entity, "device_info", None)
-    info: dict[str, Any] = dict(raw) if isinstance(raw, Mapping) else {}
+    info = _device_info_as_dict(raw)
     registered = getattr(entity, "device_entry", None)
     if isinstance(registered, dr.BaseDeviceEntry):
         # The registered device is stable; device_info follows the payload (a CT
