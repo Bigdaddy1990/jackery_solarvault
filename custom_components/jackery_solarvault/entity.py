@@ -59,13 +59,13 @@ from .util import (
 )
 
 
-
 def _set_device_info_value(info: DeviceInfo, field: str, value: Any) -> None:
     """Set one DeviceInfo field across the pre-2026.11 dict and dataclass APIs."""
     if isinstance(info, dict):
         cast("dict[str, Any]", info)[field] = value
         return
     setattr(info, field, value)
+
 
 _LOGGER = logging.getLogger(__name__)
 
