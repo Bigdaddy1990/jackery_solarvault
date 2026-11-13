@@ -59,10 +59,10 @@ from .util import (
 )
 
 
-def _set_device_info_value(info: DeviceInfo, field: str, value: Any) -> None:
+def _set_device_info_value(info: object, field: str, value: object) -> None:
     """Set one DeviceInfo field across the pre-2026.11 dict and dataclass APIs."""
     if isinstance(info, dict):
-        cast("dict[str, Any]", info)[field] = value
+        cast("dict[str, object]", info)[field] = value
         return
     setattr(info, field, value)
 
