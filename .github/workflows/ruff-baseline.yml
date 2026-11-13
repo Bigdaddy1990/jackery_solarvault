@@ -45,7 +45,7 @@ jobs:
           pre-commit run --all-files || true
           pre-commit run --hook-stage manual --check --py314-plus --ruff || true
 
-      - uses: peter-evans/create-pull-request@v8.1.1
+      - uses: peter-evans/create-pull-request@v8.1.3
         with:
           branch: chore/ruff-baseline
           title: "chore: ruff baseline (format+fix)"
