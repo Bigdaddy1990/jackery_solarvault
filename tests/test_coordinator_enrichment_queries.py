@@ -110,7 +110,7 @@ def _device_payload(  # ruff: ignore[too-many-arguments]  # isort: skip
 
 
 @pytest.fixture()
-async def coordinator(hass):  # ruff: ignore[missing-type-function-argument, missing-return-type-public-function]  # isort: skip
+async def coordinator(hass):  # ruff: ignore[missing-type-function-argument]  # isort: skip
     """Yield a coordinator with mocked api for enrichment query tests."""
     api = make_update_cycle_api()
     coord, entry, _api = await setup_update_cycle_coordinator(
