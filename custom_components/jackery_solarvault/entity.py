@@ -1,7 +1,7 @@
 """Shared entity base class."""
 
 import logging
-from typing import Any, NoReturn
+from typing import Any, NoReturn, cast
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -57,6 +57,15 @@ from .util import (
     stable_subdevice_key,
     subdevice_branding,
 )
+
+
+
+def _set_device_info_value(info: DeviceInfo, field: str, value: Any) -> None:
+    """Set one DeviceInfo field across the pre-2026.11 dict and dataclass APIs."""
+    if isinstance(info, dict):
+        cast("dict[str, Any]", info)[field] = value
+        return
+    setattr(info, field, value)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,7 +188,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             config_entry.entry_id,
         )
         if parent is not None:
-            info["via_device_id"] = parent.id
+            _set_device_info_value(info, "via_device_id", parent.id)
 
     @property
     def _payload(self) -> dict[str, Any]:
@@ -381,7 +390,11 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             )
         )
         if parent_mac is not None:
-            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
+            _set_device_info_value(
+                info,
+                "connections",
+                {(dr.CONNECTION_NETWORK_MAC, parent_mac)},
+            )
         return self._group_device_info(str(name)) or info
 
     def _group_device_info(self, name: str) -> DeviceInfo | ChildDeviceInfo | None:
