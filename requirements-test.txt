@@ -1,7 +1,7 @@
 aiohttp
 aiomqtt==2.5.1
 aiousbwatcher==1.1.2
-annotated-doc>=0.0.5
+annotated-doc>=0.0.6
 annotated-types>=0.8.0
 annotatedyaml>=1.0.2
 astroid
