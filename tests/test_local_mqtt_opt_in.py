@@ -20,7 +20,7 @@ class MockConfigEntry:
     def __contains__(self, key) -> bool:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         return key in self.options or key in self.data
 
-    def get(self, key, default=None):  # ruff: ignore[missing-type-function-argument, undocumented-public-method]
+    def get(self, key, default=None) -> object:  # ruff: ignore[missing-type-function-argument, undocumented-public-method]
         return self.options.get(key, self.data.get(key, default))
 
 
