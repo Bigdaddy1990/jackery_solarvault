@@ -30,6 +30,7 @@ from custom_components.jackery_solarvault.descriptions.sensor import (
     SENSOR_DESCRIPTIONS,
     STAT_DESCRIPTIONS,
 )
+import custom_components.jackery_solarvault.entity as entity_module
 from custom_components.jackery_solarvault.entity import JackeryEntity
 import custom_components.jackery_solarvault.sensor as sensor_module
 from custom_components.jackery_solarvault.sensor import (
@@ -450,3 +451,55 @@ def test_smart_meter_device_info_rejects_non_mac_serial_fallback() -> None:
     )
 
     assert "connections" not in entity.device_info
+
+
+class _DataclassDeviceInfo:
+    """Minimal HA 2026.11 DeviceInfo that deliberately has no mapping mutation."""
+
+    def __init__(self, **values: Any) -> None:
+        for key, value in values.items():
+            setattr(self, key, value)
+
+
+def test_parent_device_info_mutation_supports_ha_2026_11_dataclass(
+    monkeypatch: Any,
+) -> None:
+    """Parent MAC metadata is assigned through dataclass attributes on HA 2026.11."""
+    monkeypatch.setattr(entity_module, "DeviceInfo", _DataclassDeviceInfo)
+    info = _entity({PAYLOAD_PROPERTIES: {FIELD_MAC: "AA-BB-CC-11-22-33"}}).device_info
+
+    assert info.connections == {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")}
+
+
+def test_via_device_mutation_supports_ha_2026_11_dataclass(monkeypatch: Any) -> None:
+    """Parent links are assigned without relying on removed dict mutation."""
+    entity = _entity({})
+    entity.coordinator = SimpleNamespace(
+        data={_DEVICE_ID: {}},
+        hass=object(),
+        config_entry=SimpleNamespace(entry_id="entry-id"),
+    )
+    registry = SimpleNamespace(
+        async_get_device_by_identifier=lambda *_args: SimpleNamespace(id="parent-id")
+    )
+    monkeypatch.setattr(entity_module.dr, "async_get", lambda _hass: registry)
+    info = _DataclassDeviceInfo(identifiers={(DOMAIN, "child")})
+
+    entity._apply_via_device(info)  # ruff: ignore[private-member-access]
+
+    assert info.via_device_id == "parent-id"
+
+
+def test_smart_meter_device_info_mutation_supports_ha_2026_11_dataclass(
+    monkeypatch: Any,
+) -> None:
+    """Smart-meter MAC metadata is assigned through dataclass attributes."""
+    monkeypatch.setattr(sensor_module, "DeviceInfo", _DataclassDeviceInfo)
+    entity = _bound(
+        JackerySmartMeterSensor,
+        {PAYLOAD_CT_METER: {FIELD_MAC: "AABBCC445566"}},
+    )
+
+    info = entity.device_info
+
+    assert info.connections == {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:44:55:66")}
