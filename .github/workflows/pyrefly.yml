@@ -26,6 +26,8 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
 
       # Install Python dependencies and create environment
       - name: Install dependencies
