@@ -562,3 +562,36 @@ def test_child_pack_mirror_never_reads_device_entry_only_fields(
     assert device_id == "dev_battery_pack_hq2c"
     assert device["name"] == "Zusatzbatterie 1"
     assert device["model"] == "Jackery battery pack"
+
+
+class _DataclassLikeDeviceInfo:
+    """Minimal HA 2026.11-style DeviceInfo exposing as_dict, not Mapping."""
+
+    def __init__(self, **values: Any) -> None:
+        self._values = values
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return only explicitly set device-info fields."""
+        return dict(self._values)
+
+
+def test_device_config_serializes_ha_2026_11_device_info_dataclass() -> None:
+    """MQTT discovery must preserve metadata from HA 2026.11 DeviceInfo objects."""
+    entity = SimpleNamespace(
+        unique_id="dev_cloud_mqtt",
+        device_info=_DataclassLikeDeviceInfo(
+            identifiers={(DOMAIN, "dev")},
+            name="SolarVault",
+            manufacturer="Jackery",
+            model="JKS-2000",
+        ),
+        device_entry=None,
+    )
+
+    device_id, device = _device_config(cast("Any", entity))
+
+    assert device_id == "dev"
+    assert device["identifiers"] == [f"{DOMAIN}:dev"]
+    assert device["name"] == "SolarVault"
+    assert device["manufacturer"] == "Jackery"
+    assert device["model"] == "JKS-2000"

@@ -146,3 +146,54 @@ jobs:
         working-directory: ${{ env.HA_TEST_ROOT }}
         run: |
           python -m pytest -o addopts='' tests
+
+
+  deviceinfo_2026_11:
+    name: HA 2026.11.1 DeviceInfo runtime
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install Home Assistant 2026.11 runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "homeassistant==2026.11.1"
+          python -m pip check
+
+      - name: Exercise DeviceInfo dataclass contract
+        run: |
+          python - <<'PY'
+          from homeassistant.helpers import device_registry as dr
+
+          from custom_components.jackery_solarvault.const import DOMAIN
+          from custom_components.jackery_solarvault.entity import _set_device_info_value
+          from custom_components.jackery_solarvault.client.mqtt_discovery import (
+              _device_info_as_dict,
+          )
+
+          info = dr.DeviceInfo(
+              identifiers={(DOMAIN, "device-1")},
+              manufacturer="Jackery",
+              model="JKS-2000",
+              name="SolarVault",
+          )
+          assert not isinstance(info, dict)
+          _set_device_info_value(info, "via_device_id", "parent-id")
+          _set_device_info_value(
+              info,
+              "connections",
+              {(dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")},
+          )
+          values = _device_info_as_dict(info)
+          assert values["name"] == "SolarVault"
+          assert values["via_device_id"] == "parent-id"
+          assert values["connections"] == {
+              (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:11:22:33")
+          }
+          PY
