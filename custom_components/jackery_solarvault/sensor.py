@@ -261,7 +261,7 @@ from .descriptions import (
     SUBDEVICE_ALARM_SENSOR_DESCRIPTIONS,
     TOU_PLAN_SENSOR_DESCRIPTIONS,
 )
-from .entity import JackeryEntity, payload_properties_for_sources
+from .entity import JackeryEntity, _set_device_info_value, payload_properties_for_sources
 from .guards import guard_total_increasing_jitter, period_data_offset
 from .util import (
     app_energy_unit_scale,
@@ -5286,7 +5286,7 @@ class JackerySmartMeterSensor(JackeryEntity, RestoreSensor):
         self._apply_via_device(info)
         explicit_mac = ct.get(FIELD_MAC)
         if mac := (normalize_mac_address(explicit_mac) or normalize_mac_address(sn)):
-            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+            _set_device_info_value(info, "connections", {(dr.CONNECTION_NETWORK_MAC, mac)})
         return info
 
     @property
