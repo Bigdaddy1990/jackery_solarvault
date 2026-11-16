@@ -52,7 +52,7 @@ class _EntityDeviceLike(Protocol):
     """
 
     @property
-    def device_info(self) -> object | None: ...
+    def device_info(self) -> object | None: ...  # pragma: no branch
 
     @property
     def native_value(self) -> StateType | date | datetime | Decimal: ...
