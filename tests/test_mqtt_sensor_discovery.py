@@ -595,3 +595,18 @@ def test_device_config_serializes_ha_2026_11_device_info_dataclass() -> None:
     assert device["name"] == "SolarVault"
     assert device["manufacturer"] == "Jackery"
     assert device["model"] == "JKS-2000"
+
+
+def test_device_config_falls_back_when_device_info_is_none() -> None:
+    """MQTT discovery retains stable identifiers without device metadata."""
+    entity = SimpleNamespace(
+        unique_id="dev_cloud_mqtt",
+        device_info=None,
+        device_entry=None,
+    )
+
+    device_id, device = _device_config(cast("Any", entity))
+
+    assert device_id == "dev"
+    assert device["identifiers"] == [f"{DOMAIN}:dev"]
+    assert device["name"] == "Jackery dev"
