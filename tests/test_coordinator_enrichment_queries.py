@@ -8,7 +8,7 @@ which queries are skipped by throttle/conditions) — never call order.
 """  # ruff: ignore[line-too-long]  # isort: skip
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -26,6 +26,14 @@ from tests._update_cycle_fixture import (  # ruff: ignore[banned-api]  # isort: 
     make_update_cycle_api,
     setup_update_cycle_coordinator,
 )
+
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from custom_components.jackery_solarvault.coordinator import (
+        JackerySolarVaultCoordinator,
+    )
 
 
 async def _teardown(hass, entry_id) -> None:  # ruff: ignore[missing-type-function-argument]  # isort: skip
@@ -110,7 +118,9 @@ def _device_payload(  # ruff: ignore[too-many-arguments]  # isort: skip
 
 
 @pytest.fixture()
-async def coordinator(hass):  # ruff: ignore[missing-type-function-argument, missing-return-type-undocumented-public-function]  # isort: skip
+async def coordinator(
+    hass,  # ruff: ignore[missing-type-function-argument]  # isort: skip
+) -> AsyncGenerator[JackerySolarVaultCoordinator]:
     """Yield a coordinator with mocked api for enrichment query tests."""
     api = make_update_cycle_api()
     coord, entry, _api = await setup_update_cycle_coordinator(
