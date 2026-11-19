@@ -1,5 +1,6 @@
 """Cloud MQTT publish failures must not cause duplicate device commands."""
 
+import asyncio
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,11 +27,17 @@ if TYPE_CHECKING:
         [OSError("connection reset by peer"), True],
         [TimeoutError("publish operation timed out"), False],
         [MqttError("Operation timed out"), False],
+        [RuntimeError("message ID already pending"), True],
     ],
-    ids=["connection-reset", "socket-timeout", "aiomqtt-callback-timeout"],
+    ids=[
+        "connection-reset",
+        "socket-timeout",
+        "aiomqtt-callback-timeout",
+        "message-id-race",
+    ],
 )
 async def test_publish_failure_preserves_transport_when_result_is_uncertain(
-    hass: HomeAssistant, error: OSError | MqttError, transport_lost: bool
+    hass: HomeAssistant, error: OSError | MqttError | RuntimeError, transport_lost: bool
 ) -> None:
     """A publish timeout does not prove that the live receive session was lost."""
     client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
@@ -56,11 +63,15 @@ async def test_publish_failure_preserves_transport_when_result_is_uncertain(
 
 @pytest.mark.parametrize(
     "error",
-    [OSError("connection reset by peer"), MqttError("Operation timed out")],
-    ids=["broken-socket", "uncertain-callback"],
+    [
+        OSError("connection reset by peer"),
+        MqttError("Operation timed out"),
+        RuntimeError("message ID already pending"),
+    ],
+    ids=["broken-socket", "uncertain-callback", "message-id-race"],
 )
 async def test_unknown_cloud_publish_outcome_does_not_retry_device_command(
-    hass: HomeAssistant, error: OSError | MqttError
+    hass: HomeAssistant, error: OSError | MqttError | RuntimeError
 ) -> None:
     """A timed-out QoS-0 publish may have reached the broker: never resend it."""
     mqtt = JackeryMqttPushClient(hass, message_callback=AsyncMock())
@@ -105,3 +116,26 @@ async def test_session_change_after_publish_does_not_report_success(
 
     broker.publish.assert_awaited_once()
     assert client.diagnostics["last_published_topic"] is None
+
+
+async def test_broken_socket_retires_owned_mqtt_runner(
+    hass: HomeAssistant,
+) -> None:
+    """An actual socket failure releases its owned runner for reconnect."""
+    client = JackeryMqttPushClient(hass, message_callback=AsyncMock())
+    runner = asyncio.create_task(asyncio.Event().wait())
+    broker = MagicMock()
+    broker.publish = AsyncMock(side_effect=ConnectionResetError("socket reset"))
+    client._runner_task = runner  # ruff: ignore[private-member-access]
+    client._client = broker  # ruff: ignore[private-member-access]
+    client._connected = True  # ruff: ignore[private-member-access]
+    client._connected_event.set()  # ruff: ignore[private-member-access]
+    try:
+        with pytest.raises(MqttPublishOutcomeUnknownError):
+            await client.async_publish_json("test/command", {"cmd": 110})
+        await asyncio.sleep(0)
+        assert runner.cancelled()
+    finally:
+        if not runner.done():
+            runner.cancel()
+        await asyncio.gather(runner, return_exceptions=True)
