@@ -390,7 +390,7 @@ class JackeryMqttPushClient:
             await client.publish(topic, text, qos=publish_qos, retain=publish_retain)
         except asyncio.CancelledError:
             raise
-        except (MqttError, OSError) as err:
+        except (MqttError, OSError, RuntimeError) as err:
             # aiomqtt can time out waiting for an on_publish callback even
             # when the broker already accepted a QoS-0 command.
             publish_timed_out = isinstance(err, TimeoutError) or (
@@ -410,6 +410,11 @@ class JackeryMqttPushClient:
                     self._fail_pending_responses(
                         "MQTT publish disconnected the session"
                     )
+                    if (
+                        owner_task is not None
+                        and owner_task is not asyncio.current_task()
+                    ):
+                        owner_task.cancel()
             msg = f"MQTT publish failed: {detail}"
             raise MqttPublishOutcomeUnknownError(msg) from err
         if not self._session_is_current(generation, owner_task):
