@@ -400,7 +400,7 @@ class JackeryMqttPushClient:
                     or str(err) == "Operation timed out"
                 )
             )
-            detail = redacted_error(err)
+            detail = str(err)
             if self._session_is_current(generation, owner_task):
                 self._last_error = f"publish failed: {detail}"
                 if not publish_timed_out:
