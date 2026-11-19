@@ -132,6 +132,10 @@ class JackeryMqttTransportError(RuntimeError):
     """An RPC was interrupted because its MQTT session ended."""
 
 
+class MqttPublishOutcomeUnknownError(RuntimeError):
+    """A publish was attempted but broker delivery was not confirmed."""
+
+
 class JackeryMqttPushClient:
     """Async-native MQTT client for Jackery cloud topics in PROTOCOL.md §3.
 
@@ -350,7 +354,7 @@ class JackeryMqttPushClient:
     ) -> None:
         """Publish a mapping as compact UTF-8 JSON to the given MQTT topic.
 
-        If not already connected, waits up to 12 seconds for the client to become
+        If not already connected, waits up to 30 seconds for the client to become
         connected.
         Serializes `payload` using compact JSON (no unnecessary whitespace, UTF-8) and
         publishes it
@@ -386,17 +390,36 @@ class JackeryMqttPushClient:
             await client.publish(topic, text, qos=publish_qos, retain=publish_retain)
         except asyncio.CancelledError:
             raise
-        except MqttError as err:
+        except (MqttError, OSError, RuntimeError) as err:
+            # aiomqtt can time out waiting for an on_publish callback even
+            # when the broker already accepted a QoS-0 command.
+            publish_timed_out = isinstance(err, TimeoutError) or (
+                isinstance(err, MqttError)
+                and (
+                    isinstance(err.__context__, TimeoutError)
+                    or str(err) == "Operation timed out"
+                )
+            )
+            detail = str(err)
             if self._session_is_current(generation, owner_task):
-                self._connected = False
-                self._connected_event.clear()
-                self._last_error = f"publish failed: {err}"
-                self._session_state = MqttSessionState.RECONNECTING
-                self._fail_pending_responses("MQTT publish disconnected the session")
-            msg = f"MQTT publish failed: {err}"
-            raise RuntimeError(msg) from err
+                self._last_error = f"publish failed: {detail}"
+                if not publish_timed_out:
+                    self._connected = False
+                    self._connected_event.clear()
+                    self._session_state = MqttSessionState.RECONNECTING
+                    self._fail_pending_responses(
+                        "MQTT publish disconnected the session"
+                    )
+                    if (
+                        owner_task is not None
+                        and owner_task is not asyncio.current_task()
+                    ):
+                        owner_task.cancel()
+            msg = f"MQTT publish failed: {detail}"
+            raise MqttPublishOutcomeUnknownError(msg) from err
         if not self._session_is_current(generation, owner_task):
-            return
+            msg = "MQTT session changed while publish was in flight"
+            raise MqttPublishOutcomeUnknownError(msg)
         self._last_published_topic = topic
         self._last_publish_at = self._utc_now_iso()
 

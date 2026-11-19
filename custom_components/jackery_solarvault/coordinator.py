@@ -83,7 +83,7 @@ from .client.discovery_store import (
     async_save_discovery_cache,
 )
 from .client.local_mqtt import JackeryLocalMqttClient
-from .client.mqtt_push import JackeryMqttPushClient
+from .client.mqtt_push import JackeryMqttPushClient, MqttPublishOutcomeUnknownError
 from .client.mqtt_session_store import async_save_mqtt_session
 from .client.third_party_mqtt_codec import (
     decode_third_party_mqtt_config_body,
@@ -12084,6 +12084,19 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]  # 
                     command_cmd,
                 )
                 break
+            except MqttPublishOutcomeUnknownError as err:
+                mqtt = self._mqtt
+                mqtt_last_error = mqtt.diagnostics.get("last_error") if mqtt else None
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="mqtt_command_failed",
+                    translation_placeholders={
+                        "error": str(err),
+                        "mqtt_last_error": (
+                            str(mqtt_last_error) if mqtt_last_error else "n/a"
+                        ),
+                    },
+                ) from err
             except RuntimeError as err:
                 last_err = err
                 if attempt == 0:
