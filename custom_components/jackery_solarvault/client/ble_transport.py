@@ -33,8 +33,6 @@ Crypto assumptions follow implementation notes §14 and the reverse-engineered
 — that is why diagnostics retain the last raw frame behind redaction.
 """
 
-from __future__ import annotations
-
 import asyncio
 import base64
 import binascii
@@ -125,7 +123,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except UnicodeDecodeError, json.JSONDecodeError:
         return False
 
 
@@ -1787,7 +1785,7 @@ class JackeryBleListener:  # ruff: ignore[too-many-public-methods]
             return False
         try:
             request_body = json.loads(frame.body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             return False
         if (
             not isinstance(request_body, dict)  # ruff: ignore[too-many-boolean-expressions]
@@ -1934,7 +1932,7 @@ class JackeryBleListener:  # ruff: ignore[too-many-public-methods]
             return False
         try:
             request_body = json.loads(frame.body.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             return False
         if (
             not isinstance(request_body, dict)
@@ -3582,7 +3580,7 @@ class JackeryBleListener:  # ruff: ignore[too-many-public-methods]
             try:
                 decoded = base64.b64decode(raw, validate=False)
                 status, frame = ble.decode_binary_notify(decoded, key)
-            except (ValueError, binascii.Error):
+            except ValueError, binascii.Error:
                 return None, str(first_error), None
         if status:
             return frame, f"notification status {status}", status

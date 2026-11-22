@@ -1,7 +1,5 @@
 """Select Home and Portable weather events without losing alert identity."""
 
-from __future__ import annotations
-
 import copy
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any

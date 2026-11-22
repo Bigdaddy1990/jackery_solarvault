@@ -1,7 +1,5 @@
 """Track the Box BLE firmware exchange within one session generation."""
 
-from __future__ import annotations
-
 from typing import Any, Literal
 
 from ..const import (

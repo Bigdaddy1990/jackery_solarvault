@@ -1045,7 +1045,7 @@ class JackeryStatisticsEngineMixin:
                 for day_key, day_state in days.items():
                     try:
                         target_day = date.fromisoformat(day_key)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         continue
                     if target_day > today or not isinstance(day_state, dict):
                         continue

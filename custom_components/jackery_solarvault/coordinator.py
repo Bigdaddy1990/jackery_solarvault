@@ -924,7 +924,7 @@ def _portable_ups_key_fingerprint(raw: object) -> str | None:
         return None
     try:
         key = base64.b64decode(raw, validate=True)
-    except (ValueError, binascii.Error):
+    except ValueError, binascii.Error:
         return None
     if len(key) not in BLE_AES_KEY_LENGTHS:
         return None
@@ -1767,7 +1767,7 @@ def _raw_row_fingerprint(value: object) -> str | None:
     """Index JSON rows without changing their type-sensitive equality."""
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"))
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
 
 
@@ -2995,7 +2995,7 @@ def _expected_battery_pack_count(
         return 0
     try:
         return max(0, int(float(raw_expected)))
-    except (ValueError, OverflowError):
+    except ValueError, OverflowError:
         if rejection_callback is not None:
             rejection_callback("battery_pack_bat_num_value_error")
         return 0
@@ -3329,7 +3329,7 @@ def mqtt_payload_observed_at(
         return None
     try:
         observed_at = parse_utc_datetime(raw_timestamp)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         if skew_callback is not None:
             skew_callback("unparsable_timestamp")
         return None
@@ -7601,7 +7601,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
             try:
                 result = await self._async_http_call(call)
                 results[key] = result
-            except (JackeryAuthError, asyncio.CancelledError):
+            except JackeryAuthError, asyncio.CancelledError:
                 raise
             except Exception as err:  # ruff: ignore[blind-except]  # isolate transport/payload errors
                 results[key] = err
@@ -8291,7 +8291,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
         if isinstance(body, (bytes, str)):
             try:
                 decoded = json.loads(body)
-            except (ValueError, RecursionError):
+            except ValueError, RecursionError:
                 decoded = None
             if flags in _PORTABLE_UPS_FIELDS or (
                 self.device_family(device_id) == "portable"
@@ -8557,7 +8557,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
             # JSON-Validierung
             try:
                 json.dumps(body)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.exception(
                     "Invalid JSON in BLE command body for device %s", device_id
                 )
@@ -10593,7 +10593,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
             return False
         try:
             decoded = json.loads(raw.decode())
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             payload = None
         else:
             payload = decoded if isinstance(decoded, dict) else None
@@ -10901,7 +10901,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
         else:
             try:
                 decoded = base64.b64decode(encoded, validate=True)
-            except (binascii.Error, ValueError):
+            except binascii.Error, ValueError:
                 pass
             else:
                 if decoded != raw_bytes:
@@ -11139,7 +11139,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
             return None
         try:
             key = base64.b64decode(str(raw))
-        except (ValueError, binascii.Error):
+        except ValueError, binascii.Error:
             _LOGGER.debug("Jackery: bluetoothKey for %s is not valid base64", device_id)
             return None
         if len(key) not in BLE_AES_KEY_LENGTHS:
@@ -13602,7 +13602,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
                 prior_time = datetime.fromisoformat(previous_observed)
                 if prior_time.tzinfo is not None and observed < prior_time:
                     return
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return
         received = time.monotonic()
         # The separate group receipt is bounded per device/source, retains the
@@ -13662,7 +13662,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
                 try:
                     old_tier = _LIVE_SOURCE_TIER[TransportSource(old_source)]
                     incoming_tier = _LIVE_SOURCE_TIER[context.source_transport]
-                except (KeyError, ValueError):
+                except KeyError, ValueError:
                     return
                 if (
                     incoming_tier < old_tier
@@ -13747,7 +13747,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
             try:
                 transport = TransportSource(source_name)
                 tier = _LIVE_SOURCE_TIER[transport]
-            except (KeyError, ValueError):
+            except KeyError, ValueError:
                 continue
             candidates.append((tier, received, transport, receipt))
         if not candidates:
@@ -16948,7 +16948,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
         if code_match is not None:
             try:
                 code = int(code_match.group(1))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 code = None
 
         # Handle DNS resolution failures — they don't have a cloud error code
@@ -19420,7 +19420,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
         """Store one device endpoint result without cancelling peers."""
         try:
             values[device_id, endpoint] = await request
-        except (JackeryAuthError, asyncio.CancelledError):
+        except JackeryAuthError, asyncio.CancelledError:
             raise
         except Exception as err:  # ruff: ignore[blind-except]  # endpoint isolation
             values[device_id, endpoint] = err
@@ -22354,7 +22354,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
                         continue
                     try:
                         normalized_values[metric] = int(value)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         continue
                 normalized_device_id = str(device_id)
                 reconciled_snapshot = merge_daily_counter_snapshots(
@@ -22641,7 +22641,7 @@ class JackerySolarVaultCoordinator(  # ruff: ignore[too-many-public-methods]
                 else JACKERY_LIVE_ENERGY_UNITS_PER_KWH
             )
             return round(float(value) / divisor, 5)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     @callback

@@ -151,7 +151,7 @@ class JackeryMqttUpdatePublisher:
         if not isinstance(payload, dict):
             try:
                 payload = json.loads(payload)
-            except (ValueError, TypeError, AttributeError):
+            except ValueError, TypeError, AttributeError:
                 return
         if not isinstance(payload, dict):
             return

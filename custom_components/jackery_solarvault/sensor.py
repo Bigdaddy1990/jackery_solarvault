@@ -717,7 +717,7 @@ async def _async_restored_lifetime_energy_value(  # ruff: ignore[too-many-return
         return None
     try:
         value = float(native_value)
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
     if not isfinite(value) or value < 0:
         return None
@@ -788,7 +788,7 @@ async def _async_recorded_pack_temperature(
                 continue
             try:
                 value = float(state.state)
-            except (ValueError, TypeError, OverflowError):
+            except ValueError, TypeError, OverflowError:
                 continue
             if not isfinite(value):
                 continue
@@ -831,7 +831,7 @@ async def _async_restored_pack_measurement_value(
     ):
         try:
             value = float(stored.native_value)
-        except (TypeError, ValueError, OverflowError):
+        except TypeError, ValueError, OverflowError:
             pass
         else:
             if isfinite(value):
@@ -3450,7 +3450,7 @@ def _period_source_signature(source: dict[str, Any]) -> str | None:
     try:
         signature = json.dumps(source, sort_keys=True, separators=(",", ":"))
         return signature if json.loads(signature) == source else None
-    except (TypeError, ValueError, RecursionError):
+    except TypeError, ValueError, RecursionError:
         return None
 
 
@@ -5909,7 +5909,7 @@ class JackeryStatSensor(JackeryEntity, RestoreSensor):
         self._cache_initializing = True
         try:
             await super().async_added_to_hass()
-        except (Exception, asyncio.CancelledError):
+        except Exception, asyncio.CancelledError:
             batch.discard(self)
             raise
         finally:
@@ -7767,7 +7767,7 @@ class JackeryBatteryPackSensor(JackeryEntity, RestoreSensor):
         )
         try:
             await super().async_added_to_hass()
-        except (Exception, asyncio.CancelledError):
+        except Exception, asyncio.CancelledError:
             self._cache_refresh_active = False
             raise
         if not self._cache_refresh_active or restore_identity != (
@@ -9127,7 +9127,7 @@ class JackeryCloudMqttSensor(JackeryEntity, SensorEntity):
         self._cache_refresh_active = True
         try:
             await super().async_added_to_hass()
-        except (Exception, asyncio.CancelledError):
+        except Exception, asyncio.CancelledError:
             self._cache_refresh_active = False
             raise
 
@@ -9201,7 +9201,7 @@ class JackeryLocalMqttSensor(JackeryEntity, SensorEntity):
         self._cache_refresh_active = True
         try:
             await super().async_added_to_hass()
-        except (Exception, asyncio.CancelledError):
+        except Exception, asyncio.CancelledError:
             self._cache_refresh_active = False
             raise
 
@@ -9804,7 +9804,7 @@ class JackeryTimestampSensor(JackeryEntity, SensorEntity):
             return None
         try:
             return datetime.fromtimestamp(int(ts_ms) / 1000, tz=UTC)
-        except (TypeError, ValueError, OSError):
+        except TypeError, ValueError, OSError:
             return None
 
 

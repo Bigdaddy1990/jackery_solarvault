@@ -144,7 +144,7 @@ def _period_energy_number(value: object) -> float | None:
         value = value.replace(",", ".")
     try:
         number = float(value)
-    except (ValueError, OverflowError):
+    except ValueError, OverflowError:
         return None
     return number if math.isfinite(number) else None
 

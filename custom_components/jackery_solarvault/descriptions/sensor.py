@@ -449,7 +449,7 @@ def first_nonblank_int(v: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     return None
 
@@ -861,7 +861,7 @@ def _device_meta_timestamp(entity: JackeryEntity, key: str) -> datetime | None:
         return None
     try:
         return datetime.fromtimestamp(millis / 1000, UTC)
-    except (OverflowError, ValueError, OSError):
+    except OverflowError, ValueError, OSError:
         return None
 
 
@@ -946,7 +946,7 @@ def _main_battery_observed_energy(  # ruff: ignore[too-many-locals]
         if start.utcoffset() is None or end.utcoffset() is None:
             return None
         duration = end.timestamp() - start.timestamp()
-    except (KeyError, TypeError, ValueError, OverflowError, OSError):
+    except KeyError, TypeError, ValueError, OverflowError, OSError:
         return None
     if duration <= 0 or seconds > duration + 0.001:
         return None

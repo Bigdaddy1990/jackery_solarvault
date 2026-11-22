@@ -2099,7 +2099,7 @@ class JackeryBleEventAdapterMixin:
         previous = state.get(device_id)
         try:
             body = json.loads(frame.body)
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError, json.JSONDecodeError:
             state.pop(device_id, None)
             return
         if not isinstance(body, dict) or "grdAccSn" not in body:

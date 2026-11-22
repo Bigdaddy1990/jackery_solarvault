@@ -708,7 +708,7 @@ def observed_period_energy_total(  # ruff: ignore[complex-structure, too-many-br
             valid_counter = (
                 first.tzinfo is not None and last.tzinfo is not None and first <= last
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             valid_counter = False
         if valid_counter and begin <= first.date() <= last.date() < stop:
             candidates.append((
@@ -1235,7 +1235,7 @@ def config_entry_int_option(entry: object, key: str, default: int) -> int:
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -2322,7 +2322,7 @@ def safe_float(
         parsed = float(
             cast("SupportsFloat | SupportsIndex | str | bytes | bytearray", value)
         )
-    except (TypeError, ValueError, OverflowError):
+    except TypeError, ValueError, OverflowError:
         return None
     return parsed if math.isfinite(parsed) else None
 

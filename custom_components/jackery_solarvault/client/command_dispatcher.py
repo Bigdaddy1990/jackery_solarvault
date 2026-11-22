@@ -963,7 +963,7 @@ def subdevice_dev_type(
     if not _is_blank_value(raw_device_type):
         try:
             return int(str(raw_device_type))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             _LOGGER.debug(
                 "Jackery: %s=%r is not numeric; falling back to scan-name resolution",
                 FIELD_DEVICE_TYPE,
@@ -6329,7 +6329,7 @@ class JackeryCommandDispatcherMixin:  # ruff: ignore[too-many-public-methods]
                 continue
             try:
                 decoded = base64.b64decode(value, validate=True)
-            except (binascii.Error, ValueError):
+            except binascii.Error, ValueError:
                 continue
             if decoded and len(decoded) % 16 == 0:
                 return True
