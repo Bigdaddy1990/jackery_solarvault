@@ -23,6 +23,7 @@ from ..const import (
     ACTION_ID_PORTABLE_DC_USB_COUNTDOWN,
     ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC,
+    ACTION_ID_PORTABLE_RESERVE_THRESHOLD,
     ACTION_ID_PORTABLE_SET_CHARGE_POWER,
     DEFAULT_NULL_SEMANTICS,
     FIELD_CURRENCY,
@@ -38,10 +39,12 @@ from ..const import (
     FIELD_SOC_CHG_LIMIT,
     FIELD_SOC_DISCHARGE_LIMIT,
     FIELD_SOC_DISCHG_LIMIT,
+    FIELD_SRL,
     FIELD_THIRD_PARTY_MQTT_PORT,
     PAYLOAD_PRICE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+    PORTABLE_RESERVE_ALLOWED_VALUES,
 )
 from ..entity import (
     HTTP_COMMAND_SOURCES,
@@ -49,11 +52,23 @@ from ..entity import (
     LAYER5_COMMAND_SOURCES,
     LAYER5_DATA_SOURCES,
     payload_properties_for_sources,
+    property_data_sources,
 )
-from ..util import safe_int
+from ..util import safe_float, safe_int
+
+
+def _first_float(*values: object) -> float | None:
+    """Return the first non-None float from candidates, preserving 0.0."""
+    for v in values:
+        if (f := safe_float(v)) is not None:
+            return f
+    return None
+
 
 _LOW_FEED_GRID_LIMIT_W = 800
 _HIGH_FEED_GRID_LIMIT_W = 2500
+_PORTABLE_RESERVE_REPORTED_MAX = 100
+_PORTABLE_PERCENT_MAX = 100
 
 
 def _default_number_value(entity: JackeryNumberEntity) -> float | None:
@@ -66,9 +81,33 @@ def _default_number_value(entity: JackeryNumberEntity) -> float | None:
     return description.none_fallback
 
 
+def _portable_custom_limit(entity: JackeryNumberEntity, field: str) -> float | None:
+    value = safe_int(entity.section.get(field))
+    if value is None or not 0 <= value <= _PORTABLE_PERCENT_MAX:
+        return None
+    return float(value)
+
+
+def _portable_priority_soc(entity: JackeryNumberEntity, field: str) -> float | None:
+    value = safe_int(entity.section.get(field))
+    if value is None or not 1 <= value <= _PORTABLE_PERCENT_MAX:
+        return None
+    return float(value)
+
+
 @dataclass(frozen=True, kw_only=True)
 class JackeryNumberDescription(NumberEntityDescription):
     """Describes a Jackery number entity."""
+
+    # Explicit types for inherited FrozenOrThawed-generated constructor fields.
+    key: str
+    translation_key: str | None = None
+    entity_category: EntityCategory | None = None
+    native_unit_of_measurement: str | None = None
+    mode: NumberMode | None = None
+    native_min_value: float | None = None
+    native_max_value: float | None = None
+    native_step: float | None = None
 
     value_fn: Callable[[JackeryNumberEntity], float | None] = _default_number_value
     source_keys: tuple[str, ...] = ()
@@ -127,30 +166,9 @@ def first_nonblank_int(value: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except (TypeError, ValueError):  # fmt: skip
+        except TypeError, ValueError:
             return None
     return None
-
-
-def property_data_sources(*fields: str, layer5_proven: bool = False) -> tuple[str, ...]:
-    """Build property-source descriptors for the supplied fields."""
-    sources = []
-    for field in fields:
-        if layer5_proven:
-            sources.append(f"layer5:{field}")
-        else:
-            sources.append(f"http:{field}")
-    return tuple(sources)
-
-
-def safe_float(v: object) -> float | None:
-    """Convert one value to float, returning None when conversion fails."""
-    if v is None:
-        return None
-    try:
-        return float(v) if isinstance(v, (bool, int, float, str)) else None
-    except (TypeError, ValueError):  # fmt: skip
-        return None
 
 
 # ---------------------------------------------------------------------------
@@ -299,11 +317,19 @@ async def _async_portable_set_number(
     value: float,
 ) -> None:
     """Push an integer field write to a portable Explorer device."""
+    parsed = (
+        safe_int(value)
+        if action_id == ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC
+        else int(value)
+    )
+    if parsed is None:
+        msg = "Invalid Portable priority SOC value"
+        raise HomeAssistantError(msg)
     await coord.async_portable_set_number(
         dev_id,
         action_id=action_id,
         field=field,
-        value=int(value),
+        value=parsed,
     )
 
 
@@ -322,6 +348,30 @@ async def _set_portable_charge_power(
     )
 
 
+async def _set_portable_reserve_threshold(
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: float,
+) -> None:
+    if value not in PORTABLE_RESERVE_ALLOWED_VALUES:
+        msg = "Portable reserve threshold must match the App's 5-percent steps"
+        raise HomeAssistantError(msg)
+    await _async_portable_set_number(
+        coord,
+        dev_id,
+        action_id=ACTION_ID_PORTABLE_RESERVE_THRESHOLD,
+        field=FIELD_SRL,
+        value=value,
+    )
+
+
+def _portable_reserve_threshold_value(entity: JackeryNumberEntity) -> float | None:
+    value = safe_int(entity.section.get(FIELD_SRL))
+    if value is None or value < 0 or value > _PORTABLE_RESERVE_REPORTED_MAX:
+        return None
+    return float(value)
+
+
 async def _set_portable_energy_storage_charge_limit(
     coord: JackerySolarVaultCoordinator,
     dev_id: str,
@@ -334,6 +384,21 @@ async def _set_portable_energy_storage_charge_limit(
         action_id=ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
         field="dt",
         value=value,
+    )
+
+
+async def _set_portable_peak_through_charge_limit(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: float
+) -> None:
+    parsed = safe_int(value)
+    if parsed is None:
+        msg = "Invalid peak-through charge limit"
+        raise HomeAssistantError(msg)
+    await coord.async_portable_set_number(
+        dev_id,
+        action_id=ACTION_ID_PORTABLE_ENERGY_STORAGE_CHARGE_LIMIT,
+        field="bpc",
+        value=parsed,
     )
 
 
@@ -569,11 +634,27 @@ def _single_tariff_dynamic_unit(payload: dict[str, Any]) -> str:
 
 NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
     JackeryNumberDescription(
+        key="portable_reserve_restore_threshold",
+        translation_key="portable_reserve_restore_threshold",
+        native_unit_of_measurement=PERCENTAGE,
+        mode=NumberMode.SLIDER,
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=PORTABLE_RESERVE_ALLOWED_VALUES[0],
+        native_max_value=PORTABLE_RESERVE_ALLOWED_VALUES[-1],
+        native_step=5,
+        source_keys=(FIELD_SRL,),
+        value_fn=_portable_reserve_threshold_value,
+        allowed_values=tuple(float(value) for value in PORTABLE_RESERVE_ALLOWED_VALUES),
+        value_transform=_wire_float,
+        setter=_set_portable_reserve_threshold,
+    ),
+    JackeryNumberDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="soc_charge_limit_set",
         device_registry_role="main_battery",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_charge_limit_set",
+        app_fields=(FIELD_SOC_CHG_LIMIT, FIELD_SOC_CHARGE_LIMIT),
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
         # pyrefly: ignore [unexpected-keyword]
@@ -586,12 +667,9 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(
-            lambda e: (
-                section := e.section,
-                safe_float(section.get(FIELD_SOC_CHG_LIMIT))
-                or safe_float(section.get(FIELD_SOC_CHARGE_LIMIT)),
-            )[1]
+        value_fn=lambda e: _first_float(
+            e.section.get(FIELD_SOC_CHG_LIMIT),
+            e.section.get(FIELD_SOC_CHARGE_LIMIT),
         ),
         setter=_set_soc_charge,
     ),
@@ -601,6 +679,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         device_registry_role="main_battery",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="soc_discharge_limit_set",
+        app_fields=(FIELD_SOC_DISCHG_LIMIT, FIELD_SOC_DISCHARGE_LIMIT),
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=PERCENTAGE,
         # pyrefly: ignore [unexpected-keyword]
@@ -613,12 +692,9 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(
-            lambda e: (
-                section := e.section,
-                safe_float(section.get(FIELD_SOC_DISCHG_LIMIT))
-                or safe_float(section.get(FIELD_SOC_DISCHARGE_LIMIT)),
-            )[1]
+        value_fn=lambda e: _first_float(
+            e.section.get(FIELD_SOC_DISCHG_LIMIT),
+            e.section.get(FIELD_SOC_DISCHARGE_LIMIT),
         ),
         setter=_set_soc_discharge,
     ),
@@ -627,6 +703,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         key="max_output_power_set",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="max_output_power_set",
+        app_fields=(FIELD_MAX_OUT_PW,),
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
         # pyrefly: ignore [unexpected-keyword]
@@ -652,6 +729,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         key="max_feed_grid",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="max_feed_grid",
+        app_fields=(FIELD_MAX_FEED_GRID, FIELD_MAX_GRID_STD_PW),
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
         # pyrefly: ignore [unexpected-keyword]
@@ -664,12 +742,9 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_max_value=2500,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1700,
-        value_fn=(
-            lambda e: (
-                section := e.section,
-                safe_float(section.get(FIELD_MAX_FEED_GRID))
-                or safe_float(section.get(FIELD_MAX_GRID_STD_PW)),
-            )[1]
+        value_fn=lambda e: _first_float(
+            e.section.get(FIELD_MAX_FEED_GRID),
+            e.section.get(FIELD_MAX_GRID_STD_PW),
         ),
         setter=_set_max_feed_grid,
         dynamic_max=_max_feed_grid_dynamic_max,
@@ -680,6 +755,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         key="default_power_set",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="default_power_set",
+        app_fields=(FIELD_DEFAULT_PW,),
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
         # pyrefly: ignore [unexpected-keyword]
@@ -694,9 +770,10 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_step=10,
         value_fn=(
             lambda e: (
-                section := e.section,
-                (safe_float(section.get(FIELD_DEFAULT_PW))) or 0.0,
-            )[1]
+                value
+                if (value := safe_float(e.section.get(FIELD_DEFAULT_PW))) is not None
+                else 0.0
+            )
         ),
         setter=_set_default_power,
     ),
@@ -706,6 +783,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         source_section=PAYLOAD_PRICE,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="single_tariff_price_set",
+        app_fields=(FIELD_SINGLE_PRICE,),
         # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
         # pyrefly: ignore [unexpected-keyword]
@@ -733,6 +811,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         key="third_party_mqtt_port",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="third_party_mqtt_port",
+        app_fields=(FIELD_THIRD_PARTY_MQTT_PORT,),
         # pyrefly: ignore [unexpected-keyword]
         mode=NumberMode.BOX,
         # pyrefly: ignore [unexpected-keyword]
@@ -771,6 +850,19 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_step=100,
         value_fn=(lambda e: (section := e.section, safe_float(section.get("csc")))[1]),
         setter=_set_portable_charge_power,
+    ),
+    JackeryNumberDescription(
+        key="portable_peak_through_charge_limit",
+        translation_key="portable_peak_through_charge_limit",
+        native_unit_of_measurement=PERCENTAGE,
+        mode=NumberMode.SLIDER,
+        entity_category=EntityCategory.CONFIG,
+        native_min_value=10,
+        native_max_value=90,
+        native_step=1,
+        value_transform=float,
+        value_fn=lambda entity: safe_float(entity.section.get("bpc")),
+        setter=_set_portable_peak_through_charge_limit,
     ),
     JackeryNumberDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -865,7 +957,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(lambda e: (section := e.section, safe_float(section.get("dl")))[1]),
+        value_fn=lambda e: _portable_custom_limit(e, "dl"),
         setter=_set_portable_custom_use_discharge_limit,
     ),
     JackeryNumberDescription(
@@ -885,7 +977,7 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(lambda e: (section := e.section, safe_float(section.get("cl")))[1]),
+        value_fn=lambda e: _portable_custom_limit(e, "cl"),
         setter=_set_portable_custom_use_charge_limit,
     ),
     JackeryNumberDescription(
@@ -958,14 +1050,13 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         # pyrefly: ignore [unexpected-keyword]
-        native_min_value=0,
+        native_min_value=1,
         # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(
-            lambda e: (section := e.section, safe_float(section.get("oac1PrioSoc")))[1]
-        ),
+        value_transform=float,
+        value_fn=lambda e: _portable_priority_soc(e, "oac1PrioSoc"),
         setter=_set_portable_ac1_priority_soc,
     ),
     JackeryNumberDescription(
@@ -980,14 +1071,13 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         # pyrefly: ignore [unexpected-keyword]
-        native_min_value=0,
+        native_min_value=1,
         # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(
-            lambda e: (section := e.section, safe_float(section.get("oac2PrioSoc")))[1]
-        ),
+        value_transform=float,
+        value_fn=lambda e: _portable_priority_soc(e, "oac2PrioSoc"),
         setter=_set_portable_ac2_priority_soc,
     ),
     JackeryNumberDescription(
@@ -1002,14 +1092,13 @@ NUMBER_DESCRIPTIONS: tuple[JackeryNumberDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         # pyrefly: ignore [unexpected-keyword]
-        native_min_value=0,
+        native_min_value=1,
         # pyrefly: ignore [unexpected-keyword]
         native_max_value=100,
         # pyrefly: ignore [unexpected-keyword]
         native_step=1,
-        value_fn=(
-            lambda e: (section := e.section, safe_float(section.get("odcPrioSoc")))[1]
-        ),
+        value_transform=float,
+        value_fn=lambda e: _portable_priority_soc(e, "odcPrioSoc"),
         setter=_set_portable_dc_priority_soc,
     ),
     JackeryNumberDescription(

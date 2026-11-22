@@ -1102,6 +1102,9 @@
     "check_app_version": {
       "service": "mdi:cellphone-arrow-down"
     },
+    "check_ble_ota_versions": {
+      "service": "mdi:bluetooth"
+    },
     "check_jackery_accessories_exist": {
       "service": "mdi:magnify"
     },
@@ -1120,11 +1123,17 @@
     "get_alarm_detail": {
       "service": "mdi:alert-circle-outline"
     },
+    "get_battery_passport": {
+      "service": "mdi:book-open-variant"
+    },
     "get_device_currency": {
       "service": "mdi:currency-sign"
     },
     "get_dynamic_price_login_url": {
       "service": "mdi:login-variant"
+    },
+    "get_fault_log": {
+      "service": "mdi:alert-circle-outline"
     },
     "get_product_instruction": {
       "service": "mdi:book-open-variant"
@@ -1237,9 +1246,6 @@
     "report_device_timezone": {
       "service": "mdi:map-clock"
     },
-    "save_device_max_power": {
-      "service": "mdi:flash"
-    },
     "save_dynamic_price_contract_auth": {
       "service": "mdi:file-check"
     },
@@ -1275,6 +1281,9 @@
     },
     "set_third_party_mqtt_config": {
       "service": "mdi:message-cog"
+    },
+    "start_ble_ota_update": {
+      "service": "mdi:update"
     },
     "submit_feedback": {
       "service": "mdi:message-text"

@@ -1,12 +1,20 @@
 """Shared entity base class."""
 
+from collections.abc import Mapping
+from copy import deepcopy
 import logging
-from typing import Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
-from homeassistant.helpers.device_registry import ChildDeviceInfo, DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
+
+try:
+    from homeassistant.helpers.device_registry import ChildDeviceInfo
+except ImportError:
+    if not TYPE_CHECKING:
+        ChildDeviceInfo = DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
@@ -47,6 +55,7 @@ from .const import (
     PAYLOAD_WEATHER_PLAN,
 )
 from .coordinator import JackerySolarVaultCoordinator
+from .ingest import is_blank
 from .util import (
     first_nonblank_text,
     jackery_online_state,
@@ -58,23 +67,11 @@ from .util import (
     subdevice_branding,
 )
 
-
-def _set_device_info_value(info: object, field: str, value: object) -> None:
-    """Set one DeviceInfo field across the pre-2026.11 dict and dataclass APIs."""
-    if isinstance(info, dict):
-        cast("dict[str, object]", info)[field] = value
-        return
-    setattr(info, field, value)
-
-
 _LOGGER = logging.getLogger(__name__)
 
 HTTP_DATA_SOURCES = ("http",)
 LAYER5_DATA_SOURCES = ("cloud_mqtt", "local_mqtt", "ble")
 ALL_LIVE_DATA_SOURCES = (*HTTP_DATA_SOURCES, *LAYER5_DATA_SOURCES)
-# The App has no Local-MQTT command publisher. Direct device commands are
-# BLE-first with cloud MQTT fallback; explicit REST setters declare HTTP
-# separately.
 LAYER5_COMMAND_SOURCES = ("ble", "cloud_mqtt")
 HTTP_COMMAND_SOURCES = ("http",)
 HTTP_AND_LAYER5_COMMAND_SOURCES = (*HTTP_COMMAND_SOURCES, *LAYER5_COMMAND_SOURCES)
@@ -122,7 +119,9 @@ def payload_properties_for_sources(
     resolved = dict(http_props) if isinstance(http_props, dict) else {}
     props = payload.get(PAYLOAD_PROPERTIES) or {}
     if isinstance(props, dict):
-        resolved.update(props)
+        for key, value in props.items():
+            if key not in resolved or not is_blank(value):
+                resolved[key] = value
     return resolved
 
 
@@ -139,6 +138,53 @@ def raise_entity_action_error(
             "error": str(error),
         },
     )
+
+
+def _state_attributes_without_receipt_times(
+    attributes: Mapping[str, Any] | None,
+) -> Mapping[str, Any] | None:
+    """Compare sensor evidence without generating events for receipt clocks alone.
+
+    The original attributes and source receipts remain complete. Only the
+    comparison omits these two bookkeeping fields inside field observations.
+    Alarm times, reset boundaries, values and source selection stay significant.
+    """
+    if not isinstance(attributes, Mapping):
+        return attributes
+    layers = attributes.get("layer_source_fields")
+    if not isinstance(layers, Mapping):
+        return attributes
+    return {
+        **attributes,
+        "layer_source_fields": {
+            source: {
+                **receipt,
+                "field_observations": [
+                    {
+                        key: value
+                        for key, value in observation.items()
+                        if key not in {"observed_at", "received_at_monotonic"}
+                    }
+                    if isinstance(observation, Mapping)
+                    else observation
+                    for observation in receipt.get("field_observations", [])
+                ],
+            }
+            if isinstance(receipt, Mapping)
+            else receipt
+            for source, receipt in layers.items()
+        },
+    }
+
+
+def _set_device_info_field(
+    info: DeviceInfo | dict[str, object], key: str, value: object
+) -> None:
+    """Set a DeviceInfo field on HA dataclasses or legacy typed dictionaries."""
+    if isinstance(info, dict):
+        info[key] = value
+    else:
+        setattr(info, key, value)
 
 
 class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
@@ -183,12 +229,49 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         config_entry = getattr(self.coordinator, "config_entry", None)
         if hass is None or config_entry is None:
             return
-        parent = dr.async_get(hass).async_get_device_by_identifier(
-            (DOMAIN, self._device_id),
-            config_entry.entry_id,
+        registry = dr.async_get(hass)
+        parent = (
+            registry.async_get_device_by_identifier(
+                (DOMAIN, self._device_id),
+                config_entry.entry_id,
+            )
+            if hasattr(registry, "async_get_device_by_identifier")
+            else registry.async_get_device(identifiers={(DOMAIN, self._device_id)})
         )
         if parent is not None:
-            _set_device_info_value(info, "via_device_id", parent.id)
+            _set_device_info_field(info, "via_device_id", parent.id)
+
+    def _pack_child_device_info(
+        self, *, name: str | None = None
+    ) -> ChildDeviceInfo | None:
+        """Use one parent-bound child identity for every battery-pack entity.
+
+        HA 2026.11 distinguishes ChildDeviceInfo from DeviceInfo. An identifier
+        already owned by a child must not be registered as a full device.
+        Earlier HA versions keep the existing DeviceInfo compatibility path.
+        """
+        if not hasattr(dr, "ChildDeviceInfo"):
+            return None
+        hass = getattr(self.coordinator, "hass", None)
+        entry = getattr(self.coordinator, "config_entry", None)
+        pack_key = getattr(self, "_pack_key", None)
+        if hass is None or entry is None or not isinstance(pack_key, str):
+            return None
+        registry = dr.async_get(hass)
+        parent_identifier = (DOMAIN, self._device_id)
+        parent = (
+            registry.async_get_device_by_identifier(parent_identifier, entry.entry_id)
+            if hasattr(registry, "async_get_device_by_identifier")
+            else registry.async_get_device(identifiers={parent_identifier})
+        )
+        if parent is None or parent.config_entry_id != entry.entry_id:
+            return None
+        identifier = (DOMAIN, f"{self._device_id}_{pack_key}")
+        if name is not None:
+            return ChildDeviceInfo(
+                identifiers={identifier}, name=name, parent_device_id=parent.id
+            )
+        return ChildDeviceInfo(identifiers={identifier}, parent_device_id=parent.id)
 
     @property
     def _payload(self) -> dict[str, Any]:
@@ -207,7 +290,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     @property
     def merged_properties(self) -> dict[str, Any]:
         """The transport-merged device properties."""
-        return self._merged_properties
+        return self._properties
 
     @property
     def http_properties(self) -> dict[str, Any]:
@@ -226,6 +309,55 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
     ) -> dict[str, Any]:
         """Return one payload section resolved for the requested sources."""
         return self._payload_section_for_sources(section, data_sources)
+
+    def layer_source_attributes(
+        self,
+        section: str,
+        *fields: str,
+        identity: str = "",
+        receipts: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Bind one native identity to own-layer candidates and selected fields."""
+        reader = getattr(self.coordinator, "layer_source_payloads", None)
+        if not callable(reader):
+            return {}
+        layers = (
+            receipts
+            if receipts is not None
+            else reader(self._device_id, section, identity, fields=fields)
+        )
+        if not isinstance(layers, dict) or not layers:
+            return {}
+        if section == PAYLOAD_PROPERTIES:
+            provenance = getattr(self.coordinator, "_property_source_state", {}).get(
+                self._device_id, {}
+            )
+        else:
+            selected = getattr(self.coordinator, "_accessory_source_state", {}).get((
+                self._device_id,
+                section,
+                identity,
+            ))
+            provenance = selected.provenance if selected is not None else {}
+        return {
+            "source_unique_id": self.unique_id,
+            "layer_source_fields": {
+                source: {
+                    "values": {field: receipt["values"].get(field) for field in fields},
+                    "field_observations": [
+                        item
+                        for item in receipt["field_observations"]
+                        if item["path"] and item["path"][0] in fields
+                    ],
+                }
+                for source, receipt in layers.items()
+            },
+            "selected_field_sources": {
+                "/".join(path) if isinstance(path, tuple) else path: info.source.value
+                for path, info in provenance.items()
+                if (path[0] if isinstance(path, tuple) else path) in fields
+            },
+        }
 
     @property
     def _properties(self) -> dict[str, Any]:
@@ -390,10 +522,8 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             )
         )
         if parent_mac is not None:
-            _set_device_info_value(
-                info,
-                "connections",
-                {(dr.CONNECTION_NETWORK_MAC, parent_mac)},
+            _set_device_info_field(
+                info, "connections", {(dr.CONNECTION_NETWORK_MAC, parent_mac)}
             )
         return self._group_device_info(str(name)) or info
 
@@ -408,8 +538,15 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             hass = getattr(self.coordinator, "hass", None)
             entry = getattr(self.coordinator, "config_entry", None)
             if hass is not None and entry is not None:
-                parent = dr.async_get(hass).async_get_device_by_identifier(
-                    (DOMAIN, self._device_id), entry.entry_id
+                registry = dr.async_get(hass)
+                parent = (
+                    registry.async_get_device_by_identifier(
+                        (DOMAIN, self._device_id), entry.entry_id
+                    )
+                    if hasattr(registry, "async_get_device_by_identifier")
+                    else registry.async_get_device(
+                        identifiers={(DOMAIN, self._device_id)}
+                    )
                 )
                 if parent is not None:
                     language = getattr(getattr(hass, "config", None), "language", "en")
@@ -439,12 +576,22 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             if hass is not None and entry is not None:
                 registry = dr.async_get(hass)
                 identifier = (DOMAIN, f"{self._device_id}_{role}")
-                existing = registry.async_get_child_device_by_identifier(
-                    identifier, entry.entry_id
+                existing = (
+                    registry.async_get_child_device_by_identifier(
+                        identifier, entry.entry_id
+                    )
+                    if hasattr(registry, "async_get_child_device_by_identifier")
+                    else registry.async_get_device(identifiers={identifier})
                 )
                 if isinstance(self._properties.get(f"pv{channel}"), dict) or existing:
-                    parent = registry.async_get_device_by_identifier(
-                        (DOMAIN, self._device_id), entry.entry_id
+                    parent = (
+                        registry.async_get_device_by_identifier(
+                            (DOMAIN, self._device_id), entry.entry_id
+                        )
+                        if hasattr(registry, "async_get_device_by_identifier")
+                        else registry.async_get_device(
+                            identifiers={(DOMAIN, self._device_id)}
+                        )
                     )
                     if parent is not None:
                         return ChildDeviceInfo(
@@ -539,11 +686,15 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         )
         self._apply_via_device(info)
         if mac := normalize_mac_address(plug.get(FIELD_MAC)):
-            info["connections"] = {(dr.CONNECTION_NETWORK_MAC, mac)}
+            _set_device_info_field(
+                info, "connections", {(dr.CONNECTION_NETWORK_MAC, mac)}
+            )
         return info
 
     def _source_capability_contract(
         self,
+        *,
+        command_fields_only: bool = False,
     ) -> tuple[
         bool,
         tuple[str, ...],
@@ -568,6 +719,17 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         command_sources = tuple(
             getattr(description, "command_sources", self.command_sources) or (),
         )
+        supervisor_only = bool(
+            getattr(
+                description,
+                "availability_uses_supervisor",
+                self.availability_uses_supervisor,
+            )
+        )
+        if command_fields_only and not command_sources and not supervisor_only:
+            # Passive sensors use transport-neutral observations. Availability
+            # needs product support and reachability, with no command-field scan.
+            return supported, data_sources, command_sources, (), supervisor_only
         field_candidates: list[str] = []
         for owner in (description, self):
             if owner is None:
@@ -598,13 +760,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             data_sources,
             command_sources,
             tuple(dict.fromkeys(field_candidates)),
-            bool(
-                getattr(
-                    description,
-                    "availability_uses_supervisor",
-                    self.availability_uses_supervisor,
-                )
-            ),
+            supervisor_only,
         )
 
     def _online_marker_available(self, transport_reachable: bool) -> bool:
@@ -622,7 +778,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
         if self._device_id not in (self.coordinator.data or {}):
             return False
         supported, data_sources, command_sources, fields, supervisor_only = (
-            self._source_capability_contract()
+            self._source_capability_contract(command_fields_only=True)
         )
         if not supported:
             return False
@@ -647,7 +803,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             transport_reachable = self.coordinator.is_device_reachable(
                 self._device_id,
             )
-        if not super().available or not transport_reachable:
+        if not transport_reachable:
             return False
         # A missing value is ``unknown`` (native_value None), not ``unavailable``:
         # unavailable is reserved for an unreachable device or transport.
@@ -674,18 +830,52 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
 
     @callback
     def _write_prepared_state(self) -> None:
-        """Write a state after subclasses have prepared every synchronous value.
-
-        CoordinatorEntity._handle_coordinator_update performs Home Assistant's
-        synchronous state write. Calling the public update hook after an
-        asynchronous/prepared cache would re-enter this class and calculate
-        availability a second time in that measured write path.
-        """
+        """Write changes immediately; receipt clocks alone do not create events."""
+        available = self.available
+        state = self.state if available else None
+        signature = (
+            available,
+            type(state),
+            state,
+            self.capability_attributes,
+            self.state_attributes,
+            self.unit_of_measurement,
+            self.name,
+            self.icon,
+            self.entity_picture,
+            self.assumed_state,
+            self.device_class,
+            self.supported_features,
+            self.attribution,
+            _state_attributes_without_receipt_times(self.extra_state_attributes),
+        )
+        current = self.hass.states.get(self.entity_id)
+        if (
+            not self.force_update
+            and current is not None
+            and current is getattr(self, "_prepared_write_state", None)
+            and signature == getattr(self, "_prepared_write_signature", None)
+        ):
+            return
+        try:
+            captured_signature = deepcopy(signature)
+        except TypeError, ValueError, RecursionError:
+            # Unsupported diagnostic objects must retain ordinary state writes.
+            captured_signature = None
+        generation = getattr(self, "_prepared_write_generation", 0) + 1
+        self._prepared_write_generation = generation
+        # Capture mutable evidence before synchronous state listeners can change
+        # it. A nested write owns the newer signature and must keep its cache.
         super()._handle_coordinator_update()
+        if self._prepared_write_generation == generation:
+            self._prepared_write_signature = captured_signature
+            self._prepared_write_state = self.hass.states.get(self.entity_id)
 
     async def async_added_to_hass(self) -> None:
         """Prime availability before Home Assistant performs the first state write."""
         self._availability_cache_active = True
+        self._prepared_write_signature = None
+        self._prepared_write_state = None
         self._refresh_availability_cache()
         try:
             await super().async_added_to_hass()

@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 
 from ..const import (
     ACTION_ID_PORTABLE_AC_OUTPUT_MODE,
-    ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
+    ACTION_ID_PORTABLE_ENERGY_SAVING,
+    ACTION_ID_PORTABLE_LIGHT,
     ACTION_ID_PORTABLE_SCREEN,
     ACTION_ID_PORTABLE_SETTING_BATTERY,
     ACTION_ID_PORTABLE_SETTING_CHARGE,
@@ -31,6 +32,8 @@ from ..const import (
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,
     FIELD_DYNAMIC_OR_SINGLE,
+    FIELD_EN,
+    FIELD_LM,
     FIELD_MINS_INTERVAL,
     FIELD_NAME,
     FIELD_OFF_GRID_AUTO_OFF_TIME,
@@ -51,6 +54,8 @@ from ..const import (
     FIELD_WPS,
     PAYLOAD_CT_METER,
     PAYLOAD_PRICE_SOURCES,
+    PORTABLE_ENERGY_SAVING_MINUTES,
+    PORTABLE_WORKING_MODES,
     PRICE_MODE_TO_OPTION,
     STORM_MINUTES_DEFAULT,
     STORM_MINUTES_MIN_VALID,
@@ -64,13 +69,22 @@ from ..coordinator import (
     normalized_region,
     normalized_source_regions,
 )
-from ..entity import HTTP_COMMAND_SOURCES, HTTP_DATA_SOURCES, LAYER5_COMMAND_SOURCES
+from ..entity import (
+    ALL_LIVE_DATA_SOURCES,
+    HTTP_COMMAND_SOURCES,
+    HTTP_DATA_SOURCES,
+    LAYER5_COMMAND_SOURCES,
+)
 from ..util import safe_int, task_plan_value
 
 
 @dataclass(frozen=True, kw_only=True)
 class JackerySelectDescription(SelectEntityDescription):
     """Describes a Jackery select entity."""
+
+    # FrozenOrThawed injects these inherited fields at runtime.
+    key: str
+    translation_key: str | None = None
 
     value_fn: Callable[[JackerySelect], str | None]
     options: list[str] | None = None
@@ -568,31 +582,90 @@ _UPS_MODEL_OPTIONS: dict[int, str] = {
 _OPTION_TO_UPS_MODEL: dict[str, int] = {v: k for k, v in _UPS_MODEL_OPTIONS.items()}
 
 
-def _portable_ups_model_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get(FIELD_UPS))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _UPS_MODEL_OPTIONS.get(raw)
+def _portable_ups_model_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_ups_model_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_UPS_MODEL:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_UPS_MODEL,
-        field=FIELD_UPS,
-        value=_OPTION_TO_UPS_MODEL[option],
-    )
+async def _portable_ups_model_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 _POWER_MODE_OPTIONS: dict[int, str] = {
-    0: "standard",
-    1: "eco",
-    2: "performance",
+    0: "never",
+    60: "1h",
+    120: "2h",
+    480: "8h",
+    720: "12h",
+    1440: "24h",
 }
 
+_LIGHT_MODE_OPTIONS: dict[int, str] = {0: "off", 2: "high", 3: "sos"}
+_OPTION_TO_LIGHT_MODE = {value: key for key, value in _LIGHT_MODE_OPTIONS.items()}
+_UPS_OPERATION_OPTIONS: dict[int, str] = {0: "backup", 1: "online"}
+_AC_TRANSFER_OPTIONS: dict[int, str] = {0: "ups_online", 1: "delay_open"}
+
+
+def _portable_ups_operation_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get(FIELD_UPS))  # ruff: ignore[private-member-access]
+    return _UPS_OPERATION_OPTIONS.get(raw) if raw is not None else None
+
+
+async def _portable_ups_operation_select(entity: JackerySelect, option: str) -> None:
+    options = {value: key for key, value in _UPS_OPERATION_OPTIONS.items()}
+    if option not in options:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # ruff: ignore[private-member-access]
+        action_id=ACTION_ID_PORTABLE_UPS_MODEL,
+        field=FIELD_UPS,
+        value=options[option],
+    )
+
+
+def _portable_ac_transfer_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get("acmode"))  # ruff: ignore[private-member-access]
+    return _AC_TRANSFER_OPTIONS.get(raw) if raw is not None else None
+
+
+async def _portable_ac_transfer_select(entity: JackerySelect, option: str) -> None:
+    options = {value: key for key, value in _AC_TRANSFER_OPTIONS.items()}
+    if option not in options:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # ruff: ignore[private-member-access]
+        action_id=ACTION_ID_PORTABLE_AC_OUTPUT_MODE,
+        field="acmode",
+        value=options[option],
+    )
+
+
+def _portable_light_mode_current(entity: JackerySelect) -> str | None:
+    raw = safe_int(entity._properties.get(FIELD_LM))  # ruff: ignore[private-member-access]
+    return _LIGHT_MODE_OPTIONS.get(raw) if raw is not None else None
+
+
+async def _portable_light_mode_select(entity: JackerySelect, option: str) -> None:
+    if option not in _OPTION_TO_LIGHT_MODE:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # ruff: ignore[private-member-access]
+        action_id=ACTION_ID_PORTABLE_LIGHT,
+        field=FIELD_LM,
+        value=_OPTION_TO_LIGHT_MODE[option],
+    )
+
+
 _OPTION_TO_POWER_MODE: dict[str, int] = {v: k for k, v in _POWER_MODE_OPTIONS.items()}
+_PORTABLE_WORKING_MODE_OPTIONS = (
+    "auto_charge",
+    "charge_plan",
+    "self_use",
+    "peaks_troughs",
+    "backup",
+    "emergency_reserve",
+)
 
 _SCREEN_TIMEOUT_OPTIONS: dict[int, str] = {1: "off", 2: "2min", 3: "2h"}
 
@@ -658,21 +731,75 @@ async def _portable_charge_mode_select(entity: JackerySelect, option: str) -> No
     )
 
 
+def _portable_power_mode_options(entity: JackerySelect) -> list[str]:
+    model = entity.coordinator.device_model_code(entity._device_id)  # ruff:ignore[private-member-access]
+    if model is None:
+        return []
+    values = PORTABLE_ENERGY_SAVING_MINUTES.get(model, ())
+    return [_POWER_MODE_OPTIONS[value] for value in values]
+
+
 def _portable_power_mode_current(entity: JackerySelect) -> str | None:
     raw = safe_int(entity._properties.get(FIELD_PM))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _POWER_MODE_OPTIONS.get(raw)
+    option = _POWER_MODE_OPTIONS.get(raw) if raw is not None else None
+    return option if option in _portable_power_mode_options(entity) else None
 
 
 async def _portable_power_mode_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_POWER_MODE:
+    if option not in _portable_power_mode_options(entity):
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_portable_set_select(
+        entity._device_id,  # ruff:ignore[private-member-access]
+        action_id=ACTION_ID_PORTABLE_ENERGY_SAVING,
+        field=FIELD_PM,
+        value=_OPTION_TO_POWER_MODE[option],
+    )
+
+
+def _portable_working_mode_options(entity: JackerySelect) -> list[str]:
+    model = entity.coordinator.device_model_code(entity._device_id)  # ruff:ignore[private-member-access]
+    if model is None:
+        return []
+    return [
+        _PORTABLE_WORKING_MODE_OPTIONS[code]
+        for code in PORTABLE_WORKING_MODES.get(model, ())
+    ]
+
+
+def _portable_working_mode_current(entity: JackerySelect) -> str | None:
+    value = safe_int(entity._properties.get(FIELD_EN))  # ruff:ignore[private-member-access]
+    if value is None or not 0 <= value < len(_PORTABLE_WORKING_MODE_OPTIONS):
+        return None
+    option = _PORTABLE_WORKING_MODE_OPTIONS[value]
+    return option if option in _portable_working_mode_options(entity) else None
+
+
+_BOX_WORKING_MODE_OPTIONS = {0: "automatic", 1: "scheduled", 2: "self_use"}
+
+
+def _box_working_mode_current(entity: JackerySelect) -> str | None:
+    value = safe_int(entity._properties.get(FIELD_EN))  # ruff:ignore[private-member-access]
+    return _BOX_WORKING_MODE_OPTIONS.get(value) if value is not None else None
+
+
+async def _box_working_mode_select(entity: JackerySelect, option: str) -> None:
+    values = {name: code for code, name in _BOX_WORKING_MODE_OPTIONS.items()}
+    if option not in values:
+        _raise_select_action_error(entity, "invalid_select_option", option=option)
+    await entity.coordinator.async_set_box_working_mode(
+        entity._device_id,  # ruff:ignore[private-member-access]
+        values[option],
+    )
+
+
+async def _portable_working_mode_select(entity: JackerySelect, option: str) -> None:
+    if option not in _portable_working_mode_options(entity):
         _raise_select_action_error(entity, "invalid_select_option", option=option)
     await entity.coordinator.async_portable_set_select(
         entity._device_id,  # ruff:ignore[private-member-access]
         action_id=ACTION_ID_PORTABLE_USE_POWER_MODE,
-        field=FIELD_PM,
-        value=_OPTION_TO_POWER_MODE[option],
+        field=FIELD_EN,
+        value=_PORTABLE_WORKING_MODE_OPTIONS.index(option),
     )
 
 
@@ -708,22 +835,14 @@ _OPTION_TO_AC_OUTPUT_MODE: dict[str, int] = {
 }
 
 
-def _portable_ac_output_mode_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get("acmode"))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _AC_OUTPUT_MODE_OPTIONS.get(raw)
+def _portable_ac_output_mode_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_ac_output_mode_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_AC_OUTPUT_MODE:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_AC_OUTPUT_MODE,
-        field="acmode",
-        value=_OPTION_TO_AC_OUTPUT_MODE[option],
-    )
+async def _portable_ac_output_mode_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 _OUTPUT_PRIORITY_OPTIONS: dict[int, str] = {
@@ -737,76 +856,44 @@ _OPTION_TO_OUTPUT_PRIORITY: dict[str, int] = {
 }
 
 
-def _portable_output_priority_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get("outPrio"))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+def _portable_output_priority_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_output_priority_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_OUTPUT_PRIORITY:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
-        field="outPrio",
-        value=_OPTION_TO_OUTPUT_PRIORITY[option],
-    )
+async def _portable_output_priority_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
-def _portable_ac1_priority_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get("oac1Prio"))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+def _portable_ac1_priority_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_ac1_priority_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_OUTPUT_PRIORITY:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
-        field="oac1Prio",
-        value=_OPTION_TO_OUTPUT_PRIORITY[option],
-    )
+async def _portable_ac1_priority_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
-def _portable_ac2_priority_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get("oac2Prio"))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+def _portable_ac2_priority_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_ac2_priority_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_OUTPUT_PRIORITY:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
-        field="oac2Prio",
-        value=_OPTION_TO_OUTPUT_PRIORITY[option],
-    )
+async def _portable_ac2_priority_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
-def _portable_dc_priority_current(entity: JackerySelect) -> str | None:
-    raw = safe_int(entity._properties.get("odcPrio"))  # ruff:ignore[private-member-access]
-    if raw is None:
-        return None
-    return _OUTPUT_PRIORITY_OPTIONS.get(raw)
+def _portable_dc_priority_current(_entity: JackerySelect) -> str | None:
+    return None
 
 
-async def _portable_dc_priority_select(entity: JackerySelect, option: str) -> None:
-    if option not in _OPTION_TO_OUTPUT_PRIORITY:
-        _raise_select_action_error(entity, "invalid_select_option", option=option)
-    await entity.coordinator.async_portable_set_select(
-        entity._device_id,  # ruff:ignore[private-member-access]
-        action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
-        field="odcPrio",
-        value=_OPTION_TO_OUTPUT_PRIORITY[option],
-    )
+async def _portable_dc_priority_select(  # ruff: ignore[unused-async]
+    entity: JackerySelect, option: str
+) -> None:
+    _raise_select_action_error(entity, "invalid_select_option", option=option)
 
 
 # ---------------------------------------------------------------------------
@@ -817,9 +904,23 @@ async def _portable_dc_priority_select(entity: JackerySelect, option: str) -> No
 SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
     JackerySelectDescription(
         # pyrefly: ignore [unexpected-keyword]
+        key="box_working_mode",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="box_working_mode",
+        app_fields=(FIELD_EN,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options=list(_BOX_WORKING_MODE_OPTIONS.values()),
+        value_fn=_box_working_mode_current,
+        current_fn=_box_working_mode_current,
+        select_fn=_box_working_mode_select,
+    ),
+    JackerySelectDescription(
+        # pyrefly: ignore [unexpected-keyword]
         key="work_mode_select",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="work_mode_select",
+        app_fields=(FIELD_WORK_MODEL,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options=list(_OPTION_TO_WORK_MODE.keys()),
         value_fn=_work_mode_current,
         current_fn=_work_mode_current,
@@ -831,6 +932,8 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         key="temp_unit_select",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="temp_unit_select",
+        app_fields=(FIELD_TEMP_UNIT,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options=list(_OPTION_TO_TEMP_UNIT.keys()),
         value_fn=_temp_unit_current,
         current_fn=_temp_unit_current,
@@ -841,6 +944,8 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         key="auto_off_island_mode",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="auto_off_island_mode",
+        app_fields=(FIELD_OFF_GRID_TIME,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options=list(_AUTO_OFF_OPTIONS),
         value_fn=_island_auto_off_current,
         current_fn=_island_auto_off_current,
@@ -852,10 +957,13 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="storm_warning_minutes_select",
         device_registry_role="system",
+        app_fields=(FIELD_MINS_INTERVAL,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options_fn=_storm_minutes_options,
         value_fn=_storm_minutes_current,
         current_fn=_storm_minutes_current,
         select_fn=_storm_minutes_select,
+        command_sources=("cloud_mqtt",),
     ),
     JackerySelectDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -863,6 +971,9 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="electricity_price_mode",
         device_registry_role="system",
+        app_fields=(FIELD_DYNAMIC_OR_SINGLE, FIELD_PRICE_MODE),
+        data_sources=HTTP_DATA_SOURCES,
+        command_sources=HTTP_COMMAND_SOURCES,
         options=[PRICE_MODE_TO_OPTION[1], PRICE_MODE_TO_OPTION[2]],
         value_fn=_price_mode_current,
         current_fn=_price_mode_current,
@@ -875,6 +986,9 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="electricity_price_provider",
         device_registry_role="system",
+        app_fields=(FIELD_PLATFORM_COMPANY_ID, FIELD_SYSTEM_REGION, FIELD_COMPANY_NAME),
+        data_sources=HTTP_DATA_SOURCES,
+        command_sources=HTTP_COMMAND_SOURCES,
         options_fn=_price_provider_options,
         value_fn=_price_provider_current,
         current_fn=_price_provider_current,
@@ -885,6 +999,8 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         key="ct_phase_select",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ct_phase_select",
+        app_fields=(FIELD_SCHE_PHASE,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options=list(_CT_PHASE_TO_OPTION.values()),
         value_fn=_ct_phase_current,
         current_fn=_ct_phase_current,
@@ -895,20 +1011,66 @@ SELECT_DESCRIPTIONS: tuple[JackerySelectDescription, ...] = (
         key="portable_ups_model",
         # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_ups_model",
+        app_fields=(FIELD_UPS,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         options=list(_OPTION_TO_UPS_MODEL.keys()),
         value_fn=_portable_ups_model_current,
         current_fn=_portable_ups_model_current,
         select_fn=_portable_ups_model_select,
     ),
     JackerySelectDescription(
+        key="portable_ups_operation",
+        translation_key="portable_ups_operation",
+        app_fields=(FIELD_UPS,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options=list(_UPS_OPERATION_OPTIONS.values()),
+        value_fn=_portable_ups_operation_current,
+        current_fn=_portable_ups_operation_current,
+        select_fn=_portable_ups_operation_select,
+    ),
+    JackerySelectDescription(
+        key="portable_ac_transfer_mode",
+        translation_key="portable_ac_transfer_mode",
+        app_fields=("acmode",),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options=list(_AC_TRANSFER_OPTIONS.values()),
+        value_fn=_portable_ac_transfer_current,
+        current_fn=_portable_ac_transfer_current,
+        select_fn=_portable_ac_transfer_select,
+    ),
+    JackerySelectDescription(
+        key="portable_light_mode",
+        translation_key="portable_light_mode",
+        app_fields=(FIELD_LM,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options=list(_OPTION_TO_LIGHT_MODE),
+        value_fn=_portable_light_mode_current,
+        current_fn=_portable_light_mode_current,
+        select_fn=_portable_light_mode_select,
+    ),
+    JackerySelectDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="portable_power_mode",
         # pyrefly: ignore [unexpected-keyword]
-        translation_key="portable_power_mode",
-        options=list(_OPTION_TO_POWER_MODE.keys()),
+        translation_key="portable_energy_saving_time",
+        app_fields=(FIELD_PM,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options_fn=_portable_power_mode_options,
         value_fn=_portable_power_mode_current,
         current_fn=_portable_power_mode_current,
         select_fn=_portable_power_mode_select,
+    ),
+    JackerySelectDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="portable_working_mode",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="portable_working_mode",
+        app_fields=(FIELD_EN,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        options_fn=_portable_working_mode_options,
+        value_fn=_portable_working_mode_current,
+        current_fn=_portable_working_mode_current,
+        select_fn=_portable_working_mode_select,
     ),
     JackerySelectDescription(
         # pyrefly: ignore [unexpected-keyword]

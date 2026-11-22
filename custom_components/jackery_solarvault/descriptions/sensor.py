@@ -6,6 +6,7 @@ All descriptions follow HA-standard ``SensorEntityDescription`` with
 
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from functools import partial
 from math import isfinite
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -16,6 +17,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     CURRENCY_EURO,
+    MAX_LENGTH_STATE_STATE,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
@@ -30,11 +32,12 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
+from homeassistant.helpers.typing import UNDEFINED
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from homeassistant.helpers.typing import StateType
+    from homeassistant.helpers.typing import StateType, UndefinedType
 
     from ..entity import JackeryEntity
     from ..sensor import (
@@ -48,6 +51,8 @@ if TYPE_CHECKING:
         JackeryStatSensor,
         JackerySubdeviceAlarmSensor,
     )
+
+from itertools import starmap
 
 from ..const import (
     APP_DEVICE_STAT_AC_TO_BATTERY,
@@ -96,8 +101,12 @@ from ..const import (
     APP_STAT_TOTAL_REVENUE,
     APP_STAT_TOTAL_SOLAR_ENERGY,
     APP_STAT_TOTAL_SOLAR_REVENUE,
+    APP_STAT_UNIT,
+    APP_UNIT_KWH,
+    BOX_FAULT_FIELDS,
     CT_NEGATIVE_PHASE_POWER_FIELDS,
     CT_POSITIVE_PHASE_POWER_FIELDS,
+    CT_THIRD_PV_POWER_PAIRS,
     CT_TOTAL_POWER_PAIR,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
@@ -128,8 +137,17 @@ from ..const import (
     FIELD_BAT_SOC,
     FIELD_BAT_STATE,
     FIELD_BC,
+    FIELD_BLE_BOX_HOUSE_POWER,
+    FIELD_BLE_BOX_MAINS_POWER,
+    FIELD_BLE_PORTABLE_INPUT_POWER,
+    FIELD_BLE_PORTABLE_OUTPUT_POWER,
     FIELD_BLS,
     FIELD_BOX,
+    FIELD_BOX_AUTO_BACKUP_RESERVE,
+    FIELD_BOX_BACKUP_EFFECTIVE_PERIOD,
+    FIELD_BOX_CIRCUIT_RESERVE_THRESHOLD,
+    FIELD_BOX_SCHEDULED_BACKUP_RESERVE,
+    FIELD_BOX_SELF_USE_BACKUP_RESERVE,
     FIELD_BPC,
     FIELD_BT,
     FIELD_CELL_TEMP,
@@ -173,6 +191,7 @@ from ..const import (
     FIELD_CT_REACTIVE_POWER3,
     FIELD_CT_STAT,
     FIELD_CT_STATE,
+    FIELD_CT_TEMPERATURE_C,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_PHASE_ENERGY,
     FIELD_CT_VOLT,
@@ -192,8 +211,10 @@ from ..const import (
     FIELD_EC,
     FIELD_EIP,
     FIELD_EMAC,
+    FIELD_END_TS,
     FIELD_ENERGY_PLAN_PW,
     FIELD_ETH_PORT,
+    FIELD_F,
     FIELD_FOLLOW_METER,
     FIELD_FUNC_ENABLE,
     FIELD_GRID_IN_PW,
@@ -204,6 +225,7 @@ from ..const import (
     FIELD_HOME_SOURCES,
     FIELD_IAC,
     FIELD_IACPW,
+    FIELD_IDC,
     FIELD_IN_EGY,
     FIELD_IN_GRID_SIDE_PW,
     FIELD_IN_ONGRID_PW,
@@ -211,11 +233,13 @@ from ..const import (
     FIELD_IP,
     FIELD_IPAL_PW,
     FIELD_IS_CONTRACT_AUTH,
+    FIELD_IS_FIRMWARE_UPGRADE,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_IS_PACK_CONNECT,
     FIELD_IT,
     FIELD_LM,
     FIELD_MAC,
+    FIELD_MANUAL,
     FIELD_MAX_GRID_STD_PW,
     FIELD_MAX_INV_STD_PW,
     FIELD_MAX_IOT_NUM,
@@ -225,7 +249,6 @@ from ..const import (
     FIELD_MINS_INTERVAL,
     FIELD_NEXTDAY_HIGH,
     FIELD_NEXTDAY_LOW,
-    FIELD_OAC,
     FIELD_OAC1_NAME,
     FIELD_OAC2,
     FIELD_OAC2_NAME,
@@ -288,15 +311,18 @@ from ..const import (
     FIELD_SOC_FORCE_CHG,
     FIELD_SPH,
     FIELD_SPH_PC,
+    FIELD_SRL,
     FIELD_SS,
     FIELD_STACK_IN_PW,
     FIELD_STACK_OUT_PW,
     FIELD_STANDBY_PW,
+    FIELD_START_TS,
     FIELD_STAT,
     FIELD_STORM,
     FIELD_SW_EPS_IN_PW,
     FIELD_SW_EPS_OUT_PW,
     FIELD_SW_EPS_STATE,
+    FIELD_SYS_TOTAL_PV_PW,
     FIELD_TA,
     FIELD_TEMP_UNIT,
     FIELD_TODAY_ENERGY,
@@ -324,13 +350,17 @@ from ..const import (
     FIELD_WSIG,
     FIELD_WSS,
     JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
+    PAYLOAD_AIEMS_ENERGY_PREDICTION,
+    PAYLOAD_AIEMS_MODE_STATUS,
     PAYLOAD_BATTERY_TRENDS,
     PAYLOAD_CT_METER,
     PAYLOAD_DEVICE_ALERT,
     PAYLOAD_DEVICE_STATISTIC,
     PAYLOAD_DYNAMIC_PRICE,
+    PAYLOAD_ELECTRICITY_STRATEGY,
     PAYLOAD_HOME_TRENDS,
     PAYLOAD_LOCAL_DAILY_ENERGY,
+    PAYLOAD_PORTABLE_CT_STATISTICS,
     PAYLOAD_PRICE,
     PAYLOAD_PROPERTIES,
     PAYLOAD_PV_TRENDS,
@@ -340,18 +370,27 @@ from ..const import (
     PAYLOAD_TASK_PLAN,
     PAYLOAD_TOU_SCHEDULE,
     PAYLOAD_WEATHER_PLAN,
+    PAYLOAD_WIFI_LIST,
+    SAVINGS_PRICE_PRECISION,
 )
 from ..entity import ALL_LIVE_DATA_SOURCES, HTTP_DATA_SOURCES, LAYER5_DATA_SOURCES
 from ..util import (
+    accessory_ip_address,
     calculated_smart_meter_power,
     directional_power_value,
+    effective_period_total_value,
     jackery_inverter_ac_input_power,
     jackery_inverter_ac_output_power,
+    safe_float,
+    safe_int,
 )
 
 # ---------------------------------------------------------------------------
 # Helper functions used by value_fns
 # ---------------------------------------------------------------------------
+
+
+_MAX_SHARE_PERCENT = 100
 
 
 def _state_value(value: object) -> StateType:
@@ -363,8 +402,18 @@ def _identity(x: object) -> StateType:
     return _state_value(x)
 
 
+def _firmware_update_availability(value: object) -> str | None:
+    if value is True or value in {1, "1", "true", "True"}:
+        return "available"
+    if value is False or value in {0, "0", "false", "False"}:
+        return "not_available"
+    return None
+
+
 def _div(divisor: float) -> Callable[[object], float | None]:
     def _f(v: object) -> float | None:
+        if not isinstance(v, (int, float, str)):
+            return None
         parsed = safe_float(v)
         return parsed / divisor if parsed is not None else None
 
@@ -372,27 +421,7 @@ def _div(divisor: float) -> Callable[[object], float | None]:
 
 
 def _flag_int(v: object) -> int | None:
-    return safe_int(v)
-
-
-def safe_int(v: object) -> int | None:
-    """Convert a value to int safely."""
-    if not isinstance(v, (bool, int, float, str)):
-        return None
-    try:
-        return int(v)
-    except (TypeError, ValueError):  # fmt: skip
-        return None
-
-
-def safe_float(v: object) -> float | None:
-    """Convert a value to float safely."""
-    if not isinstance(v, (bool, int, float, str)):
-        return None
-    try:
-        return float(v)
-    except (TypeError, ValueError):  # fmt: skip
-        return None
+    return int(v) if isinstance(v, bool) else safe_int(v)
 
 
 def safe_bool(v: object) -> bool | None:
@@ -420,7 +449,7 @@ def first_nonblank_int(v: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except (TypeError, ValueError):  # fmt: skip
+        except TypeError, ValueError:
             return None
     return None
 
@@ -434,6 +463,30 @@ def _get_prop(entity: JackeryEntity, key: str) -> StateType:
     """Get property from merged properties."""
     props = entity.merged_properties or {}
     return _state_value(props.get(key))
+
+
+def _battery_count_for_family(entity: JackeryEntity) -> StateType:
+    """Read the count field belonging to the current App device family."""
+    family = entity.coordinator.device_family(entity.device_id)
+    if family not in {"home", "box"}:
+        return None
+    if not entity.coordinator.property_fields_match_family(
+        entity.device_id, (FIELD_BAT_NUM,)
+    ):
+        return None
+    return _get_prop(entity, FIELD_BAT_NUM)
+
+
+def _get_fresh_ble_or_app_power(
+    entity: JackeryEntity, ble_field: str, app_field: str
+) -> StateType:
+    """Prefer the BLE value while present; never substitute a stale BLE value."""
+    if ble_field in (entity.merged_properties or {}):
+        return _first_non_none_state(
+            entity.coordinator.fresh_ble_power(entity.device_id, ble_field),
+            entity.coordinator.fresh_app_power(entity.device_id, app_field),
+        )
+    return _get_prop(entity, app_field)
 
 
 def _get_payload_section(
@@ -455,6 +508,8 @@ def _smart_meter_value_fn(
 ) -> StateType:
     """Get smart meter value from CT meter payload using description logic."""
     ct = _get_ct_meter(entity)
+    if description.key == "ip_address":
+        return accessory_ip_address(ct)
     # Inline the logic from _smart_meter_description_value to avoid circular import
     raw = None
     if description.calculation:
@@ -507,6 +562,25 @@ def _get_first_list_count(
         if isinstance(value, list):
             return len(value)
     return None
+
+
+def _portable_wifi_names(payload: dict[str, Any]) -> list[str] | None:
+    """Return only a valid Portable Wi-Fi-list response."""
+    section = payload.get(PAYLOAD_WIFI_LIST)
+    names = section.get(FIELD_F) if isinstance(section, dict) else None
+    if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+        return None
+    return list(names)
+
+
+def _portable_wifi_count(entity: JackerySensorEntity) -> int | None:
+    names = _portable_wifi_names(entity.payload)
+    return len(names) if names is not None else None
+
+
+def _portable_ground_serial(entity: JackerySensorEntity) -> str | None:
+    serial = _get_prop(entity, "grdAccSn")
+    return serial.strip() or None if isinstance(serial, str) else None
 
 
 def _task_plan_value(task_plan: dict[str, Any], *keys: str) -> StateType:
@@ -604,6 +678,63 @@ def _storm_warning_minutes_value(entity: JackeryEntity) -> int | None:
     )
 
 
+def _storm_display_rows(entity: JackeryEntity) -> list[Any] | None:
+    """Select only the weather rows owned by the current device family."""
+    family = entity.coordinator.device_family(entity.device_id)
+    is_online = (
+        entity.coordinator.device_is_online(entity.device_id)
+        if hasattr(entity.coordinator, "device_is_online")
+        else getattr(entity, "available", False)
+    )
+    if family == "box":
+        if not entity.coordinator.property_fields_match_family(
+            entity.device_id, (FIELD_STORM,)
+        ):
+            return None
+        rows = entity.merged_properties.get(FIELD_STORM)
+        if rows is None and is_online:
+            return []
+    elif family in {"home", "portable"}:
+        weather_matches = getattr(
+            entity.coordinator, "weather_plan_matches_family", None
+        )
+        if callable(weather_matches) and not weather_matches(entity.device_id):
+            return None
+        plan = (entity.payload or {}).get(PAYLOAD_WEATHER_PLAN)
+        rows = plan.get(FIELD_STORM) if isinstance(plan, dict) else None
+        if rows is None and is_online:
+            return []
+    else:
+        return None
+    return rows if isinstance(rows, list) else None
+
+
+def _storm_plan_display_type(entity: JackeryEntity) -> str | None:
+    """Mirror the App's earliest storm-row display when its values are known."""
+    rows = _storm_display_rows(entity)
+    if rows is None:
+        return None
+    earliest: tuple[int, int] | None = None
+    selected: dict[str, Any] | None = None
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        start = safe_int(row.get(FIELD_START_TS))
+        end = safe_int(row.get(FIELD_END_TS))
+        if start is None or end is None:
+            return None
+        order = (start, end)
+        if earliest is None or order < earliest:
+            earliest = order
+            selected = row
+    if selected is None:
+        return "no_alert"
+    manual = safe_int(selected.get(FIELD_MANUAL))
+    if manual is None:
+        return None
+    return "manual_backup" if manual == 1 else "storm_warning"
+
+
 def _get_pv_channel_power(
     entity: JackeryEntity,
     channel_key: str,
@@ -642,17 +773,17 @@ def _section_share(
 ) -> StateType:
     """Return one percentage of an App energy-flow share object (e.g. pvUsage)."""
     shares = entity.payload_section_for_sources(section).get(key)
-    # An all-zero split is the cloud's "not aggregated yet" placeholder, not 0 %.
-    if isinstance(shares, dict) and any(
-        (reported_value := safe_float(value)) is not None
-        and isfinite(reported_value)
-        and reported_value != 0
-        for value in shares.values()
-    ):
+    # App 2.4.2 SysChartVM consumes each reported share, including explicit zero.
+    # A missing split may use matching-period flows; a reported zero is not missing.
+    if isinstance(shares, dict):
         requested_value = safe_float(shares.get(part))
-        if requested_value is None or not isfinite(requested_value):
+        if requested_value is None or not 0 <= requested_value <= _MAX_SHARE_PERCENT:
             return None
-        return _state_value(shares.get(part))
+        return requested_value
+    base_section = section
+    period = section.rsplit("_", 1)[-1]
+    if period in {DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR}:
+        base_section = section.removesuffix(f"_{period}")
     metrics = {
         (PAYLOAD_BATTERY_TRENDS, FIELD_BATTERY_SOURCES): {
             "pv": APP_DEVICE_STAT_PV_TO_BATTERY,
@@ -668,14 +799,30 @@ def _section_share(
             "battery": APP_DEVICE_STAT_PV_TO_BATTERY,
             "ac": APP_DEVICE_STAT_PV_TO_AC,
         },
-    }.get((section, key))
+    }.get((base_section, key))
     if metrics is None or part not in metrics:
         return None
-    # Only the coordinator's current-day deltas form a complete local split.
-    daily = entity.payload_section_for_sources(PAYLOAD_LOCAL_DAILY_ENERGY)
+    # Period shares require their own complete HTTP split, never today's deltas.
+    if base_section != section:
+        prefix = (
+            APP_SECTION_BATTERY_STAT
+            if base_section == PAYLOAD_BATTERY_TRENDS
+            else APP_SECTION_PV_STAT
+        )
+        flow_section = f"{prefix}_{period}"
+        source = entity.payload_section_for_sources(flow_section)
+        if str(source.get(APP_STAT_UNIT) or "").lower() != APP_UNIT_KWH:
+            return None
+    else:
+        flow_section = PAYLOAD_LOCAL_DAILY_ENERGY
+        source = entity.payload_section_for_sources(flow_section)
     flows: dict[str, float] = {}
     for name, metric in metrics.items():
-        delta = safe_float(daily.get(metric))
+        delta = (
+            effective_period_total_value(source, flow_section, metric)
+            if base_section != section
+            else safe_float(source.get(metric))
+        )
         if delta is None or not isfinite(delta) or delta < 0:
             return None
         flows[name] = delta
@@ -688,9 +835,12 @@ def _section_share(
 def _device_meta_timestamp(entity: JackeryEntity, key: str) -> datetime | None:
     """Return an epoch-milliseconds device-meta field as an aware UTC datetime."""
     millis = safe_float(entity.device_meta.get(key))
-    if millis is None or millis <= 0:
+    if millis is None or not isfinite(millis) or millis <= 0:
         return None
-    return datetime.fromtimestamp(millis / 1000, UTC)
+    try:
+        return datetime.fromtimestamp(millis / 1000, UTC)
+    except OverflowError, ValueError, OSError:
+        return None
 
 
 def _default_sensor_value(entity: JackerySensorEntity) -> StateType:
@@ -714,6 +864,73 @@ def _default_sensor_value(entity: JackerySensorEntity) -> StateType:
     return cast("StateType", value)
 
 
+def _main_battery_observed_energy(  # ruff: ignore[too-many-locals]
+    entity: JackerySensorEntity, direction: str
+) -> float | None:
+    """Read only an explicitly partial, own-power-derived Recorder estimate."""
+    payload = getattr(entity, "_payload", None)
+    section = (
+        payload.get("main_battery_observed_energy")
+        if isinstance(payload, dict)
+        else None
+    )
+    row = section.get(direction) if isinstance(section, dict) else None
+    expected_metric = {
+        "charge": "battery_charge_power",
+        "discharge": "battery_discharge_power",
+    }.get(direction)
+    if not isinstance(row, dict) or expected_metric is None:
+        return None
+    value = row.get("value")
+    seconds = row.get("observed_seconds")
+    entity_id = row.get("source_entity_id")
+    coordinator = getattr(entity, "coordinator", None)
+    device_id = getattr(entity, "_device_id", None)
+    resolve_serial = getattr(coordinator, "_resolve_device_sn", None)
+    current_serial = resolve_serial(device_id) if callable(resolve_serial) else None
+    owner_serial = row.get("owner_serial")
+    parent_epochs = getattr(coordinator, "_http_parent_identity_epochs", {})
+    binding_epochs = getattr(coordinator, "_system_binding_epochs", {})
+    if (
+        row.get("source") != "recorder_own_main_power"  # ruff: ignore[too-many-boolean-expressions]
+        or row.get("source_metric") != expected_metric
+        or row.get("partial") is not True
+        or str(row.get("unit", "")).strip().casefold() != "kwh"
+        or isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not isfinite(value)
+        or value < 0
+        or isinstance(seconds, bool)
+        or not isinstance(seconds, int | float)
+        or not isfinite(seconds)
+        or seconds <= 0
+        or not isinstance(entity_id, str)
+        or not entity_id.startswith("sensor.")
+        or not isinstance(owner_serial, str)
+        or not owner_serial.strip()
+        or not isinstance(current_serial, str)
+        or owner_serial.strip().casefold() != current_serial.strip().casefold()
+        or not isinstance(parent_epochs, dict)
+        or not isinstance(binding_epochs, dict)
+        or type(row.get("owner_parent_epoch")) is not int
+        or type(row.get("owner_binding_epoch")) is not int
+        or row["owner_parent_epoch"] != parent_epochs.get(device_id, 0)
+        or row["owner_binding_epoch"] != binding_epochs.get(device_id, 0)
+    ):
+        return None
+    try:
+        start = datetime.fromisoformat(row["observed_since"])
+        end = datetime.fromisoformat(row["observed_until"])
+        if start.utcoffset() is None or end.utcoffset() is None:
+            return None
+        duration = end.timestamp() - start.timestamp()
+    except KeyError, TypeError, ValueError, OverflowError, OSError:
+        return None
+    if duration <= 0 or seconds > duration + 0.001:
+        return None
+    return float(value)
+
+
 @dataclass(frozen=True, kw_only=True)
 class _JackerySensorEntityDescription(SensorEntityDescription):
     """Apply integration-wide entity-registry defaults to sensor metadata."""
@@ -722,6 +939,14 @@ class _JackerySensorEntityDescription(SensorEntityDescription):
     # public types for our dataclass constructor and replacement operations.
     key: str
     translation_key: str | None = None
+    name: str | UndefinedType | None = UNDEFINED
+    device_class: SensorDeviceClass | None = None
+    state_class: SensorStateClass | None = None
+    native_unit_of_measurement: str | None = None
+    options: list[str] | None = None
+    entity_category: EntityCategory | None = None
+    icon: str | None = None
+    entity_registry_enabled_default: bool = True
 
     def __post_init__(self) -> None:
         """Disable diagnostic entities until a user explicitly enables them."""
@@ -742,6 +967,7 @@ class JackerySensorDescription(_JackerySensorEntityDescription):
     value_map: dict[int, str] | None = None
     smali_field: str | None = None
     app_fields: tuple[str, ...] = ()
+    family_fields: tuple[str, ...] = ()
     data_sources: tuple[str, ...] = ()
     device_registry_role: str = "head"
     null_semantics: str = DEFAULT_NULL_SEMANTICS
@@ -799,8 +1025,6 @@ def _default_stat_value(entity: JackeryStatSensor) -> StateType:
 @dataclass(frozen=True, kw_only=True)
 class JackeryStatSensorDescription(_JackerySensorEntityDescription):
     """Sensor description for statistics with value_fn."""
-
-    _attr_has_entity_name = True
 
     value_fn: Callable[[JackeryStatSensor], StateType] = _default_stat_value
     stat_key: str
@@ -1050,6 +1274,16 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
     ),
     JackerySensorDescription(
+        app_fields=(FIELD_SYS_TOTAL_PV_PW,),
+        key="system_reported_pv_power",
+        value_fn=lambda e: safe_float(_get_prop(e, FIELD_SYS_TOTAL_PV_PW)),
+        translation_key="system_reported_pv_power",
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
         app_fields=(FIELD_PV1,),
         # pyrefly: ignore [unexpected-keyword]
         key="pv1_power",
@@ -1248,6 +1482,8 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
+        app_fields=(FIELD_WIP,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         # pyrefly: ignore [unexpected-keyword]
         key="wifi_ip",
         value_fn=lambda e: _get_prop(e, FIELD_WIP),
@@ -1257,6 +1493,8 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
+        app_fields=(FIELD_MAC,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
         # pyrefly: ignore [unexpected-keyword]
         key="mac_address",
         value_fn=lambda e: _get_prop(e, FIELD_MAC),
@@ -1418,7 +1656,9 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="battery_count",
-        value_fn=lambda e: _get_prop(e, FIELD_BAT_NUM),
+        app_fields=(FIELD_BAT_NUM, FIELD_BC),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=_battery_count_for_family,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_count",
         # pyrefly: ignore [unexpected-keyword]
@@ -1682,6 +1922,17 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         translation_key="temp_unit",
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_STORM,),
+        data_sources=LAYER5_DATA_SOURCES,
+        # pyrefly: ignore [unexpected-keyword]
+        key="storm_plan_display_type",
+        value_fn=_storm_plan_display_type,
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="storm_plan_display_type",
+        device_class=SensorDeviceClass.ENUM,
+        options=["manual_backup", "no_alert", "storm_warning"],
     ),
     JackerySensorDescription(
         app_fields=(FIELD_WPS,),
@@ -1978,7 +2229,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_charge_energy_derived",
         device_registry_role="main_battery",
-        value_fn=lambda _e: None,
+        value_fn=lambda e: _main_battery_observed_energy(e, "charge"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="main_battery_charge_energy",
         # pyrefly: ignore [unexpected-keyword]
@@ -1992,7 +2243,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         key="main_battery_discharge_energy_derived",
         device_registry_role="main_battery",
-        value_fn=lambda _e: None,
+        value_fn=lambda e: _main_battery_observed_energy(e, "discharge"),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="main_battery_discharge_energy",
         # pyrefly: ignore [unexpected-keyword]
@@ -2894,7 +3145,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
 )
 
 # Preserve historical head IDs with the same energy and device metadata.
-# Both identities stay unknown until an independent head counter is resolved.
+# Historical IDs share the explicitly partial own-power estimate, when present.
 SENSOR_DESCRIPTIONS += tuple(
     replace(
         description,
@@ -2920,7 +3171,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -3071,6 +3322,13 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_day",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
         section=PAYLOAD_PV_TRENDS,
+        transform=safe_float,
+        fallback_sources=(
+            (
+                f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_DAY}",
+                APP_STAT_TOTAL_SOLAR_REVENUE,
+            ),
+        ),
         value_fn=lambda e: _get_payload_section(
             e, PAYLOAD_PV_TRENDS, APP_STAT_TOTAL_SOLAR_REVENUE
         ),
@@ -3115,7 +3373,14 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         key="pv_revenue_month",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
+        transform=safe_float,
         section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
+        fallback_sources=(
+            (
+                f"{APP_SECTION_PV_STAT}_{DATE_TYPE_MONTH}",
+                APP_STAT_TOTAL_SOLAR_REVENUE,
+            ),
+        ),
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_MONTH}",
@@ -3136,6 +3401,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         key="pv_revenue_year",
         stat_key=APP_STAT_TOTAL_SOLAR_REVENUE,
         section=f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
+        transform=safe_float,
         value_fn=lambda e: _get_payload_section(
             e,
             f"{APP_SECTION_PV_TRENDS}_{DATE_TYPE_YEAR}",
@@ -3459,10 +3725,8 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         key="home_day_energy",
         stat_key=APP_STAT_TOTAL_HOME_ENERGY,
-        section=PAYLOAD_HOME_TRENDS,
-        value_fn=lambda e: _get_payload_section(
-            e, PAYLOAD_HOME_TRENDS, APP_STAT_TOTAL_HOME_ENERGY
-        ),
+        section=f"{APP_SECTION_HOME_TRENDS}_{DATE_TYPE_DAY}",
+        fallback_sources=((PAYLOAD_HOME_TRENDS, APP_STAT_TOTAL_HOME_ENERGY),),
         transform=safe_float,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="home_day_energy",
@@ -4078,7 +4342,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -4102,7 +4366,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -4122,7 +4386,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -4142,7 +4406,7 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -4393,12 +4657,143 @@ STAT_DESCRIPTIONS: tuple[JackeryStatSensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
     ),
 )
+
+STAT_DESCRIPTIONS += tuple(
+    JackeryStatSensorDescription(
+        key=f"battery_to_ac_{period}_energy",
+        translation_key=f"battery_to_ac_{period}_energy",
+        name=f"Battery to AC energy ({period})",
+        stat_key=APP_DEVICE_STAT_BATTERY_TO_AC,
+        section=f"{APP_SECTION_BATTERY_STAT}_{period}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        reset_period=period,
+    )
+    for period in (DATE_TYPE_DAY, DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+)
+
+STAT_DESCRIPTIONS += tuple(
+    JackeryStatSensorDescription(
+        key=f"grid_to_battery_{period}_energy",
+        translation_key=f"grid_to_battery_{period}_energy",
+        name=f"Grid to battery energy ({period})",
+        stat_key=APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+        section=f"{APP_SECTION_BATTERY_STAT}_{period}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        reset_period=period,
+    )
+    for period in (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+)
+
+STAT_DESCRIPTIONS += tuple(
+    JackeryStatSensorDescription(
+        key=f"battery_to_grid_{period}_energy",
+        translation_key=f"battery_to_grid_{period}_energy",
+        name=f"Battery to grid energy ({period})",
+        stat_key=APP_DEVICE_STAT_BATTERY_TO_GRID,
+        section=f"{APP_SECTION_BATTERY_STAT}_{period}",
+        transform=safe_float,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        reset_period=period,
+    )
+    for period in (DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR)
+)
+
+AIEMS_STATUS_FIELDS = frozenset({
+    "workMode",
+    "currentWorkMode",
+    "aiStrategy",
+    "syncStatus",
+    "hasCt",
+    "isCtOnline",
+    "isDataAuthorized",
+    "hasDynamicTariff",
+    "isAiModeAvailable",
+    "overrideRemainingSeconds",
+    "isManualOverride",
+    "manualActionMode",
+    "isSetLocation",
+    "isPriceError",
+    "aiModeSocLimits",
+})
+
+
+def _aiems_status_count(entity: JackerySensorEntity) -> int | None:
+    status = entity.payload.get(PAYLOAD_AIEMS_MODE_STATUS)
+    return (
+        len(AIEMS_STATUS_FIELDS & status.keys()) if isinstance(status, dict) else None
+    )
+
+
+AIEMS_STATUS_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="aiems_mode_status",
+        translation_key="aiems_mode_status",
+        data_sources=HTTP_DATA_SOURCES,
+        value_fn=_aiems_status_count,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+)
+
+AIEMS_PREDICTION_FIELDS = frozenset({
+    "timestamps",
+    "currency",
+    "loadData",
+    "pvData",
+    "priceData",
+    "socData",
+    "operationPlan",
+})
+
+
+def _aiems_prediction_count(entity: JackerySensorEntity) -> int | None:
+    prediction = entity.payload.get(PAYLOAD_AIEMS_ENERGY_PREDICTION)
+    timestamps = prediction.get("timestamps") if isinstance(prediction, dict) else None
+    return len(timestamps) if isinstance(timestamps, list) else None
+
+
+AIEMS_PREDICTION_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="aiems_energy_prediction",
+        translation_key="aiems_energy_prediction",
+        data_sources=HTTP_DATA_SOURCES,
+        value_fn=_aiems_prediction_count,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+)
+
+
+def _portable_ct_statistics_count(entity: JackerySensorEntity) -> int | None:
+    statistics = entity.payload.get(PAYLOAD_PORTABLE_CT_STATISTICS)
+    return len(statistics) if isinstance(statistics, dict) else None
+
+
+PORTABLE_CT_STATISTICS_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="portable_ct_statistics",
+        translation_key="portable_ct_statistics",
+        data_sources=HTTP_DATA_SOURCES,
+        value_fn=_portable_ct_statistics_count,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+)
+
 
 SMART_MODE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
@@ -4561,7 +4956,557 @@ TOU_PLAN_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     ),
 )
 
+
+def _box_ats_solar_power(  # ruff: ignore[too-many-return-statements]
+    entity: JackerySensorEntity,
+) -> int | None:
+    """Sum the ATS app's connected solar-active AC modules."""
+    total = 0
+    active = False
+    for channel in ("ac1", "ac2"):
+        ac = entity.merged_properties.get(channel)
+        if not isinstance(ac, dict):
+            return None
+        connected = safe_int(ac.get("bi"))
+        if connected is None:
+            return None
+        if connected != 1:
+            continue
+        if not entity.coordinator.property_fields_match_family(
+            entity.device_id, (f"{channel}.ss",)
+        ) or not entity.coordinator.box_solar_fields_current(
+            entity.device_id, channel, ("ss",)
+        ):
+            return None
+        solar_state = safe_int(ac.get("ss"))
+        if solar_state is None:
+            return None
+        if solar_state == 0:
+            continue
+        if not entity.coordinator.property_fields_match_family(
+            entity.device_id, (f"{channel}.acpsp",)
+        ) or not entity.coordinator.box_solar_fields_current(
+            entity.device_id, channel, ("acpsp",)
+        ):
+            return None
+        power = safe_int(ac.get("acpsp"))
+        if power is None or power < 0:
+            return None
+        total += power
+        active = True
+    return total if active else None
+
+
+def _box_ac_property(entity: JackerySensorEntity, channel: str, field: str) -> object:
+    """Read one field only from its connected Box AC module."""
+    ac = entity.merged_properties.get(channel)
+    if not isinstance(ac, dict) or safe_int(ac.get("bi")) in {None, 0}:
+        return None
+    return ac.get(field)
+
+
+def _box_ac_value(
+    entity: JackerySensorEntity, channel: str, field: str, divisor: int
+) -> float | None:
+    """Read a connected Box AC module without borrowing another module's values."""
+    raw = _box_ac_property(entity, channel, field)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None
+    value = safe_float(raw)
+    return value / divisor if value is not None else None
+
+
+def _box_ac_mode(entity: JackerySensorEntity, channel: str) -> str | None:
+    """Interpret the app's Box AC charging and discharging modes."""
+    mode = safe_int(_box_ac_property(entity, channel, "bs"))
+    return (
+        {0: "idle", 1: "charging", 2: "discharging"}.get(mode)
+        if mode is not None
+        else None
+    )
+
+
+def _box_ac_description(
+    channel: str,
+    spec: tuple[str, str, SensorDeviceClass, str, int],
+) -> JackerySensorDescription:
+    """Describe one app-backed value of a Box AC module."""
+    key, field, device_class, unit, divisor = spec
+    name = f"box_{channel}_{key}"
+    return JackerySensorDescription(
+        key=name,
+        translation_key=name,
+        app_fields=(channel,),
+        family_fields=(f"{channel}.bi", f"{channel}.{field}"),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: _box_ac_value(entity, channel, field, divisor),
+        device_class=device_class,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=unit,
+    )
+
+
+def _box_ac_metadata_descriptions(channel: str) -> tuple[JackerySensorDescription, ...]:
+    """Describe app-visible identity, operating mode and contained batteries."""
+    prefix = f"box_{channel}"
+    return (
+        JackerySensorDescription(
+            key=f"{prefix}_serial",
+            translation_key=f"{prefix}_serial",
+            app_fields=(channel,),
+            family_fields=(f"{channel}.bi", f"{channel}.sn"),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=lambda entity: _state_value(
+                _box_ac_property(entity, channel, "sn")
+            ),
+        ),
+        JackerySensorDescription(
+            key=f"{prefix}_mode",
+            translation_key=f"{prefix}_mode",
+            app_fields=(channel,),
+            family_fields=(f"{channel}.bi", f"{channel}.bs"),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=lambda entity: _box_ac_mode(entity, channel),
+        ),
+        JackerySensorDescription(
+            key=f"{prefix}_model_code",
+            translation_key=f"{prefix}_model_code",
+            app_fields=(channel,),
+            family_fields=(f"{channel}.bi", f"{channel}.mc"),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=lambda entity: safe_int(_box_ac_property(entity, channel, "mc")),
+        ),
+        JackerySensorDescription(
+            key=f"{prefix}_packs",
+            translation_key=f"{prefix}_packs",
+            app_fields=(channel,),
+            family_fields=(f"{channel}.bi", f"{channel}.bp"),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=lambda entity: (
+                len(packs)
+                if isinstance(packs := _box_ac_property(entity, channel, "bp"), list)
+                else None
+            ),
+        ),
+    )
+
+
+_SETTING_PERCENT_MAX = 100
+
+
+def _integral_setting_value(
+    entity: JackerySensorEntity, field: str, unit: str
+) -> int | None:
+    """Keep valid integral settings without fabricating a missing value."""
+    value = safe_int(_get_prop(entity, field))
+    if value is None or value < 0:
+        return None
+    if unit == PERCENTAGE and value > _SETTING_PERCENT_MAX:
+        return None
+    return value
+
+
+def _box_setting_description(
+    key: str, field: str, unit: str
+) -> JackerySensorDescription:
+    """Describe one App-backed Box setting reported in its status."""
+    return JackerySensorDescription(
+        key=key,
+        translation_key=key,
+        app_fields=(field,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: _integral_setting_value(entity, field, unit),
+        native_unit_of_measurement=unit,
+    )
+
+
+def _box_reported_remaining_hours(entity: JackerySensorEntity) -> float | None:
+    value = _integral_setting_value(entity, FIELD_OT, UnitOfTime.HOURS)
+    return value / 10 if value is not None else None
+
+
+def _box_raw_field_description(field: str) -> JackerySensorDescription:
+    """Expose an App DTO integer without assigning an unverified meaning."""
+    key = f"box_{field}_raw"
+    return JackerySensorDescription(
+        key=key,
+        translation_key=key,
+        app_fields=(field,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: safe_int(_get_prop(entity, field)),
+    )
+
+
+def _box_fault_field_description(field: str) -> JackerySensorDescription:
+    """Expose one Box App fault field without interpreting its code."""
+    key = f"box_fault_{field}_raw"
+
+    def value(entity: JackerySensorEntity) -> StateType:
+        fault = entity.merged_properties.get("fz")
+        if not isinstance(fault, dict):
+            return None
+        raw = fault.get(field)
+        if field == "loc":
+            return (
+                raw
+                if isinstance(raw, str) and len(raw) <= MAX_LENGTH_STATE_STATE
+                else None
+            )
+        return safe_int(raw)
+
+    return JackerySensorDescription(
+        key=key,
+        translation_key=key,
+        app_fields=("fz",),
+        family_fields=(f"fz.{field}",),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=value,
+    )
+
+
+def _strategy_count(entity: JackerySensorEntity, field: str) -> int | None:
+    strategy = entity.payload.get(PAYLOAD_ELECTRICITY_STRATEGY)
+    if not isinstance(strategy, dict) or field not in strategy:
+        return None
+    value = strategy[field]
+    if field == "cds":
+        return len(value) if isinstance(value, list) else None
+    if value is None:
+        return 0
+    return 1 if isinstance(value, dict) else None
+
+
+BOX_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="box_strategy_plans",
+        translation_key="box_strategy_plans",
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=lambda entity: _strategy_count(entity, "cds"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    JackerySensorDescription(
+        key="box_current_strategy",
+        translation_key="box_current_strategy",
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=lambda entity: _strategy_count(entity, "cep"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    JackerySensorDescription(
+        key="box_wifi_scan",
+        translation_key="box_wifi_scan",
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=_portable_wifi_count,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    JackerySensorDescription(
+        key="box_ats_solar_power",
+        translation_key="box_ats_solar_power",
+        app_fields=("ac1", "ac2"),
+        family_fields=("ac1.bi", "ac2.bi"),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=_box_ats_solar_power,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    *(_box_raw_field_description(field) for field in ("de", "dg", "dh", "ds")),
+    *(_box_fault_field_description(field) for field in BOX_FAULT_FIELDS),
+    JackerySensorDescription(
+        key="box_reported_battery_level",
+        translation_key="box_reported_battery_level",
+        app_fields=(FIELD_RB,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: _integral_setting_value(entity, FIELD_RB, PERCENTAGE),
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+    ),
+    JackerySensorDescription(
+        key="box_reported_remaining_time",
+        translation_key="box_reported_remaining_time",
+        app_fields=(FIELD_OT,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=_box_reported_remaining_hours,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_BLE_BOX_MAINS_POWER,),
+        key="box_mains_power",
+        value_fn=lambda e: e.coordinator.fresh_ble_power(
+            e.device_id, FIELD_BLE_BOX_MAINS_POWER
+        ),
+        translation_key="box_mains_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_BLE_BOX_HOUSE_POWER,),
+        key="box_house_power",
+        value_fn=lambda e: e.coordinator.fresh_ble_power(
+            e.device_id, FIELD_BLE_BOX_HOUSE_POWER
+        ),
+        translation_key="box_house_power",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    *starmap(
+        _box_setting_description,
+        (
+            ("box_reserve_threshold", FIELD_DT, PERCENTAGE),
+            ("box_auto_backup_reserve", FIELD_BOX_AUTO_BACKUP_RESERVE, PERCENTAGE),
+            (
+                "box_scheduled_backup_reserve",
+                FIELD_BOX_SCHEDULED_BACKUP_RESERVE,
+                PERCENTAGE,
+            ),
+            (
+                "box_self_use_backup_reserve",
+                FIELD_BOX_SELF_USE_BACKUP_RESERVE,
+                PERCENTAGE,
+            ),
+            (
+                "box_circuit_reserve_threshold",
+                FIELD_BOX_CIRCUIT_RESERVE_THRESHOLD,
+                PERCENTAGE,
+            ),
+            (
+                "box_backup_effective_period",
+                FIELD_BOX_BACKUP_EFFECTIVE_PERIOD,
+                UnitOfTime.MINUTES,
+            ),
+        ),
+    ),
+    *(
+        _box_ac_description(channel, spec)
+        for channel in ("ac1", "ac2")
+        for spec in (
+            ("soc", "rb", SensorDeviceClass.BATTERY, PERCENTAGE, 1),
+            ("total_soc", "trb", SensorDeviceClass.BATTERY, PERCENTAGE, 1),
+            ("input_power", "ip", SensorDeviceClass.POWER, UnitOfPower.WATT, 1),
+            ("output_power", "op", SensorDeviceClass.POWER, UnitOfPower.WATT, 1),
+            ("input_time", "it", SensorDeviceClass.DURATION, UnitOfTime.HOURS, 10),
+            ("output_time", "ot", SensorDeviceClass.DURATION, UnitOfTime.HOURS, 10),
+        )
+    ),
+    *(
+        description
+        for channel in ("ac1", "ac2")
+        for description in _box_ac_metadata_descriptions(channel)
+    ),
+)
+
+
+def _portable_raw_integer(entity: JackerySensorEntity, field: str) -> int | None:
+    return safe_int(_get_prop(entity, field))
+
+
+def _portable_nonnegative_integer(
+    entity: JackerySensorEntity, field: str
+) -> int | None:
+    value = _portable_raw_integer(entity, field)
+    return value if value is not None and value >= 0 else None
+
+
+def _portable_tenths_hour(entity: JackerySensorEntity, field: str) -> float | None:
+    value = _portable_nonnegative_integer(entity, field)
+    return value / 10 if value is not None else None
+
+
+def _portable_percent(entity: JackerySensorEntity, field: str) -> int | None:
+    value = _portable_raw_integer(entity, field)
+    return value if value is not None and 0 <= value <= _SETTING_PERCENT_MAX else None
+
+
+def _portable_dc_input_power(entity: JackerySensorEntity) -> int | None:
+    direct = _portable_nonnegative_integer(entity, FIELD_CIP)
+    parallel = _portable_nonnegative_integer(entity, FIELD_ACPSP)
+    if direct is None or parallel is None:
+        return None
+    return direct + parallel // 10
+
+
 PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
+    JackerySensorDescription(
+        key="portable_strategy_plans",
+        translation_key="portable_strategy_plans",
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=lambda entity: _strategy_count(entity, "cds"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    JackerySensorDescription(
+        key="portable_current_strategy",
+        translation_key="portable_current_strategy",
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=lambda entity: _strategy_count(entity, "cep"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    *(
+        JackerySensorDescription(
+            key=key,
+            translation_key=key,
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_percent, field=field),
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=PERCENTAGE,
+        )
+        for key, field in (
+            ("portable_custom_battery_threshold", FIELD_BC),
+            ("portable_peak_charge_limit", FIELD_BPC),
+        )
+    ),
+    JackerySensorDescription(
+        key="portable_dc_input_power",
+        translation_key="portable_dc_input_power",
+        app_fields=(FIELD_CIP, FIELD_ACPSP),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=_portable_dc_input_power,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    *(
+        JackerySensorDescription(
+            key=key,
+            translation_key=key,
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_raw_integer, field=field),
+        )
+        for key, field in (
+            ("portable_acpsp_raw", FIELD_ACPSP),
+            ("portable_acpss_raw", FIELD_ACPSS),
+            ("portable_charge_mode_code", FIELD_CS),
+            ("portable_light_mode_code", FIELD_LM),
+            ("portable_pal_raw", FIELD_PAL),
+            ("portable_parallel_port_state", FIELD_PC),
+            ("portable_temperature_warning_code", FIELD_TA),
+            ("portable_tp_raw", FIELD_TP),
+            ("portable_tt_raw", FIELD_TT),
+        )
+    ),
+    JackerySensorDescription(
+        key="portable_dc_shared_output_power",
+        translation_key="portable_dc_shared_output_power",
+        app_fields=(FIELD_COP,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=partial(_portable_nonnegative_integer, field=FIELD_COP),
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfPower.WATT,
+    ),
+    *(
+        JackerySensorDescription(
+            key=key,
+            translation_key=key,
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_nonnegative_integer, field=field),
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfPower.WATT,
+        )
+        for key, field in (
+            ("portable_charge_min_power", FIELD_CSL),
+            ("portable_charge_max_power", FIELD_CST),
+            ("portable_charge_set_power", FIELD_CSC),
+        )
+    ),
+    *(
+        JackerySensorDescription(
+            key=f"portable_ac{index}_timer",
+            translation_key=f"portable_ac{index}_timer",
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_nonnegative_integer, field=field),
+            device_class=SensorDeviceClass.DURATION,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfTime.SECONDS,
+        )
+        for index, field in ((1, FIELD_OACT1), (2, FIELD_OACT2))
+    ),
+    *(
+        JackerySensorDescription(
+            key=key,
+            translation_key=key,
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_nonnegative_integer, field=field),
+            device_class=SensorDeviceClass.DURATION,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfTime.SECONDS,
+        )
+        for key, field in (
+            ("portable_ac_timer", FIELD_OACT),
+            ("portable_dc_timer", FIELD_ODCT),
+            ("portable_car_timer", FIELD_ODCCT),
+            ("portable_usb_timer", FIELD_ODCUT),
+        )
+    ),
+    *(
+        JackerySensorDescription(
+            key=key,
+            translation_key=key,
+            app_fields=(field,),
+            data_sources=ALL_LIVE_DATA_SOURCES,
+            value_fn=partial(_portable_tenths_hour, field=field),
+            device_class=SensorDeviceClass.DURATION,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfTime.HOURS,
+        )
+        for key, field in (
+            ("portable_input_time", FIELD_IT),
+            ("portable_output_time", FIELD_OT),
+        )
+    ),
+    JackerySensorDescription(
+        key="portable_ground_accessory_serial",
+        translation_key="portable_ground_accessory_serial",
+        app_fields=("grdAccSn",),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=_portable_ground_serial,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        key="portable_bs_raw",
+        translation_key="portable_bs_raw",
+        app_fields=("bs",),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: safe_int(_get_prop(entity, "bs")),
+    ),
+    JackerySensorDescription(
+        key="portable_wifi_scan",
+        translation_key="portable_wifi_scan",
+        app_fields=(FIELD_F,),
+        data_sources=LAYER5_DATA_SOURCES,
+        value_fn=_portable_wifi_count,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        recorder_allowed=False,
+    ),
+    JackerySensorDescription(
+        key="portable_idc_raw",
+        translation_key="portable_idc_raw",
+        app_fields=(FIELD_IDC,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: safe_int(_get_prop(entity, FIELD_IDC)),
+    ),
+    JackerySensorDescription(
+        key="portable_reserve_restore_threshold",
+        translation_key="portable_reserve_restore_threshold",
+        app_fields=(FIELD_SRL,),
+        data_sources=ALL_LIVE_DATA_SOURCES,
+        value_fn=lambda entity: _integral_setting_value(entity, FIELD_SRL, PERCENTAGE),
+        native_unit_of_measurement=PERCENTAGE,
+    ),
     JackerySensorDescription(
         app_fields=(FIELD_IAC,),
         # pyrefly: ignore [unexpected-keyword]
@@ -4610,7 +5555,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ACOV,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_voltage",
-        value_fn=lambda e: _get_prop(e, FIELD_ACOV),
+        value_fn=lambda e: _div(10)(_get_prop(e, FIELD_ACOV)),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_voltage",
         # pyrefly: ignore [unexpected-keyword]
@@ -4655,10 +5600,10 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     JackerySensorDescription(
-        app_fields=(FIELD_OAC, FIELD_OACPW),
+        app_fields=(FIELD_OACPW,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_power",
-        value_fn=lambda e: _get_prop_any(e, FIELD_OACPW, FIELD_OAC),
+        value_fn=lambda e: _get_prop(e, FIELD_OACPW),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_power",
         # pyrefly: ignore [unexpected-keyword]
@@ -4672,7 +5617,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OAC2,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_power_2",
-        value_fn=lambda e: _get_prop(e, FIELD_OAC2),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_power_2",
         # pyrefly: ignore [unexpected-keyword]
@@ -4688,7 +5633,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OACT,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_current",
-        value_fn=lambda e: _get_prop(e, FIELD_OACT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_current",
         # pyrefly: ignore [unexpected-keyword]
@@ -4714,7 +5659,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODC_PORT,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_output_power",
-        value_fn=lambda e: _get_prop(e, FIELD_ODC_PORT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_output_power",
         # pyrefly: ignore [unexpected-keyword]
@@ -4728,7 +5673,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODCC,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_output_current",
-        value_fn=lambda e: _get_prop(e, FIELD_ODCC),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_output_current",
         # pyrefly: ignore [unexpected-keyword]
@@ -4744,7 +5689,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODCU,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_output_voltage",
-        value_fn=lambda e: _get_prop(e, FIELD_ODCU),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_output_voltage",
         # pyrefly: ignore [unexpected-keyword]
@@ -4856,7 +5801,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OACL1,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_line1_current",
-        value_fn=lambda e: _get_prop(e, FIELD_OACL1),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_line1_current",
         # pyrefly: ignore [unexpected-keyword]
@@ -4888,7 +5833,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OACL2,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_line2_current",
-        value_fn=lambda e: _get_prop(e, FIELD_OACL2),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_line2_current",
         # pyrefly: ignore [unexpected-keyword]
@@ -4920,7 +5865,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OACT1,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_current_1",
-        value_fn=lambda e: _get_prop(e, FIELD_OACT1),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_current_1",
         # pyrefly: ignore [unexpected-keyword]
@@ -4936,7 +5881,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OACT2,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_current_2",
-        value_fn=lambda e: _get_prop(e, FIELD_OACT2),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_current_2",
         # pyrefly: ignore [unexpected-keyword]
@@ -4966,7 +5911,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CS,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_status",
-        value_fn=lambda e: _get_prop(e, FIELD_CS),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_status",
         # pyrefly: ignore [unexpected-keyword]
@@ -4976,7 +5921,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CSC,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_status_code",
-        value_fn=lambda e: _get_prop(e, FIELD_CSC),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_status_code",
         # pyrefly: ignore [unexpected-keyword]
@@ -4986,7 +5931,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CSL,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_status_limit",
-        value_fn=lambda e: _get_prop(e, FIELD_CSL),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_status_limit",
         # pyrefly: ignore [unexpected-keyword]
@@ -4996,7 +5941,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CST,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_status_type",
-        value_fn=lambda e: _get_prop(e, FIELD_CST),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_status_type",
         # pyrefly: ignore [unexpected-keyword]
@@ -5006,7 +5951,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PC,),
         # pyrefly: ignore [unexpected-keyword]
         key="power_count",
-        value_fn=lambda e: _get_prop(e, FIELD_PC),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="power_count",
         # pyrefly: ignore [unexpected-keyword]
@@ -5016,7 +5961,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PM,),
         # pyrefly: ignore [unexpected-keyword]
         key="power_mode_portable",
-        value_fn=lambda e: _get_prop(e, FIELD_PM),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="power_mode_portable",
         # pyrefly: ignore [unexpected-keyword]
@@ -5046,7 +5991,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_IT,),
         # pyrefly: ignore [unexpected-keyword]
         key="input_temperature",
-        value_fn=lambda e: _div(10)(_get_prop(e, FIELD_IT)),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="input_temperature",
         # pyrefly: ignore [unexpected-keyword]
@@ -5060,7 +6005,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_OT,),
         # pyrefly: ignore [unexpected-keyword]
         key="output_temperature",
-        value_fn=lambda e: _div(10)(_get_prop(e, FIELD_OT)),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="output_temperature",
         # pyrefly: ignore [unexpected-keyword]
@@ -5085,12 +6030,11 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
     ),
     JackerySensorDescription(
-        app_fields=(FIELD_IACPW, FIELD_IP),
+        app_fields=(FIELD_IP, FIELD_BLE_PORTABLE_INPUT_POWER),
         # pyrefly: ignore [unexpected-keyword]
         key="input_power_portable",
-        value_fn=lambda e: _first_non_none_state(
-            _get_prop(e, FIELD_IP),
-            _get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_IACPW),
+        value_fn=lambda e: _get_fresh_ble_or_app_power(
+            e, FIELD_BLE_PORTABLE_INPUT_POWER, FIELD_IP
         ),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="input_power_portable",
@@ -5102,12 +6046,11 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfPower.WATT,
     ),
     JackerySensorDescription(
-        app_fields=(FIELD_OACPW, FIELD_OP),
+        app_fields=(FIELD_OP, FIELD_BLE_PORTABLE_OUTPUT_POWER),
         # pyrefly: ignore [unexpected-keyword]
         key="output_power_portable",
-        value_fn=lambda e: _first_non_none_state(
-            _get_prop(e, FIELD_OP),
-            _get_payload_section(e, PAYLOAD_PROPERTIES, FIELD_OACPW),
+        value_fn=lambda e: _get_fresh_ble_or_app_power(
+            e, FIELD_BLE_PORTABLE_OUTPUT_POWER, FIELD_OP
         ),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="output_power_portable",
@@ -5131,24 +6074,22 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
     JackerySensorDescription(
         app_fields=(FIELD_RB,),
         # pyrefly: ignore [unexpected-keyword]
-        key="remaining_runtime",
+        key="portable_battery_soc",
         value_fn=lambda e: _get_prop(e, FIELD_RB),
         # pyrefly: ignore [unexpected-keyword]
-        translation_key="remaining_runtime",
+        translation_key="portable_battery_soc",
         # pyrefly: ignore [unexpected-keyword]
-        device_class=SensorDeviceClass.DURATION,
+        device_class=SensorDeviceClass.BATTERY,
         # pyrefly: ignore [unexpected-keyword]
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        # pyrefly: ignore [unexpected-keyword]
-        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=PERCENTAGE,
     ),
     JackerySensorDescription(
         app_fields=(FIELD_BC,),
         # pyrefly: ignore [unexpected-keyword]
         key="battery_count",
-        value_fn=lambda e: _get_prop(e, FIELD_BC),
+        value_fn=_battery_count_for_family,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_count",
         # pyrefly: ignore [unexpected-keyword]
@@ -5160,7 +6101,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_BLS,),
         # pyrefly: ignore [unexpected-keyword]
         key="battery_low_state",
-        value_fn=lambda e: _get_prop(e, FIELD_BLS),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_low_state",
         # pyrefly: ignore [unexpected-keyword]
@@ -5170,7 +6111,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_CL,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_limit",
-        value_fn=lambda e: _get_prop(e, FIELD_CL),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_limit",
         # pyrefly: ignore [unexpected-keyword]
@@ -5184,7 +6125,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_DL,),
         # pyrefly: ignore [unexpected-keyword]
         key="discharge_limit",
-        value_fn=lambda e: _get_prop(e, FIELD_DL),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="discharge_limit",
         # pyrefly: ignore [unexpected-keyword]
@@ -5198,7 +6139,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PM,),
         # pyrefly: ignore [unexpected-keyword]
         key="power_mode",
-        value_fn=lambda e: _get_prop(e, FIELD_PM),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="power_mode",
         # pyrefly: ignore [unexpected-keyword]
@@ -5336,7 +6277,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODCCT,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_type",
-        value_fn=lambda e: _get_prop(e, FIELD_ODCCT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_type",
         # pyrefly: ignore [unexpected-keyword]
@@ -5346,7 +6287,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODCT,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_output_type",
-        value_fn=lambda e: _get_prop(e, FIELD_ODCT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_output_type",
         # pyrefly: ignore [unexpected-keyword]
@@ -5366,7 +6307,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ODCUT,),
         # pyrefly: ignore [unexpected-keyword]
         key="dc_usb_type",
-        value_fn=lambda e: _get_prop(e, FIELD_ODCUT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="dc_usb_type",
         # pyrefly: ignore [unexpected-keyword]
@@ -5376,7 +6317,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_BPC,),
         # pyrefly: ignore [unexpected-keyword]
         key="battery_pack_count",
-        value_fn=lambda e: _get_prop(e, FIELD_BPC),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_pack_count",
         # pyrefly: ignore [unexpected-keyword]
@@ -5396,7 +6337,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_PAL,),
         # pyrefly: ignore [unexpected-keyword]
         key="light_sensor",
-        value_fn=lambda e: _get_prop(e, FIELD_PAL),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="light_sensor",
         # pyrefly: ignore [unexpected-keyword]
@@ -5406,7 +6347,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_SFC,),
         # pyrefly: ignore [unexpected-keyword]
         key="sleep_mode_flag",
-        value_fn=lambda e: _get_prop(e, FIELD_SFC),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="sleep_mode_flag",
         # pyrefly: ignore [unexpected-keyword]
@@ -5426,7 +6367,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TA,),
         # pyrefly: ignore [unexpected-keyword]
         key="ambient_temperature",
-        value_fn=lambda e: _get_prop(e, FIELD_TA),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ambient_temperature",
         # pyrefly: ignore [unexpected-keyword]
@@ -5442,7 +6383,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TP,),
         # pyrefly: ignore [unexpected-keyword]
         key="panel_temperature",
-        value_fn=lambda e: _get_prop(e, FIELD_TP),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="panel_temperature",
         # pyrefly: ignore [unexpected-keyword]
@@ -5454,11 +6395,12 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # Keep legacy statistic identities without writing incorrectly typed values.
     JackerySensorDescription(
         app_fields=(FIELD_ACCD,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_discharge_current",
-        value_fn=lambda e: _get_prop(e, FIELD_ACCD),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_discharge_current",
         # pyrefly: ignore [unexpected-keyword]
@@ -5474,7 +6416,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ACDT,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_discharge_time",
-        value_fn=lambda e: _get_prop(e, FIELD_ACDT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_discharge_time",
         # pyrefly: ignore [unexpected-keyword]
@@ -5485,6 +6427,34 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTime.MINUTES,
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_ACCD,),
+        # pyrefly: ignore [unexpected-keyword]
+        key="portable_ac_delay_remaining",
+        value_fn=lambda e: _get_prop(e, FIELD_ACCD),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="portable_ac_delay_remaining",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.DURATION,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+    ),
+    JackerySensorDescription(
+        app_fields=(FIELD_ACDT,),
+        # pyrefly: ignore [unexpected-keyword]
+        key="portable_ac_delay_setting",
+        value_fn=lambda e: _get_prop(e, FIELD_ACDT),
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="portable_ac_delay_setting",
+        # pyrefly: ignore [unexpected-keyword]
+        device_class=SensorDeviceClass.DURATION,
+        # pyrefly: ignore [unexpected-keyword]
+        state_class=SensorStateClass.MEASUREMENT,
+        # pyrefly: ignore [unexpected-keyword]
+        native_unit_of_measurement=UnitOfTime.SECONDS,
     ),
     JackerySensorDescription(
         app_fields=(FIELD_ACIP,),
@@ -5506,7 +6476,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ACPSP,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_apparent_power_parallel",
-        value_fn=lambda e: _get_prop(e, FIELD_ACPSP),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_apparent_power_parallel",
         # pyrefly: ignore [unexpected-keyword]
@@ -5522,7 +6492,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ACPSS,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_apparent_power_sum",
-        value_fn=lambda e: _get_prop(e, FIELD_ACPSS),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_apparent_power_sum",
         # pyrefly: ignore [unexpected-keyword]
@@ -5538,7 +6508,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_COP,),
         # pyrefly: ignore [unexpected-keyword]
         key="charge_output_power",
-        value_fn=lambda e: _get_prop(e, FIELD_COP),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="charge_output_power",
         # pyrefly: ignore [unexpected-keyword]
@@ -5570,7 +6540,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_LM,),
         # pyrefly: ignore [unexpected-keyword]
         key="load_mode",
-        value_fn=lambda e: _get_prop(e, FIELD_LM),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="load_mode",
         # pyrefly: ignore [unexpected-keyword]
@@ -5622,7 +6592,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_ACOV1,),
         # pyrefly: ignore [unexpected-keyword]
         key="ac_output_voltage_2",
-        value_fn=lambda e: _get_prop(e, FIELD_ACOV1),
+        value_fn=lambda e: _div(10)(_get_prop(e, FIELD_ACOV1)),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="ac_output_voltage_2",
         # pyrefly: ignore [unexpected-keyword]
@@ -5638,7 +6608,7 @@ PORTABLE_SENSOR_DESCRIPTIONS: tuple[JackerySensorDescription, ...] = (
         app_fields=(FIELD_TT,),
         # pyrefly: ignore [unexpected-keyword]
         key="total_time",
-        value_fn=lambda e: _get_prop(e, FIELD_TT),
+        value_fn=lambda _e: None,
         # pyrefly: ignore [unexpected-keyword]
         translation_key="total_time",
         # pyrefly: ignore [unexpected-keyword]
@@ -5672,10 +6642,22 @@ SAVINGS_DETAIL_SENSOR_DESCRIPTIONS: tuple[
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda e: safe_float(e.get_savings_value("energy_kwh")),
+    ),
+    # Restored verbatim from diff/1406/sensor.py:2264-2275.
+    JackerySavingsDetailSensorDescription(
+        key="savings_price",
+        translation_key="savings_price",
+        path=("price",),
+        transform=lambda v: (
+            None if (f := safe_float(v)) is None else round(f, SAVINGS_PRICE_PRECISION)
+        ),
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=f"{CURRENCY_EURO}/kWh",
+        icon="mdi:currency-eur",
     ),
     JackerySavingsDetailSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -5760,7 +6742,12 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        value_fn=lambda e: _div(10)(safe_float(_get_prop(e, FIELD_CELL_TEMP))),
+        # Pack measurements must stay bound to this pack's own payload.  A
+        # fallback to main-device properties can silently show the head
+        # battery's temperature as an add-on pack measurement.
+        value_fn=lambda e: _div(10)(
+            safe_float(getattr(e, "_pack", {}).get(FIELD_CELL_TEMP)),
+        ),
         transform=_div(10),
     ),
     JackeryBatteryPackSensorDescription(
@@ -5775,7 +6762,7 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
-        value_fn=lambda e: safe_float(_get_prop(e, FIELD_IN_PW)),
+        value_fn=lambda e: safe_float(getattr(e, "_pack", {}).get(FIELD_IN_PW)),
     ),
     JackeryBatteryPackSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -5789,7 +6776,7 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         state_class=SensorStateClass.MEASUREMENT,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfPower.WATT,
-        value_fn=lambda e: safe_float(_get_prop(e, FIELD_OUT_PW)),
+        value_fn=lambda e: safe_float(getattr(e, "_pack", {}).get(FIELD_OUT_PW)),
     ),
     JackeryBatteryPackSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -5834,10 +6821,26 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         value_fn=lambda e: safe_int(_get_prop(e, FIELD_UPDATE_STATUS)),
     ),
     JackeryBatteryPackSensorDescription(
+        key="firmware_update_available",
+        field=FIELD_IS_FIRMWARE_UPGRADE,
+        transform=_firmware_update_availability,
+        translation_key="battery_pack_firmware_update_available",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=["available", "not_available"],
+        value_fn=lambda e: _firmware_update_availability(
+            getattr(e, "_pack", {}).get(FIELD_IS_FIRMWARE_UPGRADE)
+            if hasattr(e, "_pack")
+            else _get_prop(e, FIELD_IS_FIRMWARE_UPGRADE)
+        ),
+    ),
+    JackeryBatteryPackSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="lifetime_charge_energy",
         field=FIELD_IN_EGY,
-        transform=_div(100),
+        # Physical BatteryPackSub counter. The currently validated protocol
+        # uses 0.01 kWh, not the older 1406 comment's Wh-based /1000 scale.
+        transform=_div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH),
         # pyrefly: ignore [unexpected-keyword]
         translation_key="battery_pack_lifetime_charge_energy",
         # pyrefly: ignore [unexpected-keyword]
@@ -5848,8 +6851,9 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
+        # Never fall back to head properties or another pack's counter.
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
-            safe_float(_get_prop(e, FIELD_IN_EGY))
+            safe_float(getattr(e, "_pack", {}).get(FIELD_IN_EGY))
         ),
     ),
     JackeryBatteryPackSensorDescription(
@@ -5867,8 +6871,9 @@ BATTERY_PACK_SENSOR_DESCRIPTIONS: tuple[JackeryBatteryPackSensorDescription, ...
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
+        # Retain the precise pack identity of the lifetime field.
         value_fn=lambda e: _div(JACKERY_LIVE_ENERGY_UNITS_PER_KWH)(
-            safe_float(_get_prop(e, FIELD_OUT_EGY))
+            safe_float(getattr(e, "_pack", {}).get(FIELD_OUT_EGY))
         ),
     ),
 )
@@ -5946,7 +6951,7 @@ SMART_PLUG_SENSOR_DESCRIPTIONS: tuple[JackerySmartPlugSensorDescription, ...] = 
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         reset_period=DATE_TYPE_DAY,
@@ -6162,7 +7167,7 @@ METER_HEAD_SENSOR_DESCRIPTIONS: tuple[JackeryMeterHeadSensorDescription, ...] = 
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         # pyrefly: ignore [unexpected-keyword]
@@ -6179,7 +7184,7 @@ METER_HEAD_SENSOR_DESCRIPTIONS: tuple[JackeryMeterHeadSensorDescription, ...] = 
         # pyrefly: ignore [unexpected-keyword]
         device_class=SensorDeviceClass.ENERGY,
         # pyrefly: ignore [unexpected-keyword]
-        state_class=SensorStateClass.TOTAL,
+        state_class=SensorStateClass.TOTAL_INCREASING,
         # pyrefly: ignore [unexpected-keyword]
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         # pyrefly: ignore [unexpected-keyword]
@@ -6225,6 +7230,97 @@ METER_HEAD_SENSOR_DESCRIPTIONS: tuple[JackeryMeterHeadSensorDescription, ...] = 
 )
 
 SMART_METER_SENSOR_DESCRIPTIONS: tuple[JackerySmartMeterSensorDescription, ...] = (
+    JackerySmartMeterSensorDescription(
+        key="device_temperature",
+        field=FIELD_CT_TEMPERATURE_C,
+        transform=safe_float,
+        translation_key="smart_meter_device_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        value_fn=lambda entity: _smart_meter_value_fn(
+            entity, entity.entity_description
+        ),
+    ),
+    *(
+        JackerySmartMeterSensorDescription(
+            key=key,
+            field=field,
+            transform=safe_float,
+            translation_key=f"smart_meter_{key}",
+            device_class=SensorDeviceClass.POWER,
+            state_class=SensorStateClass.MEASUREMENT,
+            native_unit_of_measurement=UnitOfPower.WATT,
+            value_fn=lambda entity: _smart_meter_value_fn(
+                entity, entity.entity_description
+            ),
+        )
+        for key, field in (
+            ("acc_l2_power", "l2power"),
+            ("acc_l2_power_1", "l2power1"),
+            ("acc_l2_power_2", "l2power2"),
+            ("acc_l2_power_3", "l2power3"),
+        )
+    ),
+    *(
+        JackerySmartMeterSensorDescription(
+            key=f"acc_{field}_raw",
+            field=field,
+            transform=safe_float,
+            translation_key=f"smart_meter_acc_{field}_raw",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            entity_registry_enabled_default=False,
+            value_fn=lambda entity: _smart_meter_value_fn(
+                entity, entity.entity_description
+            ),
+        )
+        for field in (
+            "l2ap",
+            "l2ap1",
+            "l2ap2",
+            "l2ap3",
+            "l2curr",
+            "l2curr1",
+            "l2curr2",
+            "l2curr3",
+            "l2fact",
+            "l2fact1",
+            "l2fact2",
+            "l2fact3",
+            "l2freq",
+            "l2rep",
+            "l2rep1",
+            "l2rep2",
+            "l2rep3",
+        )
+    ),
+    *(
+        JackerySmartMeterSensorDescription(
+            key=key,
+            field=positive,
+            aliases=(positive,),
+            negative_aliases=(negative,),
+            transform=safe_float,
+            translation_key=f"smart_meter_{key}",
+            # pyrefly: ignore [unexpected-keyword]
+            device_class=SensorDeviceClass.POWER,
+            # pyrefly: ignore [unexpected-keyword]
+            state_class=SensorStateClass.MEASUREMENT,
+            # pyrefly: ignore [unexpected-keyword]
+            native_unit_of_measurement=UnitOfPower.WATT,
+            value_fn=lambda e: _smart_meter_value_fn(e, e.entity_description),
+        )
+        for key, (positive, negative) in zip(
+            (
+                "additional_pv_net_power",
+                "additional_pv_phase_1_power",
+                "additional_pv_phase_2_power",
+                "additional_pv_phase_3_power",
+            ),
+            CT_THIRD_PV_POWER_PAIRS,
+            strict=True,
+        )
+    ),
     JackerySmartMeterSensorDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="power",

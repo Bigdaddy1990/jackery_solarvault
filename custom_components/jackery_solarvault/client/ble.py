@@ -54,12 +54,13 @@ both 16-byte (AES-128) and 32-byte (AES-256) keys to stay compatible
 with whatever the device hands out. See ``coordinator.device_bluetooth_key()``.
 """
 
-from dataclasses import dataclass
-from datetime import datetime  # ruff: ignore[typing-only-standard-library-import] - runtime observation annotations
+from dataclasses import dataclass, field, replace
 import logging
 import os
 import secrets
+from typing import Literal
 
+from cryptography.hazmat.decrepit.ciphers.algorithms import ARC4
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
@@ -84,6 +85,9 @@ _HEX16_WIDTH: int = 4
 
 #: Largest unsigned value carried by the protocol's fixed-width fields.
 _UINT16_MAX: int = 0xFFFF
+_UINT8_MAX: int = 0xFF
+_PORTABLE_MIN_NOTIFY_BYTES: int = 9
+_PORTABLE_PAGED_HEADER_BYTES: int = 10
 
 #: Key lengths (in bytes) accepted by the BLE crypto helpers.
 #:
@@ -109,6 +113,65 @@ BLE_AES_KEY_LEN: int = BLE_AES_KEY_LEN_AES128
 
 #: AES-CBC IV length in bytes.
 BLE_AES_IV_LEN: int = 16
+
+PortableBleProfile = Literal["rc4", "aes_fixed", "aes_random"]
+_PORTABLE_RC4_MODELS = frozenset({
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    22,
+    25,
+    35,
+})
+_PORTABLE_FIXED_IV_MODELS = frozenset({20, 21, 23, 24, 38})
+_PORTABLE_RANDOM_IV_MODELS = frozenset({
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    39,
+    40,
+    41,
+})
+
+
+def portable_ble_profile(model_code: object) -> PortableBleProfile | None:
+    """Select the App 2.4.2 Portable codec for a documented model code."""
+    if isinstance(model_code, bool) or not isinstance(model_code, (int, str)):
+        return None
+    try:
+        code = int(model_code)
+    except ValueError:
+        return None
+    if code in _PORTABLE_RC4_MODELS:
+        return "rc4"
+    if code in _PORTABLE_FIXED_IV_MODELS:
+        return "aes_fixed"
+    if code in _PORTABLE_RANDOM_IV_MODELS:
+        return "aes_random"
+    return None
+
 
 #: GATT service UUID advertised by the SolarVault BLE radio.
 BLE_SERVICE_UUID: str = "0000bdee-0000-1000-8000-00805f9b34fb"
@@ -322,9 +385,9 @@ class BleBinaryFrame:
     variants (Modbus, zlib, MPEG-2, JAMCRC, BZIP2, ISCSI, Kermit, X.25,
     ARC, Autosar, Posix, IEC, etc.) over any tested input range (body,
     header+body, IV+body, IV+header+body), nor MD5/SHA-1/SHA-256/AES-CMAC
-    truncations with the ``bluetoothKey`` as the MAC key. AES-CBC-PKCS7
-    already provides decode-time integrity, so the read path can safely
-    leave the trailer untouched. The write path (Phase 3b) will need
+    truncations with the ``bluetoothKey`` as the MAC key. The decoder checks
+    padding and frame structure; AES-CBC does not authenticate the payload.
+    The inbound trailer remains unverified. The write path (Phase 3b) will need
     either a Frida-derived algorithm or a black-box probe of what the
     device firmware actually validates.
     """
@@ -335,28 +398,7 @@ class BleBinaryFrame:
     cmd: int
     body: bytes
     trailer: bytes
-
-
-# ---------------------------------------------------------------------------
-@dataclass(slots=True)
-class BleFrameObservation:
-    """One frame observed on the notify characteristic.
-
-    Carries both the parsed view and the original raw bytes so the
-    diagnostics surface can show what we received even if decoding failed.
-    ``parsed`` is set when AES decrypt + header parse succeeded; otherwise
-    ``decode_error`` carries the reason and ``parsed`` is None.
-    """
-
-    received_at: datetime
-    raw_bytes: bytes
-    base64_encoded: str
-    parsed: BleBinaryFrame | None
-    decode_error: str | None = None
-    session_generation: int | None = None
-    notify_sequence: int | None = None
-    delivery_id: str | None = None
-    is_fragment: bool = False
+    checksum_valid: bool | None = field(default=None, compare=False)
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +488,125 @@ def build_binary_frame(  # ruff: ignore[too-many-arguments]
     return protected + crc
 
 
+def build_portable_legacy_frame(
+    *,
+    action_id: int,
+    ble_cmd: int,
+    body: bytes,
+    frame_index: int,
+    chunk_count: int,
+) -> bytes:
+    """Build an App V1 Portable request frame before encryption."""
+    if not 0 <= action_id <= _UINT8_MAX or not 0 <= ble_cmd <= _UINT8_MAX:
+        msg = "portable action and command must fit in one byte"
+        raise ValueError(msg)
+    if not 1 <= frame_index <= chunk_count <= _UINT16_MAX:
+        msg = "invalid portable page index or count"
+        raise ValueError(msg)
+    if len(body) > (_UINT8_MAX if chunk_count == 1 else _UINT16_MAX):
+        msg = "portable page body exceeds the protocol limit"
+        raise ValueError(msg)
+    if chunk_count == 1:
+        return bytes.fromhex("dfec00") + bytes((action_id, ble_cmd, len(body))) + body
+    return (
+        bytes.fromhex("dfec80")
+        + bytes((action_id, ble_cmd))
+        + len(body).to_bytes(2, "big")
+        + frame_index.to_bytes(2, "big")
+        + chunk_count.to_bytes(2, "big")
+        + body
+    )
+
+
+def encrypt_portable_legacy_frame(
+    frame: bytes,
+    key: bytes,
+    *,
+    cipher: str,
+    security: int | None = None,
+) -> bytes:
+    """Protect one Portable V1 request using its model's App codec."""
+    _validate_key_len(key, fn="encrypt_portable_legacy_frame")
+    if not frame.startswith(bytes.fromhex("dfec")):
+        msg = "invalid portable frame magic"
+        raise ValueError(msg)
+    if security is None:
+        security = secrets.randbelow(_UINT8_MAX) + 1
+    if not 1 <= security <= _UINT8_MAX:
+        msg = "portable security value must be in 1..255"
+        raise ValueError(msg)
+    if cipher == "rc4":
+        protected = bytes(value ^ security for value in frame) + bytes((security,))
+    elif cipher == "aes_fixed":
+        protected = frame + bytes((security,))
+    else:
+        msg = "unknown portable legacy cipher"
+        raise ValueError(msg)
+    plaintext = protected + crc16_modbus(protected).to_bytes(2, "little")
+    if cipher == "aes_fixed":
+        return aes_encrypt(plaintext, key, key)
+    encryptor = Cipher(ARC4(key), mode=None).encryptor()
+    return encryptor.update(plaintext) + encryptor.finalize()
+
+
+def decode_portable_legacy_notify(
+    raw: bytes,
+    key: bytes,
+    *,
+    cipher: str,
+) -> tuple[int, BleBinaryFrame]:
+    """Decode and validate one App V1 Portable notification page."""
+    _validate_key_len(key, fn="decode_portable_legacy_notify")
+    if cipher == "rc4":
+        decryptor = Cipher(ARC4(key), mode=None).decryptor()
+        plaintext = decryptor.update(raw) + decryptor.finalize()
+    elif cipher == "aes_fixed":
+        plaintext = aes_decrypt(raw, key, key)
+    else:
+        msg = "unknown portable legacy cipher"
+        raise ValueError(msg)
+    if len(plaintext) < _PORTABLE_MIN_NOTIFY_BYTES:
+        msg = "portable notification is too short"
+        raise ValueError(msg)
+    protected, checksum = plaintext[:-2], plaintext[-2:]
+    if crc16_modbus(protected).to_bytes(2, "little") != checksum:
+        msg = "portable notification CRC mismatch"
+        raise ValueError(msg)
+    security = protected[-1]
+    frame = protected[:-1]
+    if cipher == "rc4":
+        frame = bytes(value ^ security for value in frame)
+    if not frame.startswith(bytes.fromhex("dfec")):
+        msg = "invalid portable notification magic"
+        raise ValueError(msg)
+    status = frame[2] & 0x7F
+    action_id, cmd, body_length = frame[3:6]
+    if frame[2] & 0x80:
+        if len(frame) < _PORTABLE_PAGED_HEADER_BYTES:
+            msg = "portable page header is truncated"
+            raise ValueError(msg)
+        index = int.from_bytes(frame[6:8], "big")
+        count = int.from_bytes(frame[8:10], "big")
+        body = frame[10:]
+    else:
+        index = count = 1
+        body = frame[6:]
+    if not 1 <= index <= count or len(body) != body_length:
+        msg = "invalid portable notification page"
+        raise ValueError(msg)
+    if count == 1 and not body:
+        body = b"{}"
+    return status, BleBinaryFrame(
+        index,
+        count,
+        action_id,
+        cmd,
+        body,
+        protected[-1:] + checksum,
+        checksum_valid=True,
+    )
+
+
 def encrypt_binary_notify(
     plaintext_frame: bytes,
     key: bytes,
@@ -467,8 +628,8 @@ def encrypt_binary_notify(
     return actual_iv + ciphertext
 
 
-def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
-    r"""Decrypt a raw 0xEE02 notify payload and parse the binary header.
+def decode_binary_notify(raw: bytes, key: bytes) -> tuple[int, BleBinaryFrame]:
+    r"""Decrypt a random-IV notify payload and return its status and frame.
 
     The notify characteristic delivers ``iv (16) || ciphertext`` per frame
     (verified against the 2026-05-16 live capture). The IV in those frames
@@ -490,6 +651,213 @@ def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
         msg = f"ciphertext is not aligned to AES block size: {len(ciphertext)} bytes"
         raise ValueError(msg)
     plaintext = aes_decrypt(ciphertext, key, iv)
+    if len(plaintext) < _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
+        msg = "notification plaintext is too short"
+        raise ValueError(msg)
+    status = plaintext[12]
+    body_length = int.from_bytes(plaintext[14:16], "big")
+    checksum_valid = (
+        len(plaintext)
+        == _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
+        and crc16_modbus(plaintext[:-2]).to_bytes(2, "little") == plaintext[-2:]
+    )
+    if status:
+        body_length = int.from_bytes(plaintext[14:16], "big")
+        if len(plaintext) != (
+            _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
+        ):
+            msg = "notification body length mismatch"
+            raise ValueError(msg)
+        if crc16_modbus(plaintext[:-2]).to_bytes(2, "little") != plaintext[-2:]:
+            msg = "notification CRC mismatch"
+            raise ValueError(msg)
+    frame = _parse_binary_plaintext(plaintext[:12] + b"\x00" + plaintext[13:])
+    return status, replace(frame, checksum_valid=checksum_valid)
+
+
+def decrypt_binary_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
+    """Decrypt a successful random-IV notification."""
+    status, frame = decode_binary_notify(raw, key)
+    if status:
+        msg = f"notification status {status}"
+        raise ValueError(msg)
+    return frame
+
+
+def encrypt_box_frame(plaintext_frame: bytes, key: bytes) -> bytes:
+    """Encrypt an App Box frame with its key as the fixed CBC IV."""
+    return aes_encrypt(plaintext_frame, key, key)
+
+
+_BOX_OTA_OVERHEAD: int = 50
+_HOME_OTA_OVERHEAD: int = 60
+
+
+def split_box_ota_pages(firmware: bytes, *, mtu: int) -> tuple[bytes, ...]:
+    """Prepare Box OTA pages using the app's MTU-minus-50 payload budget."""
+    return _split_ota_pages(firmware, mtu=mtu, overhead=_BOX_OTA_OVERHEAD, family="Box")
+
+
+def split_home_ota_pages(firmware: bytes, *, mtu: int) -> tuple[bytes, ...]:
+    """Prepare Home OTA pages using the app's MTU-minus-60 payload budget."""
+    return _split_ota_pages(
+        firmware, mtu=mtu, overhead=_HOME_OTA_OVERHEAD, family="Home"
+    )
+
+
+def _split_ota_pages(
+    firmware: bytes, *, mtu: int, overhead: int, family: str
+) -> tuple[bytes, ...]:
+    if not isinstance(firmware, bytes) or not firmware:
+        msg = f"{family} OTA firmware must be nonempty bytes"
+        raise ValueError(msg)
+    if (
+        isinstance(mtu, bool)
+        or not isinstance(mtu, int)
+        or not overhead < mtu <= _UINT16_MAX + overhead
+    ):
+        msg = f"{family} OTA MTU must yield a valid page size"
+        raise ValueError(msg)
+    page_size = mtu - overhead
+    if (len(firmware) + page_size - 1) // page_size > _UINT16_MAX:
+        msg = f"{family} OTA page count exceeds the protocol limit"
+        raise ValueError(msg)
+    return tuple(
+        firmware[offset : offset + page_size]
+        for offset in range(0, len(firmware), page_size)
+    )
+
+
+def encrypt_home_ota_page(
+    pages: tuple[bytes, ...],
+    *,
+    page_index: int,
+    key: bytes,
+    security: int | None = None,
+    iv: bytes | None = None,
+) -> bytes:
+    """Frame and encrypt one device-requested Home OTA page."""
+    if (
+        isinstance(page_index, bool)
+        or not isinstance(page_index, int)
+        or not 1 <= page_index <= len(pages) <= _UINT16_MAX
+        or not all(isinstance(page, bytes) and page for page in pages)
+    ):
+        msg = "invalid Home OTA page selection"
+        raise ValueError(msg)
+    frame = build_binary_frame(
+        flags=3009,
+        cmd=103,
+        frame_index=page_index,
+        chunk_count=len(pages),
+        body=pages[page_index - 1],
+        security=security,
+    )
+    return encrypt_binary_notify(frame, key, iv=iv)
+
+
+def encrypt_portable_ota_page(  # ruff: ignore[too-many-arguments]
+    pages: tuple[bytes, ...],
+    *,
+    page_index: int,
+    key: bytes,
+    profile: str,
+    security: int | None = None,
+    iv: bytes | None = None,
+) -> bytes:
+    """Frame and encrypt one Portable OTA page with its model's codec."""
+    if (
+        isinstance(page_index, bool)
+        or not isinstance(page_index, int)
+        or not 1 <= page_index <= len(pages) <= _UINT16_MAX
+        or not all(isinstance(page, bytes) and page for page in pages)
+    ):
+        msg = "invalid Portable OTA page selection"
+        raise ValueError(msg)
+    if profile in {"rc4", "aes_fixed"}:
+        frame = build_portable_legacy_frame(
+            action_id=1,
+            ble_cmd=103,
+            frame_index=page_index,
+            chunk_count=len(pages),
+            body=pages[page_index - 1],
+        )
+        return encrypt_portable_legacy_frame(
+            frame, key, cipher=profile, security=security
+        )
+    if profile == "aes_random":
+        frame = build_binary_frame(
+            flags=1,
+            cmd=103,
+            frame_index=page_index,
+            chunk_count=len(pages),
+            body=pages[page_index - 1],
+            security=security,
+        )
+        return encrypt_binary_notify(frame, key, iv=iv)
+    msg = "unknown Portable OTA profile"
+    raise ValueError(msg)
+
+
+def encrypt_box_ota_page(
+    pages: tuple[bytes, ...],
+    *,
+    page_index: int,
+    key: bytes,
+    security: int | None = None,
+) -> bytes:
+    """Frame and encrypt one device-requested Box OTA page."""
+    if (
+        isinstance(page_index, bool)
+        or not isinstance(page_index, int)
+        or not 1 <= page_index <= len(pages) <= _UINT16_MAX
+        or not all(isinstance(page, bytes) and page for page in pages)
+    ):
+        msg = "invalid Box OTA page selection"
+        raise ValueError(msg)
+    frame = build_binary_frame(
+        flags=245,
+        cmd=103,
+        frame_index=page_index,
+        chunk_count=len(pages),
+        body=pages[page_index - 1],
+        security=security,
+    )
+    return encrypt_box_frame(frame, key)
+
+
+def decode_box_notify(raw: bytes, key: bytes) -> tuple[int, BleBinaryFrame]:
+    """Decode a fixed-IV App Box notification and its response status."""
+    plaintext = aes_decrypt(raw, key, key)
+    if len(plaintext) < _BINARY_FRAME_HEADER_LEN + _BINARY_FRAME_TRAILER_LEN:
+        msg = "box notification is too short"
+        raise ValueError(msg)
+    if crc16_modbus(plaintext[:-2]).to_bytes(2, "little") != plaintext[-2:]:
+        msg = "box notification CRC mismatch"
+        raise ValueError(msg)
+    body_length = int.from_bytes(plaintext[14:16], "big")
+    if (
+        len(plaintext)
+        != _BINARY_FRAME_HEADER_LEN + body_length + _BINARY_FRAME_TRAILER_LEN
+    ):
+        msg = "box notification body length mismatch"
+        raise ValueError(msg)
+    status = plaintext[12]
+    frame = _parse_binary_plaintext(plaintext[:12] + b"\x00" + plaintext[13:])
+    return status, replace(frame, checksum_valid=True)
+
+
+def decrypt_box_notify(raw: bytes, key: bytes) -> BleBinaryFrame:
+    """Decrypt a successful fixed-IV App Box notification."""
+    status, frame = decode_box_notify(raw, key)
+    if status:
+        msg = f"box notification status {status}"
+        raise ValueError(msg)
+    return frame
+
+
+def _parse_binary_plaintext(plaintext: bytes) -> BleBinaryFrame:
+    """Parse the shared DFED header after the selected codec decrypts it."""
     if not plaintext.startswith(_BINARY_FRAME_MAGIC_BE):
         msg = f"plaintext does not start with DFED magic — got {plaintext[:4].hex()}"
         raise ValueError(msg)
@@ -813,25 +1181,35 @@ __all__ = [
     "DEFAULT_BLE_MTU",
     "BleBinaryFrame",
     "BleFrame",
-    "BleFrameObservation",
+    "PortableBleProfile",
     "aes_decrypt",
     "aes_encrypt",
     "build_binary_frame",
     "build_plaintext_frame",
+    "build_portable_legacy_frame",
     "chunk_size_for_mtu",
     "crc16_hex",
     "crc16_modbus",
+    "decode_binary_notify",
+    "decode_box_notify",
+    "decode_portable_legacy_notify",
     "decrypt_binary_notify",
+    "decrypt_box_notify",
     "decrypt_frame",
     "encrypt_binary_notify",
+    "encrypt_box_frame",
+    "encrypt_box_ota_page",
     "encrypt_frame",
+    "encrypt_portable_legacy_frame",
     "hex16",
     "hex_decode",
     "hex_encode",
     "parse_hex16",
     "parse_plaintext_frame",
+    "portable_ble_profile",
     "random_iv",
     "split_body_for_mtu",
+    "split_box_ota_pages",
     "split_payload_into_frames",
 ]
 

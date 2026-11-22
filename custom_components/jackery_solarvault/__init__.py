@@ -21,6 +21,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store as Store
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
@@ -30,6 +31,7 @@ from .client import (
     JackeryAuthError,
     JackeryError,
 )
+from .client.credentials import redacted_error
 from .client.local_mqtt import JackeryLocalMqttClient, LocalMqttConnectionSettings
 from .client.mqtt_session_store import (
     async_load_mqtt_session,
@@ -69,6 +71,8 @@ from .const import (
     ENTRY_BOOTSTRAP_MQTT_SESSION,
     FIELD_BAT_NUM,
     FIELD_DEVICE_NAME as FIELD_DEVICE_NAME,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_DEV_TYPE as FIELD_DEV_TYPE,
     FIELD_FIRMWARE_VERSION as FIELD_FIRMWARE_VERSION,
     FIELD_HARDWARE_VERSION as FIELD_HARDWARE_VERSION,
@@ -76,6 +80,7 @@ from .const import (
     FIELD_MODEL_ID as FIELD_MODEL_ID,
     FIELD_MODEL_NAME as FIELD_MODEL_NAME,
     FIELD_SCAN_NAME as FIELD_SCAN_NAME,
+    FIELD_SN,
     FIELD_SUB_TYPE as FIELD_SUB_TYPE,
     LOCAL_MQTT_DEFAULT_TOPIC,
     LOCAL_MQTT_RUNTIME_KEY as _LOCAL_MQTT_RUNTIME_KEY,
@@ -104,6 +109,7 @@ from .coordinator import (
     JackerySolarVaultCoordinator,
     battery_pack_serial,
     sorted_battery_pack_payloads,
+    subdevice_serial,
 )
 from .services import async_setup_services
 from .util import (
@@ -112,7 +118,7 @@ from .util import (
     config_entry_str_option,
     local_mqtt_opt_in,
     nonblank_text,
-    safe_bool,
+    normalize_mac_address,
     safe_int,
     smart_meter_identity,
     stable_subdevice_key,
@@ -175,6 +181,7 @@ def _async_clean_legacy_entities(
     _async_migrate_smart_meter_identity(hass, entry)
     _async_migrate_battery_pack_identities(hass, entry)
     _async_remove_phantom_battery_pack_devices(hass, entry)
+    _async_remove_legacy_split_buttons(hass, entry)
     _async_remove_entities_with_suffixes(
         hass,
         entry,
@@ -315,6 +322,7 @@ def _local_mqtt_client(
 _PRIMARY_SETUP_TIMEOUT_SEC = 90.0
 _ENTRY_TASK_CANCEL_TIMEOUT_SEC = 5.0
 _LAYER5_TASK_RUNTIME_KEY = "layer5_start_task"
+_LAYER5_READY_UNSUB_RUNTIME_KEY = "layer5_ready_unsubscribe"
 _OPTIONS_RECONCILE_TASK_RUNTIME_KEY = "options_reconcile_task"
 _OPTIONS_RECONCILE_PENDING_RUNTIME_KEY = "options_reconcile_pending"
 _OPTIONS_DEVICE_CONFIG_PENDING_RUNTIME_KEY = "options_device_config_pending"
@@ -349,7 +357,6 @@ _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY = "supplemental_layer5_tasks"
 _SUPPLEMENTAL_CLEANUP_TASK_RUNTIME_KEY = "supplemental_cleanup_task"
 _LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY = "local_mqtt_restart_after_cleanup"
 _local_mqtt_restart_after_cleanup_flag: bool = False
-_entry_runtime_bucket_cache: dict[str, dict[str, Any]] = {}
 _LOCAL_MQTT_STOP_TASKS_RUNTIME_KEY = "local_mqtt_stop_tasks"
 _LOCAL_MQTT_RECONCILE_LOCK_RUNTIME_KEY = "local_mqtt_reconcile_lock"
 _COORDINATOR_SHUTDOWN_RUNTIME_KEY = "coordinator_shutdown"
@@ -358,7 +365,6 @@ _SUPPLEMENTAL_CLEANUP_RETRY_SEC = 5.0
 _COORDINATOR_SHUTDOWN_RETRY_SEC = 5.0
 _RUNTIME_TASK_RECORD_LENGTH = 2
 _TOPIC_SUFFIX_PART_COUNT = 2
-_MAX_TCP_PORT = 65_535
 _HTTP_SETUP_TIMEOUT_MESSAGE = "Jackery HTTP setup timeout"
 
 
@@ -390,7 +396,7 @@ def _get_stable_entry_id(entry: ConfigEntry) -> str:
     try:
         if hasattr(entry_id, "__str__") and not isinstance(entry_id, str):
             return str(entry_id)
-    except (AttributeError, TypeError):  # fmt: skip
+    except AttributeError, TypeError:
         pass
     # Fallback to object id for stable identity
     return str(id(entry))
@@ -430,17 +436,11 @@ def _entry_runtime_bucket(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, 
         dict[str, Any]: The dictionary stored at hass.data[DOMAIN][entry.entry_id];
         created and inserted if it did not already exist.
     """
-    stable_entry_id = _get_stable_entry_id(entry)
-    cache_key = f"{id(hass.data)}:{stable_entry_id}"
-    cached = _entry_runtime_bucket_cache.get(cache_key)
-    if cached is not None:
-        return cached
     domain_bucket = hass.data.setdefault(DOMAIN, {})
     bucket = domain_bucket.get(entry.entry_id)
     if not isinstance(bucket, dict):
         bucket = {}
         domain_bucket[entry.entry_id] = bucket
-    _entry_runtime_bucket_cache[cache_key] = bucket
     return bucket
 
 
@@ -643,9 +643,6 @@ async def _stop_with_restart_flag(
     except Exception as err:
         _LOGGER.warning("Jackery local MQTT client async_stop raised: %s", err)
         bucket[_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY] = True
-        if entry is not None:
-            # ruff: ignore[private-member-access] — HA reload path requires resetting this internal flag
-            entry._local_mqtt_restart_after_cleanup = True
         raise
 
 
@@ -873,28 +870,6 @@ def _supplemental_cleanup_pending(
             _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
         )
     )
-
-
-def _defer_layer5_start_task(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-) -> None:
-    """Move an uncooperative old Layer-5 start task off the HTTP setup path."""
-    runtime_task = _entry_runtime_task(hass, entry, _LAYER5_TASK_RUNTIME_KEY)
-    if runtime_task is None:
-        return
-    task: asyncio.Task[Any] = runtime_task
-    bucket = _entry_runtime_bucket(hass, entry)
-    if bucket.get(_LAYER5_TASK_RUNTIME_KEY) is runtime_task:
-        bucket.pop(_LAYER5_TASK_RUNTIME_KEY, None)
-    if not task.done():
-        task.cancel()
-        _append_supplemental_runtime_object(
-            hass,
-            entry,
-            _SUPPLEMENTAL_LAYER5_TASKS_RUNTIME_KEY,
-            task,
-        )
 
 
 def _defer_supplemental_local_mqtt(
@@ -1340,7 +1315,7 @@ async def _async_prepare_primary_http(
     """Authenticate, discover, and complete HA's mandatory first HTTP refresh."""
     try:
         await _async_run_primary_http_startup(hass, entry, coordinator)
-    except (ConfigEntryAuthFailed, ConfigEntryNotReady):  # fmt: skip
+    except ConfigEntryAuthFailed, ConfigEntryNotReady:
         raise
     except JackeryAuthError as err:
         msg = f"Jackery credentials were rejected by the HTTP API: {err}"
@@ -1361,22 +1336,19 @@ async def _async_prepare_primary_http_from_cache(
             await _async_prepare_primary_http(hass, entry, coordinator)
     except asyncio.CancelledError:
         raise
-    except ConfigEntryAuthFailed:
+    except (ConfigEntryAuthFailed, JackeryAuthError) as err:
+        _LOGGER.warning(
+            "Jackery HTTP auth failed; continuing from cache and starting reauth: %s",
+            redacted_error(err, entry=entry),
+        )
         entry.async_start_reauth(hass)
-        raise
     except TimeoutError:
         _LOGGER.warning("Jackery HTTP setup timeout; continuing from cache")
-    except ConfigEntryNotReady:
-        # Let ConfigEntryNotReady propagate so the entry gets re-tried
-        raise
-    except JackeryAuthError as err:
-        # Propagate auth failures so the user gets re-auth prompt
-        msg = f"Jackery HTTP login failed from cache: {err}"
-        raise ConfigEntryAuthFailed(msg) from err
-    except (JackeryError, OSError, UpdateFailed) as err:
-        # Let other errors propagate for retry
-        msg = f"Jackery HTTP refresh from cache failed: {err}"
-        raise ConfigEntryNotReady(msg) from err
+    except (ConfigEntryNotReady, JackeryError, OSError, UpdateFailed) as err:
+        _LOGGER.warning(
+            "Jackery HTTP setup unavailable; continuing from cache: %s",
+            redacted_error(err, entry=entry),
+        )
 
 
 def _handle_optional_startup_result(
@@ -1461,6 +1433,38 @@ async def _async_start_layer5_transports(
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
+def _defer_layer5_until_ha_started(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+) -> None:
+    """Own one removable HA-ready listener for the current entry runtime."""
+    bucket = _entry_runtime_bucket(hass, entry)
+    previous = bucket.get(_LAYER5_READY_UNSUB_RUNTIME_KEY)
+    if isinstance(previous, tuple):
+        if previous[0] is coordinator:
+            return
+        previous[1]()
+
+    @callback
+    def _start_after_ready(_hass: HomeAssistant) -> None:
+        if bucket.get(_LAYER5_READY_UNSUB_RUNTIME_KEY) is record:
+            bucket.pop(_LAYER5_READY_UNSUB_RUNTIME_KEY, None)
+            _schedule_layer5_start_if_ready(hass, entry, coordinator)
+
+    unsubscribe = async_at_started(hass, _start_after_ready)
+    record = (coordinator, unsubscribe)
+    bucket[_LAYER5_READY_UNSUB_RUNTIME_KEY] = record
+
+    @callback
+    def _cancel_pending_start() -> None:
+        unsubscribe()
+        if bucket.get(_LAYER5_READY_UNSUB_RUNTIME_KEY) is record:
+            bucket.pop(_LAYER5_READY_UNSUB_RUNTIME_KEY, None)
+
+    entry.async_on_unload(_cancel_pending_start)
+
+
 def _schedule_layer5_start_if_ready(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -1471,6 +1475,9 @@ def _schedule_layer5_start_if_ready(
 ) -> None:
     """Schedule independent Layer-5 clients for the active coordinator."""
     if not _entry_owns_coordinator(hass, entry, coordinator):
+        return
+    if hass.state is not CoreState.running:
+        _defer_layer5_until_ha_started(hass, entry, coordinator)
         return
     if changed_keys:
         bucket = _entry_runtime_bucket(hass, entry)
@@ -1674,6 +1681,7 @@ def _local_mqtt_snapshot_route(
 
 def _local_mqtt_connection_settings(
     entry: JackeryConfigEntry,
+    hass: HomeAssistant | None = None,
 ) -> tuple[bool, LocalMqttConnectionSettings, int]:
     """Return whether local MQTT should run and its exact connection settings."""
     should_run, configured_topic_filter, configured_qos = (
@@ -1697,10 +1705,11 @@ def _local_mqtt_connection_settings(
         config_entry_str_option(entry, CONF_THIRD_PARTY_MQTT_PASSWORD, "") or None
     )
     snapshot_interval_sec = _configured_scan_interval_sec(entry)
+
     if should_run and not configured_host:
-        _LOGGER.warning(
+        _LOGGER.info(
             "Jackery local MQTT is enabled without a broker host; "
-            "the direct listener will remain stopped"
+            "the direct listener will remain stopped until configured"
         )
         should_run = False
     configured_settings = LocalMqttConnectionSettings(
@@ -1727,6 +1736,37 @@ def _set_local_mqtt_restart_after_cleanup(
         bucket.pop(_LOCAL_MQTT_RESTART_AFTER_CLEANUP_RUNTIME_KEY, None)
 
 
+_LOCAL_MQTT_POLL_INTERVAL_SEC = 5.0
+
+
+def _bind_local_mqtt_snapshot_requester(  # ruff: ignore[too-many-arguments]
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+    coordinator: JackerySolarVaultCoordinator,
+    client: JackeryLocalMqttClient,
+    settings: LocalMqttConnectionSettings,
+    *,
+    interval_sec: float,
+) -> None:
+    """Attach read-only queries to this entry/client, independently of HTTP."""
+    prefix, segment = _local_mqtt_snapshot_route(settings.topic_filter)
+
+    async def request_snapshot() -> int:
+        if (
+            not _entry_owns_coordinator(hass, entry, coordinator)
+            or coordinator.local_mqtt_client is not client
+        ):
+            return 0
+        return await coordinator.async_poll_local_mqtt_devices(
+            prefix, device_topic_segment=segment
+        )
+
+    client.set_snapshot_requester(
+        request_snapshot,
+        interval_sec=min(interval_sec, _LOCAL_MQTT_POLL_INTERVAL_SEC),
+    )
+
+
 async def _async_reconcile_existing_local_mqtt(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -1745,9 +1785,22 @@ async def _async_reconcile_existing_local_mqtt(
         and existing_client.is_started is True
         and existing_client.matches_configuration(settings) is True
     ):
-        existing_client.set_snapshot_interval(_configured_scan_interval_sec(entry))
-        if coordinator.local_mqtt_client is not existing_client:
+        changed_owner = coordinator.local_mqtt_client is not existing_client
+        if changed_owner:
             coordinator.set_local_mqtt_client(existing_client)
+        if changed_owner or not existing_client.snapshot_requester_installed:
+            _bind_local_mqtt_snapshot_requester(
+                hass,
+                entry,
+                coordinator,
+                existing_client,
+                settings,
+                interval_sec=_configured_scan_interval_sec(entry),
+            )
+        else:
+            existing_client.set_snapshot_interval(
+                min(_configured_scan_interval_sec(entry), _LOCAL_MQTT_POLL_INTERVAL_SEC)
+            )
         return True
 
     if not await _async_stop_local_mqtt_client(hass, entry, existing_client, bucket):
@@ -1792,7 +1845,7 @@ async def _async_start_new_local_mqtt_client(
         topic: str,
         data: dict[str, Any] | None,
         raw_bytes: bytes,
-    ) -> bool:
+    ) -> bool | Literal["broker_metadata"]:
         """Dispatch every decoded local MQTT candidate to the coordinator."""
         return await coordinator.async_handle_local_mqtt_message(
             topic,
@@ -1805,6 +1858,9 @@ async def _async_start_new_local_mqtt_client(
         settings,
         sink=_handle_local_mqtt_data,
         config_entry=entry,
+        broker_metadata_capture=coordinator.capture_local_mqtt_broker_metadata,
+        box_safety_capture=coordinator.capture_local_box_safety_ingress,
+        box_safety_sink=coordinator.async_handle_local_box_safety_ingress,
     )
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
@@ -1813,24 +1869,24 @@ async def _async_start_new_local_mqtt_client(
     coordinator.set_local_mqtt_client(client)
 
     try:
+        _bind_local_mqtt_snapshot_requester(
+            hass,
+            entry,
+            coordinator,
+            client,
+            settings,
+            interval_sec=snapshot_interval_sec,
+        )
         await client.async_start()
-    except (asyncio.CancelledError, Exception):  # fmt: skip
+    except asyncio.CancelledError, Exception:
         await _async_detach_local_mqtt_client(hass, entry, coordinator, client)
         raise
     if not _entry_owns_coordinator(hass, entry, coordinator):
         await _async_detach_local_mqtt_client(hass, entry, coordinator, client)
         return
 
-    snapshot_topic_prefix, snapshot_device_topic_segment = _local_mqtt_snapshot_route(
-        settings.topic_filter
-    )
-    client.set_snapshot_requester(
-        lambda: coordinator.async_poll_local_mqtt_devices(
-            snapshot_topic_prefix,
-            device_topic_segment=snapshot_device_topic_segment,
-        ),
-        interval_sec=snapshot_interval_sec,
-    )
+    # The device publishes telemetry to this listener; local MQTT has no
+    # App-proven command or snapshot-request topic.
 
 
 async def _async_start_local_mqtt_locked(
@@ -1842,7 +1898,7 @@ async def _async_start_local_mqtt_locked(
     if not _entry_owns_coordinator(hass, entry, coordinator):
         return
     should_run, configured_settings, snapshot_interval_sec = (
-        _local_mqtt_connection_settings(entry)
+        _local_mqtt_connection_settings(entry, hass=hass)
     )
     bucket = _entry_runtime_bucket(hass, entry)
     deferred_local_mqtt = _supplemental_runtime_items(
@@ -2459,56 +2515,6 @@ async def _async_rollback_entry_setup(
     return rollback_ok and platforms_rolled_back and shutdown_ok
 
 
-def _adopt_device_local_mqtt_config(
-    hass: HomeAssistant,
-    entry: JackeryConfigEntry,
-    coordinator: JackerySolarVaultCoordinator,
-    config: dict[str, Any],
-) -> None:
-    """Update an opted-in listener from device readback without granting consent."""
-    if not _entry_owns_coordinator(hass, entry, coordinator):
-        return
-    if not local_mqtt_opt_in(entry):
-        return
-    enabled = safe_bool(config.get("enable"))
-    if enabled is None:
-        return
-    host = str(config.get("ip") or "").strip()
-    port = safe_int(config.get("port"))
-    if enabled and (not host or port is None or not 1 <= port <= _MAX_TCP_PORT):
-        return
-
-    updates: dict[str, Any] = {CONF_THIRD_PARTY_MQTT_ENABLE: enabled}
-    if enabled:
-        updates.update({
-            CONF_THIRD_PARTY_MQTT_IP: host,
-            CONF_THIRD_PARTY_MQTT_PORT: port,
-            CONF_THIRD_PARTY_MQTT_USERNAME: str(config.get("userName") or ""),
-            CONF_THIRD_PARTY_MQTT_PASSWORD: str(config.get("password") or ""),
-            CONF_THIRD_PARTY_MQTT_TOKEN: str(config.get("token") or ""),
-        })
-    options = dict(entry.options)
-    changed = {
-        key: value for key, value in updates.items() if options.get(key) != value
-    }
-    if not changed:
-        return
-    options.update(changed)
-    bucket = _entry_runtime_bucket(hass, entry)
-    adopted = bucket.get(_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY)
-    if not isinstance(adopted, dict):
-        adopted = {}
-        bucket[_DEVICE_MQTT_ADOPTED_OPTIONS_RUNTIME_KEY] = adopted
-    adopted.update(changed)
-    hass.config_entries.async_update_entry(entry, options=options)
-    entry.async_create_task(
-        hass,
-        _async_entry_updated(hass, entry),
-        name=f"{DOMAIN}_adopted_local_mqtt_options_{entry.entry_id}",
-        eager_start=False,
-    )
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> bool:
     """Set up the Jackery SolarVault config entry and optional transports.
 
@@ -2549,14 +2555,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> b
         timedelta(seconds=interval_sec),
     )
 
-    coordinator.set_local_mqtt_config_observer(
-        lambda config: _adopt_device_local_mqtt_config(
-            hass,
-            entry,
-            coordinator,
-            config,
-        )
-    )
     entry.runtime_data = coordinator
     _LOGGER.info("Jackery: coordinator polling interval set to %ss", interval_sec)
 
@@ -2639,6 +2637,8 @@ def _async_remove_stale_energy_helpers(hass: HomeAssistant) -> None:
     registry = er.async_get(hass)
     to_remove: list[str] = []
     for ent in registry.entities.values():
+        if ent.platform != DOMAIN:
+            continue
         entity_id = ent.entity_id or ""
         if not entity_id.startswith(STALE_ENERGY_HELPER_PREFIX):
             continue
@@ -2847,10 +2847,22 @@ def _async_migrate_smart_meter_identity(
             target_identifier,
             entry.entry_id,
         )
-        legacy_identifiers = (
+        legacy_identifiers: tuple[tuple[str, str], ...] = (
             (DOMAIN, f"{parent_device_id}_smart_meter"),
             (DOMAIN, f"{parent_device_id}_smart_meter_1"),
         )
+        if target_key == (
+            f"smart_meter_{(normalize_mac_address(identity) or "").replace(":", "")}"
+        ):
+            legacy_identifiers += (
+                (
+                    DOMAIN,
+                    (
+                        f"{parent_device_id}_smart_meter_"
+                        f"{(normalize_mac_address(identity) or "").replace(":", "_")}"
+                    ),
+                ),
+            )
         for legacy_identifier in legacy_identifiers:
             if legacy_identifier == target_identifier:
                 continue
@@ -2873,11 +2885,6 @@ def _async_migrate_smart_meter_identity(
                     if (
                         entity.config_entry_id == entry.entry_id
                         and entity.platform == DOMAIN
-                    )
-                    or (
-                        entity.domain == "sensor"
-                        and entity.platform == "energy"
-                        and entity.entity_id.startswith("sensor.energy_grid_")
                     )
                 ]
                 for entity in attributable_entities:
@@ -2933,17 +2940,17 @@ def _async_migrate_smart_meter_identity(
             )
 
 
-def _battery_pack_serial_token(serial: str, index: int) -> str:
-    """Return the normalized serial token used by a stable pack key."""
-    return stable_subdevice_key("battery_pack", serial, index).rsplit("_", 1)[-1]
+def _battery_pack_serial_token(serial: str, index: int) -> tuple[str, str]:
+    """Preserve the full serial and its registry key for ownership checks."""
+    return serial.casefold(), stable_subdevice_key("battery_pack", serial, index)
 
 
 def _observed_battery_pack_indices(
     coordinator: JackerySolarVaultCoordinator,
     parent_device_id: str,
-) -> tuple[dict[str, int], dict[str, list[int]]]:
+) -> tuple[dict[tuple[str, str], int], dict[str, list[int]]]:
     """Map each observed serial and stable key to its live payload index."""
-    serial_to_index: dict[str, int] = {}
+    serial_to_index: dict[tuple[str, str], int] = {}
     key_to_indices: dict[str, list[int]] = {}
     for index in range(1, _BATTERY_PACK_INDEX_MAX + 1):
         serial = coordinator.battery_pack_observed_serial(parent_device_id, index)
@@ -2985,92 +2992,120 @@ def _seed_battery_pack_registry_identities(
 ) -> None:
     """Seed session identities from already-migrated pack registry devices."""
     for parent_device_id, records in serial_records.items():
-        keys = [
-            stable_subdevice_key("battery_pack", serial, index or 1)
-            for serial, index in records
-        ]
-        if len(keys) != len(set(keys)):
+        _seed_parent_battery_pack_identities(
+            coordinator,
+            parent_device_id,
+            records,
+            set(remaining_old_indices.get(parent_device_id, ())),
+        )
+
+
+def _seed_parent_battery_pack_identities(
+    coordinator: JackerySolarVaultCoordinator,
+    parent_device_id: str,
+    records: list[tuple[str, int | None]],
+    protected_indices: set[int],
+) -> None:
+    """Seed session identities for one parent's already-migrated pack devices."""
+    keys = {
+        stable_subdevice_key("battery_pack", serial, index or 1)
+        for serial, index in records
+    }
+    if len(keys) != len(records):
+        _LOGGER.warning(
+            "Skipping battery-pack registry identity seeding for %s: "
+            "duplicate normalized serials",
+            parent_device_id,
+        )
+        return
+
+    observed_serial_to_live_index, observed_indices = _observed_battery_pack_indices(
+        coordinator, parent_device_id
+    )
+    ambiguous_keys = _disable_ambiguous_battery_pack_overrides(
+        coordinator,
+        parent_device_id,
+        observed_indices,
+    )
+
+    stored_indices = {index for _, index in records if index is not None}
+    live_occupied_by_unrecorded = {
+        idx
+        for observed_key, idxs in observed_indices.items()
+        if observed_key not in keys
+        for idx in idxs
+    }
+    has_complete_topology = (
+        _complete_battery_pack_topology(coordinator, parent_device_id) is not None
+    )
+    matched_keys: set[str] = set()
+    blocked_keys = set(ambiguous_keys)
+    assigned_indices: set[int] = set()
+    for serial, fallback_index in sorted(records, key=operator.itemgetter(0)):
+        live_index = observed_serial_to_live_index.get(
+            _battery_pack_serial_token(serial, fallback_index or 1)
+        )
+        index = (
+            live_index
+            if fallback_index in live_occupied_by_unrecorded
+            else (fallback_index if fallback_index is not None else live_index)
+        )
+        if (
+            index is None
+            or (
+                fallback_index in live_occupied_by_unrecorded
+                and index in live_occupied_by_unrecorded
+            )
+            or (live_index is None and has_complete_topology)
+        ):
+            continue
+        key = stable_subdevice_key("battery_pack", serial, index)
+        if (
+            key in ambiguous_keys
+            or index in protected_indices
+            or index in assigned_indices
+            or (fallback_index is None and index in stored_indices)
+        ):
+            blocked_keys.add(key)
+            continue
+        coordinator.set_battery_pack_identity_override(parent_device_id, index, serial)
+        assigned_indices.add(index)
+        matched_keys.add(key)
+
+    used_indices = (
+        protected_indices
+        | stored_indices
+        | assigned_indices
+        | {index for indices in observed_indices.values() for index in indices}
+    )
+    free_indices = [
+        index
+        for index in range(1, _BATTERY_PACK_INDEX_MAX + 1)
+        if index not in used_indices
+    ]
+    for serial, stored_index in sorted(records, key=operator.itemgetter(0)):
+        live_index = observed_serial_to_live_index.get(
+            _battery_pack_serial_token(serial, stored_index or 1)
+        )
+        if live_index is None:
+            continue
+        key = stable_subdevice_key("battery_pack", serial, live_index)
+        if key in matched_keys or key in blocked_keys:
+            continue
+        # Use live_index for the override, but prefer stored_index if it's free
+        if stored_index is not None and stored_index in free_indices:
+            index = stored_index
+            free_indices.remove(index)
+        elif free_indices:
+            index = free_indices.pop(0)
+        else:
             _LOGGER.warning(
-                "Skipping battery-pack registry identity seeding for %s: "
-                "duplicate normalized serials",
+                "Skipping ambiguous battery-pack identity %s for %s",
+                serial,
                 parent_device_id,
             )
             continue
-
-        observed_serial_to_live_index, observed_indices = (
-            _observed_battery_pack_indices(coordinator, parent_device_id)
-        )
-        ambiguous_keys = _disable_ambiguous_battery_pack_overrides(
-            coordinator,
-            parent_device_id,
-            observed_indices,
-        )
-
-        protected_indices = set(remaining_old_indices.get(parent_device_id, ()))
-        stored_indices = {index for _, index in records if index is not None}
-        matched_keys: set[str] = set()
-        blocked_keys = set(ambiguous_keys)
-        assigned_indices: set[int] = set()
-        for serial, fallback_index in sorted(records, key=operator.itemgetter(0)):
-            norm_serial = _battery_pack_serial_token(serial, fallback_index or 1)
-            live_index = observed_serial_to_live_index.get(norm_serial)
-            index = fallback_index if fallback_index is not None else live_index
-            if index is None or (
-                live_index is None
-                and _complete_battery_pack_topology(coordinator, parent_device_id)
-                is not None
-            ):
-                continue
-            key = stable_subdevice_key("battery_pack", serial, index)
-            if (
-                key in ambiguous_keys
-                or index in protected_indices
-                or index in assigned_indices
-                or (fallback_index is None and index in stored_indices)
-            ):
-                blocked_keys.add(key)
-                continue
-            coordinator.set_battery_pack_identity_override(
-                parent_device_id, index, serial
-            )
-            assigned_indices.add(index)
-            matched_keys.add(key)
-
-        used_indices = (
-            protected_indices
-            | stored_indices
-            | assigned_indices
-            | {index for indices in observed_indices.values() for index in indices}
-        )
-        free_indices = [
-            index
-            for index in range(1, _BATTERY_PACK_INDEX_MAX + 1)
-            if index not in used_indices
-        ]
-        for serial, stored_index in sorted(records, key=operator.itemgetter(0)):
-            norm_serial = _battery_pack_serial_token(serial, stored_index or 1)
-            live_index = observed_serial_to_live_index.get(norm_serial)
-            if live_index is None:
-                continue
-            key = stable_subdevice_key("battery_pack", serial, live_index)
-            if key in matched_keys or key in blocked_keys:
-                continue
-            # Use live_index for the override, but prefer stored_index if it's free
-            if stored_index is not None and stored_index in free_indices:
-                index = stored_index
-                free_indices.remove(index)
-            elif free_indices:
-                index = free_indices.pop(0)
-            else:
-                _LOGGER.warning(
-                    "Skipping ambiguous battery-pack identity %s for %s",
-                    serial,
-                    parent_device_id,
-                )
-                continue
-            coordinator.set_battery_pack_identity_override(
-                parent_device_id, index, serial
-            )
+        coordinator.set_battery_pack_identity_override(parent_device_id, index, serial)
 
 
 type _BatteryPackMigrationCandidate = tuple[dr.DeviceEntry, str, str, int, str]
@@ -3324,28 +3359,19 @@ def _async_migrate_battery_pack_identities(
             continue
 
         remaining_old_indices.setdefault(parent_device_id, set()).add(numeric_index)
-        live_serial = entry.runtime_data.battery_pack_observed_serial(
-            parent_device_id, numeric_index
-        )
-        entry.runtime_data.set_battery_pack_identity_override(
-            parent_device_id, numeric_index, None
-        )
-        if (
-            stored_serial is not None
-            and live_serial is not None
-            and stable_subdevice_key("battery_pack", stored_serial, numeric_index)
-            != stable_subdevice_key("battery_pack", live_serial, numeric_index)
-        ):
-            _LOGGER.warning(
-                "Skipping battery-pack registry migration for %s: stored serial "
-                "%s conflicts with live serial %s",
-                current_identifier,
-                stored_serial,
-                live_serial,
-            )
-            continue
-        serial = stored_serial or live_serial
+        serial = stored_serial
         if serial is None:
+            continue
+        live_packs = _complete_battery_pack_topology(
+            entry.runtime_data, parent_device_id
+        )
+        if live_packs is None or not any(
+            (observed_serial := battery_pack_serial(pack)) is not None
+            and observed_serial.casefold() == serial.casefold()
+            and stable_subdevice_key("battery_pack", observed_serial, numeric_index)
+            == stable_subdevice_key("battery_pack", serial, numeric_index)
+            for pack in live_packs
+        ):
             continue
         old_candidates.append((
             device,
@@ -3402,11 +3428,11 @@ def _move_parent_attached_battery_pack_entities(
     moved = 0
     for entity in parent_entries:
         current_unique_id = entity.unique_id or ""
-        if current_unique_id.startswith(legacy_prefix):
-            new_unique_id = target_prefix + current_unique_id.removeprefix(
-                legacy_prefix
-            )
-        elif current_unique_id.startswith(target_prefix):
+        if target_prefix != legacy_prefix and current_unique_id.startswith(
+            legacy_prefix
+        ):
+            continue
+        if current_unique_id.startswith(target_prefix):
             new_unique_id = current_unique_id
         else:
             continue
@@ -3523,25 +3549,6 @@ def _async_migrate_parent_attached_battery_pack_entities(  # ruff: ignore[too-ma
                 )
 
 
-def _is_head_unit_battery_pack_duplicate(
-    device_registry: dr.DeviceRegistry,
-    device: dr.DeviceEntry,
-    suffix: str,
-) -> bool:
-    """Return whether a pack device repeats its parent head-unit identity."""
-    parent = (
-        device_registry.async_get(
-            device.via_device_id,
-            include_child_devices=False,
-        )
-        if device.via_device_id is not None
-        else None
-    )
-    parent_serial = nonblank_text(parent.serial_number) if parent is not None else None
-    child_serial = nonblank_text(device.serial_number)
-    return parent_serial is not None and parent_serial in {child_serial, suffix}
-
-
 def _complete_battery_pack_topology(
     coordinator: JackerySolarVaultCoordinator,
     parent_device_id: str,
@@ -3556,9 +3563,36 @@ def _complete_battery_pack_topology(
         return None
     packs = sorted_battery_pack_payloads(raw_packs)
     announced_count = safe_int(properties.get(FIELD_BAT_NUM))
-    return (
-        packs if announced_count is not None and announced_count == len(packs) else None
-    )
+    serials = [subdevice_serial(pack) for pack in packs]
+    if (
+        announced_count is None
+        or announced_count != len(raw_packs)
+        or len(raw_packs) != len(packs)
+        or any(serial is None for serial in serials)
+        or len(set(serials)) != len(serials)
+    ):
+        return None
+    if any(
+        serial is not None
+        and (
+            serial.casefold() == "system"
+            or not any(char.isascii() and char.isalnum() for char in serial)
+        )
+        for serial in serials
+    ):
+        return None
+    if any(
+        len({
+            value.strip()
+            for key in (FIELD_DEVICE_SN, FIELD_DEV_SN, FIELD_SN)
+            if isinstance(value := pack.get(key), str) and value
+        })
+        > 1
+        for pack in packs
+    ):
+        return None
+    identifiers = _live_battery_pack_identifiers(parent_device_id, packs)
+    return packs if len(identifiers) == len(packs) else None
 
 
 def _live_battery_pack_identifiers(
@@ -3593,17 +3627,16 @@ def _matching_serial_battery_pack_target(
     child_serial = nonblank_text(device.serial_number)
     live_serial: str | None = None
     if child_serial is not None:
-        child_key = stable_subdevice_key("battery_pack", child_serial, numeric_index)
         observed_serials = {
             serial
             for pack in packs
             if (serial := battery_pack_serial(pack)) is not None
-            and stable_subdevice_key("battery_pack", serial, numeric_index) == child_key
+            and serial.casefold() == child_serial.casefold()
+            and stable_subdevice_key("battery_pack", serial, numeric_index)
+            == stable_subdevice_key("battery_pack", child_serial, numeric_index)
         }
         if len(observed_serials) == 1:
             live_serial = observed_serials.pop()
-    elif 1 <= numeric_index <= len(packs):
-        live_serial = battery_pack_serial(packs[numeric_index - 1])
     if live_serial is None:
         return None
     live_key = stable_subdevice_key("battery_pack", live_serial, numeric_index)
@@ -3615,17 +3648,17 @@ def _matching_serial_battery_pack_target(
     if (
         serial_device is None
         or serial_device.id == device.id
-        or serial_device.config_entry_id != entry_id
+        or entry_id != serial_device.config_entry_id
     ):
         return None
     stored_serial = nonblank_text(serial_device.serial_number)
     if stored_serial is None:
         return None
     if (
-        child_serial is not None
-        and stable_subdevice_key("battery_pack", child_serial, numeric_index)
+        stored_serial.casefold() != live_serial.casefold()
+        or stable_subdevice_key("battery_pack", stored_serial, numeric_index)
         != live_key
-    ) or stable_subdevice_key("battery_pack", stored_serial, numeric_index) != live_key:
+    ):
         return None
     expected_identity = (
         parent_device_id,
@@ -3651,19 +3684,20 @@ def _move_numeric_battery_pack_entities_to_serial_target(
     old_identifier, target_identifier = identifiers
     old_prefix = f"{old_identifier}_"
     target_prefix = f"{target_identifier}_"
-    moves: list[tuple[str, str, str | None]] = []
+    moves: list[tuple[str, str]] = []
     for entity in er.async_entries_for_device(
         entity_registry,
         numeric_device.id,
         include_disabled_entities=True,
     ):
         unique_id = entity.unique_id or ""
-        if (
-            entity.config_entry_id != entry.entry_id
-            or entity.platform != DOMAIN
-            or not unique_id.startswith(old_prefix)
-        ):
+        if entity.config_entry_id != entry.entry_id or entity.platform != DOMAIN:
             continue
+        if (
+            not unique_id.startswith(old_prefix)
+            or entity.config_subentry_id != serial_device.config_subentry_id
+        ):
+            return None
         new_unique_id = target_prefix + unique_id.removeprefix(old_prefix)
         duplicate_entity_id = entity_registry.async_get_entity_id(
             entity.domain,
@@ -3671,23 +3705,10 @@ def _move_numeric_battery_pack_entities_to_serial_target(
             new_unique_id,
         )
         if duplicate_entity_id is not None:
-            duplicate = entity_registry.async_get(duplicate_entity_id)
-            if duplicate is None or (
-                duplicate.config_entry_id != entry.entry_id
-                or duplicate.device_id != serial_device.id
-            ):
-                _LOGGER.warning(
-                    "Preserving battery-pack device %s: entity %s is outside "
-                    "the expected serial target",
-                    old_identifier,
-                    duplicate_entity_id,
-                )
-                return None
-        moves.append((entity.entity_id, new_unique_id, duplicate_entity_id))
+            return None
+        moves.append((entity.entity_id, new_unique_id))
 
-    for entity_id, new_unique_id, duplicate_entity_id in moves:
-        if duplicate_entity_id is not None:
-            entity_registry.async_remove(duplicate_entity_id)
+    for entity_id, new_unique_id in moves:
         entity_registry.async_update_entity(
             entity_id,
             new_unique_id=new_unique_id,
@@ -3696,26 +3717,61 @@ def _move_numeric_battery_pack_entities_to_serial_target(
     return len(moves)
 
 
-def _async_remove_phantom_battery_pack_device(
+def _battery_pack_device_has_other_ownership(
+    registry: dr.DeviceRegistry,
+    entry: JackeryConfigEntry,
+    device: dr.DeviceEntry,
+    identifier: str,
+    target: dr.DeviceEntry | None,
+) -> bool:
+    """Preserve other identifiers, user settings, and dependent devices."""
+    if any((
+        device.config_entry_id != entry.entry_id,
+        bool(getattr(device, "is_composite_device", False)),
+        getattr(device, "composite_device_id", None) is not None,
+        getattr(device, "composite_primary_config_entry", None) is not None,
+        getattr(device, "split_at", None) is not None,
+        bool(getattr(device, "has_composite_identifiers", False)),
+        device.identifiers != {(DOMAIN, identifier)},
+        bool(device.connections),
+        device.name_by_user is not None,
+        device.area_id is not None,
+        bool(device.labels),
+        device.disabled_by is not None,
+    )):
+        return True
+    if target is not None and any(
+        (value := getattr(device, field, None)) is not None
+        and value != getattr(target, field, None)
+        for field in (
+            "name",
+            "manufacturer",
+            "model",
+            "model_id",
+            "hw_version",
+            "sw_version",
+            "configuration_url",
+            "entry_type",
+        )
+    ):
+        return True
+    return any(other.via_device_id == device.id for other in registry.devices) or any(
+        child.parent_device_id == device.id for child in registry.child_devices
+    )
+
+
+def _async_remove_phantom_battery_pack_device(  # ruff: ignore[too-many-return-statements]
     device_registry: dr.DeviceRegistry,
     entity_registry: er.EntityRegistry,
     entry: JackeryConfigEntry,
     coordinator: JackerySolarVaultCoordinator,
     device: dr.DeviceEntry,
 ) -> None:
-    """Remove one pack device only when current topology disproves it."""
+    """Remove a numeric duplicate only after verifying its serial target."""
     identity = _battery_pack_registry_identity(device_registry, device)
     if identity is None:
         return
     parent_device_id, current_identifier, suffix = identity
-    if _is_head_unit_battery_pack_duplicate(device_registry, device, suffix):
-        device_registry.async_remove_device(device.id)
-        _LOGGER.info(
-            "Removed head-unit duplicate battery-pack registry device %s",
-            current_identifier,
-        )
-        return
-
     packs = _complete_battery_pack_topology(coordinator, parent_device_id)
     live_identifiers = (
         _live_battery_pack_identifiers(parent_device_id, packs)
@@ -3725,15 +3781,46 @@ def _async_remove_phantom_battery_pack_device(
     if packs is None or current_identifier in live_identifiers:
         return
     numeric_index = int(suffix) if suffix.isdecimal() else None
-    # A historical number can exceed a shorter roster or refer to a moved row.
+    if numeric_index is None:
+        parent_device = device_registry.async_get_device_by_identifier(
+            (DOMAIN, parent_device_id),
+            entry.entry_id,
+        )
+        parent_serial = (
+            nonblank_text(parent_device.serial_number)
+            if parent_device is not None
+            else None
+        )
+        child_serial = nonblank_text(device.serial_number)
+        if (
+            parent_serial is None  # ruff: ignore[too-many-boolean-expressions]
+            or child_serial is None
+            or suffix.casefold() != parent_serial.casefold()
+            or child_serial.casefold() != parent_serial.casefold()
+            or _battery_pack_device_has_other_ownership(
+                device_registry,
+                entry,
+                device,
+                current_identifier,
+                None,
+            )
+            or er.async_entries_for_device(
+                entity_registry,
+                device.id,
+                include_disabled_entities=True,
+            )
+        ):
+            return
+        device_registry.async_remove_device(device.id)
+        _LOGGER.info(
+            "Removed phantom head-unit duplicate battery-pack registry device %s",
+            current_identifier,
+        )
+        return
+    if nonblank_text(device.serial_number) is None:
+        return
     # Verify the stored hardware identity before deleting its history owners.
-    serial_key = stable_subdevice_key(
-        "battery_pack", device.serial_number, numeric_index or 1
-    )
-    if numeric_index is not None and (
-        1 <= numeric_index <= len(packs)
-        or f"{parent_device_id}_{serial_key}" in live_identifiers
-    ):
+    if numeric_index is not None:
         target = _matching_serial_battery_pack_target(
             device_registry,
             (entry.entry_id, parent_device_id),
@@ -3748,15 +3835,21 @@ def _async_remove_phantom_battery_pack_device(
             (DOMAIN, target_identifier),
             entry.entry_id,
         )
-        moved = None
-        if serial_device is not None:
-            moved = _move_numeric_battery_pack_entities_to_serial_target(
-                entity_registry,
-                entry,
-                device,
-                serial_device,
-                (current_identifier, target_identifier),
+        if (
+            serial_device is None
+            or device.config_subentry_id != serial_device.config_subentry_id
+            or _battery_pack_device_has_other_ownership(
+                device_registry, entry, device, current_identifier, serial_device
             )
+        ):
+            return
+        moved = _move_numeric_battery_pack_entities_to_serial_target(
+            entity_registry,
+            entry,
+            device,
+            serial_device,
+            (current_identifier, target_identifier),
+        )
         if moved is None:
             return
         device_registry.async_remove_device(device.id)
@@ -3772,22 +3865,13 @@ def _async_remove_phantom_battery_pack_device(
             target_identifier,
             moved,
         )
-        return
-
-    device_registry.async_remove_device(device.id)
-    _LOGGER.info(
-        "Removed stale battery-pack registry device %s; current topology "
-        "contains %d pack(s)",
-        current_identifier,
-        len(packs),
-    )
 
 
 def _async_remove_phantom_battery_pack_devices(
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
 ) -> None:
-    """Remove pack registry devices disproved by a complete current topology."""
+    """Merge verified numeric duplicates while retaining other pack devices."""
     coordinator = entry.runtime_data
     device_registry = dr.async_get(hass)
     entity_registry = er.async_get(hass)
@@ -3800,6 +3884,84 @@ def _async_remove_phantom_battery_pack_devices(
             entry,
             coordinator,
             device,
+        )
+
+
+def _async_remove_legacy_split_buttons(
+    hass: HomeAssistant,
+    entry: JackeryConfigEntry,
+) -> None:
+    """Retire old per-transport buttons only when their canonical peer exists.
+
+    Never merge entries from different config entries, erase user metadata,
+    or remove an entry while the replacement is still unregistered.
+    """
+    registry = er.async_get(hass)
+    rows = [
+        row
+        for row in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if row.domain == "button" and row.platform == DOMAIN
+    ]
+    by_unique_id = {row.unique_id: row for row in rows if row.unique_id}
+    for old in sorted(rows, key=lambda row: row.unique_id or ""):
+        unique_id = old.unique_id or ""
+        canonical_id = next(
+            (
+                unique_id.removesuffix(suffix)
+                for suffix in ("_cloud_mqtt", "_local_mqtt", "_http", "_ble")
+                if unique_id.endswith(suffix)
+            ),
+            None,
+        )
+        if canonical_id is None:
+            continue
+        candidate = by_unique_id.get(canonical_id)
+        if candidate is None:
+            continue
+        canonical = registry.async_get(candidate.entity_id)
+        if (
+            canonical is None
+            or canonical.config_entry_id != entry.entry_id
+            or canonical.domain != "button"
+            or canonical.platform != DOMAIN
+        ):
+            continue
+        # A user-named/disabled/located variant cannot be discarded silently.
+        metadata = ("name", "icon", "area_id", "disabled_by", "hidden_by")
+        if any(
+            getattr(old, field, None) not in {None, getattr(canonical, field, None)}
+            for field in metadata
+        ) or any(
+            getattr(old, field, None)
+            and getattr(old, field) != getattr(canonical, field, None)
+            for field in ("categories", "options")
+        ):
+            _LOGGER.warning(
+                "Preserving customized legacy transport button %s", old.entity_id
+            )
+            continue
+        labels = set(canonical.labels) | set(old.labels)
+        aliases = sorted({
+            alias
+            for row in (canonical, old)
+            for alias in getattr(row, "aliases", ())
+            if isinstance(alias, str) and alias
+        })
+        update: dict[str, Any] = {}
+        if labels != set(canonical.labels):
+            update["labels"] = labels
+        existing_aliases = {
+            item for item in canonical.aliases if isinstance(item, str) and item
+        }
+        if set(aliases) != existing_aliases:
+            update["aliases"] = aliases
+        if update:
+            registry.async_update_entity(canonical.entity_id, **update)
+        registry.async_remove(old.entity_id)
+        _LOGGER.info(
+            "Retired duplicate transport button %s; canonical %s",
+            old.entity_id,
+            canonical.entity_id,
         )
 
 
@@ -3850,6 +4012,7 @@ async def _async_teardown_unloaded_entry(
     """Tear down runtime resources after Home Assistant unloaded all platforms."""
     if coordinator is not None:
         bucket[_UNLOADING_COORDINATOR_RUNTIME_KEY] = coordinator
+        coordinator.async_begin_shutdown()
     await _async_cancel_layer5_start_task(hass, entry)
     await _async_cancel_runtime_task(
         hass,
@@ -3912,6 +4075,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> 
             )
 
 
+async def async_remove_entry(hass: HomeAssistant, entry: JackeryConfigEntry) -> None:  # ruff: ignore[unused-async]
+    """Remove this entry's retained mirrors after its platforms are unloaded."""
+    from .client.mqtt_discovery import async_remove_entry_mirrors  # ruff: ignore[import-outside-top-level]
+
+    async_remove_entry_mirrors(hass, entry)
+
+
 async def async_remove_config_entry_device(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
@@ -3926,6 +4096,9 @@ async def async_remove_config_entry_device(  # ruff: ignore[unused-async]
     Returns:
         True if removal is allowed, False to prevent removal.
     """
+    coordinator = getattr(entry, "runtime_data", None)
+    if isinstance(coordinator, JackerySolarVaultCoordinator):
+        coordinator.note_removed_battery_pack(device_entry)
     return True
 
 

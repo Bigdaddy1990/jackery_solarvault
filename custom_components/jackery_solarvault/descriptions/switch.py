@@ -1,6 +1,7 @@
 """Switch descriptions for Jackery SolarVault integration."""
 
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntityDescription
@@ -14,7 +15,9 @@ from ..const import (
     ACTION_ID_PORTABLE_OUTPUT_DC,
     ACTION_ID_PORTABLE_OUTPUT_DC_CAR,
     ACTION_ID_PORTABLE_OUTPUT_DC_USB,
+    ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
     ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SWITCH,
+    ACTION_ID_PORTABLE_RESERVE_SWITCH,
     ACTION_ID_PORTABLE_SUPER_CHARGE,
     DEFAULT_NULL_SEMANTICS,
     FIELD_AUTO_STANDBY,
@@ -22,6 +25,7 @@ from ..const import (
     FIELD_IS_AUTO_STANDBY,
     FIELD_IS_FOLLOW_METER_PW,
     FIELD_OFF_GRID_DOWN,
+    FIELD_SRFC,
     FIELD_SW_EPS,
     FIELD_THIRD_PARTY_MQTT_ENABLE,
     FIELD_WPS,
@@ -37,7 +41,7 @@ from ..entity import (
     payload_properties_for_sources,
     property_data_sources,
 )
-from ..util import safe_bool, standby_is_on, task_plan_value
+from ..util import safe_bool, safe_int, standby_is_on, task_plan_value
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -82,7 +86,10 @@ def _default_switch_value(entity: JackerySwitchEntity) -> bool | None:
 class JackerySwitchDescription(SwitchEntityDescription):
     """Describes a Jackery switch with current and legacy call surfaces."""
 
-    _attr_has_entity_name = True
+    # FrozenOrThawed injects these inherited fields at runtime.
+    key: str
+    translation_key: str | None = None
+    entity_category: EntityCategory | None = None
 
     value_fn: Callable[[JackerySwitchEntity], bool | None] = _default_switch_value
     setter_fn: (
@@ -320,6 +327,21 @@ async def _set_portable_output_priority_switch(
     )
 
 
+async def _set_portable_port_priority(
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
+    *,
+    field: str,
+) -> None:
+    await coord.async_portable_toggle_output(
+        dev_id,
+        action_id=ACTION_ID_PORTABLE_OUTPUT_PRIORITY,
+        field=field,
+        enabled=value,
+    )
+
+
 async def _set_portable_discharge_memory(
     coord: JackerySolarVaultCoordinator,
     dev_id: str,
@@ -334,12 +356,44 @@ async def _set_portable_discharge_memory(
     )
 
 
+def _portable_binary_state(value: object) -> bool | None:
+    state = safe_int(value)
+    return {0: False, 1: True}.get(state) if state is not None else None
+
+
+async def _set_box_charge_now(
+    coord: JackerySolarVaultCoordinator, dev_id: str, value: bool
+) -> None:
+    await coord.async_set_box_charge_now(dev_id, value)
+
+
+async def _set_portable_emergency_discharge(
+    coord: JackerySolarVaultCoordinator,
+    dev_id: str,
+    value: bool,
+) -> None:
+    await coord.async_portable_toggle_output(
+        dev_id,
+        action_id=ACTION_ID_PORTABLE_RESERVE_SWITCH,
+        field=FIELD_SRFC,
+        enabled=value,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Switch description tuples (migrated from switch.py)
 # ---------------------------------------------------------------------------
 
 
 SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
+    JackerySwitchDescription(
+        key="box_charge_now_control",
+        translation_key="box_charge_now_control",
+        entity_category=EntityCategory.CONFIG,
+        source_keys=("rc",),
+        is_on_transform=_portable_binary_state,
+        setter_fn=_set_box_charge_now,
+    ),
     JackerySwitchDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="eps_output",
@@ -406,6 +460,7 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         fallback_section=PAYLOAD_WEATHER_PLAN,
         use_task_plan_fallback=True,
         setter_fn=_set_storm_warning,
+        command_sources=("cloud_mqtt",),
     ),
     JackerySwitchDescription(
         # pyrefly: ignore [unexpected-keyword]
@@ -419,6 +474,14 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         setter_fn=_set_third_party_mqtt_enabled,
     ),
     # --- Portable / Explorer powerstation switches ---
+    JackerySwitchDescription(
+        key="portable_emergency_full_discharge",
+        translation_key="portable_emergency_full_discharge",
+        entity_category=EntityCategory.CONFIG,
+        source_keys=(FIELD_SRFC,),
+        is_on_transform=_portable_binary_state,
+        setter_fn=_set_portable_emergency_discharge,
+    ),
     JackerySwitchDescription(
         # pyrefly: ignore [unexpected-keyword]
         key="portable_dc_output",
@@ -497,7 +560,23 @@ SWITCH_DESCRIPTIONS: tuple[JackerySwitchDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         entity_category=EntityCategory.CONFIG,
         source_keys=("outPrio",),
+        is_on_transform=_portable_binary_state,
         setter_fn=_set_portable_output_priority_switch,
+    ),
+    *(
+        JackerySwitchDescription(
+            key=key,
+            translation_key=key,
+            entity_category=EntityCategory.CONFIG,
+            source_keys=(field,),
+            is_on_transform=_portable_binary_state,
+            setter_fn=partial(_set_portable_port_priority, field=field),
+        )
+        for key, field in (
+            ("portable_ac1_priority_switch", "oac1Prio"),
+            ("portable_ac2_priority_switch", "oac2Prio"),
+            ("portable_dc_priority_switch", "odcPrio"),
+        )
     ),
     JackerySwitchDescription(
         # pyrefly: ignore [unexpected-keyword]

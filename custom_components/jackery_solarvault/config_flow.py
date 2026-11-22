@@ -581,8 +581,7 @@ class JackeryOptionsFlow(OptionsFlowWithReload):
             merged = _flow_options(user_input, current_options)
             merged.update(_merge_local_mqtt_options(user_input, current_local_mqtt))
             try:
-                if merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER]:
-                    valid_subscribe_topic(merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER])
+                valid_subscribe_topic(merged[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER])
             except vol.Invalid:
                 errors[CONF_THIRD_PARTY_MQTT_TOPIC_FILTER] = FLOW_ERROR_BASE
             else:
@@ -758,7 +757,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             payload_dict = json.loads(payload)
-        except (json.JSONDecodeError, UnicodeDecodeError):  # fmt: skip
+        except json.JSONDecodeError, UnicodeDecodeError:
             return self.async_abort(reason="invalid_discovery_info")
 
         if not isinstance(payload_dict, dict):
@@ -857,7 +856,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     field="password",
                     max_length=MAX_PASSWORD_LENGTH,
                 )
-            except (KeyError, vol.Invalid, TypeError):  # fmt: skip
+            except KeyError, vol.Invalid, TypeError:
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_BASE
                 return self.async_show_form(
                     step_id=FLOW_STEP_USER,
@@ -925,7 +924,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):  # fmt: skip
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
         return self.async_show_menu(
             step_id=FLOW_STEP_RECONFIGURE,
@@ -964,7 +963,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):  # fmt: skip
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -999,6 +998,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
                     region_code=entry.data.get(CONF_REGION_CODE),
                 )
+                api.dev_mode_entry = entry
                 try:
                     await api.async_login()
                 except JackeryAuthError:
@@ -1006,7 +1006,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 except JackeryError as err:
                     _LOGGER.debug(
                         "Cannot connect to Jackery during reconfigure: %s",
-                        redacted_error(err),
+                        redacted_error(err, entry=entry),
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
@@ -1092,9 +1092,9 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Accept a device shared with the configured Jackery account.
 
         Calls the cloud accept-bind endpoint with the supplied device and QR
-        identifiers, then schedules HTTP discovery so any newly accessible
-        device can be surfaced. Authentication failures abort with a
-        reauth-required reason; other backend errors re-show the form.
+        identifiers, then reloads the entry so the newly shared device's
+        entities are surfaced. Authentication failures start a reauth flow; other
+        backend or input errors re-show the form.
 
         Parameters:
             user_input (dict[str, Any] | None): Form data containing
@@ -1103,11 +1103,11 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
 
         Returns:
             ConfigFlowResult: The accept-shared form (possibly with errors), an
-            success abort after scheduling discovery, or a reauth-required abort.
+            update-and-reload abort on success, or a reauth start on auth failure.
         """
         try:
             entry = self._get_reconfigure_entry()
-        except (UnknownEntry, ValueError):  # fmt: skip
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_RECONFIGURE_ENTRY_MISSING)
 
         errors: dict[str, str] = {}
@@ -1129,7 +1129,8 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_abort(reason=FLOW_ABORT_ACCEPT_SHARED_REAUTH_REQUIRED)
             except JackeryError as err:
                 _LOGGER.debug(
-                    "Cannot accept shared Jackery device: %s", redacted_error(err)
+                    "Cannot accept shared Jackery device: %s",
+                    redacted_error(err, entry=entry),
                 )
                 errors[FLOW_ERROR_BASE] = FLOW_ERROR_ACCEPT_SHARED_FAILED
             else:
@@ -1174,7 +1175,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
         """
         try:
             entry = self._get_reauth_entry()
-        except (UnknownEntry, ValueError):  # fmt: skip
+        except UnknownEntry, ValueError:
             return self.async_abort(reason=FLOW_ABORT_REAUTH_ENTRY_MISSING)
         errors: dict[str, str] = {}
         stored_username = _entry_text(entry, CONF_USERNAME)
@@ -1198,6 +1199,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                     mqtt_mac_id=entry.data.get(CONF_MQTT_MAC_ID),
                     region_code=entry.data.get(CONF_REGION_CODE),
                 )
+                api.dev_mode_entry = entry
                 try:
                     await api.async_login()
                 except JackeryAuthError:
@@ -1205,7 +1207,7 @@ class JackeryConfigFlow(ConfigFlow, domain=DOMAIN):
                 except JackeryError as err:
                     _LOGGER.debug(
                         "Cannot connect to Jackery during reauth: %s",
-                        redacted_error(err),
+                        redacted_error(err, entry=entry),
                     )
                     errors[FLOW_ERROR_BASE] = FLOW_ERROR_CANNOT_CONNECT
                 else:
