@@ -859,7 +859,7 @@ class JackeryEntity(CoordinatorEntity[JackerySolarVaultCoordinator]):
             return
         try:
             captured_signature = deepcopy(signature)
-        except TypeError, ValueError, RecursionError:
+        except (TypeError, ValueError, RecursionError):
             # Unsupported diagnostic objects must retain ordinary state writes.
             captured_signature = None
         generation = getattr(self, "_prepared_write_generation", 0) + 1

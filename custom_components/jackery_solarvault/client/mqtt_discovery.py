@@ -1252,7 +1252,7 @@ class JackeryMqttSensorPublisher:
                 # mutable payload identity, own the reusable comparison value.
                 try:
                     decoded = json.loads(publication)
-                except TypeError, json.JSONDecodeError:
+                except (TypeError, json.JSONDecodeError):
                     decoded = None
                 previous = (
                     publication,
@@ -1649,7 +1649,7 @@ class JackeryMqttSensorPublisher:
             if cached is None or cached[0] != published[1]:
                 try:
                     decoded = json.loads(published[1])
-                except TypeError, json.JSONDecodeError:
+                except (TypeError, json.JSONDecodeError):
                     decoded = None
                 inputs = (
                     (decoded["value"], decoded["last_reset"])

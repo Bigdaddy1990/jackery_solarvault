@@ -1379,7 +1379,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except binascii.Error, ValueError:
+        except (binascii.Error, ValueError):
             return None
 
         if len(seed) != _MQTT_SEED_LEN:
@@ -3645,7 +3645,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 ):
                     msg = "BLE firmware download has an incomplete length"
                     raise JackeryApiError(msg)
-        except aiohttp.ClientError, TimeoutError, ValueError:
+        except (aiohttp.ClientError, TimeoutError, ValueError):
             msg = "BLE firmware download failed"
             raise JackeryApiError(msg) from None
         if not firmware:

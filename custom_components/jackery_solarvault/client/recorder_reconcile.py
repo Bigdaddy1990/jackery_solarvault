@@ -224,7 +224,7 @@ def _normalize_backfill_status(
     """Map legacy/transient cache values onto the durable state contract."""
     try:
         status = BackfillStatus(str(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         if value in {
             "auth_error",
             "deferred",
@@ -2525,7 +2525,7 @@ class JackeryRecorderReconcileMixin:
                 ],
                 sort_keys=True,
             )
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             signature = None
         else:
             signature = hashlib.sha256(encoded.encode()).hexdigest()
@@ -3099,7 +3099,7 @@ class JackeryRecorderReconcileMixin:
                 < _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC
             ):
                 return None
-        except KeyError, TypeError, ValueError:
+        except (KeyError, TypeError, ValueError):
             pass
         progress.pending_sources += 1
         return candidate
@@ -3175,7 +3175,7 @@ class JackeryRecorderReconcileMixin:
                     attempted_at.tzinfo is not None
                     and attempted_at.timestamp() < ready_epoch
                 )
-            except KeyError, TypeError, ValueError:
+            except (KeyError, TypeError, ValueError):
                 pass
         if month_curve_revisit:
             try:
@@ -3186,7 +3186,7 @@ class JackeryRecorderReconcileMixin:
                     < _STATISTICS_HTTP_BACKFILL_INTERVAL_SEC
                 ):
                     return None
-            except KeyError, TypeError, ValueError:
+            except (KeyError, TypeError, ValueError):
                 pass
             skip = False
         if skip or (checked_today and not attempted_before_ready):
@@ -3995,7 +3995,7 @@ class JackeryRecorderReconcileMixin:
                     continue
                 try:
                     created = parse_utc_datetime(metadata.get("createTime", "")).date()
-                except TypeError, ValueError, OverflowError, OSError:
+                except (TypeError, ValueError, OverflowError, OSError):
                     continue
                 if date(1970, 1, 1) < created <= today:
                     starts.append(created)
@@ -4028,7 +4028,7 @@ class JackeryRecorderReconcileMixin:
                     for key in recorded_dates:
                         try:
                             recorded = date.fromisoformat(key)
-                        except TypeError, ValueError:
+                        except (TypeError, ValueError):
                             continue
                         if date(1970, 1, 1) < recorded <= today:
                             starts.append(recorded)

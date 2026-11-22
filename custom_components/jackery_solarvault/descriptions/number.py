@@ -166,7 +166,7 @@ def first_nonblank_int(value: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
     return None
 

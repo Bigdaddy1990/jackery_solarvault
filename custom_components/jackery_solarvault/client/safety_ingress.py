@@ -26,7 +26,7 @@ def safety_payload_digest(payload: object) -> bytes | None:
             data = bytes(payload)
         else:
             return None
-    except TypeError, ValueError, UnicodeError:
+    except (TypeError, ValueError, UnicodeError):
         return None
     return hashlib.sha256(data).digest()
 

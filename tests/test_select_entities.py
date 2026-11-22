@@ -176,14 +176,14 @@ def test_ct_phase_current_maps_combined_phases() -> None:
     assert entity.current_option == "combined_phases"
 
 
-async def test_portable_ups_model_forwards_via_portable_setter() -> None:
-    """Selecting a UPS model routes through async_portable_set_select."""
+async def test_portable_ups_operation_forwards_via_portable_setter() -> None:
+    """Selecting the App UPS operation routes its wire value to the setter."""
     entity = _select(
-        "portable_ups_model",
+        "portable_ups_operation",
         {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_UPS: 0}}},
     )
 
-    await entity.async_select_option("lifepo4")
+    await entity.async_select_option("online")
 
     assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
     entity.coordinator.async_portable_set_select.assert_awaited_once()
@@ -194,36 +194,27 @@ async def test_portable_ups_model_forwards_via_portable_setter() -> None:
 
 
 def test_portable_power_mode_options_and_current() -> None:
-    """Power mode select exposes standard/eco/performance and reflects pm.
-
-    Regression for F-SWEEP-1: the redundant ``portable_energy_saving`` switch
-    was removed because "Energy Saving" is not a boolean -- it is this ``pm``
-    field. This select is the sole, correctly-keyed control for it.
-    """
+    """Energy-saving timeout reflects the app's model-specific minute values."""
     entity = _select(
         "portable_power_mode",
-        {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_PM: 1}}},
+        {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_PM: 480}}},
     )
-
-    assert set(entity.options) == {"standard", "eco", "performance"}
-    assert entity.current_option == "eco"
+    entity.coordinator.device_model_code.return_value = 36
+    assert set(entity.options) == {"never", "1h", "2h", "8h", "12h", "24h"}
+    assert entity.current_option == "8h"
 
 
 async def test_portable_power_mode_forwards_via_portable_setter() -> None:
-    """Selecting 'performance' forwards pm code 2 via the portable setter."""
+    """Energy saving uses Action 20 and pm minutes."""
     entity = _select(
         "portable_power_mode",
-        {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_PM: 0}}},
+        {_DEVICE_ID: {PAYLOAD_PROPERTIES: {FIELD_PM: 480}}},
     )
-
-    await entity.async_select_option("performance")
-
-    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
-    entity.coordinator.async_portable_set_select.assert_awaited_once()
-    assert isinstance(entity.coordinator.async_portable_set_select, AsyncMock)
-    _args, kwargs = entity.coordinator.async_portable_set_select.call_args
-    assert kwargs["field"] == FIELD_PM
-    assert kwargs["value"] == 2  # ruff: ignore[magic-value-comparison]
+    entity.coordinator.device_model_code.return_value = 36
+    await entity.async_select_option("2h")
+    entity.coordinator.async_portable_set_select.assert_awaited_once_with(
+        _DEVICE_ID, action_id=20, field=FIELD_PM, value=120
+    )
 
 
 @pytest.mark.parametrize(
@@ -340,10 +331,12 @@ async def test_setup_entry_creates_portable_select_family() -> None:
         _DEVICE_ID: {
             PAYLOAD_DEVICE: {
                 PAYLOAD_DISCOVERY_SOURCE: DISCOVERY_SOURCE_LEGACY_BIND_LIST,
+                "modelCode": 1,
             },
             PAYLOAD_PROPERTIES: {FIELD_UPS: 0},
         },
     })
+    coordinator.device_family.return_value = "portable"
     coordinator.async_add_listener = MagicMock(return_value=lambda: None)
     entry = SimpleNamespace(runtime_data=coordinator, async_on_unload=MagicMock())
     added: list[Any] = []

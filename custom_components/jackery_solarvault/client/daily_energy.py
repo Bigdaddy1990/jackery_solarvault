@@ -177,7 +177,7 @@ def _live_counter_integer(value: object) -> int | None:
         return None
     try:
         parsed = int(value)
-    except OverflowError, TypeError, ValueError:
+    except (OverflowError, TypeError, ValueError):
         return None
     if isinstance(value, float) and parsed != value:
         return None
@@ -194,7 +194,7 @@ def _counter_time(value: object) -> datetime | None:
             if parsed.tzinfo is not None and parsed.utcoffset() is not None
             else None
         )
-    except TypeError, ValueError, OverflowError:
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -226,7 +226,7 @@ def _period_counter_records(
                 continue
             try:
                 start = date.fromisoformat(record.get("period_start", ""))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 continue
             since = _counter_time(record.get("since"))
             until = _counter_time(record.get("until"))
@@ -543,7 +543,7 @@ def _clean_values(value: object) -> dict[str, int]:
             continue
         try:
             parsed = int(raw)
-        except OverflowError, TypeError, ValueError:
+        except (OverflowError, TypeError, ValueError):
             continue
         if parsed >= 0:
             cleaned[metric] = parsed
@@ -806,7 +806,7 @@ def daily_delta(  # ruff: ignore[too-many-return-statements]
         return None
     try:
         current = int(current_lifetime_value)
-    except OverflowError, TypeError, ValueError:
+    except (OverflowError, TypeError, ValueError):
         return None
     last = _clean_values(snapshot.get(_KEY_LAST_VALUES)).get(metric_key)
     return (

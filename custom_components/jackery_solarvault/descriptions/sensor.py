@@ -449,7 +449,7 @@ def first_nonblank_int(v: object) -> int | None:
             return None
         try:
             return int(float(s))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return None
     return None
 
@@ -776,10 +776,32 @@ def _section_share(
     # App 2.4.2 SysChartVM consumes each reported share, including explicit zero.
     # A missing split may use matching-period flows; a reported zero is not missing.
     if isinstance(shares, dict):
-        requested_value = safe_float(shares.get(part))
-        if requested_value is None or not 0 <= requested_value <= _MAX_SHARE_PERCENT:
-            return None
-        return requested_value
+        # The PV usage chart can report an all-zero placeholder even when
+        # complete day flows prove a nonzero split. Keep genuine App shares,
+        # including individual zero values, and never borrow a daily split
+        # for a different period.
+        pv_usage_placeholder = (
+            key == FIELD_PV_USAGE
+            and (
+                section == PAYLOAD_PV_TRENDS
+                or section.startswith(f"{PAYLOAD_PV_TRENDS}_")
+            )
+            and all(name in shares for name in ("home", "battery", "ac"))
+            and all(
+                (value := safe_float(shares[name])) is not None
+                and isfinite(value)
+                and value == 0
+                for name in ("home", "battery", "ac")
+            )
+        )
+        if not pv_usage_placeholder:
+            requested_value = safe_float(shares.get(part))
+            if (
+                requested_value is None
+                or not 0 <= requested_value <= _MAX_SHARE_PERCENT
+            ):
+                return None
+            return requested_value
     base_section = section
     period = section.rsplit("_", 1)[-1]
     if period in {DATE_TYPE_WEEK, DATE_TYPE_MONTH, DATE_TYPE_YEAR}:
@@ -839,7 +861,7 @@ def _device_meta_timestamp(entity: JackeryEntity, key: str) -> datetime | None:
         return None
     try:
         return datetime.fromtimestamp(millis / 1000, UTC)
-    except OverflowError, ValueError, OSError:
+    except (OverflowError, ValueError, OSError):
         return None
 
 
@@ -924,7 +946,7 @@ def _main_battery_observed_energy(  # ruff: ignore[too-many-locals]
         if start.utcoffset() is None or end.utcoffset() is None:
             return None
         duration = end.timestamp() - start.timestamp()
-    except KeyError, TypeError, ValueError, OverflowError, OSError:
+    except (KeyError, TypeError, ValueError, OverflowError, OSError):
         return None
     if duration <= 0 or seconds > duration + 0.001:
         return None
