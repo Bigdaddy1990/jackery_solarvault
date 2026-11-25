@@ -88,7 +88,8 @@ updates:
   # Hooks declared in .pre-commit-config.yaml.
   - package-ecosystem: "pre-commit"
     directory: "/"
-    target-branch: "main"
+    # pre-commit.ci owns hook version updates; avoid duplicate PRs.
+    open-pull-requests-limit: 0
     schedule:
       interval: "daily"
     rebase-strategy: "auto"
