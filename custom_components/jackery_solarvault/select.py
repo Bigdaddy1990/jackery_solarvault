@@ -18,16 +18,24 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from .client import JackeryAuthError
 from .const import (
     DOMAIN,
+    FIELD_EN,
+    FIELD_LM,
     FIELD_MINS_INTERVAL,
     FIELD_OFF_GRID_DOWN,
     FIELD_OFF_GRID_TIME,
+    FIELD_PM,
     FIELD_TEMP_UNIT,
+    FIELD_UPS,
     FIELD_WORK_MODEL,
     FIELD_WPC,
     PAYLOAD_CT_METER,
     PAYLOAD_PRICE,
     PAYLOAD_PRICE_SOURCES,
     PAYLOAD_WEATHER_PLAN,
+    PORTABLE_AC_TRANSFER_MODE_MODELS,
+    PORTABLE_ENERGY_SAVING_MINUTES,
+    PORTABLE_LIGHT_DETAIL_MODELS,
+    PORTABLE_UPS_MODE_MODELS,
 )
 from .coordinator import (
     ACTION_WRITE_ERRORS,
@@ -68,11 +76,7 @@ from .descriptions.select import (
     _work_mode_current,
 )
 from .entity import JackeryEntity, payload_properties_for_sources
-from .util import (
-    append_unique_entity,
-    async_setup_entity_discovery,
-    is_portable_payload as _is_portable_payload,
-)
+from .util import append_unique_entity, async_setup_entity_discovery
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -122,6 +126,14 @@ __all__ = [
 PARALLEL_UPDATES = 1
 
 _LOGGER = logging.getLogger(__name__)
+_RETIRED_PORTABLE_SELECTS = frozenset({
+    "portable_output_priority",
+    "portable_ac1_priority",
+    "portable_ac2_priority",
+    "portable_dc_priority",
+    "portable_ac_output_mode",
+    "portable_ups_model",
+})
 
 
 def _raise_select_action_error(
@@ -166,6 +178,13 @@ class JackerySelect(JackeryEntity, SelectEntity):
     """Generic description-driven Jackery select."""
 
     entity_description: JackerySelectDescription
+
+    @property
+    def available(self) -> bool:
+        if self.entity_description.key in _RETIRED_PORTABLE_SELECTS:
+            return False
+        return super().available
+
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(
@@ -204,10 +223,16 @@ class JackerySelect(JackeryEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """The currently selected option - delegates to description value_fn."""
+        if self.entity_description.key in _RETIRED_PORTABLE_SELECTS:
+            return None
         return self.entity_description.value_fn(self)
 
     async def async_select_option(self, option: str) -> None:
         """Forward the chosen option to the coordinator."""
+        if self.entity_description.key in _RETIRED_PORTABLE_SELECTS:
+            _raise_select_action_error(
+                self, "entity_action_failed", error="Use the corresponding App control"
+            )
         select_fn = self.entity_description.select_fn
         if select_fn is None:
             _raise_select_action_error(
@@ -230,8 +255,88 @@ class JackerySelect(JackeryEntity, SelectEntity):
             _raise_select_action_error(self, "entity_action_failed", error=err)
 
 
+class JackeryBoxWorkingModeSelect(JackerySelect):
+    """Box working mode with family-specific availability."""
+
+    @property
+    def available(self) -> bool:
+        """Hide a stale Box mode if the device family changes."""
+        return (
+            self.coordinator.device_family(self._device_id) == "box"
+            and super().available
+        )
+
+
+class JackeryPortableEnergySavingSelect(JackerySelect):
+    """Energy-saving time restricted to its Portable model and field."""
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_ENERGY_SAVING_MINUTES
+            and self.coordinator.property_fields_match_family(
+                self._device_id, (FIELD_PM,)
+            )
+            and super().available
+        )
+
+
+class JackeryPortableLightModeSelect(JackerySelect):
+    """App light modes restricted to the documented Portable light view."""
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_LIGHT_DETAIL_MODELS
+            and self.coordinator.property_fields_match_family(
+                self._device_id, (FIELD_LM,)
+            )
+            and super().available
+        )
+
+
+_PORTABLE_UPS_SELECTS = {
+    "portable_ups_operation": (FIELD_UPS, PORTABLE_UPS_MODE_MODELS),
+    "portable_ac_transfer_mode": ("acmode", PORTABLE_AC_TRANSFER_MODE_MODELS),
+}
+
+
+def _portable_ups_select_supported(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    key: str,
+    models: frozenset[int],
+) -> bool:
+    model = coordinator.device_model_code(device_id)
+    return model in models or (
+        key == "portable_ups_operation"
+        and model in {13, 22}
+        and coordinator.device_ups_identity(device_id) is not None
+    )
+
+
+class JackeryPortableUpsSelect(JackerySelect):
+    """App-backed UPS selection bound to model and field ownership."""
+
+    @property
+    def available(self) -> bool:
+        field, models = _PORTABLE_UPS_SELECTS[self.entity_description.key]
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and _portable_ups_select_supported(
+                self.coordinator, self._device_id, self.entity_description.key, models
+            )
+            and self.coordinator.property_fields_match_family(self._device_id, (field,))
+            and super().available
+        )
+
+
 # Home Assistant invokes platform setup as an awaitable callback.
-async def async_setup_entry(  # ruff:ignore[unused-async]
+async def async_setup_entry(  # ruff: ignore[unused-async, too-many-statements, complex-structure]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -246,7 +351,9 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         """Determine whether a keyed select entity applies to a device."""
         props = payload_properties_for_sources(payload)
         weather_plan = payload.get(PAYLOAD_WEATHER_PLAN) or {}
-        if key == "work_mode_select":
+        if key == "box_working_mode":
+            applies = props.get(FIELD_EN) is not None
+        elif key == "work_mode_select":
             applies = supports_advanced or FIELD_WORK_MODEL in props
         elif key == "temp_unit_select":
             applies = supports_advanced or FIELD_TEMP_UNIT in props
@@ -283,8 +390,11 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         """Collect select entities for devices that meet the gating rules."""
         entities: list[SelectEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
-            props = payload_properties_for_sources(payload)
-            is_portable = _is_portable_payload(payload, props)
+            payload_properties_for_sources(payload)
+            family = coordinator.device_family(dev_id)
+            if family == "unknown":
+                continue
+            is_portable = family == "portable"
             supports_advanced = coordinator.device_supports_advanced(dev_id)
             for description in SELECT_DESCRIPTIONS:
                 description_is_portable = description.key.startswith("portable_")
@@ -295,13 +405,44 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                     payload,
                     supports_advanced,
                 ):
+                    select_type: type[JackerySelect] = JackerySelect
+                    if description.key == "box_working_mode":
+                        select_type = JackeryBoxWorkingModeSelect
+                    elif description.key == "portable_power_mode":
+                        select_type = JackeryPortableEnergySavingSelect
+                    elif description.key == "portable_light_mode":
+                        select_type = JackeryPortableLightModeSelect
+                    elif description.key in _PORTABLE_UPS_SELECTS:
+                        field, models = _PORTABLE_UPS_SELECTS[description.key]
+                        if (
+                            not _portable_ups_select_supported(
+                                coordinator, dev_id, description.key, models
+                            )
+                            or payload_properties_for_sources(payload).get(field)
+                            is None
+                        ):
+                            continue
+                        select_type = JackeryPortableUpsSelect
                     append_unique_entity(
                         entities,
                         seen_unique_ids,
-                        JackerySelect(coordinator, dev_id, description),
+                        select_type(coordinator, dev_id, description),
                     )
         return entities
 
+    def _box_mode_eligibility() -> tuple[str, ...]:
+        """Discover the Box selector when its mode is first reported."""
+        return tuple(
+            device_id
+            for device_id, payload in sorted((coordinator.data or {}).items())
+            if coordinator.device_family(device_id) == "box"
+            and _gate("box_working_mode", payload, False)
+        )
+
     async_setup_entity_discovery(
-        entry, coordinator, _collect_entities, async_add_entities
+        entry,
+        coordinator,
+        _collect_entities,
+        async_add_entities,
+        eligibility_signature=_box_mode_eligibility,
     )

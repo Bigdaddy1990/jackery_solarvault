@@ -4,8 +4,6 @@ import asyncio
 import copy
 from typing import TYPE_CHECKING, Any, Final
 
-from homeassistant.helpers.storage import Store
-
 from ..const import (
     CACHE_ENTRIES_KEY,
     CACHE_STORAGE_VERSION,
@@ -14,6 +12,7 @@ from ..const import (
     DOMAIN,
 )
 from ..util import get_store_lock
+from .storage import JackeryStore as Store
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant

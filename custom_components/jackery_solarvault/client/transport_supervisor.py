@@ -44,7 +44,7 @@ class SupervisorConfig:
     update_credentials_fn: Callable[[], Awaitable[Any]] | None = None
     health_check_fn: Callable[[], bool] | None = None
     reconnect_delay_sec: float = 5.0
-    max_reconnect_delay_sec: float = 300.0
+    max_reconnect_delay_sec: float = 30.0
 
 
 class TransportSupervisor:
@@ -131,7 +131,7 @@ class TransportSupervisor:
         """Monitor transport health and trigger reconnect if needed."""
         while not self._shutdown and self._state == SupervisorState.RUNNING:
             try:  # ruff: ignore[too-many-statements-in-try-clause]
-                await asyncio.sleep(30)  # Check every 30 seconds
+                await asyncio.sleep(10)  # Check every 10 seconds
                 if self.config.health_check_fn and not self.config.health_check_fn():
                     _LOGGER.warning(
                         "Transport %s health check failed - marking degraded",

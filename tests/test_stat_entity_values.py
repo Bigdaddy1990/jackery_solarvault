@@ -16,14 +16,20 @@ from custom_components.jackery_solarvault.const import (
     APP_REQUEST_DATE_TYPE,
     APP_REQUEST_END_DATE,
     APP_REQUEST_META,
+    APP_SECTION_TODAY_ENERGY,
     APP_STAT_UNIT,
+    APP_TODAY_ENERGY_SOURCE_META,
     APP_UNIT_KWH,
+    CT_LIVE_ENERGY_UNITS_PER_KWH,
     DATE_TYPE_DAY,
     DATE_TYPE_MONTH,
     DATE_TYPE_WEEK,
     DATE_TYPE_YEAR,
     FIELD_CT_TOTAL_PHASE_ENERGY,
+    FIELD_DEVICE_SN,
+    JACKERY_LIVE_ENERGY_UNITS_PER_KWH,
     PAYLOAD_BATTERY_TRENDS,
+    PAYLOAD_DEVICE_META,
     PAYLOAD_LOCAL_DAILY_ENERGY,
 )
 from custom_components.jackery_solarvault.descriptions.sensor import (
@@ -37,6 +43,8 @@ from custom_components.jackery_solarvault.sensor import (
     _period_from_stat_description,  # ruff: ignore[import-private-name]
 )
 from custom_components.jackery_solarvault.util import (
+    attach_calculated_savings_metadata,
+    current_day_http_source,
     effective_period_total_value,
     trend_series_total,
 )
@@ -45,6 +53,101 @@ from homeassistant.components.sensor import SensorStateClass
 _DEVICE_ID = "dev-1"
 _STAT_KEY = "device_today_pv_energy"
 _NEGATIVE_KWH = -1.5
+
+
+@pytest.mark.parametrize("period", [DATE_TYPE_MONTH, DATE_TYPE_YEAR])
+@pytest.mark.parametrize("local_value", [None, 0.5, 2.0])
+@pytest.mark.parametrize(
+    "curve_case",
+    [
+        "current",
+        "zero",
+        "old",
+        "future",
+        "other_channel",
+        "future_only",
+        "absent",
+        "past_gap",
+    ],
+)
+def test_pv_open_period_uses_only_its_own_current_day_curve(
+    period: str, local_value: float | None, curve_case: str
+) -> None:
+    """Own current-day observations fill today's bucket, never historical gaps."""
+    sensor = _stat_sensor()
+    mutable = cast("Any", sensor)
+    description = next(
+        item for item in STAT_DESCRIPTIONS if item.key == f"device_pv1_{period}_energy"
+    )
+    mutable.entity_description = description
+    mutable._reset_period = period  # ruff: ignore[private-member-access]
+    today = datetime(2026, 1, 2, 12, tzinfo=UTC)
+    source: dict[str, Any] = {
+        "unit": "kWh",
+        "totalSolarEnergy": 10.0,
+        "pv1Egy": 1000.0,
+        "y": [10.0] * (12 if period == DATE_TYPE_YEAR else 31),
+        "y1": [1000.0] * (12 if period == DATE_TYPE_YEAR else 31),
+        "_request": {
+            "dateType": period,
+            "beginDate": "2026-01-01",
+            "endDate": "2026-12-31" if period == DATE_TYPE_YEAR else "2026-01-31",
+        },
+    }
+    samples: list[float | None] = [100.0] * 144 + [None] * 144
+    if curve_case == "zero":
+        samples = [0.0] * 144 + [None] * 144
+    elif curve_case == "future_only":
+        samples = [None] * 145 + [100.0] * 143
+    curve_date = {
+        "old": "2026-01-01",
+        "future": "2026-01-03",
+    }.get(curve_case, "2026-01-02")
+    payload: dict[str, Any] = {
+        description.section: source,
+        "device_pv_stat_day": {
+            "unit": "W",
+            "y2" if curve_case == "other_channel" else "y1": samples,
+            "_request": {
+                "dateType": "day",
+                "beginDate": curve_date,
+                "endDate": curve_date,
+            },
+        },
+        "verified_day_statistics": {"2026-01-01": {"device_pv_stat": {"pv1Egy": 1.0}}},
+    }
+    if curve_case == "absent":
+        payload.pop("device_pv_stat_day")
+    elif curve_case == "past_gap":
+        payload["verified_day_statistics"] = {}
+    original = deepcopy(payload)
+    mutable.coordinator.data = {_DEVICE_ID: payload}
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+        local_daily_raw=(local_value, "pv1Egy") if local_value is not None else None,
+        local_period_raw=None,
+    )
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    if curve_case == "past_gap":
+        expected = None
+    elif curve_case == "current":
+        expected = 1.0 + max(1.2, local_value or 0.0)
+    elif curve_case == "zero":
+        expected = 1.0 + (local_value or 0.0)
+    else:
+        expected = 1.0 + local_value if local_value is not None else None
+    if expected is None:
+        assert snapshot.native_value is None
+    else:
+        assert snapshot.native_value == pytest.approx(expected)
+        assert snapshot.attrs["fallback"] == (
+            "current_open_month_from_daily_buckets"
+            if period == DATE_TYPE_MONTH
+            else "current_open_year_from_month_and_daily_buckets"
+        )
+    assert payload == original
 
 
 def _stat_sensor() -> JackeryStatSensor:
@@ -87,16 +190,30 @@ def test_temperature_unit_is_a_readable_setting(
     assert description.value_fn(entity) == expected
 
 
-def test_stat_entity_does_not_clamp_negative_period_values() -> None:
-    """Stats/trends quality decisions belong upstream, not in the entity."""
+def test_negative_pv_generation_is_unknown_not_zero() -> None:
+    """An impossible negative PV value must not enter HA energy statistics."""
     sensor = _stat_sensor()
 
     payload = sensor.coordinator.data[_DEVICE_ID]
+    today = datetime.now(UTC).date().isoformat()
+    payload[sensor.entity_description.section].update({
+        APP_STAT_UNIT: APP_UNIT_KWH,
+        APP_REQUEST_META: {
+            APP_REQUEST_DATE_TYPE: DATE_TYPE_DAY,
+            APP_REQUEST_BEGIN_DATE: today,
+            APP_REQUEST_END_DATE: today,
+        },
+    })
     context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
     snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
 
-    assert sensor.native_value == pytest.approx(_NEGATIVE_KWH)
+    assert sensor.native_value is None
+    assert snapshot.attrs["unknown_reason"] == "invalid_negative_pv_generation"
+    assert (
+        payload[sensor.entity_description.section][sensor.entity_description.stat_key]
+        == _NEGATIVE_KWH
+    )
 
 
 def test_bad_pv_scalar_does_not_hide_a_complete_valid_channel_series() -> None:
@@ -126,6 +243,312 @@ def test_bad_pv_scalar_does_not_hide_a_complete_valid_channel_series() -> None:
     assert trend_series_total(source, "device_pv_stat_week", "pv1Egy") == pytest.approx(
         1.06
     )
+
+
+@pytest.mark.parametrize("period", ["month", "year"])
+def test_rejected_pv_channel_exposes_unknown_reason(freezer: Any, period: str) -> None:
+    """Rejected vendor offsets stay unknown and explain the rejection."""
+    freezer.move_to("2026-10-08 12:00:00+00:00")
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == f"device_pv1_{period}_energy"
+    )
+    raw.entity_description = description
+    raw._reset_period = period  # ruff: ignore[private-member-access]
+    source = {
+        "unit": "kWh",
+        "totalSolarEnergy": 11.93,
+        "pv1Egy": 261.98,
+        "y": [11.93],
+        "y1": [261.98],
+        "_request": {
+            "dateType": period,
+            "beginDate": "2026-10-01" if period == "month" else "2026-01-01",
+        },
+    }
+    original_source = deepcopy(source)
+    payload = {description.section: source}
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    assert snapshot.native_value is None
+    assert snapshot.attrs["unknown_reason"] == "channel_exceeds_total"
+    assert source == original_source
+
+
+@pytest.mark.parametrize("key", ["ct_input_year_energy", "ct_output_year_energy"])
+def test_missing_ct_year_source_exposes_unknown_reason(freezer: Any, key: str) -> None:
+    """An absent CT year source is visible and never becomes a zero baseline."""
+    freezer.move_to("2026-10-08 12:00:00+00:00")
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    description = next(d for d in STAT_DESCRIPTIONS if d.key == key)
+    raw.entity_description = description
+    raw._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    payload = {description.section: {}}
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    assert snapshot.native_value is None
+    assert snapshot.attrs["unknown_reason"] == "source_missing"
+
+
+@pytest.mark.parametrize("http_value", [0.0, 0.02])
+def test_compact_day_keeps_measured_local_total_during_http_source_gap(
+    freezer: Any, http_value: float
+) -> None:
+    """A missing local counter cannot turn a measured same-day total backwards."""
+    freezer.move_to("2026-10-08 12:00:00+00:00")
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    raw.entity_description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == "today_grid_import_energy"
+    )
+    raw._reset_period = "day"  # ruff: ignore[private-member-access]
+    # Day retention belongs to a proved physical parent, not to an
+    # unidentified SimpleNamespace reused across device identities.
+    raw.coordinator._device_index = {  # ruff: ignore[private-member-access]
+        _DEVICE_ID: {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "fixture-head"}}
+    }
+    payload = {
+        PAYLOAD_LOCAL_DAILY_ENERGY: {"inOngridEgy": 6},
+        APP_SECTION_TODAY_ENERGY: {
+            "dg": 0.06,
+            APP_TODAY_ENERGY_SOURCE_META: {
+                "dg": {
+                    "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                    "source_key": "inOngridEgy",
+                    "fallback": "local_lifetime_delta",
+                }
+            },
+        },
+    }
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.06)
+
+    payload[PAYLOAD_LOCAL_DAILY_ENERGY] = {}
+    payload[APP_SECTION_TODAY_ENERGY] = {
+        "dg": http_value,
+        APP_TODAY_ENERGY_SOURCE_META: {
+            "dg": {
+                "source_section": APP_SECTION_TODAY_ENERGY,
+                "source_key": "dg",
+                "fallback": "direct_http_today_total",
+            }
+        },
+    }
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.06)
+    assert sensor.extra_state_attributes["day_value_retained"] is True
+    assert sensor.extra_state_attributes["local_counter_available"] is False
+    assert payload[APP_SECTION_TODAY_ENERGY]["dg"] == pytest.approx(http_value)
+
+    http_source = payload[APP_SECTION_TODAY_ENERGY]
+    payload[APP_SECTION_TODAY_ENERGY] = {}
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.06)
+    assert sensor.extra_state_attributes["local_counter_available"] is False
+
+    payload[PAYLOAD_LOCAL_DAILY_ENERGY] = {"inOngridEgy": 7}
+    payload[APP_SECTION_TODAY_ENERGY] = {
+        "dg": 0.07,
+        APP_TODAY_ENERGY_SOURCE_META: {
+            "dg": {
+                "source_section": PAYLOAD_LOCAL_DAILY_ENERGY,
+                "source_key": "inOngridEgy",
+                "fallback": "local_lifetime_delta",
+            }
+        },
+    }
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.07)
+    assert sensor.extra_state_attributes["local_counter_available"] is True
+    assert "day_value_retained" not in sensor.extra_state_attributes
+
+    freezer.move_to("2026-10-09 00:01:00+00:00")
+    payload[PAYLOAD_LOCAL_DAILY_ENERGY] = {}
+    payload[APP_SECTION_TODAY_ENERGY] = http_source
+    # The previous day's undated cloud response cannot populate the next
+    # day's Recorder state. Only a fresh, owner-bound receipt can do so.
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value is None
+    assert "day_value_retained" not in sensor.extra_state_attributes
+
+    payload[APP_SECTION_TODAY_ENERGY] = {
+        **http_source,
+        "_http_day_receipt": {
+            "day": "2026-10-09",
+            "section": APP_SECTION_TODAY_ENERGY,
+            "owner": "fixture-head",
+            "generation": 1,
+            "fields": {"dg": http_value},
+        },
+    }
+    raw.coordinator._http_day_source_is_current = lambda device, section, value: (  # ruff: ignore[private-member-access]
+        device == _DEVICE_ID
+        and section == APP_SECTION_TODAY_ENERGY
+        and value["_http_day_receipt"]["owner"] == "fixture-head"
+    )
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(http_value)
+    assert "day_value_retained" not in sensor.extra_state_attributes
+
+
+@pytest.mark.parametrize("period", [DATE_TYPE_MONTH, DATE_TYPE_YEAR])
+@pytest.mark.parametrize("unit", ["kWh", "Wh"])
+def test_native_period_energy_keeps_independent_year_scalar_and_scales_units(
+    period: str, unit: str
+) -> None:
+    """A partial annual chart cannot replace its total; Wh never publishes as kWh."""
+    sensor = _stat_sensor()
+    description = next(
+        desc
+        for desc in STAT_DESCRIPTIONS
+        if desc.key == f"battery_charge_{period}_energy"
+    )
+    mutable = cast("Any", sensor)
+    mutable.entity_description = description
+    mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
+    initial = sensor._capture_refresh_context({})  # ruff: ignore[private-member-access]
+    begin = initial.local_today.replace(day=1)
+    if period == DATE_TYPE_YEAR:
+        begin = begin.replace(month=1)
+    scale = 1000 if unit == "Wh" else 1
+    source = {
+        "unit": unit,
+        "totalCharge": 100 * scale,
+        "y1": [None, 2 * scale, *([None] * 10)]
+        if period == DATE_TYPE_YEAR
+        else [100 * scale],
+        "_request": {"dateType": period, "beginDate": begin.isoformat()},
+    }
+    payload = {description.section: source}
+    mutable.coordinator.data[_DEVICE_ID] = payload
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(100.0)
+    assert source["totalCharge"] == 100 * scale
+    if period == DATE_TYPE_YEAR:
+        assert source["y1"][0] is None
+
+
+def test_month_charge_does_not_borrow_unrelated_week_buckets() -> None:
+    """A weekly response cannot repair a missing monthly statistic."""
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    raw.entity_description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == "battery_charge_month_energy"
+    )
+    raw._reset_period = "month"  # ruff: ignore[private-member-access]
+    payload = {
+        "device_battery_stat_month": {
+            "unit": "kWh",
+            "totalCharge": 0,
+            "y1": [None] * 31,
+            "_request": {"dateType": "month", "beginDate": "2026-10-01"},
+        },
+        "device_battery_stat_week": {
+            "unit": "kWh",
+            "y1": [5.0, 6.7736, None, None, None, None, None],
+            "_request": {"dateType": "week", "beginDate": "2026-10-05"},
+        },
+    }
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    today = datetime(2026, 10, 7, 12, tzinfo=UTC)
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+    )
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
+    without_week = {
+        key: value
+        for key, value in payload.items()
+        if key != "device_battery_stat_week"
+    }
+    raw.coordinator.data = {_DEVICE_ID: without_week}
+    comparison = replace(
+        sensor._capture_refresh_context(without_week),  # ruff: ignore[private-member-access]
+        local_now=today,
+        local_today=today.date(),
+    )
+    month_only = sensor._refresh_cache(comparison, {})  # ruff: ignore[private-member-access]
+    assert snapshot.native_value == month_only.native_value
+    assert snapshot.attrs.get("fallback") == month_only.attrs.get("fallback")
+
+
+@pytest.mark.parametrize("request_year", [2025, 2026, 2027])
+def test_battery_year_balance_shares_published_period_basis(
+    freezer: Any, request_year: int
+) -> None:
+    """Savings balance and native discharge use the same dated corrections."""
+    freezer.move_to("2026-10-07 12:00:00+00:00")
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    raw.entity_description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == "battery_discharge_year_energy"
+    )
+    raw._reset_period = "year"  # ruff: ignore[private-member-access]
+    payload: dict[str, Any] = {
+        "price": {"singlePrice": "0.28"},
+        "statistic": {"totalGeneration": "1000", "totalRevenue": "280"},
+        "pv_trends_year": {"totalSolarEnergy": "1000", "totalSolarRevenue": "280"},
+        "device_home_stat_year": {"totalOutGridEnergy": "500"},
+        "home_trends_year": {"totalHomeEgy": "500"},
+        "device_battery_stat_year": {
+            "unit": "kWh",
+            "totalCharge": "292.52",
+            "totalDischarge": "277.23",
+            "y1": [292.52] + [0.0] * 11,
+            "y2": [277.23] + [0.0] * 11,
+            "_request": {"dateType": "year", "beginDate": f"{request_year}-01-01"},
+        },
+        "device_battery_stat_month": {
+            "unit": "kWh",
+            "y1": [0.0] * 31,
+            "y2": [10.0, 12.40853] + [0.0] * 29,
+            "_request": {"dateType": "month", "beginDate": "2026-10-01"},
+        },
+    }
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    snapshot = sensor._refresh_cache(  # ruff: ignore[private-member-access]
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        {},
+    )
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+    attach_calculated_savings_metadata(payload)
+    calculation = payload["statistic"]["_savings_calculation"]
+    if request_year != datetime.now(UTC).year:
+        assert sensor.native_value is None
+        assert calculation["source_energy"]["battery_discharge_year_kwh"] is None
+        assert (
+            calculation["source_energy"]["battery_charge_discharge_balance_year_kwh"]
+            is None
+        )
+        assert calculation["battery_year_basis"]["totalDischarge"]["method"] == (
+            "year_request_outside_current_year"
+        )
+        return
+    assert sensor.native_value == pytest.approx(299.63853)
+    assert calculation["source_energy"]["battery_discharge_year_kwh"] == pytest.approx(
+        sensor.native_value
+    )
+    assert calculation["source_energy"][
+        "battery_charge_discharge_balance_year_kwh"
+    ] == pytest.approx(292.52 - 299.63853)
+    evidence = calculation["battery_year_basis"]["totalDischarge"]
+    assert evidence["raw_app_kwh"] == pytest.approx(277.23)
+    assert evidence["method"] == "current_open_year_from_month_and_daily_buckets"
+    assert evidence["completed_days_verified"] is False
 
 
 @pytest.mark.parametrize("period", [DATE_TYPE_MONTH, DATE_TYPE_YEAR])
@@ -329,6 +752,72 @@ def test_period_verified_days_replace_stale_high_cloud_totals(
     assert payload == original
 
 
+@pytest.mark.parametrize("channel", [1, 2, 3, 4])
+def test_native_pv_day_keeps_own_local_delta_during_curve_source_gap(
+    freezer: Any, channel: int
+) -> None:
+    """The captured same-day local-to-HTTP switch cannot lose observed energy."""
+    freezer.move_to("2026-10-01 10:00:00+00:00")
+    sensor = _stat_sensor()
+    raw = cast("Any", sensor)
+    description = next(
+        d for d in STAT_DESCRIPTIONS if d.key == f"device_pv{channel}_day_energy"
+    )
+    raw.entity_description = description
+    raw._reset_period = DATE_TYPE_DAY  # ruff: ignore[private-member-access]
+    # Same-day retention requires the physically identified parent. A bare
+    # numeric fixture ID cannot certify whose local counter was observed.
+    raw.coordinator._device_index = {  # ruff: ignore[private-member-access]
+        _DEVICE_ID: {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "fixture-head"}}
+    }
+    metric = f"pv{channel}Egy"
+    source: dict[str, Any] = {
+        "unit": "W",
+        f"y{channel}": [0.0] * 99 + [44.04] + [None] * 188,
+        "_request": {
+            "dateType": "day",
+            "beginDate": "2026-10-01",
+            "endDate": "2026-10-01",
+        },
+    }
+    payload = {description.section: source}
+    raw.coordinator.data = {_DEVICE_ID: payload}
+    context = replace(
+        sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
+        local_daily_raw=(0.01, metric),
+    )
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.01)
+
+    for observation in ({}, source):
+        original = deepcopy(observation)
+        payload[description.section] = observation
+        context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+        sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+        assert sensor.native_value == pytest.approx(0.01)
+        assert sensor.extra_state_attributes["day_value_retained"] is True
+        assert sensor.extra_state_attributes["local_counter_available"] is False
+        assert observation == original
+
+    context = replace(context, local_daily_raw=(0.0, metric))
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert "day_value_retained" not in sensor.extra_state_attributes
+
+    payload[description.section] = {}
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value is None
+    payload[description.section] = source
+
+    freezer.move_to("2026-10-02 10:00:00+00:00")
+    source["_request"]["beginDate"] = "2026-10-02"
+    source["_request"]["endDate"] = "2026-10-02"
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(sensor._refresh_cache(context, {}))  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.00367)
+    assert "day_value_retained" not in sensor.extra_state_attributes
+
+
 def test_period_last_reset_is_precomputed_before_ha_state_calculation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -434,7 +923,7 @@ def test_ct_eps_day_scalar_zero_is_not_exposed_as_unknown(
     unit: str,
     series: dict[str, list[int]],
 ) -> None:
-    """An App scalar zero remains real without treating W curves as energy."""
+    """Only a dated App scalar zero is a real day value, never a W curve."""
     description = next(desc for desc in STAT_DESCRIPTIONS if desc.key == sensor_key)
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)
@@ -449,6 +938,7 @@ def test_ct_eps_day_scalar_zero_is_not_exposed_as_unknown(
             },
         },
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+        _local_today=lambda: datetime.now(UTC).date(),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
@@ -460,10 +950,28 @@ def test_ct_eps_day_scalar_zero_is_not_exposed_as_unknown(
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
 
     payload = sensor.coordinator.data[_DEVICE_ID]
-    snapshot = sensor._refresh_cache(sensor._capture_refresh_context(payload), {})  # ruff: ignore[private-member-access]
+    context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(context, {})  # ruff: ignore[private-member-access]
     sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+    assert sensor.native_value is None
 
-    assert sensor.native_value == pytest.approx(0.0)
+    # An undated zero is not evidence for the current calendar day.
+    day = context.local_today.isoformat()
+    payload[section][APP_REQUEST_META] = {
+        APP_REQUEST_DATE_TYPE: DATE_TYPE_DAY,
+        APP_REQUEST_BEGIN_DATE: day,
+        APP_REQUEST_END_DATE: day,
+    }
+    updated_context = sensor._capture_refresh_context(payload)  # ruff: ignore[private-member-access]
+    snapshot = sensor._refresh_cache(updated_context, {})  # ruff: ignore[private-member-access]
+    sensor._apply_cache_snapshot(snapshot)  # ruff: ignore[private-member-access]
+    assert sensor.native_value == pytest.approx(0.0), (
+        day,
+        updated_context.local_today.isoformat(),
+        snapshot.native_value,
+        snapshot.attrs,
+        sensor.extra_state_attributes,
+    )
 
 
 @pytest.mark.parametrize(
@@ -649,10 +1157,20 @@ def test_battery_week_replaces_stale_today_bucket_with_local_day_total() -> None
     }
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
-        local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+        _device_index={
+            _DEVICE_ID: {PAYLOAD_DEVICE_META: {FIELD_DEVICE_SN: "fixture-head"}}
+        },
+        _local_today=lambda: today,
+        local_daily_energy_kwh=lambda _device_id, metric_key: (
+            payload[PAYLOAD_LOCAL_DAILY_ENERGY][metric_key]
+            / JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+            if metric_key == APP_DEVICE_STAT_BATTERY_DISCHARGE
+            else None
+        ),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
+    mutable._attr_unique_id = f"{_DEVICE_ID}_{description.key}"  # ruff: ignore[private-member-access]
     mutable.entity_description = description
     mutable._reset_period = description.reset_period  # ruff: ignore[private-member-access]
     mutable._cached_native_value = None  # ruff: ignore[private-member-access]
@@ -781,7 +1299,13 @@ def test_ct_import_open_period_hierarchy_includes_current_local_day() -> None:
         mutable = cast("Any", sensor)
         mutable.coordinator = SimpleNamespace(
             data={_DEVICE_ID: payload},
-            local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+            _local_today=lambda: today,
+            local_daily_energy_kwh=lambda _device_id, metric_key: (
+                payload[PAYLOAD_LOCAL_DAILY_ENERGY][metric_key]
+                / CT_LIVE_ENERGY_UNITS_PER_KWH
+                if metric_key == FIELD_CT_TOTAL_PHASE_ENERGY
+                else None
+            ),
         )
         mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
         mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
@@ -820,7 +1344,13 @@ def test_local_day_fallback_omits_non_applicable_null_attributes() -> None:
     }
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
-        local_daily_energy_kwh=lambda _device_id, _metric_key: None,
+        _local_today=lambda: datetime.now(UTC).date(),
+        local_daily_energy_kwh=lambda _device_id, metric_key: (
+            payload[PAYLOAD_LOCAL_DAILY_ENERGY][metric_key]
+            / JACKERY_LIVE_ENERGY_UNITS_PER_KWH
+            if metric_key == APP_DEVICE_STAT_BATTERY_DISCHARGE
+            else None
+        ),
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
     mutable._device_id = _DEVICE_ID  # ruff: ignore[private-member-access]
@@ -861,6 +1391,7 @@ def test_day_period_preserves_explicit_current_zero() -> None:
     }
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: payload},
+        _local_today=lambda: datetime.now(UTC).date(),
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
@@ -1030,24 +1561,60 @@ def _today_battery_value(
 ) -> float | None:
     """Resolve a today battery value from its two independent HTTP sources."""
     description = next(desc for desc in STAT_DESCRIPTIONS if desc.key == key)
+    now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     fallback_section, fallback_key = description.fallback_sources[0]
-    primary_source = {description.stat_key: primary} if primary is not None else {}
-    fallback_source = {fallback_key: fallback} if fallback is not None else {}
+    primary_source: dict[str, Any] = (
+        {description.stat_key: primary} if primary is not None else {}
+    )
+    fallback_source: dict[str, Any] = (
+        {fallback_key: fallback} if fallback is not None else {}
+    )
     sections = {
         description.section: primary_source,
         fallback_section: fallback_source,
     }
+    for section, source in (
+        (description.section, primary_source),
+        (fallback_section, fallback_source),
+    ):
+        source["_http_day_receipt"] = {
+            "day": now.date().isoformat(),
+            "section": section,
+            "owner": "fixture-head",
+            "scope_id": _DEVICE_ID,
+            "generation": 1,
+            "fields": dict(source),
+        }
     if curve is not None:
         curve_section, curve_key = description.fallback_sources[1]
         sections[curve_section] = {
             curve_key: 0,
             APP_CHART_SERIES_Y1: curve,
             APP_STAT_UNIT: "W",
+            APP_REQUEST_META: {
+                APP_REQUEST_DATE_TYPE: DATE_TYPE_DAY,
+                APP_REQUEST_BEGIN_DATE: now.date().isoformat(),
+                APP_REQUEST_END_DATE: now.date().isoformat(),
+            },
         }
+
+    def owned_day_source(device_id: str, section: str, source: dict[str, Any]) -> bool:
+        """Accept only the fixture's dated, owned implicit-day HTTP receipt."""
+        receipt = source.get("_http_day_receipt")
+        return (
+            device_id == _DEVICE_ID
+            and current_day_http_source(source, section, now.date())
+            and isinstance(receipt, dict)
+            and receipt.get("owner") == "fixture-head"
+        )
+
     sensor = JackeryStatSensor.__new__(JackeryStatSensor)
     mutable = cast("Any", sensor)
     mutable.coordinator = SimpleNamespace(
         data={_DEVICE_ID: sections},
+        _local_today=now.date,
+        _http_day_source_is_current=owned_day_source,
+        _http_day_source_owner_is_current=owned_day_source,
         local_daily_energy_kwh=lambda _device_id, _metric_key: None,
     )
     mutable.hass = SimpleNamespace(config=SimpleNamespace(time_zone="UTC"))
@@ -1060,7 +1627,6 @@ def _today_battery_value(
     mutable._restored_lifetime_value = None  # ruff: ignore[private-member-access]
 
     payload = sensor.coordinator.data[_DEVICE_ID]
-    now = datetime(2026, 9, 29, 12, tzinfo=UTC)
     context = replace(
         sensor._capture_refresh_context(payload),  # ruff: ignore[private-member-access]
         local_now=now,
@@ -1162,15 +1728,15 @@ def test_day_period_sensor_still_reports_last_reset() -> None:
 @pytest.mark.parametrize(
     ["shares", "expected"],
     [
-        [{"ac": 0, "home": 0, "pv": 0}, None],
+        [{"ac": 0, "home": 0, "pv": 0}, 0],
         [{"ac": 0, "home": 2, "pv": 98}, 98],
         [{"ac": 0, "home": 0, "pv": 100}, 100],
     ],
 )
-def test_all_zero_share_split_is_unknown(
+def test_reported_zero_share_is_preserved(
     shares: dict[str, int], expected: int | None
 ) -> None:
-    """An all-zero split is the cloud's not-aggregated placeholder, not 0 %."""
+    """App 2.4.2 consumes reported percentages individually, including zero."""
     entity = SimpleNamespace(
         payload_section_for_sources=lambda _section: {"batterySources": shares}
     )
@@ -1191,7 +1757,7 @@ def test_all_zero_share_split_is_unknown(
 def test_battery_share_uses_complete_local_day_flows(
     key: str, part: str, expected: float
 ) -> None:
-    """Documented daily flow deltas fill the App's all-zero share placeholder."""
+    """Documented daily flow deltas fill an absent App share object."""
     sensor = _battery_share_sensor()
     assert _section_share(sensor, PAYLOAD_BATTERY_TRENDS, key, part) == expected
 
@@ -1204,10 +1770,7 @@ def _battery_share_sensor() -> JackerySensor:
     mutable.coordinator = SimpleNamespace(
         data={
             _DEVICE_ID: {
-                PAYLOAD_BATTERY_TRENDS: {
-                    "batterySources": {"pv": 0, "home": 0, "ac": 0},
-                    "batteryUsage": {"home": 0, "ac": 0},
-                },
+                PAYLOAD_BATTERY_TRENDS: {},
                 PAYLOAD_LOCAL_DAILY_ENERGY: {
                     "pvOtBatEgy": 600,
                     "ongridOtBatEgy": 300,
@@ -1275,9 +1838,7 @@ def test_battery_share_keeps_reported_cloud_percentage(
 def _pv_usage_share_sensor() -> JackerySensor:
     """Build a sensor with complete daily PV destinations and empty cloud shares."""
     sensor = _battery_share_sensor()
-    sensor.payload["pv_trends"] = {
-        "pvUsage": {"home": 0, "battery": 0, "ac": 0},
-    }
+    sensor.payload["pv_trends"] = {}
     sensor.payload[PAYLOAD_LOCAL_DAILY_ENERGY] = {
         "pvOtOngridEgy": 600,
         "pvOtBatEgy": 300,
@@ -1353,23 +1914,25 @@ def test_pv_usage_share_does_not_use_daily_flows_for_other_periods(
     """Current-day destinations cannot stand in for historical periods."""
     sensor = _pv_usage_share_sensor()
     section = f"pv_trends_{period}"
-    sensor.payload[section] = {"pvUsage": {"home": 0, "battery": 0, "ac": 0}}
+    sensor.payload[section] = {}
 
     assert _section_share(sensor, section, "pvUsage", "home") is None
 
 
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
-@pytest.mark.parametrize(["part", "expected"], [["home", 60.0], ["ac", 10.0]])
-def test_pv_usage_share_ignores_nonfinite_cloud_placeholders(
-    invalid: float, part: str, expected: float
+@pytest.mark.parametrize(["part", "expected"], [["home", None], ["ac", 0.0]])
+def test_pv_usage_share_validates_each_reported_field(
+    invalid: float, part: str, expected: float | None
 ) -> None:
-    """A nonfinite part cannot turn an empty cloud split into a measured value."""
+    """An invalid reported part stays missing; a separate explicit zero survives."""
     sensor = _pv_usage_share_sensor()
-    sensor.payload["pv_trends"]["pvUsage"]["home"] = invalid
+    sensor.payload["pv_trends"]["pvUsage"] = {"home": invalid, "ac": 0, "battery": 0}
 
-    assert _section_share(sensor, "pv_trends", "pvUsage", part) == pytest.approx(
-        expected
-    )
+    value = _section_share(sensor, "pv_trends", "pvUsage", part)
+    if expected is None:
+        assert value is None
+    else:
+        assert value == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])

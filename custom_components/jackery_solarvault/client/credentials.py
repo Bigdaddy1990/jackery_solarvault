@@ -2,11 +2,13 @@
 
 import hashlib
 import logging
+import re
 from typing import TYPE_CHECKING, Final
 
 import voluptuous as vol
 
-from ..const import REDACTED_VALUE
+from ..const import REDACTED_VALUE, REDACT_KEYS
+from ..util import jackery_dev_mode_enabled
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -16,6 +18,15 @@ _LOGGER = logging.getLogger(__name__)
 MAX_TOKEN_LENGTH: Final = 512
 MAX_USERNAME_LENGTH: Final = 128
 MAX_PASSWORD_LENGTH: Final = 128
+_SECRET_ASSIGNMENT: Final = re.compile(
+    r"(?P<prefix>(?<!\w)(?:"
+    + "|".join(re.escape(key) for key in sorted(REDACT_KEYS))
+    + r""")["']?\s*[:=]\s*)(?:"""
+    + re.escape(REDACTED_VALUE)
+    + r"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\r\n]+)""",
+    re.IGNORECASE,
+)
+_BEARER_CREDENTIAL: Final = re.compile(r"(\bBearer\s+)[^\s'\"]+", re.IGNORECASE)
 
 
 class CredentialValidationError(vol.Invalid):
@@ -48,12 +59,25 @@ def credential_fingerprint(fields: Mapping[str, str]) -> str:
     return digest.hexdigest()
 
 
-def redacted_error(error: object) -> str:
-    """Return useful error classification without retaining exception details."""
-    if isinstance(error, BaseException) and not getattr(
-        type(error), "exposes_message", False
-    ):
-        return f"{type(error).__name__}: {REDACTED_VALUE}"
+def redacted_error_text(message: str, *, entry: object | None = None) -> str:
+    """Honor explicit raw debugging before applying the normal credential scrub."""
+    if jackery_dev_mode_enabled(entry):
+        return message
+    message = _SECRET_ASSIGNMENT.sub(
+        lambda match: f"{match.group("prefix")}{REDACTED_VALUE}", message
+    )
+    return _BEARER_CREDENTIAL.sub(
+        lambda match: f"{match.group(1)}{REDACTED_VALUE}", message
+    )
+
+
+def redacted_error(error: object, *, entry: object | None = None) -> str:
+    """Return useful error classification with redacted exception details.
+
+    Preserve exception structure and the process or entry raw-debug choice.
+    Outside explicit raw debugging, labelled credential values are scrubbed.
+    """
     if isinstance(error, BaseException):
-        return f"{type(error).__name__}: {error}"
-    return str(error)
+        msg = str(error)
+        return f"{type(error).__name__}: {redacted_error_text(msg, entry=entry)}"
+    return redacted_error_text(str(error), entry=entry)

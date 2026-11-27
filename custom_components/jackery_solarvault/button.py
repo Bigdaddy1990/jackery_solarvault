@@ -1,6 +1,6 @@
 """Button platform for Jackery SolarVault."""
 
-import asyncio
+from dataclasses import replace
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -8,15 +8,22 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .client import JackeryAuthError
 from .const import (
+    ACTION_ID_DELETE_STORM_ALERT,
+    ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+    ACTION_ID_QUERY_WEATHER_PLAN,
+    ACTION_ID_REBOOT_DEVICE,
+    DOMAIN,
     FIELD_ALERT_ID,
     FIELD_CMD,
     FIELD_DEVICE_SN,
     FIELD_DEV_SN,
     FIELD_DEV_TYPE,
     FIELD_END_TS,
+    FIELD_HOST,
     FIELD_MANUAL,
     FIELD_MESSAGE_TYPE,
     FIELD_REBOOT,
@@ -24,12 +31,31 @@ from .const import (
     FIELD_START_TS,
     FIELD_STATUS,
     FIELD_STORM,
+    MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+    MQTT_CMD_NONE,
+    MQTT_CMD_QUERY_WEATHER_PLAN,
+    MQTT_HOST,
+    MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
+    MQTT_MESSAGE_CONTROL_SUB_DEVICE,
+    MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+    MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+    MQTT_PORT,
+    PAYLOAD_BATTERY_PACKS,
+    PAYLOAD_SMART_PLUGS,
     PAYLOAD_WEATHER_PLAN,
+    PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID,
+    SUBDEVICE_DEV_TYPE_BATTERY_PACK,
+    SUBDEVICE_DEV_TYPE_SOCKET,
     TIMER_TASK_TYPE_CUSTOM_MODE,
     TIMER_TASK_TYPE_SMART_PLUG,
     TIMER_TASK_TYPE_TIME_ELEC,
 )
-from .coordinator import ACTION_WRITE_ERRORS, smart_plug_payloads
+from .coordinator import (
+    ACTION_WRITE_ERRORS,
+    battery_pack_serial,
+    sorted_battery_pack_payloads,
+    subdevice_accessories,
+)
 from .descriptions import BUTTON_DESCRIPTIONS, JackeryButtonDescription
 from .entity import (
     LAYER5_COMMAND_SOURCES,
@@ -41,11 +67,13 @@ from .entity import (
 from .util import (
     append_unique_entity,
     coordinator_entity_signature,
-    is_portable_payload as _is_portable_payload,
+    sorted_smart_plugs,
+    stable_subdevice_key,
 )
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.device_registry import ChildDeviceInfo
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
     from . import JackeryConfigEntry
@@ -141,7 +169,7 @@ def _smart_plug_device_sn(plug: object) -> str | None:
     return str(raw)
 
 
-async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an async platform hook.
+async def async_setup_entry(  # ruff: ignore[unused-async, complex-structure]  # HA requires an async platform hook.  # ruff: ignore[too-many-statements]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -163,7 +191,7 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _collect_entities() -> list[ButtonEntity]:
+    def _collect_entities() -> list[ButtonEntity]:  # ruff: ignore[complex-structure, too-many-branches]
         """Collect reboot button entities for devices managed by the coordinator.
 
         Create a JackeryRebootButton for each device that either supports advanced
@@ -178,16 +206,103 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
             props = payload_properties_for_sources(payload)
             # Keep command families separate: portable devices use the portable
             # catalog actionIds, home systems use the home catalog actionIds.
-            is_portable = _is_portable_payload(payload, props)
+            family = coordinator.device_family(dev_id)
+            if family == "unknown":
+                continue
+            if family == "box":
+                # Box uses its own App action IDs; Home actions are not a
+                # substitute even where their user-facing labels match.
+                box_reads = {
+                    "refresh_device_info": (252, 9),
+                    "refresh_wifi_list": (254, 1),
+                    "refresh_device_ota_version": (248, 100),
+                }
+                for description in BUTTON_DESCRIPTIONS:
+                    pair = box_reads.get(description.key)
+                    if pair is None:
+                        continue
+                    box_description = replace(
+                        description,
+                        action_id=pair[0],
+                        cmd=pair[1],
+                    )
+                    append_unique_entity(
+                        entities,
+                        seen_unique_ids,
+                        JackeryQueryButton(
+                            coordinator,
+                            dev_id,
+                            description=replace(
+                                box_description,
+                                command_sources=("http", "ble")
+                                if description.has_http_read
+                                else ("ble",),
+                            ),
+                        ),
+                    )
+                    if description.key == "refresh_device_info":
+                        for key, action, cmd in (
+                            ("box_refresh_circuits", 7, 10),
+                            ("box_refresh_weather", 19, 23),
+                        ):
+                            box_extra = replace(
+                                description,
+                                key=key,
+                                action_id=action,
+                                cmd=cmd,
+                                http_device_property=False,
+                            )
+                            append_unique_entity(
+                                entities,
+                                seen_unique_ids,
+                                JackeryQueryButton(
+                                    coordinator,
+                                    dev_id,
+                                    description=replace(
+                                        box_extra, command_sources=("ble",)
+                                    ),
+                                ),
+                            )
+                continue
+            is_portable = family == "portable"
             for description in BUTTON_DESCRIPTIONS:
                 if description.key.startswith("portable_") != is_portable:
                     continue
+                if description.key == "portable_power_pack_blink":
+                    continue  # The action is registered once per physical pack below.
                 append_unique_entity(
                     entities,
                     seen_unique_ids,
                     JackeryQueryButton(coordinator, dev_id, description=description),
                 )
             if is_portable:
+                packs = payload.get(PAYLOAD_BATTERY_PACKS)
+                if not isinstance(packs, list) or not packs:
+                    packs = subdevice_accessories(
+                        payload, dev_type=SUBDEVICE_DEV_TYPE_BATTERY_PACK
+                    )
+                for index, pack in enumerate(
+                    sorted_battery_pack_payloads(packs), start=1
+                ):
+                    serial = battery_pack_serial(pack)
+                    if (
+                        serial is None
+                        or coordinator.battery_pack_identity_serial(dev_id, index)
+                        != serial
+                    ):
+                        continue
+                    pack_key = stable_subdevice_key("battery_pack", serial, index)
+                    append_unique_entity(
+                        entities,
+                        seen_unique_ids,
+                        JackeryPortablePackBlinkButton(
+                            coordinator,
+                            dev_id,
+                            pack_index=index,
+                            pack_sn=serial,
+                            pack_key=pack_key,
+                        ),
+                    )
                 continue
             append_unique_entity(
                 entities,
@@ -224,7 +339,14 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                 append_unique_entity(
                     entities, seen_unique_ids, JackeryRebootButton(coordinator, dev_id)
                 )
-            valid_plugs = smart_plug_payloads(payload)
+            valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+            if not valid_plugs:
+                valid_plugs = sorted_smart_plugs(
+                    subdevice_accessories(
+                        payload,
+                        dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
+                    )
+                )
             for plug in valid_plugs:
                 plug_sn = _smart_plug_device_sn(plug)
                 if plug_sn is None:
@@ -311,9 +433,10 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
     ) -> None:
         """Initialise the entity from the coordinator and description."""
         super().__init__(coordinator, device_id, description.key)
-        self.entity_description = description
-        self._query_description = description
         self.device_registry_role = description.device_registry_role
+        self.command_sources = description.command_sources
+        self.entity_description = description
+        self._query_description = self.entity_description
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -331,63 +454,28 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             FIELD_MESSAGE_TYPE: description.message_type,
             "actionId": description.action_id,
             FIELD_CMD: description.cmd,
+            "command_transports": self.command_sources,
         }
         if description.dev_type is not None:
             attrs[FIELD_DEV_TYPE] = description.dev_type
         return attrs
 
     async def _async_run_query(self) -> None:
-        """Run the push query and optional documented HTTP read concurrently."""
-        description = self.entity_description
-        if not description.has_http_read:
-            await description.action(self.coordinator, self._device_id)
-            return
-
-        query_result: object
-        http_result: object
-        query_result, http_result = await asyncio.gather(
-            description.action(self.coordinator, self._device_id),
-            self.coordinator.async_refresh_documented_http_read(
+        """Run the query through the coordinator's independent transport dispatcher."""
+        if self.coordinator.device_family(self._device_id) == "box":
+            description = self.entity_description
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
                 self._device_id,
-                device_property=description.http_device_property,
-                system_shadow=description.http_system_shadow,
-                battery_packs=description.http_battery_packs,
-                subdevice_dev_type=description.http_subdevice_dev_type,
-            ),
-            return_exceptions=True,
-        )
-        for result in (query_result, http_result):
-            if isinstance(result, asyncio.CancelledError):
-                raise result
-        query_succeeded = not isinstance(query_result, BaseException)
-        http_succeeded = http_result is True
-        if query_succeeded or http_succeeded:
-            if isinstance(query_result, BaseException):
-                _LOGGER.debug(
-                    "Jackery query transport failed for %s/%s after the "
-                    "documented HTTP read succeeded: %s",
-                    self._device_id,
-                    description.key,
-                    query_result,
-                )
-            elif isinstance(http_result, BaseException):
-                _LOGGER.debug(
-                    "Jackery documented HTTP read failed for %s/%s after the "
-                    "query transport succeeded: %s",
-                    self._device_id,
-                    description.key,
-                    http_result,
-                )
+                message_type=description.message_type,
+                action_id=description.action_id,
+                cmd=description.cmd,
+                body_fields={},
+                allow_ble=True,
+                allow_cloud=False,
+                http_read={"device_property": description.http_device_property},
+            )
             return
-        if isinstance(query_result, BaseException):
-            raise query_result
-        if isinstance(http_result, BaseException):
-            raise http_result
-        raise_entity_action_error(
-            self.entity_description.key,
-            self._device_id,
-            "No documented refresh transport returned data",
-        )
+        await self.entity_description.action(self.coordinator, self._device_id)
 
     async def async_press(self) -> None:
         """Forward a button press to the device."""
@@ -405,13 +493,168 @@ class JackeryQueryButton(JackeryEntity, ButtonEntity):
             raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
 
+class JackeryTransportQueryButton(JackeryQueryButton):
+    """Run a documented device read over exactly one selected transport."""
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        description: JackeryButtonDescription,
+        transport: str,
+    ) -> None:
+        """Bind the entity identity, name and availability to one transport."""
+        if transport not in {"http", "ble", "cloud_mqtt"} or (
+            transport == "http" and not description.has_http_read
+        ):
+            raise ValueError("Unsupported transport-specific query")  # ruff: ignore[raise-vanilla-args]
+        self._transport = transport
+        super().__init__(
+            coordinator,
+            device_id,
+            description=replace(
+                description,
+                key=f"{description.key}_{transport}",
+                translation_key=f"{description.key}_{transport}",
+                command_sources=(transport,),
+            ),
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the exact selected transport alongside command metadata."""
+        attributes = {
+            **super().extra_state_attributes,
+            "command_transport": self._transport,
+        }
+        family = getattr(self.coordinator, "device_family", lambda _device_id: None)
+        if self._transport == "ble" and family(self._device_id) == "box":
+            # Box BLE action/cmd pairs do not establish an MQTT message type.
+            attributes.pop(FIELD_MESSAGE_TYPE, None)
+        return attributes
+
+    async def _async_run_query(self) -> None:
+        """Send the selected App read without starting another transport."""
+        description = self.entity_description
+        key = description.key.removesuffix(f"_{self._transport}")
+        if key in {"sync_time_zone", "portable_sync_time_zone"}:
+            action = (
+                self.coordinator.async_send_portable_time_zone
+                if key.startswith("portable_")
+                else self.coordinator.async_send_time_zone
+            )
+            await action(
+                self._device_id,
+                allow_ble=self._transport == "ble",
+                allow_cloud=self._transport == "cloud_mqtt",
+            )
+            return
+        if key == "sync_cloud_mqtt_info":
+            await self.coordinator.async_sync_mqtt_connect_info(
+                self._device_id,
+                allow_ble=self._transport == "ble",
+                allow_cloud=self._transport == "cloud_mqtt",
+            )
+            return
+        if key == "portable_sync_mqtt_info":
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+                self._device_id,
+                message_type=description.message_type,
+                action_id=description.action_id,
+                cmd=description.cmd,
+                body_fields={FIELD_HOST: MQTT_HOST, "port": MQTT_PORT},
+                allow_ble=self._transport == "ble",
+                allow_cloud=self._transport == "cloud_mqtt",
+                allow_local_mqtt=False,
+            )
+            return
+        if key == "portable_power_pack_blink":
+            payload = (self.coordinator.data or {}).get(self._device_id, {})
+            packs = (
+                payload.get(PAYLOAD_BATTERY_PACKS)
+                if isinstance(payload, dict)
+                else None
+            )
+            serials = (
+                {
+                    serial
+                    for pack in packs
+                    if isinstance(pack, dict)
+                    if (serial := battery_pack_serial(pack)) is not None
+                }
+                if isinstance(packs, list)
+                else set()
+            )
+            if len(serials) != 1:
+                raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+                    "Pack blink requires one unambiguous battery-pack serial"
+                )
+            target = next(iter(serials))
+
+            def identity_current() -> bool:
+                current = (self.coordinator.data or {}).get(self._device_id, {})
+                rows = (
+                    current.get(PAYLOAD_BATTERY_PACKS)
+                    if isinstance(current, dict)
+                    else None
+                )
+                return isinstance(rows, list) and [
+                    serial
+                    for row in rows
+                    if isinstance(row, dict)
+                    if (serial := battery_pack_serial(row)) is not None
+                ] == [target]
+
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+                self._device_id,
+                message_type=description.message_type,
+                action_id=description.action_id,
+                cmd=description.cmd,
+                body_fields={FIELD_SN: target, "blink": 1},
+                allow_ble=self._transport == "ble",
+                allow_cloud=self._transport == "cloud_mqtt",
+                allow_local_mqtt=False,
+                identity_guard=identity_current,
+            )
+            return
+        if self._transport == "http":
+            success = await self.coordinator.async_refresh_documented_http_read(
+                self._device_id,
+                device_property=description.http_device_property,
+                system_shadow=description.http_system_shadow,
+                battery_packs=description.http_battery_packs,
+                subdevice_dev_type=description.http_subdevice_dev_type,
+            )
+            if not success:
+                raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+                    "The selected HTTP read returned no matching data"
+                )
+            return
+        body = (
+            {}
+            if description.dev_type is None
+            else {FIELD_DEV_TYPE: description.dev_type}
+        )
+        await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+            self._device_id,
+            message_type=description.message_type,
+            action_id=description.action_id,
+            cmd=description.cmd,
+            body_fields=body,
+            allow_ble=self._transport == "ble",
+            allow_cloud=self._transport == "cloud_mqtt",
+            allow_local_mqtt=False,
+        )
+
+
 class JackeryRebootButton(JackeryEntity, ButtonEntity):
     """Restart the SolarVault device via PROTOCOL.md §4 reboot command."""
 
     _attr_translation_key = "reboot_device"
     _attr_entity_category = EntityCategory.CONFIG
     data_sources = LAYER5_DATA_SOURCES
-    command_sources = LAYER5_COMMAND_SOURCES
+    command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
     app_fields = (FIELD_REBOOT,)
 
     def __init__(
@@ -437,7 +680,19 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
         all other exceptions are converted and surfaced via `raise_entity_action_error`.
         """
         try:
-            await self.coordinator.async_reboot_device(self._device_id)
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+                self._device_id,
+                message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+                action_id=ACTION_ID_REBOOT_DEVICE,
+                cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+                body_fields={FIELD_REBOOT: 1},
+                allow_ble=True,
+                allow_cloud=True,
+                allow_local_mqtt=False,
+            )
+            self.coordinator._apply_local_property_patch(  # ruff: ignore[private-member-access]
+                self._device_id, {FIELD_REBOOT: 1}
+            )
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
         except ConfigEntryAuthFailed:
@@ -450,6 +705,54 @@ class JackeryRebootButton(JackeryEntity, ButtonEntity):
             raise_entity_action_error("reboot_device", self._device_id, err)
 
 
+class JackeryTransportRebootButton(JackeryRebootButton):
+    """Send the Home reboot command through one selected App transport."""
+
+    def __init__(
+        self, coordinator: JackerySolarVaultCoordinator, device_id: str, transport: str
+    ) -> None:
+        """Create a stable entity bound to a single command source."""
+        if transport not in {"ble", "cloud_mqtt"}:
+            raise ValueError("Unsupported reboot transport")  # ruff: ignore[raise-vanilla-args]
+        JackeryEntity.__init__(
+            self, coordinator, device_id, f"reboot_device_{transport}"
+        )
+        self._transport = transport
+        self.command_sources = (transport,)
+        self._attr_translation_key = f"reboot_device_{transport}"
+
+    async def async_press(self) -> None:
+        """Send one reboot request with the documented App command body."""
+        try:
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+                self._device_id,
+                message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+                action_id=ACTION_ID_REBOOT_DEVICE,
+                cmd=MQTT_CMD_DEVICE_PROPERTY_CHANGE,
+                body_fields={FIELD_REBOOT: 1},
+                allow_ble=self._transport == "ble",
+                allow_cloud=self._transport == "cloud_mqtt",
+                allow_local_mqtt=False,
+            )
+            self.coordinator._apply_local_property_patch(  # ruff: ignore[private-member-access]
+                self._device_id, {FIELD_REBOOT: 1}
+            )
+        except JackeryAuthError as err:
+            raise ConfigEntryAuthFailed from err
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            raise_entity_action_error(
+                self._attr_translation_key or "button_action", self._device_id, err
+            )
+        except ACTION_WRITE_ERRORS as err:
+            raise_entity_action_error(
+                self._attr_translation_key or "button_action", self._device_id, err
+            )
+
+
 class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
     """Query the app weather/storm plan via ``QueryWeatherPlan``."""
 
@@ -457,7 +760,7 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
     _attr_translation_key = "refresh_weather_plan"
     _attr_entity_category = EntityCategory.CONFIG
     data_sources = LAYER5_DATA_SOURCES
-    command_sources = LAYER5_COMMAND_SOURCES
+    command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
 
     def __init__(
         self,
@@ -469,6 +772,19 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
         plan.
         """
         super().__init__(coordinator, device_id, "refresh_weather_plan")
+
+    async def _async_run_query(self) -> None:
+        """Run the default App weather query."""
+        await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+            self._device_id,
+            message_type=MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+            action_id=ACTION_ID_QUERY_WEATHER_PLAN,
+            cmd=MQTT_CMD_QUERY_WEATHER_PLAN,
+            body_fields={},
+            allow_ble=True,
+            allow_cloud=True,
+            allow_local_mqtt=False,
+        )
 
     async def async_press(self) -> None:
         """Query the device weather/storm plan through the coordinator.
@@ -485,7 +801,7 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
                 "refresh_weather_plan", self._device_id, "entity unavailable"
             )
         try:
-            await self.coordinator.async_query_weather_plan(self._device_id)
+            await self._async_run_query()
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
         except ConfigEntryAuthFailed:
@@ -498,12 +814,42 @@ class JackeryRefreshWeatherPlanButton(JackeryEntity, ButtonEntity):
             raise_entity_action_error("refresh_weather_plan", self._device_id, err)
 
 
+class JackeryTransportWeatherPlanButton(JackeryRefreshWeatherPlanButton):
+    """Read weather plans through one selected App transport."""
+
+    def __init__(
+        self, coordinator: JackerySolarVaultCoordinator, device_id: str, transport: str
+    ) -> None:
+        """Bind the weather query identity and availability to one layer."""
+        if transport not in {"ble", "cloud_mqtt"}:
+            raise ValueError("Unsupported weather-query transport")  # ruff: ignore[raise-vanilla-args]
+        JackeryEntity.__init__(
+            self, coordinator, device_id, f"refresh_weather_plan_{transport}"
+        )
+        self._transport = transport
+        self.command_sources = (transport,)
+        self._attr_translation_key = f"refresh_weather_plan_{transport}"
+
+    async def _async_run_query(self) -> None:
+        """Send the App weather query only through the selected layer."""
+        await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+            self._device_id,
+            message_type=MQTT_MESSAGE_QUERY_WEATHER_PLAN,
+            action_id=ACTION_ID_QUERY_WEATHER_PLAN,
+            cmd=MQTT_CMD_QUERY_WEATHER_PLAN,
+            body_fields={},
+            allow_ble=self._transport == "ble",
+            allow_cloud=self._transport == "cloud_mqtt",
+            allow_local_mqtt=False,
+        )
+
+
 class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
     """Read one app schedule bucket via ``DownloadDeviceSchedule``."""
 
     _attr_entity_category = EntityCategory.CONFIG
     data_sources = LAYER5_DATA_SOURCES
-    command_sources = LAYER5_COMMAND_SOURCES
+    command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
 
     def __init__(
         self,
@@ -550,6 +896,16 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             attrs[FIELD_DEVICE_SN] = self._plug_sn
         return attrs
 
+    async def _async_run_schedule(self) -> None:
+        """Run the default App schedule read."""
+        await self.coordinator.async_read_device_schedule(
+            self._device_id,
+            task_type=self._task_type,
+            plug_sn=self._plug_sn,
+            allow_ble=True,
+            allow_cloud=True,
+        )
+
     async def async_press(self) -> None:
         """Trigger a device schedule read for the configured task bucket.
 
@@ -564,11 +920,7 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
                 str(self._attr_translation_key), self._device_id, "entity unavailable"
             )
         try:
-            await self.coordinator.async_read_device_schedule(
-                self._device_id,
-                task_type=self._task_type,
-                plug_sn=self._plug_sn,
-            )
+            await self._async_run_schedule()
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
         except ConfigEntryAuthFailed:
@@ -585,14 +937,64 @@ class JackeryReadScheduleButton(JackeryEntity, ButtonEntity):
             )
 
 
+class JackeryTransportReadScheduleButton(JackeryReadScheduleButton):
+    """Read one schedule through a single selected App transport."""
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        config: _ReadScheduleConfig,
+        plug_sn: str,
+        transport: str,
+    ) -> None:
+        if transport not in {"ble", "cloud_mqtt"}:
+            raise ValueError("Unsupported schedule-query transport")  # ruff: ignore[raise-vanilla-args]
+        task_type, key, translation = config
+        super().__init__(
+            coordinator,
+            device_id,
+            config=(task_type, f"{key}_{transport}", f"{translation}_{transport}"),
+            plug_sn=plug_sn,
+        )
+        self._transport = transport
+        self.command_sources = (transport,)
+
+    async def _async_run_schedule(self) -> None:
+        """Keep the selected plug identity and send only on one layer."""
+        if self._plug_sn:
+            payload = (self.coordinator.data or {}).get(self._device_id, {})
+            if not isinstance(payload, dict):
+                raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+                    "The selected smart plug identity is not current"
+                )
+            plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+            if not plugs:
+                plugs = sorted_smart_plugs(
+                    subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
+                )
+            if sum(_smart_plug_device_sn(plug) == self._plug_sn for plug in plugs) != 1:
+                raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+                    "The selected smart plug identity is not current"
+                )
+        await self.coordinator.async_read_device_schedule(
+            self._device_id,
+            task_type=self._task_type,
+            plug_sn=self._plug_sn,
+            allow_ble=self._transport == "ble",
+            allow_cloud=self._transport == "cloud_mqtt",
+        )
+
+
 class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
     """Delete one active app storm alert via ``CancelWeatherAlert``."""
 
     device_registry_role = "system"
     _attr_translation_key = "delete_storm_alert"
     _attr_entity_category = EntityCategory.CONFIG
-    data_sources = ("cloud_mqtt",)
-    command_sources = ("cloud_mqtt",)
+    data_sources = LAYER5_DATA_SOURCES
+    command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
     app_fields = (FIELD_ALERT_ID,)
 
     def __init__(
@@ -678,6 +1080,21 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
                 attrs[key] = alert.get(key)
         return attrs
 
+    async def _async_delete_alert(self) -> None:
+        """Run the default App storm-alert deletion."""
+        if not self._alert:
+            raise HomeAssistantError("The selected storm alert is not current")  # ruff: ignore[raise-vanilla-args]
+        await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+            self._device_id,
+            message_type=MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
+            action_id=ACTION_ID_DELETE_STORM_ALERT,
+            cmd=MQTT_CMD_NONE,
+            body_fields={FIELD_ALERT_ID: self._alert_id},
+            allow_ble=True,
+            allow_cloud=True,
+            allow_local_mqtt=False,
+        )
+
     async def async_press(self) -> None:
         """Delete the associated storm alert through the coordinator.
 
@@ -693,10 +1110,7 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
                 "delete_storm_alert", self._device_id, "entity unavailable"
             )
         try:
-            await self.coordinator.async_delete_storm_alert(
-                self._device_id,
-                self._alert_id,
-            )
+            await self._async_delete_alert()
         except JackeryAuthError as err:
             raise ConfigEntryAuthFailed from err
         except ConfigEntryAuthFailed:
@@ -707,3 +1121,145 @@ class JackeryDeleteStormAlertButton(JackeryEntity, ButtonEntity):
             raise_entity_action_error("delete_storm_alert", self._device_id, err)
         except ACTION_WRITE_ERRORS as err:
             raise_entity_action_error("delete_storm_alert", self._device_id, err)
+
+
+class JackeryTransportDeleteStormAlertButton(JackeryDeleteStormAlertButton):
+    """Delete one currently identified storm alert through a single layer."""
+
+    def __init__(
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        alert_id: str,
+        transport: str,
+    ) -> None:
+        if transport not in {"ble", "cloud_mqtt"}:
+            raise ValueError("Unsupported storm-alert transport")  # ruff: ignore[raise-vanilla-args]
+        JackeryEntity.__init__(
+            self, coordinator, device_id, f"delete_storm_alert_{alert_id}_{transport}"
+        )
+        self._alert_id = alert_id
+        self._transport = transport
+        self.command_sources = (transport,)
+        self._attr_translation_key = f"delete_storm_alert_{transport}"
+
+    async def _async_delete_alert(self) -> None:
+        """Send only when the alert identity is still in the current plan."""
+        if not self._alert:
+            raise HomeAssistantError("The selected storm alert is not current")  # ruff: ignore[raise-vanilla-args]
+        await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+            self._device_id,
+            message_type=MQTT_MESSAGE_CANCEL_WEATHER_ALERT,
+            action_id=ACTION_ID_DELETE_STORM_ALERT,
+            cmd=MQTT_CMD_NONE,
+            body_fields={FIELD_ALERT_ID: self._alert_id},
+            allow_ble=self._transport == "ble",
+            allow_cloud=self._transport == "cloud_mqtt",
+            allow_local_mqtt=False,
+        )
+
+
+class JackeryPortablePackBlinkButton(JackeryEntity, ButtonEntity):
+    """Blink a specific portable battery pack through one App transport."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    data_sources = LAYER5_DATA_SOURCES
+
+    def __init__(  # ruff: ignore[too-many-arguments]
+        self,
+        coordinator: JackerySolarVaultCoordinator,
+        device_id: str,
+        *,
+        pack_index: int,
+        pack_sn: str,
+        pack_key: str,
+        transport: str | None = None,
+    ) -> None:
+        if transport not in {None, "ble", "cloud_mqtt"}:
+            raise ValueError("Unsupported pack blink transport")  # ruff: ignore[raise-vanilla-args]
+        key = (
+            f"{pack_key}_blink"
+            if transport is None
+            else f"{pack_key}_blink_{transport}"
+        )
+        super().__init__(coordinator, device_id, key)
+        self._pack_index, self._pack_sn, self._pack_key = pack_index, pack_sn, pack_key
+        self._transport = transport
+        self.command_sources = (
+            LAYER5_COMMAND_SOURCES if transport is None else (transport,)
+        )
+        self._attr_translation_key = "portable_power_pack_blink"
+
+    @property
+    def device_info(self) -> DeviceInfo | ChildDeviceInfo:
+        """Attach this button to the same stable pack device as its sensors."""
+        child = self._pack_child_device_info()
+        if child is not None:
+            return child
+        return DeviceInfo(identifiers={(DOMAIN, f"{self._device_id}_{self._pack_key}")})
+
+    async def async_press(self) -> None:
+        """Send the App blink body only while the same pack owns this slot."""
+        revision = self.coordinator.battery_pack_identity_revision(
+            self._device_id, self._pack_sn
+        )
+
+        def identity_current() -> bool:
+            payload = (self.coordinator.data or {}).get(self._device_id)
+            if not isinstance(payload, dict):
+                return False
+            packs = payload.get(PAYLOAD_BATTERY_PACKS)
+            if not isinstance(packs, list) or not packs:
+                packs = subdevice_accessories(
+                    payload, dev_type=SUBDEVICE_DEV_TYPE_BATTERY_PACK
+                )
+            matches = [
+                pack
+                for pack in sorted_battery_pack_payloads(packs)
+                if battery_pack_serial(pack) == self._pack_sn
+            ]
+            return (
+                len(matches) == 1
+                and self.coordinator.battery_pack_identity_serial(
+                    self._device_id, self._pack_index
+                )
+                == self._pack_sn
+                and self.coordinator.battery_pack_identity_revision(
+                    self._device_id, self._pack_sn
+                )
+                == revision
+            )
+
+        if not identity_current():
+            raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+                "The selected battery pack identity is not current"
+            )
+        try:
+            await self.coordinator._async_publish_command_ble_first(  # ruff: ignore[private-member-access]
+                self._device_id,
+                message_type=MQTT_MESSAGE_CONTROL_SUB_DEVICE,
+                action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
+                cmd=PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID[
+                    ACTION_ID_PORTABLE_POWER_PACK_BLINK
+                ],
+                body_fields={FIELD_SN: self._pack_sn, "blink": 1},
+                allow_ble=self._transport in {None, "ble"},
+                allow_cloud=self._transport in {None, "cloud_mqtt"},
+                allow_local_mqtt=False,
+                identity_guard=identity_current,
+            )
+        except JackeryAuthError as err:
+            raise ConfigEntryAuthFailed from err
+        except ConfigEntryAuthFailed:
+            raise
+        except HomeAssistantError as err:
+            if getattr(err, "translation_key", None):
+                raise
+            raise_entity_action_error(
+                self._attr_translation_key or "button_action", self._device_id, err
+            )
+        except ACTION_WRITE_ERRORS as err:
+            raise_entity_action_error(
+                self._attr_translation_key or "button_action", self._device_id, err
+            )

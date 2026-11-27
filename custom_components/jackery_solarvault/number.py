@@ -20,7 +20,18 @@ from homeassistant.exceptions import (
 )
 
 from .client import JackeryAuthError
-from .const import DOMAIN, PAYLOAD_THIRD_PARTY_MQTT_CONFIG
+from .client.credentials import redacted_error
+from .const import (
+    DOMAIN,
+    FIELD_BPC,
+    FIELD_CL,
+    FIELD_DL,
+    FIELD_SRL,
+    PAYLOAD_THIRD_PARTY_MQTT_CONFIG,
+    PORTABLE_OUTPUT_PRIORITY_MODELS,
+    PORTABLE_PEAK_THROUGH_MODELS,
+    PORTABLE_RESERVE_MODELS,
+)
 from .descriptions import (
     NUMBER_DESCRIPTIONS,
     JackeryNumberDescription as _JackeryNumberDescription,
@@ -43,12 +54,7 @@ from .entity import (
     JackeryEntity,
     payload_properties_for_sources,
 )
-from .util import (
-    append_unique_entity,
-    async_setup_entity_discovery,
-    is_portable_payload as _is_portable_payload,
-    safe_float,
-)
+from .util import append_unique_entity, async_setup_entity_discovery, safe_float
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -307,7 +313,7 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         }:
             self._raise_validation_error(
                 "invalid_number_allowed_values",
-                allowed=", ".join(str(_rounded_int(v)) for v in allowed),
+                allowed_values=", ".join(str(_rounded_int(v)) for v in allowed),
             )
 
         if self.entity_description.setter is None:
@@ -329,16 +335,36 @@ class JackeryNumber(JackeryEntity, NumberEntity):
         except HomeAssistantError as err:
             if getattr(err, "translation_key", None):
                 raise
+            detail = redacted_error(
+                err,
+                entry=getattr(self.coordinator, "entry", None),
+            )
+            _LOGGER.exception(
+                "Jackery number setter failed: entity=%s device=%s error=%s",
+                self.entity_description.key,
+                self._device_id,
+                detail,
+            )
             self._raise_action_error(
                 "setter_failed",
-                error=str(err),
+                error=detail,
             )
-        except Exception as err:  # ruff: ignore[blind-except]
+        except Exception as err:
+            detail = redacted_error(
+                err,
+                entry=getattr(self.coordinator, "entry", None),
+            )
+            _LOGGER.exception(
+                "Jackery number setter failed: entity=%s device=%s error=%s",
+                self.entity_description.key,
+                self._device_id,
+                detail,
+            )
             self._raise_action_error(
                 "setter_failed",
-                error=str(err),
+                error=detail,
             )
-        finally:
+        else:
             refresh = self.coordinator.async_request_refresh()
             if isawaitable(refresh):
                 await refresh
@@ -348,7 +374,78 @@ class JackeryNumber(JackeryEntity, NumberEntity):
 # Setup
 # ---------------------------------------------------------------------------
 # Home Assistant invokes platform setup as an awaitable callback.
-async def async_setup_entry(  # ruff:ignore[unused-async]
+class JackeryPortableReserveNumber(JackeryNumber):
+    """Reserve threshold control for supported Portable models."""
+
+    @property
+    def available(self) -> bool:
+        """Hide stale controls after a family or model change."""
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_RESERVE_MODELS
+            and super().available
+        )
+
+
+class JackeryPortablePeakThroughNumber(JackeryNumber):
+    """Peak-through charge control for supported Portable models."""
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_PEAK_THROUGH_MODELS
+            and self.coordinator.property_fields_match_family(
+                self._device_id, (FIELD_BPC,)
+            )
+            and super().available
+        )
+
+
+_PORTABLE_CUSTOM_BATTERY_FIELDS = {
+    "portable_custom_use_charge_limit": FIELD_CL,
+    "portable_custom_use_discharge_limit": FIELD_DL,
+}
+
+
+class JackeryPortableCustomBatteryNumber(JackeryNumber):
+    """Custom-use battery control restricted to Portable field ownership."""
+
+    @property
+    def available(self) -> bool:
+        field = _PORTABLE_CUSTOM_BATTERY_FIELDS[self.entity_description.key]
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.property_fields_match_family(self._device_id, (field,))
+            and super().available
+        )
+
+
+_PORTABLE_PRIORITY_SOC_FIELDS = {
+    "portable_ac1_priority_soc": "oac1PrioSoc",
+    "portable_ac2_priority_soc": "oac2PrioSoc",
+    "portable_dc_priority_soc": "odcPrioSoc",
+}
+
+
+class JackeryPortablePrioritySocNumber(JackeryNumber):
+    """App output-priority SOC control bound to model and field ownership."""
+
+    @property
+    def available(self) -> bool:
+        field = _PORTABLE_PRIORITY_SOC_FIELDS[self.entity_description.key]
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_OUTPUT_PRIORITY_MODELS
+            and self.coordinator.property_fields_match_family(self._device_id, (field,))
+            and super().available
+        )
+
+
+async def async_setup_entry(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -357,15 +454,24 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
     seen_unique_ids: set[str] = set()
 
-    def _collect_entities() -> list[NumberEntity]:
+    def _collect_entities() -> list[NumberEntity]:  # ruff: ignore[too-many-branches]
         """Collect and instantiate all number entities for each device payload."""
         entities: list[NumberEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             props = payload_properties_for_sources(payload)
-            is_portable = _is_portable_payload(payload, props)
+            family = coordinator.device_family(dev_id)
+            if family == "unknown":
+                continue
+            is_portable = family == "portable"
             for description in NUMBER_DESCRIPTIONS:
-                if description.key == "third_party_mqtt_port" and not payload.get(
-                    PAYLOAD_THIRD_PARTY_MQTT_CONFIG
+                # A 3047 readback proves support; otherwise use the gate of the
+                # sibling host/user/password/token texts. The value falls back
+                # to the entry options, so a missing readback after a restart
+                # must not drop the entity from the registry.
+                if description.key == "third_party_mqtt_port" and not (
+                    payload.get(PAYLOAD_THIRD_PARTY_MQTT_CONFIG)
+                    or coordinator.device_supports_advanced(dev_id)
+                    or coordinator.device_bluetooth_key(dev_id)
                 ):
                     continue
                 if description.key.startswith("portable_") != is_portable:
@@ -373,13 +479,63 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
                 if description.key == "single_tariff_price_set" and is_portable:
                     continue
 
+                number_type: type[JackeryNumber] = JackeryNumber
+                if description.key in _PORTABLE_CUSTOM_BATTERY_FIELDS:
+                    number_type = JackeryPortableCustomBatteryNumber
+                priority_soc_field = _PORTABLE_PRIORITY_SOC_FIELDS.get(description.key)
+                if priority_soc_field is not None:
+                    if (
+                        coordinator.device_model_code(dev_id)
+                        not in PORTABLE_OUTPUT_PRIORITY_MODELS
+                        or props.get(priority_soc_field) is None
+                    ):
+                        continue
+                    number_type = JackeryPortablePrioritySocNumber
+                if description.key == "portable_reserve_restore_threshold":
+                    if (
+                        coordinator.device_model_code(dev_id)
+                        not in PORTABLE_RESERVE_MODELS
+                        or props.get(FIELD_SRL) is None
+                    ):
+                        continue
+                    number_type = JackeryPortableReserveNumber
+                if description.key == "portable_peak_through_charge_limit":
+                    if (
+                        coordinator.device_model_code(dev_id)
+                        not in PORTABLE_PEAK_THROUGH_MODELS
+                        or props.get(FIELD_BPC) is None
+                    ):
+                        continue
+                    number_type = JackeryPortablePeakThroughNumber
+
                 append_unique_entity(
                     entities,
                     seen_unique_ids,
-                    JackeryNumber(coordinator, dev_id, description),
+                    number_type(coordinator, dev_id, description),
                 )
         return entities
 
+    def _portable_number_eligibility() -> tuple[
+        tuple[str, int | None, tuple[str, ...]], ...
+    ]:
+        """Watch property presence for controls that require a device readback."""
+        fields = (*_PORTABLE_PRIORITY_SOC_FIELDS.values(), FIELD_SRL, FIELD_BPC)
+        eligible = []
+        for device_id, payload in sorted((coordinator.data or {}).items()):
+            if coordinator.device_family(device_id) != "portable":
+                continue
+            props = payload_properties_for_sources(payload)
+            eligible.append((
+                device_id,
+                coordinator.device_model_code(device_id),
+                tuple(field for field in fields if props.get(field) is not None),
+            ))
+        return tuple(eligible)
+
     async_setup_entity_discovery(
-        entry, coordinator, _collect_entities, async_add_entities
+        entry,
+        coordinator,
+        _collect_entities,
+        async_add_entities,
+        eligibility_signature=_portable_number_eligibility,
     )

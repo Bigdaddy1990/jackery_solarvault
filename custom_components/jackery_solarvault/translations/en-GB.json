@@ -23,7 +23,7 @@
           "dev_id": "Device ID",
           "qr_code_id": "QR code ID"
         },
-        "description": "Send the device ID and QR-code ID from an eligible Jackery sharing workflow using account {username}. SolarVault systems do not support device sharing. This form uses cloud authentication and schedules discovery after success; it does not scan images or reload the integration.",
+        "description": "Accept a SolarVault that was shared with the Jackery account {username}. Enter the device ID and QR code ID from the sharing invitation. The integration reloads afterwards so the shared device's entities appear.",
         "title": "Accept a shared device"
       },
       "reauth_confirm": {
@@ -66,13 +66,13 @@
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default.",
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker. The integration sends the documented SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) command over one available app-supported transport (BLE or Cloud MQTT), then reads back the stored configuration. Username, password, and token use the app-compatible ThirdPartMQTTConfig encoding. Home Assistant subscribes to the broker; it does not publish local Jackery control commands.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2). It does not change MQTT discovery or mapped-state publication.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
+          "third_party_mqtt_topic_filter": "The default `homeassistant` setting subscribes to that exact shared-export topic and the Jackery device topics `hb/device/+/event` and `hb/device/+/status`. An explicitly configured `homeassistant/#` remains a wildcard and includes Home Assistant subtopics. Other explicit filters are preserved. This filter does not enable the local MQTT bridge.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Update the password, optional sensor toggles, and the experimental Third-Party MQTT bridge for the Jackery account {username}. The email must match the originally configured account so the entry's unique ID stays stable. Switch accounts by removing the entry first.",
@@ -93,13 +93,40 @@
           "create_smart_meter_derived_sensors": "Creates additional netted sensors, gross phase-flow sensors, and calculated home consumption from Jackery reported live home load when available, otherwise Smart Meter phase values plus Jackery grid-side input/output. Disable if you only want raw Jackery values.",
           "enable_ble_transport": "Starts the experimental local BLE listener for decoded/raw SolarVault BLE diagnostics. Requires Bluetooth access on the Home Assistant host and is disabled by default."
         },
-        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nUse the account that added your SolarVault system. Jackery does not support sharing SolarVault systems with a second account. Concurrent cloud access from the app and Home Assistant is not reliably supported: logins can replace sessions, and recovery attempts do not guarantee continuous app access or live updates. Optional local MQTT/BLE and saved bootstrap data do not disable cloud login in this integration.",
+        "description": "Enter your Jackery cloud credentials. Device, region and MQTT credentials are discovered automatically from Jackery's cloud/app protocol; manual IDs are intentionally not exposed.\n\nThe optional calculated net-power sensors are local derivations from Jackery raw values. Enable them only if you need an additional signed net value for dashboards.\n\nJackery usually allows only one active session per account. Keep the Jackery app signed out of the SolarVault account while Home Assistant should receive live MQTT updates. If the app is opened briefly, Home Assistant pauses MQTT reconnects for a short time, keeps polling over HTTP, and resumes live updates automatically.",
         "title": "Jackery SolarVault"
       }
     }
   },
   "entity": {
     "binary_sensor": {
+      "battery_passport_supported": {
+        "name": "Battery passport supported"
+      },
+      "box_ac1_connected": {
+        "name": "Box AC1 connected"
+      },
+      "box_ac2_connected": {
+        "name": "Box AC2 connected"
+      },
+      "box_backup_period_enabled": {
+        "name": "Box backup period enabled"
+      },
+      "box_ble_ota_flag": {
+        "name": "Box BLE OTA flag"
+      },
+      "box_charge_now": {
+        "name": "Box charge now"
+      },
+      "box_pss": {
+        "name": "Box PSS flag"
+      },
+      "box_storm_active": {
+        "name": "Box storm warning active"
+      },
+      "box_ups_enabled": {
+        "name": "Box UPS mode"
+      },
       "eps_active": {
         "name": "EPS active"
       },
@@ -111,6 +138,18 @@
       },
       "online": {
         "name": "Online"
+      },
+      "portable_ac1_on": {
+        "name": "AC port 1 on"
+      },
+      "portable_ac2_on": {
+        "name": "AC port 2 on"
+      },
+      "portable_ble_ota_flag": {
+        "name": "Portable BLE OTA flag"
+      },
+      "portable_pack_connected": {
+        "name": "External battery connected"
       },
       "pv1_connected": {
         "name": "PV1 connected"
@@ -132,20 +171,50 @@
       }
     },
     "button": {
+      "box_refresh_circuits_ble": {
+        "name": "Refresh circuits (BLE)"
+      },
+      "box_refresh_weather_ble": {
+        "name": "Refresh weather plan (BLE)"
+      },
       "delete_storm_alert": {
         "name": "Delete storm alert"
+      },
+      "delete_storm_alert_ble": {
+        "name": "Delete storm alert (BLE)"
+      },
+      "delete_storm_alert_cloud_mqtt": {
+        "name": "Delete storm alert (Cloud MQTT)"
       },
       "portable_current_charge_plan": {
         "name": "Current charge plan"
       },
+      "portable_current_charge_plan_ble": {
+        "name": "Current charge plan (BLE)"
+      },
+      "portable_current_charge_plan_cloud_mqtt": {
+        "name": "Current charge plan (Cloud MQTT)"
+      },
       "portable_get_charge_plan": {
         "name": "Get charge plan"
+      },
+      "portable_get_charge_plan_ble": {
+        "name": "Get charge plan (BLE)"
+      },
+      "portable_get_charge_plan_cloud_mqtt": {
+        "name": "Get charge plan (Cloud MQTT)"
       },
       "portable_get_electricity_data_count": {
         "name": "Get electricity data count"
       },
       "portable_get_peaks_troughs": {
         "name": "Get peaks and troughs"
+      },
+      "portable_get_peaks_troughs_ble": {
+        "name": "Get peaks and troughs (BLE)"
+      },
+      "portable_get_peaks_troughs_cloud_mqtt": {
+        "name": "Get peaks and troughs (Cloud MQTT)"
       },
       "portable_get_power_pack_list": {
         "name": "Get battery pack list"
@@ -156,8 +225,20 @@
       "portable_power_off": {
         "name": "Power off"
       },
+      "portable_power_off_ble": {
+        "name": "Power off (BLE)"
+      },
+      "portable_power_off_cloud_mqtt": {
+        "name": "Power off (Cloud MQTT)"
+      },
       "portable_power_pack_blink": {
         "name": "Blink battery pack"
+      },
+      "portable_power_pack_blink_ble": {
+        "name": "Blink battery pack (BLE)"
+      },
+      "portable_power_pack_blink_cloud_mqtt": {
+        "name": "Blink battery pack (Cloud MQTT)"
       },
       "portable_read_device_info": {
         "name": "Read device info"
@@ -171,23 +252,74 @@
       "portable_refresh_battery_packs": {
         "name": "Refresh battery packs"
       },
+      "portable_refresh_battery_packs_ble": {
+        "name": "Refresh battery packs (BLE)"
+      },
+      "portable_refresh_battery_packs_cloud_mqtt": {
+        "name": "Refresh battery packs (Cloud MQTT)"
+      },
+      "portable_refresh_battery_packs_http": {
+        "name": "Refresh battery packs (HTTP)"
+      },
       "portable_refresh_device_info": {
         "name": "Refresh device info"
+      },
+      "portable_refresh_device_info_ble": {
+        "name": "Refresh device info (BLE)"
+      },
+      "portable_refresh_device_info_cloud_mqtt": {
+        "name": "Refresh device info (Cloud MQTT)"
+      },
+      "portable_refresh_device_info_http": {
+        "name": "Refresh device info (HTTP)"
       },
       "portable_refresh_electricity_count": {
         "name": "Refresh electricity count"
       },
+      "portable_refresh_electricity_count_ble": {
+        "name": "Refresh electricity count (BLE)"
+      },
+      "portable_refresh_electricity_count_cloud_mqtt": {
+        "name": "Refresh electricity count (Cloud MQTT)"
+      },
       "portable_refresh_sub_ct": {
         "name": "Refresh sub-CT"
+      },
+      "portable_refresh_sub_ct_ble": {
+        "name": "Refresh sub-CT (BLE)"
+      },
+      "portable_refresh_sub_ct_cloud_mqtt": {
+        "name": "Refresh sub-CT (Cloud MQTT)"
+      },
+      "portable_refresh_sub_ct_http": {
+        "name": "Refresh sub-CT (HTTP)"
       },
       "portable_refresh_wifi_config": {
         "name": "Refresh Wi-Fi config"
       },
+      "portable_refresh_wifi_config_ble": {
+        "name": "Refresh Wi-Fi config (BLE)"
+      },
+      "portable_refresh_wifi_config_cloud_mqtt": {
+        "name": "Refresh Wi-Fi config (Cloud MQTT)"
+      },
       "portable_refresh_wifi_list": {
         "name": "Refresh Wi-Fi list"
       },
+      "portable_refresh_wifi_list_ble": {
+        "name": "Refresh Wi-Fi list (BLE)"
+      },
+      "portable_refresh_wifi_list_cloud_mqtt": {
+        "name": "Refresh Wi-Fi list (Cloud MQTT)"
+      },
       "portable_restart": {
         "name": "Restart portable device"
+      },
+      "portable_restart_ble": {
+        "name": "Restart portable device (BLE)"
+      },
+      "portable_restart_cloud_mqtt": {
+        "name": "Restart portable device (Cloud MQTT)"
       },
       "portable_send_time_zone": {
         "name": "Send time zone"
@@ -195,65 +327,212 @@
       "portable_sync_mqtt_info": {
         "name": "Sync MQTT info"
       },
+      "portable_sync_mqtt_info_ble": {
+        "name": "Sync MQTT info (BLE)"
+      },
+      "portable_sync_mqtt_info_cloud_mqtt": {
+        "name": "Sync MQTT info (Cloud MQTT)"
+      },
       "portable_sync_time_zone": {
         "name": "Sync time zone"
+      },
+      "portable_sync_time_zone_ble": {
+        "name": "Sync time zone (BLE)"
+      },
+      "portable_sync_time_zone_cloud_mqtt": {
+        "name": "Sync time zone (Cloud MQTT)"
       },
       "read_custom_mode_schedule": {
         "name": "Read custom-mode schedule"
       },
+      "read_custom_mode_schedule_ble": {
+        "name": "Read custom-mode schedule (BLE)"
+      },
+      "read_custom_mode_schedule_cloud_mqtt": {
+        "name": "Read custom-mode schedule (Cloud MQTT)"
+      },
       "read_smart_plug_schedule": {
         "name": "Read smart-plug schedule"
+      },
+      "read_smart_plug_schedule_ble": {
+        "name": "Read smart-plug schedule (BLE)"
+      },
+      "read_smart_plug_schedule_cloud_mqtt": {
+        "name": "Read smart-plug schedule (Cloud MQTT)"
       },
       "read_time_electricity_schedule": {
         "name": "Read time-of-use schedule"
       },
+      "read_time_electricity_schedule_ble": {
+        "name": "Read time-of-use schedule (BLE)"
+      },
+      "read_time_electricity_schedule_cloud_mqtt": {
+        "name": "Read time-of-use schedule (Cloud MQTT)"
+      },
       "reboot_device": {
         "name": "Restart device"
+      },
+      "reboot_device_ble": {
+        "name": "Restart device (BLE)"
+      },
+      "reboot_device_cloud_mqtt": {
+        "name": "Restart device (Cloud MQTT)"
       },
       "refresh_battery_packs": {
         "name": "Refresh battery packs"
       },
+      "refresh_battery_packs_ble": {
+        "name": "Refresh battery packs (BLE)"
+      },
+      "refresh_battery_packs_cloud_mqtt": {
+        "name": "Refresh battery packs (Cloud MQTT)"
+      },
+      "refresh_battery_packs_http": {
+        "name": "Refresh battery packs (HTTP)"
+      },
       "refresh_device_info": {
         "name": "Refresh device info"
+      },
+      "refresh_device_info_ble": {
+        "name": "Refresh device info (BLE)"
+      },
+      "refresh_device_info_cloud_mqtt": {
+        "name": "Refresh device info (Cloud MQTT)"
+      },
+      "refresh_device_info_http": {
+        "name": "Refresh device info (HTTP)"
       },
       "refresh_device_ota_version": {
         "name": "Refresh device OTA version"
       },
+      "refresh_device_ota_version_ble": {
+        "name": "Refresh device OTA version (BLE)"
+      },
+      "refresh_device_ota_version_cloud_mqtt": {
+        "name": "Refresh device OTA version (Cloud MQTT)"
+      },
       "refresh_meter_heads": {
         "name": "Refresh meter heads"
+      },
+      "refresh_meter_heads_ble": {
+        "name": "Refresh meter heads (BLE)"
+      },
+      "refresh_meter_heads_cloud_mqtt": {
+        "name": "Refresh meter heads (Cloud MQTT)"
+      },
+      "refresh_meter_heads_http": {
+        "name": "Refresh meter heads (HTTP)"
       },
       "refresh_smart_meter": {
         "name": "Refresh smart meter / CT"
       },
+      "refresh_smart_meter_ble": {
+        "name": "Refresh smart meter / CT (BLE)"
+      },
+      "refresh_smart_meter_cloud_mqtt": {
+        "name": "Refresh smart meter / CT (Cloud MQTT)"
+      },
+      "refresh_smart_meter_http": {
+        "name": "Refresh smart meter / CT (HTTP)"
+      },
       "refresh_smart_plugs": {
         "name": "Refresh smart plugs"
+      },
+      "refresh_smart_plugs_ble": {
+        "name": "Refresh smart plugs (BLE)"
+      },
+      "refresh_smart_plugs_cloud_mqtt": {
+        "name": "Refresh smart plugs (Cloud MQTT)"
+      },
+      "refresh_smart_plugs_http": {
+        "name": "Refresh smart plugs (HTTP)"
       },
       "refresh_subdevice_combo": {
         "name": "Refresh combo subdevices"
       },
+      "refresh_subdevice_combo_ble": {
+        "name": "Refresh combo subdevices (BLE)"
+      },
+      "refresh_subdevice_combo_cloud_mqtt": {
+        "name": "Refresh combo subdevices (Cloud MQTT)"
+      },
+      "refresh_subdevice_combo_http": {
+        "name": "Refresh combo subdevices (HTTP)"
+      },
       "refresh_system_info": {
         "name": "Refresh system info"
+      },
+      "refresh_system_info_ble": {
+        "name": "Refresh system info (BLE)"
+      },
+      "refresh_system_info_cloud_mqtt": {
+        "name": "Refresh system info (Cloud MQTT)"
+      },
+      "refresh_system_info_http": {
+        "name": "Refresh system info (HTTP)"
       },
       "refresh_third_party_mqtt_config": {
         "name": "Refresh Third-Party MQTT config"
       },
+      "refresh_third_party_mqtt_config_ble": {
+        "name": "Refresh Third-Party MQTT config (BLE)"
+      },
+      "refresh_third_party_mqtt_config_cloud_mqtt": {
+        "name": "Refresh Third-Party MQTT config (Cloud MQTT)"
+      },
       "refresh_time_zone": {
         "name": "Refresh time zone"
+      },
+      "refresh_time_zone_ble": {
+        "name": "Refresh time zone (BLE)"
+      },
+      "refresh_time_zone_cloud_mqtt": {
+        "name": "Refresh time zone (Cloud MQTT)"
       },
       "refresh_weather_plan": {
         "name": "Refresh weather plan"
       },
+      "refresh_weather_plan_ble": {
+        "name": "Refresh weather plan (BLE)"
+      },
+      "refresh_weather_plan_cloud_mqtt": {
+        "name": "Refresh weather plan (Cloud MQTT)"
+      },
       "refresh_wifi_config": {
         "name": "Refresh Wi-Fi config"
+      },
+      "refresh_wifi_config_ble": {
+        "name": "Refresh Wi-Fi config (BLE)"
+      },
+      "refresh_wifi_config_cloud_mqtt": {
+        "name": "Refresh Wi-Fi config (Cloud MQTT)"
       },
       "refresh_wifi_list": {
         "name": "Refresh Wi-Fi list"
       },
+      "refresh_wifi_list_ble": {
+        "name": "Refresh Wi-Fi list (BLE)"
+      },
+      "refresh_wifi_list_cloud_mqtt": {
+        "name": "Refresh Wi-Fi list (Cloud MQTT)"
+      },
       "sync_cloud_mqtt_info": {
         "name": "Sync cloud MQTT info"
       },
+      "sync_cloud_mqtt_info_ble": {
+        "name": "Sync cloud MQTT info (BLE)"
+      },
+      "sync_cloud_mqtt_info_cloud_mqtt": {
+        "name": "Sync cloud MQTT info (Cloud MQTT)"
+      },
       "sync_time_zone": {
         "name": "Sync time zone"
+      },
+      "sync_time_zone_ble": {
+        "name": "Sync time zone (BLE)"
+      },
+      "sync_time_zone_cloud_mqtt": {
+        "name": "Sync time zone (Cloud MQTT)"
       }
     },
     "number": {
@@ -308,6 +587,12 @@
       "portable_energy_storage_charge_limit": {
         "name": "Energy storage charge limit"
       },
+      "portable_peak_through_charge_limit": {
+        "name": "Set peak-through charge limit"
+      },
+      "portable_reserve_restore_threshold": {
+        "name": "Reserve restore threshold"
+      },
       "single_tariff_price_set": {
         "name": "Single tariff price"
       },
@@ -329,6 +614,14 @@
           "h_2": "2 h",
           "h_24": "24 h",
           "h_8": "8 h"
+        }
+      },
+      "box_working_mode": {
+        "name": "Box operating mode",
+        "state": {
+          "automatic": "Automatic",
+          "scheduled": "Scheduled",
+          "self_use": "Self-consumption"
         }
       },
       "ct_phase_select": {
@@ -375,6 +668,13 @@
           "quiet": "Quiet"
         }
       },
+      "portable_ac_transfer_mode": {
+        "name": "AC transfer mode",
+        "state": {
+          "delay_open": "Delayed start",
+          "ups_online": "UPS online"
+        }
+      },
       "portable_battery_mode": {
         "name": "Battery mode",
         "state": {
@@ -397,6 +697,25 @@
           "battery-first": "Battery first",
           "grid-first": "Grid first",
           "solar-first": "Solar first"
+        }
+      },
+      "portable_energy_saving_time": {
+        "name": "Energy saving timeout",
+        "state": {
+          "12h": "12 hours",
+          "1h": "1 hour",
+          "24h": "24 hours",
+          "2h": "2 hours",
+          "8h": "8 hours",
+          "never": "Never"
+        }
+      },
+      "portable_light_mode": {
+        "name": "Light mode",
+        "state": {
+          "high": "High",
+          "off": "Off",
+          "sos": "SOS"
         }
       },
       "portable_output_priority": {
@@ -431,6 +750,24 @@
           "gel": "gel",
           "lifepo4": "LiFePO4",
           "standard": "Standard"
+        }
+      },
+      "portable_ups_operation": {
+        "name": "UPS operation",
+        "state": {
+          "backup": "Backup",
+          "online": "Online"
+        }
+      },
+      "portable_working_mode": {
+        "name": "Operating mode",
+        "state": {
+          "auto_charge": "Automatic charging",
+          "backup": "Backup",
+          "charge_plan": "Charging plan",
+          "emergency_reserve": "Emergency reserve",
+          "peaks_troughs": "Peak and off-peak",
+          "self_use": "Self-consumption"
         }
       },
       "storm_warning_minutes_select": {
@@ -563,6 +900,12 @@
       "activation_date": {
         "name": "Activation date"
       },
+      "aiems_energy_prediction": {
+        "name": "AIEMS energy prediction"
+      },
+      "aiems_mode_status": {
+        "name": "System AIEMS status"
+      },
       "alarm_count": {
         "name": "Active alarms"
       },
@@ -632,6 +975,13 @@
       "battery_pack_discharge_power": {
         "name": "Battery pack discharge power"
       },
+      "battery_pack_firmware_update_available": {
+        "name": "Battery pack firmware update",
+        "state": {
+          "available": "Available",
+          "not_available": "Not available"
+        }
+      },
       "battery_pack_firmware_version": {
         "name": "Battery pack firmware version"
       },
@@ -668,8 +1018,29 @@
       "battery_temperature": {
         "name": "Battery temperature"
       },
+      "battery_to_ac_day_energy": {
+        "name": "Battery to AC energy (today)"
+      },
       "battery_to_ac_lifetime_energy": {
         "name": "Battery to AC energy (lifetime)"
+      },
+      "battery_to_ac_month_energy": {
+        "name": "Battery to AC energy (month)"
+      },
+      "battery_to_ac_week_energy": {
+        "name": "Battery to AC energy (week)"
+      },
+      "battery_to_ac_year_energy": {
+        "name": "Battery to AC energy (year)"
+      },
+      "battery_to_grid_month_energy": {
+        "name": "Battery to grid energy (month)"
+      },
+      "battery_to_grid_week_energy": {
+        "name": "Battery to grid energy (week)"
+      },
+      "battery_to_grid_year_energy": {
+        "name": "Battery to grid energy (year)"
       },
       "ble_transport": {
         "name": "BLE transport"
@@ -692,8 +1063,158 @@
       "bms6_fault_code": {
         "name": "BMS 6 fault code"
       },
+      "box_ac1_input_power": {
+        "name": "Box AC1 input power"
+      },
+      "box_ac1_input_time": {
+        "name": "Box AC1 input time remaining"
+      },
+      "box_ac1_mode": {
+        "name": "Box AC1 operating mode"
+      },
+      "box_ac1_model_code": {
+        "name": "Box AC1 model code"
+      },
+      "box_ac1_output_power": {
+        "name": "Box AC1 output power"
+      },
+      "box_ac1_output_time": {
+        "name": "Box AC1 output time remaining"
+      },
+      "box_ac1_packs": {
+        "name": "Box AC1 battery packs"
+      },
+      "box_ac1_serial": {
+        "name": "Box AC1 serial number"
+      },
+      "box_ac1_soc": {
+        "name": "Box AC1 battery"
+      },
+      "box_ac1_total_soc": {
+        "name": "Box AC1 total battery"
+      },
+      "box_ac2_input_power": {
+        "name": "Box AC2 input power"
+      },
+      "box_ac2_input_time": {
+        "name": "Box AC2 input time remaining"
+      },
+      "box_ac2_mode": {
+        "name": "Box AC2 operating mode"
+      },
+      "box_ac2_model_code": {
+        "name": "Box AC2 model code"
+      },
+      "box_ac2_output_power": {
+        "name": "Box AC2 output power"
+      },
+      "box_ac2_output_time": {
+        "name": "Box AC2 output time remaining"
+      },
+      "box_ac2_packs": {
+        "name": "Box AC2 battery packs"
+      },
+      "box_ac2_serial": {
+        "name": "Box AC2 serial number"
+      },
+      "box_ac2_soc": {
+        "name": "Box AC2 battery"
+      },
+      "box_ac2_total_soc": {
+        "name": "Box AC2 total battery"
+      },
+      "box_ats_solar_power": {
+        "name": "ATS solar power"
+      },
+      "box_auto_backup_reserve": {
+        "name": "Box auto-mode backup reserve"
+      },
+      "box_backup_effective_period": {
+        "name": "Box backup effective period"
+      },
+      "box_circuit_reserve_threshold": {
+        "name": "Box circuit backup threshold"
+      },
+      "box_current_strategy": {
+        "name": "Box current energy plan"
+      },
+      "box_de_raw": {
+        "name": "Box de raw value"
+      },
+      "box_dg_raw": {
+        "name": "Box dg raw value"
+      },
+      "box_dh_raw": {
+        "name": "Box dh raw value"
+      },
+      "box_ds_raw": {
+        "name": "Box ds raw value"
+      },
+      "box_fault_bs1_raw": {
+        "name": "Box fault bs1 raw value"
+      },
+      "box_fault_bs2_raw": {
+        "name": "Box fault bs2 raw value"
+      },
+      "box_fault_ec1_raw": {
+        "name": "Box fault ec1 raw value"
+      },
+      "box_fault_ec2_raw": {
+        "name": "Box fault ec2 raw value"
+      },
+      "box_fault_es_raw": {
+        "name": "Box fault es raw value"
+      },
+      "box_fault_gs_raw": {
+        "name": "Box fault gs raw value"
+      },
+      "box_fault_loc_raw": {
+        "name": "Box fault loc raw value"
+      },
+      "box_fault_moc_raw": {
+        "name": "Box fault moc raw value"
+      },
+      "box_fault_ntc_raw": {
+        "name": "Box fault ntc raw value"
+      },
+      "box_fault_ol_raw": {
+        "name": "Box fault ol raw value"
+      },
+      "box_fault_ta1_raw": {
+        "name": "Box fault ta1 raw value"
+      },
+      "box_fault_ta2_raw": {
+        "name": "Box fault ta2 raw value"
+      },
+      "box_house_power": {
+        "name": "House power"
+      },
+      "box_mains_power": {
+        "name": "Mains power"
+      },
       "box_mode": {
         "name": "Box mode"
+      },
+      "box_reported_battery_level": {
+        "name": "Box reported battery level"
+      },
+      "box_reported_remaining_time": {
+        "name": "Box reported remaining time"
+      },
+      "box_reserve_threshold": {
+        "name": "Box reserve threshold"
+      },
+      "box_scheduled_backup_reserve": {
+        "name": "Box scheduled-mode backup reserve"
+      },
+      "box_self_use_backup_reserve": {
+        "name": "Box self-use backup reserve"
+      },
+      "box_strategy_plans": {
+        "name": "Box energy plans"
+      },
+      "box_wifi_scan": {
+        "name": "Box Wi-Fi scan"
       },
       "breaker_pc": {
         "name": "Breaker power config"
@@ -1013,6 +1534,15 @@
       "grid_state": {
         "name": "Grid state"
       },
+      "grid_to_battery_month_energy": {
+        "name": "Grid to battery energy (month)"
+      },
+      "grid_to_battery_week_energy": {
+        "name": "Grid to battery energy (week)"
+      },
+      "grid_to_battery_year_energy": {
+        "name": "Grid to battery energy (year)"
+      },
       "home_consumption_power": {
         "name": "Home consumption power"
       },
@@ -1214,6 +1744,115 @@
       "pcs5_fault_code": {
         "name": "PCS 5 fault code"
       },
+      "portable_ac1_timer": {
+        "name": "AC port 1 timer"
+      },
+      "portable_ac2_timer": {
+        "name": "AC port 2 timer"
+      },
+      "portable_ac_delay_remaining": {
+        "name": "AC delayed-start remaining time"
+      },
+      "portable_ac_delay_setting": {
+        "name": "AC delayed-start setting"
+      },
+      "portable_ac_timer": {
+        "name": "AC output timer"
+      },
+      "portable_acpsp_raw": {
+        "name": "Portable acpsp raw value"
+      },
+      "portable_acpss_raw": {
+        "name": "Portable acpss raw value"
+      },
+      "portable_battery_soc": {
+        "name": "Portable battery level"
+      },
+      "portable_bs_raw": {
+        "name": "Portable bs raw value"
+      },
+      "portable_car_timer": {
+        "name": "Car output timer"
+      },
+      "portable_charge_max_power": {
+        "name": "Maximum charging power"
+      },
+      "portable_charge_min_power": {
+        "name": "Minimum charging power"
+      },
+      "portable_charge_mode_code": {
+        "name": "Charging mode code"
+      },
+      "portable_charge_set_power": {
+        "name": "Configured charging power"
+      },
+      "portable_ct_statistics": {
+        "name": "Portable CT statistics"
+      },
+      "portable_current_strategy": {
+        "name": "Portable current energy plan"
+      },
+      "portable_custom_battery_threshold": {
+        "name": "Custom battery threshold"
+      },
+      "portable_dc_input_power": {
+        "name": "Portable DC input power"
+      },
+      "portable_dc_shared_output_power": {
+        "name": "Shared DC output power"
+      },
+      "portable_dc_timer": {
+        "name": "DC output timer"
+      },
+      "portable_ground_accessory_serial": {
+        "description": "Disabled by default. Enabling may store the serial number in Home Assistant history.",
+        "name": "Ground accessory serial number"
+      },
+      "portable_idc_raw": {
+        "name": "Portable idc raw value"
+      },
+      "portable_input_time": {
+        "name": "Charging time"
+      },
+      "portable_light_mode_code": {
+        "name": "Light mode code"
+      },
+      "portable_output_time": {
+        "name": "Discharging time"
+      },
+      "portable_pal_raw": {
+        "name": "Portable pal raw value"
+      },
+      "portable_parallel_port_state": {
+        "description": "1: charging; 2: discharging; other values show no indicator.",
+        "name": "Parallel port status code"
+      },
+      "portable_peak_charge_limit": {
+        "name": "Peak-through charge limit"
+      },
+      "portable_reserve_restore_threshold": {
+        "name": "Portable reserve restore threshold"
+      },
+      "portable_strategy_plans": {
+        "name": "Portable energy plans"
+      },
+      "portable_temperature_warning_code": {
+        "description": "1: high-temperature warning; 2: low-temperature warning; other values show no warning icon.",
+        "name": "Temperature warning code"
+      },
+      "portable_tp_raw": {
+        "name": "Portable tp raw value"
+      },
+      "portable_tt_raw": {
+        "name": "Portable tt raw value"
+      },
+      "portable_usb_timer": {
+        "name": "USB output timer"
+      },
+      "portable_wifi_scan": {
+        "description": "Disabled by default. Enabling exposes scanned Wi-Fi names in Home Assistant and may store them in its history.",
+        "name": "Portable Wi-Fi scan"
+      },
       "power_count": {
         "name": "Power count"
       },
@@ -1310,6 +1949,81 @@
       "sltb_value": {
         "name": "SLTB value"
       },
+      "smart_meter_acc_l2_power": {
+        "name": "L2 power"
+      },
+      "smart_meter_acc_l2_power_1": {
+        "name": "L2 phase 1 power"
+      },
+      "smart_meter_acc_l2_power_2": {
+        "name": "L2 phase 2 power"
+      },
+      "smart_meter_acc_l2_power_3": {
+        "name": "L2 phase 3 power"
+      },
+      "smart_meter_acc_l2ap1_raw": {
+        "name": "L2 field l2ap1 (raw)"
+      },
+      "smart_meter_acc_l2ap2_raw": {
+        "name": "L2 field l2ap2 (raw)"
+      },
+      "smart_meter_acc_l2ap3_raw": {
+        "name": "L2 field l2ap3 (raw)"
+      },
+      "smart_meter_acc_l2ap_raw": {
+        "name": "L2 field l2ap (raw)"
+      },
+      "smart_meter_acc_l2curr1_raw": {
+        "name": "L2 field l2curr1 (raw)"
+      },
+      "smart_meter_acc_l2curr2_raw": {
+        "name": "L2 field l2curr2 (raw)"
+      },
+      "smart_meter_acc_l2curr3_raw": {
+        "name": "L2 field l2curr3 (raw)"
+      },
+      "smart_meter_acc_l2curr_raw": {
+        "name": "L2 field l2curr (raw)"
+      },
+      "smart_meter_acc_l2fact1_raw": {
+        "name": "L2 field l2fact1 (raw)"
+      },
+      "smart_meter_acc_l2fact2_raw": {
+        "name": "L2 field l2fact2 (raw)"
+      },
+      "smart_meter_acc_l2fact3_raw": {
+        "name": "L2 field l2fact3 (raw)"
+      },
+      "smart_meter_acc_l2fact_raw": {
+        "name": "L2 field l2fact (raw)"
+      },
+      "smart_meter_acc_l2freq_raw": {
+        "name": "L2 field l2freq (raw)"
+      },
+      "smart_meter_acc_l2rep1_raw": {
+        "name": "L2 field l2rep1 (raw)"
+      },
+      "smart_meter_acc_l2rep2_raw": {
+        "name": "L2 field l2rep2 (raw)"
+      },
+      "smart_meter_acc_l2rep3_raw": {
+        "name": "L2 field l2rep3 (raw)"
+      },
+      "smart_meter_acc_l2rep_raw": {
+        "name": "L2 field l2rep (raw)"
+      },
+      "smart_meter_additional_pv_net_power": {
+        "name": "Additional PV net power"
+      },
+      "smart_meter_additional_pv_phase_1_power": {
+        "name": "Additional PV phase A net power"
+      },
+      "smart_meter_additional_pv_phase_2_power": {
+        "name": "Additional PV phase B net power"
+      },
+      "smart_meter_additional_pv_phase_3_power": {
+        "name": "Additional PV phase C net power"
+      },
       "smart_meter_apparent_power": {
         "name": "Apparent power"
       },
@@ -1319,14 +2033,17 @@
       "smart_meter_current": {
         "name": "Current"
       },
+      "smart_meter_device_temperature": {
+        "name": "Meter device temperature"
+      },
       "smart_meter_export_month_energy": {
-        "name": "Monthly smart-meter grid export"
+        "name": "Monthly grid export"
       },
       "smart_meter_export_week_energy": {
-        "name": "Weekly smart-meter grid export"
+        "name": "Weekly grid export"
       },
       "smart_meter_export_year_energy": {
-        "name": "Yearly smart-meter grid export"
+        "name": "Yearly grid export"
       },
       "smart_meter_frequency": {
         "name": "Frequency"
@@ -1344,13 +2061,13 @@
         "name": "Gross phase import power"
       },
       "smart_meter_import_month_energy": {
-        "name": "Monthly smart-meter grid import"
+        "name": "Monthly grid import"
       },
       "smart_meter_import_week_energy": {
-        "name": "Weekly smart-meter grid import"
+        "name": "Weekly grid import"
       },
       "smart_meter_import_year_energy": {
-        "name": "Yearly smart-meter grid import"
+        "name": "Yearly grid import"
       },
       "smart_meter_ip_address": {
         "name": "IP address"
@@ -1371,10 +2088,10 @@
         "name": "Net import power"
       },
       "smart_meter_panel_charging_energy": {
-        "name": "Smart Meter panel charging energy"
+        "name": "panel charging energy"
       },
       "smart_meter_panel_discharging_energy": {
-        "name": "Smart Meter panel discharging energy"
+        "name": "panel discharging energy"
       },
       "smart_meter_phase_1_apparent_power": {
         "name": "Phase A apparent power"
@@ -1535,6 +2252,14 @@
       "standby_power": {
         "name": "Standby power"
       },
+      "storm_plan_display_type": {
+        "name": "Weather plan event",
+        "state": {
+          "manual_backup": "Manual backup power",
+          "no_alert": "No weather alert",
+          "storm_warning": "Storm warning"
+        }
+      },
       "storm_warning_enabled": {
         "name": "Storm warning enabled"
       },
@@ -1550,11 +2275,14 @@
       "symmetry_total_positive": {
         "name": "Total positive energy (symmetry)"
       },
+      "system_reported_pv_power": {
+        "name": "System-reported PV power"
+      },
       "system_state": {
         "name": "System state"
       },
       "system_status_switch": {
-        "name": "System status"
+        "name": "Solar voltage icon status"
       },
       "task_plan": {
         "name": "Task plan"
@@ -1765,6 +2493,9 @@
       "auto_standby_set": {
         "name": "Auto-off (grid-connected)"
       },
+      "box_charge_now_control": {
+        "name": "Charge now"
+      },
       "breaker_switch": {
         "name": "Breaker switch"
       },
@@ -1777,8 +2508,14 @@
       "off_grid_shutdown": {
         "name": "Auto-off (off-grid mode)"
       },
+      "portable_ac1_priority_switch": {
+        "name": "AC1 output priority"
+      },
       "portable_ac240_output": {
         "name": "AC 240V output"
+      },
+      "portable_ac2_priority_switch": {
+        "name": "AC2 output priority"
       },
       "portable_ac_output": {
         "name": "AC output"
@@ -1792,11 +2529,17 @@
       "portable_dc_output": {
         "name": "DC output"
       },
+      "portable_dc_priority_switch": {
+        "name": "DC output priority"
+      },
       "portable_dc_usb_output": {
         "name": "DC USB output"
       },
       "portable_discharge_memory": {
         "name": "Discharge memory"
+      },
+      "portable_emergency_full_discharge": {
+        "name": "Emergency full discharge"
       },
       "portable_light": {
         "name": "Light"
@@ -1860,6 +2603,20 @@
       "third_party_mqtt_username": {
         "name": "Third-Party MQTT username"
       }
+    },
+    "update": {
+      "battery_pack_firmware": {
+        "name": "Battery pack firmware (BLE)"
+      },
+      "battery_pack_firmware_cloud": {
+        "name": "Battery pack cloud firmware"
+      },
+      "firmware": {
+        "name": "Firmware (BLE)"
+      },
+      "firmware_cloud": {
+        "name": "Cloud firmware"
+      }
     }
   },
   "exceptions": {
@@ -1887,6 +2644,9 @@
     "check_app_version_failed": {
       "message": "Could not check app version for device {device_id}: {error}"
     },
+    "check_ble_ota_versions_failed": {
+      "message": "Could not check BLE firmware updates for device {device_id}: {error}"
+    },
     "check_jackery_accessories_exist_failed": {
       "message": "Could not check Jackery accessories for device {device_id}: {error}"
     },
@@ -1911,11 +2671,17 @@
     "get_alarm_detail_failed": {
       "message": "Could not get alarm detail for device {device_id}: {error}"
     },
+    "get_battery_passport_failed": {
+      "message": "Could not read the battery passport for device {device_id}: {error}"
+    },
     "get_device_currency_failed": {
       "message": "Could not get device currency for device {device_id}: {error}"
     },
     "get_dynamic_price_login_url_failed": {
       "message": "Could not get dynamic price login URL for device {device_id}: {error}"
+    },
+    "get_fault_log_failed": {
+      "message": "Could not read fault history for device {device_id}: {error}"
     },
     "get_product_instruction_failed": {
       "message": "Could not get product instruction for device {device_id}: {error}"
@@ -2055,9 +2821,6 @@
     "report_device_timezone_failed": {
       "message": "Could not report the timezone for device {device_id}: {error}"
     },
-    "save_device_max_power_failed": {
-      "message": "Could not save max power for device {device_id}: {error}"
-    },
     "save_dynamic_price_contract_auth_failed": {
       "message": "Could not save dynamic price contract auth for device {device_id}: {error}"
     },
@@ -2093,6 +2856,9 @@
     },
     "set_third_party_mqtt_config_failed": {
       "message": "Could not set third-party MQTT config for device {device_id}: {error}"
+    },
+    "start_ble_ota_update_failed": {
+      "message": "Could not start BLE firmware update for device {device_id}: {error}"
     },
     "submit_feedback_failed": {
       "message": "Could not submit feedback for device {device_id}: {error}"
@@ -2169,14 +2935,14 @@
           "enable_derived_home_energy_fallback": "If sys/home/trends is unavailable, derives home_energy from device_home_stat.totalOutGridEnergy. Derived values are marked in attributes and source diagnostics.",
           "enable_payload_debug_log": "Writes a bounded JSONL trace of HTTP, MQTT, and BLE payload shapes for troubleshooting. The trace is disabled by default and always recursively redacts credentials, identifiers, locations, broker topics, and bluetoothKey values.",
           "enable_unredacted_debug": "Development only. Exports full diagnostics and captures complete HTTP, MQTT, and BLE JSONL frames without redaction or log rotation, including credentials and device identifiers. Disable after capture; never share these files publicly.",
-          "scan_interval": "How often the Jackery cloud is polled for live values. Cloud MQTT and Bluetooth push faster updates independently; 30 s follows Home Assistant's guidance for cloud-polling integrations. Minimum 15 s.",
-          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker (PROTOCOL.md §5 / §15). Experimental: the cloud REST relay for this command is server-side blocked, so the integration publishes the SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) frame directly via BLE first and then cloud MQTT. Username, password, and token are encoded with the app-compatible ThirdPartMQTTConfig codec before sending.",
+          "scan_interval": "Interval for independent live queries: default 30 seconds, minimum 15 seconds. Incoming MQTT and Bluetooth data are processed immediately.",
+          "third_party_mqtt_enable": "Asks the SolarVault to publish telemetry to your own MQTT broker. The integration sends the documented SET_THIRD_PARTY_MQTT_CONFIG (actionId 3046) command over one available app-supported transport (BLE or Cloud MQTT), then reads back the stored configuration. Username, password, and token use the app-compatible ThirdPartMQTTConfig encoding. Home Assistant subscribes to the broker; it does not publish local Jackery control commands.",
           "third_party_mqtt_ip": "IP or hostname of your local MQTT broker, for example 192.168.x.x.",
           "third_party_mqtt_password": "Optional MQTT broker password.",
           "third_party_mqtt_port": "TCP port of your MQTT broker. Default is 1883.",
           "third_party_mqtt_qos": "QoS for the Home Assistant subscription to raw SolarVault bridge messages (0, 1, or 2). It does not change MQTT discovery or mapped-state publication.",
           "third_party_mqtt_token": "MQTT bridge token. If left blank, the integration auto-generates a stable 9-digit app-style fallback token.",
-          "third_party_mqtt_topic_filter": "MQTT topic filter for the direct local broker fallback. Leave empty unless you know the exact Jackery bridge topic. `homeassistant` is usually wrong because it only matches Home Assistant's own event stream.",
+          "third_party_mqtt_topic_filter": "The default `homeassistant` setting subscribes to that exact shared-export topic and the Jackery device topics `hb/device/+/event` and `hb/device/+/status`. An explicitly configured `homeassistant/#` remains a wildcard and includes Home Assistant subtopics. Other explicit filters are preserved. This filter does not enable the local MQTT bridge.",
           "third_party_mqtt_username": "Optional MQTT broker username. Leave blank for anonymous brokers."
         },
         "description": "Calculated sensors are optional local derivations. The Smart Meter sensors calculate netted values, gross phase-flow values, and home consumption from Jackery reported live home load when available, otherwise Smart Meter net power plus Jackery grid-side input/output; they are not additional Jackery app raw values. The Third-Party MQTT bridge is experimental and asks the SolarVault to publish telemetry to your local broker as documented in PROTOCOL.md §5.",
@@ -2186,18 +2952,18 @@
   },
   "services": {
     "accept_shared_device": {
-      "description": "Send device and QR-code IDs to the cloud sharing endpoint using the selected account, then request a refresh. Sharing is limited to eligible devices; SolarVault systems cannot be shared.",
+      "description": "Accept a shared Jackery device on the account that owns the selected device, then refresh.",
       "fields": {
         "device_id": {
-          "description": "Pick a device to select the Jackery account used for this cloud request.",
+          "description": "Pick a Jackery device from the account that should accept the share.",
           "name": "Device ID"
         },
         "qr_code_id": {
-          "description": "QR-code ID from a supported Jackery sharing workflow.",
+          "description": "QR code ID from the sharing invitation.",
           "name": "QR code ID"
         },
         "target_dev_id": {
-          "description": "Jackery device ID from a supported sharing workflow. A raw ID can be entered in YAML.",
+          "description": "Jackery device ID from the sharing invitation.",
           "name": "Target device ID"
         }
       },
@@ -2267,6 +3033,10 @@
         "device_id": {
           "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
+        },
+        "smart": {
+          "description": "Discovered accessory data with devType, subType and scanName. Optional: param, linkType and bindKey. Required for the binding request.",
+          "name": "Accessory metadata"
         }
       },
       "name": "Bind smart part"
@@ -2316,6 +3086,20 @@
         }
       },
       "name": "Check app version"
+    },
+    "check_ble_ota_versions": {
+      "description": "Check update candidates using the device's recently received BLE firmware versions.",
+      "fields": {
+        "device_id": {
+          "description": "Select a Jackery device with a recent BLE firmware version report.",
+          "name": "Device ID"
+        },
+        "target": {
+          "description": "Select the device or its connected ground accessory.",
+          "name": "Update target"
+        }
+      },
+      "name": "Check BLE firmware updates"
     },
     "check_jackery_accessories_exist": {
       "description": "Check whether Jackery accessories exist for the supplied device serial info. Returns the response only.",
@@ -2405,6 +3189,16 @@
       },
       "name": "Get alarm detail"
     },
+    "get_battery_passport": {
+      "description": "Read the device's battery passport without automatic polling.",
+      "fields": {
+        "device_id": {
+          "description": "Pick the Jackery device whose battery passport should be read.",
+          "name": "Device ID"
+        }
+      },
+      "name": "Battery passport"
+    },
     "get_device_currency": {
       "description": "Get the currency payload for the selected Jackery device. Returns the response only.",
       "fields": {
@@ -2428,6 +3222,24 @@
         }
       },
       "name": "Get dynamic price login URL"
+    },
+    "get_fault_log": {
+      "description": "Read one page of the device's fault records without automatic polling.",
+      "fields": {
+        "device_id": {
+          "description": "Pick the Jackery device whose fault history should be read.",
+          "name": "Device ID"
+        },
+        "page_no": {
+          "description": "Page number to retrieve, starting at 1.",
+          "name": "Page number"
+        },
+        "page_size": {
+          "description": "Maximum number of fault entries per page.",
+          "name": "Page size"
+        }
+      },
+      "name": "Device fault history"
     },
     "get_product_instruction": {
       "description": "Get product instructions for a device serial number. Returns the response only.",
@@ -2458,10 +3270,10 @@
       "name": "Get push config"
     },
     "get_share_qr_code": {
-      "description": "Fetch the account QR code through the selected device’s Jackery cloud account. Returns qr_code_id and user_id and attempts to display a QR image in a persistent notification. Scan compatibility is unverified; SolarVault sharing is unsupported.",
+      "description": "Fetch the share QR code for the Jackery account that owns the selected device. Returns the response only.",
       "fields": {
         "device_id": {
-          "description": "Select a device to choose its configured Jackery account. The QR request has no device parameter; a raw Jackery device ID can also be passed.",
+          "description": "Pick a Jackery device. The QR code is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
         }
       },
@@ -2640,10 +3452,10 @@
       "name": "List notifications"
     },
     "list_shared_devices": {
-      "description": "Return received and outgoing sharing records for the selected device’s Jackery account. Returns the response only; it is not a receive-only device discovery list.",
+      "description": "List the devices shared with the Jackery account that owns the selected device. Returns the response only.",
       "fields": {
         "device_id": {
-          "description": "Select a device to choose its configured Jackery account. The list contains received and outgoing sharing records; a raw Jackery device ID can also be passed.",
+          "description": "Pick a Jackery device. The shared-device list is resolved on the owning account; automations may also pass the numeric Jackery device ID directly.",
           "name": "Device ID"
         }
       },
@@ -2939,20 +3751,6 @@
       },
       "name": "Report device timezone"
     },
-    "save_device_max_power": {
-      "description": "Save the documented device max-power record through the Jackery HTTP API, then refresh the coordinator.",
-      "fields": {
-        "device_id": {
-          "description": "Pick a Jackery device. Automations may also pass the numeric Jackery device ID directly.",
-          "name": "Device ID"
-        },
-        "max_power": {
-          "description": "Maximum power value sent as maxPower.",
-          "name": "Max power"
-        }
-      },
-      "name": "Save device max power"
-    },
     "save_dynamic_price_contract_auth": {
       "description": "Save dynamic-price contract authorization through the Jackery HTTP API, then refresh the coordinator.",
       "fields": {
@@ -3180,6 +3978,20 @@
         }
       },
       "name": "Set third-party MQTT config"
+    },
+    "start_ble_ota_update": {
+      "description": "Install a confirmed firmware update over BLE for the device, battery pack, or ground accessory.",
+      "fields": {
+        "device_id": {
+          "description": "Select a Jackery parent device or confirmed battery pack.",
+          "name": "Device"
+        },
+        "target": {
+          "description": "For a ground accessory, select its owning Portable device.",
+          "name": "Update target"
+        }
+      },
+      "name": "Start BLE firmware update"
     },
     "submit_feedback": {
       "description": "Submit feedback through the Jackery HTTP API.",

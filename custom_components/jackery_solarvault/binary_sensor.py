@@ -3,12 +3,10 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
+from .binary_sensor_compat import BinarySensorDeviceClass
 from .const import (
     DOMAIN,
     FIELD_COMM_MODE,
@@ -23,29 +21,31 @@ from .const import (
     FIELD_VERSION,
     FIELD_WNAME,
     MANUFACTURER,
+    PAYLOAD_SMART_PLUGS,
     PAYLOAD_SUBDEVICES,
     SUBDEVICE_DEV_TYPE_SMOKE,
+    SUBDEVICE_DEV_TYPE_SOCKET,
     SUBDEVICE_DEV_TYPE_TEMP_HUMIDITY,
     SUBDEVICE_DEV_TYPE_WATER_LEAK,
 )
-from .coordinator import (
-    smart_plug_entity_identity,
-    smart_plug_entity_key,
-    smart_plug_entity_payload,
-    smart_plug_payloads,
-    subdevice_accessories,
-)
+from .coordinator import subdevice_accessories
 from .descriptions import (
     BINARY_SENSOR_DESCRIPTIONS,
     JackeryBinaryDescription,
     JackerySubdeviceAlarmBinarySensorDescription,
 )
-from .entity import ALL_LIVE_DATA_SOURCES, JackeryEntity
+from .descriptions.binary_sensor import (
+    BOX_BINARY_SENSOR_DESCRIPTIONS,
+    PORTABLE_BINARY_SENSOR_DESCRIPTIONS,
+)
+from .entity import ALL_LIVE_DATA_SOURCES, JackeryEntity, payload_properties_for_sources
 from .util import (
     append_unique_entity,
     async_setup_entity_discovery,
     safe_bool,
     safe_int,
+    smart_plug_serial,
+    sorted_smart_plugs,
     sorted_sub_devices,
     stable_subdevice_key,
     sub_device_serial,
@@ -96,7 +96,48 @@ SUBDEVICE_ALARM_DEVICE_CLASSES: dict[int, BinarySensorDeviceClass] = {
 type _SubdeviceAlarmIdentity = tuple[int, str, str]
 
 
-async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an async platform hook.
+def _collect_family_binary_sensors(
+    coordinator: JackerySolarVaultCoordinator,
+    dev_id: str,
+    payload: dict[str, Any],
+    seen_unique_ids: set[str],
+    entities: list[BinarySensorEntity],
+) -> None:
+    """Collect family-specific (portable / box) binary sensors."""
+    family = coordinator.device_family(dev_id)
+    props = payload_properties_for_sources(payload)
+    if family == "portable":
+        for description in PORTABLE_BINARY_SENSOR_DESCRIPTIONS:
+            if all(
+                props.get(key) is not None for key in description.required_property_keys
+            ):
+                append_unique_entity(
+                    entities,
+                    seen_unique_ids,
+                    JackeryPortableBinarySensor(coordinator, dev_id, description),
+                )
+    elif family == "box":
+        for description in BOX_BINARY_SENSOR_DESCRIPTIONS:
+            if description.key in {
+                "box_backup_period_enabled",
+                "box_ble_ota_flag",
+                "box_storm_active",
+                "box_charge_now",
+                "box_pss",
+                "box_ups_enabled",
+            } and not all(
+                props.get(key) is not None for key in description.required_property_keys
+            ):
+                continue
+            append_unique_entity(
+                entities,
+                seen_unique_ids,
+                JackeryBoxBinarySensor(coordinator, dev_id, description),
+            )
+
+
+# Home Assistant invokes platform setup as an awaitable callback.
+async def async_setup_entry(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -133,12 +174,19 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                     seen_unique_ids,
                     JackeryBinarySensor(coordinator, dev_id, desc),
                 )
-            valid_plugs = smart_plug_payloads(payload)
+            valid_plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+            if not valid_plugs:
+                valid_plugs = sorted_smart_plugs(
+                    subdevice_accessories(
+                        payload,
+                        dev_type=SUBDEVICE_DEV_TYPE_SOCKET,
+                    )
+                )
             for index, plug in enumerate(valid_plugs, start=1):
-                plug_sn = smart_plug_entity_identity(coordinator, dev_id, plug)
+                plug_sn = smart_plug_serial(plug)
                 if plug_sn is None:
                     continue
-                plug_key = smart_plug_entity_key(coordinator, dev_id, plug_sn)
+                plug_key = stable_subdevice_key("smart_plug", plug_sn, index)
                 append_unique_entity(
                     entities,
                     seen_unique_ids,
@@ -150,6 +198,10 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
                         plug_key=plug_key,
                     ),
                 )
+
+            _collect_family_binary_sensors(
+                coordinator, dev_id, payload, seen_unique_ids, entities
+            )
 
             # Sub-device alarms (Smoke, Leak, etc.) come from subDevices array.
             valid_sub_devices = sorted_sub_devices(payload.get(PAYLOAD_SUBDEVICES))
@@ -189,8 +241,40 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
 
         return entities
 
+    def _family_eligibility() -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+        """Track late property evidence without reacting to value changes."""
+        eligible = []
+        for device_id, payload in sorted((coordinator.data or {}).items()):
+            family = coordinator.device_family(device_id)
+            if family not in {"box", "portable"}:
+                continue
+            descriptions = (
+                BOX_BINARY_SENSOR_DESCRIPTIONS
+                if family == "box"
+                else PORTABLE_BINARY_SENSOR_DESCRIPTIONS
+            )
+            props = payload_properties_for_sources(payload)
+            eligible.append((
+                device_id,
+                family,
+                tuple(
+                    description.key
+                    for description in descriptions
+                    if description.required_property_keys
+                    and all(
+                        props.get(key) is not None
+                        for key in description.required_property_keys
+                    )
+                ),
+            ))
+        return tuple(eligible)
+
     async_setup_entity_discovery(
-        entry, coordinator, _collect_entities, async_add_entities
+        entry,
+        coordinator,
+        _collect_entities,
+        async_add_entities,
+        eligibility_signature=_family_eligibility,
     )
 
 
@@ -224,12 +308,41 @@ class JackeryBinarySensor(JackeryEntity, BinarySensorEntity):
         return safe_bool(self.entity_description.value_fn(self))
 
 
+class JackeryBoxBinarySensor(JackeryBinarySensor):
+    """Binary sensor restricted to devices identified as Box."""
+
+    @property
+    def available(self) -> bool:
+        """Hide stale Box states if the device family changes."""
+        return (
+            self.coordinator.device_family(self.device_id) == "box"
+            and self.coordinator.property_fields_match_family(
+                self.device_id, self.entity_description.app_fields
+            )
+            and super().available
+        )
+
+
+class JackeryPortableBinarySensor(JackeryBinarySensor):
+    """Binary sensor restricted to devices identified as Portable."""
+
+    @property
+    def available(self) -> bool:
+        """Hide stale Portable states if the device family changes."""
+        return (
+            self.coordinator.device_family(self.device_id) == "portable"
+            and self.coordinator.property_fields_match_family(
+                self.device_id, self.entity_description.app_fields
+            )
+            and super().available
+        )
+
+
 class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
     """Current on/off state for one smart-plug subdevice."""
 
     _attr_translation_key = "smart_plug_switch_state"
     _attr_device_class = BinarySensorDeviceClass.POWER
-    _attr_device_info: DeviceInfo
     data_sources = ALL_LIVE_DATA_SOURCES
     app_fields = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
 
@@ -272,16 +385,24 @@ class JackerySmartPlugStateBinarySensor(JackeryEntity, BinarySensorEntity):
         )
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Keep this entity attached to its captured smart-plug device."""
-        return self._attr_device_info
-
-    @property
     def _plug(self) -> dict[str, Any]:
-        """Resolve current data without rebinding the captured plug identity."""
-        return smart_plug_entity_payload(
-            self.coordinator, self._device_id, self._plug_sn
-        )
+        # Look the plug up by its captured serial so cloud-side re-ordering of
+        # the plug array cannot reassign this entity to a different device.
+        """Find the smart-plug payload matching the captured serial.
+
+        Keep the entity bound to the same physical plug if the cloud-side plug list is
+        reordered.
+
+        Returns:
+            dict[str, Any]: The matching smart-plug dictionary from the current payload,
+            or an empty dict if no match is found.
+        """
+        payload = self._payload
+        if payload:
+            for plug in sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS)):
+                if smart_plug_serial(plug) == self._plug_sn:
+                    return plug
+        return {}
 
     @property
     def is_on(self) -> bool | None:

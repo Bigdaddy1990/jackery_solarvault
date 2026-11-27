@@ -111,6 +111,36 @@ query_third_party_mqtt_config:
       selector:
         device:
           integration: jackery_solarvault
+check_ble_ota_versions:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jackery_solarvault
+    target:
+      required: false
+      default: device
+      selector:
+        select:
+          options:
+            - device
+            - ground_accessory
+start_ble_ota_update:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jackery_solarvault
+    target:
+      required: false
+      default: device
+      selector:
+        select:
+          options:
+            - device
+            - ground_accessory
 send_ble_command:
   fields:
     device_id:
@@ -465,22 +495,6 @@ check_system_bound:
       example: guid
       selector:
         text: null
-save_device_max_power:
-  fields:
-    device_id:
-      required: true
-      example: '573702884982521856'
-      selector:
-        device:
-          integration: jackery_solarvault
-    max_power:
-      required: true
-      example: 800
-      selector:
-        number:
-          min: 0
-          max: 1000000
-          mode: box
 get_alarm_detail:
   fields:
     device_id:
@@ -948,6 +962,10 @@ bind_device:
           mode: box
 bind_smart_part:
   fields:
+    smart:
+      required: true
+      selector:
+        object: null
     device_id:
       required: true
       example: '573702884982521856'
@@ -1187,4 +1205,38 @@ remove_all_shared_access:
         number:
           min: 0
           max: 65535
+          mode: box
+
+get_battery_passport:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jackery_solarvault
+
+get_fault_log:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jackery_solarvault
+    page_no:
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 10000
+          step: 1
+          mode: box
+    page_size:
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
           mode: box

@@ -42,11 +42,7 @@ from .entity import (
     JackeryEntity,
     raise_entity_action_error,
 )
-from .util import (
-    append_unique_entity,
-    async_setup_entity_discovery,
-    is_portable_payload as _is_portable_payload,
-)
+from .util import append_unique_entity, async_setup_entity_discovery
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -134,7 +130,10 @@ async def async_setup_entry(  # ruff: ignore[unused-async]  # HA requires an asy
         entities: list[TextEntity] = []
         for dev_id, payload in (coordinator.data or {}).items():
             system = payload.get(PAYLOAD_SYSTEM) or {}
-            is_portable = _is_portable_payload(payload)
+            family = coordinator.device_family(dev_id)
+            if family == "unknown":
+                continue
+            is_portable = family == "portable"
             append_unique_entity(
                 entities, seen_unique_ids, JackeryDeviceNameText(coordinator, dev_id)
             )
@@ -225,8 +224,18 @@ class JackeryDeviceNameText(JackeryEntity, TextEntity):
                 },
             )
 
-        try:
-            if _is_portable_payload(self._payload):
+        try:  # ruff: ignore[too-many-statements-in-try-clause]
+            family = self.coordinator.device_family(self._device_id)
+            if family == "unknown":
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="invalid_text_value",
+                    translation_placeholders={
+                        "entity": "device_name",
+                        "device_id": self._device_id,
+                    },
+                )
+            if family == "portable":
                 await self.coordinator.async_set_device_nickname(
                     self._device_id,
                     new_name,

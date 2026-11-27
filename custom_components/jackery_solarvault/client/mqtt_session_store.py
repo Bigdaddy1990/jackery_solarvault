@@ -23,8 +23,6 @@ import math
 import time
 from typing import TYPE_CHECKING, Any, Final, TypeGuard
 
-from homeassistant.helpers.storage import Store
-
 from ..const import (
     CACHE_ENTRIES_KEY,
     CACHE_STORAGE_VERSION,
@@ -40,6 +38,7 @@ from ..const import (
     MQTT_SESSION_USER_ID,
 )
 from ..util import get_store_lock
+from .storage import JackeryStore as Store
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -100,7 +99,7 @@ def normalize_mqtt_session_snapshot(
     assert isinstance(mac_id, str)
     try:
         seed = base64.b64decode(seed_b64, validate=True)
-    except (binascii.Error, ValueError):  # fmt: skip
+    except binascii.Error, ValueError:
         return None
     if len(seed) != _MQTT_SEED_LEN:
         return None

@@ -109,7 +109,7 @@ def _broker_port(options: Mapping[str, Any]) -> int:
     )
     try:
         return int(raw)
-    except (TypeError, ValueError):  # fmt: skip
+    except TypeError, ValueError:
         return DEFAULT_THIRD_PARTY_MQTT_PORT
 
 
@@ -206,7 +206,7 @@ def stable_third_party_mqtt_token(
             return raw_token, True, None
         return raw_token, False, None
 
-    if generated_token is None:
+    if generated_token is None or not generated_token.strip():
         new_token = generate_third_party_mqtt_token()
         return new_token, True, new_token
     return generated_token, True, None
@@ -331,6 +331,14 @@ def third_party_mqtt_config_plaintext(
                         continue
                     if decoded_fields and key not in decoded_fields:
                         continue
-                    if current.get(key) is not None:
-                        config[key] = current[key]
+                    value = current.get(key)
+                    if value is None:
+                        continue
+                    # An unconfigured device reports an empty token. The app
+                    # supplies its generated token instead of replacing it
+                    # with the empty readback; empty broker credentials remain
+                    # valid for anonymous brokers.
+                    if key == FIELD_THIRD_PARTY_MQTT_TOKEN and not str(value).strip():
+                        continue
+                    config[key] = value
     return config

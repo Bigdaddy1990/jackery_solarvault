@@ -1,8 +1,7 @@
 """Button descriptions for Jackery SolarVault integration.
 
-Holds the documented app read/query command catalogue. The platform module
-keeps ``async_press`` because a query fans out over MQTT and HTTP in
-parallel — orchestration that belongs on the entity, not in a description.
+Hold the documented app read/query catalogue and its transport equivalents.
+The coordinator dispatches each supported transport independently.
 """
 
 from collections.abc import Awaitable, Callable
@@ -10,6 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntityDescription
+from homeassistant.exceptions import HomeAssistantError
 
 from ..const import (
     ACTION_ID_GET_DEVICE_OTA_VERSION,
@@ -40,7 +40,9 @@ from ..const import (
     ACTION_ID_SUBDEVICE_3033,
     ACTION_ID_SUBDEVICE_3037,
     ACTION_ID_SYNC_MQTT_CONNECT_INFO,
-    FIELD_REBOOT,
+    FIELD_DEVICE_SN,
+    FIELD_HOST,
+    FIELD_SN,
     MQTT_CMD_GET_DEVICE_OTA_VERSION,
     MQTT_CMD_GET_TIME_ZONE,
     MQTT_CMD_QUERY_COMBINE_DATA,
@@ -51,7 +53,11 @@ from ..const import (
     MQTT_CMD_READ_WIFI_LIST,
     MQTT_CMD_SEND_TIME_ZONE,
     MQTT_CMD_SYNC_MQTT_CONNECT_INFO,
+    MQTT_HOST,
+    MQTT_MESSAGE_CONTROL_SUB_DEVICE,
+    MQTT_MESSAGE_DEVICE_POWER_OFF,
     MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+    MQTT_MESSAGE_DEVICE_REBOOT,
     MQTT_MESSAGE_QUERY_COMBINE_DATA,
     MQTT_MESSAGE_QUERY_CURRENT_ELECTRICITY_STRATEGY,
     MQTT_MESSAGE_QUERY_DEVICE_PROPERTY,
@@ -60,6 +66,8 @@ from ..const import (
     MQTT_MESSAGE_QUERY_THIRD_PARTY_MQTT_CONFIG,
     MQTT_MESSAGE_QUERY_TOU_SCHEDULE,
     MQTT_MESSAGE_QUERY_WIFI_CONFIG,
+    MQTT_PORT,
+    PAYLOAD_BATTERY_PACKS,
     PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID,
     SUBDEVICE_DEV_TYPE_BATTERY_PACK,
     SUBDEVICE_DEV_TYPE_COMBO,
@@ -79,6 +87,10 @@ type QueryButtonAction = Callable[[JackerySolarVaultCoordinator, str], Awaitable
 @dataclass(frozen=True, kw_only=True)
 class JackeryButtonDescription(ButtonEntityDescription):
     """Metadata for a documented app read/query command."""
+
+    # Expose HA's dynamically inherited fields to dataclasses.replace.
+    key: str
+    translation_key: str | None = None
 
     action: QueryButtonAction
     message_type: str
@@ -134,7 +146,7 @@ async def _query_system_info(
     device_id: str,
 ) -> None:
     """Request system information for a device via the coordinator."""
-    await coordinator.async_query_system_info(device_id)
+    await coordinator.async_query_system_info(device_id, include_http=True)
 
 
 async def _query_device_info(
@@ -142,7 +154,7 @@ async def _query_device_info(
     device_id: str,
 ) -> None:
     """Request an updated device information payload for the specified device."""
-    await coordinator.async_query_device_info(device_id)
+    await coordinator.async_query_device_info(device_id, include_http=True)
 
 
 async def _query_wifi_list(
@@ -242,7 +254,7 @@ async def _query_battery_packs(
         query.
         device_id (str): Identifier of the target device.
     """
-    await coordinator.async_query_battery_packs(device_id)
+    await coordinator.async_query_battery_packs(device_id, include_http=True)
 
 
 async def _query_smart_meter(
@@ -250,7 +262,7 @@ async def _query_smart_meter(
     device_id: str,
 ) -> None:
     """Trigger a smart meter query for the specified device."""
-    await coordinator.async_query_smart_meter(device_id)
+    await coordinator.async_query_smart_meter(device_id, include_http=True)
 
 
 async def _query_meter_heads(
@@ -258,7 +270,7 @@ async def _query_meter_heads(
     device_id: str,
 ) -> None:
     """Trigger a meter-head query for the specified device."""
-    await coordinator.async_query_meter_heads(device_id)
+    await coordinator.async_query_meter_heads(device_id, include_http=True)
 
 
 async def _query_smart_plugs(
@@ -270,7 +282,7 @@ async def _query_smart_plugs(
     Triggers the coordinator to fetch and update the smart-plug list for the given
     device.
     """
-    await coordinator.async_query_smart_plugs(device_id)
+    await coordinator.async_query_smart_plugs(device_id, include_http=True)
 
 
 async def _query_subdevice_combo(
@@ -287,7 +299,7 @@ async def _query_subdevice_combo(
         device_id (str): Identifier of the device whose subdevice combo should be
         queried.
     """
-    await coordinator.async_query_subdevice_combo(device_id)
+    await coordinator.async_query_subdevice_combo(device_id, include_http=True)
 
 
 async def _portable_restart(
@@ -305,7 +317,8 @@ async def _portable_restart(
         device_id,
         action_id=ACTION_ID_PORTABLE_RESTART,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_RESTART),
-        body_fields={FIELD_REBOOT: 1},
+        body_fields={},
+        message_type=MQTT_MESSAGE_DEVICE_REBOOT,
     )
 
 
@@ -321,7 +334,8 @@ async def _portable_power_off(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_OFF,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_OFF),
-        body_fields={FIELD_REBOOT: 2},
+        body_fields={},
+        message_type=MQTT_MESSAGE_DEVICE_POWER_OFF,
     )
 
 
@@ -333,11 +347,31 @@ async def _portable_power_pack_blink(
 
     Sends a portable command to request the device blink its power pack LEDs.
     """
+    payload = (coordinator.data or {}).get(device_id, {})
+    packs = payload.get(PAYLOAD_BATTERY_PACKS) if isinstance(payload, dict) else None
+    serials = (
+        {
+            str(serial).strip()
+            for pack in packs
+            if isinstance(pack, dict)
+            if isinstance(
+                (serial := pack.get(FIELD_DEVICE_SN) or pack.get(FIELD_SN)), str
+            )
+            and serial.strip()
+        }
+        if isinstance(packs, list)
+        else set()
+    )
+    if len(serials) != 1:
+        raise HomeAssistantError(  # ruff: ignore[raise-vanilla-args]
+            "Pack blink requires one unambiguous battery-pack serial"
+        )
     await coordinator.async_send_portable_command(
         device_id,
         action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_PACK_BLINK),
-        body_fields={},
+        body_fields={FIELD_SN: next(iter(serials)), "blink": 1},
+        message_type=MQTT_MESSAGE_CONTROL_SUB_DEVICE,
     )
 
 
@@ -355,6 +389,7 @@ async def _portable_read_device_info(
         action_id=ACTION_ID_PORTABLE_READ_DEVICE_INFO,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_READ_DEVICE_INFO),
         body_fields={},
+        http_read={"device_property": True},
     )
 
 
@@ -389,6 +424,7 @@ async def _portable_get_power_pack_list(
         action_id=ACTION_ID_PORTABLE_GET_POWER_PACK_LIST,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_POWER_PACK_LIST),
         body_fields={},
+        http_read={"battery_packs": True},
     )
 
 
@@ -431,7 +467,7 @@ async def _portable_sync_mqtt_info(
         device_id,
         action_id=ACTION_ID_PORTABLE_SYNC_MQTT_INFO,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_SYNC_MQTT_INFO),
-        body_fields={},
+        body_fields={FIELD_HOST: MQTT_HOST, "port": MQTT_PORT},
     )
 
 
@@ -445,6 +481,7 @@ async def _portable_get_wifi_config(
         action_id=ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_GET_WIFI_CONFIG),
         body_fields={},
+        message_type=MQTT_MESSAGE_QUERY_WIFI_CONFIG,
     )
 
 
@@ -515,6 +552,7 @@ async def _portable_read_sub_ct(
         cmd=_portable_cmd(ACTION_ID_PORTABLE_READ_SUB_CT),
         body_fields={},
         message_type=MQTT_MESSAGE_QUERY_SUBDEVICE_GROUP_PROPERTY,
+        http_read={"subdevice_dev_type": SUBDEVICE_DEV_TYPE_CT},
     )
 
 
@@ -679,7 +717,7 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_restart",
         action=_portable_restart,
-        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        message_type=MQTT_MESSAGE_DEVICE_REBOOT,
         action_id=ACTION_ID_PORTABLE_RESTART,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_RESTART),
     ),
@@ -689,7 +727,7 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_power_off",
         action=_portable_power_off,
-        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        message_type=MQTT_MESSAGE_DEVICE_POWER_OFF,
         action_id=ACTION_ID_PORTABLE_POWER_OFF,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_OFF),
     ),
@@ -699,7 +737,7 @@ BUTTON_DESCRIPTIONS: tuple[JackeryButtonDescription, ...] = (
         # pyrefly: ignore [unexpected-keyword]
         translation_key="portable_power_pack_blink",
         action=_portable_power_pack_blink,
-        message_type=MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE,
+        message_type=MQTT_MESSAGE_CONTROL_SUB_DEVICE,
         action_id=ACTION_ID_PORTABLE_POWER_PACK_BLINK,
         cmd=_portable_cmd(ACTION_ID_PORTABLE_POWER_PACK_BLINK),
     ),

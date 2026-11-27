@@ -2,8 +2,9 @@
 
 Endpoint paths and polling rules are mirrored from PROTOCOL.md §2.
 MQTT command details are documented separately in PROTOCOL.md §3.
-Field and endpoint references are additionally mirrored from
-/docs/source-of-truth/.
+Field and endpoint references are additionally mirrored from the extracted
+catalogs in ``docs/`` (including ``hbxn_commands.html`` and the
+``jackery_*_v2.html`` endpoint/model catalogs).
 
 Domain-specific endpoint methods are exposed through the unified
 ``JackeryApi`` facade. Coordinator-owned routing stays outside this client.
@@ -13,7 +14,8 @@ Systems:  /v1/device/system/list      (no params)
 Device:   /v1/device/property         (?deviceId=<long>)
 Alarms:   /v1/api/alarm               (?systemId=<long>)
 Stats:    /v1/device/stat/systemStatistic     (?systemId=<long>)
-Trends:   /v1/device/stat/sys/pv/trends       (?systemId&beginDate&endDate&dateType)
+Trends:   /v1/device/stat/sys/pv/statics      (?systemId&beginDate&endDate&dateType)
+          /trends is the compatibility fallback after App code 10600.
 Price:    /v1/device/dynamic/powerPriceConfig (?systemId=<long>)
 """
 
@@ -21,18 +23,25 @@ import asyncio
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
+import functools
 import hashlib
 from http import HTTPStatus
 import inspect
+from ipaddress import IPv6Address, ip_address
 import json
 import logging
 import os
 import re
+import socket
+import tempfile
 import time
 from typing import TYPE_CHECKING, Any, Final, TypedDict
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 import uuid
 
 import aiohttp
@@ -41,6 +50,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 from cryptography.hazmat.primitives.serialization import load_der_public_key
 import voluptuous as vol
+from yarl import URL
 
 from ..const import (
     ACCESSORIES_BIND_PATH,
@@ -54,6 +64,7 @@ from ..const import (
     ACCESSORIES_UNBIND_PATH,
     AC_NICKNAME_PATH,
     AIEMS_ENERGY_PREDICTION_PATH,
+    AIEMS_MODE_STATUS_PATH,
     ALARM_DETAIL_PATH,
     ALARM_PATH,
     ALERT_SYNC_PATH,
@@ -72,10 +83,13 @@ from ..const import (
     APP_VERSION,
     APP_VERSION_CODE,
     APP_VERSION_PATH,
+    APP_VERSION_QUERY_NAME,
+    APP_VERSION_QUERY_TYPE,
     AUTH_AUTO_RELOGIN_COOLDOWN_SEC,
     BANNER_LIST_PATH,
     BASE_URL,
     BATTERY_PACK_PATH,
+    BATTERY_PASSPORT_PATH,
     BATTERY_TRENDS_PATH,
     BIND_CURRENCY_PATH,
     BLE_OTA_LINK_PATH,
@@ -124,6 +138,9 @@ from ..const import (
     DYNAMIC_PRICE_PATH,
     FAQ_ANSWER_PATH,
     FAQ_LIST_PATH,
+    FAULT_LOG_MAX_PAGE_NUM,
+    FAULT_LOG_MAX_PAGE_SIZE,
+    FAULT_LOG_PATH,
     FEEDBACK_PATH,
     FIELD_ACCOUNT,
     FIELD_ACTION,
@@ -139,19 +156,21 @@ from ..const import (
     FIELD_DEVICE_ID,
     FIELD_DEVICE_SN,
     FIELD_DEVICE_SN_LIST,
+    FIELD_EC,
     FIELD_FUNCTION,
     FIELD_ID,
     FIELD_IN_PW,
     FIELD_IP,
     FIELD_IS_FIRMWARE_UPGRADE,
+    FIELD_IT,
     FIELD_LIST,
     FIELD_LOGIN_TYPE,
     FIELD_MAC_ID,
-    FIELD_MAX_POWER,
     FIELD_MODEL,
     FIELD_MQTT_PASSWORD,
     FIELD_MSG,
     FIELD_OP,
+    FIELD_OT,
     FIELD_OUT_PW,
     FIELD_PASSWORD,
     FIELD_PLATFORM_COMPANY_ID,
@@ -194,7 +213,6 @@ from ..const import (
     LOGIN_PATH,
     LOGIN_TIMEOUT_SEC,
     LOGOUT_PATH,
-    MAX_POWER_SAVE_PATH,
     MODIFY_INFO_PATH,
     MQTT_CLIENT_ID_SUFFIX,
     MQTT_CREDENTIAL_CLIENT_ID,
@@ -245,6 +263,10 @@ from ..const import (
     SMART_SCHEDULE_PATH,
     SOC_STAT_PATH,
     SUB_SHADOW_PATH,
+    SYMMETRY_NEGATIVE_METRICS,
+    SYMMETRY_PORTABLE_NEGATIVE_METRICS,
+    SYMMETRY_PORTABLE_POSITIVE_METRICS,
+    SYMMETRY_POSITIVE_METRICS,
     SYMMETRY_STAT_PATH,
     SYSTEM_CREATE_PATH,
     SYSTEM_DEVICE_NAME_PATH,
@@ -263,10 +285,12 @@ from ..const import (
     ZONE_LIST_PATH,
 )
 from ..util import (
+    PayloadDebugEvent,
     app_period_date_bounds,
     chart_series_debug,
     first_nonblank_int,
     jackery_dev_mode_enabled,
+    redacted_json_safe_payload,
     safe_bool,
     safe_float,
 )
@@ -274,15 +298,21 @@ from .credentials import (
     MAX_TOKEN_LENGTH,
     credential_fingerprint,
     credential_text,
-    redacted_error,
+    redacted_error_text,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from ipaddress import IPv4Address
+    from urllib.parse import SplitResult
+
+
+from .operation_errors import OperationErrors
 
 _LOGGER = logging.getLogger(__name__)
 
 _MAX_FEEDBACK_IMAGES: Final = 3
+_MAX_INTERRUPTED_HTTP_RESPONSES: Final = 20
 _MultipartFile = tuple[str, str, bytes, str | None]
 
 
@@ -433,7 +463,7 @@ def _aes_ecb_encrypt(plaintext: bytes, key: bytes) -> bytes:
     padded = padder.update(plaintext) + padder.finalize()
     # codeql[py/weak-cryptographic-algorithm]
     # AES-ECB is mandatory for the Jackery Cloud API wire protocol.
-    cipher = Cipher(algorithms.AES(key), modes.ECB())  # nosec B305
+    cipher = Cipher(algorithms.AES(key), modes.ECB())
     encryptor = cipher.encryptor()
     return encryptor.update(padded) + encryptor.finalize()
 
@@ -488,6 +518,18 @@ def generate_login_aes_key(random_source: RandomBytesSource = os.urandom) -> byt
     return base64.b64encode(seed)
 
 
+@functools.lru_cache(maxsize=4)
+def _get_rsa_public_key(public_key_b64: str) -> rsa.RSAPublicKey:
+    der_bytes = base64.b64decode(public_key_b64)
+    public_key = load_der_public_key(der_bytes)
+    if not isinstance(public_key, rsa.RSAPublicKey):
+        msg = (
+            f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
+        )
+        raise TypeError(msg)
+    return public_key
+
+
 def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
     """Encrypt `data` using RSA PKCS#1 v1.5 with a base64-encoded DER RSA public key.
 
@@ -501,13 +543,7 @@ def _rsa_pkcs1v15_encrypt(data: bytes, public_key_b64: str) -> bytes:
     Raises:
         TypeError: If the decoded public key is not an RSA public key.
     """
-    der_bytes = base64.b64decode(public_key_b64)
-    public_key = load_der_public_key(der_bytes)
-    if not isinstance(public_key, rsa.RSAPublicKey):
-        msg = (
-            f"Jackery login expects an RSA public key, got {type(public_key).__name__}"
-        )
-        raise TypeError(msg)
+    public_key = _get_rsa_public_key(public_key_b64)
     return public_key.encrypt(data, asym_padding.PKCS1v15())
 
 
@@ -561,6 +597,9 @@ class _AuthFailureRecovery:
     status: int
     data: object
     retry_transport_once: bool = False
+    debug_request_body: dict[str, Any] | None = None
+    debug_request_params: dict[str, Any] | None = None
+    debug_request_tokens: set[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -647,6 +686,80 @@ _SENSITIVE_KEY_PARTS: Final = (
 )
 
 
+def _firmware_url_parts(url: str) -> SplitResult:
+    """Validate the shape of a manufacturer-provided HTTPS firmware URL."""
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        _ = parsed.port
+    except ValueError:
+        msg = "Invalid BLE firmware URL"
+        raise ValueError(msg) from None
+    if (
+        parsed.scheme != "https"  # ruff: ignore[too-many-boolean-expressions]
+        or not host
+        or parsed.username is not None
+        or parsed.password is not None
+        or host.lower().rstrip(".") in {"localhost", "localhost.localdomain"}
+        or host.lower().rstrip(".").endswith(".localhost")
+        or host.lower().rstrip(".").endswith(".local")
+    ):
+        msg = "Invalid BLE firmware URL"
+        raise ValueError(msg)
+    return parsed
+
+
+async def _lookup_host_addresses(
+    session: aiohttp.ClientSession, host: str
+) -> list[IPv4Address | IPv6Address]:
+    """Resolve candidate IP objects for a firmware download hostname."""
+    connector = getattr(session, "connector", None)
+    resolve_host = getattr(connector, "async_resolve_host", None)
+    if callable(resolve_host):
+        resolved = await resolve_host(host, 443)
+        return [ip_address(item["host"]) for item in resolved]
+    loop = asyncio.get_running_loop()
+    resolved = await loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    return [ip_address(item[4][0]) for item in resolved]
+
+
+async def _firmware_public_address(
+    session: aiohttp.ClientSession, host: str
+) -> IPv4Address | IPv6Address:
+    """Resolve once and return a verified public address for the actual request."""
+    try:
+        address = ip_address(host)
+    except ValueError:
+        try:
+            address = ip_address(socket.inet_aton(host))
+        except OSError:
+            try:  # ruff: ignore[too-many-statements-in-try-clause]
+                try:
+                    addresses = await _lookup_host_addresses(session, host)
+                except socket.gaierror as err:
+                    if err.errno != socket.EAI_AGAIN:
+                        raise
+                    # DNS can fail transiently while HA networking starts or
+                    # reconnects. Retry only this explicitly temporary result.
+                    await asyncio.sleep(0.25)
+                    addresses = await _lookup_host_addresses(session, host)
+            except (OSError, ValueError, KeyError, TypeError, IndexError) as err:
+                errno = getattr(err, "errno", None)
+                reason = type(err).__name__
+                if isinstance(errno, int) and not isinstance(errno, bool):
+                    reason = f"{reason}, errno={errno}"
+                msg = f"BLE firmware host resolution failed ({reason})"
+                raise JackeryApiError(msg) from err
+            if not addresses or any(not item.is_global for item in addresses):
+                msg = "BLE firmware host resolved to a non-public address"
+                raise JackeryApiError(msg) from None
+            address = addresses[0]
+    if not address.is_global:
+        msg = "BLE firmware host is not public"
+        raise JackeryApiError(msg)
+    return address
+
+
 def build_login_crypto_fields(
     login_bean: dict[str, Any],
     *,
@@ -686,6 +799,93 @@ def build_login_crypto_fields(
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
+@dataclass(slots=True)
+class _PropertyRequestContext:
+    owner: str
+    generation: int
+    task: asyncio.Task[Any] | None
+    active: bool = True
+
+
+class _RawHttpResponse(dict[str, Any]):  # ruff: ignore[subclass-builtin] - dict API compatibility
+    """Bind an HTTP response to its request-owned original envelope."""
+
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        original: dict[str, Any],
+        projection: object,
+        property_snapshot: dict[str, Any] | None,
+    ) -> None:
+        super().__init__(payload)
+        self.original = original
+        self.projection = projection
+        self.property_snapshot = property_snapshot
+
+
+class _RawPropertyResponse(dict[str, Any]):  # ruff: ignore[subclass-builtin] - dict API compatibility
+    """Bind the decoded response to its private debug snapshot."""
+
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        original: dict[str, Any],
+        received_at_monotonic: float,
+    ) -> None:
+        super().__init__(payload)
+        self.original = original
+        self.received_at_monotonic = received_at_monotonic
+
+
+class _PropertyResponse(dict[str, Any]):  # ruff: ignore[subclass-builtin] - dict API compatibility
+    """Bind the property projection to its request's original envelope."""
+
+    def __init__(
+        self,
+        payload: dict[str, Any],
+        original: dict[str, Any],
+        request_generation: int,
+        received_at_monotonic: float,
+    ) -> None:
+        super().__init__(payload)
+        self._original = original
+        self.request_generation = request_generation
+        self.received_at_monotonic = received_at_monotonic
+
+    @property
+    def original_payload(self) -> dict[str, Any]:
+        """An independent copy of the received envelope."""
+        return deepcopy(self._original)
+
+
+class _OwnedHttpResponse(dict[str, Any]):  # ruff: ignore[subclass-builtin] - dict API compatibility
+    """Keep an HTTP projection bound to its received envelope."""
+
+    def __init__(self, payload: dict[str, Any], original: dict[str, Any]) -> None:
+        super().__init__(payload)
+        self._original = original
+
+    @property
+    def original_payload(self) -> dict[str, Any]:
+        """An independent copy of the received envelope."""
+        return deepcopy(self._original)
+
+
+class _BatteryPackRows(list[dict[str, Any]]):  # ruff: ignore[subclass-builtin] - list API compatibility
+    """Keep a pack-list projection bound to its original HTTP response."""
+
+    def __init__(
+        self,
+        rows: list[dict[str, Any]],
+        original_payload: dict[str, Any],
+        request_generation: int,
+    ) -> None:
+        super().__init__(rows)
+        self.original_payload = original_payload
+        self.request_generation = request_generation
+        self.received_at_monotonic = time.monotonic()
+
+
 class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented facade mirrors the app API
     """Async client for the Jackery SolarVault cloud."""
 
@@ -717,6 +917,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self.last_system_list_response: dict[str, Any] | None = None
         self.last_legacy_device_list_response: dict[str, Any] | None = None
         self.last_property_responses: dict[str, dict[str, Any]] = {}
+        self._property_request_context: ContextVar[_PropertyRequestContext | None] = (
+            ContextVar("jackery_property_request", default=None)
+        )
         self.last_alarm_response: dict[str, Any] | None = None
         self.last_statistic_response: dict[str, Any] | None = None
         self.last_price_response: dict[str, Any] | None = None
@@ -724,6 +927,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self.last_price_history_config_response: dict[str, Any] | None = None
         self.last_device_statistic_responses: dict[str, dict[str, Any]] = {}
         self.last_device_period_stat_responses: dict[str, dict[str, Any]] = {}
+        self.last_payload_responses: dict[str, dict[str, Any]] = {}
+        self.last_interrupted_http_responses: dict[str, dict[str, Any]] = {}
+        self._owned_http_response_sequence = 0
+        self._http_capture_sequence = 0
+        self._http_capture_latest: dict[str, int] = {}
         self.last_battery_pack_responses: dict[str, dict[str, Any]] = {}
         self.last_ota_responses: dict[str, dict[str, Any]] = {}
         self.last_location_responses: dict[str, dict[str, Any]] = {}
@@ -734,6 +942,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             ]
             | None
         ) = None
+        self.payload_debug_capture_policy: Callable[[], tuple[bool, bool]] | None = None
         self.auth_rejection_callback: (
             Callable[[int, object], Awaitable[None] | None] | None
         ) = None
@@ -812,7 +1021,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
     @staticmethod
     async def _read_limited_bytes(resp: aiohttp.ClientResponse, *, limit: int) -> bytes:
-        """Read a response incrementally and reject it beyond ``limit`` bytes."""
+        """Enforce the separate hard size limit used for firmware and binary reads."""
         declared = resp.content_length
         if declared is not None and declared > limit:
             raise JackeryApiError.payload_too_large(limit)
@@ -832,7 +1041,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         *,
         policy: HttpTransportPolicy = _HTTP_POLICY,
     ) -> object:
-        """Decode only a bounded JSON response with a JSON media type."""
+        """Decode a complete JSON response with a JSON media type."""
         media_type = cls._response_media_type(resp)
         response_content: object = resp.content
         if not media_type and not isinstance(response_content, aiohttp.StreamReader):
@@ -849,9 +1058,17 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 ValueError,
             ) as err:
                 raise JackeryApiError.invalid_json() from err
-        raw = await cls._read_limited_bytes(resp, limit=policy.max_payload_bytes)
+        # JSON telemetry has no artificial byte cutoff. Large responses spill
+        # to a temporary file instead of keeping a second list of all chunks.
+        # The policy's former limit is only the in-memory spool threshold.
         try:
-            return json.loads(raw)
+            with tempfile.SpooledTemporaryFile(
+                mode="w+b", max_size=policy.max_payload_bytes
+            ) as spool:
+                async for chunk in resp.content.iter_chunked(65_536):
+                    spool.write(chunk)
+                spool.seek(0)
+                return await asyncio.to_thread(json.load, spool)
         except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as err:
             raise JackeryApiError.invalid_json() from err
 
@@ -965,8 +1182,24 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             self._requests_failed += 1
             if isinstance(err, TimeoutError):
                 self._timeouts_total += 1
-            msg = f"Login request failed: {redacted_error(err)}"
+            detail, allow_raw_cause = await self._safe_http_transport_error_text(
+                err,
+                path=LOGIN_PATH,
+                token_used="",
+                request_body=None,
+                request_params=None,
+            )
+            msg = f"Login request failed: {type(err).__name__}: {detail}"
+            if not allow_raw_cause and (
+                detail != (str(err) or "(no message)")
+                or err.__cause__ is not None
+                or (err.__context__ is not None and not err.__suppress_context__)
+            ):
+                raise JackeryApiError(msg) from None
             raise JackeryApiError(msg) from err
+        except JackeryApiError:
+            self._requests_failed += 1
+            raise
 
     @classmethod
     async def _decode_login_response(
@@ -1001,7 +1234,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         ) as err:
             raise JackeryApiError.invalid_login_json() from err
 
-    async def async_login(self) -> str:
+    async def async_login(self) -> str:  # ruff: ignore[too-many-locals] - auth context
         """Perform the app-compatible encrypted HTTP login."""
         mac_id = self._resolve_login_mac_id()
         login_bean = {
@@ -1023,54 +1256,73 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         form_body = build_login_crypto_fields(login_bean)
         data = await self._post_login_request(url, form_body, headers)
         if not isinstance(data, dict):
+            self._requests_failed += 1
             msg = f"Login returned {type(data).__name__} instead of object"
             raise JackeryApiError(msg)
 
-        # Store redacted version for diagnostics (complete in JACKERY_DEV_MODE)
-        redacted = dict(data)
-        if not jackery_dev_mode_enabled(self.dev_mode_entry):
-            if FIELD_TOKEN in redacted:
-                redacted[FIELD_TOKEN] = REDACTED_VALUE
-            if isinstance(redacted.get(FIELD_DATA), dict):
-                inner = dict(redacted[FIELD_DATA])
-                if FIELD_MQTT_PASSWORD in inner:
-                    inner[FIELD_MQTT_PASSWORD] = REDACTED_VALUE
-                redacted[FIELD_DATA] = inner
-        self.last_login_response = redacted
+        # Keep the received evidence internally; redact only the selected export.
+        self.last_login_response = deepcopy(data)
+        debug_response = self.last_login_response
+        debug_body = {"form_fields": sorted(form_body)}
+        debug_sources = ({FIELD_PASSWORD: self._password, "secret": self._account},)
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 request=(HTTP_METHOD_POST, LOGIN_PATH),
-                body={"form_fields": sorted(form_body)},
+                body=debug_body,
                 status=200,
-                response=redacted,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             )
         )
 
         if self._extract_code(data) != CODE_OK:
-            msg = (
-                f"Login rejected (code={data.get(FIELD_CODE)}, "
-                f"msg={data.get(FIELD_MSG)})"
+            self._requests_failed += 1
+            raw_mode = jackery_dev_mode_enabled(getattr(self, "dev_mode_entry", None))
+            safe_response = await asyncio.to_thread(
+                redacted_json_safe_payload,
+                debug_response,
+                sensitive_sources=debug_sources,
+                unredacted=raw_mode,
             )
+            if raw_mode and not jackery_dev_mode_enabled(
+                getattr(self, "dev_mode_entry", None)
+            ):
+                safe_response = await asyncio.to_thread(
+                    redacted_json_safe_payload,
+                    debug_response,
+                    sensitive_sources=debug_sources,
+                    unredacted=False,
+                )
+            safe_message = (
+                safe_response.get(FIELD_MSG)
+                if isinstance(safe_response, dict)
+                else None
+            )
+            msg = f"Login rejected (code={data.get(FIELD_CODE)}, msg={safe_message})"
             raise JackeryAuthError(msg)
 
-        token = data.get(FIELD_TOKEN)
+        token = data.get(FIELD_TOKEN) or ""
         if not isinstance(token, str) or not token:
+            self._requests_failed += 1
             msg = "Login succeeded but no token returned"
             raise JackeryAuthError(msg)
         try:
             token = credential_text(token, field="token", max_length=MAX_TOKEN_LENGTH)
         except vol.Invalid as err:
+            self._requests_failed += 1
             raise JackeryAuthError.invalid_token() from err
 
         raw_payload = data.get(FIELD_DATA)
         if raw_payload is not None and not isinstance(raw_payload, dict):
+            self._requests_failed += 1
             msg = f"Login returned data {type(raw_payload).__name__} instead of object"
             raise JackeryApiError(msg)
         payload = raw_payload or {}
 
         self._token = token
+        payload = data.get(FIELD_DATA) or {}
         self._mqtt_user_id = str(payload.get(FIELD_USER_ID) or "") or None
-        mqtt_seed = payload.get(FIELD_MQTT_PASSWORD)
+        mqtt_seed = payload.get(FIELD_MQTT_PASSWORD) or None
         self._mqtt_seed_b64 = mqtt_seed if isinstance(mqtt_seed, str) else None
         self._mqtt_mac_id = mac_id
         return token
@@ -1127,7 +1379,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             return None
         try:
             seed = base64.b64decode(self._mqtt_seed_b64, validate=True)
-        except (binascii.Error, ValueError):  # fmt: skip
+        except binascii.Error, ValueError:
             return None
 
         if len(seed) != _MQTT_SEED_LEN:
@@ -1160,18 +1412,6 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             "mac_id": self._mqtt_mac_id,
             "seed": self._mqtt_seed_b64,
         })
-
-    def invalidate_mqtt_session_for_http_refresh(self) -> None:
-        """Drop stale MQTT seed material so the HTTP owner refreshes it.
-
-        Cloud-MQTT authentication rejections prove that the cached
-        ``mqttPassWord`` tuple is no longer broker-accepted, but Layer 5 must
-        not perform login.  Clearing the HTTP token and MQTT seed makes the
-        next normal HTTP request run :meth:`async_login`, which is the
-        authoritative path that returns fresh MQTT credentials.
-        """
-        self._token = None
-        self._mqtt_seed_b64 = None
 
     @property
     def mqtt_mac_id_source(self) -> str:
@@ -1296,13 +1536,80 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self._auth_retries += 1
         self._last_auto_relogin_monotonic = time.monotonic()
 
-    async def _relogin_and_retry_request(
+    def _http_sensitive_sources(
+        self, token_used: str | None, request_tokens: set[str] | None = None
+    ) -> tuple[object, ...]:
+        """Capture this HTTP request's credentials for nonserializing redaction."""
+        tokens = set(request_tokens or ())
+        if token_used:
+            tokens.add(token_used)
+        if self._token:
+            tokens.add(self._token)
+        return (
+            {FIELD_TOKEN: tuple(sorted(tokens))},
+            {
+                FIELD_PASSWORD: self._password,
+                FIELD_MQTT_PASSWORD: self._mqtt_seed_b64,
+                "secret": self._account,
+            },
+        )
+
+    async def _safe_http_transport_error_text(  # ruff: ignore[too-many-arguments] - request context
+        self,
+        error: Exception,
+        *,
+        path: str,
+        token_used: str,
+        request_body: dict[str, Any] | None,
+        request_params: dict[str, Any] | None,
+        request_tokens: set[str] | None = None,
+    ) -> tuple[str, bool]:
+        """Protect echoed request secrets while retaining transport error context."""
+        event = {
+            "kind": "http",
+            "path": path,
+            "params": request_params or {},
+            "request_body": request_body or {},
+            "response": {"msg": str(error) or "(no message)"},
+        }
+        sources = self._http_sensitive_sources(token_used, request_tokens)
+        raw_mode = jackery_dev_mode_enabled(getattr(self, "dev_mode_entry", None))
+        safe = await asyncio.to_thread(
+            redacted_json_safe_payload,
+            event,
+            sensitive_sources=sources,
+            unredacted=raw_mode,
+        )
+        if raw_mode and not jackery_dev_mode_enabled(
+            getattr(self, "dev_mode_entry", None)
+        ):
+            safe = await asyncio.to_thread(
+                redacted_json_safe_payload,
+                event,
+                sensitive_sources=sources,
+                unredacted=False,
+            )
+        allow_raw_cause = raw_mode and jackery_dev_mode_enabled(
+            getattr(self, "dev_mode_entry", None)
+        )
+        if isinstance(safe, dict) and isinstance(safe.get("response"), dict):
+            return redacted_error_text(
+                str(safe["response"].get("msg", "(no message)")),
+                entry=getattr(self, "dev_mode_entry", None),
+            ), allow_raw_cause
+        return "(no message)", allow_raw_cause
+
+    async def _relogin_and_retry_request(  # ruff: ignore[too-many-arguments] - retry context
         self,
         method: str,
         path: str,
         request: JsonRequestAttempt,
         token_used: str,
+        *,
         retry_transport_once: bool = False,
+        debug_request_body: dict[str, Any] | None = None,
+        debug_request_params: dict[str, Any] | None = None,
+        debug_request_tokens: set[str] | None = None,
     ) -> tuple[int, object] | None:
         """Run exactly one rate-limited full re-login plus request retry.
 
@@ -1354,6 +1661,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                     raise
         retry_pending = retry_transport_once
         while True:
+            self._requests_total += 1
             try:
                 return await request()
             except (TimeoutError, aiohttp.ClientError) as err:
@@ -1369,11 +1677,53 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                         type(err).__name__,
                     )
                     continue
+                detail, allow_raw_cause = await self._safe_http_transport_error_text(
+                    err,
+                    path=path,
+                    token_used=token_used,
+                    request_body=debug_request_body,
+                    request_params=debug_request_params,
+                    request_tokens=debug_request_tokens,
+                )
                 msg = (
                     f"{method} {path} request failed after re-login: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                    f"{type(err).__name__}: {detail}"
                 )
+                self._record_operation_error(method, path, err, safe_detail=detail)
+                if not allow_raw_cause and (
+                    detail != (str(err) or "(no message)")
+                    or err.__cause__ is not None
+                    or (err.__context__ is not None and not err.__suppress_context__)
+                ):
+                    raise JackeryApiError(msg) from None
                 raise JackeryApiError(msg) from err
+            except JackeryApiError:
+                self._requests_failed += 1
+                raise
+
+    async def _capture_auth_response(
+        self,
+        recovery: _AuthFailureRecovery,
+        status: int,
+        data: object,
+    ) -> None:
+        """Queue one original authorization response before retry or reauth."""
+        if self.payload_debug_callback is None:
+            return
+        response = deepcopy(data)
+        sensitive_sources = self._http_sensitive_sources(
+            recovery.token_used, recovery.debug_request_tokens
+        )
+        await self._emit_payload_debug(
+            lambda: self._http_payload_debug(
+                request=(recovery.method, recovery.path),
+                params=recovery.debug_request_params,
+                body=recovery.debug_request_body,
+                status=status,
+                response=response,
+                sensitive_sources=sensitive_sources,
+            )
+        )
 
     async def _recover_auth_failure_or_raise(
         self,
@@ -1403,24 +1753,137 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             recovery.request,
             recovery.token_used,
             retry_transport_once=recovery.retry_transport_once,
+            debug_request_body=recovery.debug_request_body,
+            debug_request_params=recovery.debug_request_params,
+            debug_request_tokens=recovery.debug_request_tokens,
         )
         status = recovery.status
         data = recovery.data
         if retried is not None:
             status, data = retried
         if self._is_auth_failure_response(status, data):
+            if retried is not None:
+                self._requests_failed += 1
+                await self._capture_auth_response(recovery, status, data)
             await self._emit_auth_rejection(status, data)
+            raw_mode = jackery_dev_mode_enabled(getattr(self, "dev_mode_entry", None))
+            safe_event = await asyncio.to_thread(
+                redacted_json_safe_payload,
+                {
+                    "kind": "http",
+                    "path": recovery.path,
+                    "params": recovery.debug_request_params or {},
+                    "request_body": recovery.debug_request_body or {},
+                    "response": data,
+                },
+                sensitive_sources=self._http_sensitive_sources(
+                    recovery.token_used, recovery.debug_request_tokens
+                ),
+                unredacted=raw_mode,
+            )
+            if raw_mode and not jackery_dev_mode_enabled(
+                getattr(self, "dev_mode_entry", None)
+            ):
+                safe_event = await asyncio.to_thread(
+                    redacted_json_safe_payload,
+                    {
+                        "kind": "http",
+                        "path": recovery.path,
+                        "params": recovery.debug_request_params or {},
+                        "request_body": recovery.debug_request_body or {},
+                        "response": data,
+                    },
+                    sensitive_sources=self._http_sensitive_sources(
+                        recovery.token_used, recovery.debug_request_tokens
+                    ),
+                    unredacted=False,
+                )
+            safe_response = (
+                safe_event.get("response") if isinstance(safe_event, dict) else None
+            )
             raise JackeryAuthError(
                 self._auth_failure_message(
                     recovery.method,
                     recovery.path,
                     status,
-                    data,
+                    safe_response,
                 ),
             )
         return status, data
 
-    async def _perform_authenticated_json_request(
+    def _record_interrupted_http_response(
+        self,
+        key: str,
+        path: str,
+        request: dict[str, Any],
+        original_payload: dict[str, Any],
+    ) -> None:
+        """Retain a bounded ring of cancelled HTTP response envelopes."""
+        interrupted = getattr(self, "last_interrupted_http_responses", None)
+        if interrupted is None:
+            interrupted = self.last_interrupted_http_responses = {}
+        interrupted.pop(key, None)
+        interrupted[key] = {
+            "path": path,
+            "request": dict(request),
+            "original_payload": original_payload,
+        }
+        while len(interrupted) > _MAX_INTERRUPTED_HTTP_RESPONSES:
+            interrupted.pop(next(iter(interrupted)))
+
+    async def _async_capture_http_response(
+        self, data: dict[str, Any], path: str, request: dict[str, Any]
+    ) -> _RawHttpResponse:
+        """Preserve the request-owned envelope without blocking the event loop."""
+        self._http_capture_sequence += 1
+        sequence = self._http_capture_sequence
+        self._http_capture_latest[path] = sequence
+
+        def copy_response() -> tuple[
+            dict[str, Any], dict[str, Any], object, dict[str, Any] | None
+        ]:
+            payload = data.get(FIELD_DATA)
+            projection = deepcopy(payload) if not isinstance(payload, dict) else None
+            property_snapshot = deepcopy(data) if path == DEVICE_PROPERTY_PATH else None
+            return deepcopy(data), deepcopy(data), projection, property_snapshot
+
+        task = asyncio.create_task(asyncio.to_thread(copy_response))
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.wait((task,))
+            except asyncio.CancelledError:
+                cancelled = True
+        try:
+            original, cached, projection, property_snapshot = task.result()
+        except (Exception, asyncio.CancelledError) as err:  # ruff: ignore[blind-except] - preserve the received envelope
+            _LOGGER.warning(
+                "Jackery HTTP snapshot worker failed (%s); using synchronous copy",
+                type(err).__name__,
+            )
+            original, cached, projection, property_snapshot = copy_response()
+        if self._http_capture_latest[path] == sequence:
+            self.last_payload_responses[path] = cached
+        if cancelled:
+            context = self._property_request_context.get()
+            if (
+                context is not None
+                and context.active
+                and context.task is asyncio.current_task()
+                and str(request.get(FIELD_DEVICE_ID)) == context.owner
+                and property_snapshot is not None
+            ):
+                self._cache_property_snapshot(context, property_snapshot)
+            self._record_interrupted_http_response(
+                f"{path}:capture:{sequence}",
+                path,
+                request,
+                original,
+            )
+            raise asyncio.CancelledError
+        return _RawHttpResponse(data, original, projection, property_snapshot)
+
+    async def _perform_authenticated_json_request(  # ruff: ignore[too-many-arguments] - request context
         self,
         *,
         method: str,
@@ -1428,12 +1891,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         request: JsonRequestAttempt,
         token_used: str,
         retry_transport_once: bool = False,
-    ) -> tuple[int, dict[str, Any]]:
+        debug_request_body: dict[str, Any] | None = None,
+        debug_request_params: dict[str, Any] | None = None,
+        debug_request_tokens: set[str] | None = None,
+    ) -> tuple[int, _RawHttpResponse]:
         """Run one authenticated request through the shared retry/validation path."""
-        self._requests_total += 1
         retry_pending = retry_transport_once
         response: tuple[int, object] | None = None
         while True:
+            self._requests_total += 1
             try:
                 response = await request()
             except (TimeoutError, aiohttp.ClientError) as err:
@@ -1449,59 +1915,202 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                         type(err).__name__,
                     )
                     continue
-                msg = (
-                    f"{method} {path} request failed: "
-                    f"{type(err).__name__}: {err or "(no message)"}"
+                detail, allow_raw_cause = await self._safe_http_transport_error_text(
+                    err,
+                    path=path,
+                    token_used=token_used,
+                    request_body=debug_request_body,
+                    request_params=debug_request_params,
+                    request_tokens=debug_request_tokens,
                 )
+                msg = f"{method} {path} request failed: {type(err).__name__}: {detail}"
+                self._record_operation_error(method, path, err, safe_detail=detail)
+                if not allow_raw_cause and (
+                    detail != (str(err) or "(no message)")
+                    or err.__cause__ is not None
+                    or (err.__context__ is not None and not err.__suppress_context__)
+                ):
+                    raise JackeryApiError(msg) from None
                 raise JackeryApiError(msg) from err
+            except JackeryApiError:
+                self._requests_failed += 1
+                raise
             break
 
         status, data = response
 
         if self._is_auth_failure_response(status, data):
-            status, data = await self._recover_auth_failure_or_raise(
-                _AuthFailureRecovery(
-                    method=method,
-                    path=path,
-                    request=request,
-                    token_used=token_used,
-                    status=status,
-                    data=data,
-                    retry_transport_once=retry_transport_once,
-                )
+            self._requests_failed += 1
+            recovery = _AuthFailureRecovery(
+                method=method,
+                path=path,
+                request=request,
+                token_used=token_used,
+                status=status,
+                data=data,
+                retry_transport_once=retry_transport_once,
+                debug_request_body=debug_request_body,
+                debug_request_params=debug_request_params,
+                debug_request_tokens=debug_request_tokens,
             )
+            await self._capture_auth_response(recovery, status, data)
+            status, data = await self._recover_auth_failure_or_raise(recovery)
         request_key = (method, path)
+        if isinstance(data, dict):
+            data = await self._async_capture_http_response(
+                data, path, debug_request_params or debug_request_body or {}
+            )
         if status != HTTPStatus.OK:
             msg = f"{method} {path} HTTP {status}"
-            raise await self._rejected_response(request_key, status, data, msg)
+            raise await self._rejected_response(
+                request_key,
+                status,
+                data,
+                msg,
+                request_body=debug_request_body,
+                request_params=debug_request_params,
+                token_used=token_used,
+                request_tokens=debug_request_tokens,
+            )
         if not isinstance(data, dict):
             msg = f"{method} {path} returned {type(data).__name__} instead of object"
-            raise await self._rejected_response(request_key, status, data, msg)
+            raise await self._rejected_response(
+                request_key,
+                status,
+                data,
+                msg,
+                request_body=debug_request_body,
+                request_params=debug_request_params,
+                token_used=token_used,
+                request_tokens=debug_request_tokens,
+            )
         code = self._extract_code(data)
         if code not in {CODE_OK, None}:
             msg = (
                 f"{method} {path} code={data.get(FIELD_CODE)} "
                 f"msg={data.get(FIELD_MSG)!r}"
             )
-            raise await self._rejected_response(request_key, status, data, msg)
+            raise await self._rejected_response(
+                request_key,
+                status,
+                data,
+                msg,
+                request_body=debug_request_body,
+                request_params=debug_request_params,
+                token_used=token_used,
+                request_tokens=debug_request_tokens,
+            )
+        assert isinstance(data, _RawHttpResponse)
         return status, data
 
-    async def _rejected_response(
-        self, request: HttpRequestKey, status: int, data: object, msg: str
+    async def _rejected_response(  # ruff: ignore[too-many-arguments] - request context
+        self,
+        request: HttpRequestKey,
+        status: int,
+        data: object,
+        msg: str,
+        *,
+        request_body: dict[str, Any] | None = None,
+        request_params: dict[str, Any] | None = None,
+        token_used: str | None = None,
+        request_tokens: set[str] | None = None,
     ) -> JackeryApiError:
         """Payload-log a rejected response and return the error to raise.
 
         Callers only payload-log successful bodies, so without this every
         cloud error code stayed invisible in the payload debug log.
         """
-        await self._emit_payload_debug(
-            self._http_payload_debug(
-                request=request,
-                status=status,
-                response=data if isinstance(data, dict) else None,
-            )
+        self._requests_failed += 1
+        captured_at = datetime.now(UTC).isoformat()
+        policy = self.payload_debug_capture_policy
+        captured_enabled, captured_unredacted = (
+            policy() if policy is not None else (None, None)
         )
-        return JackeryApiError(msg)
+        error_unredacted = (
+            captured_unredacted
+            if captured_unredacted is not None
+            else jackery_dev_mode_enabled(getattr(self, "dev_mode_entry", None))
+        )
+        debug_response = (
+            data.original
+            if isinstance(data, _RawHttpResponse)
+            else self.last_payload_responses.get(request[1], data)
+            if isinstance(data, dict)
+            else data
+        )
+        sensitive_sources = self._http_sensitive_sources(token_used, request_tokens)
+        if self.payload_debug_callback is not None and captured_enabled:
+            await self._emit_payload_debug(
+                lambda: self._http_payload_debug(
+                    request=request,
+                    params=request_params,
+                    body=request_body,
+                    status=status,
+                    response=debug_response,
+                    sensitive_sources=sensitive_sources,
+                    capture_timestamp=captured_at,
+                )
+            )
+        safe_event = await asyncio.to_thread(
+            redacted_json_safe_payload,
+            {
+                "kind": "http",
+                "path": request[1],
+                "params": request_params or {},
+                "request_body": request_body or {},
+                "response": debug_response,
+            },
+            sensitive_sources=sensitive_sources,
+            unredacted=error_unredacted,
+        )
+        if error_unredacted and not jackery_dev_mode_enabled(
+            getattr(self, "dev_mode_entry", None)
+        ):
+            safe_event = await asyncio.to_thread(
+                redacted_json_safe_payload,
+                {
+                    "kind": "http",
+                    "path": request[1],
+                    "params": request_params or {},
+                    "request_body": request_body or {},
+                    "response": debug_response,
+                },
+                sensitive_sources=sensitive_sources,
+                unredacted=False,
+            )
+        safe_response = (
+            safe_event.get("response") if isinstance(safe_event, dict) else None
+        )
+        if isinstance(safe_response, dict) and (
+            FIELD_CODE in safe_response or FIELD_MSG in safe_response
+        ):
+            reason = redacted_error_text(
+                str(safe_response.get(FIELD_MSG)),
+                entry=getattr(self, "dev_mode_entry", None),
+            )
+            msg = (
+                f"{request[0]} {request[1]} HTTP {status} "
+                f"code={self._extract_code(debug_response)} msg={reason!r}"
+            )
+        error = JackeryApiError(
+            redacted_error_text(msg, entry=getattr(self, "dev_mode_entry", None))
+        )
+        self._record_operation_error(f"{request[0]} HTTP {status}", request[1], error)
+        if self.payload_debug_callback is not None and captured_enabled is None:
+            debug_event = await asyncio.to_thread(
+                self._http_payload_debug,
+                request=request,
+                params=request_params,
+                body=request_body,
+                status=status,
+                response=debug_response,
+                sensitive_sources=sensitive_sources,
+                capture_enabled=captured_enabled,
+                capture_unredacted=captured_unredacted,
+                capture_timestamp=captured_at,
+            )
+            await self._emit_payload_debug(debug_event)
+        return error
 
     async def _emit_auth_rejection(self, status: int, data: object) -> None:
         """Notify the coordinator about a final HTTP auth rejection."""
@@ -1543,18 +2152,22 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 "Jackery payload debug logging failed: %s", err, exc_info=True
             )
 
-    def _http_payload_debug(  # keyword-only builder for distinct debug-event fields
-        self,
+    @staticmethod
+    def _http_payload_debug(  # ruff: ignore[too-many-arguments] - distinct event fields
         *,
         request: HttpRequestKey,
         params: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
         status: int | None = None,
-        response: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Build a complete HTTP payload event, redacting outside dev mode."""
+        response: object = None,
+        sensitive_sources: tuple[object, ...] = (),
+        capture_enabled: bool | None = None,
+        capture_unredacted: bool | None = None,
+        capture_timestamp: str | None = None,
+    ) -> PayloadDebugEvent:
+        """Keep a receipt-time HTTP copy; the final export owns redaction."""
         method, path = request
-        payload = response.get(FIELD_DATA) if isinstance(response, dict) else None
+        payload = response.get(FIELD_DATA) if isinstance(response, dict) else response
         event: dict[str, Any] = {
             "kind": "http",
             "method": method,
@@ -1568,10 +2181,13 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         series_debug = chart_series_debug(payload)
         if series_debug:
             event["chart_series_debug"] = series_debug
-        if jackery_dev_mode_enabled(self.dev_mode_entry):
-            return deepcopy(event)
-        redacted = JackeryApi._redact_http_diagnostic(event)
-        return redacted if isinstance(redacted, dict) else {}
+        return PayloadDebugEvent(
+            deepcopy(event),
+            sensitive_sources=sensitive_sources,
+            capture_enabled=capture_enabled,
+            capture_unredacted=capture_unredacted,
+            capture_timestamp=capture_timestamp,
+        )
 
     @staticmethod
     def _redact_http_diagnostic(value: object) -> object:
@@ -1643,25 +2259,72 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             return data
         return {**data, FIELD_DATA: {**section, **coalesced_series}}
 
-    @staticmethod
-    def _payload_dict(data: dict[str, Any], path: str) -> dict[str, Any]:
-        """Return a dict payload or an empty dict with one diagnostic warning.
+    async def _async_owned_http_response(
+        self,
+        payload: dict[str, Any],
+        original: dict[str, Any],
+        path: str,
+        request: dict[str, Any],
+    ) -> _OwnedHttpResponse:
+        """Retain a received envelope even if its request is cancelled."""
+        if isinstance(original, _RawHttpResponse):
+            return _OwnedHttpResponse(payload, original.original)
+        sequence = getattr(self, "_owned_http_response_sequence", 0) + 1
+        self._owned_http_response_sequence = sequence
+        task = asyncio.create_task(asyncio.to_thread(deepcopy, original))
+        try:
+            snapshot = await asyncio.shield(task)
+        except asyncio.CancelledError:
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError:
+                    continue
+            snapshot = task.result()
+            self._record_interrupted_http_response(
+                f"{path}:{sequence}",
+                path,
+                request,
+                snapshot,
+            )
+            raise
+        return _OwnedHttpResponse(payload, snapshot)
 
-        Several Jackery endpoints return `{code,msg,data}` but backend variants
-        sometimes change `data` to null, list or string. Returning those shapes
-        to the coordinator would break payload merging and sensor creation.
+    def _payload_dict(
+        self,
+        data: dict[str, Any],
+        path: str,
+        *,
+        require_object: bool = False,
+        cache_response: bool = True,
+    ) -> dict[str, Any]:
+        """Extract an object or preserve another documented shape under ``data``.
+
+        Jackery endpoints return ``{code,msg,data}``; some App endpoints
+        legitimately return lists, strings or booleans.
+        Object-only telemetry must reject malformed refreshes to keep its cache;
+        both forms retain the complete original envelope independently.
         """
+        if cache_response and not isinstance(data, _RawHttpResponse):
+            self.last_payload_responses[path] = deepcopy(data)
         payload = data.get(FIELD_DATA)
         if isinstance(payload, dict):
             return payload
         if payload is None:
             return {}
-        _LOGGER.warning(
-            "Jackery %s returned unexpected data shape for dict payload: %s",
-            path,
-            type(payload).__name__,
-        )
-        return {}
+        if require_object:
+            msg = (
+                f"Jackery {path} returned non-object telemetry: "
+                f"{type(payload).__name__}"
+            )
+            raise JackeryApiError(msg)
+        return {
+            FIELD_DATA: (
+                data.projection
+                if isinstance(data, _RawHttpResponse)
+                else deepcopy(payload)
+            )
+        }
 
     @staticmethod
     def _payload_list(data: dict[str, Any], path: str) -> list[dict[str, Any]]:
@@ -1883,19 +2546,67 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self._maybe_learn_region_code(systems)
         return systems
 
+    def _cache_property_snapshot(
+        self, context: _PropertyRequestContext, snapshot: dict[str, Any]
+    ) -> None:
+        """Keep the newest successful property envelope for its device."""
+        generations: dict[str, int] = getattr(
+            self, "_property_response_generations", {}
+        )
+        self._property_response_generations = generations
+        if context.generation > generations.get(context.owner, 0):
+            self.last_property_responses[context.owner] = snapshot
+            generations[context.owner] = context.generation
+
+    def _cache_property_response(
+        self, context: _PropertyRequestContext, data: dict[str, Any]
+    ) -> None:
+        """Cache a mock or overridden request response without aliasing it."""
+        generations = getattr(self, "_property_response_generations", {})
+        if context.generation > generations.get(context.owner, 0):
+            self._cache_property_snapshot(context, deepcopy(data))
+
     async def async_get_device_property(
         self,
         device_id: str | int,
-    ) -> dict[str, Any]:
+    ) -> _PropertyResponse:
         """GET /v1/device/property — device + properties dict."""
-        data = await self._get_json(
-            DEVICE_PROPERTY_PATH,
-            params={FIELD_DEVICE_ID: str(device_id)},
-            profile=HttpProfile.FAST,
-            retry_transport_once=True,
+        generation = getattr(self, "_property_request_generation", 0) + 1
+        self._property_request_generation = generation
+        context = _PropertyRequestContext(
+            owner=str(device_id),
+            generation=generation,
+            task=asyncio.current_task(),
         )
-        self.last_property_responses[str(device_id)] = data
-        return self._payload_dict(data, DEVICE_PROPERTY_PATH)
+        token = self._property_request_context.set(context)
+        try:
+            data = await self._get_json(
+                DEVICE_PROPERTY_PATH,
+                params={FIELD_DEVICE_ID: context.owner},
+                profile=HttpProfile.FAST,
+                retry_transport_once=True,
+            )
+        finally:
+            context.active = False
+            self._property_request_context.reset(token)
+        property_data = dict(data)
+        if isinstance(data, _RawPropertyResponse):
+            captured = True
+            received_at = data.received_at_monotonic
+            original = data.original
+        else:
+            captured = False
+            received_at = time.monotonic()
+            original = deepcopy(property_data)
+        self._cache_property_response(context, property_data)
+        return _PropertyResponse(
+            self._payload_dict(
+                property_data, DEVICE_PROPERTY_PATH, cache_response=not captured
+            ),
+            original,
+            generation,
+            received_at,
+        )
 
     async def async_get_alarm(self, system_id: str | int) -> object:
         """GET /v1/api/alarm — alarm list for a system."""
@@ -1916,7 +2627,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             totalGeneration, totalRevenue, totalCarbon, isSetPrice
         """
         data = await self._get_json(
-            SYSTEM_STATISTIC_PATH, params={FIELD_SYSTEM_ID: str(system_id)}
+            SYSTEM_STATISTIC_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
+            retry_transport_once=True,
         )
         self.last_statistic_response = data
         return self._payload_dict(data, SYSTEM_STATISTIC_PATH)
@@ -1947,7 +2660,14 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 raise
             path = PV_TRENDS_LEGACY_PATH
             data = await self._get_json(path, params=params)
-        payload = self._payload_dict(data, path)
+        payload = dict(self._payload_dict(data, path, require_object=True))
+        if not payload and path != PV_TRENDS_LEGACY_PATH:
+            # The statics route can return code=0, data=null for a period.
+            # Retry the documented alternative with exactly the same window;
+            # never borrow another period or fabricate zero-valued shares.
+            path = PV_TRENDS_LEGACY_PATH
+            data = await self._get_json(path, params=params)
+            payload = dict(self._payload_dict(data, path, require_object=True))
         if payload:
             payload.setdefault(
                 APP_REQUEST_META,
@@ -2010,7 +2730,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             dict: Mapping of statistic keys to their values as strings in kWh.
         """
         data = await self._get_json(
-            DEVICE_STATISTIC_PATH, params={FIELD_DEVICE_ID: str(device_id)}
+            DEVICE_STATISTIC_PATH,
+            params={FIELD_DEVICE_ID: str(device_id)},
+            retry_transport_once=True,
         )
         self.last_device_statistic_responses[str(device_id)] = data
         return self._payload_dict(data, DEVICE_STATISTIC_PATH)
@@ -2033,6 +2755,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Parameters:
             path (str): Endpoint path to query.
             device_id (str | int): Device identifier to request data for.
+            date_type (str): Period granularity (e.g., day, month, year). `begin_date`/`end_date` are computed if omitted.
+            begin_date (str | None): Start date for the period (computed if None).
+            end_date (str | None): End date for the period (computed if None).
+            system_id (str | int | None): Optional system identifier included in the request.
             query (DevicePeriodQuery): Period granularity, date range and the
             optional `systemId`/`type` dimensions. Dates are computed when the
             query leaves them unset.
@@ -2040,7 +2766,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Returns:
             dict[str, Any]: Normalized payload dict from the endpoint's `data` field,
             augmented with `APP_REQUEST_META`.
-        """
+        """  # ruff: ignore[line-too-long]
         # PROTOCOL.md §2: Periodenabfragen use explicit full ranges.
         # month/year with today..today can return day-like partial totals.
         date_type = query.date_type
@@ -2060,11 +2786,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         data = await self._get_json(path, params=params)
         stored = data
         if isinstance(data, dict):
-            data[APP_REQUEST_META] = {"path": path, "params": dict(params)}
+            data = {**data, APP_REQUEST_META: {"path": path, "params": dict(params)}}
             stored = self._coalesced_day_stat_copy(data, date_type)
         period_cache_key = f"{path}:{device_id}:{date_type}"
         self.last_device_period_stat_responses[period_cache_key] = stored
-        payload = self._payload_dict(data, path)
+        payload = dict(self._payload_dict(data, path, require_object=True))
         payload.setdefault(
             APP_REQUEST_META,
             {
@@ -2078,7 +2804,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def async_get_device_pv_stat(
         self,
         device_id: str | int,
-        system_id: str | int,
+        system_id: str | int | None = None,
         *,
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
@@ -2168,8 +2894,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """Retrieve CT (smart-meter) statistics for a device.
 
-        Pass either a ready ``query`` — the coordinator does, so it can retry the
-        same period on another phase — or the individual period arguments.
+        Pass either a ready ``query`` or the individual period arguments.
+        ``type=0`` selects Grid; ``type=1`` selects the separate Third-PV path.
+        They must never substitute for one another under Grid metrics.
 
         Parameters:
                 device_id (str | int): Device identifier passed as `deviceId` to the
@@ -2186,11 +2913,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 statistics. The payload may include request metadata (APP_REQUEST_META)
                 when a date range was provided.
         """
-        # ``CtStatApi.type`` is required: omitting it returns an empty shell
-        # (``code=0``, ``y1=[]``), which the zero-guard then discards and the CT
-        # period sensors go "unknown". The app's default tab is phase L1, so
-        # that is the default here; the coordinator retries with
-        # ``CT_STAT_TYPE_L2`` when an L1 answer carries no observable data.
+        # The App's default tab selects Grid (type 0); type 1 is Third PV.
+        # Keep the physical selection explicit, even for an empty response.
+        # Legacy L1/L2 constant names do not denote interchangeable phases.
         return await self._async_get_device_period_stat(
             DEVICE_CT_STAT_PATH,
             device_id=device_id,
@@ -2207,12 +2932,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def async_get_device_meter_stat(
         self,
         device_id: str | int,
+        *,
+        stat_type: int | None = None,
     ) -> dict[str, Any]:
         """Retrieve the Smart-Meter (CT accessory) panel totals for the given device.
 
         Parameters:
             device_id: Smart-Meter / CT accessory deviceId (not the SolarVault main
             deviceId).
+            stat_type: Optional App panel path, 0 or 1. None omits the selection.
 
         Returns:
             A dictionary containing the parsed payload with the meter panel totals from
@@ -2220,12 +2948,20 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
         GET /v1/device/stat/meter
         """
-        data = await self._get_json(
-            DEVICE_METER_STAT_PATH, params={FIELD_DEVICE_ID: str(device_id)}
-        )
-        self.last_device_period_stat_responses[
-            f"{DEVICE_METER_STAT_PATH}:{device_id}:panel"
-        ] = data
+        params = {FIELD_DEVICE_ID: str(device_id)}
+        cache_key = f"{DEVICE_METER_STAT_PATH}:{device_id}:panel"
+        if stat_type is not None:
+            if (
+                not isinstance(stat_type, int)
+                or isinstance(stat_type, bool)
+                or stat_type not in {0, 1}
+            ):
+                msg = "Meter panel type must be 0, 1 or None"
+                raise ValueError(msg)
+            params[APP_REQUEST_STAT_TYPE] = str(stat_type)
+            cache_key += f":{stat_type}"
+        data = await self._get_json(DEVICE_METER_STAT_PATH, params=params)
+        self.last_device_period_stat_responses[cache_key] = data
         return self._payload_dict(data, DEVICE_METER_STAT_PATH)
 
     async def async_get_battery_pack_list(self, device_sn: str) -> list[dict[str, Any]]:
@@ -2243,16 +2979,33 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             list if no packs are found or the response shape is unrecognized.
         """
         params = {FIELD_DEVICE_SN: str(device_sn)}
+        generation = getattr(self, "_battery_pack_request_generation", 0) + 1
+        self._battery_pack_request_generation = generation
         data = await self._get_json(BATTERY_PACK_PATH, params=params)
+        original_payload = deepcopy(data)
         if isinstance(data, dict):
-            data[APP_REQUEST_META] = {
-                "path": BATTERY_PACK_PATH,
-                "params": dict(params),
+            data = {
+                **data,
+                APP_REQUEST_META: {
+                    "path": BATTERY_PACK_PATH,
+                    "params": dict(params),
+                },
             }
-        self.last_battery_pack_responses[str(device_sn)] = data
+        response_generations: dict[str, int] = getattr(
+            self, "_battery_pack_response_generations", {}
+        )
+        self._battery_pack_response_generations = response_generations
+        serial = str(device_sn)
+        if generation > response_generations.get(serial, 0):
+            self.last_battery_pack_responses[serial] = data
+            response_generations[serial] = generation
         raw = data.get(FIELD_DATA)
         if isinstance(raw, list):
-            return [item for item in raw if isinstance(item, dict)]
+            return _BatteryPackRows(
+                [item for item in raw if isinstance(item, dict)],
+                original_payload,
+                generation,
+            )
         if isinstance(raw, dict):
             raw_body = raw.get(FIELD_BODY)
             candidates = [
@@ -2264,7 +3017,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             ]
             for candidate in candidates:
                 if isinstance(candidate, list):
-                    return [item for item in candidate if isinstance(item, dict)]
+                    return _BatteryPackRows(
+                        [item for item in candidate if isinstance(item, dict)],
+                        original_payload,
+                        generation,
+                    )
             # Some API variants return a single body object directly.
             if any(
                 key in raw
@@ -2276,20 +3033,69 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                     FIELD_RB,
                     FIELD_IP,
                     FIELD_OP,
+                    FIELD_EC,
+                    FIELD_IT,
+                    FIELD_OT,
                     FIELD_VERSION,
                     FIELD_CURRENT_VERSION,
                     FIELD_IS_FIRMWARE_UPGRADE,
                     FIELD_UPDATE_STATUS,
                 )
             ):
-                return [raw]
+                return _BatteryPackRows([raw], original_payload, generation)
         if raw is not None:
             _LOGGER.warning(
                 "Jackery %s returned unexpected data shape for battery packs: %s",
                 BATTERY_PACK_PATH,
                 type(raw).__name__,
             )
-        return []
+        return _BatteryPackRows([], original_payload, generation)
+
+    async def async_get_battery_passport(self, device_sn: str) -> dict[str, Any]:
+        """Read all App 2.4.7 battery metrics without automatic polling."""
+        if not isinstance(device_sn, str) or not device_sn.strip():
+            msg = "deviceSn is required for battery passport"
+            raise ValueError(msg)
+        response = await self._get_json(
+            BATTERY_PASSPORT_PATH,
+            params={FIELD_DEVICE_SN: device_sn},
+        )
+        return self._payload_dict(response, BATTERY_PASSPORT_PATH, require_object=True)
+
+    async def async_get_fault_log(
+        self,
+        device_sn: str,
+        *,
+        page_num: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Read an app fault-history page, preserving all original fields."""
+        if not isinstance(device_sn, str) or not device_sn.strip():
+            msg = "deviceSn is required for fault log"
+            raise ValueError(msg)
+        if (
+            isinstance(page_num, bool)
+            or not isinstance(page_num, int)
+            or not 1 <= page_num <= FAULT_LOG_MAX_PAGE_NUM
+        ):
+            msg = "page_num must be between 1 and 10000"
+            raise ValueError(msg)
+        if (
+            isinstance(page_size, bool)
+            or not isinstance(page_size, int)
+            or not 1 <= page_size <= FAULT_LOG_MAX_PAGE_SIZE
+        ):
+            msg = "page_size must be between 1 and 100"
+            raise ValueError(msg)
+        response = await self._get_json(
+            FAULT_LOG_PATH,
+            params={
+                FIELD_DEVICE_SN: device_sn,
+                "pageNum": page_num,
+                "pageSize": page_size,
+            },
+        )
+        return self._payload_dict(response, FAULT_LOG_PATH, require_object=True)
 
     async def async_get_ota_info(self, device_sn: str) -> dict[str, Any]:
         """Retrieve OTA information for the device identified by `device_sn`.
@@ -2311,6 +3117,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             if items:
                 return self._select_ota_item(items, device_sn)
         if isinstance(raw, dict):
+            if not self._select_ota_item([raw], device_sn):
+                return {}
             raw_body = raw.get(FIELD_BODY)
             if isinstance(raw_body, list):
                 body_items = [item for item in raw_body if isinstance(item, dict)]
@@ -2337,7 +3145,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                         FIELD_UPGRADE_TYPE,
                     )
                 ):
-                    return candidate
+                    return self._select_ota_item([candidate], device_sn)
         items = self._payload_list(data, OTA_LIST_PATH)
         if items:
             return self._select_ota_item(items, device_sn)
@@ -2520,19 +3328,43 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """
         return await self._post_form(
             DEVICE_ACCEPT_BIND_PATH,
-            {"devId": dev_id, "qrCodeId": qr_code_id},
+            {"devId": dev_id, "qrCodeId": self._share_qr_identifier(qr_code_id)},
         )
 
+    @staticmethod
+    def _share_qr_identifier(invitation: str) -> str:
+        """Extract the App bean identifier without fetching an invitation URL."""
+        raw = invitation.strip()
+        value: object = raw
+        if raw.startswith("{"):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError as err:
+                msg = "Invalid sharing invitation JSON"
+                raise JackeryApiError(msg) from err
+            value = decoded.get("qrCodeId") if isinstance(decoded, dict) else None
+        elif raw.startswith(("https://", "http://")):
+            try:
+                values = parse_qs(urlsplit(raw).query).get("qrCodeId", [])
+            except ValueError as err:
+                msg = "Invalid sharing invitation URL"
+                raise JackeryApiError(msg) from err
+            value = values[0] if len(values) == 1 else None
+        if not isinstance(value, str) or not value.strip():
+            msg = "Sharing invitation requires a nonempty qrCodeId"
+            raise JackeryApiError(msg)
+        return value.strip()
+
     async def async_get_device_shared_list(self) -> list[dict[str, Any]]:
-        """Return received and outgoing sharing records for the current account.
+        """Return the list of devices shared with the current account.
 
         The backend bean is ``{receive: list, share: list}`` (see
         ``DeviceSharedListApi$Bean`` in the reference), but older/edge
         responses may also return a bare list. Both shapes are unwrapped
-        leniently to tolerate these shapes during sharing-list handling.
+        leniently so a shape change never breaks shared-device discovery.
 
         Returns:
-            list[dict[str, Any]]: Sharing records as extracted from the
+            list[dict[str, Any]]: Shared device entries as extracted from the
             backend payload.
         """
         data = await self._get_json(DEVICE_SHARED_LIST_PATH)
@@ -2725,7 +3557,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         target_firmware_ids: str,
         target_version_id: str,
     ) -> dict[str, Any]:
-        """Query BLE OTA link for a sub-device.
+        """Query BLE OTA links using the app's POST/form contract.
 
         Parameters:
             device_sn: Parent device serial number.
@@ -2736,9 +3568,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Returns:
             dict: Backend response data.
         """
-        return await self._get_json(
+        # BaseBleOTAActivity.downloadFirmware uses PostRequest (Llj/k).
+        # This API has no JSON override; RequestServer supplies FORM.
+        return await self._post_form(
             BLE_OTA_LINK_PATH,
-            params={
+            {
                 FIELD_DEVICE_SN: device_sn,
                 FIELD_SUB_DEVICE_SN: sub_device_sn,
                 FIELD_TARGET_FIRMWARE_IDS: target_firmware_ids,
@@ -2746,15 +3580,91 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             },
         )
 
-    async def async_get_ble_ota_versions(self, version_list: str) -> dict[str, Any]:
+    async def async_download_ble_ota_firmware(
+        self, url: str, *, max_bytes: int
+    ) -> bytes:
+        """Download a bounded firmware image without forwarding API headers."""
+        if (
+            isinstance(max_bytes, bool)
+            or not isinstance(max_bytes, int)
+            or max_bytes <= 0
+        ):
+            msg = "Invalid BLE firmware size limit"
+            raise ValueError(msg)
+        parsed = _firmware_url_parts(url)
+        host = parsed.hostname
+        assert host is not None
+        address = await _firmware_public_address(self._session, host)
+        address_host = (
+            f"[{address}]" if isinstance(address, IPv6Address) else str(address)
+        )
+        authority = (
+            f"{address_host}:{parsed.port}" if parsed.port is not None else address_host
+        )
+        pinned_url = urlunsplit((
+            parsed.scheme,
+            authority,
+            parsed.path,
+            parsed.query,
+            parsed.fragment,
+        ))
+        permitted_headers = {"accept", "accept-encoding", "content-type", "user-agent"}
+        if (
+            self._session.auth is not None
+            or any(
+                name.casefold() not in permitted_headers
+                for name in self._session.headers
+            )
+            or self._session.cookie_jar.filter_cookies(URL(pinned_url))
+        ):
+            msg = "BLE firmware shared session contains credentials"
+            raise JackeryApiError(msg)
+        request_headers = {"Host": parsed.netloc, "Accept-Encoding": "identity"}
+        if self._session.trust_env:
+            request_headers["Authorization"] = ""
+        try:  # ruff: ignore[too-many-statements-in-try-clause]
+            async with self._session.get(
+                pinned_url,
+                headers=request_headers,
+                server_hostname=host,
+                allow_redirects=False,
+                timeout=self._policy().timeout(),
+            ) as response:
+                if response.status != HTTPStatus.OK:
+                    msg = "BLE firmware download returned an unexpected status"
+                    raise JackeryApiError(msg)
+                headers = getattr(response, "headers", {})
+                encoding = headers.get("Content-Encoding", "").strip().casefold()
+                if encoding not in {"", "identity"}:
+                    msg = "BLE firmware download has an unsupported encoding"
+                    raise JackeryApiError(msg)
+                firmware = await self._read_limited_bytes(response, limit=max_bytes)
+                if (
+                    response.content_length is not None
+                    and len(firmware) != response.content_length
+                ):
+                    msg = "BLE firmware download has an incomplete length"
+                    raise JackeryApiError(msg)
+        except aiohttp.ClientError, TimeoutError, ValueError:
+            msg = "BLE firmware download failed"
+            raise JackeryApiError(msg) from None
+        if not firmware:
+            msg = "BLE firmware download is empty"
+            raise JackeryApiError(msg)
+        return firmware
+
+    async def async_get_ble_ota_versions(self, version_list: object) -> dict[str, Any]:
         """Retrieve available BLE OTA versions for the specified version list.
 
         Parameters:
-            version_list (str): Version list query parameter as a raw string.
+            version_list: Device-reported BLE firmware version list.
 
         Returns:
             dict[str, Any]: Backend response data containing OTA version information.
         """
+        if not isinstance(version_list, list):
+            msg = "BLE OTA versions must be a list"
+            raise TypeError(msg)
         return await self._post_json(BLE_OTA_VERSIONS_PATH, {FIELD_LIST: version_list})
 
     async def async_start_ota_update(
@@ -2870,10 +3780,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         """
         data = await self._get_json(
             DEVICE_PORTABLE_CT_STAT_PATH,
-            params={
-                FIELD_DEVICE_ID: str(device_id),
-                APP_REQUEST_STAT_TYPE: str(CT_STAT_TYPE_L1),
-            },
+            params={FIELD_DEVICE_ID: str(device_id)},
         )
         return self._payload_dict(data, DEVICE_PORTABLE_CT_STAT_PATH)
 
@@ -2948,7 +3855,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             APP_REQUEST_END_DATE: str(end_date),
         }
         data = await self._get_json(HOME_TRENDS_PATH, params=params)
-        payload = self._payload_dict(data, HOME_TRENDS_PATH)
+        payload = dict(self._payload_dict(data, HOME_TRENDS_PATH, require_object=True))
         if payload:
             payload.setdefault(
                 APP_REQUEST_META,
@@ -2975,7 +3882,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             APP_REQUEST_END_DATE: str(end_date),
         }
         data = await self._get_json(BATTERY_TRENDS_PATH, params=params)
-        payload = self._payload_dict(data, BATTERY_TRENDS_PATH)
+        payload = dict(
+            self._payload_dict(data, BATTERY_TRENDS_PATH, require_object=True)
+        )
         if payload:
             payload.setdefault(
                 APP_REQUEST_META,
@@ -2987,6 +3896,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         self,
         *,
         device_sn: str,
+        portable: bool = False,
         date_type: str = DATE_TYPE_DAY,
         begin_date: str | None = None,
         end_date: str | None = None,
@@ -2995,6 +3905,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
         Parameters:
             device_sn (str): Device serial number.
+            portable (bool): Select the Portable App metric lists; defaults to False.
             date_type (str): Period granularity (e.g., "day").
             begin_date (str | None): Start date for the period; computed if None.
             end_date (str | None): End date for the period; computed if None.
@@ -3002,6 +3913,9 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Returns:
             dict[str, Any]: Normalized symmetry statistics payload.
         """
+        if not device_sn.strip():
+            msg = "Symmetry statistics require a device serial"
+            raise JackeryApiError(msg)
         begin, end = app_period_date_bounds(
             date_type,
             begin_date=begin_date,
@@ -3014,8 +3928,12 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 APP_REQUEST_DATE_TYPE: date_type,
                 FIELD_DEVICE_SN: str(device_sn),
                 APP_REQUEST_END_DATE: str(end),
-                "negative": "1",
-                "positive": "1",
+                "negative": SYMMETRY_PORTABLE_NEGATIVE_METRICS
+                if portable
+                else SYMMETRY_NEGATIVE_METRICS,
+                "positive": SYMMETRY_PORTABLE_POSITIVE_METRICS
+                if portable
+                else SYMMETRY_POSITIVE_METRICS,
             },
         )
         return self._payload_dict(data, SYMMETRY_STAT_PATH)
@@ -3040,7 +3958,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             period.
         """
         begin, end = app_period_date_bounds(
-            DATE_TYPE_DAY,
+            date_type,
             begin_date=begin_date,
             end_date=end_date,
         )
@@ -3050,7 +3968,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             APP_REQUEST_END_DATE: str(end),
         }
         data = await self._get_json(CUTOFF_STAT_PATH, params=params)
-        payload = self._payload_dict(data, CUTOFF_STAT_PATH)
+        payload = dict(self._payload_dict(data, CUTOFF_STAT_PATH))
         payload.setdefault(
             APP_REQUEST_META,
             {
@@ -3186,7 +4104,23 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             SMART_SCHEDULE_PATH,
             params={FIELD_SYSTEM_ID: str(system_id)},
         )
-        return self._payload_dict(data, SMART_SCHEDULE_PATH)
+        projected = self._payload_dict(data, SMART_SCHEDULE_PATH)
+        return await self._async_owned_http_response(
+            projected, data, SMART_SCHEDULE_PATH, {FIELD_SYSTEM_ID: str(system_id)}
+        )
+
+    async def async_get_aiems_mode_status(
+        self, *, system_id: str | int
+    ) -> dict[str, object]:
+        """Return the complete AI-EMS status body for one system."""
+        data = await self._get_json(
+            AIEMS_MODE_STATUS_PATH,
+            params={FIELD_SYSTEM_ID: str(system_id)},
+        )
+        projected = self._payload_dict(data, AIEMS_MODE_STATUS_PATH)
+        return await self._async_owned_http_response(
+            projected, data, AIEMS_MODE_STATUS_PATH, {FIELD_SYSTEM_ID: str(system_id)}
+        )
 
     async def async_get_aiems_energy_prediction(
         self, *, system_id: str | int
@@ -3196,7 +4130,13 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             AIEMS_ENERGY_PREDICTION_PATH,
             params={FIELD_SYSTEM_ID: str(system_id)},
         )
-        return self._payload_dict(data, AIEMS_ENERGY_PREDICTION_PATH)
+        projected = self._payload_dict(data, AIEMS_ENERGY_PREDICTION_PATH)
+        return await self._async_owned_http_response(
+            projected,
+            data,
+            AIEMS_ENERGY_PREDICTION_PATH,
+            {FIELD_SYSTEM_ID: str(system_id)},
+        )
 
     async def async_set_single_mode(
         self,
@@ -3463,7 +4403,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             QUERY_TOU_PLAN_PATH,
             params={FIELD_DEVICE_ID: str(device_id)},
         )
-        return self._payload_dict(data, QUERY_TOU_PLAN_PATH)
+        projected = self._payload_dict(data, QUERY_TOU_PLAN_PATH)
+        return await self._async_owned_http_response(
+            projected, data, QUERY_TOU_PLAN_PATH, {FIELD_DEVICE_ID: str(device_id)}
+        )
 
     async def async_get_currency_list(self) -> list[dict[str, Any]]:
         """Retrieve the list of available currencies.
@@ -3810,11 +4753,11 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Note:
             Orphaned accessory-bind endpoint; covered by a contract test
             rather than surfaced as an entity (RQ-4 config-flow wiring is
-            gated on live verification). ``AccessoryItem`` is not in any
-            source-of-truth field catalog, so the descriptor shape
-            (``deviceSn``, ``devType``, ``subType``, ``scanName``,
-            ``bindKey``, ``params``, ``modelCode``) is inferred from the
-            decompiled DTO rather than catalog-confirmed.
+            gated on live verification). ``AccessoryItem`` fields
+            ``deviceSn``, ``devType``, ``subType``, ``scanName``, ``bindKey``,
+            ``params`` and ``modelCode`` are confirmed by the decompiled DTO
+            and ``docs/APP_2_4_2_fields.csv:518-524``. Hardware binding and
+            provisioning remain separate from this request contract.
         """
         payload: dict[str, Any] = {
             "accessories": [dict(item) for item in accessories],
@@ -3899,20 +4842,29 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
                 "deviceSn": device_sn,
                 "subDeviceSn": sub_device_sn,
             },
+            retry_transport_once=True,
         )
         payload = data.get(FIELD_DATA)
-        if (
-            isinstance(payload, list)
-            and payload
-            and all(
-                isinstance(item, dict) and "name" in item and "value" in item
-                for item in payload
-            )
+        rows = (
+            [item for item in payload if item is not None]
+            if isinstance(payload, list)
+            else []
+        )
+        if rows and all(
+            isinstance(item, dict) and "name" in item and "value" in item
+            for item in rows
         ):
-            # App model DiyPropertySubShadowApi.PropertyBean is a name/value
-            # pair list; keep that shape instead of discarding it.
-            return {str(item["name"]): item["value"] for item in payload}
-        return self._payload_dict(data, SUB_SHADOW_PATH)
+            # Skip only null gaps in App PropertyBean lists; preserve the
+            # existing name coercion and last-value-wins projection.
+            projected = {str(item["name"]): item["value"] for item in rows}
+        else:
+            projected = self._payload_dict(data, SUB_SHADOW_PATH)
+        return await self._async_owned_http_response(
+            projected,
+            data,
+            SUB_SHADOW_PATH,
+            {"devType": dev_type, "deviceSn": device_sn, "subDeviceSn": sub_device_sn},
+        )
 
     async def async_get_system_shadow(
         self,
@@ -3933,7 +4885,13 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             SYSTEM_SHADOW_PATH,
             {"deviceSn": device_sn, "diySn": diy_sn},
         )
-        return self._payload_dict(data, SYSTEM_SHADOW_PATH)
+        projected = self._payload_dict(data, SYSTEM_SHADOW_PATH)
+        return await self._async_owned_http_response(
+            projected,
+            data,
+            SYSTEM_SHADOW_PATH,
+            {"deviceSn": device_sn, "diySn": diy_sn},
+        )
 
     async def async_get_notify_list(
         self,
@@ -4031,7 +4989,10 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             SMART_MODE_INFO_PATH,
             params={FIELD_SYSTEM_ID: str(system_id)},
         )
-        return self._payload_dict(data, SMART_MODE_INFO_PATH)
+        projected = self._payload_dict(data, SMART_MODE_INFO_PATH)
+        return await self._async_owned_http_response(
+            projected, data, SMART_MODE_INFO_PATH, {FIELD_SYSTEM_ID: str(system_id)}
+        )
 
     async def async_start_smart_mode(self, system_id: str | int) -> dict[str, Any]:
         """Enable smart mode for the specified system.
@@ -4050,8 +5011,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def async_check_app_version(
         self,
         *,
-        type: str = "",
-        version_name: str = "",
+        type: str = APP_VERSION_QUERY_TYPE,
+        version_name: str = APP_VERSION_QUERY_NAME,
     ) -> dict[str, Any]:
         """Check whether a newer app version is available.
 
@@ -4283,8 +5244,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         Searches the provided list of OTA item dictionaries for the first item whose
         `FIELD_DEVICE_SN`
         stringified value equals `device_sn`. If no matching item is found, returns the
-        first item
-        in `items` as a fallback; returns an empty dict when `items` is empty.
+        sole anonymous item as a request-scoped fallback; returns an empty dict
+        when no suitable item exists.
 
         Parameters:
             items (list[dict[str, Any]]): List of OTA item dictionaries; each may
@@ -4292,14 +5253,16 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             device_sn (str): Device serial number to match (compared as a string).
 
         Returns:
-            dict[str, Any]: The matching OTA item, the first item as a fallback, or
-            `{}` if `items` is empty.
+            dict[str, Any]: The matching OTA item, a sole anonymous item, or `{}`
+            when the response cannot be assigned to the requested device.
         """
         requested_sn = str(device_sn)
         for item in items:
             if str(item.get(FIELD_DEVICE_SN) or "") == requested_sn:
                 return item
-        return items[0] if items else {}
+        if len(items) == 1 and not items[0].get(FIELD_DEVICE_SN):
+            return items[0]
+        return {}
 
     async def _get_json(
         self,
@@ -4328,6 +5291,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             backend errors.
         """
         token_used = await self._ensure_token()
+        request_tokens: set[str] = set()
+        debug_params = deepcopy(params)
         url = f"{BASE_URL}{path}"
         policy = self._policy(profile)
         effective_timeout = request_timeout or policy.total_timeout
@@ -4335,6 +5300,8 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         def _request_headers() -> dict[str, str]:
             """Build authenticated JSON headers for the current GET attempt."""
             headers = self._headers(with_token=True)
+            if token := headers.get(FIELD_TOKEN):
+                request_tokens.add(token)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
@@ -4342,7 +5309,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             """Perform one GET attempt and return status plus decoded JSON."""
             async with self._session.get(
                 url,
-                params=params,
+                params=debug_params,
                 headers=_request_headers(),
                 timeout=policy.timeout(effective_timeout),
             ) as resp:
@@ -4358,7 +5325,22 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             request=_do,
             token_used=token_used,
             retry_transport_once=retry_transport_once,
+            debug_request_params=debug_params,
+            debug_request_tokens=request_tokens,
         )
+        debug_response = data.original
+        received_at = time.monotonic()
+        if path == DEVICE_PROPERTY_PATH and data.property_snapshot is not None:
+            context = self._property_request_context.get()
+            if (
+                context is not None
+                and context.active
+                and context.task is asyncio.current_task()
+                and params is not None
+                and str(params.get(FIELD_DEVICE_ID)) == context.owner
+            ):
+                self._cache_property_snapshot(context, data.property_snapshot)
+        debug_sources = self._http_sensitive_sources(token_used, request_tokens)
         code = self._extract_code(data)
         body = data.get(FIELD_DATA)
         _LOGGER.debug(
@@ -4371,11 +5353,14 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
                 request=(HTTP_METHOD_GET, path),
-                params=params,
+                params=debug_params,
                 status=status,
-                response=data,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             ),
         )
+        if path == DEVICE_PROPERTY_PATH:
+            return _RawPropertyResponse(data, debug_response, received_at)
         return data
 
     # --- HTTP write endpoints documented in APP_POLLING_MQTT.md --------------
@@ -4386,17 +5371,21 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ) -> dict[str, Any]:
         """Generic JSON PUT helper with token re-login on expiry."""
         token_used = await self._ensure_token()
+        request_tokens: set[str] = set()
+        debug_body = deepcopy(payload)
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
             headers = self._headers(with_token=True)
+            if token := headers.get(FIELD_TOKEN):
+                request_tokens.add(token)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
         async def _do() -> tuple[int, object]:
             async with self._session.put(
                 url,
-                json=payload,
+                json=debug_body,
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
@@ -4407,13 +5396,18 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path=path,
             request=_do,
             token_used=token_used,
+            debug_request_body=debug_body,
+            debug_request_tokens=request_tokens,
         )
+        debug_response = data.original
+        debug_sources = self._http_sensitive_sources(token_used, request_tokens)
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 request=(HTTP_METHOD_PUT, path),
-                body=payload,
+                body=debug_body,
                 status=status,
-                response=data,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             )
         )
         return data
@@ -4480,11 +5474,14 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             authorization failure.
         """
         token_used = await self._ensure_token()
+        request_tokens: set[str] = set()
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
             """Build HTTP headers for a form-encoded POST, including the auth token."""
             headers = self._headers(with_token=True)
+            if token := headers.get(FIELD_TOKEN):
+                request_tokens.add(token)
             if not multipart:
                 headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_FORM
             return headers
@@ -4533,57 +5530,60 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path=path,
             request=_do,
             token_used=token_used,
+            debug_request_body=debug_body,
+            debug_request_tokens=request_tokens,
         )
+        debug_response = data.original
+        debug_sources = self._http_sensitive_sources(token_used, request_tokens)
         await self._emit_payload_debug(
-            self._http_payload_debug(
+            lambda: self._http_payload_debug(
                 request=(HTTP_METHOD_POST, path),
                 body=debug_body,
                 status=status,
-                response=data,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             )
         )
         return data
 
-    async def async_set_max_power(self, device_id: str | int, max_power: int) -> bool:
-        """Set device maximum power through the experimental endpoint.
-
-        Validates that `max_power` is an integer greater than or equal to 0 before
-        sending the request.
-
-        Parameters:
-            device_id (str | int): Device identifier (serial or numeric id) used by the
-            backend.
-            max_power (int): Desired maximum power in watts; must be an integer greater
-            than or equal to 0.
-
-        Returns:
-            bool: `True` if the backend acknowledged success (truthy `FIELD_DATA`),
-            `False` otherwise.
-
-        Raises:
-            JackeryApiError: If `max_power` is invalid or the API call fails.
-        """
-        if not isinstance(max_power, int) or max_power < 0:
-            msg = "max_power must be a non-negative integer"
-            raise JackeryApiError(msg)
-        data = await self._post_form(
-            MAX_POWER_SAVE_PATH,
-            {FIELD_MAX_POWER: max_power, FIELD_DEVICE_ID: str(device_id)},
+    def _record_operation_error(
+        self, method: str, path: str, err: Exception, *, safe_detail: str | None = None
+    ) -> None:
+        """Log final transport errors at the HTTP ownership boundary."""
+        evidence = getattr(self, "_operation_errors", None)
+        if evidence is None:
+            evidence = self._operation_errors = OperationErrors(_LOGGER, "http_api")
+        evidence.record(
+            err,
+            operation=method,
+            target=path,
+            qos=None,
+            entry=getattr(self, "dev_mode_entry", None),
+            error_text=(
+                f"{type(err).__name__}: {safe_detail}"
+                if safe_detail is not None
+                else None
+            ),
         )
-        return bool(data.get(FIELD_DATA))
 
     def diagnostics_snapshot(self) -> dict[str, Any]:
         """Provide in-memory transport counters for the HTTP API diagnostic sensor.
 
         Returns:
-            dict[str, int]: Mapping with keys: requests_total, requests_failed,
-            timeouts_total, auth_retries.
+            dict[str, int]: Physical API/login request attempts, including
+            retries; failed attempts include transport, decoding and rejected
+            HTTP/API responses. Timeouts and auth retries remain separate.
         """
         return {
             "requests_total": self._requests_total,
             "requests_failed": self._requests_failed,
             "timeouts_total": self._timeouts_total,
             "auth_retries": self._auth_retries,
+            "operation_errors": (
+                self._operation_errors.snapshot()
+                if getattr(self, "_operation_errors", None) is not None
+                else {"errors": 0, "last_error": None}
+            ),
         }
 
     def hydrate_mqtt_session(
@@ -4654,7 +5654,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
 
         GET /v1/device/bind/list
         """
-        data = await self._get_json(DEVICE_LIST_PATH)
+        data = await self._get_json(DEVICE_LIST_PATH, retry_transport_once=True)
         self.last_legacy_device_list_response = data
         return self._payload_list(data, DEVICE_LIST_PATH)
 
@@ -4673,11 +5673,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     async def _delete_json(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Send an authenticated JSON-body DELETE with one automatic re-login."""
         token_used = await self._ensure_token()
+        request_tokens: set[str] = set()
+        debug_body = deepcopy(payload)
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
             """Build authenticated JSON headers for the DELETE request."""
             headers = self._headers(with_token=True)
+            if token := headers.get(FIELD_TOKEN):
+                request_tokens.add(token)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
@@ -4685,7 +5689,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             """Perform one DELETE attempt and return its status and body."""
             async with self._session.delete(
                 url,
-                json=payload,
+                json=debug_body,
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
@@ -4696,13 +5700,18 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path=path,
             request=_do,
             token_used=token_used,
+            debug_request_body=debug_body,
+            debug_request_tokens=request_tokens,
         )
+        debug_response = data.original
+        debug_sources = self._http_sensitive_sources(token_used, request_tokens)
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
                 request=(_HTTP_METHOD_DELETE, path),
-                body=payload,
+                body=debug_body,
                 status=status,
-                response=data,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             )
         )
         return data
@@ -4714,11 +5723,15 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
     ]:  # linear re-login ladder; splitting would thread session state through helpers
         """Generic JSON-body POST with auto re-login on expiry."""
         token_used = await self._ensure_token()
+        request_tokens: set[str] = set()
+        debug_body = deepcopy(payload)
         url = f"{BASE_URL}{path}"
 
         def _request_headers() -> dict[str, str]:
             """Build authenticated JSON headers for the current POST attempt."""
             headers = self._headers(with_token=True)
+            if token := headers.get(FIELD_TOKEN):
+                request_tokens.add(token)
             headers[HTTP_HEADER_CONTENT_TYPE] = HTTP_CONTENT_TYPE_JSON
             return headers
 
@@ -4726,7 +5739,7 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             """Perform one JSON POST attempt and return status plus decoded JSON."""
             async with self._session.post(
                 url,
-                json=payload,
+                json=debug_body,
                 headers=_request_headers(),
                 timeout=_HTTP_POLICY.timeout(),
             ) as resp:
@@ -4737,13 +5750,18 @@ class JackeryApi:  # ruff: ignore[too-many-public-methods] - one documented faca
             path=path,
             request=_do,
             token_used=token_used,
+            debug_request_body=debug_body,
+            debug_request_tokens=request_tokens,
         )
+        debug_response = data.original
+        debug_sources = self._http_sensitive_sources(token_used, request_tokens)
         await self._emit_payload_debug(
             lambda: self._http_payload_debug(
                 request=(HTTP_METHOD_POST, path),
-                body=payload,
+                body=debug_body,
                 status=status,
-                response=data,
+                response=debug_response,
+                sensitive_sources=debug_sources,
             ),
         )
         return data

@@ -23,10 +23,12 @@ Goal of this first revision: read-only diagnostic listener. The listener:
      the raw bytes when decryption fails) so the integration can expose
      last-seen metadata in diagnostics.
 
-Explicit setter commands use the same session owner to serialize encrypted,
-chunked writes to ``0xEE01``. No unsolicited keep-alive command is emitted.
+The setter side (chunked writes to ``0xEE01``) is intentionally out of
+scope here. Once Phase 3a has shown the listener decodes real frames
+correctly, the same chunking/encrypt path from :mod:`.ble` will be
+plumbed into :meth:`async_write_frames`.
 
-Crypto assumptions follow PROTOCOL.md §14 and the reverse-engineered
+Crypto assumptions follow implementation notes §14 and the reverse-engineered
 ``bb/a`` smali. Without a Frida-captured frame the layout is best-effort
 — that is why diagnostics retain the last raw frame behind redaction.
 """
@@ -36,22 +38,31 @@ import base64
 import binascii
 from collections import deque
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+import hashlib
 import importlib
 from itertools import starmap
 import json
 import logging
 import random
 import time
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from bleak import BleakClient
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS, establish_connection
 
-from ..const import DEFAULT_BLE_ACK_TIMEOUT_SEC
+from homeassistant.core import callback
+
+from ..const import (
+    BOX_BLE_WRITE_PAIRS,
+    DEFAULT_BLE_ACK_TIMEOUT_SEC,
+    MQTT_CMD_DEVICE_GET_OTA_PAGE_DATA,
+    MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE,
+)
+from ..models import BleProcessDisposition
 from . import ble
-from .ble import BleFrameObservation
+from .ble_ota import BoxOtaTransfer
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -92,6 +103,7 @@ class _BluetoothModule(Protocol):
 
 _LOGGER = logging.getLogger(__name__)
 _BLE_NOTIFICATION_LOG_SAMPLE_EVERY = 256
+_MIN_WRITE_MTU = 61
 
 
 def _should_log_ble_notification(frame_count: int) -> bool:
@@ -111,7 +123,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
     """
     try:
         return isinstance(json.loads(body.decode("utf-8")), dict)
-    except (UnicodeDecodeError, json.JSONDecodeError):  # fmt: skip
+    except UnicodeDecodeError, json.JSONDecodeError:
         return False
 
 
@@ -122,10 +134,7 @@ def _body_is_complete_json_object(body: bytes) -> bool:
 DEFAULT_BLE_CONNECT_TIMEOUT_SEC: float = 20.0
 
 #: Minimum time between (re)connect attempts when the device drops the link.
-
-#: A GATT link must keep notify ownership this long before it resets the
-#: escalating ESPHome-proxy protection backoff.
-_STABLE_SESSION_SEC: float = 60.0
+_RECONNECT_BACKOFF_SEC: float = 30.0
 
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
 #: runners to honour cancellation. HA's shutdown sequence reports tasks
@@ -133,6 +142,28 @@ _STABLE_SESSION_SEC: float = 60.0
 #: ``async_unload_entry``) — keep this well below that so the listener
 #: never becomes the reason a shutdown logs "tasks still pending".
 _STOP_TIMEOUT_SEC: float = 5.0
+
+#: How often to write a no-op query frame to keep the GATT session
+#: warm. The SolarVault peripheral closes idle GATT sessions after
+#: roughly 20 s (observed 2026-05-17 production log: BLE disconnects
+#: every 6-20 s without traffic). 15 s sits comfortably below that and
+#: doubles as a property-refresh — the device answers each ``cmd=106``
+#: with a ``DevicePropertyChange`` notify that the sink merges into
+#: ``coordinator.data`` via the existing cmd=107 path.
+_KEEPALIVE_INTERVAL_SEC: float = 15.0
+
+# --- restored from Clause/live lineage (backup) ---  # noqa: E303, RUF100, RUF105
+_LOST_LINK_BACKOFF_SEC: float = 8.0
+_MAX_CONNECTION_RETRIES: int = 50
+_MAX_BACKOFF_SEC: float = 300.0
+# bleak / HA-bluetooth imports are deferred to the methods that need them so
+# the module can be imported on systems without BlueZ during tests.
+
+#: Minimum time between (re)connect attempts when the device drops the link.
+
+#: A GATT link must keep notify ownership this long before it resets the
+#: escalating ESPHome-proxy protection backoff.
+_STABLE_SESSION_SEC: float = 60.0
 _COOPERATIVE_STOP_GRACE_SEC: float = 0.25
 _SINK_RETRY_INITIAL_SEC: float = 0.01
 _SINK_RETRY_MAX_SEC: float = 1.0
@@ -147,11 +178,48 @@ _REASSEMBLY_MAX_BODY_BYTES: int = 256 * 1024
 _REASSEMBLY_MAX_MESSAGES_PER_DEVICE: int = 8
 _NOTIFY_QUEUE_WARN_FRAMES: int = _REASSEMBLY_MAX_CHUNKS
 _UINT16_MAX: int = 0xFFFF
+_BOX_OTA_INSTALL_TIMEOUT_SEC: float = 900.0
+_BOX_OTA_RESTART_TIMEOUT_SEC: float = 120.0
+_BOX_OTA_STATUS_CMD: int = 104
+_BOX_OTA_INSTALLING: int = 2
+_BOX_OTA_RESTARTING: int = 3
+_ASCII_SERIAL_MIN: int = 32
+_ASCII_SERIAL_MAX: int = 126
+_OtaFamily = Literal["box", "home", "rc4", "aes_fixed", "aes_random"]
 
 
 # ---------------------------------------------------------------------------
 # Public data classes
 # ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class BleFrameObservation:
+    """One frame observed on the notify characteristic.
+
+    Carries both the parsed view and the original raw bytes so the
+    diagnostics surface can show what we received even if decoding failed.
+    ``parsed`` is set when AES decrypt + header parse succeeded; otherwise
+    ``decode_error`` carries the reason and ``parsed`` is None.
+    """
+
+    received_at: datetime
+    raw_bytes: bytes
+    base64_encoded: str
+    parsed: ble.BleBinaryFrame | None
+    decode_error: str | None = None
+    session_generation: int | None = None
+    notify_sequence: int | None = None
+    delivery_id: str | None = None
+    is_fragment: bool = False
+    rejected_frame: ble.BleBinaryFrame | None = None
+    protocol_status: int | None = None
+    key_fingerprint: bytes | None = field(default=None, repr=False, compare=False)
+    first_notify_sequence: int | None = None
+    device_identity: tuple[int, str] | None = field(default=None, repr=False)
+    session_key_fingerprint: bytes | None = field(default=None, repr=False)
+    received_at_monotonic: float | None = None
+    safety_received_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -164,6 +232,9 @@ class BleListenerStats:
     frames_received: int = 0
     frames_decoded: int = 0
     frames_decode_failed: int = 0
+    acks_received: int = 0
+    acks_timed_out: int = 0
+
     multi_chunk_frames_buffered: int = 0
     multi_chunk_messages_assembled: int = 0
     multi_chunk_assemblies_dropped: int = 0
@@ -180,8 +251,6 @@ class BleListenerStats:
     notify_queue_bytes: int = 0
     notify_queue_high_watermark_bytes: int = 0
     notify_queue_oldest_age_sec: float = 0.0
-    acks_received: int = 0
-    acks_timed_out: int = 0
     last_error: str | None = None
     last_decode_error: str | None = None
     last_sink_error: str | None = None
@@ -194,6 +263,10 @@ class BleListenerStats:
     # how much BLE telemetry is still unconsumed (cmd=120 system /
     # per-device / CT variants currently — see coordinator sink).
     unrouted_frames_by_cmd: dict[int, int] = field(default_factory=dict)
+    # Per-cmd counters for frames the sink recognized. This keeps
+    # unchanged-but-routed frames (for example battery-pack lifetime
+    # snapshots) separate from genuinely unsupported BLE payloads.
+    routed_frames_by_cmd: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -212,6 +285,7 @@ class _PendingAck:
     registered_notify_sequence: int
     future: asyncio.Future[ble.BleBinaryFrame]
     session: _GattSession
+    require_msg_id: bool = False
     failure_reason: str | None = None
 
 
@@ -226,6 +300,8 @@ class _BleCommand:
     wait_for_ack: bool
     ack_timeout_sec: float
     mtu_override: int | None
+    expected_profile: str | None
+    is_safe: Callable[[], bool] | None
 
 
 @dataclass(slots=True)
@@ -236,6 +312,9 @@ class _PendingFrameAssembly:
     frames: dict[int, ble.BleBinaryFrame]
     updated_at: float
     first_notify_sequence: int | None
+    ota_key: bytes | None = field(default=None, repr=False)
+    first_received_at: datetime | None = None
+    first_received_monotonic: float | None = None
 
 
 @dataclass(slots=True)
@@ -244,10 +323,26 @@ class _GattSession:
 
     generation: int
     client: BleakClient
+    device_identity: tuple[int, str] | None = field(default=None, repr=False)
+    key_fingerprint: bytes | None = field(default=None, repr=False)
     active: bool = True
+    identity_refresh_requested: bool = False
     accepting_notifications: bool = True
     notify_started: bool = False
+    write_mtu: int | None = None
+    last_ota_reply_sequence: int = 0
+    ota_page_request: BleFrameObservation | None = None
+    ota_page_key: bytes | None = field(default=None, repr=False)
+    ota_count_request: BleFrameObservation | None = None
+    ota_count_key: bytes | None = field(default=None, repr=False)
+    ota_start_consumed: bool = False
+    ota_completed: bool = False
+    ota_start_sequence: int | None = None
+    ota_events: asyncio.Queue[BleFrameObservation | None] | None = field(
+        default=None, repr=False
+    )
     write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    uncertain_ack_pairs: set[tuple[int, int]] = field(default_factory=set)
     notify_sequence: int = 0
     # Bleak's notification callback is synchronous and therefore cannot apply
     # backpressure. Keep accepted frames in a lossless FIFO; queue depth and its
@@ -268,14 +363,16 @@ class _GattSession:
 # ---------------------------------------------------------------------------
 
 
-FrameSink = Callable[[str, BleFrameObservation], Awaitable[bool]]
+FrameSink = Callable[
+    [str, BleFrameObservation], Awaitable[bool | BleProcessDisposition]
+]
 # Async sink called for every observed frame.
 
 # ``device_id`` is the Jackery numeric device id (matches coordinator state).
 # ``observation`` carries the decoded or raw frame.
 
 
-class JackeryBleListener:
+class JackeryBleListener:  # ruff: ignore[too-many-public-methods]
     """Connects to one or more SolarVault devices via BLE and forwards frames.
 
     The listener owns one ``BleakClient`` per device. It re-attempts the
@@ -299,6 +396,12 @@ class JackeryBleListener:
         connect_backoff_note_failure: Callable[[str, float], float],
         connect_backoff_note_success: Callable[[str], None],
         serial_resolver: Callable[[str], str | None] | None = None,
+        device_identity_resolver: Callable[[str], tuple[int, str] | None] | None = None,
+        profile_resolver: Callable[[str], ble.PortableBleProfile | str | None]
+        | None = None,
+        ota_pending_resolver: Callable[[str], bool] | None = None,
+        disconnect_callback: Callable[[str, int], None] | None = None,
+        reassembly_gap_callback: Callable[[str, int, int], None] | None = None,
         config_entry: ConfigEntry | None = None,
     ) -> None:
         """Construct a Jackery BLE notification listener.
@@ -322,12 +425,17 @@ class JackeryBleListener:
         self._hass = hass
         self._config_entry = config_entry
         self._sink = sink
+        self._disconnect_callback = disconnect_callback
+        self._on_reassembly_gap = reassembly_gap_callback
         self._key_resolver = key_resolver
         self._ble_address_resolver = ble_address_resolver
         self._connect_backoff_remaining = connect_backoff_remaining
         self._connect_backoff_note_failure = connect_backoff_note_failure
         self._connect_backoff_note_success = connect_backoff_note_success
         self._serial_resolver = serial_resolver
+        self._device_identity_resolver = device_identity_resolver
+        self._profile_resolver = profile_resolver
+        self._ota_pending_resolver = ota_pending_resolver
         self._ha_bluetooth: _BluetoothModule | None = None
         self._stats: dict[str, BleListenerStats] = {}
         self._unregister_callbacks: list[Callable[[], None]] = []
@@ -351,6 +459,7 @@ class JackeryBleListener:
         # runner. ``async_send_command`` reads from this dict to write to
         # the open session without re-establishing the connect.
         self._clients: dict[str, BleakClient] = {}
+        self._identity_refresh_seen: set[str] = set()
         # Pending ACK registrations per device id. ``_handle_notification``
         # resolves the matching futures when a decoded frame arrives. Each
         # device can have multiple in-flight writes (rare in practice for
@@ -467,6 +576,7 @@ class JackeryBleListener:
         if now - started_at < _STABLE_SESSION_SEC:
             return False
         self._connect_backoff_note_success(device_id)
+        self._identity_refresh_seen.discard(device_id)
         return True
 
     def _log_connection_unavailable(
@@ -528,7 +638,17 @@ class JackeryBleListener:
                 "still owns the GATT session"
             )
             raise RuntimeError(msg)
-        session = _GattSession(generation=generation, client=client)
+        identity_resolver = getattr(self, "_device_identity_resolver", None)
+        identity = (
+            identity_resolver(device_id) if identity_resolver is not None else None
+        )
+        key = self._key_resolver(device_id)
+        session = _GattSession(
+            generation=generation,
+            client=client,
+            device_identity=identity,
+            key_fingerprint=hashlib.sha256(key).digest() if key is not None else None,
+        )
         self._sessions[device_id] = session
         self._clients[device_id] = client
         return session
@@ -537,12 +657,27 @@ class JackeryBleListener:
         self,
         device_id: str,
         session: _GattSession | None = None,
+        *,
+        reason: str | None = None,
     ) -> int:
         """Clear owned frame assemblies and return the number discarded."""
         owner = self._frame_assembly_owners.get(device_id)
         if session is not None and owner is not session:
             return 0
         assemblies = self._frame_assemblies.pop(device_id, None)
+        if assemblies and reason is not None:
+            stats = self.stats_for(device_id)
+            for cmd, flags in assemblies:
+                self._record_multi_chunk_drop_reason(stats, cmd, reason)
+                if reason == "session_closed":
+                    recover = getattr(self, "_on_reassembly_gap", None)
+                    if callable(recover):
+                        try:
+                            recover(device_id, cmd, flags)
+                        except Exception:
+                            _LOGGER.exception(
+                                "BLE reconnect recovery scheduling failed"
+                            )
         if owner is None or session is None or owner is session:
             self._frame_assembly_owners.pop(device_id, None)
         return len(assemblies) if assemblies is not None else 0
@@ -568,6 +703,35 @@ class JackeryBleListener:
         current = session.notify_task
         if current is not None and not current.done():
             await asyncio.shield(current)
+
+    async def async_wait_for_notification_drain(
+        self, device_id: str, generation: int
+    ) -> bool:
+        """Wait for accepted notifications without changing session ownership."""
+        session = self._sessions.get(device_id)
+        if (
+            session is None
+            or session.generation != generation
+            or not self._session_is_current(device_id, session)
+        ):
+            return False
+        try:
+            await asyncio.wait_for(
+                self._async_wait_for_notification_drain(device_id, session), timeout=2.0
+            )
+        except TimeoutError:
+            return False
+        return self._session_is_current(device_id, session)
+
+    @staticmethod
+    def _signal_ota_session_end(session: _GattSession) -> None:
+        """Wake an OTA transfer after accepted notifications have drained."""
+        if (
+            session.ota_events is not None
+            and session.notify_inflight is None
+            and session.notify_queue.empty()
+        ):
+            session.ota_events.put_nowait(None)
 
     async def _async_teardown_session_impl(
         self,
@@ -608,6 +772,7 @@ class JackeryBleListener:
             await asyncio.wait_for(client.disconnect(), timeout=5.0)
 
         session.active = False
+        self._signal_ota_session_end(session)
         if self._sessions.get(device_id) is session:
             self._sessions.pop(device_id, None)
             if self._clients.get(device_id) is session.client:
@@ -615,7 +780,9 @@ class JackeryBleListener:
             if self._mtu_owners.get(device_id) is session:
                 self._mtu_owners.pop(device_id, None)
                 self._mtu.pop(device_id, None)
-        dropped = self._clear_frame_assemblies(device_id, session)
+        dropped = self._clear_frame_assemblies(
+            device_id, session, reason="session_closed"
+        )
         if dropped:
             self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
         self._cancel_session_pending_acks(device_id, session)
@@ -749,6 +916,8 @@ class JackeryBleListener:
                     self._refresh_notification_queue_stats(device_id)
         if cancellation_requested:
             raise asyncio.CancelledError
+        if not session.accepting_notifications:
+            self._signal_ota_session_end(session)
 
     def _start_notification_drain(
         self,
@@ -860,16 +1029,18 @@ class JackeryBleListener:
         Different bleak backends expose the MTU under different attribute
         names, and at different points in the connect lifecycle. We try
         the well-known ones in order and keep the cache empty if none
-        produce a usable integer — the writer then falls back to
-        :data:`ble.DEFAULT_BLE_MTU`.
+        produce an integer. Unknown capacity never grants write readiness.
+        The write characteristic is authoritative for write-without-response;
+        it can also establish capacity when BlueZ reports the MTU sentinel 23.
         """
         if session is not None and not self._session_is_current(device_id, session):
             return
+        mtu = 0
         for attr in ("mtu_size", "mtu"):
             value = getattr(client, attr, None)
             if value is None:
                 continue
-            if not isinstance(value, int):
+            if isinstance(value, bool) or not isinstance(value, int):
                 _LOGGER.debug(
                     "Jackery BLE %s: backend reported %s=%r (%s), not an int",
                     device_id,
@@ -878,38 +1049,146 @@ class JackeryBleListener:
                     type(value).__name__,
                 )
                 continue
-            try:
-                payload_size = ble.chunk_size_for_mtu(value)
-            except ValueError as err:
-                _LOGGER.warning(
-                    "Jackery BLE %s: unusable negotiated %s=%d: %s",
-                    device_id,
-                    attr,
-                    value,
-                    err,
-                )
-                continue
-            else:
-                self._mtu[device_id] = value
-                if session is not None:
-                    self._mtu_owners[device_id] = session
-                _LOGGER.debug(
-                    "Jackery BLE %s: negotiated MTU=%d (%d body bytes/frame)",
-                    device_id,
-                    value,
-                    payload_size,
-                )
-                return
-        _LOGGER.debug(
-            "Jackery BLE %s: bleak did not expose mtu_size yet, will assume "
-            "%d on the next write",
-            device_id,
-            ble.DEFAULT_BLE_MTU,
+            mtu = max(value, 0)
+            break
+        capacity = self._write_capacity(client)
+        if capacity is not None:
+            # ATT writes use MTU minus the three-byte ATT header. Preserve
+            # the app's separate 60-byte frame budget for chunk construction.
+            characteristic_mtu = capacity + 3
+            mtu = (
+                min(mtu, characteristic_mtu)
+                if mtu >= _MIN_WRITE_MTU
+                else characteristic_mtu
+            )
+        self._mtu[device_id] = mtu
+        if session is not None:
+            self._mtu_owners[device_id] = session
+            session.write_mtu = mtu
+        _LOGGER.debug("Jackery BLE %s: effective write MTU=%d", device_id, mtu)
+
+    @staticmethod
+    def _write_capacity(client: BleakClient) -> int | None:
+        """Return the current characteristic's proven no-response write limit."""
+        services = getattr(client, "services", None)
+        if services is None:
+            return None
+        characteristic = services.get_characteristic(ble.BLE_WRITE_CHAR_UUID)
+        capacity = getattr(characteristic, "max_write_without_response_size", None)
+        return (
+            capacity
+            if isinstance(capacity, int)
+            and not isinstance(capacity, bool)
+            and capacity > 0
+            else None
         )
 
     def mtu_for_device(self, device_id: str) -> int:
         """Return the cached negotiated MTU for ``device_id`` or the default."""
         return self._mtu.get(device_id, ble.DEFAULT_BLE_MTU)
+
+    def current_session_generation(self, device_id: str) -> int | None:
+        """Return the generation of a connected, notification-ready session."""
+        session = self._sessions.get(device_id)
+        if (
+            session is None
+            or not session.notify_started
+            or not getattr(session.client, "is_connected", False)
+            or not self._session_is_current(device_id, session)
+        ):
+            return None
+        return session.generation
+
+    @callback
+    def request_identity_refresh(self, device_id: str, generation: int) -> None:
+        """Retire only the session whose device identity was invalidated."""
+        session = self._sessions.get(device_id)
+        if session is not None and session.generation == generation:
+            session.identity_refresh_requested = True
+            session.active = False
+
+    def current_notification_marker(self, device_id: str) -> tuple[int, int] | None:
+        """Return the installed session and last accepted notification sequence."""
+        session = self._sessions.get(device_id)
+        if session is None:
+            return None
+        return session.generation, session.notify_sequence
+
+    def owns_current_observation(
+        self, device_id: str, observation: BleFrameObservation
+    ) -> bool:
+        """Verify the listener and current session that accepted an observation."""
+        return self.owns_current_delivery(
+            device_id,
+            observation.session_generation,
+            observation.notify_sequence,
+            observation.delivery_id,
+        )
+
+    def owns_current_delivery(
+        self,
+        device_id: str,
+        generation: int | None,
+        sequence: int | None,
+        delivery_id: str | None,
+    ) -> bool:
+        """Verify a retained delivery still belongs to this listener session."""
+        if generation is None or sequence is None:
+            return False
+        return self.current_session_generation(
+            device_id
+        ) == generation and self.owns_delivery(
+            device_id, generation, sequence, delivery_id
+        )
+
+    def owns_delivery(
+        self, device_id: str, generation: int, sequence: int, delivery_id: str | None
+    ) -> bool:
+        """Verify a delivery's listener identity without requiring a connection."""
+        return delivery_id == (
+            f"{self._delivery_namespace}:{device_id}:{generation}:{sequence}"
+        )
+
+    def box_ota_started(self, device_id: str, generation: int) -> bool:
+        """Return whether this session has started its one OTA exchange."""
+        session = self._sessions.get(device_id)
+        return bool(
+            session is not None
+            and session.generation == generation
+            and self._session_is_current(device_id, session)
+            and session.ota_start_consumed
+        )
+
+    def release_ota_recovery(self, device_id: str, generation: int) -> None:
+        """Release a session-local interlock after external version confirmation."""
+        session = self._sessions.get(device_id)
+        if (
+            session is None
+            or session.generation != generation
+            or not self._session_is_current(device_id, session)
+            or session.ota_events is not None
+        ):
+            msg = "BLE OTA recovery session is no longer current"
+            raise RuntimeError(msg)
+        session.ota_completed = True
+
+    def session_is_current(
+        self, device_id: str, generation: int, through_sequence: int
+    ) -> bool:
+        """Return whether the requested device still owns this BLE session."""
+        session = self._sessions.get(device_id)
+        return bool(
+            session is not None
+            and session.generation == generation
+            and session.notify_started
+            and getattr(session.client, "is_connected", False)
+            and self._session_is_current(device_id, session)
+            and session.notify_queue.empty()
+            and (
+                session.notify_inflight is None
+                or session.notify_inflight[0] <= through_sequence
+            )
+        )
 
     async def async_ensure_connected(
         self,
@@ -917,8 +1196,8 @@ class JackeryBleListener:
         *,
         timeout_sec: float = DEFAULT_BLE_CONNECT_TIMEOUT_SEC,
     ) -> bool:
-        """Wait for a current BLE session with its notification channel ready."""
-        if self._stop_event.is_set():
+        """Wait for a current BLE session ready for notifications and writes."""
+        if self._stop_event.is_set() or self._hass.is_stopping:
             return False
         client = self._clients.get(device_id)
         session = self._sessions.get(device_id)
@@ -929,7 +1208,8 @@ class JackeryBleListener:
             and session.notify_started
             and self._session_is_current(device_id, session)
         ):
-            return True
+            self._record_negotiated_mtu(device_id, client, session=session)
+            return session.write_mtu is not None and session.write_mtu >= _MIN_WRITE_MTU
         address = self._device_addresses.get(device_id)
         if address is None:
             return False
@@ -956,7 +1236,7 @@ class JackeryBleListener:
             return False
         deadline = asyncio.get_running_loop().time() + timeout_sec
         connected = False
-        while not self._stop_event.is_set():
+        while not self._stop_event.is_set() and not self._hass.is_stopping:
             client = self._clients.get(device_id)
             session = self._sessions.get(device_id)
             if (
@@ -966,7 +1246,11 @@ class JackeryBleListener:
                 and session.notify_started
                 and self._session_is_current(device_id, session)
             ):
-                connected = True
+                self._record_negotiated_mtu(device_id, client, session=session)
+                connected = (
+                    session.write_mtu is not None
+                    and session.write_mtu >= _MIN_WRITE_MTU
+                )
                 break
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
@@ -976,13 +1260,15 @@ class JackeryBleListener:
 
     async def _async_stop_requested_within(self, delay: float) -> bool:
         """Return whether listener shutdown is requested before ``delay`` expires."""
+        if self._hass.is_stopping:
+            return True
         try:
             await asyncio.wait_for(self._stop_event.wait(), timeout=delay)
         except TimeoutError:
             return False
         return True
 
-    async def _async_write_command_chunks(
+    async def _async_write_command_chunks(  # ruff: ignore[too-many-arguments]
         self,
         device_id: str,
         session: _GattSession,
@@ -990,6 +1276,7 @@ class JackeryBleListener:
         *,
         key: bytes,
         command: _BleCommand,
+        profile: str | None,
     ) -> None:
         """Encrypt and write every chunk for one current GATT session."""
         client = session.client
@@ -998,18 +1285,740 @@ class JackeryBleListener:
             if not self._session_is_current(device_id, session):
                 msg = f"BLE session for {device_id} changed during write"
                 raise RuntimeError(msg)
-            plain = ble.build_binary_frame(
-                cmd=command.ble_msg_type,
-                body=chunk,
-                flags=command.msg_id,
-                frame_index=idx,
-                chunk_count=chunk_count,
-            )
-            blob = ble.encrypt_binary_notify(plain, key)
+            if command.is_safe is not None and command.is_safe() is not True:
+                msg = f"BLE command is no longer valid for device {device_id}"
+                raise RuntimeError(msg)
+            if profile in {"rc4", "aes_fixed"}:
+                plain = ble.build_portable_legacy_frame(
+                    action_id=command.msg_id,
+                    ble_cmd=command.ble_msg_type,
+                    body=chunk,
+                    frame_index=idx,
+                    chunk_count=chunk_count,
+                )
+                blob = ble.encrypt_portable_legacy_frame(plain, key, cipher=profile)
+            else:
+                plain = ble.build_binary_frame(
+                    cmd=command.ble_msg_type,
+                    body=chunk,
+                    flags=command.msg_id,
+                    frame_index=idx,
+                    chunk_count=chunk_count,
+                )
+                blob = (
+                    ble.encrypt_box_frame(plain, key)
+                    if profile == "box_fixed"
+                    else ble.encrypt_binary_notify(plain, key)
+                )
+            capacity = self._write_capacity(client)
+            if capacity is not None and len(blob) > capacity:
+                msg = (
+                    f"BLE encrypted frame exceeds write capacity for {device_id}: "
+                    f"{len(blob)} > {capacity}"
+                )
+                raise RuntimeError(msg)
             await asyncio.wait_for(
                 client.write_gatt_char(ble.BLE_WRITE_CHAR_UUID, blob, response=False),
                 timeout=command.timeout_sec,
             )
+
+    async def async_query_box_ota_version(
+        self,
+        device_id: str,
+        *,
+        session_generation: int,
+        is_safe: Callable[[], bool],
+        family: _OtaFamily = "box",
+    ) -> int:
+        """Write a Box version query and return its own notification barrier."""
+        session = self._sessions.get(device_id)
+        key = self._key_resolver(device_id)
+        if session is None or session.generation != session_generation or key is None:
+            msg = "Box OTA version query has no current session"
+            raise RuntimeError(msg)
+        expected_profile = (
+            "box_fixed" if family == "box" else None if family == "home" else family
+        )
+        async with session.write_lock:
+            if (
+                not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                or not getattr(session.client, "is_connected", False)
+                or not session.notify_started
+                or session.write_mtu is None
+                or session.ota_events is not None
+                or self._profile_resolver is None
+                or self._profile_resolver(device_id) != expected_profile
+                or self._key_resolver(device_id) != key
+                or is_safe() is not True
+            ):
+                msg = "Box OTA version query is no longer authorized"
+                raise RuntimeError(msg)
+            mtu = (
+                min(session.write_mtu, 315)
+                if family in {"rc4", "aes_fixed"}
+                else session.write_mtu
+            )
+            chunks = ble.split_body_for_mtu(b'{"cmd":100}', mtu)
+            barrier = session.notify_sequence
+            for index, chunk in enumerate(chunks, start=1):
+                if (
+                    not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                    or not getattr(session.client, "is_connected", False)
+                    or self._profile_resolver is None
+                    or self._profile_resolver(device_id) != expected_profile
+                    or self._key_resolver(device_id) != key
+                    or is_safe() is not True
+                ):
+                    msg = "Box OTA version query was interrupted"
+                    raise RuntimeError(msg)
+                action = 248 if family == "box" else 3006 if family == "home" else 2
+                if family in {"rc4", "aes_fixed"}:
+                    plain = ble.build_portable_legacy_frame(
+                        action_id=action,
+                        ble_cmd=100,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = ble.encrypt_portable_legacy_frame(
+                        plain, key, cipher=family
+                    )
+                else:
+                    plain = ble.build_binary_frame(
+                        flags=action,
+                        cmd=100,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = (
+                        ble.encrypt_box_frame(plain, key)
+                        if family == "box"
+                        else ble.encrypt_binary_notify(plain, key)
+                    )
+                capacity = self._write_capacity(session.client)
+                if capacity is not None and len(encrypted) > capacity:
+                    msg = "Box OTA version query exceeds the current GATT capacity"
+                    raise RuntimeError(msg)
+                if index == len(chunks):
+                    barrier = session.notify_sequence
+                await asyncio.wait_for(
+                    session.client.write_gatt_char(
+                        ble.BLE_WRITE_CHAR_UUID, encrypted, response=False
+                    ),
+                    timeout=10.0,
+                )
+            if not self._session_is_current(device_id, session):
+                msg = "Box OTA session changed during version query"
+                raise RuntimeError(msg)
+            return barrier
+
+    async def async_run_home_ota(  # ruff: ignore[too-many-arguments]
+        self,
+        device_id: str,
+        *,
+        target_sn: str,
+        firmware: dict[str, bytes],
+        session_generation: int,
+        is_safe: Callable[[str], bool],
+        is_current: Callable[[str], bool],
+        timeout_sec: float,
+    ) -> str:
+        """Follow Home firmware requests on one current GATT session."""
+        return await self.async_run_box_ota(
+            device_id,
+            target_sn=target_sn,
+            firmware=firmware,
+            session_generation=session_generation,
+            is_safe=is_safe,
+            is_current=is_current,
+            timeout_sec=timeout_sec,
+            family="home",
+        )
+
+    async def async_run_portable_ota(  # ruff: ignore[too-many-arguments]
+        self,
+        device_id: str,
+        *,
+        target_sn: str,
+        firmware: dict[str, bytes],
+        session_generation: int,
+        is_safe: Callable[[str], bool],
+        is_current: Callable[[str], bool],
+        timeout_sec: float,
+    ) -> str:
+        """Follow Portable firmware requests using the selected model codec."""
+        profile = self._profile_resolver(device_id) if self._profile_resolver else None
+        if profile not in {"rc4", "aes_fixed", "aes_random"}:
+            msg = "Portable OTA model profile is not available"
+            raise RuntimeError(msg)
+        return await self.async_run_box_ota(
+            device_id,
+            target_sn=target_sn,
+            firmware=firmware,
+            session_generation=session_generation,
+            is_safe=is_safe,
+            is_current=is_current,
+            timeout_sec=timeout_sec,
+            family=cast("_OtaFamily", profile),
+        )
+
+    async def async_run_box_ota(  # ruff: ignore[complex-structure, too-many-arguments, too-many-branches, too-many-statements]
+        self,
+        device_id: str,
+        *,
+        target_sn: str,
+        firmware: dict[str, bytes],
+        session_generation: int,
+        is_safe: Callable[[str], bool],
+        is_current: Callable[[str], bool],
+        timeout_sec: float,
+        family: _OtaFamily = "box",
+    ) -> str:
+        """Follow Box firmware requests on one current GATT session."""
+        session = self._sessions.get(device_id)
+        if (
+            session is None  # ruff: ignore[too-many-boolean-expressions]
+            or session.generation != session_generation
+            or not self._session_is_current(device_id, session)
+            or session.write_mtu is None
+            or session.ota_events is not None
+            or timeout_sec <= 0
+        ):
+            msg = "Box OTA session is not ready"
+            raise RuntimeError(msg)
+        key = self._key_resolver(device_id)
+        if key is None:
+            msg = "Box OTA session has no key"
+            raise RuntimeError(msg)
+        transfer = BoxOtaTransfer(
+            target_sn,
+            firmware,
+            mtu=min(session.write_mtu, 315)
+            if family in {"rc4", "aes_fixed"}
+            else session.write_mtu,
+            generation=session_generation,
+            family="box" if family == "box" else "home",
+        )
+        announcement = transfer.announcement()
+        events: asyncio.Queue[BleFrameObservation | None] = asyncio.Queue()
+        session.ota_events = events
+        try:
+            if not await self.async_send_box_ota_start(
+                device_id,
+                target_sn=announcement["sn"],
+                firmware_types=tuple(firmware),
+                session_generation=session_generation,
+                is_safe=is_safe,
+                family=family,
+            ):
+                msg = "Box OTA announcement was not sent"
+                raise RuntimeError(msg)
+            transfer.response_sent()
+            event_timeout = timeout_sec
+            restarting = False
+            while True:
+                observation = await asyncio.wait_for(
+                    events.get(), timeout=event_timeout
+                )
+                if observation is None:
+                    if restarting:
+                        return "reconnect_required"
+                    msg = "Box OTA connection was lost"
+                    raise RuntimeError(msg)
+                if (
+                    self._key_resolver(device_id) != key  # ruff: ignore[too-many-boolean-expressions]
+                    or observation.session_generation != session_generation
+                    or observation.decode_error is not None
+                    or observation.parsed is None
+                    or observation.notify_sequence is None
+                    or observation.first_notify_sequence is None
+                    or observation.protocol_status is None
+                    or (
+                        family != "box"
+                        and observation.parsed.checksum_valid is not True
+                    )
+                    or session.ota_start_sequence is None
+                    or observation.first_notify_sequence <= session.ota_start_sequence
+                    or observation.key_fingerprint != hashlib.sha256(key).digest()
+                ):
+                    msg = "Box OTA observation lost its session or could not be decoded"
+                    raise RuntimeError(msg)
+                try:
+                    body = json.loads(observation.parsed.body or b"{}")
+                except json.JSONDecodeError as err:
+                    msg = "Box OTA request body is invalid"
+                    raise RuntimeError(msg) from err
+                if not isinstance(body, dict):
+                    msg = "Box OTA request body is not an object"
+                    raise RuntimeError(msg)  # ruff: ignore[type-check-without-type-error]
+                if not self._session_is_current(device_id, session):
+                    if (
+                        observation.parsed.cmd == _BOX_OTA_STATUS_CMD
+                        and body.get("code") == _BOX_OTA_RESTARTING
+                        and is_current(target_sn) is True
+                    ):
+                        transfer.receive(
+                            observation.parsed.cmd,
+                            body,
+                            status=observation.protocol_status,
+                            generation=session_generation,
+                            sequence=observation.notify_sequence,
+                        )
+                        return "reconnect_required"
+                    msg = "Box OTA connection was lost"
+                    raise RuntimeError(msg)
+                await asyncio.wait_for(session.notify_queue.join(), timeout=timeout_sec)
+                authorized = (
+                    is_current(target_sn)
+                    if observation.parsed.cmd == _BOX_OTA_STATUS_CMD
+                    else is_safe(target_sn)
+                )
+                if (
+                    not self._session_is_current(device_id, session)
+                    or self._key_resolver(device_id) != key
+                    or authorized is not True
+                ):
+                    msg = "Box OTA target or safety state changed"
+                    raise RuntimeError(msg)
+                response = transfer.receive(
+                    observation.parsed.cmd,
+                    body,
+                    status=observation.protocol_status,
+                    generation=session_generation,
+                    sequence=observation.notify_sequence,
+                )
+                if response is None:
+                    if transfer.state == "success":
+                        session.ota_completed = True
+                        return "success"
+                    if transfer.state == "failed":
+                        code = body.get("code")
+                        messages = {
+                            1: "Box OTA firmware invalid",
+                            5: "Box OTA installation failed",
+                        }
+                        msg = "Box OTA unknown failure status"
+                        if isinstance(code, int) and not isinstance(code, bool):
+                            msg = messages.get(code, msg)
+                        elif isinstance(code, float) and code.is_integer():
+                            msg = messages.get(int(code), msg)
+                        raise RuntimeError(msg)
+                    if observation.parsed.cmd == _BOX_OTA_STATUS_CMD:
+                        if body.get("code") == _BOX_OTA_INSTALLING:
+                            event_timeout = _BOX_OTA_INSTALL_TIMEOUT_SEC
+                        elif body.get("code") == _BOX_OTA_RESTARTING:
+                            event_timeout = _BOX_OTA_RESTART_TIMEOUT_SEC
+                            restarting = True
+                    continue
+                if response["cmd"] == MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE:
+                    sent = await self.async_send_box_ota_count(
+                        device_id,
+                        request=observation,
+                        target_sn=target_sn,
+                        firmware_type=response["f"],
+                        page_count=response["p"],
+                        firmware_size=response["s"],
+                        session_generation=session_generation,
+                        is_safe=lambda: is_safe(target_sn),
+                        family=family,
+                    )
+                else:
+                    sent = await self.async_send_box_ota_page(
+                        device_id,
+                        response["pages"],
+                        request=observation,
+                        firmware_type=response["f"],
+                        page_index=response["p"],
+                        session_generation=session_generation,
+                        is_safe=lambda: is_safe(target_sn),
+                        family=family,
+                    )
+                if not sent:
+                    msg = "Box OTA request could not be answered safely"
+                    raise RuntimeError(msg)
+                transfer.response_sent()
+        finally:
+            if session.ota_events is events:
+                session.ota_events = None
+                session.ota_count_request = None
+                session.ota_count_key = None
+                session.ota_page_request = None
+                session.ota_page_key = None
+
+    async def async_send_box_ota_start(  # ruff: ignore[too-many-arguments]
+        self,
+        device_id: str,
+        *,
+        target_sn: str,
+        firmware_types: tuple[str, ...],
+        session_generation: int,
+        is_safe: Callable[[str], bool],
+        family: _OtaFamily = "box",
+    ) -> bool:
+        """Send one firmware announcement through the current Box session."""
+        session = self._sessions.get(device_id)
+        if (
+            session is None  # ruff: ignore[too-many-boolean-expressions]
+            or isinstance(session_generation, bool)
+            or session.generation != session_generation
+            or not isinstance(target_sn, str)
+            or not target_sn.strip()
+            or not firmware_types
+            or any(
+                not isinstance(name, str) or not name or "," in name
+                for name in firmware_types
+            )
+            or len(set(firmware_types)) != len(firmware_types)
+        ):
+            return False
+        key = self._key_resolver(device_id)
+        if key is None:
+            return False
+        expected_profile = (
+            "box_fixed" if family == "box" else None if family == "home" else family
+        )
+        async with session.write_lock:
+            if (
+                not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                or not getattr(session.client, "is_connected", False)
+                or not session.notify_started
+                or session.write_mtu is None
+                or self._profile_resolver is None
+                or self._profile_resolver(device_id) != expected_profile
+                or self._key_resolver(device_id) != key
+                or is_safe(target_sn) is not True
+                or session.ota_start_consumed
+                or not session.notify_queue.empty()
+            ):
+                return False
+            body = json.dumps(
+                {"cmd": 101, "sn": target_sn, "f": ",".join(firmware_types)},
+                separators=(",", ":"),
+            ).encode()
+            mtu = (
+                min(session.write_mtu, 315)
+                if family in {"rc4", "aes_fixed"}
+                else session.write_mtu
+            )
+            chunks = ble.split_body_for_mtu(body, mtu)
+            for index, chunk in enumerate(chunks, start=1):
+                if (
+                    not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                    or not getattr(session.client, "is_connected", False)
+                    or self._profile_resolver is None
+                    or self._profile_resolver(device_id) != expected_profile
+                    or self._key_resolver(device_id) != key
+                    or is_safe(target_sn) is not True
+                    or not session.notify_queue.empty()
+                ):
+                    if index > 1:
+                        msg = "Box OTA announcement interrupted"
+                        raise RuntimeError(msg)
+                    return False
+                action = 247 if family == "box" else 3007 if family == "home" else 3
+                if family in {"rc4", "aes_fixed"}:
+                    plain = ble.build_portable_legacy_frame(
+                        action_id=action,
+                        ble_cmd=101,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = ble.encrypt_portable_legacy_frame(
+                        plain, key, cipher=family
+                    )
+                else:
+                    plain = ble.build_binary_frame(
+                        flags=action,
+                        cmd=101,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = (
+                        ble.encrypt_box_frame(plain, key)
+                        if family == "box"
+                        else ble.encrypt_binary_notify(plain, key)
+                    )
+                capacity = self._write_capacity(session.client)
+                if capacity is not None and len(encrypted) > capacity:
+                    msg = "Box OTA announcement exceeds the current GATT write capacity"
+                    raise RuntimeError(msg)
+                if index == len(chunks):
+                    session.ota_start_sequence = session.notify_sequence
+                if not session.ota_start_consumed:
+                    session.ota_start_consumed = True
+                await asyncio.wait_for(
+                    session.client.write_gatt_char(
+                        ble.BLE_WRITE_CHAR_UUID, encrypted, response=False
+                    ),
+                    timeout=10.0,
+                )
+        return True
+
+    async def async_send_box_ota_count(  # ruff: ignore[too-many-arguments, too-many-return-statements, too-many-branches]
+        self,
+        device_id: str,
+        *,
+        request: BleFrameObservation,
+        target_sn: str,
+        firmware_type: str,
+        page_count: int,
+        firmware_size: int,
+        session_generation: int,
+        is_safe: Callable[[], bool],
+        family: _OtaFamily = "box",
+    ) -> bool:
+        """Answer one current Box firmware page-count request."""
+        session = self._sessions.get(device_id)
+        frame = request.parsed
+        if (
+            session is None  # ruff: ignore[too-many-boolean-expressions]
+            or frame is None
+            or (session.ota_start_consumed and session.ota_events is None)
+            or frame.cmd != MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE
+            or request.is_fragment
+            or request.decode_error is not None
+            or request.protocol_status != 0
+        ):
+            return False
+        try:
+            request_body = json.loads(frame.body.decode("utf-8"))
+        except UnicodeDecodeError, json.JSONDecodeError:
+            return False
+        if (
+            not isinstance(request_body, dict)  # ruff: ignore[too-many-boolean-expressions]
+            or request_body.get("f") != firmware_type
+            or not isinstance(firmware_type, str)
+            or not firmware_type
+            or not isinstance(target_sn, str)
+            or not target_sn
+            or isinstance(page_count, bool)
+            or not isinstance(page_count, int)
+            or not 1 <= page_count <= _UINT16_MAX
+            or isinstance(firmware_size, bool)
+            or not isinstance(firmware_size, int)
+            or firmware_size <= 0
+            or isinstance(session_generation, bool)
+            or session.generation != session_generation
+            or request.session_generation != session_generation
+        ):
+            return False
+        key = self._key_resolver(device_id)
+        if key is None or session.ota_count_key != key:
+            return False
+        expected_profile = (
+            "box_fixed" if family == "box" else None if family == "home" else family
+        )
+        async with session.write_lock:
+            if (
+                not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                or not getattr(session.client, "is_connected", False)
+                or not session.notify_started
+                or session.write_mtu is None
+                or session.write_mtu <= (50 if family == "box" else 60)
+                or self._profile_resolver is None
+                or self._profile_resolver(device_id) != expected_profile
+                or self._key_resolver(device_id) != key
+                or is_safe() is not True
+                or session.ota_count_request is not request
+                or request.notify_sequence is None
+                or not session.notify_queue.empty()
+                or (
+                    session.notify_inflight is not None
+                    and session.notify_inflight[0] > request.notify_sequence
+                )
+                or session.last_ota_reply_sequence >= request.notify_sequence
+            ):
+                return False
+            mtu = (
+                min(session.write_mtu, 315)
+                if family in {"rc4", "aes_fixed"}
+                else session.write_mtu
+            )
+            page_size = mtu - (50 if family == "box" else 60)
+            if (firmware_size + page_size - 1) // page_size != page_count:
+                return False
+            body_fields = {
+                "cmd": 102,
+                "sn": target_sn,
+                "f": firmware_type,
+                "p": page_count,
+            }
+            if family in {"box", "home"}:
+                body_fields["s"] = firmware_size
+            body = json.dumps(body_fields, separators=(",", ":")).encode()
+            chunks = ble.split_body_for_mtu(body, mtu)
+            for index, chunk in enumerate(chunks, start=1):
+                if (
+                    not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                    or not getattr(session.client, "is_connected", False)
+                    or self._profile_resolver is None
+                    or self._profile_resolver(device_id) != expected_profile
+                    or self._key_resolver(device_id) != key
+                    or is_safe() is not True
+                    or session.ota_count_request is not request
+                    or not session.notify_queue.empty()
+                    or (
+                        session.notify_inflight is not None
+                        and session.notify_inflight[0] > request.notify_sequence
+                    )
+                ):
+                    if index > 1:
+                        msg = "Box OTA count response interrupted"
+                        raise RuntimeError(msg)
+                    return False
+                action = 246 if family == "box" else 3008 if family == "home" else 4
+                if family in {"rc4", "aes_fixed"}:
+                    plain = ble.build_portable_legacy_frame(
+                        action_id=action,
+                        ble_cmd=102,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = ble.encrypt_portable_legacy_frame(
+                        plain, key, cipher=family
+                    )
+                else:
+                    plain = ble.build_binary_frame(
+                        flags=action,
+                        cmd=102,
+                        frame_index=index,
+                        chunk_count=len(chunks),
+                        body=chunk,
+                    )
+                    encrypted = (
+                        ble.encrypt_box_frame(plain, key)
+                        if family == "box"
+                        else ble.encrypt_binary_notify(plain, key)
+                    )
+                capacity = self._write_capacity(session.client)
+                if capacity is not None and len(encrypted) > capacity:
+                    msg = "Box OTA count exceeds the current GATT write capacity"
+                    raise RuntimeError(msg)
+                session.last_ota_reply_sequence = request.notify_sequence
+                await asyncio.wait_for(
+                    session.client.write_gatt_char(
+                        ble.BLE_WRITE_CHAR_UUID, encrypted, response=False
+                    ),
+                    timeout=10.0,
+                )
+        return True
+
+    async def async_send_box_ota_page(  # ruff: ignore[too-many-arguments, too-many-return-statements]
+        self,
+        device_id: str,
+        pages: tuple[bytes, ...],
+        *,
+        request: BleFrameObservation,
+        firmware_type: str,
+        page_index: int,
+        session_generation: int,
+        is_safe: Callable[[], bool],
+        family: _OtaFamily = "box",
+    ) -> bool:
+        """Write a requested Box firmware page only through its owning session."""
+        session = self._sessions.get(device_id)
+        frame = request.parsed
+        if (
+            frame is None
+            or frame.cmd != MQTT_CMD_DEVICE_GET_OTA_PAGE_DATA
+            or request.is_fragment
+            or request.decode_error is not None
+            or request.protocol_status != 0
+        ):
+            return False
+        try:
+            request_body = json.loads(frame.body.decode("utf-8"))
+        except UnicodeDecodeError, json.JSONDecodeError:
+            return False
+        if (
+            not isinstance(request_body, dict)
+            or request_body.get("f") != firmware_type
+            or isinstance(request_body.get("p"), bool)
+            or not isinstance(request_body.get("p"), int)
+            or request_body.get("p") != page_index
+        ):
+            return False
+        if (
+            isinstance(session_generation, bool)  # ruff: ignore[too-many-boolean-expressions]
+            or not isinstance(session_generation, int)
+            or session is None
+            or (session.ota_start_consumed and session.ota_events is None)
+            or session.generation != session_generation
+            or not session.notify_started
+            or session.write_mtu is None
+            or not self._session_is_current(device_id, session)
+            or request.session_generation != session_generation
+        ):
+            return False
+        key = self._key_resolver(device_id)
+        if key is None or session.ota_page_key != key:
+            return False
+        expected_profile = (
+            "box_fixed" if family == "box" else None if family == "home" else family
+        )
+        async with session.write_lock:
+            if (
+                not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                or not getattr(session.client, "is_connected", False)
+                or not session.notify_started
+                or session.write_mtu is None
+                or self._profile_resolver is None
+                or self._profile_resolver(device_id) != expected_profile
+                or self._key_resolver(device_id) != key
+                or is_safe() is not True
+            ):
+                return False
+            mtu = (
+                min(session.write_mtu, 315)
+                if family in {"rc4", "aes_fixed"}
+                else session.write_mtu
+            )
+            if any(len(page) > mtu - (50 if family == "box" else 60) for page in pages):
+                msg = "Box OTA page exceeds the current session MTU"
+                raise ValueError(msg)
+            encrypted = (
+                ble.encrypt_box_ota_page(pages, page_index=page_index, key=key)
+                if family == "box"
+                else ble.encrypt_home_ota_page(pages, page_index=page_index, key=key)
+                if family == "home"
+                else ble.encrypt_portable_ota_page(
+                    pages, page_index=page_index, key=key, profile=family
+                )
+            )
+            capacity = self._write_capacity(session.client)
+            if capacity is not None and len(encrypted) > capacity:
+                msg = "Box OTA page exceeds the current GATT write capacity"
+                raise RuntimeError(msg)
+
+            async def write_if_current() -> bool:
+                if (
+                    not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                    or not getattr(session.client, "is_connected", False)
+                    or self._profile_resolver is None
+                    or self._profile_resolver(device_id) != expected_profile
+                    or self._key_resolver(device_id) != key
+                    or is_safe() is not True
+                    or session.ota_page_request is not request
+                    or request.notify_sequence is None
+                    or not session.notify_queue.empty()
+                    or (
+                        session.notify_inflight is not None
+                        and session.notify_inflight[0] > request.notify_sequence
+                    )
+                    or session.last_ota_reply_sequence >= request.notify_sequence
+                ):
+                    return False
+                session.last_ota_reply_sequence = request.notify_sequence
+                await session.client.write_gatt_char(
+                    ble.BLE_WRITE_CHAR_UUID, encrypted, response=False
+                )
+                return True
+
+            return await asyncio.wait_for(write_if_current(), timeout=10.0)
 
     async def async_send_command(  # ruff: ignore[too-many-arguments]
         self,
@@ -1022,6 +2031,8 @@ class JackeryBleListener:
         wait_for_ack: bool = False,
         ack_timeout_sec: float = DEFAULT_BLE_ACK_TIMEOUT_SEC,
         mtu_override: int | None = None,
+        expected_profile: str | None = None,
+        is_safe: Callable[[], bool] | None = None,
     ) -> bool:
         """Send one logical command frame over BLE.
 
@@ -1039,6 +2050,8 @@ class JackeryBleListener:
             `wait_for_ack` is True.
             mtu_override (int | None): Optional MTU to use instead of the negotiated or
             default MTU (used for tests/diagnostics).
+            is_safe (Callable[[], bool] | None): Optional guard checked inside the
+            session lock and before each GATT chunk.
 
         Returns:
             bool: `True` if the GATT write completed (and, when requested, a matching
@@ -1057,6 +2070,8 @@ class JackeryBleListener:
             wait_for_ack=wait_for_ack,
             ack_timeout_sec=ack_timeout_sec,
             mtu_override=mtu_override,
+            expected_profile=expected_profile,
+            is_safe=is_safe,
         )
         self._validate_command(command)
         return await self._async_send_command(device_id, command)
@@ -1085,7 +2100,7 @@ class JackeryBleListener:
             msg = "mtu_override must be an integer"
             raise ValueError(msg)
 
-    async def _async_send_command(
+    async def _async_send_command(  # ruff: ignore[too-many-branches, too-many-statements, complex-structure]
         self,
         device_id: str,
         command: _BleCommand,
@@ -1095,34 +2110,79 @@ class JackeryBleListener:
         if (
             session is None
             or not session.notify_started
+            or session.write_mtu is None
+            or session.write_mtu < _MIN_WRITE_MTU
             or not self._session_is_current(device_id, session)
         ):
             return False
         client = session.client
         if not getattr(client, "is_connected", False):
             return False
-        key = self._key_resolver(device_id)
-        if key is None:
-            msg = f"no bluetoothKey available for device {device_id}"
-            raise RuntimeError(msg)
         mtu = (
-            command.mtu_override
+            min(command.mtu_override, session.write_mtu)
             if command.mtu_override is not None
-            else self.mtu_for_device(device_id)
+            else session.write_mtu
         )
-        try:
-            chunks = ble.split_body_for_mtu(command.body, mtu)
-        except ValueError as err:
-            msg = f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
-            raise RuntimeError(msg) from err
         # The protocol has no transaction id. Keep one logical write (all chunks
         # plus its optional explicit ACK wait) under the session lock so concurrent
         # service calls cannot interleave.
         async with session.write_lock:
-            if not self._session_is_current(device_id, session) or not getattr(
-                client, "is_connected", False
+            if (
+                not self._session_is_current(device_id, session)  # ruff: ignore[too-many-boolean-expressions]
+                or not getattr(client, "is_connected", False)
+                or session.ota_events is not None
+                or (session.ota_start_consumed and not session.ota_completed)
+                or (
+                    self._ota_pending_resolver is not None
+                    and self._ota_pending_resolver(device_id)
+                )
+                or (command.is_safe is not None and command.is_safe() is not True)
             ):
                 return False
+            profile = (
+                self._profile_resolver(device_id) if self._profile_resolver else None
+            )
+            if profile not in {None, "rc4", "aes_fixed", "aes_random", "box_fixed"}:
+                msg = f"unknown BLE protocol for device {device_id}"
+                raise RuntimeError(msg)
+            if command.expected_profile is not None and command.expected_profile != (
+                profile or "home"
+            ):
+                msg = f"BLE device profile changed before write for {device_id}"
+                raise RuntimeError(msg)
+            if (
+                profile == "box_fixed"
+                and (
+                    command.msg_id,
+                    command.ble_msg_type,
+                )
+                in session.uncertain_ack_pairs
+            ):
+                msg = (
+                    f"previous Box ack is uncertain for {device_id}; reconnect required"
+                )
+                raise RuntimeError(msg)
+            if (
+                profile == "box_fixed"
+                and (command.msg_id, command.ble_msg_type) in BOX_BLE_WRITE_PAIRS
+                and not command.wait_for_ack
+            ):
+                msg = f"Box write requires an ack for {device_id}"
+                raise RuntimeError(msg)
+            key = self._key_resolver(device_id)
+            if key is None:
+                msg = f"no bluetoothKey available for device {device_id}"
+                raise RuntimeError(msg)
+            body = command.body
+            if profile in {"rc4", "aes_fixed"}:
+                mtu = min(mtu, 315)
+                if body == b"{}":
+                    body = b""
+            try:
+                chunks = ble.split_body_for_mtu(body, mtu)
+            except ValueError as err:
+                msg = f"BLE MTU {mtu} too small to fit any body for {device_id}: {err}"
+                raise RuntimeError(msg) from err
             # Register the ACK *before* the write — otherwise a fast-echoing
             # peripheral could deliver the notify before the future exists.
             pending: _PendingAck | None = None
@@ -1132,6 +2192,7 @@ class JackeryBleListener:
                     session,
                     command.msg_id,
                     command.ble_msg_type,
+                    require_msg_id=profile is not None,
                 )
             try:
                 await self._async_write_command_chunks(
@@ -1140,15 +2201,31 @@ class JackeryBleListener:
                     chunks,
                     key=key,
                     command=command,
+                    profile=profile,
                 )
             except TimeoutError as err:
+                if profile == "box_fixed" and pending is not None:
+                    session.uncertain_ack_pairs.add((
+                        command.msg_id,
+                        command.ble_msg_type,
+                    ))
                 self._discard_optional_pending_ack(device_id, pending)
                 msg = f"BLE write to {device_id} timed out after {command.timeout_sec}s"
                 raise RuntimeError(msg) from err
             except asyncio.CancelledError:
+                if profile == "box_fixed" and pending is not None:
+                    session.uncertain_ack_pairs.add((
+                        command.msg_id,
+                        command.ble_msg_type,
+                    ))
                 self._discard_optional_pending_ack(device_id, pending)
                 raise
             except Exception as err:  # bleak surfaces BleakError + variants
+                if profile == "box_fixed" and pending is not None:
+                    session.uncertain_ack_pairs.add((
+                        command.msg_id,
+                        command.ble_msg_type,
+                    ))
                 self._discard_optional_pending_ack(device_id, pending)
                 msg = f"BLE write to {device_id} failed: {err}"
                 raise RuntimeError(msg) from err
@@ -1159,10 +2236,19 @@ class JackeryBleListener:
                     msg_id=command.msg_id,
                     ble_msg_type=command.ble_msg_type,
                     ack_timeout_sec=command.ack_timeout_sec,
+                    quarantine_on_timeout=profile == "box_fixed",
                 )
+            if command.is_safe is not None and command.is_safe() is not True:
+                if profile == "box_fixed" and pending is not None:
+                    session.uncertain_ack_pairs.add((
+                        command.msg_id,
+                        command.ble_msg_type,
+                    ))
+                msg = f"BLE identity or session changed after write for {device_id}"
+                raise RuntimeError(msg)
         return True
 
-    async def _await_pending_ack(
+    async def _await_pending_ack(  # ruff: ignore[too-many-arguments]
         self,
         device_id: str,
         pending: _PendingAck,
@@ -1170,6 +2256,7 @@ class JackeryBleListener:
         msg_id: int,
         ble_msg_type: int,
         ack_timeout_sec: float,
+        quarantine_on_timeout: bool = False,
     ) -> None:
         """Wait for a registered ACK future, updating stats and cleanup.
 
@@ -1193,6 +2280,8 @@ class JackeryBleListener:
                 asyncio.shield(pending.future), timeout=ack_timeout_sec
             )
         except TimeoutError as err:
+            if quarantine_on_timeout:
+                pending.session.uncertain_ack_pairs.add((msg_id, ble_msg_type))
             self._discard_pending_ack(device_id, pending)
             stats.acks_timed_out += 1
             stats.last_error = f"ack timeout msgId={msg_id} bleMsgType={ble_msg_type}"
@@ -1202,6 +2291,8 @@ class JackeryBleListener:
             )
             raise RuntimeError(msg) from err
         except asyncio.CancelledError as err:
+            if quarantine_on_timeout:
+                pending.session.uncertain_ack_pairs.add((msg_id, ble_msg_type))
             self._discard_pending_ack(device_id, pending)
             task = asyncio.current_task()
             if pending.future.cancelled() and (task is None or task.cancelling() == 0):
@@ -1225,6 +2316,8 @@ class JackeryBleListener:
         session: _GattSession,
         msg_id: int,
         ble_msg_type: int,
+        *,
+        require_msg_id: bool = False,
     ) -> _PendingAck:
         """Register a pending ACK wait record for the given device.
 
@@ -1247,6 +2340,7 @@ class JackeryBleListener:
             registered_notify_sequence=session.notify_sequence,
             future=loop.create_future(),
             session=session,
+            require_msg_id=require_msg_id,
         )
         self._pending_acks.setdefault(device_id, []).append(pending)
         return pending
@@ -1305,6 +2399,7 @@ class JackeryBleListener:
         frame: ble.BleBinaryFrame,
         *,
         notify_sequence: int | None,
+        error: str | None = None,
     ) -> None:
         """Fulfil every pending ACK on ``device_id`` matched by ``frame``.
 
@@ -1325,8 +2420,13 @@ class JackeryBleListener:
             if notify_sequence <= pending.registered_notify_sequence:
                 remaining.append(pending)
                 continue
-            if frame.cmd == pending.expected_ble_msg_type:
-                pending.future.set_result(frame)
+            if frame.cmd == pending.expected_ble_msg_type and (
+                not pending.require_msg_id or frame.flags == pending.expected_msg_id
+            ):
+                if error is None:
+                    pending.future.set_result(frame)
+                else:
+                    pending.future.set_exception(RuntimeError(error))
                 continue
             remaining.append(pending)
         if remaining:
@@ -1391,6 +2491,8 @@ class JackeryBleListener:
             will be created lazily for a device the first time an advertisement matching
             the listener's BLE matcher is seen.
         """
+        if self._hass.is_stopping:
+            return
         stop_task = self._stop_task
         if stop_task is not None and not stop_task.done():
             msg = "Jackery BLE listener teardown is still in progress"
@@ -1420,7 +2522,6 @@ class JackeryBleListener:
 
         matcher: BluetoothCallbackMatcher = {
             "service_uuid": ble.BLE_SERVICE_UUID,
-            "manufacturer_id": ble.BLE_MANUFACTURER_ID,
         }
         unregister = bluetooth_module.async_register_callback(
             self._hass,
@@ -1451,10 +2552,9 @@ class JackeryBleListener:
         # logbook. Without this line a silent listener (zero further
         # callbacks) is indistinguishable from a misconfigured matcher.
         _LOGGER.info(
-            "Jackery BLE: matcher registered (service_uuid=%s, "
-            "manufacturer_id=%#x) for %d device(s); awaiting advertisements",
+            "Jackery BLE: matcher registered (service_uuid=%s) "
+            "for %d device(s); awaiting advertisements",
             ble.BLE_SERVICE_UUID,
-            ble.BLE_MANUFACTURER_ID,
             len(device_ids),
         )
 
@@ -1481,7 +2581,7 @@ class JackeryBleListener:
     def _spawn_connection_if_ready(self, device_id: str) -> None:
         """Start one non-blocking runner when identity and address are known."""
         address = self._device_addresses.get(device_id)
-        if address is None or self._stop_event.is_set():
+        if address is None or self._stop_event.is_set() or self._hass.is_stopping:
             return
         existing = self._connections.get(device_id)
         if existing is not None and not existing.done():
@@ -1534,6 +2634,9 @@ class JackeryBleListener:
         session_items: tuple[tuple[str, _GattSession], ...] = tuple(
             self._sessions.items(),
         )
+        if self._disconnect_callback is not None:
+            for device_id, session in session_items:
+                self._disconnect_callback(device_id, session.generation)
         self._fence_callbacks_and_ack_waiters()
         await self._async_teardown_sessions(session_items)
         connection_items = await self._async_stop_connections()
@@ -1622,7 +2725,10 @@ class JackeryBleListener:
                 self._connections.pop(device_id, None)
         for device_id, session in session_items:
             session.active = False
-            dropped = self._clear_frame_assemblies(device_id, session)
+            self._signal_ota_session_end(session)
+            dropped = self._clear_frame_assemblies(
+                device_id, session, reason="transport_shutdown"
+            )
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
             if self._sessions.get(device_id) is not session:
@@ -1634,13 +2740,17 @@ class JackeryBleListener:
                 self._mtu_owners.pop(device_id, None)
                 self._mtu.pop(device_id, None)
         for device_id, owner in list(self._frame_assembly_owners.items()):
-            dropped = self._clear_frame_assemblies(device_id, owner)
+            dropped = self._clear_frame_assemblies(
+                device_id, owner, reason="transport_shutdown"
+            )
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
         for device_id in list(self._frame_assemblies):
             if device_id in self._frame_assembly_owners:
                 continue
-            dropped = self._clear_frame_assemblies(device_id)
+            dropped = self._clear_frame_assemblies(
+                device_id, reason="transport_shutdown"
+            )
             if dropped:
                 self.stats_for(device_id).multi_chunk_assemblies_dropped += dropped
 
@@ -1722,22 +2832,27 @@ class JackeryBleListener:
         for cached_id, cached_mac in self._device_addresses.items():
             if cached_mac.upper() == address.upper():
                 return cached_id
-        # Step 2: decode the serial from manufacturer data.
-        mfr_data = (service_info.manufacturer_data or {}).get(ble.BLE_MANUFACTURER_ID)
-        serial: str | None = None
-        if isinstance(mfr_data, bytes):
+        # App manufacturer keys encode the category and the first serial byte.
+        matches: set[str] = set()
+        for manufacturer_id, mfr_data in (service_info.manufacturer_data or {}).items():
+            prefix, category = divmod(manufacturer_id, 256)
+            if category not in {1, 2, 8, 9} or not (
+                _ASCII_SERIAL_MIN <= prefix <= _ASCII_SERIAL_MAX
+            ):
+                continue
             try:
                 serial = mfr_data.decode("ascii").strip()
             except UnicodeDecodeError:
-                serial = None
-        if serial is None:
+                continue
+            if not serial or self._serial_resolver is None:
+                continue
+            for candidate in (chr(prefix) + serial, serial):
+                device_id = self._serial_resolver(candidate)
+                if device_id is not None:
+                    matches.add(device_id)
+        if len(matches) != 1:
             return None
-        # Step 3: ask the coordinator for the matching device id.
-        device_id: str | None = None
-        if self._serial_resolver is not None:
-            device_id = self._serial_resolver(serial)
-        if device_id is None:
-            return None
+        device_id = next(iter(matches))
         # Step 4: bind only an unambiguous configured identity. Raw serials and
         # adapter addresses are intentionally absent from support logs.
         if not self._bind_device_address(device_id, address):
@@ -1768,7 +2883,7 @@ class JackeryBleListener:
         stats = self.stats_for(device_id)
         runner_task = asyncio.current_task()
         try:  # ruff: ignore[too-many-statements-in-try-clause] - the try deliberately owns the runner lifecycle
-            while not self._stop_event.is_set():
+            while not self._stop_event.is_set() and not self._hass.is_stopping:
                 retained_session = self._sessions.get(device_id)
                 if retained_session is not None:
                     try:
@@ -1808,6 +2923,8 @@ class JackeryBleListener:
                         pass
                     else:
                         return
+                if self._stop_event.is_set() or self._hass.is_stopping:
+                    return
                 bluetooth_module = self._ha_bluetooth
                 if bluetooth_module is None:
                     stats.last_error = "Home Assistant Bluetooth is not loaded"
@@ -1866,6 +2983,8 @@ class JackeryBleListener:
                         max_attempts=1,
                     )
                 except BLEAK_RETRY_EXCEPTIONS as err:
+                    if self._stop_event.is_set() or self._hass.is_stopping:
+                        return
                     stats.connect_failures += 1
                     stats.last_error = f"connect: {err}"
                     # PROTOCOL.md §4: the peripheral may stop advertising
@@ -1888,8 +3007,10 @@ class JackeryBleListener:
                         return
                     continue
 
-                if self._stop_event.is_set() or not self._connection_is_current(
-                    device_id, runner_task
+                if (
+                    self._stop_event.is_set()
+                    or self._hass.is_stopping
+                    or not self._connection_is_current(device_id, runner_task)
                 ):
                     try:
                         await asyncio.wait_for(client.disconnect(), timeout=5.0)
@@ -1953,6 +3074,7 @@ class JackeryBleListener:
                     # (hence ASYNC110 is suppressed below).
                     while (
                         not self._stop_event.is_set()
+                        and not self._hass.is_stopping
                         and client.is_connected
                         and self._session_is_current(device_id, session)
                     ):
@@ -1980,8 +3102,14 @@ class JackeryBleListener:
                     await self._teardown_session(device_id, session)
                     stats.last_disconnect_at = datetime.now(UTC)
 
-                if self._stop_event.is_set():
+                if self._stop_event.is_set() or self._hass.is_stopping:
                     return
+                if (
+                    session.identity_refresh_requested
+                    and device_id not in self._identity_refresh_seen
+                ):
+                    self._identity_refresh_seen.add(device_id)
+                    continue
                 # PROTOCOL.md §4: BLE peripherals routinely drop idle
                 # sessions; the surrounding ``while not self._stop_event``
                 # loop reconnects after this backoff. Logged at INFO so
@@ -1993,7 +3121,12 @@ class JackeryBleListener:
                 )
                 self._log_connection_unavailable(
                     device_id,
-                    "Jackery BLE %s: lost link, backoff %ss before retry",
+                    (
+                        "Jackery BLE %s: repeated identity changes, "
+                        "backoff %ss before retry"
+                        if session.identity_refresh_requested
+                        else "Jackery BLE %s: lost link, backoff %ss before retry"
+                    ),
                     device_id,
                     delay,
                 )
@@ -2060,6 +3193,9 @@ class JackeryBleListener:
             session.active = False
             session.accepting_notifications = False
             session.notify_started = False
+            self._signal_ota_session_end(session)
+            if generation is not None and self._disconnect_callback is not None:
+                self._disconnect_callback(device_id, generation)
         stats = self.stats_for(device_id)
         stats.last_disconnect_at = datetime.now(UTC)
         # Promoted from DEBUG to INFO: peripheral disconnects are the
@@ -2090,7 +3226,9 @@ class JackeryBleListener:
         session: _GattSession | None = None,
         notify_sequence: int | None = None,
         received_monotonic: float | None = None,
+        received_at: datetime | None = None,
         accepted: bool = False,
+        notification_key: bytes | None = None,
     ) -> tuple[ble.BleBinaryFrame | None, int | None]:
         """Return a complete frame and its earliest queued notification sequence."""
         stats = self.stats_for(device_id)
@@ -2154,6 +3292,15 @@ class JackeryBleListener:
                 stats.multi_chunk_expired_by_cmd[cmd] = (
                     stats.multi_chunk_expired_by_cmd.get(cmd, 0) + 1
                 )
+                recover = getattr(self, "_on_reassembly_gap", None)
+                if callable(recover):
+                    try:
+                        recover(device_id, cmd, key[1])
+                    except Exception:
+                        # A failed retry scheduler must never discard another frame.
+                        _LOGGER.exception(
+                            "BLE missing-chunk recovery scheduling failed"
+                        )
             stats.multi_chunk_assemblies_dropped += len(expired)
             if not assemblies:
                 self._clear_frame_assemblies(device_id, session)
@@ -2182,6 +3329,20 @@ class JackeryBleListener:
 
         key = (frame.cmd, frame.flags)
         assembly = assemblies.get(key)
+        if (
+            (
+                frame.cmd in {100, 101, 102, 103, 104}
+                or (frame.flags, frame.cmd) in {(3011, 106), (6, 3)}
+                or (frame.flags, frame.cmd) in {(252, 9), (248, 100)}
+            )
+            and assembly is not None
+            and assembly.ota_key != notification_key
+        ):
+            assemblies.pop(key, None)
+            self._record_multi_chunk_drop_reason(stats, frame.cmd, "ota_key_changed")
+            stats.multi_chunk_assemblies_dropped += 1
+            msg = "OTA fragment key changed during reassembly"
+            raise ValueError(msg)
         if assembly is not None and assembly.chunk_count != frame.chunk_count:
             assemblies.pop(key, None)
             self._record_multi_chunk_drop_reason(
@@ -2199,6 +3360,15 @@ class JackeryBleListener:
                     stats, frame.cmd, "first_chunk_changed"
                 )
                 stats.multi_chunk_assemblies_dropped += 1
+                recover = getattr(self, "_on_reassembly_gap", None)
+                if callable(recover):
+                    try:
+                        recover(device_id, frame.cmd, frame.flags)
+                    except Exception:
+                        # A failed retry scheduler must never stop fragment ingress.
+                        _LOGGER.exception(
+                            "BLE changed-prefix recovery scheduling failed"
+                        )
                 assembly = None
         if assembly is None:
             if len(assemblies) >= _REASSEMBLY_MAX_MESSAGES_PER_DEVICE:
@@ -2214,6 +3384,9 @@ class JackeryBleListener:
                 frames={},
                 updated_at=now,
                 first_notify_sequence=notify_sequence,
+                ota_key=notification_key,
+                first_received_at=received_at,
+                first_received_monotonic=received_monotonic,
             )
             assemblies[key] = assembly
         elif assembly.first_notify_sequence is None or notify_sequence is None:
@@ -2237,6 +3410,9 @@ class JackeryBleListener:
                     frames={frame.frame_index: frame},
                     updated_at=now,
                     first_notify_sequence=notify_sequence,
+                    ota_key=notification_key,
+                    first_received_at=received_at,
+                    first_received_monotonic=received_monotonic,
                 )
                 assemblies[key] = assembly
                 stats.multi_chunk_frames_buffered += 1
@@ -2291,6 +3467,9 @@ class JackeryBleListener:
                 for index in range(1, assembly.chunk_count + 1)
             ),
             trailer=last_frame.trailer,
+            checksum_valid=all(
+                chunk.checksum_valid is True for chunk in assembly.frames.values()
+            ),
         )
         first_notify_sequence = assembly.first_notify_sequence
         assemblies.pop(key, None)
@@ -2335,16 +3514,21 @@ class JackeryBleListener:
             except Exception as err:  # ruff: ignore[blind-except]
                 self._record_sink_failure(device_id, stats, str(err))
             else:
-                previous_sink_error = stats.last_sink_error
-                if sink_processed and previous_sink_error is not None:
-                    stats.last_sink_error = None
-                    if stats.last_error == previous_sink_error:
-                        stats.last_error = stats.last_decode_error
-                    _LOGGER.info(
-                        "Jackery BLE %s: coordinator sink recovered",
-                        device_id,
+                if sink_processed is BleProcessDisposition.RETRY:
+                    self._record_sink_failure(
+                        device_id, stats, "coordinator requested retry"
                     )
-                return sink_processed
+                else:
+                    previous_sink_error = stats.last_sink_error
+                    if sink_processed and previous_sink_error is not None:
+                        stats.last_sink_error = None
+                        if stats.last_error == previous_sink_error:
+                            stats.last_error = stats.last_decode_error
+                        _LOGGER.info(
+                            "Jackery BLE %s: coordinator sink recovered",
+                            device_id,
+                        )
+                    return bool(sink_processed)
             await asyncio.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, _SINK_RETRY_MAX_SEC)
 
@@ -2360,23 +3544,47 @@ class JackeryBleListener:
             session is None or accepted or self._session_is_current(device_id, session)
         )
 
-    def _decode_notification_payload(
+    def _decode_notification_payload(  # ruff: ignore[too-many-return-statements]
         self,
         device_id: str,
         raw: bytes,
-    ) -> tuple[ble.BleBinaryFrame | None, str | None]:
+    ) -> tuple[ble.BleBinaryFrame | None, str | None, int | None]:
         """Decode raw or proxy-base64-wrapped bytes without discarding either path."""
         key = self._key_resolver(device_id)
         if key is None:
-            return None, "no bluetoothKey for device"
+            return None, "no bluetoothKey for device", None
+        profile = self._profile_resolver(device_id) if self._profile_resolver else None
+        if profile not in {None, "rc4", "aes_fixed", "aes_random", "box_fixed"}:
+            return None, "unknown BLE protocol for device", None
+        if profile == "box_fixed":
+            try:
+                status, frame = ble.decode_box_notify(raw, key)
+            except ValueError as err:
+                return None, str(err), None
+            if status:
+                return frame, f"box notification status {status}", status
+            return frame, None, status
+        if profile in {"rc4", "aes_fixed"}:
+            try:
+                status, frame = ble.decode_portable_legacy_notify(
+                    raw, key, cipher=profile
+                )
+            except ValueError as err:
+                return None, str(err), None
+            if status:
+                return frame, f"portable notification status {status}", status
+            return frame, None, status
         try:
-            return ble.decrypt_binary_notify(raw, key), None
+            status, frame = ble.decode_binary_notify(raw, key)
         except ValueError as first_error:
             try:
                 decoded = base64.b64decode(raw, validate=False)
-                return ble.decrypt_binary_notify(decoded, key), None
-            except (ValueError, binascii.Error):  # fmt: skip
-                return None, str(first_error)
+                status, frame = ble.decode_binary_notify(decoded, key)
+            except ValueError, binascii.Error:
+                return None, str(first_error), None
+        if status:
+            return frame, f"notification status {status}", status
+        return frame, None, status
 
     @staticmethod
     def _record_decode_recovery(
@@ -2466,7 +3674,7 @@ class JackeryBleListener:
         if not pending:
             self._clear_frame_assemblies(device_id, session)
 
-    async def _handle_notification(  # ruff: ignore[too-many-arguments]
+    async def _handle_notification(  # ruff: ignore[too-many-arguments, too-many-branches, too-many-locals, too-many-statements, complex-structure]
         self,
         device_id: str,
         raw: bytes,
@@ -2517,19 +3725,76 @@ class JackeryBleListener:
                 len(raw),
             )
 
-        parsed, decode_error = self._decode_notification_payload(device_id, raw)
+        notification_key = self._key_resolver(device_id)
+        parsed, decode_error, protocol_status = self._decode_notification_payload(
+            device_id, raw
+        )
+        if session is not None and (
+            decode_error is not None
+            or (parsed is not None and parsed.cmd in {101, 102, 103, 104})
+        ):
+            session.ota_page_request = None
+            session.ota_page_key = None
+            session.ota_count_request = None
+            session.ota_count_key = None
+        if (
+            session is not None
+            and decode_error is not None
+            and self._frame_assembly_owners.get(device_id) is session
+        ):
+            assemblies = self._frame_assemblies.get(device_id, {})
+            ota_keys = [
+                key
+                for key in assemblies
+                if key[0] in {101, 102, 103, 104} or key in {(9, 252), (100, 248)}
+            ]
+            for ota_key in ota_keys:
+                assemblies.pop(ota_key, None)
+                self._record_multi_chunk_drop_reason(stats, ota_key[0], "decode_error")
+            stats.multi_chunk_assemblies_dropped += len(ota_keys)
+            if not assemblies:
+                self._clear_frame_assemblies(device_id, session)
+        rejected_frame = None
         ack_notify_sequence = notify_sequence
+        safety_received_at: datetime | None = observed_at
+        safety_received_monotonic = received_monotonic
+        if parsed is not None and decode_error is not None:
+            self._resolve_pending_acks(
+                device_id,
+                session,
+                parsed,
+                notify_sequence=notify_sequence,
+                error=decode_error,
+            )
+            rejected_frame = parsed
+            parsed = None
 
         if parsed is not None:
             assembled: ble.BleBinaryFrame | None
-            if _body_is_complete_json_object(
-                parsed.body
-            ) and not self._continues_pending_assembly(
-                device_id, parsed, session, received_monotonic
+            previous_assembly = None
+            profile = (
+                self._profile_resolver(device_id) if self._profile_resolver else None
+            )
+            portable_paged = parsed.chunk_count > 1 and (
+                profile in {"rc4", "aes_fixed", "aes_random", "box_fixed"}
+                or parsed.cmd in {100, 101, 102, 103, 104}
+            )
+            if (
+                not portable_paged
+                and _body_is_complete_json_object(parsed.body)
+                and not self._continues_pending_assembly(
+                    device_id, parsed, session, received_monotonic
+                )
             ):
                 self._reset_assembly_for_standalone_page(device_id, parsed, session)
                 assembled = parsed
+                if parsed.chunk_count > 1 and (parsed.flags, parsed.cmd) == (3011, 106):
+                    assembled = replace(parsed, checksum_valid=False)
             else:
+                previous_assembly = self._frame_assemblies.get(device_id, {}).get((
+                    parsed.cmd,
+                    parsed.flags,
+                ))
                 try:
                     assembled, ack_notify_sequence = self._reassemble_frame(
                         device_id,
@@ -2537,12 +3802,19 @@ class JackeryBleListener:
                         session=session,
                         notify_sequence=notify_sequence,
                         received_monotonic=received_monotonic,
+                        received_at=observed_at,
                         accepted=accepted,
+                        notification_key=notification_key,
                     )
                 except ValueError as err:
                     parsed = None
                     assembled = None
                     decode_error = f"reassembly: {err}"
+                    if session is not None:
+                        session.ota_page_request = None
+                        session.ota_page_key = None
+                        session.ota_count_request = None
+                        session.ota_count_key = None
             if parsed is not None:
                 self._record_decode_recovery(device_id, stats)
                 if assembled is None:
@@ -2555,6 +3827,19 @@ class JackeryBleListener:
                         notify_sequence=notify_sequence,
                         delivery_id=delivery_id,
                         is_fragment=True,
+                        protocol_status=protocol_status,
+                        device_identity=session.device_identity
+                        if session is not None
+                        else None,
+                        session_key_fingerprint=session.key_fingerprint
+                        if session is not None
+                        else None,
+                        received_at_monotonic=received_monotonic,
+                        key_fingerprint=(
+                            hashlib.sha256(notification_key).digest()
+                            if notification_key is not None
+                            else None
+                        ),
                     )
                     stats.last_frame = observation
                     # A fragment reaches diagnostics immediately but resolves no
@@ -2573,6 +3858,21 @@ class JackeryBleListener:
                         stats,
                     )
                     return
+                if assembled.chunk_count > 1:
+                    if (
+                        previous_assembly is None
+                        or ack_notify_sequence
+                        != previous_assembly.first_notify_sequence
+                        or previous_assembly.first_received_at is None
+                        or previous_assembly.first_received_monotonic is None
+                    ):
+                        safety_received_at = None
+                        safety_received_monotonic = None
+                    else:
+                        safety_received_at = previous_assembly.first_received_at
+                        safety_received_monotonic = (
+                            previous_assembly.first_received_monotonic
+                        )
                 parsed = assembled
 
         observation = BleFrameObservation(
@@ -2583,8 +3883,47 @@ class JackeryBleListener:
             decode_error=decode_error,
             session_generation=session_generation,
             notify_sequence=notify_sequence,
+            first_notify_sequence=ack_notify_sequence,
             delivery_id=delivery_id,
+            rejected_frame=rejected_frame,
+            protocol_status=protocol_status,
+            device_identity=session.device_identity if session is not None else None,
+            session_key_fingerprint=session.key_fingerprint
+            if session is not None
+            else None,
+            received_at_monotonic=safety_received_monotonic,
+            safety_received_at=safety_received_at,
+            key_fingerprint=(
+                hashlib.sha256(notification_key).digest()
+                if notification_key is not None
+                else None
+            ),
         )
+        if (
+            session is not None
+            and parsed is not None
+            and not (session.ota_start_consumed and session.ota_events is None)
+            and parsed.cmd == MQTT_CMD_DEVICE_GET_OTA_PAGE_DATA
+        ):
+            session.ota_page_request = observation
+            session.ota_page_key = notification_key
+        if (
+            session is not None
+            and parsed is not None
+            and not (session.ota_start_consumed and session.ota_events is None)
+            and parsed.cmd == MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE
+        ):
+            session.ota_count_request = observation
+            session.ota_count_key = notification_key
+        if (
+            session is not None
+            and session.ota_events is not None
+            and (
+                decode_error is not None
+                or (parsed is not None and parsed.cmd in {101, 102, 103, 104})
+            )
+        ):
+            session.ota_events.put_nowait(observation)
         stats.last_frame = observation
         if parsed is not None:
             if _should_log_ble_notification(stats.frames_decoded):

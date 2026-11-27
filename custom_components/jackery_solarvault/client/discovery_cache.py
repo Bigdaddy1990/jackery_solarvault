@@ -5,11 +5,10 @@
 import asyncio
 import copy
 import logging
-from collections.abc import Mapping
 from typing import Any, Final, TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.storage import Store
+from .storage import JackeryStore as Store
 
 from ..const import (
     CACHE_ENTRIES_KEY,

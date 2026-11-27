@@ -63,10 +63,8 @@ LOCAL_MQTT_MAX_PAYLOAD_BYTES: int = 128 * 1024
 # hass.data runtime key for the per-entry direct local-MQTT client. Single
 # source so __init__.py (writer) and local_mqtt.py (reader) cannot diverge.
 LOCAL_MQTT_RUNTIME_KEY: Final = "local_mqtt_client"
-# Default topic filter for the local HA-broker listener (docs/ENV.md:51+79).
-# The discovery topic is the documented HA root: ``homeassistant``. It is
-# never widened to a wildcard and never mixed with the cloud MQTT tree
-# (``hb/app/*``). Local MQTT and cloud MQTT are separate layers (2026-09-22).
+# Default exact topic for the shared local telemetry export.
+# Local broker filters are never mixed with the cloud ``hb/app/*`` tree.
 LOCAL_MQTT_DEFAULT_TOPIC: Final = "homeassistant"
 # Native Shelly RPC status pushes observed in the shared Home Assistant broker.
 # Subscribe to this exact topic only. The adapter filters high-rate BLE scan
@@ -77,7 +75,7 @@ SHELLY_RPC_EVENT_TOPIC: Final = "homeassistant/events/rpc"
 # ein einziger Connect-/Subscribe-Fehler den Runner endgueltig und der Layer
 # blieb bis zum naechsten Integrations-Reload tot (RX-Zaehler dauerhaft 0).
 LOCAL_MQTT_RECONNECT_INITIAL_SEC: Final = 5.0
-LOCAL_MQTT_RECONNECT_MAX_SEC: Final = 60.0
+LOCAL_MQTT_RECONNECT_MAX_SEC: Final = 300.0
 LOCAL_MQTT_RECONNECT_FACTOR: Final = 2.0
 _HOME_ASSISTANT_EVENT_HEAD_BYTES: int = 1024
 _LOCAL_MQTT_JACKERY_MARKER_KEYS = {
@@ -144,19 +142,16 @@ SUBDEVICE_FIELD_LAST_SEEN_AT: Final = "_last_seen_at"
 # mobile app logs in at the same time), rebuilding MQTT credentials on every
 # poll can create reconnect churn. Throttle reconnect attempts a little.
 MQTT_RECONNECT_THROTTLE_SEC: Final = 90
-MQTT_TRANSIENT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (30, 60, 120)
-MQTT_CONNECT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (300, 900, 1800)
+MQTT_TRANSIENT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (2, 5, 10)
+MQTT_CONNECT_BACKOFF_STEPS_SEC: Final[tuple[int, ...]] = (5, 10, 30)
 # Freshness window: an MQTT frame newer than this marks the MQTT channel as
-# live. Used to pause redundant cloud-MQTT once local-MQTT delivers and for
-# staleness diagnostics. HTTP polling is NEVER skipped based on this — HTTP is
-# the always-on, authoritative data path and is never gated by MQTT/BLE state
-# (owner invariant 2026-07-05).
+# live. Field selection and diagnostics use freshness after independent
+# acquisition; fresh Local MQTT never pauses Cloud MQTT, HTTP or BLE polling.
 MQTT_LIVE_THRESHOLD_SEC: Final = 15
 # Consecutive CONNACK auth rejections (rc=4/5/134/135) at this threshold are
 # logged loudly by the MQTT client. They do not trigger HA reauth by themselves:
 # the official Jackery app can rotate broker sessions while HTTP credentials
 # remain valid, so the coordinator pauses MQTT and keeps HTTP polling alive.
-MQTT_AUTH_FAILURE_TOLERANCE: Final = 3
 # When the broker rejects credentials with CONNACK rc=4/5/134/135, the most
 # likely cause is that the official Jackery app just logged in with the same
 # ``<userId>@APP`` clientId and the broker rotated our credentials. Reconnect-
@@ -267,9 +262,7 @@ COORDINATOR_SHUTDOWN_TIMEOUT_SEC: Final[float] = 10.0
 #: cadence is unchanged — the backoff only slows things down further
 #: when connects keep failing.
 BLE_CONNECT_BACKOFF_INITIAL_SEC: Final[float] = 30.0
-#: Cap for the exponential connect backoff (initial, doubled, cap). Repeated
-#: short GATT sessions are particularly hard on ESPHome proxies, so the ladder
-#: may cool down for ten minutes. A stable notify session resets it.
+#: Cap for the exponential connect backoff (initial, doubled, cap).
 BLE_CONNECT_BACKOFF_MAX_SEC: Final[float] = 600.0
 #: Hard timeout for ``async_stop()`` to wait for in-flight connection
 #: runners to honour cancellation. HA's shutdown sequence reports tasks
@@ -454,10 +447,14 @@ SHELLY_UNBIND_DEVICE_PATH: Final = "/v1/wss-cloud/device/shelly/unbind/device"
 SHELLY_UNBIND_ACCOUNT_PATH: Final = "/v1/wss-cloud/device/shelly/unbind/account"
 SHELLY_BINDING_FAILURES_PATH: Final = "/v1/device/shelly/binding/failures"
 BATTERY_PACK_PATH: Final = "/v1/device/battery/pack/list"  # ?deviceSn=<sn>
+# App 2.4.7 read-only device metric APIs, not part of automatic polling.
+BATTERY_PASSPORT_PATH: Final = "/v1/device/metric/detail"  # ?deviceSn=<sn>
+FAULT_LOG_PATH: Final = "/v1/device/metric/faults"  # ?deviceSn&pageNum&pageSize
+FAULT_LOG_MAX_PAGE_NUM: Final = 10000
+FAULT_LOG_MAX_PAGE_SIZE: Final = 100
 OTA_LIST_PATH: Final = "/v1/device/ota/list"  # ?deviceSnList=<sn>
 LOCATION_PATH: Final = "/v1/device/location"  # ?deviceId=<id>
 SYSTEM_NAME_PATH: Final = "/v1/device/system/name"  # PUT {systemName,id}
-MAX_POWER_SAVE_PATH: Final = "/v1/device/deviceMaxPowerRecord/saveRecord"
 
 # Legacy endpoint used by Explorer portables — kept as fallback only
 DEVICE_LIST_PATH: Final = "/v1/device/bind/list"
@@ -474,6 +471,12 @@ USER_INFO_PATH: Final = "/v1/user/info"
 CANCEL_ACCOUNT_PATH: Final = "/v1/auth/cancel"
 UPDATE_REGISTER_ID_PATH: Final = "/v1/auth/updateRegisterId"
 GENERATED_JWT_PATH: Final = "/v1/auth/generatedJwt"
+VERIFICATION_REQUEST_PATHS: Final = frozenset({
+    CHECK_VERIFY_CODE_PATH,
+    RESET_PASSWORD_PATH,
+    REGISTER_PATH,
+    CANCEL_ACCOUNT_PATH,
+})
 
 # --- Device management endpoints ---------------------------------------------
 DEVICE_BIND_PATH: Final = "/v1/device/bind"
@@ -513,6 +516,11 @@ SYSTEM_SHADOW_PATH: Final = "/v1/device/property/systemShadow"
 
 # --- Statistics endpoints (additional) ---------------------------------------
 SYMMETRY_STAT_PATH: Final = "/v1/device/stat/symmetry"
+# App C6755i / StoredEnergyChartActivity select metric names, never booleans.
+SYMMETRY_POSITIVE_METRICS: Final = "bcs"
+SYMMETRY_NEGATIVE_METRICS: Final = "bds"
+SYMMETRY_PORTABLE_POSITIVE_METRICS: Final = "acpspe,idce,iace"
+SYMMETRY_PORTABLE_NEGATIVE_METRICS: Final = "odce,oace,oce"
 CUTOFF_STAT_PATH: Final = "/v1/device/stat/cutoff"
 SOC_STAT_PATH: Final = "/v1/device/stat/soc"
 CARBON_STAT_PATH: Final = "/v1/device/stat/carbon"
@@ -543,6 +551,10 @@ BIND_CURRENCY_PATH: Final = "/v1/device/currencies/bindCurrency"
 BLE_OTA_LINK_PATH: Final = "/v1/device/ota/bluetooth"
 BLE_OTA_VERSIONS_PATH: Final = "/v1/device/ota/version/list"
 OTA_UPDATE_PATH: Final = "/v1/device/ota/update"
+
+# 2.4.2 AiEmsEnergyPredictionVM uses GET; RequestServer prefixes v1/.
+AIEMS_ENERGY_PREDICTION_PATH: Final = "/v1/api/aiems/report/energy/prediction"
+AIEMS_MODE_STATUS_PATH: Final = "/v1/api/aiems/mode/status"
 CHARGE_REPORT_PATH: Final = "/v1/device/chargeReport"
 
 # --- Push / Notification endpoints -------------------------------------------
@@ -556,11 +568,15 @@ SMART_MODE_CHECK_PATH: Final = "/v1/device/smartMode/checkIfSet"
 SMART_MODE_INFO_PATH: Final = "/v1/device/smartMode/getSmartMode"
 SMART_MODE_START_PATH: Final = "/v1/device/smartMode/startSmartMode"
 SMART_SCHEDULE_PATH: Final = "/v1/device/stat/getSmartSchedulePrediction"
-# 2.4.2 AiEmsEnergyPredictionVM uses GET; RequestServer prefixes v1/.
-AIEMS_ENERGY_PREDICTION_PATH: Final = "/v1/api/aiems/report/energy/prediction"
+# 2.4.0 AiEmsEnergyPredictionApi ("api/aiems/report/energy/prediction"):
+# request systemId only; distinct from getSmartSchedulePrediction above.
+# Deliberately NOT exposed as a constant — the endpoint is unproven, and
+# tests/test_app_2_4_0_contracts.py asserts its absence from the API surface.
 
 # --- Miscellaneous endpoints -------------------------------------------------
 APP_VERSION_PATH: Final = "/v1/app/version/getNewVersion"
+APP_VERSION_QUERY_NAME: Final = "2.4.6"
+APP_VERSION_QUERY_TYPE: Final = "0"
 BANNER_LIST_PATH: Final = "/v1/app/banner/list"
 FEEDBACK_PATH: Final = "/v1/api/file/feedback"
 FAQ_ANSWER_PATH: Final = "/v1/api/faq/answer"
@@ -590,11 +606,11 @@ REGISTER_APP_ID: Final = "com.hbxn.jackery"
 # --- Android app headers documented in PROTOCOL.md §2 --------------------
 # NB: iOS headers (platform=1) returned empty device lists on a SolarVault-only
 # account. Android headers (platform=2) return data on /v1/device/property.
-# Pinned to the current app release: the AndroidManifest of 2.4.1 declares
-# versionName="2.4.1" / versionCode="99" (package com.hbxn.jackery).
-# Update only together with a re-capture of the request signatures.
-APP_VERSION: Final = "v2.4.1"
-APP_VERSION_CODE: Final = "99"
+# App 2.4.6 AppApplication.m51604f sets these exact HTTP header values;
+# see docs/APP_2_4_6_INTEGRATION_MAP.md. The authenticated request path sends
+# them separately from the token and encrypted login body.
+APP_VERSION: Final = "2.4.6"
+APP_VERSION_CODE: Final = "106"
 SYS_VERSION: Final = "Android 16,level 36/[arm64-v8a, armeabi-v7a, armeabi]"
 USER_AGENT: Final = "okhttp/5.3.2"
 DEVICE_MODEL_HEADER: Final = "samsung/SM-S918B"
@@ -661,10 +677,9 @@ DEFAULT_CREATE_CALCULATED_POWER_SENSORS: Final = False
 DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS: Final = False
 
 # Slow-metric refresh cadences (decoupled from the fast property polling).
-# These values match the server-side update rhythm we observed in the
-# captured traffic — polling faster yields no fresher data.
-SLOW_METRICS_INTERVAL_SEC: Final = 120  # statistic + pv_trends + alarm
-PRICE_CONFIG_INTERVAL_SEC: Final = 600  # power price barely ever changes
+ALARM_HTTP_INTERVAL_SEC: Final = 15  # HTTP alarm fallback
+SLOW_METRICS_INTERVAL_SEC: Final = 120  # statistics and trends
+PRICE_CONFIG_INTERVAL_SEC: Final = 600  # power price and OTA
 DEFAULT_STORM_WARNING_MINUTES: Final = 120
 REQUEST_TIMEOUT_SEC: Final = 30
 # DNS resolution timeout. Must be shorter than the total/connect timeouts so
@@ -707,7 +722,7 @@ HTTP_METHOD_PUT: Final = "PUT"
 HTTP_HEADER_CONTENT_TYPE: Final = "content-type"
 HTTP_CONTENT_TYPE_FORM: Final = "application/x-www-form-urlencoded"
 HTTP_CONTENT_TYPE_JSON: Final = "application/json; charset=utf-8"
-HTTP_RAW_TEXT_LIMIT: Final = 10000
+HTTP_RAW_TEXT_LIMIT: Final = 20000
 
 # Shared payload section names. Coordinator, diagnostics and entity platforms use
 # the same normalized payload shape; keep the keys in one place so section names
@@ -725,6 +740,8 @@ PAYLOAD_HOME_TRENDS: Final = "home_trends"
 PAYLOAD_ALARM: Final = "alarm"
 PAYLOAD_DEVICE_STATISTIC: Final = "device_statistic"
 PAYLOAD_OTA: Final = "ota"
+PAYLOAD_BLE_OTA_VERSIONS: Final = "ble_ota_versions"
+PAYLOAD_BLE_OTA_EVENTS: Final = "ble_ota_events"
 PAYLOAD_LOCATION: Final = "location"
 PAYLOAD_DYNAMIC_PRICE: Final = "dynamic_price"
 PAYLOAD_WEATHER_PLAN: Final = "weather_plan"
@@ -737,6 +754,10 @@ PAYLOAD_MQTT_CONNECT_INFO: Final = "mqtt_connect_info"
 PAYLOAD_PRICE_SOURCES: Final = "price_sources"
 PAYLOAD_BATTERY_PACKS: Final = "battery_packs"
 PAYLOAD_CT_METER: Final = "ct_meter"
+PAYLOAD_CT_METERS: Final = "ct_meters"
+PAYLOAD_PORTABLE_CT_STATISTICS: Final = "portable_ct_statistics"
+PAYLOAD_AIEMS_ENERGY_PREDICTION: Final = "aiems_energy_prediction"
+PAYLOAD_AIEMS_MODE_STATUS: Final = "aiems_mode_status"
 PAYLOAD_METER_HEADS: Final = "meter_heads"
 # Smart-plug subdevice payload bucket. Populated from the ``plugs`` array of
 # UploadSubDeviceGroupProperty (cmd=110, actionId=3032, devType=6 per the
@@ -744,14 +765,10 @@ PAYLOAD_METER_HEADS: Final = "meter_heads"
 # the plug list with the same shape as battery packs.
 PAYLOAD_SMART_PLUGS: Final = "smart_plugs"
 PAYLOAD_NOTICE: Final = "notice"
-# Layer-5 UploadDeviceAlert frames (cmd 122): BLE fault codes and cloud-MQTT
-# alert counters, merged per field; HTTP /v1/api/alarm keeps PAYLOAD_ALARM.
-PAYLOAD_DEVICE_ALERT: Final = "device_alert"
 PAYLOAD_ELECTRICITY_STRATEGY: Final = "electricity_strategy"
 PAYLOAD_TOU_SCHEDULE: Final = "tou_schedule"
 PAYLOAD_SMART_MODE: Final = "smart_mode"
 PAYLOAD_SMART_SCHEDULE: Final = "smart_schedule"
-PAYLOAD_AIEMS_ENERGY_PREDICTION: Final = "aiems_energy_prediction"
 PAYLOAD_SYMMETRY_STAT: Final = "symmetry_stat"
 PAYLOAD_SOCKET_STAT: Final = "socket_stat"
 PAYLOAD_CIRCUIT_PROPERTY: Final = "circuit_property"
@@ -865,24 +882,6 @@ FIELD_SW: Final = "sw"
 FIELD_SUB_DEVICE: Final = "subDevice"
 FIELD_SUB_DEVICES: Final = "subDevices"
 FIELD_ALARM_ID: Final = "alarmId"
-FIELD_DEVICE_ONLINE_TIME: Final = "onlineTime"
-FIELD_DEVICE_OFFLINE_TIME: Final = "offlineTime"
-DEVICE_ALERT_FAULT_CODE_FIELDS: Final = (
-    "bms1",
-    "bms2",
-    "bms3",
-    "bms4",
-    "bms5",
-    "bms6",
-    "ems1",
-    "ems2",
-    "pcs1",
-    "pcs2",
-    "pcs3",
-    "pcs4",
-    "pcs5",
-    "iot1",
-)
 FIELD_SYS_ALERT_COUNT: Final = "sysAlertCount"
 FIELD_ALERT_COUNT: Final = "alertCount"
 FIELD_SW_EPS: Final = "swEps"
@@ -960,7 +959,6 @@ FIELD_UPDATE_STATUS: Final = "updateStatus"
 FIELD_EC: Final = "ec"
 FIELD_IT: Final = "it"
 FIELD_OT: Final = "ot"
-FIELD_MAX_POWER: Final = "maxPower"
 FIELD_CURRENCY_CODE: Final = "currencyCode"
 FIELD_SINGLE_CURRENCY: Final = "singleCurrency"
 FIELD_SINGLE_CURRENCY_CODE: Final = "singleCurrencyCode"
@@ -1000,12 +998,14 @@ FIELD_MAX_GRID_STD_PW: Final = "maxGridStdPw"
 FIELD_DEFAULT_PW: Final = "defaultPw"
 FIELD_SOC_CHG_LIMIT: Final = "socChgLimit"
 FIELD_SOC_FORCE_CHG: Final = "socForceChg"
-FIELD_PV_MAX_CHG_POWER: Final = "pvMaxChgPower"
 FIELD_SOC_CHARGE_LIMIT: Final = "socChargeLimit"
 FIELD_SOC_DISCHG_LIMIT: Final = "socDischgLimit"
 FIELD_SOC_DISCHARGE_LIMIT: Final = "socDischargeLimit"
 FIELD_OTHER_LOAD_PW: Final = "otherLoadPw"
 FIELD_ABILITY: Final = "ability"
+# App 2.4.7 HomeBody.AbilityBits / PortableBody.AbilityBits (bit positions).
+BATTERY_PASSPORT_HOME_BIT: Final = 14
+BATTERY_PASSPORT_PORTABLE_BIT: Final = 3
 FIELD_MAX_IOT_NUM: Final = "maxIotNum"
 FIELD_MAX_INV_STD_PW: Final = "maxInvStdPw"
 FIELD_BAT_NUM: Final = "batNum"
@@ -1013,9 +1013,9 @@ FIELD_BAT_STATE: Final = "batState"
 FIELD_BAT_SOC: Final = "batSoc"
 FIELD_ACC_CT_BODY: Final = "AccCTBody"
 FIELD_CELL_TEMP: Final = "cellTemp"
-FIELD_IN_EGY: Final = "inEgy"  # Pack lifetime charged energy in 0.01 kWh units
+FIELD_IN_EGY: Final = "inEgy"  # Pack lifetime charged energy in Wh (BLE cmd=120)
 FIELD_IN_PW: Final = "inPw"
-FIELD_OUT_EGY: Final = "outEgy"  # Pack lifetime discharged energy in 0.01 kWh units
+FIELD_OUT_EGY: Final = "outEgy"  # Pack lifetime discharged energy in Wh (BLE cmd=120)
 FIELD_OUT_PW: Final = "outPw"
 FIELD_SWITCH_STATE: Final = "switchSta"  # PlugSub current on/off state (0/1)
 FIELD_SYS_SWITCH: Final = "sysSwitch"  # PlugSub desired on/off setter (0/1)
@@ -1027,6 +1027,10 @@ FIELD_CHARGING_ENERGY: Final = "chargingEnergy"
 FIELD_DISCHARGING_ENERGY: Final = "dischargingEnergy"
 FIELD_RB: Final = "rb"
 FIELD_IP: Final = "ip"
+FIELD_BLE_BOX_MAINS_POWER: Final = "bleBoxMainsPower"
+FIELD_BLE_BOX_HOUSE_POWER: Final = "bleBoxHousePower"
+FIELD_BLE_PORTABLE_INPUT_POWER: Final = "blePortableInputPower"
+FIELD_BLE_PORTABLE_OUTPUT_POWER: Final = "blePortableOutputPower"
 FIELD_OP: Final = "op"
 FIELD_STANDBY_PW: Final = "standbyPw"
 FIELD_SW_EPS_IN_PW: Final = "swEpsInPw"
@@ -1050,28 +1054,28 @@ FIELD_OUT_GRID_SIDE_PW: Final = "outGridSidePw"
 # MQTT credential keys returned by login and consumed by mqtt_push.py.
 FIELD_IAC: Final = "iac"  # AC input current (A)
 FIELD_IACPW: Final = "iacPw"  # AC input power (W)
-FIELD_ACCD: Final = "accd"  # AC discharge current (A)
+FIELD_ACCD: Final = "accd"  # AC delayed-start remaining time (seconds)
 FIELD_ACIP: Final = "acip"  # AC input power alt (W)
 FIELD_CIP: Final = "cip"  # Charging input power (W)
-FIELD_IDC: Final = "idc"  # DC input current (A)
+FIELD_IDC: Final = "idc"  # Portable App field; unit and meaning not established
 FIELD_ACOV: Final = "acov"  # AC output voltage (V)
 FIELD_ACOV1: Final = "acov1"  # AC output voltage 2 (V)
 FIELD_ACOHZ: Final = "acohz"  # AC output frequency (Hz)
 FIELD_ACPS: Final = "acps"  # AC output apparent power (VA)
-FIELD_ACPSP: Final = "acpsp"  # AC output apparent power parallel (VA)
-FIELD_ACPSS: Final = "acpss"  # AC output apparent power sum (VA)
-FIELD_ACDT: Final = "acdt"  # AC output current (A)
+FIELD_ACPSP: Final = "acpsp"  # Portable DC-input sum component (tenths)
+FIELD_ACPSS: Final = "acpss"  # Portable DC-input icon state
+FIELD_ACDT: Final = "acdt"  # AC delayed-start setting (seconds)
 FIELD_ACMODE: Final = "acmode"  # AC output mode
 FIELD_OAC: Final = "oac"  # AC output power (W)
 FIELD_OAC2: Final = "oac2"  # AC output power 2 (W)
 FIELD_OACPW: Final = "oacPw"  # AC output power main (W)
-FIELD_OACT: Final = "oact"  # AC output current (A)
-FIELD_ODC_PORT: Final = "odc"  # DC output power (W)
+FIELD_OACT: Final = "oact"  # Portable AC output countdown (seconds)
+FIELD_ODC_PORT: Final = "odc"  # Portable DC output switch state
 FIELD_ODCC: Final = "odcc"  # DC/car output enable flag (0/1), not a current reading
-FIELD_ODCCT: Final = "odcct"  # DC output current total (A)
-FIELD_ODCT: Final = "odct"  # DC output current type (A)
+FIELD_ODCCT: Final = "odcct"  # Portable car output countdown (seconds)
+FIELD_ODCT: Final = "odct"  # Portable DC output countdown (seconds)
 FIELD_ODCU: Final = "odcu"  # DC/USB output enable flag (0/1), not a voltage reading
-FIELD_ODCUT: Final = "odcut"  # DC output voltage total (V)
+FIELD_ODCUT: Final = "odcut"  # Portable USB output countdown (seconds)
 FIELD_ODC_PRIO: Final = "odcPrio"  # DC output priority setting
 FIELD_ODC_PRIO_SOC: Final = "odcPrioSoc"  # DC output priority SOC threshold
 FIELD_OUT_PRIO: Final = "outPrio"  # Output priority mode
@@ -1081,12 +1085,12 @@ FIELD_OAC1_PRIO_SOC: Final = "oac1PrioSoc"  # AC output 1 priority SOC
 FIELD_OAC2_NAME: Final = "oac2Name"  # AC output 2 name
 FIELD_OAC2_PRIO: Final = "oac2Prio"  # AC output 2 priority
 FIELD_OAC2_PRIO_SOC: Final = "oac2PrioSoc"  # AC output 2 priority SOC
-FIELD_OACL1: Final = "oacl1"  # AC output line 1 power (W)
+FIELD_OACL1: Final = "oacl1"  # Portable AC port 1 switch state
 FIELD_OACL1_PW: Final = "oacl1Pw"  # AC output line 1 power main (W)
-FIELD_OACL2: Final = "oacl2"  # AC output line 2 power (W)
+FIELD_OACL2: Final = "oacl2"  # Portable AC port 2 switch state
 FIELD_OACL2_PW: Final = "oacl2Pw"  # AC output line 2 power main (W)
-FIELD_OACT1: Final = "oact1"  # AC output current 1 (A)
-FIELD_OACT2: Final = "oact2"  # AC output current 2 (A)
+FIELD_OACT1: Final = "oact1"  # Portable AC port 1 timer (seconds)
+FIELD_OACT2: Final = "oact2"  # Portable AC port 2 timer (seconds)
 FIELD_DHG_RECALL: Final = "dhg_recall"  # Discharge recall flag
 FIELD_USBA1: Final = "usba1"  # USB-A port 1 power (W)
 FIELD_USBA2: Final = "usba2"  # USB-A port 2 power (W)
@@ -1097,36 +1101,123 @@ FIELD_USBC3: Final = "usbc3"  # USB-C port 3 power (W)
 FIELD_IPAL_PW: Final = "ipalPw"  # Input power allocation (W)
 FIELD_OPAL_PW: Final = "opalPw"  # Output power allocation (W)
 FIELD_TA: Final = "ta"  # Temperature alarm
-FIELD_TP: Final = "tp"  # Temperature port (°C)
-FIELD_TT: Final = "tt"  # Temperature type (°C)
-FIELD_EN: Final = "en"  # Enabled state
+FIELD_TP: Final = "tp"  # Portable scheduled-task icon input
+FIELD_TT: Final = "tt"  # Portable scheduled-task icon input for box mode
+FIELD_EN: Final = "en"  # Box/Portable operating mode
 FIELD_SS: Final = "ss"  # System status/switch state
 FIELD_DT: Final = "dt"  # Discharge time (min)
 FIELD_WSS: Final = "wss"  # WiFi switch status
 FIELD_AST: Final = "ast"  # Auto standby timer
-FIELD_PAL: Final = "pal"  # Power alarm level
-FIELD_BC: Final = "bc"  # Battery count
-FIELD_BT: Final = "bt"  # Battery temperature (°C)
-FIELD_BLS: Final = "bls"  # Battery low state
+FIELD_PAL: Final = "pal"  # Portable merge-icon input
+FIELD_BC: Final = "bc"  # Portable custom battery threshold (percent)
+FIELD_BT: Final = "bt"  # Portable raw temperature key; distinct from cellTemp
+FIELD_BLS: Final = "bls"  # Model-specific status
 FIELD_IS_PACK_CONNECT: Final = "isPackConnect"  # External pack connected
 FIELD_CL: Final = "cl"  # Charge limit
 FIELD_DL: Final = "dl"  # Discharge limit
-FIELD_CS: Final = "cs"  # Charge state
-FIELD_CSC: Final = "csc"  # Charge state config
-FIELD_CSL: Final = "csl"  # Charge state limit
-FIELD_CST: Final = "cst"  # Charge state total
-FIELD_COP: Final = "cop"  # Charge output power
-FIELD_PC: Final = "pc"  # Power configuration
+FIELD_CS: Final = "cs"  # Portable charging mode
+FIELD_CSC: Final = "csc"  # Portable configured charging power (W)
+FIELD_CSL: Final = "csl"  # Portable minimum charging power (W)
+FIELD_CST: Final = "cst"  # Portable maximum charging power (W)
+FIELD_COP: Final = "cop"  # Portable shared DC output power (W)
+FIELD_PC: Final = "pc"  # Portable parallel-port charge/discharge state
 FIELD_PM: Final = "pm"  # Power mode
 FIELD_PMB: Final = "pmb"  # Power mode backup
-FIELD_LM: Final = "lm"  # Load mode
+FIELD_LM: Final = "lm"  # Portable light mode
 FIELD_PSS: Final = "pss"  # Power source selector
-FIELD_SFC: Final = "sfc"  # Solar feature config
+FIELD_BOX_AUTO_BACKUP_RESERVE: Final = "autoDt"
+FIELD_BOX_SCHEDULED_BACKUP_RESERVE: Final = "cdsDt"
+FIELD_BOX_SELF_USE_BACKUP_RESERVE: Final = "selfDt"
+FIELD_BOX_CIRCUIT_RESERVE_THRESHOLD: Final = "ddt"
+FIELD_BOX_BACKUP_PERIOD_ENABLED: Final = "ps"
+FIELD_BOX_BACKUP_EFFECTIVE_PERIOD: Final = "pst"
+BOX_FAULT_FIELDS: Final = (
+    "gs",
+    "es",
+    "bs1",
+    "bs2",
+    "ol",
+    "ntc",
+    "loc",
+    "moc",
+    "ec1",
+    "ec2",
+    "ta1",
+    "ta2",
+)
+FIELD_SFC: Final = "sfc"  # Portable super-charge setting
+FIELD_SRL: Final = "srl"
+FIELD_SRFC: Final = "srfc"
+PORTABLE_RESERVE_MODELS: Final = frozenset({36, 37, 38})
+PORTABLE_CT_PANEL_MODEL_CODE: Final = 4007
+PORTABLE_PEAK_THROUGH_MODELS: Final = frozenset({
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    36,
+    37,
+    39,
+    40,
+    41,
+})
+PORTABLE_TOU_QUERY_MODELS: Final = PORTABLE_PEAK_THROUGH_MODELS | frozenset({
+    14,
+    17,
+    19,
+    20,
+    21,
+    24,
+    38,
+})
+PORTABLE_PEAK_THROUGH_MIN: Final = 10
+PORTABLE_PEAK_THROUGH_MAX: Final = 90
+PORTABLE_LIGHT_DETAIL_MODELS: Final = frozenset({
+    23,
+    24,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    36,
+    37,
+    39,
+    40,
+    41,
+})
+PORTABLE_OUTPUT_PRIORITY_MODELS: Final = frozenset({27, 31, 32, 36, 37})
+PORTABLE_UPS_MODE_MODELS: Final = frozenset({23, 24})
+PORTABLE_AC_TRANSFER_MODE_MODELS: Final = frozenset({26})
+PORTABLE_RESERVE_ALLOWED_VALUES: Final = tuple(range(10, 91, 5))
+PORTABLE_ENERGY_SAVING_MINUTES: Final = {
+    **dict.fromkeys((1, 2, 4, 5, 6, 7, 26, 34, 35), (480, 720, 1440, 0)),
+    **dict.fromkeys((8, 9, 10, *range(12, 26), 38), (120, 480, 720, 1440, 0)),
+    **dict.fromkeys(
+        (27, 28, 29, 30, 31, 32, 33, 36, 37, 39, 40, 41),
+        (60, 120, 480, 720, 1440, 0),
+    ),
+}
+PORTABLE_WORKING_MODES: Final = {
+    **dict.fromkeys((13, 14, 17, 19, 20, 21, 22, 24), (0, 1, 2)),
+    **dict.fromkeys((27, 28, 29, 30, 31, 32, 33, 39, 40, 41), (0, 1, 2, 3)),
+    **dict.fromkeys((36, 37), (0, 1, 2, 3, 5)),
+    26: (3, 4),
+    38: (0, 1, 2, 5),
+}
 FIELD_SLTB: Final = "sltb"  # Select time base
 FIELD_UPS: Final = "ups"  # UPS mode
 FIELD_BOX: Final = "box"  # Box status
-FIELD_BPC: Final = "bpc"  # Battery pack count
-FIELD_F: Final = "f"  # Fault/error strings
+FIELD_BPC: Final = "bpc"  # Portable peak-through charge limit (percent)
+FIELD_F: Final = "f"  # Context-specific: Portable Wi-Fi names or OTA firmware type
 FIELD_N: Final = "n"  # Negative (energy/power)
 FIELD_P: Final = "p"  # Positive (energy/power)
 FIELD_TOTAL_N: Final = "totalN"
@@ -1190,6 +1281,70 @@ FIELD_CT_REACTIVE_POWER: Final = "rep"
 FIELD_CT_REACTIVE_POWER1: Final = "rep1"
 FIELD_CT_REACTIVE_POWER2: Final = "rep2"
 FIELD_CT_REACTIVE_POWER3: Final = "rep3"
+ACC_CT_BODY_MEASUREMENT_FIELDS: Final = frozenset({
+    FIELD_CT_VOLT,
+    FIELD_CT_VOLT1,
+    FIELD_CT_VOLT2,
+    FIELD_CT_VOLT3,
+    FIELD_CT_CURRENT,
+    FIELD_CT_CURRENT1,
+    FIELD_CT_CURRENT2,
+    FIELD_CT_CURRENT3,
+    FIELD_CT_FREQUENCY,
+    FIELD_CT_POWER_FACTOR,
+    FIELD_CT_POWER_FACTOR1,
+    FIELD_CT_POWER_FACTOR2,
+    FIELD_CT_POWER_FACTOR3,
+    FIELD_CT_APPARENT_POWER,
+    FIELD_CT_APPARENT_POWER1,
+    FIELD_CT_APPARENT_POWER2,
+    FIELD_CT_APPARENT_POWER3,
+    FIELD_CT_REACTIVE_POWER,
+    FIELD_CT_REACTIVE_POWER1,
+    FIELD_CT_REACTIVE_POWER2,
+    FIELD_CT_REACTIVE_POWER3,
+})
+CT_THIRD_PV_POWER_PAIRS: Final = (
+    ("l2tPhasePw", "l2tnPhasePw"),
+    ("l2aPhasePw", "l2anPhasePw"),
+    ("l2bPhasePw", "l2bnPhasePw"),
+    ("l2cPhasePw", "l2cnPhasePw"),
+)
+CT_THIRD_PV_POWER_FIELDS: Final = frozenset(
+    field for pair in CT_THIRD_PV_POWER_PAIRS for field in pair
+)
+ACC_CT_L2_POWER_FIELDS: Final = frozenset({
+    "l2power",
+    "l2power1",
+    "l2power2",
+    "l2power3",
+})
+ACC_CT_L2_RAW_FIELDS: Final = frozenset({
+    "l2ap",
+    "l2ap1",
+    "l2ap2",
+    "l2ap3",
+    "l2curr",
+    "l2curr1",
+    "l2curr2",
+    "l2curr3",
+    "l2fact",
+    "l2fact1",
+    "l2fact2",
+    "l2fact3",
+    "l2freq",
+    "l2rep",
+    "l2rep1",
+    "l2rep2",
+    "l2rep3",
+})
+FIELD_SYS_TOTAL_PV_PW: Final = "sysTotalPvPw"
+FIELD_PV_MAX_CHG_POWER: Final = "pvMaxChgPower"
+FIELD_DEVICE_ONLINE_TIME: Final = "onlineTime"
+FIELD_DEVICE_OFFLINE_TIME: Final = "offlineTime"
+PAYLOAD_DEVICE_ALERT: Final = "device_alert"
+CONF_ENABLE_UNREDACTED_DEBUG: Final = "enable_unredacted_debug"
+DEFAULT_ENABLE_UNREDACTED_DEBUG: Final = False
 # CtSub.funForm per source-of-truth/jackery_entity_field_candidates_v2.html:
 # CT function-form / wiring-mode identifier (1-phase vs 3-phase config).
 # Exposed as diagnostic — useful for troubleshooting an unexpected CT layout.
@@ -1271,32 +1426,6 @@ CT_ATTRIBUTE_FIELDS: Final = (
     FIELD_CT_C_NEGATIVE_PHASE_ENERGY,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
 )
-# Measurements only Jackery's own CT clamp reports (App model AccCTBody,
-# APP_FIELD_EXPOSURE.md). Cloud-bridged meters (isCloud, e.g. Shelly Pro 3EM)
-# deliver phase power and energy only, so these never carry a value there.
-ACC_CT_BODY_MEASUREMENT_FIELDS: Final = frozenset({
-    FIELD_CT_VOLT,
-    FIELD_CT_VOLT1,
-    FIELD_CT_VOLT2,
-    FIELD_CT_VOLT3,
-    FIELD_CT_CURRENT,
-    FIELD_CT_CURRENT1,
-    FIELD_CT_CURRENT2,
-    FIELD_CT_CURRENT3,
-    FIELD_CT_FREQUENCY,
-    FIELD_CT_POWER_FACTOR,
-    FIELD_CT_POWER_FACTOR1,
-    FIELD_CT_POWER_FACTOR2,
-    FIELD_CT_POWER_FACTOR3,
-    FIELD_CT_APPARENT_POWER,
-    FIELD_CT_APPARENT_POWER1,
-    FIELD_CT_APPARENT_POWER2,
-    FIELD_CT_APPARENT_POWER3,
-    FIELD_CT_REACTIVE_POWER,
-    FIELD_CT_REACTIVE_POWER1,
-    FIELD_CT_REACTIVE_POWER2,
-    FIELD_CT_REACTIVE_POWER3,
-})
 
 FIELD_TARGET_MODULE_VERSION: Final = "targetModuleVersion"
 FIELD_UPGRADE_TYPE: Final = "upgradeType"
@@ -1319,7 +1448,9 @@ TIMER_TASK_TYPE_CUSTOM_MODE: Final = 2
 TIMER_TASK_TYPE_TIME_ELEC: Final = 3
 
 # MQTT subdevice routing and mirroring keys documented in PROTOCOL.md.
+FIELD_CT_TEMPERATURE_C: Final = "temperature_c"
 CT_METER_KEYS: Final = frozenset({
+    FIELD_CT_TEMPERATURE_C,
     FIELD_CT_POWER,
     FIELD_CT_POWER1,
     FIELD_CT_POWER2,
@@ -1469,9 +1600,10 @@ SYSTEM_INFO_KEYS: Final = frozenset({
     FIELD_BAT_STATE,
     FIELD_SOC,
 })
+# "bt" is also a portable head property. An isolated temperature value
+# cannot prove battery-pack ownership or divert the whole live frame.
 BATTERY_PACK_HINT_KEYS: Final = frozenset({
     FIELD_BAT_SOC,
-    FIELD_CELL_TEMP,
     FIELD_IN_PW,
     FIELD_OUT_PW,
     FIELD_IN_EGY,
@@ -1525,10 +1657,9 @@ APP_CHART_SERIES_Y5: Final = "y5"
 APP_CHART_SERIES_Y6: Final = "y6"
 APP_HOME_GRID_SERIES_KEYS: Final = (APP_CHART_SERIES_Y1, APP_CHART_SERIES_Y2)
 
-# Date-type values used by the documented app period endpoints. App 2.1.1
-# exposes day/week/month/year/total for stat calls; "hour" is not a REST
-# dateType and day Recorder buckets are derived from the day curve.
-# Date-type values used by the documented app period endpoints.
+# The App's REST statistics accept day/week/month/year. "hour" is
+# reserved for internal chart/Recorder diagnostics: request five-minute
+# samples with dateType=day, never dateType=hour (Jackery code 10422).
 DATE_TYPE_HOUR: Final = "hour"
 DATE_TYPE_DAY: Final = "day"
 DATE_TYPE_WEEK: Final = "week"
@@ -1571,6 +1702,31 @@ APP_CHART_STAT_PERIODS: Final = tuple(
     for date_type in APP_CHART_DATE_TYPES
 )
 
+
+# Repair/data-quality diagnostics. These do not change entity values; they only
+# surface contradictions between documented app sources. Keep the dict keys
+# centralized because coordinator, diagnostics and tests read the same payload.
+DATA_QUALITY_LEVEL_WARNING: Final = "warning"
+DATA_QUALITY_KEY_LEVEL: Final = "level"
+DATA_QUALITY_KEY_REASON: Final = "reason"
+DATA_QUALITY_KEY_METRIC_KEY: Final = "metric_key"
+DATA_QUALITY_KEY_LABEL: Final = "label"
+DATA_QUALITY_KEY_SOURCE_SECTION: Final = "source_section"
+DATA_QUALITY_KEY_SOURCE_VALUE: Final = "source_value"
+DATA_QUALITY_KEY_REFERENCE_SECTION: Final = "reference_section"
+DATA_QUALITY_KEY_REFERENCE_VALUE: Final = "reference_value"
+DATA_QUALITY_KEY_SOURCE_REQUEST: Final = "source_request"
+DATA_QUALITY_KEY_REFERENCE_REQUEST: Final = "reference_request"
+DATA_QUALITY_KEY_SOURCE_CHART_SERIES_KEY: Final = "source_chart_series_key"
+DATA_QUALITY_KEY_REFERENCE_CHART_SERIES_KEY: Final = "reference_chart_series_key"
+DATA_QUALITY_KEY_TOTAL_METHOD: Final = "total_method"
+DATA_QUALITY_REASON_YEAR_LESS_THAN_MONTH: Final = "year_less_than_month"
+DATA_QUALITY_REASON_YEAR_LESS_THAN_WEEK: Final = "year_less_than_week"
+DATA_QUALITY_REASON_MONTH_LESS_THAN_WEEK: Final = "month_less_than_week"
+DATA_QUALITY_REASON_LIFETIME_LESS_THAN_YEAR: Final = "lifetime_less_than_year"
+DATA_QUALITY_REPAIR_EXAMPLE_LIMIT: Final = 3
+REPAIR_ISSUE_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
+REPAIR_TRANSLATION_APP_DATA_INCONSISTENCY: Final = "app_data_inconsistency"
 REPAIR_ISSUE_DEVICE_NOT_ACTIVATED: Final = "device_not_activated"
 REPAIR_TRANSLATION_DEVICE_NOT_ACTIVATED: Final = "device_not_activated"
 
@@ -1770,12 +1926,18 @@ APP_CHART_STAT_METRICS: Final = (
 
 # Select-option mappings from the documented app state machines. Option strings
 # are translation keys; integer values are sent back to Jackery unchanged.
+WORK_MODE_AI_SMART: Final = 8
+WORK_MODE_SELF_USE: Final = 2
+WORK_MODE_CUSTOM: Final = 4
+WORK_MODE_TARIFF: Final = 7
+WORK_MODE_OFF: Final = 0
+
 WORK_MODE_TO_OPTION: Final = {
-    8: "ai_smart",
-    2: "self_use",
-    4: "custom",
-    7: "tariff",
-    0: "off",
+    WORK_MODE_AI_SMART: "ai_smart",
+    WORK_MODE_SELF_USE: "self_use",
+    WORK_MODE_CUSTOM: "custom",
+    WORK_MODE_TARIFF: "tariff",
+    WORK_MODE_OFF: "off",
 }
 WORK_MODE_READ_ALIASES: Final = {5: "tariff"}
 TEMP_UNIT_TO_OPTION: Final = {0: "celsius", 1: "fahrenheit"}
@@ -1791,52 +1953,129 @@ STORM_MINUTES_DEFAULT: Final = tuple(
 STORM_MINUTES_MIN_VALID: Final = 60
 PRICE_MODE_TO_OPTION: Final = {1: "dynamic", 2: "single"}
 
-# Only authentication secrets are masked in ordinary diagnostics. Device
-# identities, telemetry and raw frames must remain available for mapping.
+# Diagnostics redaction keys. Keep this set broad because app/MQTT payloads can
+# include personal account data, device IDs, locations and tariff credentials.
 REDACTED_VALUE: Final = "**REDACTED**"
 
-# Optional diagnostic payload debug log. Each active segment is size-limited; it
+# Optional diagnostic payload debug log. It is redacted and size-limited, but it
 # still contains detailed raw cloud/MQTT value shapes for troubleshooting parser
 # and mapping bugs.
 PAYLOAD_DEBUG_LOG_FILENAME: Final = "jackery_solarvault_payload_debug.jsonl"
 PAYLOAD_DEBUG_LOGGER_NAME: Final = f"custom_components.{DOMAIN}.payload_debug"
 PAYLOAD_DEBUG_LOG_MAX_BYTES: Final = 2_000_000
 PAYLOAD_DEBUG_LOG_BACKUP_SUFFIX: Final = ".1"
+MQTT_SENSOR_PUBLISHER_RUNTIME_KEY: Final = "mqtt_sensor_publisher"
+MQTT_TELEMETRY_SCHEMA: Final = f"{DOMAIN}.telemetry.v1"
 # Per-channel throttle window for payload-debug records. Stops the JSONL log
 # from growing at the MQTT push-rate when a user enabled the dedicated DEBUG
 # logger and forgot to disable it. Genuine first-of-its-kind records are still
 # emitted immediately because the dedup check runs *before* the throttle.
 PAYLOAD_DEBUG_THROTTLE_SEC: Final = 60
 # Per-device BLE AES key from ``/v1/device/system/list``; used by BLE/MQTT
-# Layer-C payload encryption.
+# Layer-C payload encryption and always redacted from diagnostics.
 FIELD_BLUETOOTH_KEY: Final = "bluetoothKey"
+# Device/system IDs and serials are source provenance, not credentials.
+# Mask secrets at the output boundary without destroying transport identities.
+# The protocol fields p/s (energy/OTA) and gridStandard are technical
+# values, not generic credentials. Preserve them in diagnostics.
 REDACT_KEYS: Final = frozenset({
     FIELD_PASSWORD,
+    "confirmPassword",
+    "verificationCode",
+    MQTT_CREDENTIAL_USERNAME,
+    "ssid",
+    "bssid",
+    CONF_MQTT_MAC_ID,
+    CONF_REGION_CODE,
+    ENTRY_BOOTSTRAP_MQTT_SESSION,
+    MQTT_SESSION_USER_ID,
     MQTT_SESSION_SEED_B64,
+    MQTT_SESSION_MAC_ID,
+    MQTT_SESSION_MAC_ID_SOURCE,
+    FIELD_MAC_ID,
     FIELD_TOKEN,
     FIELD_MQTT_PASSWORD,
-    FIELD_BLUETOOTH_KEY,
+    FIELD_DEVICE_NAME,
+    FIELD_SYSTEM_NAME,
     "mqttPassword",
+    "grdAccSn",
+    "ACCOUNTID",
+    FIELD_WNAME,
+    FIELD_MAC,
+    FIELD_WIP,
+    FIELD_BLUETOOTH_KEY,
     "local_key",
     "localKey",
     FIELD_DEVICE_SECRET,
     FIELD_RANDOM_SALT,
+    "phone",
+    "mobPhone",
+    "email",
+    "mail",
+    FIELD_ACCOUNT,
+    "accountName",
+    "accountEmail",
+    "bindEmail",
+    "bindEmailAddress",
+    "bindPhone",
+    "avatar",
+    "appUserName",
+    "nickname",
+    FIELD_USER_ID,
+    MQTT_CREDENTIAL_CLIENT_ID,
     MQTT_CREDENTIAL_PASSWORD,
+    MQTT_CREDENTIAL_USER_ID,
+    MQTT_CREDENTIAL_USERNAME,
+    "clientId",
     "platformToken",
+    "platformApiParam",
     "contractAuth",
+    "powerPriceResource",
+    "address",
+    "addressDetail",
+    FIELD_TIMEZONE,
+    FIELD_COUNTRY,
+    FIELD_COUNTRY_CODE,
+    FIELD_LONGITUDE,
+    FIELD_LATITUDE,
+    FIELD_REGION,
+    "base64_encoded",
+    "mqttUser",
+    "mqttUsername",
+    "mqttClientId",
+    "mqtt_user",
+    "mqtt_username",
+    "raw_bytes",
+    "raw_hex",
+    "trailer_hex",
+    CONF_THIRD_PARTY_MQTT_IP,
+    CONF_THIRD_PARTY_MQTT_USERNAME,
     CONF_THIRD_PARTY_MQTT_PASSWORD,
     CONF_THIRD_PARTY_MQTT_TOKEN,
+    # Additional redaction keys (covered by test_logging_diagnostics.py).
     "access_token",
     "refresh_token",
     "token",
     "api_key",
+    "apiToken",
     "secret",
     "aes_key",
     "rsa_key",
+    "mqtt_mac_id",
+    "latitude",
+    "longitude",
+    "gps",
+    "lat",
+    "lon",
+    "account_id",
+    "bind_user_id",
     "mqtt_password",
     "nested_token",
+    # Legacy ``local_mqtt_*`` keys stay listed so diagnostics from entries that
+    # have not been migrated yet are still redacted.
+    "local_mqtt_host",
+    "local_mqtt_username",
     "local_mqtt_password",
-    "raw_hex",
 })
 
 # MQTT client metadata and topic layout
@@ -1916,10 +2155,21 @@ NON_BATTERY_SUBDEVICE_TYPES: Final = frozenset({
 # zero.  Shape: ``{YYYY-MM-DD: {section_prefix: {stat_key: kWh}}}``.
 PAYLOAD_VERIFIED_DAY_STATISTICS: Final = "verified_day_statistics"
 
+# Observed own-energy totals from valid five-minute day samples. Unlike the
+# certified totals above, these may cover only part of a day; each metric keeps
+# its sample coverage so native period sensors can expose measured partial sums.
+PAYLOAD_OBSERVED_DAY_STATISTICS: Final = "observed_day_statistics"
+
+# Own internal-battery energy estimated from bounded native power intervals.
+PAYLOAD_MAIN_BATTERY_OBSERVED_ENERGY: Final = "main_battery_observed_energy"
+
 # Payload sections that must survive a slow HTTP refresh when they were last
 # updated via MQTT. These are integration payload keys, not MQTT message types.
 PRESERVED_FAST_PAYLOAD_KEYS: Final = (
+    PAYLOAD_BLE_OTA_EVENTS,
+    PAYLOAD_BLE_OTA_VERSIONS,
     PAYLOAD_CT_METER,
+    PAYLOAD_PORTABLE_CT_STATISTICS,
     PAYLOAD_METER_HEADS,
     PAYLOAD_SMART_PLUGS,
     PAYLOAD_CIRCUIT_PROPERTY,
@@ -1936,6 +2186,8 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     PAYLOAD_ELECTRICITY_STRATEGY,
     PAYLOAD_BATTERY_BOUNDARY,
     PAYLOAD_VERIFIED_DAY_STATISTICS,
+    PAYLOAD_OBSERVED_DAY_STATISTICS,
+    PAYLOAD_MAIN_BATTERY_OBSERVED_ENERGY,
     # Shadow-config buckets: filled only by the background getSmartMode /
     # getSmartSchedulePrediction fallback (TOU via MQTT), never by the fast HTTP
     # poll's fresh entry dict. Without preservation a transient/failed/skipped
@@ -1943,9 +2195,11 @@ PRESERVED_FAST_PAYLOAD_KEYS: Final = (
     # (the carry-forward alone cannot help — self.data is already rebuilt).
     PAYLOAD_SMART_MODE,
     PAYLOAD_SMART_SCHEDULE,
-    PAYLOAD_AIEMS_ENERGY_PREDICTION,
     PAYLOAD_TOU_SCHEDULE,
+    PAYLOAD_AIEMS_ENERGY_PREDICTION,
+    PAYLOAD_AIEMS_MODE_STATUS,
 )
+
 
 # Service names and payload fields from services.yaml.
 SERVICE_RENAME_SYSTEM: Final = "rename_system"
@@ -1956,6 +2210,8 @@ SERVICE_SET_STORM_ALERT_LOCATION: Final = "set_storm_alert_location"
 SERVICE_SET_THIRD_PARTY_MQTT_CONFIG: Final = "set_third_party_mqtt_config"
 SERVICE_QUERY_THIRD_PARTY_MQTT_CONFIG: Final = "query_third_party_mqtt_config"
 SERVICE_SEND_BLE_COMMAND: Final = "send_ble_command"
+SERVICE_CHECK_BLE_OTA_VERSIONS: Final = "check_ble_ota_versions"
+SERVICE_START_BLE_OTA_UPDATE: Final = "start_ble_ota_update"
 # schedule write — body shape is the Frida-PCAP-captured
 # DownloadDeviceSchedule frame (see docs/MQTT_PROTOCOL.md
 # §"DownloadDeviceSchedule"). Body is passed verbatim so users can match
@@ -1985,7 +2241,6 @@ SERVICE_QUERY_SOCKET_STAT: Final = "query_socket_stat"
 SERVICE_LIST_COUNTRY_ZONES: Final = "list_country_zones"
 SERVICE_LIST_GRID_STANDARDS: Final = "list_grid_standards"
 SERVICE_CHECK_SYSTEM_BOUND: Final = "check_system_bound"
-SERVICE_SAVE_DEVICE_MAX_POWER: Final = "save_device_max_power"
 # Device-operation services on an already-configured device (runtime ops).
 SERVICE_SET_DEVICE_NICKNAME: Final = "set_device_nickname"
 SERVICE_SET_ACCOUNT_NICKNAME: Final = "set_account_nickname"
@@ -2013,6 +2268,8 @@ SERVICE_LIST_SHELLY_BINDING_FAILURES: Final = "list_shelly_binding_failures"
 SERVICE_GET_SHELLY_AUTH_URL: Final = "get_shelly_auth_url"
 SERVICE_LIST_SHELLY_DEVICES: Final = "list_shelly_devices"
 SERVICE_GET_ALARM_DETAIL: Final = "get_alarm_detail"
+SERVICE_GET_BATTERY_PASSPORT: Final = "get_battery_passport"
+SERVICE_GET_FAULT_LOG: Final = "get_fault_log"
 SERVICE_LIST_NOTIFICATIONS: Final = "list_notifications"
 SERVICE_GET_UNREAD_COUNT: Final = "get_unread_count"
 SERVICE_GET_PUSH_CONFIG: Final = "get_push_config"
@@ -2082,7 +2339,6 @@ SERVICE_FIELD_BEGIN_DATE: Final = "begin_date"
 SERVICE_FIELD_END_DATE: Final = "end_date"
 SERVICE_FIELD_DEVICE_SN: Final = "device_sn"
 SERVICE_FIELD_COUNTRY: Final = "country"
-SERVICE_FIELD_MAX_POWER: Final = "max_power"
 SERVICE_FIELD_ALARM_KEY: Final = "alarm_key"
 SERVICE_FIELD_CURRENT_TIME: Final = "current_time"
 SERVICE_FIELD_PAGE_NO: Final = "page_no"
@@ -2200,6 +2456,8 @@ NON_APP_DIAGNOSTIC_SENSOR_SUFFIXES: Final = frozenset({
 })
 REMOVED_SENSOR_SUFFIXES: Final = {
     "_alert_count",
+    "_smart_meter_grid_import_energy",
+    "_smart_meter_grid_export_energy",
     "_grid_side_in_power",
     "_grid_side_out_power",
     "_max_grid_power",
@@ -2219,9 +2477,6 @@ REMOVED_SENSOR_SUFFIXES: Final = {
     "_savings_pv_surplus_loss_year_energy",
     "_smart_meter_import_today_energy",
     "_smart_meter_export_today_energy",
-    # Duplicates of _smart_meter_lifetime_{import,export}_energy (same tPhaseEgy).
-    "_smart_meter_grid_import_energy",
-    "_smart_meter_grid_export_energy",
 }
 
 PLATFORMS: Final = [
@@ -2232,12 +2487,15 @@ PLATFORMS: Final = [
     "number",
     "select",
     "button",
+    "update",
 ]
 
 # --- MQTT message types and command IDs -------------------------------------
 # The app protocol transports most writes as MQTT messageType/cmd/actionId triples.
 # Keep these names aligned with docs/source-of-truth instead of repeating raw strings.
 MQTT_MESSAGE_DEVICE_PROPERTY_CHANGE: Final = "DevicePropertyChange"
+MQTT_MESSAGE_DEVICE_REBOOT: Final = "DeviceReboot"
+MQTT_MESSAGE_DEVICE_POWER_OFF: Final = "DevicePowerOff"
 MQTT_MESSAGE_CONTROL_COMBINE: Final = "ControlCombine"
 MQTT_MESSAGE_QUERY_COMBINE_DATA: Final = "QueryCombineData"
 MQTT_MESSAGE_QUERY_DEVICE_PROPERTY: Final = "QueryDeviceProperty"
@@ -2247,6 +2505,7 @@ MQTT_MESSAGE_UPLOAD_SUBDEVICE_INCREMENTAL_PROPERTY: Final = (
     "UploadSubDeviceIncrementalProperty"
 )
 MQTT_MESSAGE_UPLOAD_WEATHER_PLAN: Final = "UploadWeatherPlan"
+MQTT_MESSAGE_EXECUTE_WEATHER_PLAN: Final = "ExecuteWeatherPlan"
 MQTT_MESSAGE_BIND_SMART_ACCESSORY: Final = "BindSmartAccessory"
 MQTT_MESSAGE_REMOVE_SMART_ACCESSORY: Final = "RemoveSmartAccessory"
 MQTT_MESSAGE_QUERY_WEATHER_PLAN: Final = "QueryWeatherPlan"
@@ -2304,6 +2563,23 @@ MQTT_CMD_NOTIFY_DEVICE_OTA_TOTAL_PAGE: Final = 102
 MQTT_CMD_DEVICE_GET_OTA_PAGE_DATA: Final = 103
 MQTT_CMD_BIND_SMART_PART: Final = 108
 MQTT_CMD_UNBIND_SMART_PART: Final = 109
+
+BOX_BLE_VALIDATED_WRITE_PAIRS: Final[frozenset[tuple[int, int]]] = frozenset({
+    (2, 4),
+    (3, 5),
+    (4, 6),
+    (5, 7),
+    (6, 8),
+    (8, 11),
+    (10, 13),
+    (11, 14),
+    (16, 19),
+    (17, 20),
+    (23, 99),
+})
+BOX_BLE_WRITE_PAIRS: Final[frozenset[tuple[int, int]]] = (
+    BOX_BLE_VALIDATED_WRITE_PAIRS | {(1, 3), (9, 12), (13, 16), (14, 17), (15, 18)}
+)
 
 # --- action IDs (Jackery cloud command/upload protocol) ----------------
 # These IDs are sent in BLE/MQTT command payloads' `actionId` field. Keep them
@@ -2411,7 +2687,10 @@ ACTION_ID_TIMER_TASK_DELETE: Final = 3016  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_UPDATE: Final = 3017  # cmd=112 DownloadDeviceSchedule
 ACTION_ID_TIMER_TASK_READ: Final = 3018  # cmd=112 DownloadDeviceSchedule
 
-# --- Portable / Explorer powerstation command IDs (msg_id 1-53) ---------------
+# --- Portable / Explorer powerstation command IDs (msg_id 1-59) ---------------
+ACTION_ID_BOX_READ_DEVICE_INFO: Final = 252
+BLE_CMD_BOX_READ_DEVICE_INFO: Final = 9
+
 # Sourced from ``com.hbxn.control.device.cmd.portable.b`` (51 portable commands
 # per source-of-truth/Jackery_2.1.1_RE_Supplement.md §3.2). All transport as
 # ``messageType=DevicePropertyChange`` with ``bleMsgType`` per row, unless noted.
@@ -2464,8 +2743,8 @@ ACTION_ID_PORTABLE_AC_OUTPUT_DELAY: Final = 41  # ble=4 DevicePropertyChange
 ACTION_ID_PORTABLE_SET_PEAKS_TROUGHS: Final = 42  # ble=130 TOUSchedule
 ACTION_ID_PORTABLE_GET_PEAKS_TROUGHS: Final = 43  # ble=131 QueryTOUSchedule
 ACTION_ID_PORTABLE_BLUETOOTH_SLEEP: Final = 44  # ble=4 DevicePropertyChange
-ACTION_ID_PORTABLE_RESTART: Final = 45  # ble=96 DevicePropertyChange
-ACTION_ID_PORTABLE_POWER_OFF: Final = 46  # ble=97 DevicePropertyChange
+ACTION_ID_PORTABLE_RESTART: Final = 45  # ble=96 DeviceReboot
+ACTION_ID_PORTABLE_POWER_OFF: Final = 46  # ble=97 DevicePowerOff
 ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SWITCH: Final = 47  # ble=4 DevicePropertyChange
 ACTION_ID_PORTABLE_OUTPUT_PRIORITY: Final = 48  # ble=4 DevicePropertyChange
 ACTION_ID_PORTABLE_OUTPUT_PRIORITY_SOC: Final = 49  # ble=4 DevicePropertyChange
@@ -2473,6 +2752,10 @@ ACTION_ID_PORTABLE_SYNC_MQTT_INFO: Final = 50  # ble=99 DevicePropertyChange
 ACTION_ID_PORTABLE_READ_SUB_CT: Final = 51  # ble=110 QuerySubDeviceGroupProperty
 ACTION_ID_PORTABLE_GET_WIFI_CONFIG: Final = 52  # ble=124 QueryWifiConfig
 ACTION_ID_PORTABLE_DISCHARGE_MEMORY: Final = 53  # ble=4 DevicePropertyChange
+ACTION_ID_PORTABLE_GET_STORM_EVENT: Final = 54  # ble=23 QueryWeatherPlan
+ACTION_ID_PORTABLE_STORM_EVENT_SWITCH: Final = 57  # ble=4 DevicePropertyChange
+ACTION_ID_PORTABLE_RESERVE_THRESHOLD: Final = 58  # ble=4 DevicePropertyChange
+ACTION_ID_PORTABLE_RESERVE_SWITCH: Final = 59  # ble=4 DevicePropertyChange
 
 PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID: Final = {
     ACTION_ID_PORTABLE_OTA_PAGE_DATA: 103,
@@ -2526,6 +2809,10 @@ PORTABLE_BLE_MSG_TYPE_BY_ACTION_ID: Final = {
     ACTION_ID_PORTABLE_READ_SUB_CT: 110,
     ACTION_ID_PORTABLE_GET_WIFI_CONFIG: 124,
     ACTION_ID_PORTABLE_DISCHARGE_MEMORY: 4,
+    ACTION_ID_PORTABLE_GET_STORM_EVENT: 23,
+    ACTION_ID_PORTABLE_STORM_EVENT_SWITCH: 4,
+    ACTION_ID_PORTABLE_RESERVE_THRESHOLD: 4,
+    ACTION_ID_PORTABLE_RESERVE_SWITCH: 4,
 }
 
 # Frozenset of every portable command ID for coordinator-owned command routing.
@@ -2583,6 +2870,10 @@ PORTABLE_ACTION_IDS: Final = frozenset({
     ACTION_ID_PORTABLE_READ_SUB_CT,
     ACTION_ID_PORTABLE_GET_WIFI_CONFIG,
     ACTION_ID_PORTABLE_DISCHARGE_MEMORY,
+    ACTION_ID_PORTABLE_GET_STORM_EVENT,
+    ACTION_ID_PORTABLE_STORM_EVENT_SWITCH,
+    ACTION_ID_PORTABLE_RESERVE_THRESHOLD,
+    ACTION_ID_PORTABLE_RESERVE_SWITCH,
 })
 
 # Third-party MQTT bridge body keys per ``ThirdPartyMqttBody.smali``.
@@ -2649,6 +2940,8 @@ SUBDEVICE_SCAN_NAME_DEV_TYPES: Final[dict[str, int]] = {
     "HTO905A": SUBDEVICE_DEV_TYPE_METER_HEAD,
     "HTO906A": SUBDEVICE_DEV_TYPE_CT,
     "HTO907A": SUBDEVICE_DEV_TYPE_CT,
+    "HTO2675A": SUBDEVICE_DEV_TYPE_CT,
+    "HTO2604A": SUBDEVICE_DEV_TYPE_CT,
     "HTO910A": SUBDEVICE_DEV_TYPE_METER_HEAD,
 }
 
@@ -2669,6 +2962,8 @@ SUBDEVICE_SCAN_NAME_LABELS: Final[dict[str, str]] = {
     "HTO905A": "Jackery HTO905A (Meter Head)",
     "HTO906A": "Jackery HTO906A (CT)",
     "HTO907A": "Jackery HTO907A (CT)",
+    "HTO2675A": "Jackery HTO907B (CT)",
+    "HTO2604A": "Jackery HTO2604A (CT)",
     "HTO910A": "Jackery HTO910A (Meter Head)",
 }
 
@@ -2691,6 +2986,8 @@ SUBDEVICE_SCAN_NAME_MANUFACTURERS: Final[dict[str, str]] = {
     "HTO905A": "Jackery",
     "HTO906A": "Jackery",
     "HTO907A": "Jackery",
+    "HTO2675A": "Jackery",
+    "HTO2604A": "Jackery",
     "HTO910A": "Jackery",
 }
 
@@ -2745,8 +3042,6 @@ DEFAULT_ENABLE_YEAR_STATISTICS: Final = True
 EXTERNAL_STAT_BUCKET_DAILY: Final = "daily"
 CONF_ENABLE_PAYLOAD_DEBUG_LOG: Final = "enable_payload_debug_log"
 DEFAULT_ENABLE_PAYLOAD_DEBUG_LOG: Final = False
-CONF_ENABLE_UNREDACTED_DEBUG: Final = "enable_unredacted_debug"
-DEFAULT_ENABLE_UNREDACTED_DEBUG: Final = False
 CONF_ENABLE_HOUR_STATISTICS: Final = "enable_hour_statistics"
 DEFAULT_ENABLE_HOUR_STATISTICS: Final = True
 CONF_ENABLE_DAY_STATISTICS: Final = "enable_day_statistics"
@@ -2770,13 +3065,13 @@ LOCAL_DAILY_LIFETIME_METRICS: Final[tuple[str, ...]] = (
     APP_DEVICE_STAT_PV_TO_BATTERY,
     APP_DEVICE_STAT_PV_TO_ONGRID,
     APP_DEVICE_STAT_ONGRID_TO_BATTERY,
+    APP_DEVICE_STAT_EPS_INPUT,
+    APP_DEVICE_STAT_EPS_OUTPUT,
     APP_DEVICE_STAT_AC_TO_BATTERY,
     APP_DEVICE_STAT_AC_TO_ONGRID,
     APP_DEVICE_STAT_BATTERY_TO_AC,
     APP_DEVICE_STAT_ONGRID_TO_AC_LOAD,
     APP_DEVICE_STAT_PV_TO_AC,
-    APP_DEVICE_STAT_EPS_INPUT,
-    APP_DEVICE_STAT_EPS_OUTPUT,
     FIELD_CT_TOTAL_PHASE_ENERGY,
     FIELD_CT_TOTAL_NEGATIVE_PHASE_ENERGY,
 )
@@ -2788,6 +3083,11 @@ PAYLOAD_LOCAL_DAILY_ENERGY: Final = "local_daily_energy"
 UNRECORDED_ATTRS_HTTP_API: Final = frozenset({
     "connected",
     "requests_total",
+    "polling",
+    "slow_metrics_interval_seconds",
+    "historical_metrics_interval_seconds",
+    "shadow_measurements_interval_seconds",
+    "shadow_config_interval_seconds",
     "requests_failed",
     "timeouts_total",
     "auth_retries",
@@ -2818,9 +3118,15 @@ UNRECORDED_ATTRS_CLOUD_MQTT: Final = frozenset({
     "library",
 })
 UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
+    "broker_counters_scope",
+    "coordinator_counters_scope",
+    "transport_counters_scope",
+    "device_messages_accepted_scope",
+    "transport_instance_started_at",
     "connected",
     "broker_connected",
     "subscribed",
+    "subscription_retry_active",
     "started",
     "periodic_requests_active",
     "snapshot_request_active",
@@ -2828,13 +3134,41 @@ UNRECORDED_ATTRS_LOCAL_MQTT: Final = frozenset({
     "publish_errors",
     "last_publish_at",
     "subscription_filter_count",
+    "subscription_attempt_failure_count",
+    "subscription_failures_by_topic",
+    "requested_topics",
+    "subscribed_topics",
     "topics_seen_count",
+    "topics_seen",
     "topics_seen_truncated",
+    "messages_broker_metadata",
+    "device_status_messages_received",
+    "device_event_messages_received",
     "device_traffic_observed",
+    "head_device_traffic_observed",
+    "lifetime_traffic_observed",
+    "device_traffic_observed_count",
+    "head_device_traffic_observed_count",
+    "lifetime_traffic_observed_count",
+    "device_messages_accepted",
+    "device_telemetry_age_seconds",
+    "device_telemetry_freshness_seconds",
+    "bridge_config_status",
+    "bridge_config_attempts",
+    "bridge_stale_rearm_attempts",
+    "bridge_last_stale_rearm_at",
     "messages_received",
     "messages_dropped",
     "messages_forwarded",
     "messages_filtered",
+    "messages_rejected_by_sink",
+    "rejection_reason_counts",
+    "last_rejection_reason",
+    "messages_oversized",
+    "messages_oversized_identified_own_export",
+    "messages_oversized_not_identified_own_export",
+    "sink_errors",
+    "last_sink_error",
     "last_connect_at",
     "last_disconnect_at",
     "last_message_at",
@@ -2932,6 +3266,10 @@ _OPTION_DEFAULTS: dict[str, bool] = {
     CONF_CREATE_CALCULATED_POWER_SENSORS: DEFAULT_CREATE_CALCULATED_POWER_SENSORS,
     CONF_CREATE_SAVINGS_DETAIL_SENSORS: DEFAULT_CREATE_SAVINGS_DETAIL_SENSORS,
     CONF_ENABLE_BLE_TRANSPORT: DEFAULT_ENABLE_BLE_TRANSPORT,
+    CONF_ENABLE_DAY_STATISTICS: DEFAULT_ENABLE_DAY_STATISTICS,
+    CONF_ENABLE_WEEK_STATISTICS: DEFAULT_ENABLE_WEEK_STATISTICS,
+    CONF_ENABLE_MONTH_STATISTICS: DEFAULT_ENABLE_MONTH_STATISTICS,
+    CONF_ENABLE_YEAR_STATISTICS: DEFAULT_ENABLE_YEAR_STATISTICS,
     CONF_ENABLE_DERIVED_HOME_ENERGY_FALLBACK: (
         DEFAULT_ENABLE_DERIVED_HOME_ENERGY_FALLBACK
     ),

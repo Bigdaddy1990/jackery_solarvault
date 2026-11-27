@@ -20,7 +20,7 @@ The actions follow the same routing contract:
 """
 
 import base64
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 import io
 import json
 import logging
@@ -50,17 +50,27 @@ from .client.credentials import (
 )
 from .const import (
     APP_PERIOD_DATE_TYPES,
+    APP_VERSION_QUERY_NAME,
+    APP_VERSION_QUERY_TYPE,
     DISCOVERY_SOURCE_LEGACY_BIND_LIST,
     DOMAIN,
+    FAULT_LOG_MAX_PAGE_NUM,
+    FAULT_LOG_MAX_PAGE_SIZE,
+    FIELD_DEVICE_SN,
+    FIELD_DEV_SN,
     FIELD_ID,
     FIELD_QR_CODE_ID,
     FIELD_SYSTEM_ID,
     FIELD_USER_ID,
     MQTT_ACTION_IDS_SCHEDULE,
+    PAYLOAD_BLE_OTA_VERSIONS,
     PAYLOAD_DEVICE,
+    PAYLOAD_DEVICE_META,
     PAYLOAD_DISCOVERY,
     PAYLOAD_DISCOVERY_SOURCE,
     PAYLOAD_SYSTEM,
+    PORTABLE_PEAK_THROUGH_MODELS,
+    PORTABLE_TOU_QUERY_MODELS,
     SERVICE_ACCEPT_SHARED_DEVICE,
     SERVICE_AGREE_PRIVACY_CONSENT,
     SERVICE_BIND_CURRENCY,
@@ -69,6 +79,7 @@ from .const import (
     SERVICE_CANCEL_DYNAMIC_PRICE_CONTRACT_AUTH,
     SERVICE_CHECK_ACCESSORIES_EXIST,
     SERVICE_CHECK_APP_VERSION,
+    SERVICE_CHECK_BLE_OTA_VERSIONS,
     SERVICE_CHECK_JACKERY_ACCESSORIES_EXIST,
     SERVICE_CHECK_PRIVACY_UPDATE,
     SERVICE_CHECK_SYSTEM_BOUND,
@@ -113,7 +124,6 @@ from .const import (
     SERVICE_FIELD_LATITUDE,
     SERVICE_FIELD_LEVEL,
     SERVICE_FIELD_LONGITUDE,
-    SERVICE_FIELD_MAX_POWER,
     SERVICE_FIELD_NEW_NAME,
     SERVICE_FIELD_NICKNAME,
     SERVICE_FIELD_PAGE_INDEX,
@@ -137,8 +147,10 @@ from .const import (
     SERVICE_FIELD_WAIT_FOR_ACK,
     SERVICE_FIELD_ZONE_ID,
     SERVICE_GET_ALARM_DETAIL,
+    SERVICE_GET_BATTERY_PASSPORT,
     SERVICE_GET_DEVICE_CURRENCY,
     SERVICE_GET_DYNAMIC_PRICE_LOGIN_URL,
+    SERVICE_GET_FAULT_LOG,
     SERVICE_GET_PRODUCT_INSTRUCTION,
     SERVICE_GET_PUSH_CONFIG,
     SERVICE_GET_SHARE_QR_CODE,
@@ -180,7 +192,6 @@ from .const import (
     SERVICE_REPORT_DEVICE_TIMEZONE,
     SERVICE_RESPONSE_QR_CODE_ID,
     SERVICE_RESPONSE_USER_ID,
-    SERVICE_SAVE_DEVICE_MAX_POWER,
     SERVICE_SAVE_DYNAMIC_PRICE_CONTRACT_AUTH,
     SERVICE_SAVE_DYNAMIC_PRICE_LOCATION_ID,
     SERVICE_SAVE_TOU_PLAN,
@@ -193,6 +204,7 @@ from .const import (
     SERVICE_SET_PUSH_CONFIG,
     SERVICE_SET_STORM_ALERT_LOCATION,
     SERVICE_SET_THIRD_PARTY_MQTT_CONFIG,
+    SERVICE_START_BLE_OTA_UPDATE,
     SERVICE_SUBMIT_FEEDBACK,
     SERVICE_SYNC_ALERTS,
     SERVICE_SYNC_OFFLINE_STATISTICS,
@@ -209,6 +221,8 @@ from .schema_compat import Schema
 from .util import (
     payload_has_home_payload_evidence as _payload_has_home_payload_evidence,
     safe_bool,
+    safe_float,
+    stable_subdevice_key,
 )
 
 if TYPE_CHECKING:
@@ -362,6 +376,13 @@ QUERY_THIRD_PARTY_MQTT_SCHEMA = vol.Schema({
         cv.string,
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
+})
+CHECK_BLE_OTA_SCHEMA = vol.Schema({
+    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
+        cv.string,
+        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
+    ),
+    vol.Optional("target", default="device"): vol.In(("device", "ground_accessory")),
 })
 SEND_BLE_COMMAND_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
@@ -589,16 +610,6 @@ CHECK_SYSTEM_BOUND_SCHEMA = vol.Schema({
         vol.Length(max=128),
     ),
 })
-SAVE_DEVICE_MAX_POWER_SCHEMA = vol.Schema({
-    vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
-        cv.string,
-        vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
-    ),
-    vol.Required(SERVICE_FIELD_MAX_POWER): vol.All(
-        _coerce_service_int,
-        vol.Range(min=0, max=1000000),
-    ),
-})
 GET_ALARM_DETAIL_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
         cv.string,
@@ -638,6 +649,17 @@ ACCOUNT_READ_SCHEMA = vol.Schema({
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
 })
+GET_BATTERY_PASSPORT_SCHEMA = ACCOUNT_READ_SCHEMA
+GET_FAULT_LOG_SCHEMA = ACCOUNT_READ_SCHEMA.extend({
+    vol.Optional(SERVICE_FIELD_PAGE_NO, default=1): vol.All(
+        _coerce_service_int,
+        vol.Range(min=1, max=FAULT_LOG_MAX_PAGE_NUM),
+    ),
+    vol.Optional(SERVICE_FIELD_PAGE_SIZE, default=20): vol.All(
+        _coerce_service_int,
+        vol.Range(min=1, max=FAULT_LOG_MAX_PAGE_SIZE),
+    ),
+})
 SYNC_OFFLINE_STATISTICS_SCHEMA = ACCOUNT_READ_SCHEMA.extend({
     vol.Required(SERVICE_FIELD_BODY): vol.All(dict, vol.Length(min=1)),
 })
@@ -646,11 +668,11 @@ CHECK_APP_VERSION_SCHEMA = vol.Schema({
         cv.string,
         vol.Match(SERVICE_NON_EMPTY_TEXT_PATTERN),
     ),
-    vol.Optional(SERVICE_FIELD_TYPE, default=""): vol.All(
+    vol.Optional(SERVICE_FIELD_TYPE, default=APP_VERSION_QUERY_TYPE): vol.All(
         cv.string,
         vol.Length(max=64),
     ),
-    vol.Optional(SERVICE_FIELD_VERSION_NAME, default=""): vol.All(
+    vol.Optional(SERVICE_FIELD_VERSION_NAME, default=APP_VERSION_QUERY_NAME): vol.All(
         cv.string,
         vol.Length(max=64),
     ),
@@ -873,6 +895,7 @@ BIND_SMART_PART_SCHEMA = vol.Schema({
     ),
 })
 UNBIND_SMART_PART_SCHEMA = BIND_SMART_PART_SCHEMA
+BIND_SMART_PART_SCHEMA = BIND_SMART_PART_SCHEMA.extend({vol.Required("smart"): dict})
 LIST_SHARED_DEVICES_SCHEMA = vol.Schema({
     vol.Required(SERVICE_FIELD_DEVICE_ID): vol.All(
         cv.string,
@@ -1118,6 +1141,8 @@ def _resolve_jackery_device_id(hass: HomeAssistant, raw: str) -> str:
 def _coordinator_for_device(
     hass: HomeAssistant,
     device_id: str,
+    *,
+    config_entry_id: str | None = None,
 ) -> JackerySolarVaultCoordinator | None:
     """Locate the coordinator that manages the specified Jackery device id.
 
@@ -1126,6 +1151,11 @@ def _coordinator_for_device(
         loaded.
     """
     for coordinator in _loaded_coordinators(hass):
+        if config_entry_id is not None and (
+            coordinator.config_entry is None
+            or coordinator.config_entry.entry_id != config_entry_id
+        ):
+            continue
         if device_id in (coordinator.data or {}):
             return coordinator
     return None
@@ -1166,6 +1196,44 @@ def _raise_if_portable_home_service(
             f"{service_name} is a Home-family command and is not valid "
             "for portable devices"
         ),
+    )
+
+
+def _raise_if_unsupported_portable_tou(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    *,
+    translation_key: str,
+    supported_models: frozenset[int],
+) -> bool:
+    """Allow TOU operations only for App-supported Portable models."""
+    family_reader = getattr(coordinator, "device_family", None)
+    family = family_reader(device_id) if callable(family_reader) else None
+    if family == "unknown":
+        raise _service_validation_error(
+            translation_key,
+            device_id=device_id,
+            error="TOU plan requires an unambiguous device family",
+        )
+    portable = (
+        family == "portable"
+        if family is not None
+        else _is_portable_device(coordinator, device_id)
+    )
+    if not portable:
+        return False
+    model_reader = getattr(coordinator, "device_model_code", None)
+    model = model_reader(device_id) if callable(model_reader) else None
+    if (
+        isinstance(model, int)
+        and not isinstance(model, bool)
+        and model in supported_models
+    ):
+        return True
+    raise _service_validation_error(
+        translation_key,
+        device_id=device_id,
+        error="TOU plan is not supported for this Portable model",
     )
 
 
@@ -1230,12 +1298,13 @@ def _service_action_error(
     *,
     device_id: str,
     error: object,
+    entry: object | None = None,
     extra_placeholders: dict[str, str] | None = None,
 ) -> HomeAssistantError:
     """Construct a translated error for an external service action failure."""
     placeholders = {
         "device_id": device_id,
-        "error": redacted_error(error),
+        "error": redacted_error(error, entry=entry),
     }
     if extra_placeholders is not None:
         placeholders.update(extra_placeholders)
@@ -1497,6 +1566,63 @@ def _tou_tasks_from_service(
     return tasks
 
 
+def _validate_portable_tou_tasks(  # ruff: ignore[too-many-branches]
+    tasks: list[dict[str, JsonValueType]], device_id: str
+) -> None:
+    """Validate the App's Portable PeaksTroughs fields before writing."""
+
+    def fail() -> None:
+        raise _service_validation_error(
+            "save_tou_plan_failed",
+            device_id=device_id,
+            error="Portable TOU plan contains an invalid App field type",
+        )
+
+    def app_integer(value: object) -> bool:
+        return (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and -(2**31) <= value < 2**31
+        )
+
+    for item in tasks:
+        month = item.get("month")
+        if month is not None and not isinstance(month, str):
+            fail()
+        follow = item.get("follow")
+        if "follow" in item and not app_integer(follow):
+            fail()
+        for field in ("crest", "flat", "lowest", "trough"):
+            if field not in item:
+                continue
+            value = item[field]
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or safe_float(value) is None
+            ):
+                fail()
+        for field in ("work", "weekend"):
+            periods = item.get(field)
+            if periods is None:
+                continue
+            if not isinstance(periods, list):
+                fail()
+                continue
+            for period in periods:
+                if period is None:
+                    continue
+                if not isinstance(period, dict):
+                    fail()
+                    continue
+                for name in ("start", "end"):
+                    value = period.get(name)
+                    if value is not None and not isinstance(value, str):
+                        fail()
+                if "type" in period and not app_integer(period["type"]):
+                    fail()
+
+
 def _service_bool(
     raw: object,
     *,
@@ -1666,7 +1792,7 @@ async def _async_handle_rename(hass: HomeAssistant, call: ServiceCall) -> None:
             translation_key="rename_system_failed",
             translation_placeholders={
                 "system_id": system_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
 
@@ -1713,7 +1839,7 @@ async def _async_handle_refresh_weather_plan(
             translation_key="refresh_weather_plan_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
 
@@ -1766,7 +1892,7 @@ async def _async_handle_refresh_subdevices(
             translation_key="refresh_subdevices_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
 
@@ -1826,7 +1952,7 @@ async def _async_handle_delete_storm_alert(
             translation_placeholders={
                 "device_id": device_id,
                 "alert_id": alert_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
 
@@ -1875,6 +2001,7 @@ async def _async_handle_set_storm_alert_location(
             "set_storm_alert_location_failed",
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -1990,7 +2117,7 @@ async def _async_handle_set_third_party_mqtt_config(
             translation_key="set_third_party_mqtt_config_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
 
@@ -2056,9 +2183,755 @@ async def _async_handle_query_third_party_mqtt_config(
             translation_key="query_third_party_mqtt_config_failed",
             translation_placeholders={
                 "device_id": device_id,
-                "error": redacted_error(err),
+                "error": redacted_error(err, entry=getattr(coordinator, "entry", None)),
             },
         ) from err
+
+
+def _registry_device_serial_number(device: dr.BaseDeviceEntry | None) -> str | None:
+    """Read the physical serial only on full devices, never HA child entries."""
+    return device.serial_number if isinstance(device, dr.DeviceEntry) else None
+
+
+def _ble_ota_child_serial(  # ruff: ignore[too-many-return-statements]
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    selected: dr.BaseDeviceEntry,
+) -> str | None:
+    """Resolve a child serial without guessing from its registry identifier."""
+    is_pack = any(
+        domain == DOMAIN and identifier.startswith(f"{device_id}_battery_pack_")
+        for domain, identifier in selected.identifiers
+    )
+    if not is_pack:
+        return selected.serial_number if isinstance(selected, dr.DeviceEntry) else None
+    matches: list[tuple[int, str]] = []
+    for index in range(1, 6):
+        serial = coordinator.battery_pack_identity_serial(device_id, index)
+        if serial is None:
+            continue
+        key = stable_subdevice_key("battery_pack", serial, index)
+        identifier = f"{device_id}_{key}"
+        if (DOMAIN, identifier) in selected.identifiers:
+            matches.append((index, serial))
+    if len(matches) != 1:
+        return None
+    matched_index, serial = matches[0]
+    if isinstance(selected, dr.DeviceEntry) and selected.serial_number != serial:
+        return None
+    confirmation = coordinator.battery_pack_recent_confirmation(device_id, serial)
+    if confirmation is False:
+        return None
+    if confirmation is True:
+        return serial
+    versions = (coordinator.data or {}).get(device_id, {}).get(PAYLOAD_BLE_OTA_VERSIONS)
+    if not isinstance(versions, list) or not any(
+        isinstance(version, dict) and version.get(FIELD_DEVICE_SN) == serial
+        for version in versions
+    ):
+        return None
+    key = stable_subdevice_key("battery_pack", serial, matched_index)
+    observed_serials = [
+        observed
+        for index in range(1, 6)
+        if (observed := coordinator.battery_pack_observed_serial(device_id, index))
+        is not None
+    ]
+    if observed_serials.count(serial) != 1:
+        return None
+    for observed in observed_serials:
+        if (
+            observed != serial
+            and stable_subdevice_key("battery_pack", observed, matched_index) == key
+        ):
+            return None
+    return serial
+
+
+def _ble_ota_parent_serial(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    parent_device: object | None,
+) -> str | None:
+    """Resolve a current parent serial from live payload or bound HA identity.
+
+    The device-registry value is a cached identity tied to the selected Jackery
+    config entry. Use it only when the coordinator has no serial yet; a conflict
+    between the live payload and registry is ambiguous and must be rejected.
+    """
+    live_serial = coordinator._resolve_device_sn(device_id)  # ruff: ignore[private-member-access]
+    registry_serial = getattr(parent_device, "serial_number", None)
+    if not isinstance(registry_serial, str) or not registry_serial.strip():
+        registry_serial = None
+    indexed = coordinator._device_index.get(device_id) or {}  # ruff: ignore[private-member-access]
+    payload = (coordinator.data or {}).get(device_id, {})
+    serials: set[str] = set()
+    for source in (
+        indexed.get(PAYLOAD_DEVICE_META),
+        payload.get(PAYLOAD_DEVICE),
+        payload.get(PAYLOAD_DISCOVERY),
+    ):
+        if isinstance(source, Mapping):
+            serials.update(
+                str(value)
+                for field in (FIELD_DEVICE_SN, FIELD_DEV_SN)
+                if (value := source.get(field))
+            )
+    if len(serials) > 1 or (
+        registry_serial is not None
+        and any(serial != registry_serial for serial in serials)
+    ):
+        return None
+    return live_serial or registry_serial
+
+
+async def _async_check_ground_ble_ota_versions(  # ruff: ignore[too-many-arguments, too-many-statements]
+    hass: HomeAssistant,
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    raw_device_id: str,
+    selected: dr.BaseDeviceEntry | None,
+    *,
+    force_fresh_report: bool = False,
+) -> ServiceResponse:
+    """Check a Ground candidate while its parent and BLE evidence remain bound."""
+    pending = coordinator._ble_ota_pending  # ruff: ignore[private-member-access]
+    marker = (
+        dict(pending[device_id])
+        if pending is not None and device_id in pending
+        else None
+    )
+    recovering = marker is not None
+    if marker is not None and marker.get("target_kind") != "ground_accessory":
+        msg = "Pending BLE OTA belongs to a different target"
+        raise HomeAssistantError(msg)
+    identity = coordinator.ground_ble_identity(device_id)
+    target_sn = (
+        identity.serial
+        if recovering and identity is not None
+        else coordinator.ground_ble_ota_target(device_id)
+    )
+    if marker is not None and marker.get("target_sn") != target_sn:
+        msg = "Pending BLE OTA belongs to a different ground accessory"
+        raise HomeAssistantError(msg)
+    if target_sn is None or identity is None:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="no current BLE ground accessory identity and version report",
+        )
+    parent_sn = coordinator._resolve_device_sn(device_id)  # ruff: ignore[private-member-access]
+    if not parent_sn:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="owning device serial number is missing",
+        )
+    model, key = (
+        coordinator._ble_ota_model_evidence(device_id),  # ruff: ignore[private-member-access]
+        coordinator.device_bluetooth_key(device_id),
+    )
+    registry = dr.async_get(hass)
+    selected_snapshot = (
+        (
+            frozenset(selected.identifiers),
+            getattr(selected, "created_at", None),
+            selected.config_entry_id,
+        )
+        if selected
+        else None
+    )
+    changed = False
+
+    def observe_identity() -> None:
+        nonlocal changed
+        properties = (coordinator.data or {}).get(device_id, {}).get("properties", {})
+        serial = properties.get("grdAccSn") if isinstance(properties, dict) else None
+        if (
+            not isinstance(serial, str)
+            or serial.strip() != target_sn
+            or coordinator._ble_ota_model_evidence(device_id) != model  # ruff: ignore[private-member-access]
+            or coordinator.device_bluetooth_key(device_id) != key
+        ):
+            changed = True
+
+    def identity_is_current() -> bool:  # ruff: ignore[too-many-return-statements]
+        current = coordinator._ble_ground_identity.get(device_id)  # ruff: ignore[private-member-access]
+        current_pending = coordinator._ble_ota_pending  # ruff: ignore[private-member-access]
+        if (
+            changed
+            or current_pending is None
+            or current_pending.get(device_id) != marker
+            or (
+                not recovering and device_id in coordinator._ble_ota_recovery_active  # ruff: ignore[private-member-access]
+            )
+        ):
+            return False
+        current_parent_sn = coordinator._resolve_device_sn(device_id)  # ruff: ignore[private-member-access]
+        if current_parent_sn is not None and current_parent_sn != parent_sn:
+            return False
+        if current is None:
+            return False
+        if (
+            current.generation != identity.generation
+            or current.first_sequence != identity.first_sequence
+            or coordinator._ble_ota_model_evidence(device_id) != model  # ruff: ignore[private-member-access]
+            or coordinator.device_bluetooth_key(device_id) != key
+        ):
+            return False
+        if (
+            not recovering and coordinator.ground_ble_ota_target(device_id) != target_sn
+        ) or (recovering and coordinator.ground_ble_identity(device_id) != current):
+            return False
+        current_device = registry.async_get(raw_device_id)
+        if selected is None:
+            return current_device is None and raw_device_id == device_id
+        return bool(
+            current_device is not None
+            and (
+                frozenset(current_device.identifiers),
+                getattr(current_device, "created_at", None),
+                current_device.config_entry_id,
+            )
+            == selected_snapshot
+            and _resolve_jackery_device_id(hass, raw_device_id) == device_id
+            and not (
+                getattr(current_device, "parent_device_id", None)
+                or getattr(current_device, "via_device_id", None)
+            )
+        )
+
+    unsubscribe = coordinator.async_add_listener(observe_identity)
+    try:
+        if not identity_is_current():
+            msg = "Ground accessory identity or OTA interlock is not current"
+            raise HomeAssistantError(msg)
+        result = await coordinator.async_check_ble_ota_versions(
+            device_id,
+            target_sn=target_sn,
+            parent_sn=parent_sn,
+            identity_is_current=identity_is_current if recovering else None,
+            force_fresh_report=force_fresh_report,
+        )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed from err
+    except (JackeryError, LookupError) as err:
+        raise _service_action_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error=err,
+            entry=getattr(coordinator, "entry", None),
+        ) from err
+    finally:
+        unsubscribe()
+    if not identity_is_current():
+        msg = "Selected ground accessory identity changed during the BLE update check"
+        raise HomeAssistantError(msg)
+    return cast("ServiceResponse", result)
+
+
+async def _async_handle_check_ble_ota_versions(  # ruff: ignore[too-many-locals, too-many-statements, too-many-branches, complex-structure]
+    hass: HomeAssistant,
+    call: ServiceCall,
+    *,
+    force_fresh_report: bool = False,
+) -> ServiceResponse:
+    """Return update candidates for a recent device-reported BLE version list."""
+    device_id = _device_id_from_service(
+        hass,
+        call.data[SERVICE_FIELD_DEVICE_ID],
+        translation_key="check_ble_ota_versions_failed",
+    )
+    raw_device_id = call.data[SERVICE_FIELD_DEVICE_ID]
+    registry = dr.async_get(hass)
+    selected = registry.async_get(raw_device_id)
+    coordinator = _coordinator_for_device(
+        hass,
+        device_id,
+        config_entry_id=selected.config_entry_id if selected is not None else None,
+    )
+    if coordinator is None:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    parent_link = (
+        getattr(selected, "parent_device_id", None)
+        or getattr(selected, "via_device_id", None)
+        if selected is not None
+        else None
+    )
+    parent_registry_id = parent_link or (
+        getattr(selected, "id", None) if selected is not None else None
+    )
+    parent_registry = (
+        registry.async_get(parent_registry_id)
+        if parent_registry_id is not None
+        else None
+    )
+    is_child = parent_link is not None
+    is_ground = call.data.get("target") == "ground_accessory"
+    if is_ground and is_child:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="select the owning Portable device for a ground accessory",
+        )
+    if selected is not None and not any(
+        domain == DOMAIN for domain, _ in selected.identifiers
+    ):
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="selected device is not a Jackery device",
+        )
+    if selected is None and raw_device_id != device_id:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="subdevice identity is not registered",
+        )
+    if selected is not None and (
+        coordinator.config_entry is None
+        or selected.config_entry_id != coordinator.config_entry.entry_id
+        or (parent_link is not None and registry.async_get(parent_link) is None)
+    ):
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="selected device ownership is not valid",
+        )
+    if parent_link is not None and (
+        selected is None
+        or parent_registry is None
+        or parent_registry.config_entry_id != selected.config_entry_id
+        or not any(domain == DOMAIN for domain, _ in parent_registry.identifiers)
+    ):
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="selected parent device ownership is not valid",
+        )
+    if parent_registry is not None and (
+        (DOMAIN, device_id) not in parent_registry.identifiers
+        or getattr(parent_registry, "parent_device_id", None)
+        or getattr(parent_registry, "via_device_id", None)
+    ):
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="selected parent is not the owning Jackery main device",
+        )
+    if is_ground:
+        return await _async_check_ground_ble_ota_versions(
+            hass,
+            coordinator,
+            device_id,
+            raw_device_id,
+            selected,
+            force_fresh_report=force_fresh_report,
+        )
+    parent_sn = _ble_ota_parent_serial(coordinator, device_id, parent_registry)
+    if not parent_sn:
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="owning device serial number is missing or inconsistent",
+        )
+    target_sn = (
+        _ble_ota_child_serial(coordinator, device_id, selected)
+        if is_child and selected is not None
+        else parent_sn
+    )
+    if not target_sn or (is_child and target_sn == parent_sn):
+        raise _service_validation_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error="selected device serial number is missing",
+        )
+    pack_revision = coordinator.battery_pack_identity_revision(device_id, target_sn)
+    child_identity_changed = False
+
+    def observe_child_identity() -> None:
+        nonlocal child_identity_changed
+        current = registry.async_get(raw_device_id)
+        if (
+            current is None
+            or _ble_ota_child_serial(coordinator, device_id, current) != target_sn
+        ):
+            child_identity_changed = True
+
+    selected_identifiers = frozenset(selected.identifiers) if selected else None
+    selected_created = getattr(selected, "created_at", None) if selected else None
+    selected_entry = selected.config_entry_id if selected else None
+    parent_identifiers = (
+        frozenset(parent_registry.identifiers) if parent_registry is not None else None
+    )
+    parent_created = getattr(parent_registry, "created_at", None)
+    parent_entry = getattr(parent_registry, "config_entry_id", None)
+    parent_registry_serial = getattr(parent_registry, "serial_number", None)
+
+    def parent_registry_identity_is_current() -> bool:
+        if parent_registry_id is None:
+            return parent_registry is None
+        current_parent = registry.async_get(parent_registry_id)
+        return bool(
+            current_parent is not None
+            and getattr(current_parent, "created_at", None) == parent_created
+            and current_parent.config_entry_id == parent_entry
+            and frozenset(current_parent.identifiers) == parent_identifiers
+            and getattr(current_parent, "serial_number", None) == parent_registry_serial
+        )
+
+    def selected_identity_is_current() -> bool:
+        current_parent_sn = coordinator._resolve_device_sn(device_id)  # ruff: ignore[private-member-access]
+        if current_parent_sn is not None and current_parent_sn != parent_sn:
+            return False
+        if (
+            parent_registry_id is not None
+            and _ble_ota_parent_serial(
+                coordinator, device_id, registry.async_get(parent_registry_id)
+            )
+            != parent_sn
+        ):
+            return False
+        current = registry.async_get(raw_device_id)
+        if selected is None:
+            return current is None and raw_device_id == device_id
+        return bool(
+            current is not None
+            and not child_identity_changed
+            and _resolve_jackery_device_id(hass, raw_device_id) == device_id
+            and current.config_entry_id == selected_entry
+            and frozenset(current.identifiers) == selected_identifiers
+            and getattr(current, "created_at", None) == selected_created
+            and (
+                getattr(current, "parent_device_id", None)
+                or getattr(current, "via_device_id", None)
+            )
+            == parent_link
+            and (parent_link is None or registry.async_get(parent_link) is not None)
+            and parent_registry_identity_is_current()
+            and (
+                not is_child
+                or (
+                    _ble_ota_child_serial(coordinator, device_id, current) == target_sn
+                    and coordinator.battery_pack_identity_revision(device_id, target_sn)
+                    == pack_revision
+                )
+            )
+        )
+
+    unsubscribe = (
+        coordinator.async_add_listener(observe_child_identity) if is_child else None
+    )
+    try:
+        result = await coordinator.async_check_ble_ota_versions(
+            device_id,
+            target_sn=target_sn,
+            parent_sn=parent_sn,
+            identity_is_current=selected_identity_is_current,
+            force_fresh_report=force_fresh_report,
+        )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed from err
+    except (JackeryError, LookupError) as err:
+        raise _service_action_error(
+            "check_ble_ota_versions_failed",
+            device_id=device_id,
+            error=err,
+            entry=getattr(coordinator, "entry", None),
+        ) from err
+    finally:
+        if unsubscribe is not None:
+            unsubscribe()
+    if selected is not None:
+        current = registry.async_get(raw_device_id)
+        if current is None:
+            msg = "Selected device identity changed during the BLE update check"
+            raise HomeAssistantError(msg)
+        registry_changed = (
+            child_identity_changed
+            or _resolve_jackery_device_id(hass, raw_device_id) != device_id
+            or current.config_entry_id != selected.config_entry_id
+            or current.identifiers != selected.identifiers
+            or getattr(current, "created_at", None)
+            != getattr(selected, "created_at", None)
+        )
+        relationship_changed = (
+            (
+                getattr(current, "parent_device_id", None)
+                or getattr(current, "via_device_id", None)
+            )
+            != parent_link
+            or (parent_link is not None and registry.async_get(parent_link) is None)
+            or (
+                is_child
+                and _ble_ota_child_serial(coordinator, device_id, current) != target_sn
+            )
+            or (
+                is_child
+                and coordinator.battery_pack_identity_revision(device_id, target_sn)
+                != pack_revision
+            )
+        )
+        if (
+            registry_changed
+            or relationship_changed
+            or not selected_identity_is_current()
+        ):
+            msg = "Selected device identity changed during the BLE update check"
+            raise HomeAssistantError(msg)
+    return cast("ServiceResponse", result)
+
+
+async def _async_start_ground_ble_ota_update(
+    coordinator: JackerySolarVaultCoordinator,
+    device_id: str,
+    raw_device_id: str,
+    candidate: dict[str, Any],
+) -> ServiceResponse:
+    """Run Ground OTA while its parent and accessory identity remain stable."""
+    target = candidate.get(FIELD_DEVICE_SN)
+    identity = coordinator.ground_ble_identity(device_id)
+    evidence = coordinator._ble_ota_registry_evidence(device_id, raw_device_id)  # ruff: ignore[private-member-access]
+    if (
+        not isinstance(target, str)
+        or identity is None
+        or coordinator.ground_ble_ota_target(device_id) != target
+        or evidence is None
+    ):
+        msg = "Ground OTA target or parent identity is not current"
+        raise HomeAssistantError(msg)
+    model = coordinator._ble_ota_model_evidence(device_id)  # ruff: ignore[private-member-access]
+    key = coordinator.device_bluetooth_key(device_id)
+    changed = False
+
+    def observe_identity() -> None:
+        nonlocal changed
+        properties = (coordinator.data or {}).get(device_id, {}).get("properties", {})
+        serial = properties.get("grdAccSn") if isinstance(properties, dict) else None
+        if (
+            not isinstance(serial, str)
+            or serial.strip() != target
+            or coordinator._ble_ota_model_evidence(device_id) != model  # ruff: ignore[private-member-access]
+            or coordinator.device_bluetooth_key(device_id) != key
+        ):
+            changed = True
+
+    def identity_is_current() -> bool:
+        current = coordinator.ground_ble_identity(device_id, require_connected=False)
+        return bool(
+            not changed
+            and current is not None
+            and current.serial == target
+            and current.generation == identity.generation
+            and current.first_sequence == identity.first_sequence
+            and coordinator._ble_ota_model_evidence(device_id) == model  # ruff: ignore[private-member-access]
+            and coordinator.device_bluetooth_key(device_id) == key
+            and coordinator._ble_ota_registry_evidence(  # ruff: ignore[private-member-access]
+                device_id, raw_device_id
+            )
+            == evidence
+        )
+
+    unsubscribe = coordinator.async_add_listener(observe_identity)
+    try:
+        status = await coordinator.async_start_box_ble_ota(
+            device_id,
+            target_sn=target,
+            candidate=candidate,
+            identity_is_current=identity_is_current,
+            selected_device_id=raw_device_id,
+            target_kind="ground_accessory",
+        )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed from err
+    except (JackeryError, LookupError, RuntimeError, ValueError, TimeoutError) as err:
+        raise _service_action_error(
+            "start_ble_ota_update_failed",
+            device_id=device_id,
+            error=err,
+            entry=getattr(coordinator, "entry", None),
+        ) from err
+    finally:
+        unsubscribe()
+    return cast("ServiceResponse", {"status": status})
+
+
+async def _async_handle_start_ble_ota_update(  # ruff: ignore[too-many-locals]  # ruff: ignore[too-many-statements]
+    hass: HomeAssistant,
+    call: ServiceCall,
+    *,
+    _registry_retry: bool = False,
+) -> ServiceResponse:
+    """Run the selected device's current Box BLE firmware update."""
+    raw_device_id = call.data[SERVICE_FIELD_DEVICE_ID]
+    device_id = _device_id_from_service(
+        hass, raw_device_id, translation_key="start_ble_ota_update_failed"
+    )
+    registry = dr.async_get(hass)
+    selected = registry.async_get(raw_device_id)
+    coordinator = _coordinator_for_device(
+        hass,
+        device_id,
+        config_entry_id=selected.config_entry_id if selected is not None else None,
+    )
+    if coordinator is None:
+        raise _service_validation_error(
+            "start_ble_ota_update_failed",
+            device_id=device_id,
+            error="no Jackery entry owns this device id",
+        )
+    parent_link = (
+        getattr(selected, "parent_device_id", None)
+        or getattr(selected, "via_device_id", None)
+        if selected is not None
+        else None
+    )
+    selected_identifiers = (
+        frozenset(selected.identifiers) if selected is not None else None
+    )
+    selected_modified = selected.modified_at if selected is not None else None
+    selected_entry = selected.config_entry_id if selected is not None else None
+    selected_created = getattr(selected, "created_at", None)
+    selected_serial = _registry_device_serial_number(selected)
+    parent_epoch = getattr(coordinator, "_http_parent_identity_epochs", {}).get(
+        device_id, 0
+    )
+    system_epoch = getattr(coordinator, "_system_binding_epochs", {}).get(device_id, 0)
+
+    def selected_identity_is_current(*, check_revision: bool = False) -> bool:
+        if (
+            _coordinator_for_device(hass, device_id, config_entry_id=selected_entry)
+            is not coordinator
+            or getattr(coordinator, "_http_parent_identity_epochs", {}).get(
+                device_id, 0
+            )
+            != parent_epoch
+            or getattr(coordinator, "_system_binding_epochs", {}).get(device_id, 0)
+            != system_epoch
+        ):
+            return False
+        current = registry.async_get(raw_device_id)
+        if selected is None:
+            return current is None and raw_device_id == device_id
+        if (
+            current is None  # ruff: ignore[too-many-boolean-expressions]
+            or getattr(current, "created_at", None) != selected_created
+            or _registry_device_serial_number(current) != selected_serial
+            or (check_revision and current.modified_at != selected_modified)
+            or current.config_entry_id != selected_entry
+            or frozenset(current.identifiers) != selected_identifiers
+            or _resolve_jackery_device_id(hass, raw_device_id) != device_id
+            or (
+                getattr(current, "parent_device_id", None)
+                or getattr(current, "via_device_id", None)
+            )
+            != parent_link
+        ):
+            return False
+        return parent_link is None or registry.async_get(parent_link) is not None
+
+    def can_repeat_preflight() -> bool:
+        """Allow one new read-only check after a registry metadata update."""
+        current = registry.async_get(raw_device_id)
+        return bool(
+            not _registry_retry
+            and selected is not None
+            and current is not None
+            and current.modified_at != selected_modified
+            and current.config_entry_id == selected_entry
+            and frozenset(current.identifiers) == selected_identifiers
+            and getattr(current, "created_at", None) == selected_created
+            and _registry_device_serial_number(current) == selected_serial
+            and (
+                getattr(current, "parent_device_id", None)
+                or getattr(current, "via_device_id", None)
+            )
+            == parent_link
+            and (parent_link is None or registry.async_get(parent_link) is not None)
+            and _resolve_jackery_device_id(hass, raw_device_id) == device_id
+            and _coordinator_for_device(hass, device_id, config_entry_id=selected_entry)
+            is coordinator
+            and getattr(coordinator, "_http_parent_identity_epochs", {}).get(
+                device_id, 0
+            )
+            == parent_epoch
+            and getattr(coordinator, "_system_binding_epochs", {}).get(device_id, 0)
+            == system_epoch
+        )
+
+    try:
+        checked = await _async_handle_check_ble_ota_versions(
+            hass, call, force_fresh_report=_registry_retry
+        )
+    except ConfigEntryAuthFailed:
+        raise
+    except HomeAssistantError:
+        if can_repeat_preflight():
+            return await _async_handle_start_ble_ota_update(
+                hass, call, _registry_retry=True
+            )
+        raise
+    if not selected_identity_is_current(check_revision=True):
+        if can_repeat_preflight():
+            return await _async_handle_start_ble_ota_update(
+                hass, call, _registry_retry=True
+            )
+        msg = "Selected device identity changed during the BLE update check"
+        raise HomeAssistantError(msg)
+    candidates = checked.get("data") if isinstance(checked, dict) else None
+    if (
+        not isinstance(candidates, list)
+        or len(candidates) != 1
+        or not isinstance(candidates[0], dict)
+    ):
+        msg = "A unique BLE OTA update candidate is required"
+        raise HomeAssistantError(msg)
+    candidate = candidates[0]
+    if call.data.get("target") == "ground_accessory":
+        return await _async_start_ground_ble_ota_update(
+            coordinator, device_id, raw_device_id, candidate
+        )
+    target_sn = candidate.get(FIELD_DEVICE_SN)
+    if not isinstance(target_sn, str) or not target_sn:
+        msg = "A BLE OTA target serial is required"
+        raise HomeAssistantError(msg)
+    pack_revision = coordinator.battery_pack_identity_revision(device_id, target_sn)
+
+    def identity_is_current() -> bool:
+        if not selected_identity_is_current():
+            return False
+        current = registry.async_get(raw_device_id)
+        if parent_link is not None:
+            return (
+                current is not None
+                and _ble_ota_child_serial(coordinator, device_id, current) == target_sn
+                and coordinator.battery_pack_identity_revision(device_id, target_sn)
+                == pack_revision
+            )
+        return True
+
+    try:
+        status = await coordinator.async_start_box_ble_ota(
+            device_id,
+            target_sn=target_sn,
+            candidate=candidate,
+            identity_is_current=identity_is_current,
+            selected_device_id=raw_device_id,
+        )
+    except JackeryAuthError as err:
+        raise ConfigEntryAuthFailed from err
+    except (JackeryError, LookupError, RuntimeError, ValueError, TimeoutError) as err:
+        raise _service_action_error(
+            "start_ble_ota_update_failed",
+            device_id=device_id,
+            error=err,
+            entry=getattr(coordinator, "entry", None),
+        ) from err
+    return cast("ServiceResponse", {"status": status})
 
 
 async def _async_handle_send_ble_command(
@@ -2139,14 +3012,23 @@ async def _async_handle_send_ble_command(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     if not sent:
         msg = "send_ble_command_failed"
+        pending = getattr(coordinator, "_ble_ota_pending", None)
+        ota_blocked = (
+            isinstance(pending, dict)
+            and device_id in pending
+            and coordinator._ble_ota_pending_blocked(device_id)  # ruff: ignore[private-member-access]
+        )
         raise _service_validation_error(
             msg,
             device_id=device_id,
             error=(
-                "BLE writes are disabled or no active BLE session exists after "
+                "BLE OTA recovery is pending for this device"
+                if ota_blocked
+                else "BLE writes are disabled or no active BLE session exists after "
                 "waiting for reconnect"
             ),
         )
@@ -2191,6 +3073,7 @@ async def _async_handle_set_device_nickname(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2238,6 +3121,7 @@ async def _async_handle_set_account_nickname(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2277,6 +3161,7 @@ async def _async_handle_unbind_device(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2330,6 +3215,7 @@ async def _async_handle_bind_device(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2365,7 +3251,9 @@ async def _async_handle_bind_smart_part(
         max_length=64,
     )
     try:
-        await coordinator.async_bind_smart_part(device_id, accessory_sn)
+        await coordinator.async_bind_smart_part(
+            device_id, accessory_sn, smart=call.data["smart"]
+        )
     except ConfigEntryAuthFailed:
         raise
     except JackeryAuthError as err:
@@ -2386,6 +3274,7 @@ async def _async_handle_bind_smart_part(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2442,19 +3331,19 @@ async def _async_handle_unbind_smart_part(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
-def _render_share_qr_png_data_uri(qr_code_id: str) -> str:
-    """Return a base64 PNG ``data:`` URI encoding the share ``qrCodeId``.
-
-    The renderer encodes only ``qrCodeId``. The API exposes an account QR
-    envelope and an accept-bind operation, but does not establish the exact
-    scan format or the participating account roles. Rendering is best-effort
-    and does not prove app compatibility or device-sharing eligibility.
-    """
+def _render_share_qr_png_data_uri(qr_code_id: str, user_id: str | None) -> str:
+    """Encode the App's QrCodeApi bean JSON as a PNG data URI."""
     buffer = io.BytesIO()
-    segno.make(qr_code_id, error="m").save(buffer, kind="png", scale=6, border=2)
+    invitation = {FIELD_QR_CODE_ID: qr_code_id}
+    if user_id is not None:
+        invitation[FIELD_USER_ID] = user_id
+    segno.make(
+        json.dumps(invitation, separators=(",", ":"), ensure_ascii=False), error="m"
+    ).save(buffer, kind="png", scale=6, border=2)
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
 
@@ -2465,12 +3354,11 @@ async def _notify_share_qr_code(
     qr_code_id: object,
     user_id: object,
 ) -> None:
-    """Create a persistent notification with an account QR image and limits.
+    """Create a persistent notification with a scannable share QR image.
 
     Best-effort: a render or notification failure must never fail the service,
     which still returns the ``{qr_code_id, user_id}`` envelope. The notification
-    documents the device-sharing limits and unverified scan format without
-    promising that the image can be used to share a SolarVault.
+    carries the App's JSON bean, from which the scanner extracts ``qrCodeId``.
     """
     if not isinstance(qr_code_id, str) or not qr_code_id:
         return
@@ -2478,22 +3366,19 @@ async def _notify_share_qr_code(
         data_uri = await hass.async_add_executor_job(
             _render_share_qr_png_data_uri,
             qr_code_id,
+            user_id if isinstance(user_id, str) else None,
         )
         message = (
             f"![Share QR code]({data_uri})\n\n"
-            f"Account QR code for eligible Jackery device-sharing workflows. "
-            f"SolarVault systems cannot be shared. This integration still "
-            f"requires cloud account authentication.\n\n"
+            f"Sharing invitation for this Jackery account. The device owner can "
+            f"scan it in the Jackery app's device-sharing screen.\n\n"
             f"qrCodeId: `{qr_code_id}`\n"
-            f"userId: `{user_id}`\n\n"
-            f"Note: The rendered QR format is reconstructed and is not guaranteed "
-            f"to scan in the Jackery app. Use these identifiers only with a "
-            f"documented sharing procedure for an eligible device."
+            f"userId: `{user_id}`"
         )
         persistent_notification.async_create(
             hass,
             message,
-            title="Jackery account QR code",
+            title="Jackery SolarVault share QR code",
         )
     except Exception:
         _LOGGER.debug(
@@ -2506,7 +3391,7 @@ async def _async_handle_get_share_qr_code(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> ServiceResponse:
-    """Return the account QR code using the selected device's configured account."""
+    """Return the share QR code for the account that owns the selected device."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2534,6 +3419,7 @@ async def _async_handle_get_share_qr_code(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     qr_code_id = data.get(FIELD_QR_CODE_ID)
     user_id = data.get(FIELD_USER_ID)
@@ -2582,6 +3468,7 @@ async def _async_handle_get_smart_schedule_prediction(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"prediction": cast("JsonValueType", prediction)}
 
@@ -2619,6 +3506,7 @@ async def _async_handle_unbind_accessories(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"result": cast("JsonValueType", result)}
 
@@ -2672,6 +3560,7 @@ async def _async_handle_set_ac_nickname(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2711,6 +3600,7 @@ async def _async_handle_report_device_timezone(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2761,6 +3651,7 @@ async def _async_handle_accept_shared_device(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2768,7 +3659,7 @@ async def _async_handle_list_shared_devices(
     hass: HomeAssistant,
     call: ServiceCall,
 ) -> ServiceResponse:
-    """Return received and outgoing sharing records using the selected account."""
+    """Return the devices shared with the account that owns the selected device."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
@@ -2796,6 +3687,7 @@ async def _async_handle_list_shared_devices(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     # The cloud payload is JSON-decoded, so its entries are JSON-native at runtime;
     # cast documents that trust boundary for the ServiceResponse contract.
@@ -2851,6 +3743,7 @@ async def _async_handle_list_shared_managers(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     # The cloud payload is JSON-decoded, so its entries are JSON-native at runtime;
     # cast documents that trust boundary for the ServiceResponse contract.
@@ -2907,6 +3800,7 @@ async def _async_handle_remove_shared_access(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2962,6 +3856,7 @@ async def _async_handle_remove_all_shared_access(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -2997,6 +3892,7 @@ async def _async_handle_get_shelly_auth_url(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"auth_url": cast("JsonValueType", auth_url)}
 
@@ -3033,6 +3929,7 @@ async def _async_handle_list_shelly_devices(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"devices": cast("list[JsonValueType]", devices)}
 
@@ -3086,6 +3983,7 @@ async def _async_handle_unbind_shelly_device(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     if not accepted:
         msg = "unbind_shelly_device_failed"
@@ -3128,6 +4026,7 @@ async def _async_handle_unbind_shelly_account(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     if not accepted:
         msg = "unbind_shelly_account_failed"
@@ -3177,6 +4076,7 @@ async def _async_handle_list_shelly_binding_failures(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"failures": cast("JsonValueType", failures)}
 
@@ -3252,6 +4152,18 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
             SERVICE_SEND_BLE_COMMAND,
             _async_handle_send_ble_command,
             SEND_BLE_COMMAND_SCHEMA,
+        ),
+        _ServiceRegistration(
+            SERVICE_CHECK_BLE_OTA_VERSIONS,
+            _async_handle_check_ble_ota_versions,
+            CHECK_BLE_OTA_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+        _ServiceRegistration(
+            SERVICE_START_BLE_OTA_UPDATE,
+            _async_handle_start_ble_ota_update,
+            CHECK_BLE_OTA_SCHEMA,
+            SupportsResponse.ONLY,
         ),
         _ServiceRegistration(
             SERVICE_SEND_DEVICE_SCHEDULE,
@@ -3361,14 +4273,21 @@ def _service_registrations() -> tuple[_ServiceRegistration, ...]:
             SupportsResponse.ONLY,
         ),
         _ServiceRegistration(
-            SERVICE_SAVE_DEVICE_MAX_POWER,
-            _async_handle_save_device_max_power,
-            SAVE_DEVICE_MAX_POWER_SCHEMA,
-        ),
-        _ServiceRegistration(
             SERVICE_GET_ALARM_DETAIL,
             _async_handle_get_alarm_detail,
             GET_ALARM_DETAIL_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+        _ServiceRegistration(
+            SERVICE_GET_BATTERY_PASSPORT,
+            _async_handle_get_battery_passport,
+            GET_BATTERY_PASSPORT_SCHEMA,
+            SupportsResponse.ONLY,
+        ),
+        _ServiceRegistration(
+            SERVICE_GET_FAULT_LOG,
+            _async_handle_get_fault_log,
+            GET_FAULT_LOG_SCHEMA,
             SupportsResponse.ONLY,
         ),
         _ServiceRegistration(
@@ -3749,6 +4668,7 @@ async def _async_handle_send_device_schedule(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -3785,6 +4705,7 @@ async def _async_handle_insert_electricity_strategy(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -3806,13 +4727,15 @@ async def _async_handle_save_tou_plan(
             device_id=device_id,
             error="no Jackery entry owns this device id",
         )
-    _raise_if_portable_home_service(
+    portable = _raise_if_unsupported_portable_tou(
         coordinator,
         device_id,
         translation_key="save_tou_plan_failed",
-        service_name=SERVICE_SAVE_TOU_PLAN,
+        supported_models=PORTABLE_PEAK_THROUGH_MODELS,
     )
     tasks = _tou_tasks_from_service(call.data[SERVICE_FIELD_BODY], device_id)
+    if portable:
+        _validate_portable_tou_tasks(tasks, device_id)
     try:
         await coordinator.async_save_tou_plan(device_id, tasks)
     except JackeryAuthError as err:
@@ -3827,6 +4750,7 @@ async def _async_handle_save_tou_plan(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -3848,11 +4772,11 @@ async def _async_handle_query_tou_plan(
             device_id=device_id,
             error="no Jackery entry owns this device id",
         )
-    _raise_if_portable_home_service(
+    _raise_if_unsupported_portable_tou(
         coordinator,
         device_id,
         translation_key="query_tou_plan_failed",
-        service_name=SERVICE_QUERY_TOU_PLAN,
+        supported_models=PORTABLE_TOU_QUERY_MODELS,
     )
     try:
         plan = await coordinator.async_query_tou_plan(device_id)
@@ -3868,6 +4792,7 @@ async def _async_handle_query_tou_plan(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"plan": cast("JsonValueType", plan)}
 
@@ -3904,6 +4829,7 @@ async def _async_handle_list_currencies(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"currencies": cast("list[JsonValueType]", currencies)}
 
@@ -3952,6 +4878,7 @@ async def _async_handle_get_device_currency(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"currency": cast("JsonValueType", currency)}
 
@@ -4007,6 +4934,7 @@ async def _async_handle_bind_currency(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -4054,6 +4982,7 @@ async def _async_handle_list_accessories(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"accessories": cast("list[JsonValueType]", accessories)}
 
@@ -4112,6 +5041,7 @@ async def _async_handle_check_accessories_exist(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"exists": cast("JsonValueType", exists)}
 
@@ -4170,6 +5100,7 @@ async def _async_handle_check_jackery_accessories_exist(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"exists": cast("JsonValueType", exists)}
 
@@ -4236,6 +5167,7 @@ async def _async_handle_set_accessory_name(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -4293,6 +5225,7 @@ async def _async_handle_get_dynamic_price_login_url(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"login": cast("JsonValueType", login)}
 
@@ -4352,6 +5285,7 @@ async def _async_handle_list_dynamic_price_contracts(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"contracts": cast("list[JsonValueType]", contracts)}
 
@@ -4426,6 +5360,7 @@ async def _async_handle_save_dynamic_price_contract_auth(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -4483,6 +5418,7 @@ async def _async_handle_cancel_dynamic_price_contract_auth(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -4533,6 +5469,7 @@ async def _async_handle_save_dynamic_price_location_id(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -4605,6 +5542,7 @@ async def _async_handle_query_socket_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"socket_stat": cast("JsonValueType", socket_stat)}
 
@@ -4647,6 +5585,7 @@ async def _async_handle_list_country_zones(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"zones": cast("list[JsonValueType]", zones)}
 
@@ -4698,6 +5637,7 @@ async def _async_handle_list_grid_standards(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"standards": cast("list[JsonValueType]", standards)}
 
@@ -4765,62 +5705,101 @@ async def _async_handle_check_system_bound(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"exists": cast("JsonValueType", exists)}
 
 
-async def _async_handle_save_device_max_power(
+def _app_metric_device_owner(
     hass: HomeAssistant,
     call: ServiceCall,
-) -> None:
-    """Save a device max-power record through the Jackery HTTP API."""
+    *,
+    translation_key: str,
+) -> tuple[str, JackerySolarVaultCoordinator, str]:
+    """Resolve an explicitly requested device to its authenticated serial owner."""
     device_id = _device_id_from_service(
         hass,
         call.data[SERVICE_FIELD_DEVICE_ID],
-        translation_key="save_device_max_power_failed",
+        translation_key=translation_key,
     )
     coordinator = _coordinator_for_device(hass, device_id)
     if coordinator is None:
-        msg = "save_device_max_power_failed"
         raise _service_validation_error(
-            msg,
+            translation_key,
             device_id=device_id,
-            error="no Jackery entry owns this device id",
+            error="no Jackery account owns this device id",
         )
-    _raise_if_portable_home_service(
-        coordinator,
-        device_id,
-        translation_key="save_device_max_power_failed",
-        service_name=SERVICE_SAVE_DEVICE_MAX_POWER,
-    )
-    max_power = _service_int(
-        call.data[SERVICE_FIELD_MAX_POWER],
-        field_name=SERVICE_FIELD_MAX_POWER,
-        translation_key="save_device_max_power_failed",
-        device_id=device_id,
-        bounds=(0, 1000000),
+    serial = coordinator._resolve_device_sn(device_id)  # ruff: ignore[private-member-access]
+    if not isinstance(serial, str) or not serial.strip():
+        raise _service_validation_error(
+            translation_key,
+            device_id=device_id,
+            error="device serial is not confirmed for this device",
+        )
+    return device_id, coordinator, serial
+
+
+async def _async_handle_get_battery_passport(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Read all App 2.4.7 battery-passport fields only when explicitly asked."""
+    device_id, coordinator, serial = _app_metric_device_owner(
+        hass, call, translation_key="get_battery_passport_failed"
     )
     try:
-        await coordinator.async_save_device_max_power(device_id, max_power)
+        result = await coordinator.api.async_get_battery_passport(serial)
     except JackeryAuthError as err:
-        msg = (
-            "Jackery credentials were rejected while saving max power. "
-            "Re-authentication is required."
-        )
+        msg = "Jackery credentials rejected the battery passport request"
         raise ConfigEntryAuthFailed(msg) from err
     except (
-        HomeAssistantError,
         JackeryError,
+        HomeAssistantError,
         LookupError,
         RuntimeError,
         ValueError,
     ) as err:
-        msg = "save_device_max_power_failed"
         raise _service_action_error(
-            msg,
+            "get_battery_passport_failed",
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
+    # No field renaming, filtering or guessed values. Preserve future API keys.
+    return {"passport": cast("JsonValueType", result)}
+
+
+async def _async_handle_get_fault_log(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Return one owner-scoped page with all original fault record fields."""
+    device_id, coordinator, serial = _app_metric_device_owner(
+        hass, call, translation_key="get_fault_log_failed"
+    )
+    page_no = cast("int", call.data.get(SERVICE_FIELD_PAGE_NO, 1))
+    page_size = cast("int", call.data.get(SERVICE_FIELD_PAGE_SIZE, 20))
+    try:
+        result = await coordinator.api.async_get_fault_log(
+            serial, page_num=page_no, page_size=page_size
+        )
+    except JackeryAuthError as err:
+        msg = "Jackery credentials rejected the fault history request"
+        raise ConfigEntryAuthFailed(msg) from err
+    except (
+        JackeryError,
+        HomeAssistantError,
+        LookupError,
+        RuntimeError,
+        ValueError,
+    ) as err:
+        raise _service_action_error(
+            "get_fault_log_failed",
+            device_id=device_id,
+            error=err,
+            entry=getattr(coordinator, "entry", None),
+        ) from err
+    return {"fault_log": cast("JsonValueType", result)}
 
 
 async def _async_handle_get_alarm_detail(
@@ -4877,6 +5856,7 @@ async def _async_handle_get_alarm_detail(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"alarm": cast("JsonValueType", detail)}
 
@@ -4946,6 +5926,7 @@ async def _async_handle_list_notifications(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"notifications": cast("list[JsonValueType]", notifications)}
 
@@ -4982,6 +5963,7 @@ async def _async_handle_get_unread_count(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"unread": cast("JsonValueType", unread)}
 
@@ -5018,6 +6000,7 @@ async def _async_handle_get_push_config(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"config": cast("JsonValueType", config)}
 
@@ -5055,6 +6038,7 @@ async def _async_handle_set_push_config(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5120,6 +6104,7 @@ async def _async_handle_sync_alerts(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5170,6 +6155,7 @@ async def _async_handle_sync_offline_statistics(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     if not accepted:
         msg = "sync_offline_statistics_failed"
@@ -5236,6 +6222,7 @@ async def _async_handle_query_charge_report(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"charge_report": cast("JsonValueType", report)}
 
@@ -5297,6 +6284,7 @@ async def _async_handle_query_cutoff_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"cutoff_stat": cast("JsonValueType", stat)}
 
@@ -5333,6 +6321,7 @@ async def _async_handle_query_soc_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"soc_stat": cast("JsonValueType", stat)}
 
@@ -5376,6 +6365,7 @@ async def _async_handle_query_carbon_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"carbon_stat": cast("JsonValueType", stat)}
 
@@ -5412,6 +6402,7 @@ async def _async_handle_query_profit_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"profit_stat": cast("JsonValueType", stat)}
 
@@ -5482,6 +6473,7 @@ async def _async_handle_query_box_stat(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"box_stat": cast("JsonValueType", stat)}
 
@@ -5535,6 +6527,7 @@ async def _async_handle_check_app_version(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"app_version": cast("JsonValueType", version)}
 
@@ -5571,6 +6564,7 @@ async def _async_handle_list_banners(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"banners": cast("JsonValueType", banners)}
 
@@ -5638,6 +6632,7 @@ async def _async_handle_submit_feedback(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5673,6 +6668,7 @@ async def _async_handle_list_faqs(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"faqs": cast("JsonValueType", faqs)}
 
@@ -5709,6 +6705,7 @@ async def _async_handle_list_faq_answers(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"faq_answers": cast("JsonValueType", answers)}
 
@@ -5745,6 +6742,7 @@ async def _async_handle_check_privacy_update(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"privacy_update": cast("JsonValueType", privacy_update)}
 
@@ -5793,6 +6791,7 @@ async def _async_handle_agree_privacy_consent(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5845,6 +6844,7 @@ async def _async_handle_get_product_instruction(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"product_instruction": cast("JsonValueType", instruction)}
 
@@ -5881,6 +6881,7 @@ async def _async_handle_get_user_info(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
     return {"user_info": cast("JsonValueType", user_info)}
 
@@ -5918,6 +6919,7 @@ async def _async_handle_update_electricity_strategy(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5954,6 +6956,7 @@ async def _async_handle_delete_electricity_strategy(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err
 
 
@@ -5989,4 +6992,5 @@ async def _async_handle_query_electricity_strategy(
             msg,
             device_id=device_id,
             error=err,
+            entry=getattr(coordinator, "entry", None),
         ) from err

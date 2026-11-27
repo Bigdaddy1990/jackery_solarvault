@@ -6,7 +6,7 @@ descriptions/switch.py.
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
@@ -47,6 +47,7 @@ from .const import (
     FIELD_SOCKET_PRIORITY,
     FIELD_SPH,
     FIELD_SPH_PC,
+    FIELD_SRFC,
     FIELD_SW,
     FIELD_SWITCH_STATE,
     FIELD_SYS_SWITCH,
@@ -55,17 +56,13 @@ from .const import (
     FIELD_WPS,
     MANUFACTURER,
     PAYLOAD_CIRCUIT_PROPERTY,
+    PAYLOAD_SMART_PLUGS,
+    PORTABLE_OUTPUT_PRIORITY_MODELS,
+    PORTABLE_RESERVE_MODELS,
     SUBDEVICE_DEV_TYPE_BREAKER,
+    SUBDEVICE_DEV_TYPE_SOCKET,
 )
-from .coordinator import (
-    ACTION_WRITE_ERRORS,
-    smart_plug_entity_identity,
-    smart_plug_entity_key,
-    smart_plug_entity_payload,
-    smart_plug_payload,
-    smart_plug_payloads,
-    subdevice_accessories,
-)
+from .coordinator import ACTION_WRITE_ERRORS, subdevice_accessories
 from .descriptions import SWITCH_DESCRIPTIONS, JackerySwitchDescription
 from .descriptions.switch import (
     _set_auto_standby,
@@ -87,6 +84,7 @@ from .descriptions.switch import (
 )
 from .entity import (
     ALL_LIVE_DATA_SOURCES,
+    HTTP_AND_LAYER5_COMMAND_SOURCES,
     HTTP_COMMAND_SOURCES,
     HTTP_DATA_SOURCES,
     LAYER5_COMMAND_SOURCES,
@@ -99,9 +97,10 @@ from .util import (
     append_unique_entity,
     async_setup_entity_discovery,
     circuit_id,
-    is_portable_payload as _is_portable_payload,
     safe_bool,
+    smart_plug_serial,
     sorted_circuits,
+    sorted_smart_plugs,
     stable_subdevice_key,
 )
 
@@ -223,13 +222,66 @@ class JackerySwitch(JackeryEntity, SwitchEntity):
             raise_entity_action_error(self.entity_description.key, self._device_id, err)
 
 
+class JackeryBoxChargeNowSwitch(JackerySwitch):
+    """Box charge-now control requiring fresh App safety evidence."""
+
+    @property
+    def available(self) -> bool:
+        state = self.is_on
+        return (
+            state is not None
+            and self.coordinator.device_family(self._device_id) == "box"
+            and self.coordinator.property_fields_match_family(self._device_id, ("rc",))
+            and self.coordinator.box_charge_now_allowed(
+                self._device_id, not state, require_rc=True
+            )
+            and super().available
+        )
+
+
+class JackeryPortableEmergencySwitch(JackerySwitch):
+    """Switch restricted to Portable models supporting emergency discharge."""
+
+    @property
+    def available(self) -> bool:
+        """Hide the switch if its device family or model changes."""
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_RESERVE_MODELS
+            and super().available
+        )
+
+
+_PORTABLE_PRIORITY_SWITCH_FIELDS = {
+    "portable_output_priority_switch": "outPrio",
+    "portable_ac1_priority_switch": "oac1Prio",
+    "portable_ac2_priority_switch": "oac2Prio",
+    "portable_dc_priority_switch": "odcPrio",
+}
+
+
+class JackeryPortablePrioritySwitch(JackerySwitch):
+    """App priority switch bound to model and field ownership."""
+
+    @property
+    def available(self) -> bool:
+        field = _PORTABLE_PRIORITY_SWITCH_FIELDS[self.entity_description.key]
+        return (
+            self.coordinator.device_family(self._device_id) == "portable"
+            and self.coordinator.device_model_code(self._device_id)
+            in PORTABLE_OUTPUT_PRIORITY_MODELS
+            and self.coordinator.property_fields_match_family(self._device_id, (field,))
+            and super().available
+        )
+
+
 class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
     """Writable switch for one smart-plug subdevice."""
 
     _attr_translation_key = "smart_plug_switch"
-    _attr_device_info: DeviceInfo
     data_sources: tuple[str, ...] = ALL_LIVE_DATA_SOURCES
-    command_sources: tuple[str, ...] = HTTP_COMMAND_SOURCES
+    command_sources: tuple[str, ...] = HTTP_AND_LAYER5_COMMAND_SOURCES
     app_fields: tuple[str, ...] = (FIELD_SWITCH_STATE, FIELD_SYS_SWITCH)
 
     def __init__(
@@ -246,7 +298,14 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         self._plug_index = plug_index
         self._plug_sn = plug_sn
         self._plug_key = plug_key
-        self.command_sources = self._current_command_sources()
+        plug = self._plug
+        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
+        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+            "shelly",
+        )
+        self.command_sources = (
+            HTTP_COMMAND_SOURCES if is_cloud else LAYER5_COMMAND_SOURCES
+        )
         # Build the per-plug device_info once at construction.
         self._attr_device_info = self._build_smart_plug_device_info(
             plug_index,
@@ -255,47 +314,17 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         )
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Keep this entity attached to its captured smart-plug device."""
-        return self._attr_device_info
-
-    @property
     def _plug(self) -> dict[str, Any]:
         """Smart-plug payload matching this entity's captured serial."""
-        return smart_plug_entity_payload(
-            self.coordinator, self._device_id, self._plug_sn
-        )
-
-    def _current_command_sources(self) -> tuple[str, ...]:
-        """Use the current classification for both availability and writes."""
-        return (
-            HTTP_COMMAND_SOURCES
-            if self._is_cloud_plug(self._plug)
-            else LAYER5_COMMAND_SOURCES
-        )
-
-    @override
-    def _source_capability_contract(
-        self,
-    ) -> tuple[bool, tuple[str, ...], tuple[str, ...], tuple[str, ...], bool]:
-        """Refresh executable sources before availability or capability checks."""
-        self.command_sources = self._current_command_sources()
-        return super()._source_capability_contract()
-
-    @staticmethod
-    def _is_cloud_plug(plug: dict[str, Any]) -> bool:
-        """Identify Shelly control from the current merged socket payload."""
-        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
-        return safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
-            "shelly",
-        )
+        for plug in sorted_smart_plugs(self._payload.get(PAYLOAD_SMART_PLUGS)):
+            if smart_plug_serial(plug) == self._plug_sn:
+                return plug
+        return {}
 
     @property
     def is_on(self) -> bool | None:
         """Determine whether the smart plug's output is active."""
         raw = self._plug.get(FIELD_SWITCH_STATE)
-        if raw is None:
-            raw = self._plug.get(FIELD_SYS_SWITCH)
         return safe_bool(raw)
 
     @staticmethod
@@ -318,15 +347,15 @@ class JackerySmartPlugSwitch(JackeryEntity, SwitchEntity):
         """Set the linked plug state and request a coordinator refresh."""
         plug = self._plug
         plug_sn = self._jackery_device_sn(plug)
-        if self._is_cloud_plug(plug):
+        scan_name = str(plug.get(FIELD_SCAN_NAME) or "").lower()
+        is_cloud = safe_bool(plug.get(FIELD_IS_CLOUD)) is True or scan_name.startswith(
+            "shelly",
+        )
+        if is_cloud:
             shelly_device_id = self._cloud_device_id(plug)
             if shelly_device_id is None:
                 raise_entity_action_error(
                     "smart_plug_switch", self._device_id, "missing Shelly deviceId"
-                )
-            if smart_plug_payload(self._payload, shelly_device_id) != plug:
-                raise_entity_action_error(
-                    "smart_plug_switch", self._device_id, "ambiguous Shelly deviceId"
                 )
             if safe_bool(plug.get(FIELD_CONTROL_ALLOWED)) is not True:
                 raise_entity_action_error(
@@ -437,15 +466,25 @@ class JackeryBreakerSwitch(JackeryEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: object) -> None:
         """Close the breaker relay."""
-        await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, True
-        )
+        try:
+            await self.coordinator.async_set_breaker_switch(
+                self._device_id, self._breaker_id, True
+            )
+        except Exception as err:  # ruff: ignore[blind-except]
+            raise_entity_action_error(
+                f"{self._breaker_key}_switch", self._device_id, err
+            )
 
     async def async_turn_off(self, **kwargs: object) -> None:
         """Open the breaker relay."""
-        await self.coordinator.async_set_breaker_switch(
-            self._device_id, self._breaker_id, False
-        )
+        try:
+            await self.coordinator.async_set_breaker_switch(
+                self._device_id, self._breaker_id, False
+            )
+        except Exception as err:  # ruff: ignore[blind-except]
+            raise_entity_action_error(
+                f"{self._breaker_key}_switch", self._device_id, err
+            )
 
     def _build_breaker_device_info(
         self,
@@ -494,11 +533,6 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
     _attr_translation_key = "smart_plug_priority_enabled"
     command_sources: tuple[str, ...] = LAYER5_COMMAND_SOURCES
     app_fields: tuple[str, ...] = (FIELD_SOCKET_PRIORITY,)
-
-    @override
-    def _current_command_sources(self) -> tuple[str, ...]:
-        """Priority writes always use Jackery's independent Layer 5 transports."""
-        return LAYER5_COMMAND_SOURCES
 
     def __init__(
         self,
@@ -562,6 +596,7 @@ class JackerySmartPlugPrioritySwitch(JackerySmartPlugSwitch):
 
 # Home Assistant invokes platform setup as an awaitable callback.
 _SWITCH_GATING: dict[str, Callable[[dict[str, Any], bool], bool]] = {
+    "box_charge_now_control": lambda props, _advanced: "rc" in props,
     "eps_output": lambda _props, _advanced: True,
     "auto_standby_set": lambda props, advanced: (
         advanced or FIELD_IS_AUTO_STANDBY in props or FIELD_AUTO_STANDBY in props
@@ -595,12 +630,16 @@ def _collect_smart_plug_switches(
     seen_unique_ids: set[str],
 ) -> None:
     """Collect relay and optional priority switches for smart plugs."""
-    plugs = smart_plug_payloads(payload)
+    plugs = sorted_smart_plugs(payload.get(PAYLOAD_SMART_PLUGS))
+    if not plugs:
+        plugs = sorted_smart_plugs(
+            subdevice_accessories(payload, dev_type=SUBDEVICE_DEV_TYPE_SOCKET)
+        )
     for index, plug in enumerate(plugs, start=1):
-        serial = smart_plug_entity_identity(coordinator, dev_id, plug)
+        serial = smart_plug_serial(plug)
         if serial is None:
             continue
-        key = smart_plug_entity_key(coordinator, dev_id, serial)
+        key = stable_subdevice_key("smart_plug", serial, index)
         _append_switch_entity(
             entities,
             seen_unique_ids,
@@ -664,12 +703,39 @@ def _collect_switch_entities(
     entities: list[SwitchEntity] = []
     for dev_id, payload in (coordinator.data or {}).items():
         props = payload_properties_for_sources(payload)
-        is_portable = _is_portable_payload(payload, props)
+        family = coordinator.device_family(dev_id)
+        if family == "unknown":
+            continue
+        is_portable = family == "portable"
         supports_advanced = coordinator.device_supports_advanced(dev_id)
         for description in SWITCH_DESCRIPTIONS:
             portable_description = description.key.startswith("portable_")
             if portable_description != is_portable:
                 continue
+            switch_type: type[JackerySwitch] = JackerySwitch
+            if description.key == "box_charge_now_control":
+                if family != "box" or coordinator.device_model_code(dev_id) not in {
+                    2001,
+                    2002,
+                }:
+                    continue
+                switch_type = JackeryBoxChargeNowSwitch
+            priority_field = _PORTABLE_PRIORITY_SWITCH_FIELDS.get(description.key)
+            if priority_field is not None:
+                if (
+                    coordinator.device_model_code(dev_id)
+                    not in PORTABLE_OUTPUT_PRIORITY_MODELS
+                    or props.get(priority_field) is None
+                ):
+                    continue
+                switch_type = JackeryPortablePrioritySwitch
+            if description.key == "portable_emergency_full_discharge":
+                if (
+                    coordinator.device_model_code(dev_id) not in PORTABLE_RESERVE_MODELS
+                    or props.get(FIELD_SRFC) is None
+                ):
+                    continue
+                switch_type = JackeryPortableEmergencySwitch
             predicate = _SWITCH_GATING.get(description.key)
             if portable_description or (
                 predicate is not None and predicate(props, supports_advanced)
@@ -677,7 +743,7 @@ def _collect_switch_entities(
                 _append_switch_entity(
                     entities,
                     seen_unique_ids,
-                    JackerySwitch(coordinator, dev_id, description),
+                    switch_type(coordinator, dev_id, description),
                 )
         if is_portable:
             continue
@@ -698,7 +764,7 @@ def _collect_switch_entities(
     return entities
 
 
-async def async_setup_entry(  # ruff:ignore[unused-async]
+async def async_setup_entry(  # ruff: ignore[unused-async]
     hass: HomeAssistant,
     entry: JackeryConfigEntry,
     async_add_entities: AddEntitiesCallback,
@@ -711,8 +777,42 @@ async def async_setup_entry(  # ruff:ignore[unused-async]
         """Collect switches from the current coordinator payload."""
         return _collect_switch_entities(coordinator, seen_unique_ids)
 
+    def _switch_eligibility() -> tuple[
+        tuple[str, str, int | None, tuple[str, ...]], ...
+    ]:
+        """Detect newly supported switches without tracking live state values."""
+        eligible = []
+        for device_id, payload in sorted((coordinator.data or {}).items()):
+            family = coordinator.device_family(device_id)
+            if family == "unknown":
+                continue
+            model = coordinator.device_model_code(device_id)
+            props = payload_properties_for_sources(payload)
+            if family == "portable":
+                keys = tuple(
+                    field
+                    for field in (
+                        *_PORTABLE_PRIORITY_SWITCH_FIELDS.values(),
+                        FIELD_SRFC,
+                    )
+                    if props.get(field) is not None
+                )
+            else:
+                advanced = coordinator.device_supports_advanced(device_id)
+                keys = tuple(
+                    key
+                    for key, predicate in _SWITCH_GATING.items()
+                    if predicate(props, advanced)
+                )
+            eligible.append((device_id, family, model, keys))
+        return tuple(eligible)
+
     async_setup_entity_discovery(
-        entry, coordinator, _collect_entities, async_add_entities
+        entry,
+        coordinator,
+        _collect_entities,
+        async_add_entities,
+        eligibility_signature=_switch_eligibility,
     )
 
 

@@ -1,25 +1,35 @@
 """Binary sensor descriptions for Jackery SolarVault integration."""
 
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntityDescription,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.const import EntityCategory
 
+from ..binary_sensor_compat import BinarySensorDeviceClass
 from ..const import (
+    BATTERY_PASSPORT_HOME_BIT,
+    BATTERY_PASSPORT_PORTABLE_BIT,
     DEFAULT_NULL_SEMANTICS,
+    FIELD_ABILITY,
     FIELD_ALERT_COUNT,
+    FIELD_BLS,
+    FIELD_BOX_BACKUP_PERIOD_ENABLED,
     FIELD_COMM_STATE,
     FIELD_ETH_PORT,
+    FIELD_IS_PACK_CONNECT,
+    FIELD_OACL1,
+    FIELD_OACL2,
     FIELD_ONLINE_STATUS,
+    FIELD_PSS,
     FIELD_PV1,
     FIELD_PV2,
     FIELD_PV3,
     FIELD_PV4,
+    FIELD_STORM,
     FIELD_SW_EPS_STATE,
+    FIELD_UPS,
 )
 from ..entity import ALL_LIVE_DATA_SOURCES, HTTP_DATA_SOURCES, property_data_sources
 from ..util import safe_int
@@ -38,6 +48,11 @@ def _default_binary_value(_entity: object) -> None:
 @dataclass(frozen=True, kw_only=True)
 class JackeryBinaryDescription(BinarySensorEntityDescription):
     """Describes a Jackery binary sensor entity."""
+
+    # Home Assistant's FrozenOrThawed metaclass injects these inherited fields.
+    key: str
+    translation_key: str | None = None
+    device_class: BinarySensorDeviceClass | None = None
 
     value_fn: Callable[[Any], bool | None] = _default_binary_value
     getter: Callable[[dict[str, Any], dict[str, Any]], Any] | None = None
@@ -99,6 +114,145 @@ def _pv_comm_state(entity: JackeryEntity, channel: str) -> bool | None:
     return None if state is None else state == 1
 
 
+def _box_ac_connected(entity: JackeryEntity, channel: str) -> bool | None:
+    """Return the Box app's connection state for an AC channel."""
+    ac = entity.merged_properties.get(channel)
+    state = safe_int(ac.get("bi")) if isinstance(ac, dict) else None
+    return None if state is None else state != 0
+
+
+def _box_backup_period_enabled(entity: JackeryEntity) -> bool | None:
+    """Return the App's explicit enabled/disabled backup-period state."""
+    state = safe_int(entity.merged_properties.get(FIELD_BOX_BACKUP_PERIOD_ENABLED))
+    return {0: False, 1: True}.get(state) if state is not None else None
+
+
+def _app_flag(entity: JackeryEntity, field: str) -> bool | None:
+    state = safe_int(entity.merged_properties.get(field))
+    return {0: False, 1: True}.get(state) if state is not None else None
+
+
+def _battery_passport_supported(entity: JackeryEntity) -> bool | None:
+    """Decode App 2.4.7's different Home and Portable capability bits."""
+    family = entity.coordinator.device_family(entity.device_id)
+    bit = {
+        "home": BATTERY_PASSPORT_HOME_BIT,
+        "portable": BATTERY_PASSPORT_PORTABLE_BIT,
+    }.get(family)
+    raw = entity.merged_properties.get(FIELD_ABILITY)
+    if bit is None or isinstance(raw, bool):
+        return None
+    mask = safe_int(raw)
+    if mask is None or mask < 0:
+        return None
+    return bool(mask & (1 << bit))
+
+
+def _portable_pack_connected(entity: JackeryEntity) -> bool | None:
+    value = entity.merged_properties.get(FIELD_IS_PACK_CONNECT)
+    return (
+        value if isinstance(value, bool) else _app_flag(entity, FIELD_IS_PACK_CONNECT)
+    )
+
+
+def _box_storm_active(entity: JackeryEntity) -> bool | None:
+    """Match the Box app's active-warning status without inventing malformed data."""
+    rows = entity.merged_properties.get(FIELD_STORM)
+    if not isinstance(rows, list):
+        return None
+    statuses = [row.get("status") if isinstance(row, dict) else None for row in rows]
+    if any(type(value) is int and value == 1 for value in statuses):
+        return True
+    if any(type(value) is not int for value in statuses):
+        return None
+    return False
+
+
+BOX_BINARY_SENSOR_DESCRIPTIONS: tuple[JackeryBinaryDescription, ...] = (
+    JackeryBinaryDescription(
+        key="box_ac1_connected",
+        translation_key="box_ac1_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        value_fn=lambda entity: _box_ac_connected(entity, "ac1"),
+        app_fields=("ac1.bi",),
+        required_property_keys=("ac1",),
+    ),
+    JackeryBinaryDescription(
+        key="box_ac2_connected",
+        translation_key="box_ac2_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        value_fn=lambda entity: _box_ac_connected(entity, "ac2"),
+        app_fields=("ac2.bi",),
+        required_property_keys=("ac2",),
+    ),
+    JackeryBinaryDescription(
+        key="box_backup_period_enabled",
+        translation_key="box_backup_period_enabled",
+        value_fn=_box_backup_period_enabled,
+        app_fields=(FIELD_BOX_BACKUP_PERIOD_ENABLED,),
+        required_property_keys=(FIELD_BOX_BACKUP_PERIOD_ENABLED,),
+    ),
+    JackeryBinaryDescription(
+        key="box_ble_ota_flag",
+        translation_key="box_ble_ota_flag",
+        value_fn=lambda entity: _app_flag(entity, FIELD_BLS),
+        required_property_keys=(FIELD_BLS,),
+    ),
+    JackeryBinaryDescription(
+        key="box_storm_active",
+        translation_key="box_storm_active",
+        value_fn=_box_storm_active,
+        required_property_keys=(FIELD_STORM,),
+    ),
+    JackeryBinaryDescription(
+        key="box_charge_now",
+        translation_key="box_charge_now",
+        value_fn=lambda entity: _app_flag(entity, "rc"),
+        required_property_keys=("rc",),
+    ),
+    JackeryBinaryDescription(
+        key="box_ups_enabled",
+        translation_key="box_ups_enabled",
+        value_fn=lambda entity: _app_flag(entity, FIELD_UPS),
+        required_property_keys=(FIELD_UPS,),
+    ),
+    JackeryBinaryDescription(
+        key="box_pss",
+        translation_key="box_pss",
+        value_fn=lambda entity: _app_flag(entity, FIELD_PSS),
+        required_property_keys=(FIELD_PSS,),
+    ),
+)
+
+
+PORTABLE_BLE_OTA_DESCRIPTION = JackeryBinaryDescription(
+    key="portable_ble_ota_flag",
+    translation_key="portable_ble_ota_flag",
+    value_fn=lambda entity: _app_flag(entity, FIELD_BLS),
+    required_property_keys=(FIELD_BLS,),
+)
+
+PORTABLE_BINARY_SENSOR_DESCRIPTIONS = (
+    PORTABLE_BLE_OTA_DESCRIPTION,
+    JackeryBinaryDescription(
+        key="portable_pack_connected",
+        translation_key="portable_pack_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        value_fn=_portable_pack_connected,
+        required_property_keys=(FIELD_IS_PACK_CONNECT,),
+    ),
+    *(
+        JackeryBinaryDescription(
+            key=f"portable_ac{index}_on",
+            translation_key=f"portable_ac{index}_on",
+            value_fn=partial(_app_flag, field=field),
+            required_property_keys=(field,),
+        )
+        for index, field in ((1, FIELD_OACL1), (2, FIELD_OACL2))
+    ),
+)
+
+
 BINARY_SENSOR_DESCRIPTIONS: tuple[
     JackeryBinaryDescription | JackerySubdeviceAlarmBinarySensorDescription, ...
 ] = (
@@ -114,6 +268,17 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[
         # pyrefly: ignore [unexpected-keyword]
         entity_registry_enabled_default=False,
         value_fn=lambda e: e.device_meta.get(FIELD_ONLINE_STATUS),
+    ),
+    JackeryBinaryDescription(
+        # pyrefly: ignore [unexpected-keyword]
+        key="battery_passport_supported",
+        # pyrefly: ignore [unexpected-keyword]
+        translation_key="battery_passport_supported",
+        # pyrefly: ignore [unexpected-keyword]
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_battery_passport_supported,
+        app_fields=(FIELD_ABILITY,),
+        required_property_keys=(FIELD_ABILITY,),
     ),
     JackeryBinaryDescription(
         # pyrefly: ignore [unexpected-keyword]

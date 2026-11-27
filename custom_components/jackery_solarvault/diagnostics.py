@@ -1,9 +1,12 @@
 """Diagnostics support for Jackery SolarVault."""
 
+import copy
+from functools import partial
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.const import CONF_PASSWORD, CONF_TOKEN
 
 # _local_mqtt_client moved to coordinator property
 from .const import (
@@ -29,6 +32,19 @@ from .util import (
 
 _LOGGER = logging.getLogger(__name__)
 
+_CRITICAL_CREDENTIAL_KEYS: frozenset[str] = frozenset({
+    CONF_PASSWORD,
+    CONF_TOKEN,
+    CONF_THIRD_PARTY_MQTT_PASSWORD,
+    "password",
+    "token",
+    "seed",
+    "bluetoothKey",
+    "key",
+    "secret",
+    "credential",
+})
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -40,39 +56,24 @@ if TYPE_CHECKING:
 
 def _redacted_payload_map(
     payloads: Mapping[Any, Any],
-    prefix: str,
+    _prefix: str,
     redact_keys: frozenset[str],
 ) -> dict[str, Any]:
-    """Build a deterministic labeled mapping of redacted payloads.
-
-    Replace original mapping keys with stable generated labels.
-
-    Payloads are processed in a stable order, sorted by the string form of each
-    original key. Every value is redacted with ``redact_keys``; non-mappings are
-    wrapped as ``{"value": payload}`` before redaction.
-
-    Parameters:
-        payloads (Mapping[Any, Any]): Mapping whose keys will be replaced by generated
-        labels; values are payloads to redact.
-        prefix (str): Prefix for generated ``<prefix>_<index>`` labels, starting
-            at index 1.
-        redact_keys (frozenset[str]): Field names to redact from each payload.
+    """Keep source keys and redact secrets before wrapping scalar payloads.
 
     Returns:
-        dict[str, Any]: Mapping of generated labels to redacted payloads.
+        dict[str, Any]: Sorted source identities mapped to redacted payloads.
     """
     redacted: dict[str, Any] = {}
-    for index, key in enumerate(sorted(payloads, key=str), start=1):
+    for key in sorted(payloads, key=str):
         payload = payloads[key]
-        label = f"{prefix}_{index}" if redact_keys else str(key)
-        if isinstance(payload, dict):
-            redacted[label] = async_redact_data(payload, redact_keys)
-        else:
-            redacted[label] = async_redact_data({"value": payload}, redact_keys)
+        label = str(key)
+        value = payload if isinstance(payload, dict) else {"value": payload}
+        redacted.update(async_redact_data({label: value}, redact_keys))
     return redacted
 
 
-async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # HA requires async.
+async def async_get_config_entry_diagnostics(  # HA requires async.
     hass: HomeAssistant, entry: JackeryConfigEntry
 ) -> dict[str, Any]:
     """Build a diagnostics export for the given config entry.
@@ -91,6 +92,13 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
               diagnostics.
     """
     coordinator: JackerySolarVaultCoordinator = entry.runtime_data
+    runtime_bucket = hass.data.get(DOMAIN, {}).get(entry.entry_id, {})
+    publisher = (
+        runtime_bucket.get("mqtt_sensor_publisher")
+        if isinstance(runtime_bucket, dict)
+        else None
+    )
+    mirror_snapshot = getattr(publisher, "diagnostics_snapshot", None)
     dev_mode = jackery_dev_mode_enabled(entry)
     source = None
     if dev_mode:
@@ -106,7 +114,11 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             "in clear text; do not share this export publicly",
             source,
         )
-    redact_keys = active_redact_keys(entry)
+    redact_keys = (
+        active_redact_keys(entry)
+        if dev_mode
+        else (active_redact_keys(entry) | _CRITICAL_CREDENTIAL_KEYS)
+    )
     sensitive_sources = (
         dict(entry.data),
         dict(entry.options),
@@ -146,6 +158,11 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
         ),
         "property_responses": _redacted_payload_map(
             coordinator.api.last_property_responses, "property_response", redact_keys
+        ),
+        "interrupted_http_responses": _redacted_payload_map(
+            getattr(coordinator.api, "last_interrupted_http_responses", {}),
+            "interrupted_http_response",
+            redact_keys,
         ),
         "alarm_response": async_redact_data(
             coordinator.api.last_alarm_response or {}, redact_keys
@@ -187,6 +204,20 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             coordinator.mqtt_diagnostics_snapshot(),
             redact_keys,
         ),
+        "mqtt_mirror": async_redact_data(
+            mirror_snapshot() if callable(mirror_snapshot) else {}, redact_keys
+        ),
+        "mqtt_operations": async_redact_data(
+            {
+                key: value
+                for key, value in hass.data
+                .get(DOMAIN, {})
+                .get("mqtt_operation_errors", {})
+                .items()
+                if key != "causes"
+            },
+            redact_keys,
+        ),
         "polling": async_redact_data(
             coordinator.polling_diagnostics,
             redact_keys,
@@ -214,6 +245,10 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
             coordinator.app_chart_import_diagnostics(),
             redact_keys,
         ),
+        "layer_source_payloads": async_redact_data(
+            coordinator.layer_source_diagnostics(),
+            redact_keys,
+        ),
     }
 
     export = {
@@ -226,8 +261,15 @@ async def async_get_config_entry_diagnostics(  # ruff: ignore[unused-async]  # H
     }
     return cast(
         "dict[str, Any]",
-        redacted_json_safe_payload(
-            export, sensitive_sources=sensitive_sources, unredacted=dev_mode
+        await hass.async_add_executor_job(
+            partial(
+                redacted_json_safe_payload,
+                export,
+                sensitive_sources=(
+                    copy.deepcopy(sensitive_sources) if not dev_mode else ()
+                ),
+                unredacted=dev_mode,
+            )
         ),
     )
 
